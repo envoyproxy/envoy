@@ -9,8 +9,10 @@ export PPROF_PATH=/thirdparty_build/bin/pprof
 [ -z "${NUM_CPUS}" ] && NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 [ -z "${ENVOY_SRCDIR}" ] && export ENVOY_SRCDIR=/source
 [ -z "${ENVOY_BUILD_TARGET}" ] && export ENVOY_BUILD_TARGET=//source/exe:envoy-static
+[ -z "${ENVOY_BUILD_ARCH}" ] && export ENVOY_BUILD_ARCH=$(uname -m)
 echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
 echo "ENVOY_BUILD_TARGET=${ENVOY_BUILD_TARGET}"
+echo "ENVOY_BUILD_ARCH=${ENVOY_BUILD_ARCH}"
 
 function setup_gcc_toolchain() {
   if [[ ! -z "${ENVOY_STDLIB}" && "${ENVOY_STDLIB}" != "libstdc++" ]]; then
@@ -83,7 +85,7 @@ export BAZEL_BUILD_OPTIONS=" ${BAZEL_OPTIONS} --verbose_failures --show_task_fin
   --test_output=errors --repository_cache=${BUILD_DIR}/repository_cache --experimental_repository_cache_hardlinks \
   ${BAZEL_BUILD_EXTRA_OPTIONS} ${BAZEL_EXTRA_TEST_OPTIONS}"
 
-[[ "$(uname -m)" == "aarch64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --define=hot_restart=disabled --test_env=HEAPCHECK="
+[[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HEAPCHECK="
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean --expunge
 

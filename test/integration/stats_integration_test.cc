@@ -192,7 +192,6 @@ private:
           auto* socket_address = host->mutable_socket_address();
           socket_address->set_protocol(envoy::config::core::v3::SocketAddress::TCP);
           socket_address->set_address("0.0.0.0");
-          socket_address->set_port_value(80);
         }
       }
     });
@@ -287,6 +286,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/07/20  11559    44747       46000   stats: add histograms for request/response headers
   //                                          and body sizes.
   // 2020/07/21  12034    44811       46000   Add configurable histogram buckets.
+  // 2020/07/31  12035    45002       46000   Init manager store unready targets in hash map.
+  // 2020/08/10  12275    44949       46000   Re-organize tls histogram maps to improve continuity.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -305,7 +306,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
     // https://github.com/envoyproxy/envoy/issues/12209
-    // EXPECT_MEMORY_EQ(m_per_cluster, 44811);
+    // EXPECT_MEMORY_EQ(m_per_cluster, 44949);
   }
   EXPECT_MEMORY_LE(m_per_cluster, 46000); // Round up to allow platform variations.
 }
@@ -363,6 +364,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/07/20  11559    36859       38000   stats: add histograms for request/response headers
   //                                          and body sizes.
   // 2020/07/21  12034    36923       38000   Add configurable histogram buckets.
+  // 2020/07/31  12035    37114       38000   Init manager store unready targets in hash map.
+  // 2020/08/10  12275    37061       38000   Re-organize tls histogram maps to improve continuity.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -381,7 +384,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
     // https://github.com/envoyproxy/envoy/issues/12209
-    // EXPECT_MEMORY_EQ(m_per_cluster, 36923);
+    // EXPECT_MEMORY_EQ(m_per_cluster, 37061);
   }
   EXPECT_MEMORY_LE(m_per_cluster, 38000); // Round up to allow platform variations.
 }

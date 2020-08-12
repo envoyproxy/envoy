@@ -85,7 +85,7 @@ uint64_t fractionalPercentDenominatorToInt(
 } // namespace ProtobufPercentHelper
 } // namespace Envoy
 
-// Convert an envoy::api::v2::core::Percent to a double or a default.
+// Convert an envoy::type::v3::Percent to a double or a default.
 // @param message supplies the proto message containing the field.
 // @param field_name supplies the field name in the message.
 // @param default_value supplies the default if the field is not present.
@@ -94,7 +94,7 @@ uint64_t fractionalPercentDenominatorToInt(
        ? (message).has_##field_name() ? (message).field_name().value() : default_value             \
        : throw EnvoyException(fmt::format("Value not in the range of 0..100 range.")))
 
-// Convert an envoy::api::v2::core::Percent to a rounded integer or a default.
+// Convert an envoy::type::v3::Percent to a rounded integer or a default.
 // @param message supplies the proto message containing the field.
 // @param field_name supplies the field name in the message.
 // @param max_value supplies the maximum allowed integral value (e.g., 100, 10000, etc.).

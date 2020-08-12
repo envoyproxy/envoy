@@ -32,6 +32,7 @@
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/network/udp_default_writer_config.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "server/active_raw_udp_listener_config.h"
@@ -85,8 +86,10 @@ public:
   void
   sendLocalReply(bool is_grpc_request, Http::Code code, absl::string_view body,
                  const std::function<void(Http::ResponseHeaderMap& headers)>& /*modify_headers*/,
-                 bool is_head_request, const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                 const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                  absl::string_view /*details*/) override {
+    const bool is_head_request =
+        headers_ != nullptr && headers_->getMethodValue() == Http::Headers::get().MethodValues.Head;
     Http::Utility::sendLocalReply(
         false,
         Http::Utility::EncodeFunctions(
@@ -297,7 +300,7 @@ public:
       return testing::AssertionSuccess();
     }
     Thread::CondVar callback_ready_event;
-    bool unexpected_disconnect = false;
+    std::atomic<bool> unexpected_disconnect = false;
     connection_.dispatcher().post(
         [this, f, &callback_ready_event, &unexpected_disconnect]() -> void {
           // The use of connected() here, vs. !disconnected_, is because we want to use the lock_
@@ -696,7 +699,8 @@ private:
   public:
     FakeListener(FakeUpstream& parent)
         : parent_(parent), name_("fake_upstream"),
-          udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>()) {}
+          udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>()),
+          udp_writer_factory_(std::make_unique<Network::UdpDefaultWriterFactory>()) {}
 
   private:
     // Network::ListenerConfig
@@ -716,6 +720,9 @@ private:
     Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       return udp_listener_factory_.get();
     }
+    Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
+      return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
+    }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
@@ -734,6 +741,7 @@ private:
     const std::string name_;
     Network::NopConnectionBalancerImpl connection_balancer_;
     const Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
+    const Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
     BasicResourceLimitImpl connection_resource_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   };

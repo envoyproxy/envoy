@@ -45,6 +45,7 @@ configure_make(
         # https://github.com/envoyproxy/envoy/issues/6084
         # TODO(htuch): Remove when #6084 is fixed
         "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
+        "//bazel:msan_build": {"ENVOY_CONFIG_MSAN": "1"},
         "//conditions:default": {},
     }),
     lib_source = "@com_github_luajit_luajit//:all",
@@ -65,6 +66,7 @@ configure_make(
         # https://github.com/envoyproxy/envoy/issues/6084
         # TODO(htuch): Remove when #6084 is fixed
         "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
+        "//bazel:msan_build": {"ENVOY_CONFIG_MSAN": "1"},
         "//conditions:default": {},
     }),
     lib_source = "@com_github_moonjit_moonjit//:all",
@@ -156,6 +158,7 @@ envoy_cmake_external(
     name = "event",
     cache_entries = {
         "EVENT__DISABLE_OPENSSL": "on",
+        "EVENT__DISABLE_MBEDTLS": "on",
         "EVENT__DISABLE_REGRESS": "on",
         "EVENT__DISABLE_TESTS": "on",
         "EVENT__LIBRARY_TYPE": "STATIC",
@@ -205,20 +208,6 @@ envoy_cmake_external(
     static_libraries = select({
         "//bazel:windows_x86_64": ["nghttp2.lib"],
         "//conditions:default": ["libnghttp2.a"],
-    }),
-)
-
-envoy_cmake_external(
-    name = "yaml",
-    cache_entries = {
-        "YAML_CPP_BUILD_TESTS": "off",
-        "YAML_CPP_BUILD_TOOLS": "off",
-        "CMAKE_CXX_COMPILER_FORCED": "on",
-    },
-    lib_source = "@com_github_jbeder_yaml_cpp//:all",
-    static_libraries = select({
-        "//bazel:windows_x86_64": ["yaml-cpp.lib"],
-        "//conditions:default": ["libyaml-cpp.a"],
     }),
 )
 

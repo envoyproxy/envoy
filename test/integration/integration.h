@@ -184,14 +184,14 @@ public:
   virtual void createEnvoy();
   // Sets upstream_protocol_ and alters the upstream protocol in the config_helper_
   void setUpstreamProtocol(FakeHttpConnection::Type protocol);
-  // Sets fake_upstreams_count_ and alters the upstream protocol in the config_helper_
+  // Sets fake_upstreams_count_
   void setUpstreamCount(uint32_t count) { fake_upstreams_count_ = count; }
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
   void setDeterministic() { deterministic_ = true; }
-  void setLegacyCodecs() { config_helper_.setLegacyCodecs(); }
+  void setNewCodecs() { config_helper_.setNewCodecs(); }
 
   FakeHttpConnection::Type upstreamProtocol() const { return upstream_protocol_; }
 

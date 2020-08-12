@@ -286,12 +286,12 @@ FakeHttpConnection::FakeHttpConnection(
     // For the purpose of testing, we always have the upstream encode the trailers if any
     http1_settings.enable_trailers_ = true;
     Http::Http1::CodecStats& stats = fake_upstream.http1CodecStats();
-#ifdef ENVOY_USE_LEGACY_CODECS_IN_INTEGRATION_TESTS
-    codec_ = std::make_unique<Legacy::TestHttp1ServerConnectionImpl>(
+#ifdef ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS
+    codec_ = std::make_unique<TestHttp1ServerConnectionImpl>(
         shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
 #else
-    codec_ = std::make_unique<TestHttp1ServerConnectionImpl>(
+    codec_ = std::make_unique<Legacy::TestHttp1ServerConnectionImpl>(
         shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
 #endif
@@ -302,12 +302,12 @@ FakeHttpConnection::FakeHttpConnection(
     http2_options.set_allow_connect(true);
     http2_options.set_allow_metadata(true);
     Http::Http2::CodecStats& stats = fake_upstream.http2CodecStats();
-#ifdef ENVOY_USE_LEGACY_CODECS_IN_INTEGRATION_TESTS
-    codec_ = std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
+#ifdef ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS
+    codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
         shared_connection_.connection(), *this, stats, http2_options, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
 #else
-    codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
+    codec_ = std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
         shared_connection_.connection(), *this, stats, http2_options, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
 #endif
@@ -443,8 +443,8 @@ makeTcpListenSocket(const Network::Address::InstanceConstSharedPtr& address) {
 }
 
 static Network::SocketPtr makeTcpListenSocket(uint32_t port, Network::Address::IpVersion version) {
-  return makeTcpListenSocket(
-      Network::Utility::parseInternetAddress(Network::Test::getAnyAddressString(version), port));
+  return makeTcpListenSocket(Network::Utility::parseInternetAddress(
+      Network::Test::getLoopbackAddressString(version), port));
 }
 
 static Network::SocketPtr
@@ -519,7 +519,7 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
   }
   auto connection_wrapper =
       std::make_unique<QueuedConnectionWrapper>(connection, allow_unexpected_disconnects_);
-  connection_wrapper->moveIntoListBack(std::move(connection_wrapper), new_connections_);
+  LinkedList::moveIntoListBack(std::move(connection_wrapper), new_connections_);
   upstream_event_.notifyOne();
   return true;
 }
@@ -709,7 +709,7 @@ FakeRawConnection::waitForData(const std::function<bool(const std::string&)>& da
 AssertionResult FakeRawConnection::write(const std::string& data, bool end_stream,
                                          milliseconds timeout) {
   return shared_connection_.executeOnDispatcher(
-      [&data, end_stream](Network::Connection& connection) {
+      [data, end_stream](Network::Connection& connection) {
         Buffer::OwnedImpl to_write(data);
         connection.write(to_write, end_stream);
       },

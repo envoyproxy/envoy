@@ -68,8 +68,10 @@ protected:
 class Http1ServerConnectionImplTest : public Http1CodecTestBase,
                                       public testing::TestWithParam<bool> {
 public:
+  bool testingNewCodec() { return GetParam(); }
+
   void initialize() {
-    if (GetParam()) {
+    if (testingNewCodec()) {
       codec_ = std::make_unique<Http1::ServerConnectionImpl>(
           connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
           max_request_headers_count_, headers_with_underscores_action_);
@@ -135,7 +137,7 @@ void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_ur
 
   if (allow_absolute_url) {
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
-    if (GetParam()) {
+    if (testingNewCodec()) {
       codec_ = std::make_unique<Http1::ServerConnectionImpl>(
           connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
           max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
@@ -154,7 +156,7 @@ void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_ur
         return decoder;
       }));
 
-  EXPECT_CALL(decoder, sendLocalReply(_, Http::Code::BadRequest, "Bad Request", _, _, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(_, Http::Code::BadRequest, "Bad Request", _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(p, codec_->protocol());
@@ -171,7 +173,7 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
   // Make a new 'codec' with the right settings
   if (allow_absolute_url) {
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
-    if (GetParam()) {
+    if (testingNewCodec()) {
       codec_ = std::make_unique<Http1::ServerConnectionImpl>(
           connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
           max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
@@ -198,7 +200,7 @@ void Http1ServerConnectionImplTest::expectTrailersTest(bool enable_trailers) {
   // Make a new 'codec' with the right settings
   if (enable_trailers) {
     codec_settings_.enable_trailers_ = enable_trailers;
-    if (GetParam()) {
+    if (testingNewCodec()) {
       codec_ = std::make_unique<Http1::ServerConnectionImpl>(
           connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
           max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
@@ -240,7 +242,7 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
   initialize();
   // Make a new 'codec' with the right settings
   codec_settings_.enable_trailers_ = enable_trailers;
-  if (GetParam()) {
+  if (testingNewCodec()) {
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
         max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
@@ -271,7 +273,7 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
   EXPECT_TRUE(status.ok());
   buffer = Buffer::OwnedImpl(trailer_string);
   if (enable_trailers) {
-    EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
+    EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
     status = codec_->dispatch(buffer);
     EXPECT_TRUE(isCodecProtocolError(status));
     EXPECT_EQ(status.message(), "trailers size exceeds limit");
@@ -299,7 +301,7 @@ void Http1ServerConnectionImplTest::testRequestHeadersExceedLimit(std::string he
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
   buffer = Buffer::OwnedImpl(header_string + "\r\n");
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "headers size exceeds limit");
@@ -364,7 +366,7 @@ TEST_P(Http1ServerConnectionImplTest, IdentityEncodingNoChunked) {
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\ntransfer-encoding: identity\r\n\r\n");
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported transfer encoding");
@@ -379,7 +381,7 @@ TEST_P(Http1ServerConnectionImplTest, UnsupportedEncoding) {
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\ntransfer-encoding: gzip\r\n\r\n");
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported transfer encoding");
@@ -531,7 +533,7 @@ TEST_P(Http1ServerConnectionImplTest, InvalidChunkHeader) {
                            "6\r\nHello \r\n"
                            "invalid\r\nWorl");
 
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_CHUNK_SIZE");
@@ -548,7 +550,7 @@ TEST_P(Http1ServerConnectionImplTest, IdentityAndChunkedBody) {
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: "
                            "identity,chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n");
 
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported transfer encoding");
@@ -754,7 +756,7 @@ TEST_P(Http1ServerConnectionImplTest, Http11InvalidTrailerPost) {
                            "body\r\n0\r\n"
                            "badtrailer\r\n\r\n");
 
-  EXPECT_CALL(decoder, sendLocalReply(_, Http::Code::BadRequest, "Bad Request", _, _, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(_, Http::Code::BadRequest, "Bad Request", _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
 }
@@ -836,7 +838,7 @@ TEST_P(Http1ServerConnectionImplTest, BadRequestNoStreamLegacy) {
 
   MockRequestDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).Times(0);
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _)).Times(0);
 
   Buffer::OwnedImpl buffer("bad");
   auto status = codec_->dispatch(buffer);
@@ -856,49 +858,9 @@ TEST_P(Http1ServerConnectionImplTest, BadRequestNoStream) {
         return decoder;
       }));
   // Check that before any headers are parsed, requests do not look like HEAD or gRPC requests.
-  EXPECT_CALL(decoder, sendLocalReply(false, _, _, _, false, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(false, _, _, _, _, _));
 
   Buffer::OwnedImpl buffer("bad");
-  auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(isCodecProtocolError(status));
-}
-
-// Make sure that if the first line is parsed, that sendLocalReply tracks HEAD requests correctly.
-TEST_P(Http1ServerConnectionImplTest, BadHeadRequest) {
-  initialize();
-
-  MockRequestDecoder decoder;
-  Http::ResponseEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
-        response_encoder = &encoder;
-        return decoder;
-      }));
-  // Make sure sendLocalReply picks up the head request.
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, true, _, _));
-
-  // Send invalid characters
-  Buffer::OwnedImpl buffer("HEAD / HTTP/1.1\r\nHOST: h.com\r\r\r\r");
-  auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(isCodecProtocolError(status));
-}
-
-// Make sure that if gRPC headers are parsed, they are tracked by sendLocalReply.
-TEST_P(Http1ServerConnectionImplTest, BadGrpcRequest) {
-  initialize();
-
-  MockRequestDecoder decoder;
-  Http::ResponseEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
-        response_encoder = &encoder;
-        return decoder;
-      }));
-  // Make sure sendLocalReply picks up the head request.
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, true, _, _));
-
-  // Send invalid characters
-  Buffer::OwnedImpl buffer("HEAD / HTTP/1.1\r\ncontent-type: application/grpc\r\nHOST: ###\r\r");
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
 }
@@ -912,7 +874,7 @@ TEST_P(Http1ServerConnectionImplTest, RejectInvalidMethod) {
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl buffer("BAD / HTTP/1.1\r\nHost: foo\r\n");
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
 }
@@ -928,7 +890,7 @@ TEST_P(Http1ServerConnectionImplTest, BadRequestStartedStream) {
   EXPECT_TRUE(status.ok());
 
   Buffer::OwnedImpl buffer2("g");
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
 }
@@ -1056,7 +1018,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
       }));
   Buffer::OwnedImpl buffer(
       absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: ", std::string(1, 3), "\r\n"));
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "http/1.1 protocol error: header value contains invalid chars");
@@ -1125,7 +1087,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreCauseRequestReject
       }));
 
   Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "http/1.1 protocol error: header name contains underscores");
@@ -1146,7 +1108,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderInvalidAuthority) {
         return decoder;
       }));
   Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.\"com\r\n\r\n"));
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(),
@@ -1169,7 +1131,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderMutateEmbeddedNul) {
 
     Buffer::OwnedImpl buffer(
         absl::StrCat(example_input.substr(0, n), std::string(1, '\0'), example_input.substr(n)));
-    EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
+    EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
     auto status = codec_->dispatch(buffer);
     EXPECT_FALSE(status.ok());
     EXPECT_TRUE(isCodecProtocolError(status));
@@ -1774,7 +1736,7 @@ TEST_P(Http1ServerConnectionImplTest, ConnectRequestAbsoluteURLNotallowed) {
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl buffer("CONNECT http://host:80 HTTP/1.1\r\n\r\n");
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
 }
@@ -1803,7 +1765,7 @@ TEST_P(Http1ServerConnectionImplTest, ConnectRequestWithTEChunked) {
 
   // Per https://tools.ietf.org/html/rfc7231#section-4.3.6 CONNECT with body has no defined
   // semantics: Envoy will reject chunked CONNECT requests.
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   Buffer::OwnedImpl buffer(
       "CONNECT host:80 HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n12345abcd");
   auto status = codec_->dispatch(buffer);
@@ -1821,7 +1783,7 @@ TEST_P(Http1ServerConnectionImplTest, ConnectRequestWithNonZeroContentLength) {
   // Make sure we avoid the deferred_end_stream_headers_ optimization for
   // requests-with-no-body.
   Buffer::OwnedImpl buffer("CONNECT host:80 HTTP/1.1\r\ncontent-length: 1\r\n\r\nabcd");
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported content length");
@@ -1881,8 +1843,10 @@ TEST_P(Http1ServerConnectionImplTest, WatermarkTest) {
 class Http1ClientConnectionImplTest : public Http1CodecTestBase,
                                       public testing::TestWithParam<bool> {
 public:
+  bool testingNewCodec() { return GetParam(); }
+
   void initialize() {
-    if (GetParam()) {
+    if (testingNewCodec()) {
       codec_ = std::make_unique<Http1::ClientConnectionImpl>(
           connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_);
     } else {
@@ -1892,7 +1856,7 @@ public:
   }
 
   void readDisableOnRequestEncoder(RequestEncoder* request_encoder, bool disable) {
-    if (GetParam()) {
+    if (testingNewCodec()) {
       dynamic_cast<Http1::RequestEncoderImpl*>(request_encoder)->readDisable(disable);
     } else {
       dynamic_cast<Legacy::Http1::RequestEncoderImpl*>(request_encoder)->readDisable(disable);
@@ -2278,12 +2242,23 @@ TEST_P(Http1ClientConnectionImplTest, BadEncodeParams) {
 
   NiceMock<MockResponseDecoder> response_decoder;
 
-  // Need to set :method and :path
+  // Need to set :method and :path.
+  // New and legacy codecs will behave differently on errors from processing outbound data. The
+  // legacy codecs will throw an exception (that presently will be uncaught in contexts like
+  // sendLocalReply), while the new codecs temporarily RELEASE_ASSERT until Envoy handles errors on
+  // outgoing data.
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
-  EXPECT_THROW(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
-               CodecClientException);
-  EXPECT_THROW(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true),
-               CodecClientException);
+  if (testingNewCodec()) {
+    EXPECT_DEATH(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
+                 ":method and :path must be specified");
+    EXPECT_DEATH(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true),
+                 ":method and :path must be specified");
+  } else {
+    EXPECT_THROW(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
+                 CodecClientException);
+    EXPECT_THROW(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true),
+                 CodecClientException);
+  }
 }
 
 TEST_P(Http1ClientConnectionImplTest, NoContentLengthResponse) {
@@ -2667,7 +2642,7 @@ TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersSplitRejected) {
   }
   // the 60th 1kb header should induce overflow
   buffer = Buffer::OwnedImpl(fmt::format("big: {}\r\n", long_string));
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "headers size exceeds limit");
@@ -2697,7 +2672,7 @@ TEST_P(Http1ServerConnectionImplTest, ManyRequestHeadersSplitRejected) {
 
   // The final 101th header should induce overflow.
   buffer = Buffer::OwnedImpl("header101:\r\n\r\n");
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
+  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "headers size exceeds limit");

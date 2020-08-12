@@ -93,6 +93,7 @@ public:
                          Network::Address::InstanceConstSharedPtr address,
                          const Network::Socket::OptionsSharedPtr& socket_options,
                          Stats::ScopePtr&& listener_scope) override;
+  uint32_t concurrency() const override { return server_.options().concurrency(); }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -255,7 +256,7 @@ private:
     struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
 
-      const OverloadActionState inactive_ = OverloadActionState::Inactive;
+      const OverloadActionState inactive_ = OverloadActionState::inactive();
     };
 
     NullOverloadManager(ThreadLocal::SlotAllocator& slot_allocator)
@@ -376,6 +377,9 @@ private:
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
     Network::ActiveUdpListenerFactory* udpListenerFactory() override {
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+    Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
     envoy::config::core::v3::TrafficDirection direction() const override {

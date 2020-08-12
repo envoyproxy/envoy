@@ -51,8 +51,17 @@ if [[ $${ENVOY_TSAN-} == "1" ]]; then
   WEE8_BUILD_ARGS+=" is_tsan=true"
 fi
 
-# Release build.
-WEE8_BUILD_ARGS+=" is_debug=false"
+# Debug/release build.
+if [[ $(COMPILATION_MODE) == "dbg" && $${ENVOY_UBSAN_VPTR-} != "1" && $${ENVOY_MSAN-} != "1" && $${ENVOY_TSAN-} != "1" ]]; then
+  WEE8_BUILD_ARGS+=" is_debug=true"
+  WEE8_BUILD_ARGS+=" v8_symbol_level=2"
+  WEE8_BUILD_ARGS+=" v8_optimized_debug=false"
+else
+  WEE8_BUILD_ARGS+=" is_debug=false"
+  WEE8_BUILD_ARGS+=" v8_symbol_level=1"
+  WEE8_BUILD_ARGS+=" v8_enable_handle_zapping=false"
+fi
+
 # Clang or not Clang, that is the question.
 WEE8_BUILD_ARGS+=" is_clang=$$IS_CLANG"
 # Hack to disable bleeding-edge compiler flags.
@@ -81,17 +90,28 @@ if [[ `uname -m` == "aarch64" ]]; then
 fi
 
 # Build wee8.
-if [[ "$$(uname -s)" == "Darwin" ]]; then
+if [[ -f /etc/centos-release ]] && [[ $$(cat /etc/centos-release) =~ "CentOS Linux release 7" ]] && [[ -x "$$(command -v gn)" ]]; then
+  # Using system default gn tools
+  # This is done only for CentOS 7, as it has an old version of GLIBC which is otherwise incompatible
+  gn=$$(command -v gn)
+elif [[ "$$(uname -s)" == "Darwin" ]]; then
   gn=buildtools/mac/gn
-  ninja=third_party/depot_tools/ninja
 elif [[ "$$(uname -s)-$$(uname -m)" == "Linux-x86_64" ]]; then
   gn=buildtools/linux64/gn
+else
+  # Using system default gn tools
+  gn=$$(command -v gn)
+fi
+
+if [[ "$$(uname -s)" == "Darwin" ]]; then
+  ninja=third_party/depot_tools/ninja
+elif [[ "$$(uname -s)-$$(uname -m)" == "Linux-x86_64" ]]; then
   ninja=third_party/depot_tools/ninja
 else
-  # Using system default ninja & gn tools
-  gn=$$(command -v gn)
+  # Using system default ninja tools
   ninja=$$(command -v ninja)
 fi
+
 "$$gn" gen out/wee8 --args="$$WEE8_BUILD_ARGS"
 "$$ninja" -C out/wee8 wee8
 

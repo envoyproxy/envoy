@@ -56,7 +56,7 @@ FaultMap FaultManagerImpl::buildFaultMap(
   // Next, create the fault map that maps commands to pointers to Fault objects.
   // Group faults by command
   FaultMap fault_map;
-  for (auto base_fault : faults) {
+  for (auto const& base_fault : faults) {
     auto fault_ptr = std::make_shared<FaultImpl>(base_fault);
     if (!fault_ptr->commands().empty()) {
       for (const std::string& command : fault_ptr->commands()) {

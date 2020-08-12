@@ -2,7 +2,7 @@
 
 # Enforces:
 # - License headers on Envoy BUILD files
-# - envoy_package() top-level invocation for standard Envoy package setup.
+# - envoy_package() or envoy_extension_package() top-level invocation for standard Envoy package setup.
 # - Infers API dependencies from source files.
 # - Misc. cleanups: avoids redundant blank lines, removes unused loads.
 # - Maybe more later?
@@ -31,8 +31,9 @@ OLD_LICENSES_REGEX = re.compile(r'^licenses\(.*\n+', re.MULTILINE)
 # Match an Envoy rule, e.g. envoy_cc_library( in a BUILD file.
 ENVOY_RULE_REGEX = re.compile(r'envoy[_\w]+\(')
 
-# Match a load() statement for the envoy_package macro.
+# Match a load() statement for the envoy_package macros.
 PACKAGE_LOAD_BLOCK_REGEX = re.compile('("envoy_package".*?\)\n)', re.DOTALL)
+EXTENSION_PACKAGE_LOAD_BLOCK_REGEX = re.compile('("envoy_extension_package".*?\)\n)', re.DOTALL)
 
 # Match Buildozer 'print' output. Example of Buildozer print output:
 # cc_library json_transcoder_filter_lib [json_transcoder_filter.cc] (missing) (missing)
@@ -70,20 +71,29 @@ def RunBuildozer(cmds, contents):
 
 
 # Add an Apache 2 license and envoy_package() import and rule as needed.
-def FixPackageAndLicense(contents):
+def FixPackageAndLicense(path, contents):
+  regex_to_use = PACKAGE_LOAD_BLOCK_REGEX
+  package_string = 'envoy_package'
+
+  if 'source/extensions' in path:
+    regex_to_use = EXTENSION_PACKAGE_LOAD_BLOCK_REGEX
+    package_string = 'envoy_extension_package'
+
   # Ensure we have an envoy_package import load if this is a real Envoy package. We also allow
   # the prefix to be overridden if envoy is included in a larger workspace.
   if re.search(ENVOY_RULE_REGEX, contents):
+    new_load = 'new_load {}//bazel:envoy_build_system.bzl %s' % package_string
     contents = RunBuildozer([
-        ('new_load {}//bazel:envoy_build_system.bzl envoy_package'.format(
-            os.getenv("ENVOY_BAZEL_PREFIX", "")), '__pkg__'),
+        (new_load.format(os.getenv("ENVOY_BAZEL_PREFIX", "")), '__pkg__'),
     ], contents)
     # Envoy package is inserted after the load block containing the
     # envoy_package import.
-    if 'envoy_package()' not in contents:
-      contents = re.sub(PACKAGE_LOAD_BLOCK_REGEX, r'\1\nenvoy_package()\n\n', contents)
-      if 'envoy_package()' not in contents:
-        raise EnvoyBuildFixerError('Unable to insert envoy_package()')
+    package_and_parens = package_string + '()'
+    if package_and_parens not in contents:
+      contents = re.sub(regex_to_use, r'\1\n%s\n\n' % package_and_parens, contents)
+      if package_and_parens not in contents:
+        raise EnvoyBuildFixerError('Unable to insert %s' % package_and_parens)
+
   # Delete old licenses.
   if re.search(OLD_LICENSES_REGEX, contents):
     contents = re.sub(OLD_LICENSES_REGEX, '', contents)
@@ -173,7 +183,7 @@ def FixBuild(path):
   with open(path, 'r') as f:
     contents = f.read()
   xforms = [
-      FixPackageAndLicense,
+      functools.partial(FixPackageAndLicense, path),
       functools.partial(FixApiDeps, path),
       BuildifierLint,
   ]

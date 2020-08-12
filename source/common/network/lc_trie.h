@@ -9,6 +9,7 @@
 #include "envoy/network/address.h"
 
 #include "common/common/assert.h"
+#include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/cidr_range.h"
 #include "common/network/utility.h"
@@ -68,10 +69,11 @@ public:
     }
     const size_t max_prefixes = MaxLcTrieNodes * fill_factor / 2;
     if (num_prefixes > max_prefixes) {
-      throw EnvoyException(fmt::format("The input vector has '{0}' CIDR range entries. LC-Trie "
-                                       "can only support '{1}' CIDR ranges with the specified "
-                                       "fill factor.",
-                                       num_prefixes, max_prefixes));
+      ExceptionUtil::throwEnvoyException(
+          fmt::format("The input vector has '{0}' CIDR range entries. LC-Trie "
+                      "can only support '{1}' CIDR ranges with the specified "
+                      "fill factor.",
+                      num_prefixes, max_prefixes));
     }
 
     // Step 1: separate the provided prefixes by protocol (IPv4 vs IPv6),
@@ -575,7 +577,7 @@ private:
         // number of supported trie_ entries, throw an Envoy Exception.
         if (position >= MaxLcTrieNodes) {
           // Adding 1 to the position to count how many nodes are trying to be set.
-          throw EnvoyException(
+          ExceptionUtil::throwEnvoyException(
               fmt::format("The number of internal nodes required for the LC-Trie "
                           "exceeded the maximum number of "
                           "supported nodes. Minimum number of internal nodes required: "
