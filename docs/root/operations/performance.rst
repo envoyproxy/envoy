@@ -79,7 +79,7 @@ Envoy by default use tcmalloc as memory allocator which provides function to ret
 OS and reduce the physical memory usage. Currently envoy could shrink heap when xDS response
 is received and also when an admin handler is hit. 
 
-Since shrink could be expensive, envoy should free memory only if free could reclaim phyiscal memory back. 
+Since shrink could be expensive, envoy should free memory only if free could reclaim physical memory back. 
 The runtime key "envoy.memory.heap_shrink_threshold" could be used to tune the behavior. If the gap beteween
 envoy requested memory and tcmalloc used physical memory is greater than this threshold, envoy will indeed
 request tcmalloc to free. 
