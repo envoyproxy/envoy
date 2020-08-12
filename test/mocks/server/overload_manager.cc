@@ -9,6 +9,12 @@ namespace Envoy {
 namespace Server {
 
 using ::testing::ReturnRef;
+
+MockThreadLocalOverloadState::MockThreadLocalOverloadState()
+    : disabled_state_(OverloadActionState::inactive()) {
+  ON_CALL(*this, getState).WillByDefault(ReturnRef(disabled_state_));
+}
+
 MockOverloadManager::MockOverloadManager() {
   ON_CALL(*this, getThreadLocalOverloadState()).WillByDefault(ReturnRef(overload_state_));
 }

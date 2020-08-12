@@ -23,7 +23,7 @@ public:
 
   explicit ValidationClusterManagerFactory(
       Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
-      ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
+      ThreadLocal::Instance& tls, Random::RandomGenerator& random,
       Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
       Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
       Secret::SecretManager& secret_manager, ProtobufMessage::ValidationContext& validation_context,
@@ -57,7 +57,7 @@ public:
   ValidationClusterManager(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                            ClusterManagerFactory& factory, Stats::Store& stats,
                            ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                           Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                           Random::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                            AccessLog::AccessLogManager& log_manager, Event::Dispatcher& dispatcher,
                            Server::Admin& admin,
                            ProtobufMessage::ValidationContext& validation_context, Api::Api& api,

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
@@ -15,7 +16,7 @@ namespace Config {
 class SubscriptionFactoryImpl : public SubscriptionFactory, Logger::Loggable<Logger::Id::config> {
 public:
   SubscriptionFactoryImpl(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                          Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
+                          Upstream::ClusterManager& cm, Random::RandomGenerator& random,
                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
                           Runtime::Loader& runtime);
 
@@ -29,7 +30,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;
   Upstream::ClusterManager& cm_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
   Runtime::Loader& runtime_;

@@ -70,13 +70,13 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   tcp_client->waitForData("ello", false);
 
   // Make sure length based wait works for the data already received
-  tcp_client->waitForData(5);
-  tcp_client->waitForData(4);
+  ASSERT_TRUE(tcp_client->waitForData(5));
+  ASSERT_TRUE(tcp_client->waitForData(4));
 
   // Drain part of the received message
   tcp_client->clearData(2);
   tcp_client->waitForData("llo");
-  tcp_client->waitForData(3);
+  ASSERT_TRUE(tcp_client->waitForData(3));
 
   ASSERT_TRUE(tcp_client->write("hello"));
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
@@ -122,6 +122,25 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  tcp_client->waitForDisconnect();
+}
+
+TEST_P(TcpProxyIntegrationTest, NoUpstream) {
+  // Set the first upstream to have an invalid port, so connection will fail,
+  // but it won't fail synchronously (as it would if there were simply no
+  // upstreams)
+  fake_upstreams_count_ = 0;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* lb_endpoint =
+        cluster->mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
+    lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(1);
+  });
+  config_helper_.skipPortUsageValidation();
+  enable_half_close_ = false;
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->waitForDisconnect();
 }
 

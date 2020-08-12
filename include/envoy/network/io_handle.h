@@ -85,6 +85,8 @@ public:
     Address::InstanceConstSharedPtr peer_address_;
     // The payload length of this packet.
     unsigned int msg_len_{0};
+    // The gso_size, if specified in the transport header
+    unsigned int gso_size_{0};
   };
 
   /**
@@ -142,6 +144,11 @@ public:
   virtual bool supportsMmsg() const PURE;
 
   /**
+   * return true if the platform supports udp_gro
+   */
+  virtual bool supportsUdpGro() const PURE;
+
+  /**
    * Bind to address. The handle should have been created with a call to socket()
    * @param address address to bind to.
    * @param addrlen address length
@@ -157,6 +164,15 @@ public:
    *   is successful, errno_ shouldn't be used.
    */
   virtual Api::SysCallIntResult listen(int backlog) PURE;
+
+  /**
+   * Accept on listening handle
+   * @param addr remote address to be returned
+   * @param addrlen remote address length
+   * @param flags flags to be applied to accepted session
+   * @return accepted IoHandlePtr
+   */
+  virtual std::unique_ptr<IoHandle> accept(struct sockaddr* addr, socklen_t* addrlen) PURE;
 
   /**
    * Connect to address. The handle should have been created with a call to socket()

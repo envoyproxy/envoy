@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/compression/gzip/compressor:compressor_lib",
         "//source/extensions/compression/gzip/decompressor:zlib_decompressor_impl_lib",
         "//test/test_common:utility_lib",

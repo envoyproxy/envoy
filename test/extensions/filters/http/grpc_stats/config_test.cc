@@ -7,7 +7,7 @@
 
 #include "test/common/buffer/utility.h"
 #include "test/common/stream_info/test_util.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
@@ -64,7 +64,7 @@ protected:
 
   envoy::extensions::filters::http::grpc_stats::v3::FilterConfig config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  std::shared_ptr<Http::StreamFilter> filter_;
+  Http::StreamFilterSharedPtr filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;

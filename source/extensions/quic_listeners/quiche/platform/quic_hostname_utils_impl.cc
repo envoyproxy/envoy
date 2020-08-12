@@ -1,3 +1,4 @@
+
 // NOLINT(namespace-envoy)
 
 // This file is part of the QUICHE platform implementation, and is not to be
@@ -8,7 +9,7 @@
 
 #include <string>
 
-#include "common/http/utility.h"
+#include "common/http/url_utility.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"

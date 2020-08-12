@@ -21,7 +21,8 @@
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 
 using testing::_;
@@ -41,10 +42,14 @@ const std::string BasicConfig = R"EOF(
   name: name
   connect_timeout: 0.25s
   dns_lookup_family: V4_ONLY
-  hosts:
-  - socket_address:
-      address: foo.bar.com
-      port_value: 22120
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 22120
   cluster_type:
     name: envoy.clusters.redis
     typed_config:
@@ -85,10 +90,11 @@ protected:
     return addresses;
   }
 
-  void setupFromV2Yaml(const std::string& yaml) {
+  void setupFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
     expectRedisSessionCreated();
     NiceMock<Upstream::MockClusterManager> cm;
-    envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV2Yaml(yaml);
+    envoy::config::cluster::v3::Cluster cluster_config =
+        Upstream::parseClusterFromV3Yaml(yaml, avoid_boosting);
     Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
@@ -116,9 +122,9 @@ protected:
         });
   }
 
-  void setupFactoryFromV2Yaml(const std::string& yaml) {
+  void setupFactoryFromV3Yaml(const std::string& yaml) {
     NiceMock<Upstream::MockClusterManager> cm;
-    envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV2Yaml(yaml);
+    envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
     Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
@@ -453,7 +459,7 @@ protected:
   }
 
   void testBasicSetup(const std::string& config, const std::string& expected_discovery_address) {
-    setupFromV2Yaml(config);
+    setupFromV3Yaml(config);
     const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
     expectResolveDiscovery(Network::DnsLookupFamily::V4Only, expected_discovery_address,
                            resolved_addresses);
@@ -543,7 +549,7 @@ protected:
   Ssl::MockContextManager ssl_context_manager_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Event::MockTimer* resolve_timer_;
   ReadyWatcher membership_updated_;
@@ -615,10 +621,14 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
   connect_timeout: 0.25s
   )EOF" + std::get<0>(GetParam()) +
                              R"EOF(
-  hosts:
-  - socket_address:
-      address: foo.bar.com
-      port_value: 22120
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 22120
   cluster_type:
     name: envoy.clusters.redis
     typed_config:
@@ -628,7 +638,7 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
         cluster_refresh_timeout: 0.25s
   )EOF";
 
-  setupFromV2Yaml(config);
+  setupFromV3Yaml(config);
 
   expectRedisResolve(true);
   EXPECT_CALL(*dns_resolver_, resolve("foo.bar.com", std::get<1>(GetParam()), _))
@@ -652,7 +662,7 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
 
 TEST_F(RedisClusterTest, EmptyDnsResponse) {
   Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
-  setupFromV2Yaml(BasicConfig);
+  setupFromV3Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{};
   EXPECT_CALL(*dns_timer, enableTimer(_, _));
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
@@ -676,7 +686,7 @@ TEST_F(RedisClusterTest, EmptyDnsResponse) {
 
 TEST_F(RedisClusterTest, FailedDnsResponse) {
   Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
-  setupFromV2Yaml(BasicConfig);
+  setupFromV3Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{};
   EXPECT_CALL(*dns_timer, enableTimer(_, _));
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses,
@@ -733,7 +743,7 @@ TEST_F(RedisClusterTest, Basic) {
 }
 
 TEST_F(RedisClusterTest, RedisResolveFailure) {
-  setupFromV2Yaml(BasicConfig);
+  setupFromV3Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
   expectRedisResolve(true);
@@ -767,10 +777,14 @@ TEST_F(RedisClusterTest, FactoryInitNotRedisClusterTypeFailure) {
   name: name
   connect_timeout: 0.25s
   dns_lookup_family: V4_ONLY
-  hosts:
-  - socket_address:
-      address: foo.bar.com
-      port_value: 22120
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 22120
   cluster_type:
     name: envoy.clusters.memcached
     typed_config:
@@ -780,16 +794,16 @@ TEST_F(RedisClusterTest, FactoryInitNotRedisClusterTypeFailure) {
         cluster_refresh_timeout: 0.25s
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(setupFactoryFromV2Yaml(basic_yaml_hosts), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(setupFactoryFromV3Yaml(basic_yaml_hosts), EnvoyException,
                             "Redis cluster can only created with redis cluster type.");
 }
 
 TEST_F(RedisClusterTest, FactoryInitRedisClusterTypeSuccess) {
-  setupFactoryFromV2Yaml(BasicConfig);
+  setupFactoryFromV3Yaml(BasicConfig);
 }
 
 TEST_F(RedisClusterTest, RedisErrorResponse) {
-  setupFromV2Yaml(BasicConfig);
+  setupFromV3Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
   expectRedisResolve(true);
@@ -844,7 +858,7 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
 }
 
 TEST_F(RedisClusterTest, RedisReplicaErrorResponse) {
-  setupFromV2Yaml(BasicConfig);
+  setupFromV3Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
   expectRedisResolve(true);
@@ -881,7 +895,7 @@ TEST_F(RedisClusterTest, RedisReplicaErrorResponse) {
 }
 
 TEST_F(RedisClusterTest, DnsDiscoveryResolverBasic) {
-  setupFromV2Yaml(BasicConfig);
+  setupFromV3Yaml(BasicConfig);
   testDnsResolve("foo.bar.com", 22120);
 }
 
@@ -890,13 +904,19 @@ TEST_F(RedisClusterTest, MultipleDnsDiscovery) {
   name: name
   connect_timeout: 0.25s
   dns_lookup_family: V4_ONLY
-  hosts:
-  - socket_address:
-      address: foo.bar.com
-      port_value: 22120
-  - socket_address:
-      address: foo1.bar.com
-      port_value: 22120
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 22120               
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo1.bar.com
+                    port_value: 22120
   cluster_type:
     name: envoy.clusters.redis
     typed_config:
@@ -906,7 +926,7 @@ TEST_F(RedisClusterTest, MultipleDnsDiscovery) {
         cluster_refresh_timeout: 0.25s
   )EOF";
 
-  setupFromV2Yaml(config);
+  setupFromV3Yaml(config);
 
   // Only single in-flight "cluster slots" call.
   expectRedisResolve(true);
@@ -937,7 +957,7 @@ TEST_F(RedisClusterTest, MultipleDnsDiscovery) {
 }
 
 TEST_F(RedisClusterTest, HostRemovalAfterHcFail) {
-  setupFromV2Yaml(BasicConfig);
+  setupFromV3Yaml(BasicConfig);
   auto health_checker = std::make_shared<Upstream::MockHealthChecker>();
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);

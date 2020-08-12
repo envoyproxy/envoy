@@ -12,8 +12,9 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_dispatcher.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_source.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
+#include "extensions/quic_listeners/quiche/udp_gso_batch_writer.h"
 
 namespace Envoy {
 namespace Quic {
@@ -35,20 +36,6 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        const quic::QuicConfig& quic_config,
                                        Network::Socket::OptionsSharedPtr options,
                                        const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
-    : ActiveQuicListener(dispatcher, parent, listen_socket, listener_config, quic_config,
-                         std::move(options),
-                         std::make_unique<EnvoyQuicProofSource>(
-                             listen_socket, listener_config.filterChainManager()),
-                         enabled) {}
-
-ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
-                                       Network::ConnectionHandler& parent,
-                                       Network::SocketSharedPtr listen_socket,
-                                       Network::ListenerConfig& listener_config,
-                                       const quic::QuicConfig& quic_config,
-                                       Network::Socket::OptionsSharedPtr options,
-                                       std::unique_ptr<quic::ProofSource> proof_source,
-                                       const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
     : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
       listen_socket_(*listen_socket), enabled_(enabled, Runtime::LoaderSingleton::get()) {
@@ -67,7 +54,10 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
   random->RandBytes(random_seed_, sizeof(random_seed_));
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
       quiche::QuicheStringPiece(reinterpret_cast<char*>(random_seed_), sizeof(random_seed_)),
-      quic::QuicRandom::GetInstance(), std::move(proof_source), quic::KeyExchangeSource::Default());
+      quic::QuicRandom::GetInstance(),
+      std::make_unique<EnvoyQuicProofSource>(listen_socket_, listener_config.filterChainManager(),
+                                             stats_),
+      quic::KeyExchangeSource::Default());
   auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);
   crypto_config_->AddDefaultConfig(random, connection_helper->GetClock(),
                                    quic::QuicCryptoServerConfig::ConfigOptions());
@@ -77,7 +67,20 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
       per_worker_stats_, dispatcher, listen_socket_);
-  quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(listen_socket_));
+
+  // Create udp_packet_writer
+  Network::UdpPacketWriterPtr udp_packet_writer =
+      listener_config.udpPacketWriterFactory()->get().createUdpPacketWriter(
+          listen_socket_.ioHandle(), listener_config.listenerScope());
+  udp_packet_writer_ = udp_packet_writer.get();
+  if (udp_packet_writer->isBatchMode()) {
+    // UdpPacketWriter* can be downcasted to UdpGsoBatchWriter*, which indirectly inherits
+    // from the quic::QuicPacketWriter class and can be passed to InitializeWithWriter().
+    quic_dispatcher_->InitializeWithWriter(
+        dynamic_cast<Quic::UdpGsoBatchWriter*>(udp_packet_writer.release()));
+  } else {
+    quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(std::move(udp_packet_writer)));
+  }
 }
 
 ActiveQuicListener::~ActiveQuicListener() { onListenerShutdown(); }
@@ -90,9 +93,9 @@ void ActiveQuicListener::onListenerShutdown() {
 
 void ActiveQuicListener::onData(Network::UdpRecvData& data) {
   quic::QuicSocketAddress peer_address(
-      envoyAddressInstanceToQuicSocketAddress(data.addresses_.peer_));
+      envoyIpAddressToQuicSocketAddress(data.addresses_.peer_->ip()));
   quic::QuicSocketAddress self_address(
-      envoyAddressInstanceToQuicSocketAddress(data.addresses_.local_));
+      envoyIpAddressToQuicSocketAddress(data.addresses_.local_->ip()));
   quic::QuicTime timestamp =
       quic::QuicTime::Zero() +
       quic::QuicTime::Delta::FromMicroseconds(std::chrono::duration_cast<std::chrono::microseconds>(

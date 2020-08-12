@@ -127,7 +127,7 @@ public:
   NiceMock<Upstream::MockClusterInfo> cluster_;
   TestVirtualCluster virtual_cluster_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Event::MockDispatcher dispatcher_;
   Event::MockTimer* retry_timer_{};
   RetryStatePtr state_;
@@ -216,6 +216,22 @@ TEST_F(RouterRetryStateImplTest, PolicyResourceExhaustedRemoteRateLimited) {
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"}, {"grpc-status", "8"}, {"x-envoy-ratelimited", "true"}};
   EXPECT_EQ(RetryStatus::No, state_->shouldRetryHeaders(response_headers, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, PolicyEnvoyRateLimitedRemoteRateLimited) {
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "envoy-ratelimited"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  expectTimerCreateAndEnable();
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "429"},
+                                                   {"x-envoy-ratelimited", "true"}};
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->invokeCallback();
+
+  EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
+            state_->shouldRetryHeaders(response_headers, callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyGatewayErrorRemote502) {

@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "common/thread_local/thread_local_impl.h"
+
 #include "extensions/filters/common/lua/lua.h"
 
 #include "test/mocks/common.h"
@@ -46,7 +48,7 @@ public:
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
-  std::unique_ptr<ThreadLocalState> state_;
+  ThreadLocalStatePtr state_;
   std::function<void()> yield_callback_;
   ReadyWatcher on_yield_;
 };
@@ -155,6 +157,55 @@ TEST_F(LuaTest, MarkDead) {
   EXPECT_CALL(*ref.get(), onDestroy());
   ref.reset();
   lua_gc(cr1->luaState(), LUA_GCCOLLECT, 0);
+}
+
+class ThreadSafeTest : public testing::Test {
+public:
+  ThreadSafeTest()
+      : api_(Api::createApiForTest()), main_dispatcher_(api_->allocateDispatcher("main")),
+        worker_dispatcher_(api_->allocateDispatcher("worker")) {}
+
+  // Use real dispatchers to verify that callback functions can be executed correctly.
+  Api::ApiPtr api_;
+  Event::DispatcherPtr main_dispatcher_;
+  Event::DispatcherPtr worker_dispatcher_;
+  ThreadLocal::InstanceImpl tls_;
+
+  std::unique_ptr<ThreadLocalState> state_;
+};
+
+// Test whether ThreadLocalState can be safely released.
+TEST_F(ThreadSafeTest, StateDestructedBeforeWorkerRun) {
+  const std::string SCRIPT{R"EOF(
+    function HelloWorld()
+      print("Hello World!")
+    end
+  )EOF"};
+
+  tls_.registerThread(*main_dispatcher_, true);
+  EXPECT_EQ(main_dispatcher_.get(), &tls_.dispatcher());
+  tls_.registerThread(*worker_dispatcher_, false);
+
+  // Some callback functions waiting to be executed will be added to the dispatcher of the Worker
+  // thread. The callback functions in the main thread will be executed directly.
+  state_ = std::make_unique<ThreadLocalState>(SCRIPT, tls_);
+  state_->registerType<TestObject>();
+
+  main_dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Destroy state_.
+  state_.reset(nullptr);
+
+  // Start a new worker thread to execute the callback functions in the worker dispatcher.
+  Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([this]() {
+    worker_dispatcher_->run(Event::Dispatcher::RunType::Block);
+    // Verify we have the expected dispatcher for the new worker thread.
+    EXPECT_EQ(worker_dispatcher_.get(), &tls_.dispatcher());
+  });
+  thread->join();
+
+  tls_.shutdownGlobalThreading();
+  tls_.shutdownThread();
 }
 
 } // namespace

@@ -127,7 +127,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.fuzz <test>` &mdash; build and run a specified fuzz test or test dir under `-c dbg --config=asan-fuzzer` with clang. If specifying a single fuzz test, must use the full target name with "_with_libfuzzer" for `<test>`.
 * `bazel.compile_time_options` &mdash; build Envoy and run tests with various compile-time options toggled to their non-default state, to ensure they still build.
 * `bazel.compile_time_options <test>` &mdash; build Envoy and run a specified test or test dir with various compile-time options toggled to their non-default state, to ensure they still build.
-* `bazel.clang_tidy` &mdash; build and run clang-tidy over all source files.
+* `bazel.clang_tidy <files>` &mdash; build and run clang-tidy specified source files, if no files specified, runs against the diff with the last GitHub commit.
 * `check_format`&mdash; run `clang-format` and `buildifier` on entire source tree.
 * `fix_format`&mdash; run and enforce `clang-format` and `buildifier` on entire source tree.
 * `check_spelling`&mdash; run `misspell` on entire project.
@@ -176,8 +176,7 @@ The macOS CI build is part of the [CircleCI](https://circleci.com/gh/envoyproxy/
 Dependencies are installed by the `ci/mac_ci_setup.sh` script, via [Homebrew](https://brew.sh),
 which is pre-installed on the CircleCI macOS image. The dependencies are cached are re-installed
 on every build. The `ci/mac_ci_steps.sh` script executes the specific commands that
-build and test Envoy. If Envoy cannot be built (`error: /Library/Developer/CommandLineTools/usr/bin/libtool: no output file specified (specify with -o output)`),
-ensure that Xcode is installed.
+build and test Envoy. Note that the full version of Xcode (not just Command Line Tools) is required.
 
 # Coverity Scan Build Flow
 

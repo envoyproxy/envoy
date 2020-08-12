@@ -9,6 +9,7 @@
 # external dependencies. Since BUILD files are generated, this is the canonical
 # place to define this mapping.
 EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP = {
+    "google/api/expr/v1alpha1/checked.proto": "@com_google_googleapis//google/api/expr/v1alpha1:checked_proto",
     "google/api/expr/v1alpha1/syntax.proto": "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto",
     "metrics.proto": "@prometheus_metrics_model//:client_model",
     "opencensus/proto/trace/v1/trace.proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto",
@@ -17,6 +18,7 @@ EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP = {
 
 # This maps from the Bazel proto_library target to the Go language binding target for external dependencies.
 EXTERNAL_PROTO_GO_BAZEL_DEP_MAP = {
+    "@com_google_googleapis//google/api/expr/v1alpha1:checked_proto": "@com_google_googleapis//google/api/expr/v1alpha1:expr_go_proto",
     "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@com_google_googleapis//google/api/expr/v1alpha1:expr_go_proto",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto_go",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_and_config_proto_go",
@@ -24,6 +26,7 @@ EXTERNAL_PROTO_GO_BAZEL_DEP_MAP = {
 
 # This maps from the Bazel proto_library target to the C++ language binding target for external dependencies.
 EXTERNAL_PROTO_CC_BAZEL_DEP_MAP = {
+    "@com_google_googleapis//google/api/expr/v1alpha1:checked_proto": "@com_google_googleapis//google/api/expr/v1alpha1:checked_cc_proto",
     "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@com_google_googleapis//google/api/expr/v1alpha1:syntax_cc_proto",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto_cc",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto_cc",
@@ -31,6 +34,7 @@ EXTERNAL_PROTO_CC_BAZEL_DEP_MAP = {
 
 # This maps from the Bazel proto_library target to the Python language binding target for external dependencies.
 EXTERNAL_PROTO_PY_BAZEL_DEP_MAP = {
+    "@com_google_googleapis//google/api/expr/v1alpha1:checked_proto": "@com_google_googleapis//google/api/expr/v1alpha1:checked_py_proto",
     "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@com_google_googleapis//google/api/expr/v1alpha1:syntax_py_proto",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto_py",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto_py",

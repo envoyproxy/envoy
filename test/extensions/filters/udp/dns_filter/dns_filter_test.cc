@@ -4,7 +4,8 @@
 #include "common/common/logger.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/listener_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -100,7 +101,7 @@ public:
   Network::UdpRecvData udp_response_;
   NiceMock<Filesystem::MockInstance> file_system_;
   NiceMock<Stats::MockHistogram> histogram_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Server::Configuration::MockListenerFactoryContext> listener_factory_;
   Stats::IsolatedStoreImpl stats_store_;
   std::shared_ptr<Network::MockDnsResolver> resolver_;

@@ -5,7 +5,6 @@
 #include <memory>
 #include <stack>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/common/exception.h"
@@ -93,7 +92,7 @@ public:
     /**
      * Decodes a uint8_t array into a SymbolVec.
      */
-    static SymbolVec decodeSymbols(const SymbolTable::Storage array, uint64_t size);
+    static SymbolVec decodeSymbols(const SymbolTable::Storage array, size_t size);
 
     /**
      * Decodes a uint8_t array into a sequence of symbols and literal strings.
@@ -103,18 +102,18 @@ public:
      *
      * @param array the StatName encoded as a uint8_t array.
      * @param size the size of the array in bytes.
-     * @param symbolTokenFn a function to be called whenever a symbol is encountered in the array.
-     * @param stringVIewTokeNFn a function to be called whenever a string literal is encountered.
+     * @param symbol_token_fn a function to be called whenever a symbol is encountered in the array.
+     * @param string_view_token_fn a function to be called whenever a string literal is encountered.
      */
-    static void decodeTokens(const SymbolTable::Storage array, uint64_t size,
-                             const std::function<void(Symbol)>& symbolTokenFn,
-                             const std::function<void(absl::string_view)>& stringViewTokenFn);
+    static void decodeTokens(const SymbolTable::Storage array, size_t size,
+                             const std::function<void(Symbol)>& symbol_token_fn,
+                             const std::function<void(absl::string_view)>& string_view_token_fn);
 
     /**
      * Returns the number of bytes required to represent StatName as a uint8_t
      * array, including the encoded size.
      */
-    uint64_t bytesRequired() const {
+    size_t bytesRequired() const {
       return data_bytes_required_ + encodingSizeBytes(data_bytes_required_);
     }
 
@@ -130,13 +129,13 @@ public:
      * @param number A number to encode in a variable length byte-array.
      * @return The number of bytes it would take to encode the number.
      */
-    static uint64_t encodingSizeBytes(uint64_t number);
+    static size_t encodingSizeBytes(uint64_t number);
 
     /**
      * @param num_data_bytes The number of bytes in a data-block.
      * @return The total number of bytes required for the data-block and its encoded size.
      */
-    static uint64_t totalSizeBytes(uint64_t num_data_bytes) {
+    static size_t totalSizeBytes(size_t num_data_bytes) {
       return encodingSizeBytes(num_data_bytes) + num_data_bytes;
     }
 
@@ -167,10 +166,10 @@ public:
      * @param The encoded byte array, written previously by appendEncoding.
      * @return A pair containing the decoded number, and the number of bytes consumed from encoding.
      */
-    static std::pair<uint64_t, uint64_t> decodeNumber(const uint8_t* encoding);
+    static std::pair<uint64_t, size_t> decodeNumber(const uint8_t* encoding);
 
   private:
-    uint64_t data_bytes_required_{0};
+    size_t data_bytes_required_{0};
     MemBlockBuilder<uint8_t> mem_block_;
   };
 
@@ -229,7 +228,7 @@ private:
    * @param size the size of the array in bytes.
    * @return std::string the retrieved stat name.
    */
-  std::vector<absl::string_view> decodeStrings(const Storage array, uint64_t size) const;
+  std::vector<absl::string_view> decodeStrings(const Storage array, size_t size) const;
 
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
@@ -403,16 +402,16 @@ public:
   bool operator!=(const StatName& rhs) const { return !(*this == rhs); }
 
   /**
-   * @return uint64_t the number of bytes in the symbol array, excluding the
-   *                  overhead for the size itself.
+   * @return size_t the number of bytes in the symbol array, excluding the
+   *                overhead for the size itself.
    */
-  uint64_t dataSize() const;
+  size_t dataSize() const;
 
   /**
-   * @return uint64_t the number of bytes in the symbol array, including the
+   * @return size_t the number of bytes in the symbol array, including the
    *                  overhead for the size itself.
    */
-  uint64_t size() const { return SymbolTableImpl::Encoding::totalSizeBytes(dataSize()); }
+  size_t size() const { return SymbolTableImpl::Encoding::totalSizeBytes(dataSize()); }
 
   /**
    * Copies the entire StatName representation into a MemBlockBuilder, including
@@ -466,7 +465,8 @@ private:
    * hasher and comparator.
    */
   absl::string_view dataAsStringView() const {
-    return {reinterpret_cast<const char*>(data()), dataSize()};
+    return {reinterpret_cast<const char*>(data()),
+            static_cast<absl::string_view::size_type>(dataSize())};
   }
 
   const uint8_t* size_and_data_{nullptr};
@@ -497,7 +497,7 @@ public:
   // generate symbols for it.
   StatNameManagedStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(name, table), symbol_table_(table) {}
-  StatNameManagedStorage(StatNameManagedStorage&& src)
+  StatNameManagedStorage(StatNameManagedStorage&& src) noexcept
       : StatNameStorage(std::move(src)), symbol_table_(src.symbol_table_) {}
 
   ~StatNameManagedStorage() { free(symbol_table_); }
@@ -814,7 +814,7 @@ public:
    *
    * @return the StatName or fallback.
    */
-  StatName getBuiltin(absl::string_view token, StatName fallback);
+  StatName getBuiltin(absl::string_view token, StatName fallback) const;
 
   /**
    * Adds a StatName using the pool, but without remembering it in any maps.

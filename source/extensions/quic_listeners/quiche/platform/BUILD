@@ -1,12 +1,12 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
 # Build targets in this package are part of the QUICHE platform implementation.
 # These implementations are the infrastructure building block for QUIC. They are
@@ -188,7 +188,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
-        "//source/common/http:utility_lib",
+        "//source/common/http:url_utility_lib",
     ],
 )
 

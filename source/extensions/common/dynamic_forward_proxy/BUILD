@@ -1,18 +1,19 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "dns_cache_interface",
     hdrs = ["dns_cache.h"],
     deps = [
         "//include/envoy/common:backoff_strategy_interface",
+        "//include/envoy/common:random_generator_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/thread_local:thread_local_interface",

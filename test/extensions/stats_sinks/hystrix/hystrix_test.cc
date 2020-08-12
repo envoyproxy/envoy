@@ -5,7 +5,9 @@
 #include "extensions/stat_sinks/hystrix/hystrix.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/admin_stream.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
@@ -155,7 +157,7 @@ public:
     addClusterToMap(cluster2_name_, cluster2_.cluster_);
   }
 
-  std::unordered_map<std::string, std::string>
+  absl::node_hash_map<std::string, std::string>
   addSecondClusterAndSendDataHelper(Buffer::OwnedImpl& buffer, const uint64_t success_step,
                                     const uint64_t error_step, const uint64_t timeout_step,
                                     const uint64_t success_step2, const uint64_t error_step2,
@@ -214,8 +216,8 @@ public:
     }
   }
 
-  std::unordered_map<std::string, std::string> buildClusterMap(absl::string_view data_message) {
-    std::unordered_map<std::string, std::string> cluster_message_map;
+  absl::node_hash_map<std::string, std::string> buildClusterMap(absl::string_view data_message) {
+    absl::node_hash_map<std::string, std::string> cluster_message_map;
     std::vector<std::string> messages =
         absl::StrSplit(data_message, "data: ", absl::SkipWhitespace());
     for (auto message : messages) {
@@ -241,7 +243,7 @@ public:
   ClusterTestInfo cluster2_{cluster2_name_};
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
-  NiceMock<Server::MockInstance> server_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_;
   Upstream::ClusterManager::ClusterInfoMap cluster_map_;
 
   std::unique_ptr<HystrixSink> sink_;
@@ -255,7 +257,7 @@ TEST_F(HystrixSinkTest, EmptyFlush) {
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
   sink_->flush(snapshot_);
-  std::unordered_map<std::string, std::string> cluster_message_map =
+  absl::node_hash_map<std::string, std::string> cluster_message_map =
       buildClusterMap(buffer.toString());
   validateResults(cluster_message_map[cluster1_name_], 0, 0, 0, 0, 0, window_size_);
 }
@@ -278,7 +280,7 @@ TEST_F(HystrixSinkTest, BasicFlow) {
     sink_->flush(snapshot_);
   }
 
-  std::unordered_map<std::string, std::string> cluster_message_map =
+  absl::node_hash_map<std::string, std::string> cluster_message_map =
       buildClusterMap(buffer.toString());
 
   Json::ObjectSharedPtr json_buffer =
@@ -350,7 +352,7 @@ TEST_F(HystrixSinkTest, Disconnect) {
   }
 
   EXPECT_NE(buffer.length(), 0);
-  std::unordered_map<std::string, std::string> cluster_message_map =
+  absl::node_hash_map<std::string, std::string> cluster_message_map =
       buildClusterMap(buffer.toString());
   Json::ObjectSharedPtr json_buffer =
       Json::Factory::loadFromString(cluster_message_map[cluster1_name_]);
@@ -390,7 +392,7 @@ TEST_F(HystrixSinkTest, AddCluster) {
   Buffer::OwnedImpl buffer = createClusterAndCallbacks();
 
   // Add cluster and "run" some traffic.
-  std::unordered_map<std::string, std::string> cluster_message_map =
+  absl::node_hash_map<std::string, std::string> cluster_message_map =
       addSecondClusterAndSendDataHelper(buffer, success_step, error_step, timeout_step,
                                         success_step2, error_step2, timeout_step2);
 
@@ -431,7 +433,7 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   removeSecondClusterHelper(buffer);
 
   // Check that removed worked.
-  std::unordered_map<std::string, std::string> cluster_message_map =
+  absl::node_hash_map<std::string, std::string> cluster_message_map =
       buildClusterMap(buffer.toString());
   ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end())
       << "cluster1_name = " << cluster1_name_;
@@ -483,7 +485,7 @@ TEST_F(HystrixSinkTest, HistogramTest) {
   sink_->registerConnection(&callbacks_);
   sink_->flush(snapshot_);
 
-  std::unordered_map<std::string, std::string> cluster_message_map =
+  absl::node_hash_map<std::string, std::string> cluster_message_map =
       buildClusterMap(buffer.toString());
 
   Json::ObjectSharedPtr latency = Json::Factory::loadFromString(cluster_message_map[cluster1_name_])

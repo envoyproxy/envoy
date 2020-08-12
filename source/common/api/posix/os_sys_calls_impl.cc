@@ -73,6 +73,43 @@ bool OsSysCallsImpl::supportsMmsg() const {
 #endif
 }
 
+bool OsSysCallsImpl::supportsUdpGro() const {
+#if !defined(__linux__)
+  return false;
+#else
+  static const bool is_supported = [] {
+    int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
+    if (fd < 0) {
+      return false;
+    }
+    int val = 1;
+    bool result = (0 == ::setsockopt(fd, IPPROTO_UDP, UDP_GRO, &val, sizeof(val)));
+    ::close(fd);
+    return result;
+  }();
+  return is_supported;
+#endif
+}
+
+bool OsSysCallsImpl::supportsUdpGso() const {
+#if !defined(__linux__)
+  return false;
+#else
+  static const bool is_supported = [] {
+    int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
+    if (fd < 0) {
+      return false;
+    }
+    int optval;
+    socklen_t optlen = sizeof(optval);
+    bool result = (0 <= ::getsockopt(fd, IPPROTO_UDP, UDP_SEGMENT, &optval, &optlen));
+    ::close(fd);
+    return result;
+  }();
+  return is_supported;
+#endif
+}
+
 SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {
   const int rc = ::ftruncate(fd, length);
   return {rc, rc != -1 ? 0 : errno};
@@ -162,6 +199,25 @@ SysCallIntResult OsSysCallsImpl::listen(os_fd_t sockfd, int backlog) {
 
 SysCallSizeResult OsSysCallsImpl::write(os_fd_t sockfd, const void* buffer, size_t length) {
   const ssize_t rc = ::write(sockfd, buffer, length);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) {
+  os_fd_t rc;
+
+#if defined(__linux__)
+  rc = ::accept4(sockfd, addr, addrlen, SOCK_NONBLOCK);
+  // If failed with EINVAL try without flags
+  if (rc >= 0 || errno != EINVAL) {
+    return {rc, rc != -1 ? 0 : errno};
+  }
+#endif
+
+  rc = ::accept(sockfd, addr, addrlen);
+  if (rc >= 0) {
+    setsocketblocking(rc, false);
+  }
+
   return {rc, rc != -1 ? 0 : errno};
 }
 

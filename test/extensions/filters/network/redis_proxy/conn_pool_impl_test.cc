@@ -134,7 +134,7 @@ public:
     EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
         .WillOnce(
             Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-              EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
+              EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2("hash_key"));
               EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
               EXPECT_EQ(context->downstreamConnection(), nullptr);
               return this->cm_.thread_local_cluster_.lb_.host_;
@@ -150,7 +150,7 @@ public:
     EXPECT_NE(nullptr, request);
   }
 
-  std::unordered_map<Upstream::HostConstSharedPtr, InstanceImpl::ThreadLocalActiveClientPtr>&
+  absl::node_hash_map<Upstream::HostConstSharedPtr, InstanceImpl::ThreadLocalActiveClientPtr>&
   clientMap() {
     InstanceImpl* conn_pool_impl = dynamic_cast<InstanceImpl*>(conn_pool_.get());
     return conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().client_map_;
@@ -161,7 +161,7 @@ public:
     return conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().client_map_[host].get();
   }
 
-  std::unordered_map<std::string, Upstream::HostConstSharedPtr>& hostAddressMap() {
+  absl::node_hash_map<std::string, Upstream::HostConstSharedPtr>& hostAddressMap() {
     InstanceImpl* conn_pool_impl = dynamic_cast<InstanceImpl*>(conn_pool_.get());
     return conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().host_address_map_;
   }
@@ -230,7 +230,7 @@ public:
     EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
         .WillOnce(
             Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-              EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
+              EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2("hash_key"));
               EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
               EXPECT_EQ(context->downstreamConnection(), nullptr);
               auto redis_context =
@@ -306,7 +306,7 @@ TEST_F(RedisConnPoolImplTest, Basic) {
 
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
+        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2("hash_key"));
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
         EXPECT_EQ(context->downstreamConnection(), nullptr);
         return cm_.thread_local_cluster_.lb_.host_;
@@ -337,7 +337,7 @@ TEST_F(RedisConnPoolImplTest, BasicRespVariant) {
 
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
+        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2("hash_key"));
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
         EXPECT_EQ(context->downstreamConnection(), nullptr);
         return cm_.thread_local_cluster_.lb_.host_;
@@ -367,7 +367,7 @@ TEST_F(RedisConnPoolImplTest, ClientRequestFailed) {
 
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
+        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2("hash_key"));
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
         EXPECT_EQ(context->downstreamConnection(), nullptr);
         return cm_.thread_local_cluster_.lb_.host_;
@@ -410,7 +410,7 @@ TEST_F(RedisConnPoolImplTest, Hashtagging) {
 
   auto expectHashKey = [](const std::string& s) {
     return [s](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-      EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64(s));
+      EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2(s));
       return nullptr;
     };
   };
@@ -441,7 +441,7 @@ TEST_F(RedisConnPoolImplTest, HashtaggingNotEnabled) {
 
   auto expectHashKey = [](const std::string& s) {
     return [s](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-      EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64(s));
+      EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2(s));
       return nullptr;
     };
   };
@@ -631,10 +631,6 @@ TEST_F(RedisConnPoolImplTest, RemoteClose) {
 }
 
 TEST_F(RedisConnPoolImplTest, MakeRequestToHost) {
-  InSequence s;
-
-  setup(false);
-
   Common::Redis::RespValue value;
   Common::Redis::Client::MockPoolRequest active_request1;
   Common::Redis::Client::MockPoolRequest active_request2;
@@ -645,48 +641,55 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToHost) {
   Upstream::HostConstSharedPtr host1;
   Upstream::HostConstSharedPtr host2;
 
-  // There is no cluster yet, so makeRequestToHost() should fail.
-  EXPECT_EQ(nullptr, conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1));
-  // Add the cluster now.
-  update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
+  {
+    InSequence s;
 
-  EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client1)));
-  EXPECT_CALL(*client1, makeRequest_(Ref(value), Ref(callbacks1)))
-      .WillOnce(Return(&active_request1));
-  Common::Redis::Client::PoolRequest* request1 =
-      conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1);
-  EXPECT_EQ(&active_request1, request1);
-  EXPECT_EQ(host1->address()->asString(), "10.0.0.1:3000");
+    setup(false);
 
-  // IPv6 address returned from Redis server will not have square brackets
-  // around it, while Envoy represents Address::Ipv6Instance addresses with square brackets around
-  // the address.
-  EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host2), Return(client2)));
-  EXPECT_CALL(*client2, makeRequest_(Ref(value), Ref(callbacks2)))
-      .WillOnce(Return(&active_request2));
-  Common::Redis::Client::PoolRequest* request2 =
-      conn_pool_->makeRequestToHost("2001:470:813B:0:0:0:0:1:3333", value, callbacks2);
-  EXPECT_EQ(&active_request2, request2);
-  EXPECT_EQ(host2->address()->asString(), "[2001:470:813b::1]:3333");
+    // There is no cluster yet, so makeRequestToHost() should fail.
+    EXPECT_EQ(nullptr, conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1));
+    // Add the cluster now.
+    update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
 
-  // Test with a badly specified host address (no colon, no address, no port).
-  EXPECT_EQ(conn_pool_->makeRequestToHost("bad", value, callbacks1), nullptr);
-  // Test with a badly specified IPv4 address.
-  EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.bad:3000", value, callbacks1), nullptr);
-  // Test with a badly specified TCP port.
-  EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.0.1:bad", value, callbacks1), nullptr);
-  // Test with a TCP port outside of the acceptable range for a 32-bit integer.
-  EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.0.1:4294967297", value, callbacks1),
-            nullptr); // 2^32 + 1
-  // Test with a TCP port outside of the acceptable range for a TCP port (0 .. 65535).
-  EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.0.1:65536", value, callbacks1), nullptr);
-  // Test with a badly specified IPv6-like address.
-  EXPECT_EQ(conn_pool_->makeRequestToHost("bad:ipv6:3000", value, callbacks1), nullptr);
-  // Test with a valid IPv6 address and a badly specified TCP port (out of range).
-  EXPECT_EQ(conn_pool_->makeRequestToHost("2001:470:813b:::70000", value, callbacks1), nullptr);
+    EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client1)));
+    EXPECT_CALL(*client1, makeRequest_(Ref(value), Ref(callbacks1)))
+        .WillOnce(Return(&active_request1));
+    Common::Redis::Client::PoolRequest* request1 =
+        conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1);
+    EXPECT_EQ(&active_request1, request1);
+    EXPECT_EQ(host1->address()->asString(), "10.0.0.1:3000");
 
-  EXPECT_CALL(*client2, close());
+    // IPv6 address returned from Redis server will not have square brackets
+    // around it, while Envoy represents Address::Ipv6Instance addresses with square brackets around
+    // the address.
+    EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host2), Return(client2)));
+    EXPECT_CALL(*client2, makeRequest_(Ref(value), Ref(callbacks2)))
+        .WillOnce(Return(&active_request2));
+    Common::Redis::Client::PoolRequest* request2 =
+        conn_pool_->makeRequestToHost("2001:470:813B:0:0:0:0:1:3333", value, callbacks2);
+    EXPECT_EQ(&active_request2, request2);
+    EXPECT_EQ(host2->address()->asString(), "[2001:470:813b::1]:3333");
+
+    // Test with a badly specified host address (no colon, no address, no port).
+    EXPECT_EQ(conn_pool_->makeRequestToHost("bad", value, callbacks1), nullptr);
+    // Test with a badly specified IPv4 address.
+    EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.bad:3000", value, callbacks1), nullptr);
+    // Test with a badly specified TCP port.
+    EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.0.1:bad", value, callbacks1), nullptr);
+    // Test with a TCP port outside of the acceptable range for a 32-bit integer.
+    EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.0.1:4294967297", value, callbacks1),
+              nullptr); // 2^32 + 1
+    // Test with a TCP port outside of the acceptable range for a TCP port (0 .. 65535).
+    EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.0.1:65536", value, callbacks1), nullptr);
+    // Test with a badly specified IPv6-like address.
+    EXPECT_EQ(conn_pool_->makeRequestToHost("bad:ipv6:3000", value, callbacks1), nullptr);
+    // Test with a valid IPv6 address and a badly specified TCP port (out of range).
+    EXPECT_EQ(conn_pool_->makeRequestToHost("2001:470:813b:::70000", value, callbacks1), nullptr);
+  }
+
+  // We cannot guarantee which order close will be called, perform these checks unsequenced
   EXPECT_CALL(*client1, close());
+  EXPECT_CALL(*client2, close());
   tls_.shutdownThread();
 }
 
@@ -741,7 +744,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndRemovedWithDraining) {
   EXPECT_EQ(&active_request2, request2);
   EXPECT_EQ(host2->address()->asString(), "[2001:470:813b::1]:3333");
 
-  std::unordered_map<std::string, Upstream::HostConstSharedPtr>& host_address_map =
+  absl::node_hash_map<std::string, Upstream::HostConstSharedPtr>& host_address_map =
       hostAddressMap();
   EXPECT_EQ(host_address_map.size(), 2); // host1 and host2 have been created.
   EXPECT_EQ(host_address_map[host1->address()->asString()], host1);
@@ -840,7 +843,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithNoDraining) {
   EXPECT_EQ(&active_request2, request2);
   EXPECT_EQ(host2->address()->asString(), "[2001:470:813b::1]:3333");
 
-  std::unordered_map<std::string, Upstream::HostConstSharedPtr>& host_address_map =
+  absl::node_hash_map<std::string, Upstream::HostConstSharedPtr>& host_address_map =
       hostAddressMap();
   EXPECT_EQ(host_address_map.size(), 2); // host1 and host2 have been created.
   EXPECT_EQ(host_address_map[host1->address()->asString()], host1);
@@ -918,7 +921,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithClusterRemoval) {
   EXPECT_EQ(&active_request2, request2);
   EXPECT_EQ(host2->address()->asString(), "[2001:470:813b::1]:3333");
 
-  std::unordered_map<std::string, Upstream::HostConstSharedPtr>& host_address_map =
+  absl::node_hash_map<std::string, Upstream::HostConstSharedPtr>& host_address_map =
       hostAddressMap();
   EXPECT_EQ(host_address_map.size(), 2); // host1 and host2 have been created.
   EXPECT_EQ(host_address_map[host1->address()->asString()], host1);
@@ -1186,7 +1189,7 @@ TEST_F(RedisConnPoolImplTest, MakeRequestAndRedirectFollowedByDelete) {
   MockPoolCallbacks callbacks;
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
+        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2("hash_key"));
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
         EXPECT_EQ(context->downstreamConnection(), nullptr);
         return this->cm_.thread_local_cluster_.lb_.host_;

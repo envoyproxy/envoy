@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
@@ -32,7 +33,7 @@ static constexpr double defaultAggression = 2.0;
 
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
     const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
-    Runtime::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotPtr&& tls,
+    Random::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotPtr&& tls,
     std::shared_ptr<ResponseEvaluator> response_evaluator)
     : random_(random), scope_(scope), tls_(std::move(tls)),
       admission_control_feature_(proto_config.enabled(), runtime),
@@ -49,7 +50,7 @@ double AdmissionControlFilterConfig::aggression() const {
 AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
                                                const std::string& stats_prefix)
     : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)),
-      record_request_(true) {}
+      expect_grpc_status_in_trailer_(false), record_request_(true) {}
 
 Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   // TODO(tonya11en): Ensure we document the fact that healthchecks are ignored.

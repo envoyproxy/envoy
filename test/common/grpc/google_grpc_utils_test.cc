@@ -8,6 +8,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::HasSubstr;
 using testing::Pair;
 using testing::UnorderedElementsAre;
 
@@ -99,8 +100,8 @@ TEST(GoogleGrpcUtilsTest, ChannelArgsFromConfig) {
   )EOF");
   const grpc::ChannelArguments channel_args = GoogleGrpcUtils::channelArgsFromConfig(config);
   grpc_channel_args effective_args = channel_args.c_channel_args();
-  std::unordered_map<std::string, std::string> string_args;
-  std::unordered_map<std::string, int> int_args;
+  absl::node_hash_map<std::string, std::string> string_args;
+  absl::node_hash_map<std::string, int> int_args;
   for (uint32_t n = 0; n < effective_args.num_args; ++n) {
     const grpc_arg arg = effective_args.args[n];
     ASSERT_TRUE(arg.type == GRPC_ARG_STRING || arg.type == GRPC_ARG_INTEGER);
@@ -110,9 +111,10 @@ TEST(GoogleGrpcUtilsTest, ChannelArgsFromConfig) {
       int_args[arg.key] = arg.value.integer;
     }
   }
-  EXPECT_THAT(string_args, UnorderedElementsAre(Pair("grpc.ssl_target_name_override", "bar"),
-                                                Pair("grpc.primary_user_agent", "grpc-c++/1.25.0"),
-                                                Pair("grpc.default_authority", "foo")));
+  EXPECT_THAT(string_args,
+              UnorderedElementsAre(Pair("grpc.ssl_target_name_override", "bar"),
+                                   Pair("grpc.primary_user_agent", HasSubstr("grpc-c++/")),
+                                   Pair("grpc.default_authority", "foo")));
   EXPECT_THAT(int_args, UnorderedElementsAre(Pair("grpc.http2.max_ping_strikes", 5),
                                              Pair("grpc.http2.max_pings_without_data", 3)));
 }

@@ -59,7 +59,7 @@ DEFINE_PROTO_FUZZER(
   ConfigSharedPtr config = nullptr;
   try {
     config = std::make_shared<Config>(proto_config, dispatcher, stats_store, runtime);
-  } catch (EnvoyException e) {
+  } catch (EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException in config's constructor: {}", e.what());
     return;
   }

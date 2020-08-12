@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/random_generator.h"
 #include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
@@ -75,6 +76,10 @@ public:
 
   void setSampled(bool sampled) override;
 
+  // TODO(#11622): Implement baggage storage for zipkin spans
+  void setBaggage(absl::string_view, absl::string_view) override;
+  std::string getBaggage(absl::string_view) override;
+
   /**
    * @return a reference to the Zipkin::Span object.
    */
@@ -99,7 +104,7 @@ public:
   Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
          Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
          ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
-         const LocalInfo::LocalInfo& localinfo, Runtime::RandomGenerator& random_generator,
+         const LocalInfo::LocalInfo& localinfo, Random::RandomGenerator& random_generator,
          TimeSource& time_source);
 
   /**

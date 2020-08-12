@@ -9,7 +9,6 @@ namespace Network {
 
 class SocketImpl : public virtual Socket {
 public:
-  SocketImpl(Socket::Type type, Address::Type addr_type, Address::IpVersion version);
   SocketImpl(Socket::Type socket_type, const Address::InstanceConstSharedPtr addr);
 
   // Network::Socket

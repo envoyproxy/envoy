@@ -12,6 +12,7 @@
 using testing::AtLeast;
 using testing::ByMove;
 using testing::InSequence;
+using testing::InvokeWithoutArgs;
 using testing::Return;
 using testing::ReturnNew;
 using testing::SaveArg;
@@ -66,6 +67,7 @@ public:
                               int send_sys_errno = 0) {
       EXPECT_CALL(*idle_timer_, enableTimer(parent_.config_->sessionTimeout(), nullptr));
 
+      EXPECT_CALL(*io_handle_, supportsUdpGro());
       EXPECT_CALL(*io_handle_, supportsMmsg());
       // Return the datagram.
       EXPECT_CALL(*io_handle_, recvmsg(_, 1, _, _))
@@ -97,6 +99,7 @@ public:
               }
             }));
         // Return an EAGAIN result.
+        EXPECT_CALL(*io_handle_, supportsUdpGro());
         EXPECT_CALL(*io_handle_, supportsMmsg());
         EXPECT_CALL(*io_handle_, recvmsg(_, 1, _, _))
             .WillOnce(Return(ByMove(Api::IoCallUint64Result(
@@ -160,9 +163,14 @@ public:
     EXPECT_CALL(*filter_, createIoHandle(_))
         .WillOnce(Return(ByMove(Network::IoHandlePtr{test_sessions_.back().io_handle_})));
     EXPECT_CALL(*new_session.io_handle_, fd());
-    EXPECT_CALL(callbacks_.udp_listener_.dispatcher_,
-                createFileEvent_(_, _, Event::FileTriggerType::Edge, Event::FileReadyType::Read))
+    EXPECT_CALL(
+        callbacks_.udp_listener_.dispatcher_,
+        createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
         .WillOnce(DoAll(SaveArg<1>(&new_session.file_event_cb_), Return(nullptr)));
+    // Internal Buffer is Empty, flush will be a no-op
+    ON_CALL(callbacks_.udp_listener_, flush())
+        .WillByDefault(
+            InvokeWithoutArgs([]() -> Api::IoCallUint64Result { return makeNoError(0); }));
   }
 
   void checkTransferStats(uint64_t rx_bytes, uint64_t rx_datagrams, uint64_t tx_bytes,

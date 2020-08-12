@@ -230,27 +230,20 @@ public:
 
     // Entries in this headers are not present in the original request headers.
     new_headers_from_upstream.iterate(
-        [](const Http::HeaderEntry& h, void* context) -> Http::HeaderMap::Iterate {
-          auto* entry = static_cast<envoy::service::auth::v3::CheckResponse*>(context)
-                            ->mutable_ok_response()
-                            ->mutable_headers()
-                            ->Add();
+        [&check_response](const Http::HeaderEntry& h) -> Http::HeaderMap::Iterate {
+          auto* entry = check_response.mutable_ok_response()->mutable_headers()->Add();
           // Try to append to a non-existent field.
           entry->mutable_append()->set_value(true);
           entry->mutable_header()->set_key(std::string(h.key().getStringView()));
           entry->mutable_header()->set_value(std::string(h.value().getStringView()));
           return Http::HeaderMap::Iterate::Continue;
-        },
-        &check_response);
+        });
 
     // Entries in this headers are not present in the original request headers. But we set append =
     // true and append = false.
     headers_to_append_multiple.iterate(
-        [](const Http::HeaderEntry& h, void* context) -> Http::HeaderMap::Iterate {
-          auto* entry = static_cast<envoy::service::auth::v3::CheckResponse*>(context)
-                            ->mutable_ok_response()
-                            ->mutable_headers()
-                            ->Add();
+        [&check_response](const Http::HeaderEntry& h) -> Http::HeaderMap::Iterate {
+          auto* entry = check_response.mutable_ok_response()->mutable_headers()->Add();
           const auto key = std::string(h.key().getStringView());
           const auto value = std::string(h.value().getStringView());
 
@@ -259,8 +252,7 @@ public:
           entry->mutable_header()->set_key(key);
           entry->mutable_header()->set_value(value);
           return Http::HeaderMap::Iterate::Continue;
-        },
-        &check_response);
+        });
 
     ext_authz_request_->sendGrpcMessage(check_response);
     ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);

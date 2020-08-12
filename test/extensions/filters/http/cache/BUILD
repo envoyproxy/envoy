@@ -9,13 +9,13 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "http_cache_utils_test",
-    srcs = ["http_cache_utils_test.cc"],
+    name = "cache_headers_utils_test",
+    srcs = ["cache_headers_utils_test.cc"],
     extension_name = "envoy.filters.http.cache",
     deps = [
         "//include/envoy/http:header_map_interface",
         "//source/common/http:header_map_lib",
-        "//source/extensions/filters/http/cache:http_cache_utils_lib",
+        "//source/extensions/filters/http/cache:cache_headers_utils_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -40,18 +40,18 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/cache:cache_filter_lib",
         "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )
 
 envoy_extension_cc_test(
-    name = "cache_filter_utils_test",
-    srcs = ["cache_filter_utils_test.cc"],
+    name = "cacheability_utils_test",
+    srcs = ["cacheability_utils_test.cc"],
     extension_name = "envoy.filters.http.cache",
     deps = [
-        "//source/extensions/filters/http/cache:cache_filter_utils_lib",
+        "//source/extensions/filters/http/cache:cacheability_utils_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -64,7 +64,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/cache:config",
         "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
     ],
 )

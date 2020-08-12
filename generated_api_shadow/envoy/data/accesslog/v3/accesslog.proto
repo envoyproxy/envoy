@@ -186,7 +186,7 @@ message AccessLogCommon {
 }
 
 // Flags indicating occurrences during request/response processing.
-// [#next-free-field: 22]
+// [#next-free-field: 23]
 message ResponseFlags {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.ResponseFlags";
@@ -269,6 +269,9 @@ message ResponseFlags {
 
   // Indicates the response was served from a cache filter.
   bool response_from_cache_filter = 21;
+
+  // Indicates that a filter configuration is not available.
+  bool no_filter_config_found = 22;
 }
 
 // Properties of a negotiated TLS connection.

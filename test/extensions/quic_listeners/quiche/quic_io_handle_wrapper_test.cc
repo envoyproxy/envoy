@@ -60,7 +60,6 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   EXPECT_CALL(os_sys_calls_, getsockname(_, _, _)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   wrapper_->domain();
 
-  EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _)).WillOnce(Return(0));
   EXPECT_CALL(os_sys_calls_, getsockname(_, _, _))
       .WillOnce(Invoke([](os_fd_t, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
         addr->sa_family = AF_INET6;
@@ -112,6 +111,9 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
                      "recvmmsg is called after close");
   EXPECT_DEBUG_DEATH(wrapper_->recvmmsg(slices, /*self_port=*/12345, output2),
                      "recvmmsg is called after close");
+
+  EXPECT_CALL(os_sys_calls_, supportsUdpGro());
+  wrapper_->supportsUdpGro();
 
   EXPECT_CALL(os_sys_calls_, supportsMmsg());
   wrapper_->supportsMmsg();

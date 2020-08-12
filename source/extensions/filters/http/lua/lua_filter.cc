@@ -19,6 +19,11 @@ namespace Lua {
 
 namespace {
 
+struct HttpResponseCodeDetailValues {
+  const absl::string_view LuaResponse = "lua_response";
+};
+using HttpResponseCodeDetails = ConstSingleton<HttpResponseCodeDetailValues>;
+
 const std::string DEPRECATED_LUA_NAME = "envoy.lua";
 
 std::atomic<bool>& deprecatedNameLogged() {
@@ -330,17 +335,15 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
 
   // We need to build a table with the headers as return param 1. The body will be return param 2.
   lua_newtable(coroutine_.luaState());
-  response->headers().iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        lua_State* state = static_cast<lua_State*>(context);
-        lua_pushlstring(state, header.key().getStringView().data(),
-                        header.key().getStringView().length());
-        lua_pushlstring(state, header.value().getStringView().data(),
-                        header.value().getStringView().length());
-        lua_settable(state, -3);
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      coroutine_.luaState());
+  response->headers().iterate([lua_State = coroutine_.luaState()](
+                                  const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    lua_pushlstring(lua_State, header.key().getStringView().data(),
+                    header.key().getStringView().length());
+    lua_pushlstring(lua_State, header.value().getStringView().data(),
+                    header.value().getStringView().length());
+    lua_settable(lua_State, -3);
+    return Http::HeaderMap::Iterate::Continue;
+  });
 
   // TODO(mattklein123): Avoid double copy here.
   if (response->body() != nullptr) {
@@ -723,6 +726,7 @@ void Filter::scriptLog(spdlog::level::level_enum level, const char* message) {
 
 void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                                        lua_State*) {
+  callbacks_->streamInfo().setResponseCodeDetails(HttpResponseCodeDetails::get().LuaResponse);
   callbacks_->encodeHeaders(std::move(headers), body == nullptr);
   if (body && !parent_.destroyed_) {
     callbacks_->encodeData(*body, true);

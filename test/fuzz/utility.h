@@ -83,8 +83,8 @@ replaceInvalidStringValues(const envoy::config::core::v3::Metadata& upstream_met
 template <class T>
 inline T fromHeaders(
     const test::fuzz::Headers& headers,
-    const std::unordered_set<std::string>& ignore_headers = std::unordered_set<std::string>(),
-    std::unordered_set<std::string> include_headers = std::unordered_set<std::string>()) {
+    const absl::node_hash_set<std::string>& ignore_headers = absl::node_hash_set<std::string>(),
+    absl::node_hash_set<std::string> include_headers = absl::node_hash_set<std::string>()) {
   T header_map;
   for (const auto& header : headers.headers()) {
     if (ignore_headers.find(absl::AsciiStrToLower(header.key())) == ignore_headers.end()) {
@@ -116,14 +116,12 @@ inline Http::MetadataMapVector fromMetadata(const test::fuzz::Metadata& metadata
 // Convert from HeaderMap to test proto Headers.
 inline test::fuzz::Headers toHeaders(const Http::HeaderMap& headers) {
   test::fuzz::Headers fuzz_headers;
-  headers.iterate(
-      [](const Http::HeaderEntry& header, void* ctxt) -> Http::HeaderMap::Iterate {
-        auto* fuzz_header = static_cast<test::fuzz::Headers*>(ctxt)->add_headers();
-        fuzz_header->set_key(std::string(header.key().getStringView()));
-        fuzz_header->set_value(std::string(header.value().getStringView()));
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &fuzz_headers);
+  headers.iterate([&fuzz_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    auto* fuzz_header = fuzz_headers.add_headers();
+    fuzz_header->set_key(std::string(header.key().getStringView()));
+    fuzz_header->set_value(std::string(header.value().getStringView()));
+    return Http::HeaderMap::Iterate::Continue;
+  });
   return fuzz_headers;
 }
 

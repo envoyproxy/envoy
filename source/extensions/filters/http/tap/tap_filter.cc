@@ -35,7 +35,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool) {
-  if (tapper_ != nullptr) {
+  if ((tapper_ != nullptr) && (0 != data.length())) {
     tapper_->onRequestBody(data);
   }
   return Http::FilterDataStatus::Continue;
@@ -56,7 +56,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
 }
 
 Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool) {
-  if (tapper_ != nullptr) {
+  if ((tapper_ != nullptr) && (0 != data.length())) {
     tapper_->onResponseBody(data);
   }
   return Http::FilterDataStatus::Continue;

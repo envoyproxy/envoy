@@ -64,7 +64,7 @@ TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
   EXPECT_CALL(*cluster.info_, features()).WillRepeatedly(Return(0));
 
   Runtime::MockLoader runtime;
-  Runtime::MockRandomGenerator random;
+  Random::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
   AccessLog::MockAccessLogManager log_manager;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
@@ -83,7 +83,7 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
       .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP2));
 
   Runtime::MockLoader runtime;
-  Runtime::MockRandomGenerator random;
+  Random::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
   AccessLog::MockAccessLogManager log_manager;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
@@ -104,7 +104,7 @@ public:
   std::unique_ptr<MockHealthCheckEventLogger> event_logger_storage_{
       std::make_unique<MockHealthCheckEventLogger>()};
   MockHealthCheckEventLogger& event_logger_{*event_logger_storage_};
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
 };
 
@@ -136,8 +136,8 @@ public:
 
   using TestSessionPtr = std::unique_ptr<TestSession>;
   using HostWithHealthCheckMap =
-      std::unordered_map<std::string,
-                         const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig>;
+      absl::node_hash_map<std::string,
+                          const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig>;
 
   void allocHealthChecker(const std::string& yaml, bool avoid_boosting = true) {
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(

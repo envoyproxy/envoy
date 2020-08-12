@@ -275,24 +275,21 @@ void Filter::jsonizeRequest(Http::RequestHeaderMap const& headers, const Buffer:
   }
 
   // Wrap the headers
-  headers.iterate(
-      [](const Http::HeaderEntry& entry, void* ctx) -> Http::HeaderMap::Iterate {
-        auto* req = static_cast<Request*>(ctx);
-        // ignore H2 pseudo-headers
-        if (absl::StartsWith(entry.key().getStringView(), ":")) {
-          return Http::HeaderMap::Iterate::Continue;
-        }
-        std::string name = std::string(entry.key().getStringView());
-        auto it = req->mutable_headers()->find(name);
-        if (it == req->headers().end()) {
-          req->mutable_headers()->insert({name, std::string(entry.value().getStringView())});
-        } else {
-          // Coalesce headers with multiple values
-          it->second += fmt::format(",{}", entry.value().getStringView());
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &json_req);
+  headers.iterate([&json_req](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
+    // ignore H2 pseudo-headers
+    if (absl::StartsWith(entry.key().getStringView(), ":")) {
+      return Http::HeaderMap::Iterate::Continue;
+    }
+    std::string name = std::string(entry.key().getStringView());
+    auto it = json_req.mutable_headers()->find(name);
+    if (it == json_req.headers().end()) {
+      json_req.mutable_headers()->insert({name, std::string(entry.value().getStringView())});
+    } else {
+      // Coalesce headers with multiple values
+      it->second += fmt::format(",{}", entry.value().getStringView());
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
 
   // Wrap the Query String
   if (headers.Path()) {

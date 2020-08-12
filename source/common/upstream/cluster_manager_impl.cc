@@ -155,15 +155,11 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      std::unique_ptr<Cleanup> maybe_eds_resume;
+      Config::ScopedResume maybe_resume_eds;
       if (cm_.adsMux()) {
         const auto type_urls =
             Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-        if (!cm_.adsMux()->paused(type_urls)) {
-          cm_.adsMux()->pause(type_urls);
-          maybe_eds_resume =
-              std::make_unique<Cleanup>([this, type_urls] { cm_.adsMux()->resume(type_urls); });
-        }
+        maybe_resume_eds = cm_.adsMux()->pause(type_urls);
       }
       initializeSecondaryClusters();
     }
@@ -238,7 +234,7 @@ void ClusterManagerInitHelper::setPrimaryClustersInitializedCb(
 ClusterManagerImpl::ClusterManagerImpl(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-    Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+    Random::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
     Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
     Http::Context& http_context, Grpc::Context& grpc_context)
@@ -805,9 +801,10 @@ void ClusterManagerImpl::updateClusterCounts() {
     const auto type_urls = Config::getAllVersionTypeUrls<envoy::config::cluster::v3::Cluster>();
     const uint64_t previous_warming = cm_stats_.warming_clusters_.value();
     if (previous_warming == 0 && !warming_clusters_.empty()) {
-      ads_mux_->pause(type_urls);
+      resume_cds_ = ads_mux_->pause(type_urls);
     } else if (previous_warming > 0 && warming_clusters_.empty()) {
-      ads_mux_->resume(type_urls);
+      ASSERT(resume_cds_ != nullptr);
+      resume_cds_.reset();
     }
   }
   cm_stats_.active_clusters_.set(active_clusters_.size());

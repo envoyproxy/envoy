@@ -5,17 +5,20 @@
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/network/exception.h"
+#include "envoy/network/udp_packet_writer_config.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 
 #include "common/access_log/access_log_impl.h"
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/config/utility.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/socket_option_factory.h"
+#include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_features.h"
@@ -168,7 +171,7 @@ Http::Context& ListenerFactoryContextBaseImpl::httpContext() { return server_.ht
 const LocalInfo::LocalInfo& ListenerFactoryContextBaseImpl::localInfo() const {
   return server_.localInfo();
 }
-Envoy::Runtime::RandomGenerator& ListenerFactoryContextBaseImpl::random() {
+Envoy::Random::RandomGenerator& ListenerFactoryContextBaseImpl::random() {
   return server_.random();
 }
 Envoy::Runtime::Loader& ListenerFactoryContextBaseImpl::runtime() { return server_.runtime(); }
@@ -274,6 +277,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);
   buildUdpListenerFactory(socket_type, concurrency);
+  buildUdpWriterFactory(socket_type);
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
   buildFilterChains();
@@ -329,6 +333,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);
   buildUdpListenerFactory(socket_type, concurrency);
+  buildUdpWriterFactory(socket_type);
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
   buildFilterChains();
@@ -370,7 +375,30 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
   }
 }
 
+void ListenerImpl::buildUdpWriterFactory(Network::Socket::Type socket_type) {
+  if (socket_type == Network::Socket::Type::Datagram) {
+    auto udp_writer_config = config_.udp_writer_config();
+    if (!Api::OsSysCallsSingleton::get().supportsUdpGso() ||
+        udp_writer_config.typed_config().type_url().empty()) {
+      const std::string default_type_url =
+          "type.googleapis.com/envoy.config.listener.v3.UdpDefaultWriterOptions";
+      udp_writer_config.mutable_typed_config()->set_type_url(default_type_url);
+    }
+    auto& config_factory =
+        Config::Utility::getAndCheckFactory<Network::UdpPacketWriterConfigFactory>(
+            udp_writer_config);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        udp_writer_config.typed_config(), validation_visitor_, config_factory);
+    udp_writer_factory_ = config_factory.createUdpPacketWriterFactory(*message);
+  }
+}
+
 void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
+  // The process-wide `signal()` handling may fail to handle SIGPIPE if overridden
+  // in the process (i.e., on a mobile client). Some OSes support handling it at the socket layer:
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    addListenSocketOptions(Network::SocketOptionFactory::buildSocketNoSigpipeOptions());
+  }
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, transparent, false)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }
@@ -389,6 +417,11 @@ void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
     addListenSocketOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+    // TODO(yugant) : Add a config option for UDP_GRO
+    if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+      // Needed to receive gso_size option
+      addListenSocketOptions(Network::SocketOptionFactory::buildUdpGroOptions());
+    }
   }
 }
 
@@ -538,7 +571,7 @@ Http::Context& PerListenerFactoryContextImpl::httpContext() {
 const LocalInfo::LocalInfo& PerListenerFactoryContextImpl::localInfo() const {
   return listener_factory_context_base_->localInfo();
 }
-Envoy::Runtime::RandomGenerator& PerListenerFactoryContextImpl::random() {
+Envoy::Random::RandomGenerator& PerListenerFactoryContextImpl::random() {
   return listener_factory_context_base_->random();
 }
 Envoy::Runtime::Loader& PerListenerFactoryContextImpl::runtime() {

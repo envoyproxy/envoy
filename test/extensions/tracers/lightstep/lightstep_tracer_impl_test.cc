@@ -124,7 +124,7 @@ public:
   std::unique_ptr<LightStepDriver> driver_;
   NiceMock<Event::MockTimer>* timer_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 
@@ -716,6 +716,17 @@ TEST_F(LightStepDriverTest, SpawnChild) {
 
   EXPECT_FALSE(base1_context.empty());
   EXPECT_FALSE(base2_context.empty());
+}
+
+TEST_F(LightStepDriverTest, GetAndSetBaggage) {
+  setupValidDriver();
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, true});
+
+  std::string key = "key1";
+  std::string value = "value1";
+  span->setBaggage(key, value);
+  EXPECT_EQ(span->getBaggage(key), value);
 }
 
 } // namespace

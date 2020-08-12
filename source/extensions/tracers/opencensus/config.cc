@@ -7,14 +7,13 @@
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/tracers/opencensus/opencensus_tracer_impl.h"
-#include "extensions/tracers/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace OpenCensus {
 
-OpenCensusTracerFactory::OpenCensusTracerFactory() : FactoryBase(TracerNames::get().OpenCensus) {}
+OpenCensusTracerFactory::OpenCensusTracerFactory() : FactoryBase("envoy.tracers.opencensus") {}
 
 Tracing::HttpTracerSharedPtr OpenCensusTracerFactory::createHttpTracerTyped(
     const envoy::config::trace::v3::OpenCensusConfig& proto_config,

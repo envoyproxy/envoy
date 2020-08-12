@@ -23,7 +23,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/listener_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -86,6 +86,7 @@ public:
   ResourceLimit& openConnections() override { return open_connections_; }
   const std::string& name() const override { return name_; }
   Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override { return absl::nullopt; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }
@@ -1282,6 +1283,7 @@ public:
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
   Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override { return absl::nullopt; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }

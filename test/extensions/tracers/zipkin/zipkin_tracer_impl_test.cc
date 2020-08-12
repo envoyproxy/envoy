@@ -2,7 +2,6 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
@@ -146,7 +145,7 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
 
   NiceMock<Tracing::MockConfig> config_;
   Event::SimulatedTimeSystem test_time_;
@@ -690,6 +689,14 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   EXPECT_FALSE(zipkin_zipkin_span4.annotations().empty());
   EXPECT_EQ(timestamp_count, zipkin_zipkin_span4.annotations().back().timestamp());
   EXPECT_EQ("abc", zipkin_zipkin_span4.annotations().back().value());
+
+  // ====
+  // Test baggage noop
+  // ====
+  Tracing::SpanPtr span5 = driver_->startSpan(config_, request_headers_, operation_name_,
+                                              start_time_, {Tracing::Reason::Sampling, true});
+  span5->setBaggage("baggage_key", "baggage_value");
+  EXPECT_EQ("", span5->getBaggage("baggage_key"));
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
@@ -865,11 +872,10 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   span->setSampled(true);
   span->injectContext(request_headers_);
   request_headers_.iterate(
-      [](const Http::HeaderEntry& header, void* cb) -> Http::HeaderMap::Iterate {
-        EXPECT_FALSE(static_cast<DupCallback*>(cb)->operator()(header.key().getStringView()));
+      [&dup_callback](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+        dup_callback(header.key().getStringView());
         return Http::HeaderMap::Iterate::Continue;
-      },
-      &dup_callback);
+      });
 }
 
 } // namespace

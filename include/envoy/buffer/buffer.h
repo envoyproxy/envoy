@@ -12,10 +12,12 @@
 #include "envoy/network/io_handle.h"
 
 #include "common/common/byte_order.h"
+#include "common/common/utility.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -54,6 +56,21 @@ public:
    */
   virtual void done() PURE;
 };
+
+/**
+ * A class to facilitate extracting buffer slices from a buffer instance.
+ */
+class SliceData {
+public:
+  virtual ~SliceData() = default;
+
+  /**
+   * @return a mutable view of the slice data.
+   */
+  virtual absl::Span<uint8_t> getMutableData() PURE;
+};
+
+using SliceDataPtr = std::unique_ptr<SliceData>;
 
 /**
  * A basic buffer abstraction.
@@ -145,6 +162,15 @@ public:
   getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const PURE;
 
   /**
+   * Transfer ownership of the front slice to the caller. Must only be called if the
+   * buffer is not empty otherwise the implementation will have undefined behavior.
+   * If the underlying slice is immutable then the implementation must create and return
+   * a mutable slice that has a copy of the immutable data.
+   * @return pointer to SliceData object that wraps the front slice
+   */
+  virtual SliceDataPtr extractMutableFrontSlice() PURE;
+
+  /**
    * @return uint64_t the total length of the buffer (not necessarily contiguous in memory).
    */
   virtual uint64_t length() const PURE;
@@ -190,9 +216,22 @@ public:
    * @param data supplies the data to search for.
    * @param size supplies the length of the data to search for.
    * @param start supplies the starting index to search from.
+   * @param length limits the search to specified number of bytes starting from start index.
+   * When length value is zero, entire length of data from starting index to the end is searched.
    * @return the index where the match starts or -1 if there is no match.
    */
-  virtual ssize_t search(const void* data, uint64_t size, size_t start) const PURE;
+  virtual ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const PURE;
+
+  /**
+   * Search for an occurrence of data within entire buffer.
+   * @param data supplies the data to search for.
+   * @param size supplies the length of the data to search for.
+   * @param start supplies the starting index to search from.
+   * @return the index where the match starts or -1 if there is no match.
+   */
+  ssize_t search(const void* data, uint64_t size, size_t start) const {
+    return search(data, size, start, 0);
+  }
 
   /**
    * Search for an occurrence of data at the start of a buffer.
@@ -248,7 +287,7 @@ public:
     static_assert(Size <= sizeof(T), "requested size is bigger than integer being read");
 
     if (length() < start + Size) {
-      throw EnvoyException("buffer underflow");
+      ExceptionUtil::throwEnvoyException("buffer underflow");
     }
 
     constexpr const auto displacement = Endianness == ByteOrder::BigEndian ? sizeof(T) - Size : 0;

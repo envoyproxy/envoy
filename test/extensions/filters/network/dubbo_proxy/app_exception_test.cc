@@ -49,9 +49,9 @@ TEST_F(AppExceptionTest, Encode) {
   EXPECT_TRUE(result.second);
 
   const ContextImpl* context = static_cast<const ContextImpl*>(result.first.get());
-  EXPECT_EQ(expect_body_size, context->body_size());
-  EXPECT_EQ(metadata->message_type(), MessageType::Response);
-  buffer.drain(context->header_size());
+  EXPECT_EQ(expect_body_size, context->bodySize());
+  EXPECT_EQ(metadata->messageType(), MessageType::Response);
+  buffer.drain(context->headerSize());
 
   // Verify the response type and content.
   size_t hessian_int_size;

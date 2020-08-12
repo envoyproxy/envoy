@@ -51,7 +51,7 @@ private:
   void runInitializeCallbackIfAny();
 
   ClusterManager& cm_;
-  std::unique_ptr<Config::Subscription> subscription_;
+  Config::SubscriptionPtr subscription_;
   std::string system_version_info_;
   std::function<void()> initialize_callback_;
   Stats::ScopePtr scope_;

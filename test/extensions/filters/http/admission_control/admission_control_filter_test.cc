@@ -12,7 +12,7 @@
 #include "extensions/filters/http/admission_control/thread_local_controller.h"
 
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -48,7 +48,7 @@ public:
 class TestConfig : public AdmissionControlFilterConfig {
 public:
   TestConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
-             Runtime::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotPtr&& tls,
+             Random::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotPtr&& tls,
              MockThreadLocalController& controller, std::shared_ptr<ResponseEvaluator> evaluator)
       : AdmissionControlFilterConfig(proto_config, runtime, random, scope, std::move(tls),
                                      std::move(evaluator)),
@@ -104,7 +104,7 @@ protected:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Stats::IsolatedStoreImpl scope_;
   Event::SimulatedTimeSystem time_system_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   std::shared_ptr<AdmissionControlFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<MockThreadLocalController> controller_;

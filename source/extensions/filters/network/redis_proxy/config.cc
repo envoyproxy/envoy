@@ -5,6 +5,7 @@
 
 #include "extensions/common/redis/cluster_refresh_manager_impl.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
+#include "extensions/filters/network/common/redis/fault_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 #include "extensions/filters/network/redis_proxy/proxy_filter.h"
 #include "extensions/filters/network/redis_proxy/router_impl.h"
@@ -86,10 +87,13 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   auto router =
       std::make_unique<PrefixRoutes>(prefix_routes, std::move(upstreams), context.runtime());
 
+  auto fault_manager = std::make_unique<Common::Redis::FaultManagerImpl>(
+      context.random(), context.runtime(), proto_config.faults());
+
   std::shared_ptr<CommandSplitter::Instance> splitter =
       std::make_shared<CommandSplitter::InstanceImpl>(
           std::move(router), context.scope(), filter_config->stat_prefix_, context.timeSource(),
-          proto_config.latency_in_micros());
+          proto_config.latency_in_micros(), std::move(fault_manager));
   return [splitter, filter_config](Network::FilterManager& filter_manager) -> void {
     Common::Redis::DecoderFactoryImpl factory;
     filter_manager.addReadFilter(std::make_shared<ProxyFilter>(

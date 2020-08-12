@@ -189,24 +189,28 @@ void IntegrationTcpClient::waitForData(const std::string& data, bool exact_match
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
 }
 
-void IntegrationTcpClient::waitForData(size_t length) {
+AssertionResult IntegrationTcpClient::waitForData(size_t length,
+                                                  std::chrono::milliseconds timeout) {
   if (payload_reader_->data().size() >= length) {
-    return;
+    return AssertionSuccess();
   }
 
-  payload_reader_->setLengthToWaitFor(length);
-  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  return payload_reader_->waitForLength(length, timeout);
 }
 
 void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
+  Event::TimerPtr timeout_timer =
+      connection_->dispatcher().createTimer([this]() -> void { connection_->dispatcher().exit(); });
+  timeout_timer->enableTimer(TestUtility::DefaultTimeout);
+
   if (ignore_spurious_events) {
-    while (!disconnected_) {
+    while (!disconnected_ && timeout_timer->enabled()) {
       connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
     }
   } else {
     connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
-    EXPECT_TRUE(disconnected_);
   }
+  EXPECT_TRUE(disconnected_);
 }
 
 void IntegrationTcpClient::waitForHalfClose() {
@@ -282,6 +286,11 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+  // In ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS mode, set runtime config to use legacy codecs.
+#ifdef ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS
+  ENVOY_LOG_MISC(debug, "Using new codecs");
+  setNewCodecs();
+#endif
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
@@ -481,7 +490,9 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
     const char* rejected = "listener_manager.lds.update_rejected";
     for (Stats::CounterSharedPtr success_counter = test_server_->counter(success),
                                  rejected_counter = test_server_->counter(rejected);
-         (success_counter == nullptr || success_counter->value() < concurrency_) &&
+         (success_counter == nullptr ||
+          success_counter->value() <
+              concurrency_ * config_helper_.bootstrap().static_resources().listeners_size()) &&
          (!allow_lds_rejection || rejected_counter == nullptr || rejected_counter->value() == 0);
          success_counter = test_server_->counter(success),
                                  rejected_counter = test_server_->counter(rejected)) {
@@ -533,15 +544,6 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
       });
 
   connection->run();
-}
-
-IntegrationTestServerPtr BaseIntegrationTest::createIntegrationTestServer(
-    const std::string& bootstrap_path,
-    std::function<void(IntegrationTestServer&)> on_server_ready_function,
-    std::function<void()> on_server_init_function, Event::TestTimeSystem& time_system) {
-  return IntegrationTestServer::create(bootstrap_path, version_, on_server_ready_function,
-                                       on_server_init_function, deterministic_, time_system, *api_,
-                                       defer_listener_finalization_);
 }
 
 void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
@@ -692,6 +694,23 @@ AssertionResult compareSets(const std::set<std::string>& set1, const std::set<st
     failure << x << ", ";
   }
   return failure << "}";
+}
+
+AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
+                                                          std::chrono::milliseconds timeout) {
+  const auto end_time = time_system_.monotonicTime() + timeout;
+  while (time_system_.monotonicTime() < end_time) {
+    try {
+      Network::TcpListenSocket(Network::Utility::getAddressWithPort(
+                                   *Network::Test::getCanonicalLoopbackAddress(version_), port),
+                               nullptr, true);
+      return AssertionSuccess();
+    } catch (const EnvoyException&) {
+      timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+    }
+  }
+
+  return AssertionFailure() << "Timeout waiting for port availability";
 }
 
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(

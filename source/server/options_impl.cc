@@ -10,8 +10,8 @@
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"
-#include "common/common/version.h"
 #include "common/protobuf/utility.h"
+#include "common/version/version.h"
 
 #include "server/options_impl_platform.h"
 
@@ -112,7 +112,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       "", "log-format-prefix-with-location",
       "Prefix all occurrences of '%v' in log format with with '[%g:%#] ' ('[path/to/file.cc:99] "
       "').",
-      false, true, "bool", cmd);
+      false, false, "bool", cmd);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
                                         cmd);
   TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,

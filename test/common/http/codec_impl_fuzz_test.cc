@@ -50,7 +50,7 @@ template <>
 TestRequestHeaderMapImpl
 fromSanitizedHeaders<TestRequestHeaderMapImpl>(const test::fuzz::Headers& headers) {
   return Fuzz::fromHeaders<TestRequestHeaderMapImpl>(headers, {"transfer-encoding"},
-                                                     {":authority"});
+                                                     {":authority", ":method", ":path"});
 }
 
 // Convert from test proto Http1ServerSettings to Http1Settings.
@@ -462,32 +462,34 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
 
+  Http1::CodecStats::AtomicPtr http1_stats;
+  Http2::CodecStats::AtomicPtr http2_stats;
   ClientConnectionPtr client;
   ServerConnectionPtr server;
   const bool http2 = http_version == HttpVersion::Http2;
-  Http1::CodecStats::AtomicPtr stats;
 
   if (http2) {
-    client = std::make_unique<Http2::TestClientConnectionImpl>(
-        client_connection, client_callbacks, stats_store, client_http2_options,
-        max_request_headers_kb, max_response_headers_count,
+    client = std::make_unique<Http2::ClientConnectionImpl>(
+        client_connection, client_callbacks, Http2::CodecStats::atomicGet(http2_stats, stats_store),
+        client_http2_options, max_request_headers_kb, max_response_headers_count,
         Http2::ProdNghttp2SessionFactory::get());
   } else {
     client = std::make_unique<Http1::ClientConnectionImpl>(
-        client_connection, Http1::CodecStats::atomicGet(stats, stats_store), client_callbacks,
+        client_connection, Http1::CodecStats::atomicGet(http1_stats, stats_store), client_callbacks,
         client_http1settings, max_response_headers_count);
   }
 
   if (http2) {
     const envoy::config::core::v3::Http2ProtocolOptions server_http2_options{
         fromHttp2Settings(input.h2_settings().server())};
-    server = std::make_unique<Http2::TestServerConnectionImpl>(
-        server_connection, server_callbacks, stats_store, server_http2_options,
-        max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
+    server = std::make_unique<Http2::ServerConnectionImpl>(
+        server_connection, server_callbacks, Http2::CodecStats::atomicGet(http2_stats, stats_store),
+        server_http2_options, max_request_headers_kb, max_request_headers_count,
+        headers_with_underscores_action);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
     server = std::make_unique<Http1::ServerConnectionImpl>(
-        server_connection, Http1::CodecStats::atomicGet(stats, stats_store), server_callbacks,
+        server_connection, Http1::CodecStats::atomicGet(http1_stats, stats_store), server_callbacks,
         server_http1settings, max_request_headers_kb, max_request_headers_count,
         headers_with_underscores_action);
   }
@@ -521,7 +523,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         }
         auto stream_ptr = pending_streams.front()->removeFromList(pending_streams);
         HttpStream* const stream = stream_ptr.get();
-        stream_ptr->moveIntoListBack(std::move(stream_ptr), streams);
+        LinkedList::moveIntoListBack(std::move(stream_ptr), streams);
         stream->response_.response_encoder_ = &encoder;
         encoder.getStream().addCallbacks(stream->response_.stream_callbacks_);
         stream->stream_index_ = streams.size() - 1;
@@ -578,7 +580,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
               should_close_connection = true;
             }
           });
-      stream->moveIntoListBack(std::move(stream), pending_streams);
+      LinkedList::moveIntoListBack(std::move(stream), pending_streams);
       break;
     }
     case test::common::http::Action::kStreamAction: {
@@ -643,8 +645,8 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     }
   }
   if (!codec_error && http2) {
-    dynamic_cast<Http2::TestClientConnectionImpl&>(*client).goAway();
-    dynamic_cast<Http2::TestServerConnectionImpl&>(*server).goAway();
+    dynamic_cast<Http2::ClientConnectionImpl&>(*client).goAway();
+    dynamic_cast<Http2::ServerConnectionImpl&>(*server).goAway();
   }
 }
 

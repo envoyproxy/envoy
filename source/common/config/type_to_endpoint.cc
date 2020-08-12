@@ -177,13 +177,19 @@ TypeUrlToVersionedServiceMap* buildTypeUrlToServiceMap() {
                                 "envoy.service.listener.v3.ListenerDiscoveryService"),
            SERVICE_VERSION_INFO("envoy.service.discovery.v2.RuntimeDiscoveryService",
                                 "envoy.service.runtime.v3.RuntimeDiscoveryService"),
+           ServiceVersionInfoMap{{
+               "envoy.service.extension.v3.ExtensionConfigDiscoveryService",
+               ServiceVersionInfo{{
+                   {envoy::config::core::v3::ApiVersion::V3,
+                    "envoy.service.extension.v3.ExtensionConfigDiscoveryService"},
+               }},
+           }},
        }) {
-    for (const auto& registered_service : registered) {
-      const TypeUrl resource_type_url = getResourceTypeUrl(registered_service.first);
+    for (const auto& [registered_service_name, registered_service_info] : registered) {
+      const TypeUrl resource_type_url = getResourceTypeUrl(registered_service_name);
       VersionedService& service = (*type_url_to_versioned_service_map)[resource_type_url];
 
-      for (const auto& versioned_service_name : registered_service.second.names_) {
-        const ServiceName& service_name = versioned_service_name.second;
+      for (const auto& [transport_api_version, service_name] : registered_service_info.names_) {
         const auto* service_desc =
             Protobuf::DescriptorPool::generated_pool()->FindServiceByName(service_name);
         ASSERT(service_desc != nullptr, fmt::format("{} missing", service_name));
@@ -193,7 +199,6 @@ TypeUrlToVersionedServiceMap* buildTypeUrlToServiceMap() {
         // services don't implement all, e.g. VHDS doesn't support SotW or REST.
         for (int method_index = 0; method_index < service_desc->method_count(); ++method_index) {
           const auto& method_desc = *service_desc->method(method_index);
-          const auto transport_api_version = versioned_service_name.first;
           if (absl::StartsWith(method_desc.name(), "Stream")) {
             service.sotw_grpc_.methods_[transport_api_version] = method_desc.full_name();
           } else if (absl::StartsWith(method_desc.name(), "Delta")) {

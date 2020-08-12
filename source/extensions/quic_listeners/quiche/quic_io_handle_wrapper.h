@@ -63,10 +63,14 @@ public:
     return io_handle_.recvmmsg(slices, self_port, output);
   }
   bool supportsMmsg() const override { return io_handle_.supportsMmsg(); }
+  bool supportsUdpGro() const override { return io_handle_.supportsUdpGro(); }
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override {
     return io_handle_.bind(address);
   }
   Api::SysCallIntResult listen(int backlog) override { return io_handle_.listen(backlog); }
+  Network::IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override {
+    return io_handle_.accept(addr, addrlen);
+  }
   Api::SysCallIntResult connect(Network::Address::InstanceConstSharedPtr address) override {
     return io_handle_.connect(address);
   }

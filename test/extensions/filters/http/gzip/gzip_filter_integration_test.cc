@@ -103,7 +103,9 @@ public:
 
   const uint64_t window_bits{15 | 16};
 
-  Extensions::Compression::Gzip::Decompressor::ZlibDecompressorImpl decompressor_{};
+  Stats::IsolatedStoreImpl stats_store_;
+  Extensions::Compression::Gzip::Decompressor::ZlibDecompressorImpl decompressor_{stats_store_,
+                                                                                  "test"};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GzipIntegrationTest,

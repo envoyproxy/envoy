@@ -7,6 +7,7 @@
 
 using testing::_;
 using testing::Assign;
+using testing::ByMove;
 using testing::InSequence;
 using testing::Return;
 using testing::ReturnRef;
@@ -24,7 +25,7 @@ public:
   HttpPerRequestTapperImplTest() {
     EXPECT_CALL(*config_, createPerTapSinkHandleManager_(1)).WillOnce(Return(sink_manager_));
     EXPECT_CALL(*config_, createMatchStatusVector())
-        .WillOnce(Return(TapCommon::Matcher::MatchStatusVector(1)));
+        .WillOnce(Return(ByMove(TapCommon::Matcher::MatchStatusVector(1))));
     EXPECT_CALL(*config_, rootMatcher()).WillRepeatedly(ReturnRef(matcher_));
     EXPECT_CALL(matcher_, onNewStream(_)).WillOnce(SaveArgAddress(&statuses_));
     tapper_ = std::make_unique<HttpPerRequestTapperImpl>(config_, 1);
@@ -53,11 +54,13 @@ TEST_F(HttpPerRequestTapperImplTest, BufferedFlowNoTap) {
   InSequence s;
   EXPECT_CALL(matcher_, onHttpRequestHeaders(_, _));
   tapper_->onRequestHeaders(request_headers_);
+  EXPECT_CALL(matcher_, onRequestBody(_, _));
   tapper_->onRequestBody(Buffer::OwnedImpl("hello"));
   EXPECT_CALL(matcher_, onHttpRequestTrailers(_, _));
   tapper_->onRequestTrailers(request_trailers_);
   EXPECT_CALL(matcher_, onHttpResponseHeaders(_, _));
   tapper_->onResponseHeaders(response_headers_);
+  EXPECT_CALL(matcher_, onResponseBody(_, _));
   tapper_->onResponseBody(Buffer::OwnedImpl("world"));
   EXPECT_CALL(matcher_, onHttpResponseTrailers(_, _));
   tapper_->onResponseTrailers(response_trailers_);
@@ -73,11 +76,13 @@ TEST_F(HttpPerRequestTapperImplTest, BufferedFlowTap) {
   InSequence s;
   EXPECT_CALL(matcher_, onHttpRequestHeaders(_, _));
   tapper_->onRequestHeaders(request_headers_);
+  EXPECT_CALL(matcher_, onRequestBody(_, _));
   tapper_->onRequestBody(Buffer::OwnedImpl("hello"));
   EXPECT_CALL(matcher_, onHttpRequestTrailers(_, _));
   tapper_->onRequestTrailers(request_trailers_);
   EXPECT_CALL(matcher_, onHttpResponseHeaders(_, _));
   tapper_->onResponseHeaders(response_headers_);
+  EXPECT_CALL(matcher_, onResponseBody(_, _));
   tapper_->onResponseBody(Buffer::OwnedImpl("world"));
   EXPECT_CALL(matcher_, onHttpResponseTrailers(_, _));
   tapper_->onResponseTrailers(response_trailers_);
@@ -116,6 +121,7 @@ TEST_F(HttpPerRequestTapperImplTest, StreamedMatchRequestTrailers) {
   InSequence s;
   EXPECT_CALL(matcher_, onHttpRequestHeaders(_, _));
   tapper_->onRequestHeaders(request_headers_);
+  EXPECT_CALL(matcher_, onRequestBody(_, _));
   tapper_->onRequestBody(Buffer::OwnedImpl("hello"));
   EXPECT_CALL(matcher_, onHttpRequestTrailers(_, _))
       .WillOnce(Assign(&(*statuses_)[0].matches_, true));
@@ -156,6 +162,7 @@ http_streamed_trace_segment:
         value: f
 )EOF")));
   tapper_->onResponseHeaders(response_headers_);
+  EXPECT_CALL(matcher_, onResponseBody(_, _));
   EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
                                   R"EOF(
 http_streamed_trace_segment:
@@ -187,11 +194,13 @@ TEST_F(HttpPerRequestTapperImplTest, StreamedMatchResponseTrailers) {
   InSequence s;
   EXPECT_CALL(matcher_, onHttpRequestHeaders(_, _));
   tapper_->onRequestHeaders(request_headers_);
+  EXPECT_CALL(matcher_, onRequestBody(_, _));
   tapper_->onRequestBody(Buffer::OwnedImpl("hello"));
   EXPECT_CALL(matcher_, onHttpRequestTrailers(_, _));
   tapper_->onRequestTrailers(request_trailers_);
   EXPECT_CALL(matcher_, onHttpResponseHeaders(_, _));
   tapper_->onResponseHeaders(response_headers_);
+  EXPECT_CALL(matcher_, onResponseBody(_, _));
   tapper_->onResponseBody(Buffer::OwnedImpl("world"));
   EXPECT_CALL(matcher_, onHttpResponseTrailers(_, _))
       .WillOnce(Assign(&(*statuses_)[0].matches_, true));

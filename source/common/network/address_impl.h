@@ -8,6 +8,7 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/network/address.h"
+#include "envoy/network/socket.h"
 
 namespace Envoy {
 namespace Network {
@@ -37,10 +38,14 @@ public:
   const std::string& logicalName() const override { return asString(); }
   Type type() const override { return type_; }
 
+  const SocketInterface& socketInterface() const override { return socket_interface_; }
+
 protected:
-  InstanceBase(Type type) : type_(type) {}
+  InstanceBase(Type type, const SocketInterface* sock_interface)
+      : socket_interface_(*sock_interface), type_(type) {}
 
   std::string friendly_name_;
+  const SocketInterface& socket_interface_;
 
 private:
   const Type type_;
@@ -54,23 +59,26 @@ public:
   /**
    * Construct from an existing unix IPv4 socket address (IP v4 address and port).
    */
-  explicit Ipv4Instance(const sockaddr_in* address);
+  explicit Ipv4Instance(const sockaddr_in* address,
+                        const SocketInterface* sock_interface = nullptr);
 
   /**
    * Construct from a string IPv4 address such as "1.2.3.4". Port will be unset/0.
    */
-  explicit Ipv4Instance(const std::string& address);
+  explicit Ipv4Instance(const std::string& address,
+                        const SocketInterface* sock_interface = nullptr);
 
   /**
    * Construct from a string IPv4 address such as "1.2.3.4" as well as a port.
    */
-  Ipv4Instance(const std::string& address, uint32_t port);
+  Ipv4Instance(const std::string& address, uint32_t port,
+               const SocketInterface* sock_interface = nullptr);
 
   /**
    * Construct from a port. The IPv4 address will be set to "any" and is suitable for binding
    * a port to any available address.
    */
-  explicit Ipv4Instance(uint32_t port);
+  explicit Ipv4Instance(uint32_t port, const SocketInterface* sock_interface = nullptr);
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
@@ -124,23 +132,26 @@ public:
   /**
    * Construct from an existing unix IPv6 socket address (IP v6 address and port).
    */
-  Ipv6Instance(const sockaddr_in6& address, bool v6only = true);
+  Ipv6Instance(const sockaddr_in6& address, bool v6only = true,
+               const SocketInterface* sock_interface = nullptr);
 
   /**
    * Construct from a string IPv6 address such as "12:34::5". Port will be unset/0.
    */
-  explicit Ipv6Instance(const std::string& address);
+  explicit Ipv6Instance(const std::string& address,
+                        const SocketInterface* sock_interface = nullptr);
 
   /**
    * Construct from a string IPv6 address such as "12:34::5" as well as a port.
    */
-  Ipv6Instance(const std::string& address, uint32_t port);
+  Ipv6Instance(const std::string& address, uint32_t port,
+               const SocketInterface* sock_interface = nullptr);
 
   /**
    * Construct from a port. The IPv6 address will be set to "any" and is suitable for binding
    * a port to any available address.
    */
-  explicit Ipv6Instance(uint32_t port);
+  explicit Ipv6Instance(uint32_t port, const SocketInterface* sock_interface = nullptr);
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
@@ -195,12 +206,14 @@ public:
   /**
    * Construct from an existing unix address.
    */
-  explicit PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t mode = 0);
+  explicit PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t mode = 0,
+                        const SocketInterface* sock_interface = nullptr);
 
   /**
    * Construct from a string pipe path.
    */
-  explicit PipeInstance(const std::string& pipe_path, mode_t mode = 0);
+  explicit PipeInstance(const std::string& pipe_path, mode_t mode = 0,
+                        const SocketInterface* sock_interface = nullptr);
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;

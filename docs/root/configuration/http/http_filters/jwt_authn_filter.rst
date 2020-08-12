@@ -7,8 +7,15 @@ This HTTP filter can be used to verify JSON Web Token (JWT). It will verify its 
 
 JWKS is needed to verify JWT signatures. They can be specified in the filter config or can be fetched remotely from a JWKS server.
 
-.. attention::
-   EdDSA, ES256, ES384, ES512, HS256, HS384, HS512, RS256, RS384 and RS512 are supported for the JWT alg.
+Following are supported JWT alg:
+
+.. code-block::
+
+   ES256, ES384, ES512,
+   HS256, HS384, HS512,
+   RS256, RS384, RS512,
+   PS256, PS384, PS512,
+   EdDSA
 
 Configuration
 -------------
@@ -42,9 +49,11 @@ If *from_headers* and *from_params* is empty,  the default location to extract J
 
   Authorization: Bearer <token>
 
-If fails to extract a JWT from above header, then check query parameter key *access_token* as in this example::
+and query parameter key *access_token* as::
 
   /path?access_token=<JWT>
+
+If a request has two tokens, one from the header and the other from the query parameter, all of them must be valid.
 
 In the :ref:`filter config <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtAuthentication>`, *providers* is a map, to map *provider_name* to a :ref:`JwtProvider <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtProvider>`. The *provider_name* must be unique, it is referred in the `JwtRequirement <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtRequirement>` in its *provider_name* field.
 

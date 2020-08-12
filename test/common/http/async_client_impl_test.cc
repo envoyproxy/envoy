@@ -82,7 +82,7 @@ public:
   NiceMock<Event::MockTimer>* timer_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Http::ContextImpl http_context_;
   AsyncClientImpl client_;

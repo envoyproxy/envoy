@@ -18,9 +18,9 @@ namespace {
 // in the cluster. The load balancing policy must be set
 // to random for proper test operation.
 const std::string& listenerConfig() {
-  CONSTRUCT_ON_FIRST_USE(std::string, R"EOF(
+  CONSTRUCT_ON_FIRST_USE(std::string, fmt::format(R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
@@ -44,7 +44,8 @@ static_resources:
           settings:
             op_timeout: 5s
             enable_redirection: true
-)EOF");
+)EOF",
+                                                  TestEnvironment::nullDevicePath()));
 }
 
 const std::string& clusterConfig() {
@@ -170,7 +171,7 @@ public:
     });
 
     on_server_ready_function_ = [this](Envoy::IntegrationTestServer& test_server) {
-      mock_rng_ = dynamic_cast<Runtime::MockRandomGenerator*>(&(test_server.server().random()));
+      mock_rng_ = dynamic_cast<Random::MockRandomGenerator*>(&(test_server.server().random()));
       // Abort now if we cannot downcast the server's random number generator pointer.
       ASSERT_TRUE(mock_rng_ != nullptr);
       // Ensure that fake_upstreams_[0] is the load balancer's host of choice by default.
@@ -356,7 +357,7 @@ protected:
     return result.str();
   }
 
-  Runtime::MockRandomGenerator* mock_rng_{};
+  Random::MockRandomGenerator* mock_rng_{};
   const int num_upstreams_;
   const Network::Address::IpVersion version_;
   int random_index_;

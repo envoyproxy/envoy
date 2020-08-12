@@ -24,6 +24,7 @@ envoy_extension_cc_test(
         "//source/common/network:address_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/ext_authz",
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/mocks/network:network_mocks",
@@ -40,7 +41,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.ext_authz",
     deps = [
         "//source/extensions/filters/network/ext_authz:config",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/ext_authz/v3:pkg_cc_proto",
     ],

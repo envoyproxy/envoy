@@ -16,7 +16,7 @@ namespace Config {
 
 SubscriptionFactoryImpl::SubscriptionFactoryImpl(
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-    Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
+    Upstream::ClusterManager& cm, Random::RandomGenerator& random,
     ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api, Runtime::Loader& runtime)
     : local_info_(local_info), dispatcher_(dispatcher), cm_(cm), random_(random),
       validation_visitor_(validation_visitor), api_(api), runtime_(runtime) {}
@@ -99,7 +99,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
         Utility::configSourceInitialFetchTimeout(config), true);
   }
   default:
-    throw EnvoyException("Missing config source specifier in envoy::api::v2::core::ConfigSource");
+    throw EnvoyException(
+        "Missing config source specifier in envoy::config::core::v3::ConfigSource");
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }

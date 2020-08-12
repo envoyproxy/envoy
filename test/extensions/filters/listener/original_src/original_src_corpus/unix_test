@@ -1,6 +1,0 @@
-config {
-  bind_port: true
-  mark: 0
-}
-
-address: "unix://domain.socket"

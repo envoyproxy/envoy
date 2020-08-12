@@ -10,7 +10,7 @@
 #include "extensions/tracers/xray/tracer.h"
 #include "extensions/tracers/xray/xray_configuration.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -98,6 +98,16 @@ TEST_F(XRayTracerTest, NonSampledSpansNotSerialized) {
   Tracer tracer{"" /*span name*/, std::move(broker_), server_.timeSource()};
   auto span = tracer.createNonSampledSpan();
   span->finishSpan();
+}
+
+TEST_F(XRayTracerTest, BaggageNotImplemented) {
+  Tracer tracer{"" /*span name*/, std::move(broker_), server_.timeSource()};
+  auto span = tracer.createNonSampledSpan();
+  span->setBaggage("baggage_key", "baggage_value");
+  span->finishSpan();
+
+  // Baggage isn't supported so getBaggage should always return empty
+  ASSERT_EQ("", span->getBaggage("baggage_key"));
 }
 
 TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {

@@ -60,7 +60,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Network::MockDnsResolver> resolver_{std::make_shared<Network::MockDnsResolver>()};
   NiceMock<ThreadLocal::MockInstance> tls_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> loader_;
   Stats::IsolatedStoreImpl store_;
   std::unique_ptr<DnsCache> dns_cache_;
@@ -671,11 +671,39 @@ TEST_F(DnsCacheImplTest, ClustersCircuitBreakersOverflow) {
   EXPECT_EQ(0, TestUtility::findCounter(store_, "dns_cache.foo.dns_rq_pending_overflow")->value());
 }
 
+TEST(DnsCacheImplOptionsTest, UseTcpForDnsLookupsOptionSet) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Runtime::MockLoader> loader;
+  Stats::IsolatedStoreImpl store;
+
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+  config.set_use_tcp_for_dns_lookups(true);
+  EXPECT_CALL(dispatcher, createDnsResolver(_, true)).WillOnce(Return(resolver));
+  DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
+}
+
+TEST(DnsCacheImplOptionsTest, UseTcpForDnsLookupsOptionUnSet) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Runtime::MockLoader> loader;
+  Stats::IsolatedStoreImpl store;
+
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+  config.set_use_tcp_for_dns_lookups(false);
+  EXPECT_CALL(dispatcher, createDnsResolver(_, false)).WillOnce(Return(resolver));
+  DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
+}
+
 // DNS cache manager config tests.
 TEST(DnsCacheManagerImplTest, LoadViaConfig) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   NiceMock<Runtime::MockLoader> loader;
   Stats::IsolatedStoreImpl store;
   DnsCacheManagerImpl cache_manager(dispatcher, tls, random, loader, store);
@@ -710,7 +738,7 @@ TEST(DnsCacheManagerImplTest, LoadViaConfig) {
 // I spent too much time trying to figure this out. So for the moment I have copied this test body
 // here. I will spend some more time fixing this, but wanted to land unblocking functionality first.
 TEST(UtilityTest, PrepareDnsRefreshStrategy) {
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
 
   {
     // dns_failure_refresh_rate not set.

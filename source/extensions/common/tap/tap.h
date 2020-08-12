@@ -5,7 +5,7 @@
 #include "envoy/data/tap/v3/wrapper.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "extensions/common/tap/tap_matcher.h"
+#include "extensions/common/matcher/matcher.h"
 
 #include "absl/strings/string_view.h"
 
@@ -13,6 +13,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Tap {
+
+using Matcher = Envoy::Extensions::Common::Matcher::Matcher;
 
 using TraceWrapperPtr = std::unique_ptr<envoy::data::tap::v3::TraceWrapper>;
 inline TraceWrapperPtr makeTraceWrapper() {
@@ -137,6 +139,13 @@ public:
    * Return the root matcher for use in updating a match status vector.
    */
   virtual const Matcher& rootMatcher() const PURE;
+
+  /**
+   * Non-const version of rootMatcher method.
+   */
+  Matcher& rootMatcher() {
+    return const_cast<Matcher&>(static_cast<const TapConfig&>(*this).rootMatcher());
+  }
 
   /**
    * Return whether the tap session should run in streaming or buffering mode.

@@ -2,6 +2,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/grpc/status.h"
@@ -39,7 +40,7 @@ public:
    */
   static HealthCheckerSharedPtr
   create(const envoy::config::core::v3::HealthCheck& health_check_config,
-         Upstream::Cluster& cluster, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+         Upstream::Cluster& cluster, Runtime::Loader& runtime, Random::RandomGenerator& random,
          Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 };
@@ -51,7 +52,7 @@ class HttpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   HttpHealthCheckerImpl(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+                        Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
   /**
    * Utility class checking if given http status matches configured expectations.
@@ -222,7 +223,7 @@ class TcpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   TcpHealthCheckerImpl(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                        Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                       Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+                       Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
 private:
   struct TcpActiveHealthCheckSession;
@@ -287,7 +288,7 @@ class GrpcHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   GrpcHealthCheckerImpl(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+                        Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
 private:
   struct GrpcActiveHealthCheckSession : public ActiveHealthCheckSession,

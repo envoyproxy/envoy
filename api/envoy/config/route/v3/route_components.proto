@@ -127,7 +127,9 @@ message VirtualHost {
 
   // Specifies a list of HTTP headers that should be removed from each response
   // handled by this virtual host.
-  repeated string response_headers_to_remove = 11;
+  repeated string response_headers_to_remove = 11 [(validate.rules).repeated = {
+    items {string {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+  }];
 
   // Indicates that the virtual host has a CORS policy.
   CorsPolicy cors = 8;
@@ -543,7 +545,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 35]
+// [#next-free-field: 36]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -888,6 +890,23 @@ message RouteAction {
     //   must come from trusted source.
     string host_rewrite_header = 29
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+    // Indicates that during forwarding, the host header will be swapped with
+    // the result of the regex substitution executed on path value with query and fragment removed.
+    // This is useful for transitioning variable content between path segment and subdomain.
+    //
+    // For example with the following config:
+    //
+    //   .. code-block:: yaml
+    //
+    //     host_rewrite_path_regex:
+    //       pattern:
+    //         google_re2: {}
+    //         regex: "^/(.+)/.+$"
+    //       substitution: \1
+    //
+    // Would rewrite the host header to `envoyproxy.io` given the path `/envoyproxy.io/some/path`.
+    type.matcher.v3.RegexMatchAndSubstitute host_rewrite_path_regex = 35;
   }
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
@@ -1490,6 +1509,10 @@ message RateLimit {
       // Metadata struct that defines the key and path to retrieve the string value. A match will
       // only happen if the value in the dynamic metadata is of type string.
       type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
+
+      // An optional value to use if *metadata_key* is empty. If not set and
+      // no value is present under the metadata_key then no descriptor is generated.
+      string default_value = 3;
     }
 
     oneof action_specifier {

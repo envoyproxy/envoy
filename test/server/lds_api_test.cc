@@ -9,18 +9,21 @@
 #include "server/lds_api.h"
 
 #include "test/mocks/config/mocks.h"
+#include "test/mocks/init/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/listener_manager.h"
+#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 
-using testing::_;
-using testing::InSequence;
-using testing::Invoke;
-using testing::Return;
-using testing::Throw;
+using ::testing::_;
+using ::testing::InSequence;
+using ::testing::Invoke;
+using ::testing::NiceMock;
+using ::testing::Return;
+using ::testing::Throw;
 
 namespace Envoy {
 namespace Server {
@@ -73,7 +76,8 @@ public:
       listeners_.back().name_ = name;
       refs.emplace_back(listeners_.back());
     }
-    EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(refs));
+    EXPECT_CALL(listener_manager_, listeners(ListenerManager::WARMING | ListenerManager::ACTIVE))
+        .WillOnce(Return(refs));
     EXPECT_CALL(listener_manager_, beginListenerUpdate());
   }
 
@@ -117,7 +121,8 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
   socket_address->set_port_value(1);
   listener.add_filter_chains();
 
-  EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+  EXPECT_CALL(listener_manager_, listeners(ListenerManager::WARMING | ListenerManager::ACTIVE))
+      .WillOnce(Return(existing_listeners));
 
   EXPECT_CALL(listener_manager_, beginListenerUpdate());
   EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
@@ -138,7 +143,8 @@ TEST_F(LdsApiTest, EmptyListenersUpdate) {
 
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
 
-  EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+  EXPECT_CALL(listener_manager_, listeners(ListenerManager::WARMING | ListenerManager::ACTIVE))
+      .WillOnce(Return(existing_listeners));
   EXPECT_CALL(listener_manager_, beginListenerUpdate());
   EXPECT_CALL(listener_manager_, endListenerUpdate(_))
       .WillOnce(Invoke([](ListenerManager::FailureStates&& state) { EXPECT_EQ(0, state.size()); }));
@@ -161,7 +167,8 @@ TEST_F(LdsApiTest, ListenerCreationContinuesEvenAfterException) {
   const auto listener_2 = buildListener("valid-listener-2");
   const auto listener_3 = buildListener("invalid-listener-2");
 
-  EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+  EXPECT_CALL(listener_manager_, listeners(ListenerManager::WARMING | ListenerManager::ACTIVE))
+      .WillOnce(Return(existing_listeners));
 
   EXPECT_CALL(listener_manager_, beginListenerUpdate());
   EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
@@ -192,7 +199,8 @@ TEST_F(LdsApiTest, ValidateDuplicateListeners) {
   const auto listener = buildListener("duplicate_listener");
 
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
-  EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+  EXPECT_CALL(listener_manager_, listeners(ListenerManager::WARMING | ListenerManager::ACTIVE))
+      .WillOnce(Return(existing_listeners));
   EXPECT_CALL(listener_manager_, beginListenerUpdate());
   EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true)).WillOnce(Return(true));
   EXPECT_CALL(listener_manager_, endListenerUpdate(_));
@@ -344,7 +352,7 @@ resources:
       address: tcp://0.0.0.1
       port_value: 61000
   filter_chains:
-  - filters: 
+  - filters:
   )EOF";
   auto response1 =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);

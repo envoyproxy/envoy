@@ -69,7 +69,9 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     : Envoy::Config::SubscriptionBase<envoy::config::route::v3::RouteConfiguration>(
           rds.config_source().resource_api_version(),
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
-      route_config_name_(rds.route_config_name()), factory_context_(factory_context),
+      route_config_name_(rds.route_config_name()),
+      scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
+      factory_context_(factory_context),
       parent_init_target_(fmt::format("RdsRouteConfigSubscription init {}", route_config_name_),
                           [this]() { local_init_manager_.initialize(local_init_watcher_); }),
       local_init_watcher_(fmt::format("RDS local-init-watcher {}", rds.route_config_name()),
@@ -78,7 +80,6 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
           fmt::format("RdsRouteConfigSubscription local-init-target {}", route_config_name_),
           [this]() { subscription_->start({route_config_name_}); }),
       local_init_manager_(fmt::format("RDS local-init-manager {}", route_config_name_)),
-      scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
       stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier) {
@@ -305,10 +306,17 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
   auto alias =
       VhdsSubscription::domainNameToAlias(config_update_info_->routeConfigName(), for_domain);
-  factory_context_.dispatcher().post([this, alias, &thread_local_dispatcher,
+  // The RdsRouteConfigProviderImpl instance can go away before the dispatcher has a chance to
+  // execute the callback. still_alive shared_ptr will be deallocated when the current instance of
+  // the RdsRouteConfigProviderImpl is deallocated; we rely on a weak_ptr to still_alive flag to
+  // determine if the RdsRouteConfigProviderImpl instance is still valid.
+  factory_context_.dispatcher().post([this, maybe_still_alive = std::weak_ptr<bool>(still_alive_),
+                                      alias, &thread_local_dispatcher,
                                       route_config_updated_cb]() -> void {
-    subscription_->updateOnDemand(alias);
-    config_update_callbacks_.push_back({alias, thread_local_dispatcher, route_config_updated_cb});
+    if (maybe_still_alive.lock()) {
+      subscription_->updateOnDemand(alias);
+      config_update_callbacks_.push_back({alias, thread_local_dispatcher, route_config_updated_cb});
+    }
   });
 }
 
@@ -335,7 +343,7 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
     RdsRouteConfigSubscriptionSharedPtr subscription(new RdsRouteConfigSubscription(
         rds, manager_identifier, factory_context, stat_prefix, *this));
     init_manager.add(subscription->parent_init_target_);
-    std::shared_ptr<RdsRouteConfigProviderImpl> new_provider{
+    RdsRouteConfigProviderImplSharedPtr new_provider{
         new RdsRouteConfigProviderImpl(std::move(subscription), factory_context)};
     dynamic_route_config_providers_.insert(
         {manager_identifier, std::weak_ptr<RdsRouteConfigProviderImpl>(new_provider)});

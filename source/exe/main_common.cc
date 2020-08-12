@@ -46,7 +46,7 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
 MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
                                ListenerHooks& listener_hooks,
                                Server::ComponentFactory& component_factory,
-                               std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
+                               std::unique_ptr<Random::RandomGenerator>&& random_generator,
                                Thread::ThreadFactory& thread_factory,
                                Filesystem::Instance& file_system,
                                std::unique_ptr<ProcessContext> process_context)
@@ -102,7 +102,7 @@ void MainCommonBase::configureComponentLogLevels() {
   }
 }
 
-void MainCommonBase::configureHotRestarter(Runtime::RandomGenerator& random_generator) {
+void MainCommonBase::configureHotRestarter(Random::RandomGenerator& random_generator) {
 #ifdef ENVOY_HOT_RESTART
   if (!options_.hotRestartDisabled()) {
     uint32_t base_id = options_.baseId();
@@ -188,7 +188,7 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
 MainCommon::MainCommon(int argc, const char* const* argv)
     : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info),
       base_(options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
-            std::make_unique<Runtime::RandomGeneratorImpl>(), platform_impl_.threadFactory(),
+            std::make_unique<Random::RandomGeneratorImpl>(), platform_impl_.threadFactory(),
             platform_impl_.fileSystem(), nullptr) {}
 
 std::string MainCommon::hotRestartVersion(bool hot_restart_enabled) {

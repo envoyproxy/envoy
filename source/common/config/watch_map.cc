@@ -2,6 +2,7 @@
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "common/common/cleanup.h"
 #include "common/config/decoded_resource_impl.h"
 
 namespace Envoy {
@@ -17,8 +18,20 @@ Watch* WatchMap::addWatch(SubscriptionCallbacks& callbacks,
 }
 
 void WatchMap::removeWatch(Watch* watch) {
-  wildcard_watches_.erase(watch); // may or may not be in there, but we want it gone.
-  watches_.erase(watch);
+  if (deferred_removed_during_update_ != nullptr) {
+    deferred_removed_during_update_->insert(watch);
+  } else {
+    wildcard_watches_.erase(watch); // may or may not be in there, but we want it gone.
+    watches_.erase(watch);
+  }
+}
+
+void WatchMap::removeDeferredWatches() {
+  for (auto& watch : *deferred_removed_during_update_) {
+    wildcard_watches_.erase(watch); // may or may not be in there, but we want it gone.
+    watches_.erase(watch);
+  }
+  deferred_removed_during_update_ = nullptr;
 }
 
 AddedRemoved WatchMap::updateWatchInterest(Watch* watch,
@@ -62,6 +75,10 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
     return;
   }
 
+  // Track any removals triggered by earlier watch updates.
+  ASSERT(deferred_removed_during_update_ == nullptr);
+  deferred_removed_during_update_ = std::make_unique<absl::flat_hash_set<Watch*>>();
+  Cleanup cleanup([this] { removeDeferredWatches(); });
   // Build a map from watches, to the set of updated resources that each watch cares about. Each
   // entry in the map is then a nice little bundle that can be fed directly into the individual
   // onConfigUpdate()s.
@@ -80,6 +97,9 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
   const bool map_is_single_wildcard = (watches_.size() == 1 && wildcard_watches_.size() == 1);
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
   for (auto& watch : watches_) {
+    if (deferred_removed_during_update_->count(watch.get()) > 0) {
+      continue;
+    }
     const auto this_watch_updates = per_watch_updates.find(watch);
     if (this_watch_updates == per_watch_updates.end()) {
       // This update included no resources this watch cares about.
@@ -90,12 +110,12 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
       //    of this watch's resources, so the watch must be informed with an onConfigUpdate.
       // 3) Otherwise, we can skip onConfigUpdate for this watch.
       if (map_is_single_wildcard || !watch->state_of_the_world_empty_) {
-        watch->callbacks_.onConfigUpdate({}, version_info);
         watch->state_of_the_world_empty_ = true;
+        watch->callbacks_.onConfigUpdate({}, version_info);
       }
     } else {
-      watch->callbacks_.onConfigUpdate(this_watch_updates->second, version_info);
       watch->state_of_the_world_empty_ = false;
+      watch->callbacks_.onConfigUpdate(this_watch_updates->second, version_info);
     }
   }
 }
@@ -130,6 +150,10 @@ void WatchMap::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
+  // Track any removals triggered by earlier watch updates.
+  ASSERT(deferred_removed_during_update_ == nullptr);
+  deferred_removed_during_update_ = std::make_unique<absl::flat_hash_set<Watch*>>();
+  Cleanup cleanup([this] { removeDeferredWatches(); });
   // Build a pair of maps: from watches, to the set of resources {added,removed} that each watch
   // cares about. Each entry in the map-pair is then a nice little bundle that can be fed directly
   // into the individual onConfigUpdate()s.
@@ -157,22 +181,27 @@ void WatchMap::onConfigUpdate(
   }
 
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
-  for (const auto& added : per_watch_added) {
-    const Watch* cur_watch = added.first;
+  for (const auto& [cur_watch, resource_to_add] : per_watch_added) {
+    if (deferred_removed_during_update_->count(cur_watch) > 0) {
+      continue;
+    }
     const auto removed = per_watch_removed.find(cur_watch);
     if (removed == per_watch_removed.end()) {
       // additions only, no removals
-      cur_watch->callbacks_.onConfigUpdate(added.second, {}, system_version_info);
+      cur_watch->callbacks_.onConfigUpdate(resource_to_add, {}, system_version_info);
     } else {
       // both additions and removals
-      cur_watch->callbacks_.onConfigUpdate(added.second, removed->second, system_version_info);
+      cur_watch->callbacks_.onConfigUpdate(resource_to_add, removed->second, system_version_info);
       // Drop the removals now, so the final removals-only pass won't use them.
       per_watch_removed.erase(removed);
     }
   }
   // Any removals-only updates will not have been picked up in the per_watch_added loop.
-  for (auto& removed : per_watch_removed) {
-    removed.first->callbacks_.onConfigUpdate({}, removed.second, system_version_info);
+  for (auto& [cur_watch, resource_to_remove] : per_watch_removed) {
+    if (deferred_removed_during_update_->count(cur_watch) > 0) {
+      continue;
+    }
+    cur_watch->callbacks_.onConfigUpdate({}, resource_to_remove, system_version_info);
   }
 }
 

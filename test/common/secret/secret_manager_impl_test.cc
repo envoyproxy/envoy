@@ -15,7 +15,9 @@
 #include "common/ssl/tls_certificate_config_impl.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/config_tracker.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -41,7 +43,8 @@ protected:
         dynamic_cast<const envoy::admin::v3::SecretsConfigDump&>(*message_ptr);
     envoy::admin::v3::SecretsConfigDump expected_secrets_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_secrets_config_dump);
-    EXPECT_EQ(expected_secrets_config_dump.DebugString(), secrets_config_dump.DebugString());
+    EXPECT_THAT(secrets_config_dump,
+                ProtoEqIgnoreRepeatedFieldOrdering(expected_secrets_config_dump));
   }
 
   void setupSecretProviderContext() {}
@@ -257,7 +260,7 @@ TEST_F(SecretManagerImplTest, DeduplicateDynamicTlsCertificateSecretProvider) {
 
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
@@ -340,7 +343,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
 
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
@@ -438,7 +441,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandler) {
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
@@ -692,7 +695,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerWarmingSecrets) {
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
@@ -825,7 +828,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSecrets) {
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
@@ -897,7 +900,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticValidationContext) {
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
@@ -942,7 +945,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSessionTicketsContext) {
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;

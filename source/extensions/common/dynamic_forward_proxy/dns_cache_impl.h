@@ -42,7 +42,7 @@ struct DnsCacheStats {
 class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy> {
 public:
   DnsCacheImpl(Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
-               Runtime::RandomGenerator& random, Runtime::Loader& loader, Stats::Scope& root_scope,
+               Random::RandomGenerator& random, Runtime::Loader& loader, Stats::Scope& root_scope,
                const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
   ~DnsCacheImpl() override;
   static DnsCacheStats generateDnsCacheStats(Stats::Scope& scope);
@@ -89,7 +89,7 @@ private:
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
     const std::string& resolvedHost() const override { return resolved_host_; }
     bool isIpAddress() const override { return is_ip_address_; }
-    void touch() override { last_used_time_ = time_source_.monotonicTime().time_since_epoch(); }
+    void touch() final { last_used_time_ = time_source_.monotonicTime().time_since_epoch(); }
 
     TimeSource& time_source_;
     const std::string resolved_host_;

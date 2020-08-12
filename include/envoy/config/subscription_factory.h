@@ -14,7 +14,7 @@ public:
   /**
    * Subscription factory interface.
    *
-   * @param config envoy::api::v2::core::ConfigSource to construct from.
+   * @param config envoy::config::core::v3::ConfigSource to construct from.
    * @param type_url type URL for the resource being subscribed to.
    * @param scope stats scope for any stats tracked by the subscription.
    * @param callbacks the callbacks needed by all Subscription objects, to deliver config updates.

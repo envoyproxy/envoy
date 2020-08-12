@@ -3,10 +3,10 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/network/connection.h"
@@ -28,6 +28,8 @@
 #include "common/stream_info/stream_info_impl.h"
 #include "common/tcp_proxy/upstream.h"
 #include "common/upstream/load_balancer_impl.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -206,7 +208,7 @@ private:
   ThreadLocal::SlotPtr upstream_drain_manager_slot_;
   SharedConfigSharedPtr shared_config_;
   std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
-  Runtime::RandomGenerator& random_generator_;
+  Random::RandomGenerator& random_generator_;
   std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
 };
 
@@ -320,7 +322,7 @@ public:
     bool on_high_watermark_called_{false};
   };
 
-  virtual StreamInfo::StreamInfo& getStreamInfo();
+  StreamInfo::StreamInfo& getStreamInfo();
 
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
@@ -420,7 +422,7 @@ private:
   // This must be a map instead of set because there is no way to move elements
   // out of a set, and these elements get passed to deferredDelete() instead of
   // being deleted in-place. The key and value will always be equal.
-  std::unordered_map<Drainer*, DrainerPtr> drainers_;
+  absl::node_hash_map<Drainer*, DrainerPtr> drainers_;
 };
 
 } // namespace TcpProxy

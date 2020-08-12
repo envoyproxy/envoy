@@ -81,6 +81,13 @@ When compression is *applied*:
   "*content-encoding*" header.
 - The "*vary: accept-encoding*" header is inserted on every response.
 
+Also the "*vary: accept-encoding*" header may be inserted even if compression is *not*
+applied due to incompatible "*accept-encoding*" header in a request. This happens
+when the requested resource still can be compressed given compatible "*accept-encoding*".
+Otherwise, if an uncompressed response is cached by a caching proxy in front of Envoy,
+the proxy won't know to fetch a new incoming request with compatible "*accept-encoding*"
+from upstream.
+
 .. _compressor-statistics:
 
 Statistics

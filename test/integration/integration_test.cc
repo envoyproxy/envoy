@@ -124,12 +124,12 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   check_listener_stats(0, 0);
 
   // Main thread admin listener stats.
-  EXPECT_NE(nullptr, test_server_->counter("listener.admin.main_thread.downstream_cx_total"));
+  test_server_->waitForCounterExists("listener.admin.main_thread.downstream_cx_total");
 
   // Per-thread watchdog stats.
-  EXPECT_NE(nullptr, test_server_->counter("server.main_thread.watchdog_miss"));
-  EXPECT_NE(nullptr, test_server_->counter("server.worker_0.watchdog_miss"));
-  EXPECT_NE(nullptr, test_server_->counter("server.worker_1.watchdog_miss"));
+  test_server_->waitForCounterExists("server.main_thread.watchdog_miss");
+  test_server_->waitForCounterExists("server.worker_0.watchdog_miss");
+  test_server_->waitForCounterExists("server.worker_1.watchdog_miss");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
@@ -290,11 +290,11 @@ TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 }
 
 TEST_P(IntegrationTest, EnvoyProxyingEarly100ContinueWithEncoderFilter) {
-  testEnvoyProxying100Continue(true, true);
+  testEnvoyProxying1xx(true, true);
 }
 
 TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
-  testEnvoyProxying100Continue(false, true);
+  testEnvoyProxying1xx(false, true);
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10923.
@@ -304,7 +304,7 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
-  testEnvoyProxying100Continue(true);
+  testEnvoyProxying1xx(true);
 }
 
 // This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a
@@ -717,6 +717,10 @@ TEST_P(IntegrationTest, PipelineWithTrailers) {
 // an inline sendLocalReply to make sure the "kick" works under the call stack
 // of dispatch as well as when a response is proxied from upstream.
 TEST_P(IntegrationTest, PipelineInline) {
+  // When deprecating this flag, set hcm.mutable_stream_error_on_invalid_http_message true.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.hcm_stream_error_on_invalid_message",
+                                    "false");
+
   autonomous_upstream_ = true;
   initialize();
   std::string response;
@@ -1223,6 +1227,11 @@ TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
 // Send continuous pipelined requests while not reading responses, to check
 // HTTP/1.1 response flood protection.
 TEST_P(IntegrationTest, TestFlood) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_stream_error_on_invalid_http_message()->set_value(true);
+      });
   initialize();
 
   // Set up a raw connection to easily send requests without reading responses.
@@ -1300,6 +1309,11 @@ TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
 
 // Make sure flood protection doesn't kick in with many requests sent serially.
 TEST_P(IntegrationTest, TestManyBadRequests) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_stream_error_on_invalid_http_message()->set_value(true);
+      });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1402,6 +1416,30 @@ TEST_P(IntegrationTest, ConnectWithChunkedBody) {
   tcp_client->waitForDisconnect(false);
   EXPECT_TRUE(absl::StartsWith(tcp_client->data(), "HTTP/1.1 503 Service Unavailable\r\n"));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+// Verifies that a 204 response returns without a body
+TEST_P(IntegrationTest, Response204WithBody) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  // Create a response with a body. This will cause an upstream messaging error but downstream
+  // should still see a response.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "204"}}, false);
+  upstream_request_->encodeData(512, true);
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect(true));
+
+  response->waitForEndStream();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("204"));
+  // The body should be removed
+  EXPECT_EQ(0, response->body().size());
 }
 
 TEST_P(IntegrationTest, QuitQuitQuit) {

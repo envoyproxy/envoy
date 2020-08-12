@@ -18,7 +18,7 @@ namespace Upstream {
 
 RingHashLoadBalancer::RingHashLoadBalancer(
     const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
-    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    Runtime::Loader& runtime, Random::RandomGenerator& random,
     const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>& config,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, common_config),
@@ -168,7 +168,7 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
 
       const uint64_t hash =
           (hash_function == HashFunction::Cluster_RingHashLbConfig_HashFunction_MURMUR_HASH_2)
-              ? MurmurHash::murmurHash2_64(hash_key, MurmurHash::STD_HASH_SEED)
+              ? MurmurHash::murmurHash2(hash_key, MurmurHash::STD_HASH_SEED)
               : HashUtil::xxHash64(hash_key);
 
       ENVOY_LOG(trace, "ring hash: hash_key={} hash={}", hash_key.data(), hash);
