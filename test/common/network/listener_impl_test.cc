@@ -65,8 +65,8 @@ TEST_P(ListenerImplDeathTest, ErrorCallback) {
 class TestListenerImpl : public ListenerImpl {
 public:
   TestListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket, ListenerCallbacks& cb,
-                   bool bind_to_port)
-      : ListenerImpl(dispatcher, std::move(socket), cb, bind_to_port) {}
+                   bool bind_to_port, uint32_t tcp_backlog = ENVOY_TCP_BACKLOG_SIZE)
+      : ListenerImpl(dispatcher, std::move(socket), cb, bind_to_port, tcp_backlog) {}
 
   MOCK_METHOD(Address::InstanceConstSharedPtr, getLocalAddress, (os_fd_t fd));
 };
