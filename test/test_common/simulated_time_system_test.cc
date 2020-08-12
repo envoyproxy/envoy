@@ -482,6 +482,22 @@ TEST_P(SimulatedTimeSystemTest, Enabled) {
   EXPECT_TRUE(timer->enabled());
 }
 
+TEST_P(SimulatedTimeSystemTest, DeleteTimerFromThread) {
+  TimerPtr timer = scheduler_->createTimer([]() {}, dispatcher_);
+  timer->enableTimer(std::chrono::milliseconds(0));
+  auto thread = Thread::threadFactoryForTest().createThread([&timer]() { timer.reset(); });
+  advanceMsAndLoop(1);
+  thread->join();
+}
+
+TEST_P(SimulatedTimeSystemTest, DeleteTimerFromThread2) {
+  TimerPtr timer = scheduler_->createTimer([]() {}, dispatcher_);
+  timer->enableTimer(std::chrono::milliseconds(1));
+  auto thread = Thread::threadFactoryForTest().createThread([&timer]() { timer.reset(); });
+  advanceMsAndLoop(1);
+  thread->join();
+}
+
 } // namespace
 } // namespace Test
 } // namespace Event

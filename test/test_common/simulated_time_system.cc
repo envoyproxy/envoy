@@ -73,6 +73,11 @@ public:
     disableAlarmLockHeld(alarm);
   }
 
+  void waitUntilIdle() {
+    absl::MutexLock lock(&mutex_);
+    mutex_.Await(absl::Condition(&not_running_cbs_));
+  }
+
   void updateTime(MonotonicTime monotonic_time, SystemTime system_time) {
     bool inc_pending = false;
     {
@@ -161,6 +166,7 @@ private:
   };
 
   absl::Mutex mutex_;
+  bool not_running_cbs_ ABSL_GUARDED_BY(mutex_) = true;
   AlarmSet registered_alarms_ ABSL_GUARDED_BY(mutex_);
   AlarmSet triggered_alarms_ ABSL_GUARDED_BY(mutex_);
 
@@ -306,15 +312,22 @@ void SimulatedTimeSystemHelper::SimulatedScheduler::runReadyAlarms() {
     registered_alarms_.remove(alarm_registration.alarm_);
   }
 
+  ASSERT(not_running_cbs_);
+  not_running_cbs_ = false;
   while (!triggered_alarms_.empty()) {
     Alarm& alarm = triggered_alarms_.next().alarm_;
     triggered_alarms_.remove(alarm);
     UnlockGuard unlocker(mutex_);
     alarm.runAlarm();
   }
+  ASSERT(!not_running_cbs_);
+  not_running_cbs_ = true;
 }
 
-SimulatedTimeSystemHelper::Alarm::Alarm::~Alarm() { simulated_scheduler_.disableAlarm(*this); }
+SimulatedTimeSystemHelper::Alarm::Alarm::~Alarm() {
+  simulated_scheduler_.disableAlarm(*this);
+  simulated_scheduler_.waitUntilIdle();
+}
 
 void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimer() {
   simulated_scheduler_.disableAlarm(*this);
