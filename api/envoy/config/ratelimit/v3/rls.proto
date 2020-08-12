@@ -17,6 +17,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Rate limit service]
 
 // Rate limit :ref:`configuration overview <config_rate_limit_service>`.
+// [#next-free-field: 6]
 message RateLimitServiceConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.ratelimit.v2.RateLimitServiceConfig";
