@@ -72,7 +72,7 @@ envoy_cc_mock(
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/mocks/grpc:grpc_mocks",
-        "//test/mocks/http:http_mocks",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
