@@ -14,21 +14,12 @@
 
 /**
  * TestSocketInterface allows overriding the behavior of the IoHandle interface.
- * TestSocketInterface::install() must be called early in the test initialization before
- * any network connections were established.
  */
 namespace Envoy {
 namespace Network {
 
 class TestIoSocketHandle : public IoSocketHandleImpl {
 public:
-  /**
-   * Override the behavior of the IoSocketHandleImpl::writev() method.
-   * The supplied callback is invoked with the arguments of the writev method.
-   * Returning absl::nullopt from the callback continues normal execution of the
-   * IoSocketHandleImpl::writev() method. Returning a Api::IoCallUint64Result from callback skips
-   * the IoSocketHandleImpl::writev() with the returned result value.
-   */
   using WritevOverrideType = absl::optional<Api::IoCallUint64Result>(uint32_t index,
                                                                      const Buffer::RawSlice* slices,
                                                                      uint64_t num_slice);
@@ -52,18 +43,6 @@ private:
  * Most integration tests have deterministic order in which Envoy accepts connections.
  * For example a test with one client connection will result in two accepted sockets. First
  * is for the client<->Envoy connection and the second is for the Envoy<->upstream connection.
- * Example of overriding IoHandle::writev() method:
- *
- *   auto* io_handle = Envoy::Network::TestSocketInterface::GetSingleton().waitForAcceptedSocket(0);
- *   // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames
- * start to accumulate
- *   // in the transport socket buffer.
- *   io_handle->setWritevOverride([](const Buffer::RawSlice*, uint64_t) {
- *     return Api::IoCallUint64Result(
- *         0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
- * Network::IoSocketError::deleteIoError));
- *   });
- *
  */
 
 class TestSocketInterface : public SocketInterfaceImpl {
@@ -71,11 +50,18 @@ public:
   TestSocketInterface();
   ~TestSocketInterface() override;
 
+  /**
+   * Override the behavior of the IoSocketHandleImpl::writev() method.
+   * The supplied callback is invoked with the arguments of the writev method.
+   * Returning absl::nullopt from the callback continues normal execution of the
+   * IoSocketHandleImpl::writev() method. Returning a Api::IoCallUint64Result from callback skips
+   * the IoSocketHandleImpl::writev() with the returned result value.
+   * NOTE: this method must be called before any sockets are created to avoid race condition in
+   * setting the `writev_overide_proc_` member.
+   */
   void overrideWritev(TestIoSocketHandle::WritevOverrideProc writev);
 
 private:
-  void addAcceptedSocket(TestIoSocketHandle* handle);
-
   // SocketInterface
   using SocketInterfaceImpl::socket;
   IoHandlePtr socket(os_fd_t fd) override;
