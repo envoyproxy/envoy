@@ -106,7 +106,7 @@ uint64_t fractionalPercentDenominatorToInt(
     if (std::isnan(msg.field_name().value())) {                                                    \
       ExceptionUtil::throwEnvoyException(fmt::format("Value not in the range of 0..100 range."));  \
     }                                                                                              \
-    (message).has_##field_name() ? (message).field_name().value() : default_value                  \
+    return (msg).has_##field_name() ? (msg).field_name().value() : default_value;                  \
   }((message)))
 // Convert an envoy::type::v3::Percent to a rounded integer or a default.
 // @param message supplies the proto message containing the field.
@@ -122,9 +122,9 @@ uint64_t fractionalPercentDenominatorToInt(
     if (std::isnan(msg.field_name().value())) {                                                    \
       ExceptionUtil::throwEnvoyException(fmt::format("Value not in the range of 0..100 range."));  \
     }                                                                                              \
-    (message).has_##field_name()                                                                   \
-        ? ProtobufPercentHelper::convertPercent((message).field_name().value(), max_value)         \
-        : ProtobufPercentHelper::checkAndReturnDefault(default_value, max_value)                   \
+    return (msg).has_##field_name()                                                                \
+               ? ProtobufPercentHelper::convertPercent((msg).field_name().value(), max_value)      \
+               : ProtobufPercentHelper::checkAndReturnDefault(default_value, max_value);           \
   }((message)))
 
 namespace Envoy {
