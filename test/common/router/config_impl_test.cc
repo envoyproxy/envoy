@@ -965,8 +965,10 @@ virtual_hosts:
     EXPECT_EQ("www2", route->clusterName());
     EXPECT_EQ("www2", virtualHostName(route));
     route->finalizeRequestHeaders(headers, stream_info, true);
-    // TODO(samflattery): uncomment after https://github.com/google/re2/issues/272 resolved
-    /* EXPECT_EQ("/nXwforrXg2_Xndpoint/tXX?test=me", headers.get_(Http::Headers::get().Path)); */
+    // TODO(samflattery): remove after https://github.com/google/re2/issues/272 resolved
+#ifndef FUZZ_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    EXPECT_EQ("/nXwforrXg2_Xndpoint/tXX?test=me", headers.get_(Http::Headers::get().Path));
+#endif
     EXPECT_EQ("/newforreg2_endpoint/tee?test=me",
               headers.get_(Http::Headers::get().EnvoyOriginalPath));
   }
@@ -979,9 +981,10 @@ virtual_hosts:
     EXPECT_EQ("www2", route->clusterName());
     EXPECT_EQ("www2", virtualHostName(route));
     route->finalizeRequestHeaders(headers, stream_info, true);
-    // TODO(samflattery): uncomment after https://github.com/google/re2/issues/272 resolved
-    /* EXPECT_EQ("/VxVct/pVth/fVr/rVgVx1", headers.get_(Http::Headers::get().Path)); */
+    // TODO(samflattery): remove after https://github.com/google/re2/issues/272 resolved
+#ifndef FUZZ_BUILD_MODE_UNSAFE_FOR_PRODUCTION
     EXPECT_EQ("/exact/path/for/regex1", headers.get_(Http::Headers::get().EnvoyOriginalPath));
+#endif
   }
 
   // Regular expression path rewrite after exact path match testing,
@@ -993,8 +996,10 @@ virtual_hosts:
     EXPECT_EQ("www2", route->clusterName());
     EXPECT_EQ("www2", virtualHostName(route));
     route->finalizeRequestHeaders(headers, stream_info, true);
-    // TODO(samflattery): uncomment after https://github.com/google/re2/issues/272 resolved
-    /* EXPECT_EQ("/VxVct/pVth/fVr/rVgVx1?test=aeiou", headers.get_(Http::Headers::get().Path)); */
+    // TODO(samflattery): remove after https://github.com/google/re2/issues/272 resolved
+#ifndef FUZZ_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    EXPECT_EQ("/VxVct/pVth/fVr/rVgVx1?test=aeiou", headers.get_(Http::Headers::get().Path));
+#endif
     EXPECT_EQ("/exact/path/for/regex1?test=aeiou",
               headers.get_(Http::Headers::get().EnvoyOriginalPath));
   }
