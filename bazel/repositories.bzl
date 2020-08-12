@@ -339,15 +339,12 @@ def _com_github_google_libprotobuf_mutator():
     )
 
 def _com_github_jbeder_yaml_cpp():
-    location = _get_location("com_github_jbeder_yaml_cpp")
-    http_archive(
+    _repository_impl(
         name = "com_github_jbeder_yaml_cpp",
-        build_file_content = BUILD_ALL_CONTENT,
-        **location
     )
     native.bind(
         name = "yaml_cpp",
-        actual = "@envoy//bazel/foreign_cc:yaml",
+        actual = "@com_github_jbeder_yaml_cpp//:yaml-cpp",
     )
 
 def _com_github_libevent_libevent():

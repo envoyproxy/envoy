@@ -265,7 +265,7 @@ DEPENDENCY_REPOSITORIES = dict(
         sha256 = "79ab7069ef1c7c3632e7ffe095f7185d4c77b64d8035db3c085c239d4fe96d5f",
         strip_prefix = "yaml-cpp-98acc5a8874faab28b82c28936f4b400b389f5d6",
         # 2020-07-28
-        urls = ["https://github.com/greenhouse-org/yaml-cpp/archive/98acc5a8874faab28b82c28936f4b400b389f5d6.tar.gz"],
+        urls = ["https://github.com/jbeder/yaml-cpp/archive/98acc5a8874faab28b82c28936f4b400b389f5d6.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),

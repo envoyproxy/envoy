@@ -212,22 +212,6 @@ envoy_cmake_external(
 )
 
 envoy_cmake_external(
-    name = "yaml",
-    cache_entries = {
-        "YAML_CPP_BUILD_TESTS": "off",
-        "YAML_CPP_BUILD_TOOLS": "off",
-        "YAML_BUILD_SHARED_LIBS": "off",
-        "CMAKE_CXX_COMPILER_FORCED": "on",
-        "YAML_MSVC_SHARED_RT": "off",
-    },
-    lib_source = "@com_github_jbeder_yaml_cpp//:all",
-    static_libraries = select({
-        "//bazel:windows_x86_64": ["yaml-cpp.lib"],
-        "//conditions:default": ["libyaml-cpp.a"],
-    }),
-)
-
-envoy_cmake_external(
     name = "zlib",
     cache_entries = {
         "BUILD_SHARED_LIBS": "off",
