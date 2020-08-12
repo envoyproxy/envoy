@@ -106,31 +106,6 @@ ResponseCacheControl::ResponseCacheControl(absl::string_view cache_control_heade
   }
 }
 
-std::ostream& operator<<(std::ostream& os, const OptionalDuration& duration) {
-  return duration.has_value() ? os << duration.value().count() : os << " ";
-}
-
-std::ostream& operator<<(std::ostream& os, const RequestCacheControl& request_cache_control) {
-  return os << "{"
-            << "must_validate: " << request_cache_control.must_validate_ << ", "
-            << "no_store: " << request_cache_control.no_store_ << ", "
-            << "no_transform: " << request_cache_control.no_transform_ << ", "
-            << "only_if_cached: " << request_cache_control.only_if_cached_ << ", "
-            << "max_age: " << request_cache_control.max_age_ << ", "
-            << "min_fresh: " << request_cache_control.min_fresh_ << ", "
-            << "max_stale: " << request_cache_control.max_stale_ << "}";
-}
-
-std::ostream& operator<<(std::ostream& os, const ResponseCacheControl& response_cache_control) {
-  return os << "{"
-            << "must_validate: " << response_cache_control.must_validate_ << ", "
-            << "no_store: " << response_cache_control.no_store_ << ", "
-            << "no_transform: " << response_cache_control.no_transform_ << ", "
-            << "no_stale: " << response_cache_control.no_stale_ << ", "
-            << "public: " << response_cache_control.is_public_ << ", "
-            << "max_age: " << response_cache_control.max_age_ << "}";
-}
-
 bool operator==(const RequestCacheControl& lhs, const RequestCacheControl& rhs) {
   return (lhs.must_validate_ == rhs.must_validate_) && (lhs.no_store_ == rhs.no_store_) &&
          (lhs.no_transform_ == rhs.no_transform_) && (lhs.only_if_cached_ == rhs.only_if_cached_) &&
