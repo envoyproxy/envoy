@@ -2,7 +2,6 @@
 
 #include "extensions/filters/common/expr/context.h"
 
-#include "test/mocks/http/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/host.h"
