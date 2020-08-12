@@ -2,7 +2,7 @@
 
 #include "envoy/network/listener.h"
 
-#include "common/network/socket_option_impl.h"
+#include "common/network/socket_option_factory.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -154,8 +154,8 @@ void UdpProxyFilter::ClusterInfo::removeSession(const ActiveSession* session) {
 UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
                                              Network::UdpRecvData::LocalPeerAddresses&& addresses,
                                              const Upstream::HostConstSharedPtr& host)
-    : cluster_(cluster), addresses_(std::move(addresses)), host_(host),
-      use_original_src_ip_(cluster_.filter_.config_->usingOriginalSrcIp()),
+    : cluster_(cluster), use_original_src_ip_(cluster_.filter_.config_->usingOriginalSrcIp()),
+      addresses_(std::move(addresses)), host_(host),
       idle_timer_(cluster.filter_.read_callbacks_->udpListener().dispatcher().createTimer(
           [this] { onIdleTimer(); })),
       // NOTE: The socket call can only fail due to memory/fd exhaustion. No local ephemeral port
@@ -175,29 +175,20 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
       .inc();
 
   if (use_original_src_ip_) {
-    ENVOY_LOG(debug, "The original src is enabled for address {}.",
-              addresses_.peer_->asStringView());
-
-    const auto host_addr = host_->address()->ip();
-    const int trans_value = 1;
-    Api::SysCallIntResult result;
-
-    if (host_addr->version() == Network::Address::IpVersion::v6) {
-      // set ipv6 option
-      result = Network::SocketOptionImpl::setSocketOption(*socket_, ENVOY_SOCKET_IPV6_TRANSPARENT,
-                                                          &trans_value, sizeof(trans_value));
-      RELEASE_ASSERT(!SOCKET_FAILURE(result.rc_), "");
-      if (!host_addr->ipv6()->v6only()) {
-        // set ipv4 option
-        result = Network::SocketOptionImpl::setSocketOption(*socket_, ENVOY_SOCKET_IP_TRANSPARENT,
-                                                            &trans_value, sizeof(trans_value));
-        RELEASE_ASSERT(!SOCKET_FAILURE(result.rc_), "");
-      }
+    const Network::Socket::OptionsSharedPtr socket_options =
+        Network::SocketOptionFactory::buildIpTransparentOptions();
+    const bool ok = Network::Socket::applyOptions(
+        socket_options, *socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND);
+    if (ok) {
+      ENVOY_LOG(debug, "The original src is enabled for address {}.",
+                addresses_.peer_->asStringView());
+      socket_->addOptions(socket_options);
     } else {
-      // set ipv4 option
-      result = Network::SocketOptionImpl::setSocketOption(*socket_, ENVOY_SOCKET_IP_TRANSPARENT,
-                                                          &trans_value, sizeof(trans_value));
-      RELEASE_ASSERT(!SOCKET_FAILURE(result.rc_), "");
+      ENVOY_LOG(warn,
+                "Fall back to no use_original_src_ip mode due to failed to apply transparent "
+                "socket options to socket {} for peer address {}.",
+                socket_->ioHandle().fd(), addresses_.peer_->asStringView());
+      use_original_src_ip_ = false;
     }
   }
 

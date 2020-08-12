@@ -8,6 +8,7 @@
 
 #include "common/network/socket_impl.h"
 #include "common/network/socket_interface_impl.h"
+#include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -139,9 +140,9 @@ private:
     }
 
     ClusterInfo& cluster_;
+    bool use_original_src_ip_;
     const Network::UdpRecvData::LocalPeerAddresses addresses_;
     const Upstream::HostConstSharedPtr host_;
-    const bool use_original_src_ip_;
     // TODO(mattklein123): Consider replacing an idle timer for each session with a last used
     // time stamp and a periodic scan of all sessions to look for timeouts. This solution is simple,
     // though it might not perform well for high volume traffic. Note that this is how TCP proxy
