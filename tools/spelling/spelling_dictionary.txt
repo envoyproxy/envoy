@@ -26,6 +26,7 @@ CAS
 CB
 CDS
 CEL
+activations
 ceil
 CHACHA
 CHLO
