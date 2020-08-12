@@ -170,7 +170,6 @@ envoy_cc_test(
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
