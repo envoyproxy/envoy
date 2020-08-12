@@ -85,6 +85,17 @@ public:
       next_monotonic_time_ = monotonic_time;
       next_system_time_ = system_time;
       if (!pending_dec_ && (!registered_alarms_.empty() || !triggered_alarms_.empty())) {
+        // HACK: selectively increment only on dispatchers that have active alarms to allow the
+        // pending alarms mechanism to be used to detect when alarms had their times updated, while
+        // also avoiding waiting for decrements from dispatchers that are either not active or are
+        // blocked on epoll for a long time because of lack of other events that would wake them up.
+        // There is a known, but not understood issue with QUIC tests timing out when using this
+        // version of simulated timers, I'm guessing that the event loops in question do not have a
+        // real periodic timer that ensures that the max epoll wait ends up being relatively small
+        // and ensures that events scheduled from outside the worker thread have a chance to
+        // execute. It may be necessary to have the simulated scheduler add a real periodic timer on
+        // construction in order to ensure that the event loop remains responsive to external event
+        // activations.
         inc_pending = true;
         pending_dec_ = true;
       }
