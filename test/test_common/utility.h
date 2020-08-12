@@ -246,7 +246,7 @@ public:
    * @param value target value.
    * @param time_system the time system to use for waiting.
    * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
-   * @param fixfix
+   * @param dispatcher the dispatcher to run non-blocking periodically during the wait.
    * @return AssertionSuccess() if the gauge was == to the value within the timeout, else
    * AssertionFailure().
    */

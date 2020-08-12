@@ -61,9 +61,11 @@ bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& heade
   ResponseCacheControl response_cache_control(cache_control);
 
   // Only cache responses with explicit validation data, either:
-  //    max-age or s-maxage cache-control directives with date header.
-  //    expires header.
+  //    "no-cache" cache-control directive
+  //    "max-age" or "s-maxage" cache-control directives with date header
+  //    expires header
   const bool has_validation_data =
+      response_cache_control.must_validate_ ||
       (headers.Date() && response_cache_control.max_age_.has_value()) ||
       headers.get(Http::Headers::get().Expires);
 

@@ -27,12 +27,6 @@ void TestRealTimeSystem::advanceTimeAsyncImpl(const Duration& duration) {
   advanceTimeWait(duration);
 }
 
-bool TestRealTimeSystem::waitForImpl(absl::Mutex& mutex, const absl::Condition& condition,
-                                     const Duration& duration) noexcept {
-  only_one_thread_.checkOneThread();
-  return mutex.AwaitWithTimeout(condition, absl::FromChrono(duration));
-}
-
 SystemTime TestRealTimeSystem::systemTime() { return real_time_system_.systemTime(); }
 
 MonotonicTime TestRealTimeSystem::monotonicTime() { return real_time_system_.monotonicTime(); }

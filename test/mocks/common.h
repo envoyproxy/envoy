@@ -62,11 +62,6 @@ public:
   void advanceTimeAsyncImpl(const Duration& duration) override {
     real_time_.advanceTimeAsyncImpl(duration);
   }
-  bool waitForImpl(absl::Mutex& mutex, const absl::Condition& condition,
-                   const Duration& duration) noexcept
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
-    return real_time_.waitFor(mutex, condition, duration); // NO_CHECK_FORMAT(real_time)
-  }
   MOCK_METHOD(SystemTime, systemTime, ());
   MOCK_METHOD(MonotonicTime, monotonicTime, ());
 

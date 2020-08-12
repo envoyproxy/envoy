@@ -62,14 +62,11 @@ public:
    * @param duration The maximum amount of time to wait.
    * @return Thread::CondVar::WaitStatus whether the condition timed out or not.
    */
-  virtual bool waitForImpl(absl::Mutex& mutex, const absl::Condition& condition,
-                           const Duration& duration) noexcept
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) PURE; // fixfix
-
   template <class D>
   bool waitFor(absl::Mutex& mutex, const absl::Condition& condition, const D& duration) noexcept
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
-    return waitForImpl(mutex, condition, std::chrono::duration_cast<Duration>(duration));
+        only_one_thread_.checkOneThread();
+  return mutex.AwaitWithTimeout(condition, absl::FromChrono(std::chrono::duration_cast<Duration>(duration)));
   }
 
   /**
@@ -122,13 +119,6 @@ public:
   void advanceTimeWaitImpl(const Duration& duration) override {
     timeSystem().advanceTimeWaitImpl(duration);
   }
-
-  bool waitForImpl(absl::Mutex& mutex, const absl::Condition& condition,
-                   const Duration& duration) noexcept
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
-    return timeSystem().waitForImpl(mutex, condition, duration);
-  }
-
   SchedulerPtr createScheduler(Scheduler& base_scheduler,
                                CallbackScheduler& cb_scheduler) override {
     return timeSystem().createScheduler(base_scheduler, cb_scheduler);

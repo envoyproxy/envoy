@@ -14,8 +14,6 @@ public:
   // TestTimeSystem
   void advanceTimeAsyncImpl(const Duration& duration) override;
   void advanceTimeWaitImpl(const Duration& duration) override;
-  bool waitForImpl(absl::Mutex& mutex, const absl::Condition& condition,
-                   const Duration& duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
 
   // Event::TimeSystem
   Event::SchedulerPtr createScheduler(Scheduler& base_scheduler,

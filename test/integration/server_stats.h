@@ -50,7 +50,7 @@ public:
    * @param name gauge name.
    * @param value target value.
    * @param timeout amount of time to wait before asserting false, or 0 for no timeout.
-   * @param fixfix
+   * @param dispatcher the dispatcher to run non-blocking periodically during the wait.
    */
   virtual void waitForGaugeEq(const std::string& name, uint64_t value,
                               std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),

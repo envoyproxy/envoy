@@ -240,13 +240,6 @@ void SimulatedTimeSystemHelper::waitForNoPendingLockHeld() const
       &pending_alarms_));
 }
 
-bool SimulatedTimeSystemHelper::waitForImpl(absl::Mutex& mutex, const absl::Condition& condition,
-                                            const Duration& duration) noexcept
-    ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
-  only_one_thread_.checkOneThread();
-  return mutex.AwaitWithTimeout(condition, absl::FromChrono(duration));
-}
-
 void SimulatedTimeSystemHelper::alarmActivateLockHeld(Alarm& alarm) ABSL_NO_THREAD_SAFETY_ANALYSIS {
   // We disable thread-safety analysis as the compiler can't detect that
   // alarm_.timeSystem() == this, so we must be holding the right mutex.
