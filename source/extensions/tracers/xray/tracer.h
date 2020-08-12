@@ -132,6 +132,10 @@ public:
    */
   void log(Envoy::SystemTime, const std::string&) override {}
 
+  // X-Ray doesn't support baggage, so noop these OpenTracing functions.
+  void setBaggage(absl::string_view, absl::string_view) override {}
+  std::string getBaggage(absl::string_view) override { return std::string(); }
+
   /**
    * Creates a child span.
    * In X-Ray terms this creates a sub-segment and sets its parent ID to the current span's ID.
