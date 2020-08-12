@@ -11,15 +11,27 @@
 namespace Envoy {
 namespace Server {
 
-enum class OverloadActionState {
-  /**
-   * Indicates that an overload action is active because at least one of its triggers has fired.
-   */
-  Active,
-  /**
-   * Indicates that an overload action is inactive because none of its triggers have fired.
-   */
-  Inactive
+/**
+ * Tracks the state of an overload action. The state is a number between 0 and 1 that represents the
+ * level of saturation. The values are categorized in two groups:
+ * - Saturated (value = 1): indicates that an overload action is active because at least one of its
+ *   triggers has reached saturation.
+ * - Scaling (0 <= value < 1): indicates that an overload action is not saturated.
+ */
+class OverloadActionState {
+public:
+  static constexpr OverloadActionState inactive() { return OverloadActionState(0); }
+
+  static constexpr OverloadActionState saturated() { return OverloadActionState(1.0); }
+
+  explicit constexpr OverloadActionState(float value)
+      : action_value_(std::min(1.0f, std::max(0.0f, value))) {}
+
+  float value() const { return action_value_; }
+  bool isSaturated() const { return action_value_ == 1; }
+
+private:
+  float action_value_;
 };
 
 /**

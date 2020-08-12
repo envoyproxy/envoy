@@ -256,7 +256,7 @@ private:
     struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
 
-      const OverloadActionState inactive_ = OverloadActionState::Inactive;
+      const OverloadActionState inactive_ = OverloadActionState::inactive();
     };
 
     NullOverloadManager(ThreadLocal::SlotAllocator& slot_allocator)

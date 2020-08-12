@@ -5723,7 +5723,7 @@ TEST(HttpConnectionManagerTracingStatsTest, verifyTracingStats) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
-  Server::OverloadActionState stop_accepting_requests = Server::OverloadActionState::Active;
+  Server::OverloadActionState stop_accepting_requests = Server::OverloadActionState::saturated();
   ON_CALL(overload_manager_.overload_state_,
           getState(Server::OverloadActionNames::get().StopAcceptingRequests))
       .WillByDefault(ReturnRef(stop_accepting_requests));
@@ -5754,7 +5754,7 @@ TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenOverloaded) {
-  Server::OverloadActionState disable_http_keep_alive = Server::OverloadActionState::Active;
+  Server::OverloadActionState disable_http_keep_alive = Server::OverloadActionState::saturated();
   ON_CALL(overload_manager_.overload_state_,
           getState(Server::OverloadActionNames::get().DisableHttpKeepAlive))
       .WillByDefault(ReturnRef(disable_http_keep_alive));

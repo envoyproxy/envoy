@@ -50,8 +50,18 @@ message ThresholdTrigger {
       "envoy.config.overload.v2alpha.ThresholdTrigger";
 
   // If the resource pressure is greater than or equal to this value, the trigger
-  // will fire.
+  // will enter saturation.
   double value = 1 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
+}
+
+message ScaledTrigger {
+  // If the resource pressure is greater than this value, the trigger will be in the
+  // :ref:`scaling <arch_overview_overload_manager-triggers-state>` state with value
+  // `(pressure - scaling_threshold) / (saturation_threshold - scaling_threshold)`.
+  double scaling_threshold = 1 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
+
+  // If the resource pressure is greater than this value, the trigger will enter saturation.
+  double saturation_threshold = 2 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
 }
 
 message Trigger {
@@ -65,6 +75,8 @@ message Trigger {
     option (validate.required) = true;
 
     ThresholdTrigger threshold = 2;
+
+    ScaledTrigger scaled = 3;
   }
 }
 
@@ -77,9 +89,9 @@ message OverloadAction {
   // DNS to ensure uniqueness.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
-  // A set of triggers for this action. If any of these triggers fire the overload action
-  // is activated. Listeners are notified when the overload action transitions from
-  // inactivated to activated, or vice versa.
+  // A set of triggers for this action. The state of the action is the maximum
+  // state of all triggers, which can be scaling between 0 and 1 or saturated. Listeners
+  // are notified when the overload action changes state.
   repeated Trigger triggers = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 
