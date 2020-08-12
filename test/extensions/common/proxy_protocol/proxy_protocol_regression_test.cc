@@ -70,6 +70,7 @@ public:
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
   Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override { return absl::nullopt; }
   ResourceLimit& openConnections() override { return open_connections_; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;

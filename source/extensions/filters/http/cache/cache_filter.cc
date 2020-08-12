@@ -5,6 +5,7 @@
 #include "common/http/utility.h"
 
 #include "extensions/filters/http/cache/cacheability_utils.h"
+#include "extensions/filters/http/cache/inline_headers_handles.h"
 
 #include "absl/strings/string_view.h"
 
@@ -275,9 +276,8 @@ bool CacheFilter::shouldUpdateCachedEntry(const Http::ResponseHeaderMap& respons
   // and assuming a single cached response per key:
   // If the 304 response contains a strong validator (etag) that does not match the cached response,
   // the cached response should not be updated.
-  const Http::HeaderEntry* response_etag = response_headers.get(Http::CustomHeaders::get().Etag);
-  const Http::HeaderEntry* cached_etag =
-      lookup_result_->headers_->get(Http::CustomHeaders::get().Etag);
+  const Http::HeaderEntry* response_etag = response_headers.getInline(etag_handle.handle());
+  const Http::HeaderEntry* cached_etag = lookup_result_->headers_->getInline(etag_handle.handle());
   return !response_etag || (cached_etag && cached_etag->value().getStringView() ==
                                                response_etag->value().getStringView());
 }
@@ -289,25 +289,24 @@ void CacheFilter::injectValidationHeaders(Http::RequestHeaderMap& request_header
          "injectValidationHeaders precondition unsatisfied: the "
          "CacheFilter is not validating a cache lookup result");
 
-  const Http::HeaderEntry* etag_header =
-      lookup_result_->headers_->get(Http::CustomHeaders::get().Etag);
+  const Http::HeaderEntry* etag_header = lookup_result_->headers_->getInline(etag_handle.handle());
   const Http::HeaderEntry* last_modified_header =
-      lookup_result_->headers_->get(Http::CustomHeaders::get().LastModified);
+      lookup_result_->headers_->getInline(last_modified_handle.handle());
 
   if (etag_header) {
     absl::string_view etag = etag_header->value().getStringView();
-    request_headers.setReferenceKey(Http::CustomHeaders::get().IfNoneMatch, etag);
+    request_headers.setInline(if_none_match_handle.handle(), etag);
   }
   if (CacheHeadersUtils::httpTime(last_modified_header) != SystemTime()) {
     // Valid Last-Modified header exists.
     absl::string_view last_modified = last_modified_header->value().getStringView();
-    request_headers.setReferenceKey(Http::CustomHeaders::get().IfModifiedSince, last_modified);
+    request_headers.setInline(if_modified_since_handle.handle(), last_modified);
   } else {
     // Either Last-Modified is missing or invalid, fallback to Date.
     // A correct behaviour according to:
     // https://httpwg.org/specs/rfc7232.html#header.if-modified-since
     absl::string_view date = lookup_result_->headers_->getDateValue();
-    request_headers.setReferenceKey(Http::CustomHeaders::get().IfModifiedSince, date);
+    request_headers.setInline(if_modified_since_handle.handle(), date);
   }
 }
 

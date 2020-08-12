@@ -2,6 +2,8 @@
 
 #include <list>
 
+#include "common/common/macros.h"
+
 #include "absl/base/attributes.h"
 #include "absl/synchronization/mutex.h"
 

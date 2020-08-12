@@ -95,10 +95,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_google_absl = dict(
-        sha256 = "ec8ef47335310cc3382bdc0d0cc1097a001e67dc83fcba807845aa5696e7e1e4",
-        strip_prefix = "abseil-cpp-302b250e1d917ede77b5ff00a6fd9f28430f1563",
-        # 2020-07-13
-        urls = ["https://github.com/abseil/abseil-cpp/archive/302b250e1d917ede77b5ff00a6fd9f28430f1563.tar.gz"],
+        sha256 = "573baccd67aa591b8c7209bfb0c77e0d15633d77ced39d1ccbb1232828f7f7d9",
+        strip_prefix = "abseil-cpp-ce4bc927755fdf0ed03d679d9c7fa041175bb3cb",
+        # 2020-08-08
+        urls = ["https://github.com/abseil/abseil-cpp/archive/ce4bc927755fdf0ed03d679d9c7fa041175bb3cb.tar.gz"],
         use_category = ["dataplane", "controlplane"],
         cpe = "N/A",
     ),
@@ -265,7 +265,7 @@ DEPENDENCY_REPOSITORIES = dict(
         sha256 = "79ab7069ef1c7c3632e7ffe095f7185d4c77b64d8035db3c085c239d4fe96d5f",
         strip_prefix = "yaml-cpp-98acc5a8874faab28b82c28936f4b400b389f5d6",
         # 2020-07-28
-        urls = ["https://github.com/greenhouse-org/yaml-cpp/archive/98acc5a8874faab28b82c28936f4b400b389f5d6.tar.gz"],
+        urls = ["https://github.com/jbeder/yaml-cpp/archive/98acc5a8874faab28b82c28936f4b400b389f5d6.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
@@ -354,8 +354,8 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     io_bazel_rules_go = dict(
-        sha256 = "a8d6b1b354d371a646d2f7927319974e0f9e52f73a2452d2b3877118169eb6bb",
-        urls = ["https://github.com/bazelbuild/rules_go/releases/download/v0.23.3/rules_go-v0.23.3.tar.gz"],
+        sha256 = "0310e837aed522875791750de44408ec91046c630374990edd51827cb169f616",
+        urls = ["https://github.com/bazelbuild/rules_go/releases/download/v0.23.7/rules_go-v0.23.7.tar.gz"],
         use_category = ["build"],
     ),
     rules_cc = dict(
@@ -410,9 +410,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/b2b8ff25f5a565324b93411ca29c3403ccbca969.tar.gz
-        sha256 = "792924bbf27203bb0d1d08c99597a30793ef8f4cfa2df99792aea7200f1b27e3",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/b2b8ff25f5a565324b93411ca29c3403ccbca969.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/96bd860bec207d4b722ab7f319fa47be129a85cd.tar.gz
+        sha256 = "d7129a2f41f2bd00a8a38b33f9b7b955d3e7de3dec20f69b70d7000d3a856360",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/96bd860bec207d4b722ab7f319fa47be129a85cd.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),

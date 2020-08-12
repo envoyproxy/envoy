@@ -11,6 +11,8 @@
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
+#include "extensions/filters/http/cache/inline_headers_handles.h"
+
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
@@ -19,13 +21,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
-
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    request_cache_control_handle(Http::CustomHeaders::get().CacheControl);
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    response_cache_control_handle(Http::CustomHeaders::get().CacheControl);
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    pragma_handler(Http::CustomHeaders::get().Pragma);
 
 LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp)
     : timestamp_(timestamp) {
@@ -68,7 +63,7 @@ size_t localHashKey(const Key& key) { return stableHashKey(key); }
 void LookupRequest::initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers) {
   const absl::string_view cache_control =
       request_headers.getInlineValue(request_cache_control_handle.handle());
-  const absl::string_view pragma = request_headers.getInlineValue(pragma_handler.handle());
+  const absl::string_view pragma = request_headers.getInlineValue(pragma_handle.handle());
 
   if (!cache_control.empty()) {
     request_cache_control_ = RequestCacheControl(cache_control);
