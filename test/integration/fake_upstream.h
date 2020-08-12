@@ -346,7 +346,7 @@ public:
         });
     Event::TestTimeSystem& time_system =
         dynamic_cast<Event::TestTimeSystem&>(connection_.dispatcher().timeSource());
-    if (!time_system.waitFor(lock_, absl::Condition(&callback_ready_event), timeout, true)) {
+    if (!time_system.waitFor(lock_, absl::Condition(&callback_ready_event), timeout)) {
       return testing::AssertionFailure() << "Timed out while executing on dispatcher.";
     }
     if (unexpected_disconnect && !allow_unexpected_disconnects_) {

@@ -149,7 +149,7 @@ AssertionResult FakeStream::waitForHeadersComplete(milliseconds timeout) {
     lock_.AssertReaderHeld();
     return headers_ != nullptr;
   };
-  if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout, true)) {
+  if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
     return AssertionFailure() << "Timed out waiting for headers.";
   }
   return AssertionSuccess();
@@ -165,7 +165,7 @@ bool waitForWithDispatcherRun(Event::TestTimeSystem& time_system, absl::Mutex& l
   const auto end_time = time_system.monotonicTime() + timeout;
   while (time_system.monotonicTime() < end_time) {
     // Wake up every 5ms to run the client dispatcher.
-    if (time_system.waitFor(lock, absl::Condition(&condition), 5ms, true)) {
+    if (time_system.waitFor(lock, absl::Condition(&condition), 5ms)) {
       return true;
     }
 
@@ -220,7 +220,7 @@ AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatche
 
 AssertionResult FakeStream::waitForReset(milliseconds timeout) {
   absl::MutexLock lock(&lock_);
-  if (!time_system_.waitFor(lock_, absl::Condition(&saw_reset_), timeout, true)) {
+  if (!time_system_.waitFor(lock_, absl::Condition(&saw_reset_), timeout)) {
     return AssertionFailure() << "Timed out waiting for reset.";
   }
   return AssertionSuccess();
@@ -362,7 +362,7 @@ AssertionResult FakeConnectionBase::waitForDisconnect(milliseconds timeout) {
     return !shared_connection_.connectedLockHeld();
   };
 
-  if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout, true)) {
+  if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
     return AssertionFailure() << "Timed out waiting for disconnect.";
   }
   ENVOY_LOG(trace, "FakeConnectionBase done waiting for disconnect");
@@ -371,7 +371,7 @@ AssertionResult FakeConnectionBase::waitForDisconnect(milliseconds timeout) {
 
 AssertionResult FakeConnectionBase::waitForHalfClose(milliseconds timeout) {
   absl::MutexLock lock(&lock_);
-  if (!time_system_.waitFor(lock_, absl::Condition(&half_closed_), timeout, true)) {
+  if (!time_system_.waitFor(lock_, absl::Condition(&half_closed_), timeout)) {
     return AssertionFailure() << "Timed out waiting for half close.";
   }
   return AssertionSuccess();
@@ -583,7 +583,7 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
     };
 
     ENVOY_LOG(debug, "waiting for raw connection");
-    if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout, true)) {
+    if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
       return AssertionFailure() << "Timed out waiting for raw connection";
     }
     connection = std::make_unique<FakeRawConnection>(consumeConnection(), timeSystem());
@@ -610,7 +610,7 @@ testing::AssertionResult FakeUpstream::waitForUdpDatagram(Network::UdpRecvData& 
     return !received_datagrams_.empty();
   };
 
-  if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout, true)) {
+  if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
     return AssertionFailure() << "Timed out waiting for UDP datagram.";
   }
 
@@ -641,7 +641,7 @@ AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* 
     return data_.size() == num_bytes;
   };
   ENVOY_LOG(debug, "waiting for {} bytes of data", num_bytes);
-  if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout, true)) {
+  if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
     return AssertionFailure() << "Timed out waiting for data.";
   }
   if (data != nullptr) {
@@ -659,7 +659,7 @@ FakeRawConnection::waitForData(const std::function<bool(const std::string&)>& da
     return data_validator(data_);
   };
   ENVOY_LOG(debug, "waiting for data");
-  if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout, true)) {
+  if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
     return AssertionFailure() << "Timed out waiting for data.";
   }
   if (data != nullptr) {

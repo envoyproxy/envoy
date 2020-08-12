@@ -56,16 +56,16 @@ public:
                                       Event::CallbackScheduler& cb_scheduler) override {
     return real_time_.createScheduler(base_scheduler, cb_scheduler);
   }
-  void advanceTimeWaitImpl(const Duration& duration, bool always_sleep) override {
-    real_time_.advanceTimeWaitImpl(duration, always_sleep);
+  void advanceTimeWaitImpl(const Duration& duration) override {
+    real_time_.advanceTimeWaitImpl(duration);
   }
-  void advanceTimeAsyncImpl(const Duration& duration, bool always_sleep) override {
-    real_time_.advanceTimeAsyncImpl(duration, always_sleep);
+  void advanceTimeAsyncImpl(const Duration& duration) override {
+    real_time_.advanceTimeAsyncImpl(duration);
   }
-  bool waitForImpl(absl::Mutex& mutex, const absl::Condition& condition, const Duration& duration,
-                   bool always_sleep) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
-    return real_time_.waitFor(mutex, condition, duration, // NO_CHECK_FORMAT(real_time)
-                              always_sleep);
+  bool waitForImpl(absl::Mutex& mutex, const absl::Condition& condition,
+                   const Duration& duration) noexcept
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+    return real_time_.waitFor(mutex, condition, duration); // NO_CHECK_FORMAT(real_time)
   }
   MOCK_METHOD(SystemTime, systemTime, ());
   MOCK_METHOD(MonotonicTime, monotonicTime, ());

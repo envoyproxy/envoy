@@ -25,11 +25,10 @@ public:
    * use this variant.
    *
    * @param duration The amount of time to sleep.
-   * @param fixfix
    */
-  virtual void advanceTimeWaitImpl(const Duration& duration, bool always_sleep) PURE;
-  template <class D> void advanceTimeWait(const D& duration, bool always_sleep = false) {
-    advanceTimeWaitImpl(std::chrono::duration_cast<Duration>(duration), always_sleep);
+  virtual void advanceTimeWaitImpl(const Duration& duration) PURE;
+  template <class D> void advanceTimeWait(const D& duration = false) {
+    advanceTimeWaitImpl(std::chrono::duration_cast<Duration>(duration));
   }
 
   /**
@@ -42,32 +41,39 @@ public:
    * loop. Unit tests will often use this variant.
    *
    * @param duration The amount of time to sleep.
-   * @param fixfix
    */
-  virtual void advanceTimeAsyncImpl(const Duration& duration, bool always_sleep) PURE;
-  template <class D> void advanceTimeAsync(const D& duration, bool always_sleep = false) {
-    advanceTimeAsyncImpl(std::chrono::duration_cast<Duration>(duration), always_sleep);
+  virtual void advanceTimeAsyncImpl(const Duration& duration) PURE;
+  template <class D> void advanceTimeAsync(const D& duration = false) {
+    advanceTimeAsyncImpl(std::chrono::duration_cast<Duration>(duration));
   }
 
   /**
-   * Waits for the specified duration to expire, or for a condvar to
-   * be notified, whichever comes first.
+   * Waits for the specified duration to expire, or for the condition to be satisfied, whichever
+   * comes first.
    *
    * @param mutex A mutex which must be held before calling this function.
    * @param condvar The condition to wait on.
    * @param duration The maximum amount of time to wait.
-   * @param fixfix
    * @return Thread::CondVar::WaitStatus whether the condition timed out or not.
    */
   virtual bool waitForImpl(absl::Mutex& mutex, const absl::Condition& condition,
-                           const Duration& duration, bool always_sleep) noexcept
+                           const Duration& duration) noexcept
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) PURE;
 
   template <class D>
-  bool waitFor(absl::Mutex& mutex, const absl::Condition& condition, const D& duration,
-               bool always_sleep = false) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
-    return waitForImpl(mutex, condition, std::chrono::duration_cast<Duration>(duration),
-                       always_sleep);
+  bool waitFor(absl::Mutex& mutex, const absl::Condition& condition, const D& duration) noexcept
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+    return waitForImpl(mutex, condition, std::chrono::duration_cast<Duration>(duration));
+  }
+
+  /**
+   * This function will perform a real sleep in all time systems (real or simulated). This function
+   * should NOT be used without a good reason. It is either for supporting old code that needs to
+   * be converted to an event based approach, simulated time, or some other solution. Be ready
+   * to explain why you are using this in code review.
+   */
+  template <class D> void realSleepDoNotUseWithoutReadingTheAboveComment(const D& duration) {
+    std::this_thread::sleep_for(duration); // NO_CHECK_FORMAT(real_time)
   }
 };
 
@@ -104,16 +110,17 @@ private:
 // subclass.
 template <class TimeSystemVariant> class DelegatingTestTimeSystemBase : public TestTimeSystem {
 public:
-  void advanceTimeAsyncImpl(const Duration& duration, bool always_sleep) override {
-    timeSystem().advanceTimeAsyncImpl(duration, always_sleep);
+  void advanceTimeAsyncImpl(const Duration& duration) override {
+    timeSystem().advanceTimeAsyncImpl(duration);
   }
-  void advanceTimeWaitImpl(const Duration& duration, bool always_sleep) override {
-    timeSystem().advanceTimeWaitImpl(duration, always_sleep);
+  void advanceTimeWaitImpl(const Duration& duration) override {
+    timeSystem().advanceTimeWaitImpl(duration);
   }
 
-  bool waitForImpl(absl::Mutex& mutex, const absl::Condition& condition, const Duration& duration,
-                   bool always_sleep) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
-    return timeSystem().waitForImpl(mutex, condition, duration, always_sleep);
+  bool waitForImpl(absl::Mutex& mutex, const absl::Condition& condition,
+                   const Duration& duration) noexcept
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+    return timeSystem().waitForImpl(mutex, condition, duration);
   }
 
   SchedulerPtr createScheduler(Scheduler& base_scheduler,

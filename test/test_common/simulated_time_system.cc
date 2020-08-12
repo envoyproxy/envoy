@@ -216,27 +216,21 @@ MonotonicTime SimulatedTimeSystemHelper::monotonicTime() {
   return monotonic_time_;
 }
 
-void SimulatedTimeSystemHelper::advanceTimeAsyncImpl(const Duration& duration, bool always_sleep) {
+void SimulatedTimeSystemHelper::advanceTimeAsyncImpl(const Duration& duration) {
   only_one_thread_.checkOneThread();
   absl::MutexLock lock(&mutex_);
   MonotonicTime monotonic_time =
       monotonic_time_ + std::chrono::duration_cast<MonotonicTime::duration>(duration);
   setMonotonicTimeLockHeld(monotonic_time);
-  if (always_sleep) {
-    std::this_thread::sleep_for(duration);
-  }
 }
 
-void SimulatedTimeSystemHelper::advanceTimeWaitImpl(const Duration& duration, bool always_sleep) {
+void SimulatedTimeSystemHelper::advanceTimeWaitImpl(const Duration& duration) {
   only_one_thread_.checkOneThread();
   absl::MutexLock lock(&mutex_);
   MonotonicTime monotonic_time =
       monotonic_time_ + std::chrono::duration_cast<MonotonicTime::duration>(duration);
   setMonotonicTimeLockHeld(monotonic_time);
   waitForNoPendingLockHeld();
-  if (always_sleep) {
-    std::this_thread::sleep_for(duration);
-  }
 }
 
 void SimulatedTimeSystemHelper::waitForNoPendingLockHeld() const
@@ -247,50 +241,10 @@ void SimulatedTimeSystemHelper::waitForNoPendingLockHeld() const
 }
 
 bool SimulatedTimeSystemHelper::waitForImpl(absl::Mutex& mutex, const absl::Condition& condition,
-                                            const Duration& duration, bool always_sleep) noexcept
+                                            const Duration& duration) noexcept
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
   only_one_thread_.checkOneThread();
-
-  const MonotonicTime end_time = monotonicTime() + duration;
-
-  bool timeout_not_reached = true;
-  while (timeout_not_reached) {
-    // First check to see if the condition is already satisfied without advancing sim time.
-    if (condition.Eval()) {
-      return true;
-    }
-
-    // This function runs with the caller-provided mutex held. We need to
-    // hold this->mutex_ while accessing the timer-queue and blocking on
-    // callbacks completing. To avoid potential deadlock we must drop
-    // the caller's mutex before taking ours. We also must care to avoid
-    // break/continue/return/throw during this non-RAII lock operation.
-    mutex.Unlock();
-    {
-      absl::MutexLock lock(&mutex_);
-      if (monotonic_time_ < end_time) {
-        MonotonicTime next_wakeup = end_time;
-        if (!alarms_.empty()) {
-          // If there's another alarm pending, sleep forward to it.
-          const AlarmRegistration& alarm_registration = *alarms_.begin();
-          next_wakeup = std::min(alarm_registration.time_, next_wakeup);
-        }
-        const auto sleep_duration = next_wakeup - monotonic_time_;
-        setMonotonicTimeLockHeld(next_wakeup);
-        waitForNoPendingLockHeld();
-        if (always_sleep) {
-          std::this_thread::sleep_for(sleep_duration);
-        }
-      } else {
-        // If we reached our end_time, break the loop and return timeout. We
-        // don't break immediately as we have to drop mutex_ and re-take mutex,
-        // and it's cleaner to have a linear flow to the end of the loop.
-        timeout_not_reached = false;
-      }
-    }
-    mutex.Lock();
-  }
-  return false;
+  return mutex.AwaitWithTimeout(condition, absl::FromChrono(duration));
 }
 
 void SimulatedTimeSystemHelper::alarmActivateLockHeld(Alarm& alarm) ABSL_NO_THREAD_SAFETY_ANALYSIS {
