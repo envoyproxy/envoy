@@ -287,6 +287,14 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                     ? absl::optional<Http::LowerCaseString>(Http::LowerCaseString(
                                           route.route().host_rewrite_header()))
                                     : absl::nullopt),
+      host_rewrite_path_regex_(
+          route.route().has_host_rewrite_path_regex()
+              ? Regex::Utility::parseRegex(route.route().host_rewrite_path_regex().pattern())
+              : nullptr),
+      host_rewrite_path_regex_substitution_(
+          route.route().has_host_rewrite_path_regex()
+              ? route.route().host_rewrite_path_regex().substitution()
+              : ""),
       cluster_name_(route.route().cluster()), cluster_header_name_(route.route().cluster_header()),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
@@ -527,6 +535,11 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
         headers.setHost(header_value);
       }
     }
+  } else if (host_rewrite_path_regex_ != nullptr) {
+    const std::string path(headers.getPathValue());
+    absl::string_view just_path(Http::PathUtil::removeQueryAndFragment(path));
+    headers.setHost(
+        host_rewrite_path_regex_->replaceAll(just_path, host_rewrite_path_regex_substitution_));
   }
 
   // Handle path rewrite
@@ -1197,7 +1210,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
       bool duplicate_found = false;
       if ("*" == domain) {
         if (default_virtual_host_) {
-          throw EnvoyException(fmt::format("Only a single wildcard domain is permitted"));
+          throw EnvoyException(fmt::format("Only a single wildcard domain is permitted in route {}",
+                                           route_config.name()));
         }
         default_virtual_host_ = virtual_host;
       } else if (!domain.empty() && '*' == domain[0]) {
@@ -1212,8 +1226,9 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
         duplicate_found = !virtual_hosts_.emplace(domain, virtual_host).second;
       }
       if (duplicate_found) {
-        throw EnvoyException(fmt::format(
-            "Only unique values for domains are permitted. Duplicate entry of domain {}", domain));
+        throw EnvoyException(fmt::format("Only unique values for domains are permitted. Duplicate "
+                                         "entry of domain {} in route {}",
+                                         domain, route_config.name()));
       }
     }
   }

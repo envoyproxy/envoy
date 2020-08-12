@@ -102,6 +102,14 @@ void OpenTracingSpan::log(SystemTime timestamp, const std::string& event) {
   finish_options_.log_records.emplace_back(std::move(record));
 }
 
+void OpenTracingSpan::setBaggage(absl::string_view key, absl::string_view value) {
+  span_->SetBaggageItem({key.data(), key.length()}, {value.data(), value.length()});
+}
+
+std::string OpenTracingSpan::getBaggage(absl::string_view key) {
+  return span_->BaggageItem({key.data(), key.length()});
+}
+
 void OpenTracingSpan::injectContext(Http::RequestHeaderMap& request_headers) {
   if (driver_.propagationMode() == OpenTracingDriver::PropagationMode::SingleHeader) {
     // Inject the span context using Envoy's single-header format.

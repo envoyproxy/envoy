@@ -267,6 +267,9 @@ protected:
 
     bool buffersOverrun() const { return read_disable_count_ > 0; }
 
+    void encodeDataHelper(Buffer::Instance& data, bool end_stream,
+                          bool skip_encoding_empty_trailers);
+
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
@@ -498,6 +501,13 @@ protected:
   // this changes in the future. Also it is important that onSend does not do partial writes, as the
   // nghttp2 library will keep calling this callback to write the rest of the frame.
   ssize_t onSend(const uint8_t* data, size_t length);
+
+  // Some browsers (e.g. WebKit-based browsers: https://bugs.webkit.org/show_bug.cgi?id=210108) have
+  // a problem with processing empty trailers (END_STREAM | END_HEADERS with zero length HEADERS) of
+  // an HTTP/2 response as reported here: https://github.com/envoyproxy/envoy/issues/10514. This is
+  // controlled by "envoy.reloadable_features.http2_skip_encoding_empty_trailers" runtime feature
+  // flag.
+  const bool skip_encoding_empty_trailers_;
 
 private:
   virtual ConnectionCallbacks& callbacks() PURE;

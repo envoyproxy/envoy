@@ -15,8 +15,6 @@
 namespace Envoy {
 namespace Stats {
 
-class Allocator;
-
 /**
  * General interface for all stats objects.
  */

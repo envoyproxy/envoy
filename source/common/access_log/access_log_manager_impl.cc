@@ -12,16 +12,16 @@ namespace Envoy {
 namespace AccessLog {
 
 AccessLogManagerImpl::~AccessLogManagerImpl() {
-  for (auto& access_log : access_logs_) {
-    ENVOY_LOG(debug, "destroying access logger {}", access_log.first);
-    access_log.second.reset();
+  for (auto& [log_key, log_file_ptr] : access_logs_) {
+    ENVOY_LOG(debug, "destroying access logger {}", log_key);
+    log_file_ptr.reset();
   }
   ENVOY_LOG(debug, "destroyed access loggers");
 }
 
 void AccessLogManagerImpl::reopen() {
-  for (auto& access_log : access_logs_) {
-    access_log.second->reopen();
+  for (auto& [log_key, log_file_ptr] : access_logs_) {
+    log_file_ptr->reopen();
   }
 }
 
