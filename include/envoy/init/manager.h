@@ -82,8 +82,8 @@ struct Manager {
    */
   virtual const absl::flat_hash_map<std::string, uint32_t>& unreadyTargets() const PURE;
 
-  virtual void dumpUnreadyTargetsConfig(
-      std::unique_ptr<envoy::admin::v3::UnreadyTargetsConfigDumpList> config_dump_list) PURE;
+  virtual void
+  dumpUnreadyTargetsConfig(envoy::admin::v3::UnreadyTargetsConfigDumpList& config_dump_list) PURE;
 };
 
 } // namespace Init

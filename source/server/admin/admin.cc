@@ -656,7 +656,7 @@ ProtobufTypes::MessagePtr AdminImpl::dumpListenerUnreadyTargetsConfigs() const {
 
   for (const auto& listener_config : listeners) {
     auto& listener = dynamic_cast<ListenerImpl&>(listener_config.get());
-    listener.initManager().dumpUnreadyTargetsConfig(std::move(unready_targets_config_dump_list));
+    listener.initManager().dumpUnreadyTargetsConfig(*unready_targets_config_dump_list);
   }
   return unready_targets_config_dump_list;
 }

@@ -39,7 +39,7 @@ public:
   void initialize(const Watcher& watcher) override;
   const absl::flat_hash_map<std::string, uint32_t>& unreadyTargets() const override;
   void dumpUnreadyTargetsConfig(
-      std::unique_ptr<envoy::admin::v3::UnreadyTargetsConfigDumpList> config_dump_list) override;
+      envoy::admin::v3::UnreadyTargetsConfigDumpList& config_dump_list) override;
 
 private:
   // Callback function with an additional target_name parameter, decrease unready targets count by
