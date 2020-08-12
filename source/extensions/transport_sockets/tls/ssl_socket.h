@@ -55,7 +55,7 @@ private:
 class SslSocketInfo : public Envoy::Ssl::ConnectionInfo, public Envoy::Ssl::Handshaker {
 public:
   SslSocketInfo(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx,
-                Ssl::HandshakeCallbacks* handshake_callbacks_);
+                Ssl::HandshakeCallbacks* handshake_callbacks);
 
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
