@@ -113,7 +113,6 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
     for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
       // Get a grouping of hosts by locality.
       for (const auto& locality_hosts : hosts->hostsPerLocality().get()) {
-
         // For this locality, add the response grouping.
         envoy::service::health::v3::LocalityEndpointsHealth* locality_health =
             cluster_health->add_locality_endpoints_health();
@@ -121,7 +120,6 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
 
         // Add all hosts to this locality.
         for (const auto& host : locality_hosts) {
-
           // Add this endpoint's health status to this locality grouping.
           auto* endpoint = locality_health->add_endpoints_health();
           Network::Utility::addressToProtobufAddress(
