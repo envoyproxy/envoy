@@ -36,7 +36,8 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildNotFound) {
   MockListenerManager listener_manager;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
   EXPECT_CALL(server_, listenerManager()).WillOnce(ReturnRef(listener_manager));
-  EXPECT_CALL(listener_manager, listeners()).WillOnce(Return(listeners));
+  EXPECT_CALL(listener_manager, listeners(ListenerManager::ListenerState::ACTIVE))
+      .WillOnce(Return(listeners));
 
   HotRestartMessage::Request request;
   request.mutable_pass_listen_socket()->set_address("tcp://127.0.0.1:80");
@@ -51,7 +52,8 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildNotBindPort) {
   InSequence s;
   listeners.push_back(std::ref(*static_cast<Network::ListenerConfig*>(&listener_config)));
   EXPECT_CALL(server_, listenerManager()).WillOnce(ReturnRef(listener_manager));
-  EXPECT_CALL(listener_manager, listeners()).WillOnce(Return(listeners));
+  EXPECT_CALL(listener_manager, listeners(ListenerManager::ListenerState::ACTIVE))
+      .WillOnce(Return(listeners));
   EXPECT_CALL(listener_config, listenSocketFactory());
   EXPECT_CALL(listener_config.socket_factory_, localAddress());
   EXPECT_CALL(listener_config, bindToPort()).WillOnce(Return(false));

@@ -15,6 +15,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/network/filter_manager_impl.h"
+#include "common/network/socket_interface.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -413,8 +414,8 @@ public:
   MOCK_METHOD(const std::string&, addressAsString, (), (const));
   MOCK_METHOD(bool, isAnyAddress, (), (const));
   MOCK_METHOD(bool, isUnicastAddress, (), (const));
-  MOCK_METHOD(Address::Ipv4*, ipv4, (), (const));
-  MOCK_METHOD(Address::Ipv6*, ipv6, (), (const));
+  MOCK_METHOD(const Address::Ipv4*, ipv4, (), (const));
+  MOCK_METHOD(const Address::Ipv6*, ipv6, (), (const));
   MOCK_METHOD(uint32_t, port, (), (const));
   MOCK_METHOD(Address::IpVersion, version, (), (const));
   MOCK_METHOD(bool, v6only, (), (const));
@@ -432,21 +433,22 @@ public:
 
   MOCK_METHOD(Api::SysCallIntResult, bind, (os_fd_t), (const));
   MOCK_METHOD(Api::SysCallIntResult, connect, (os_fd_t), (const));
-  MOCK_METHOD(Address::Ip*, ip, (), (const));
-  MOCK_METHOD(Address::Pipe*, pipe, (), (const));
+  MOCK_METHOD(const Address::Ip*, ip, (), (const));
+  MOCK_METHOD(const Address::Pipe*, pipe, (), (const));
   MOCK_METHOD(IoHandlePtr, socket, (Socket::Type), (const));
   MOCK_METHOD(Address::Type, type, (), (const));
-  MOCK_METHOD(sockaddr*, sockAddr, (), (const));
+  MOCK_METHOD(const sockaddr*, sockAddr, (), (const));
   MOCK_METHOD(socklen_t, sockAddrLen, (), (const));
 
   const std::string& asString() const override { return physical_; }
   absl::string_view asStringView() const override { return physical_; }
   const std::string& logicalName() const override { return logical_; }
-  const std::string& socketInterface() const override { return socket_interface_; }
+  const Network::SocketInterface& socketInterface() const override {
+    return SocketInterfaceSingleton::get();
+  }
 
   const std::string logical_;
   const std::string physical_;
-  const std::string socket_interface_{""};
 };
 
 class MockTransportSocketCallbacks : public TransportSocketCallbacks {

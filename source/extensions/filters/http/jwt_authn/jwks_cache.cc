@@ -115,7 +115,7 @@ public:
     return it->second;
   }
 
-  JwksData* findByProvider(const std::string& provider) override {
+  JwksData* findByProvider(const std::string& provider) final {
     const auto it = jwks_data_map_.find(provider);
     if (it == jwks_data_map_.end()) {
       return nullptr;
