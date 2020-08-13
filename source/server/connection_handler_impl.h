@@ -348,20 +348,34 @@ class ActiveRawUdpListener : public Network::UdpListenerCallbacks,
 public:
   ActiveRawUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
                        Network::ListenerConfig& config);
-  ActiveRawUdpListener(Network::ConnectionHandler& parent, Network::UdpListenerPtr&& listener,
+  ActiveRawUdpListener(Network::ConnectionHandler& parent,
+                       Network::SocketSharedPtr listen_socket_ptr, Event::Dispatcher& dispatcher,
                        Network::ListenerConfig& config);
+  ActiveRawUdpListener(Network::ConnectionHandler& parent, Network::Socket& listen_socket,
+                       Network::SocketSharedPtr listen_socket_ptr, Event::Dispatcher& dispatcher,
+                       Network::ListenerConfig& config);
+  ActiveRawUdpListener(Network::ConnectionHandler& parent, Network::Socket& listen_socket,
+                       Network::UdpListenerPtr&& listener, Network::ListenerConfig& config);
 
   // Network::UdpListenerCallbacks
   void onData(Network::UdpRecvData& data) override;
   void onReadReady() override;
   void onWriteReady(const Network::Socket& socket) override;
   void onReceiveError(Api::IoError::IoErrorCode error_code) override;
+  Network::UdpPacketWriter& udpPacketWriter() override { return *udp_packet_writer_; }
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return udp_listener_.get(); }
   void pauseListening() override { udp_listener_->disable(); }
   void resumeListening() override { udp_listener_->enable(); }
-  void shutdownListener() override { udp_listener_.reset(); }
+  void shutdownListener() override {
+    // The read filter should be deleted before the UDP listener is deleted.
+    // The read filter refers to the UDP listener to send packets to downstream.
+    // If the UDP listener is deleted before the read filter, the read filter may try to use it
+    // after deletion.
+    read_filter_.reset();
+    udp_listener_.reset();
+  }
 
   // Network::UdpListenerFilterManager
   void addReadFilter(Network::UdpListenerReadFilterPtr&& filter) override;
@@ -372,6 +386,8 @@ public:
 private:
   Network::UdpListenerPtr udp_listener_;
   Network::UdpListenerReadFilterPtr read_filter_;
+  Network::UdpPacketWriterPtr udp_packet_writer_;
+  Network::Socket& listen_socket_;
 };
 
 } // namespace Server

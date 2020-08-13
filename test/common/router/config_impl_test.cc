@@ -705,12 +705,12 @@ virtual_hosts:
       prefix: "/host/rewrite/me"
     route:
       cluster: ats
-      host_rewrite: new_host
+      host_rewrite_literal: new_host
   - match:
       prefix: "/oldhost/rewrite/me"
     route:
       cluster: ats
-      host_rewrite: new_oldhost
+      host_rewrite_literal: new_oldhost
   - match:
       path: "/foo"
       case_sensitive: true
@@ -728,7 +728,7 @@ virtual_hosts:
       case_sensitive: false
     route:
       cluster: ats
-      host_rewrite: new_host
+      host_rewrite_literal: new_host
   - match:
       path: "/FOOD"
       case_sensitive: false
@@ -749,12 +749,21 @@ virtual_hosts:
         value: rewrote
     route:
       cluster: ats
-      auto_host_rewrite_header: x-rewrite-host
+      host_rewrite_header: x-rewrite-host
   - match:
       path: "/do-not-rewrite-host-with-header-value"
     route:
       cluster: ats
-      auto_host_rewrite_header: x-rewrite-host
+      host_rewrite_header: x-rewrite-host
+  - match:
+      path: "/rewrite-host-with-path-regex/envoyproxy.io"
+    route:
+      cluster: ats
+      host_rewrite_path_regex:
+        pattern:
+          google_re2: {}
+          regex: "^/.+/(.+)$"
+        substitution: \1
   - match:
       prefix: "/"
     route:
@@ -1028,6 +1037,24 @@ virtual_hosts:
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("api.lyft.com", headers.get_(Http::Headers::get().Host));
+  }
+
+  // Rewrites host using path.
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("api.lyft.com", "/rewrite-host-with-path-regex/envoyproxy.io", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("envoyproxy.io", headers.get_(Http::Headers::get().Host));
+  }
+
+  // Rewrites host using path, removes query parameters
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders(
+        "api.lyft.com", "/rewrite-host-with-path-regex/envoyproxy.io?query=query", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("envoyproxy.io", headers.get_(Http::Headers::get().Host));
   }
 
   // Case sensitive rewrite matching test.

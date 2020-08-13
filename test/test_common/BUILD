@@ -283,6 +283,7 @@ envoy_cc_test(
         ":utility_lib",
         "//source/common/event:libevent_scheduler_lib",
         "//test/mocks/event:event_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

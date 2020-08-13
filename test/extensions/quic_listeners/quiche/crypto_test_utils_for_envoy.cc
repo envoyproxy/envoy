@@ -19,7 +19,7 @@
 #endif
 
 #include <memory>
-#include "extensions/quic_listeners/quiche/envoy_quic_fake_proof_verifier.h"
+#include "test/extensions/quic_listeners/quiche/test_proof_verifier.h"
 #include "test/extensions/quic_listeners/quiche/test_proof_source.h"
 
 namespace quic {
@@ -32,7 +32,7 @@ std::unique_ptr<ProofSource> ProofSourceForTesting() {
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 std::unique_ptr<ProofVerifier> ProofVerifierForTesting() {
-  return std::make_unique<Envoy::Quic::EnvoyQuicFakeProofVerifier>();
+  return std::make_unique<Envoy::Quic::TestProofVerifier>();
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
