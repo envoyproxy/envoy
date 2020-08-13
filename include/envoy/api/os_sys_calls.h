@@ -160,6 +160,11 @@ public:
    * @see man 2 write
    */
   virtual SysCallSizeResult write(os_fd_t socket, const void* buffer, size_t length) PURE;
+
+  /**
+   * @see man 2 accept. The fds returned are configured to be non-blocking.
+   */
+  virtual SysCallSocketResult accept(os_fd_t socket, sockaddr* addr, socklen_t* addrlen) PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;
