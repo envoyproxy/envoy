@@ -158,6 +158,7 @@ envoy_cmake_external(
     name = "event",
     cache_entries = {
         "EVENT__DISABLE_OPENSSL": "on",
+        "EVENT__DISABLE_MBEDTLS": "on",
         "EVENT__DISABLE_REGRESS": "on",
         "EVENT__DISABLE_TESTS": "on",
         "EVENT__LIBRARY_TYPE": "STATIC",
@@ -207,22 +208,6 @@ envoy_cmake_external(
     static_libraries = select({
         "//bazel:windows_x86_64": ["nghttp2.lib"],
         "//conditions:default": ["libnghttp2.a"],
-    }),
-)
-
-envoy_cmake_external(
-    name = "yaml",
-    cache_entries = {
-        "YAML_CPP_BUILD_TESTS": "off",
-        "YAML_CPP_BUILD_TOOLS": "off",
-        "YAML_BUILD_SHARED_LIBS": "off",
-        "CMAKE_CXX_COMPILER_FORCED": "on",
-        "YAML_MSVC_SHARED_RT": "off",
-    },
-    lib_source = "@com_github_jbeder_yaml_cpp//:all",
-    static_libraries = select({
-        "//bazel:windows_x86_64": ["yaml-cpp.lib"],
-        "//conditions:default": ["libyaml-cpp.a"],
     }),
 )
 

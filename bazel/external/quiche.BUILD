@@ -3585,6 +3585,20 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "quic_test_tools_mock_syscall_wrapper_lib",
+    srcs = ["quiche/quic/test_tools/quic_mock_syscall_wrapper.cc"],
+    hdrs = ["quiche/quic/test_tools/quic_mock_syscall_wrapper.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_core_syscall_wrapper_lib",
+        ":quic_platform_base",
+        ":quic_platform_test",
+    ],
+)
+
+envoy_cc_test_library(
     name = "quic_test_tools_sent_packet_manager_peer_lib",
     srcs = ["quiche/quic/test_tools/quic_sent_packet_manager_peer.cc"],
     hdrs = ["quiche/quic/test_tools/quic_sent_packet_manager_peer.h"],
@@ -3728,6 +3742,25 @@ envoy_cc_test_library(
         ":quic_test_tools_stream_peer_lib",
         ":quiche_common_test_tools_test_utils_lib",
         ":spdy_core_framer_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quic_test_tools_session_peer_lib",
+    srcs = [
+        "quiche/quic/test_tools/quic_session_peer.cc",
+    ],
+    hdrs = [
+        "quiche/quic/test_tools/quic_session_peer.h",
+    ],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_core_packets_lib",
+        ":quic_core_session_lib",
+        ":quic_core_utils_lib",
+        ":quic_platform",
     ],
 )
 
