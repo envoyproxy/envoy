@@ -138,9 +138,10 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
 
 Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,
                                                     Network::ListenerCallbacks& cb,
-                                                    bool bind_to_port) {
+                                                    bool bind_to_port, uint32_t backlog_size) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::ListenerImpl>(*this, std::move(socket), cb, bind_to_port);
+  return std::make_unique<Network::ListenerImpl>(*this, std::move(socket), cb, bind_to_port,
+                                                 backlog_size);
 }
 
 Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr&& socket,

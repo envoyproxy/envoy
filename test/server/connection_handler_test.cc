@@ -56,9 +56,11 @@ public:
         Network::Socket::Type socket_type, std::chrono::milliseconds listener_filters_timeout,
         bool continue_on_listener_filters_timeout,
         Network::ListenSocketFactorySharedPtr socket_factory,
-        std::shared_ptr<NiceMock<Network::MockFilterChainManager>> filter_chain_manager = nullptr)
+        std::shared_ptr<NiceMock<Network::MockFilterChainManager>> filter_chain_manager = nullptr,
+        uint32_t tcp_backlog_size = ENVOY_TCP_BACKLOG_SIZE)
         : parent_(parent), socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()),
           socket_factory_(std::move(socket_factory)), tag_(tag), bind_to_port_(bind_to_port),
+          tcp_backlog_size_(tcp_backlog_size),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
           name_(name), listener_filters_timeout_(listener_filters_timeout),
           continue_on_listener_filters_timeout_(continue_on_listener_filters_timeout),
@@ -109,6 +111,7 @@ public:
       return empty_access_logs_;
     }
     ResourceLimit& openConnections() override { return open_connections_; }
+    uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
 
     void setMaxConnections(const uint32_t num_connections) {
       open_connections_.setMax(num_connections);
@@ -120,6 +123,7 @@ public:
     Network::ListenSocketFactorySharedPtr socket_factory_;
     uint64_t tag_;
     bool bind_to_port_;
+    const uint32_t tcp_backlog_size_;
     const bool hand_off_restored_destination_connections_;
     const std::string name_;
     const std::chrono::milliseconds listener_filters_timeout_;
@@ -178,11 +182,12 @@ public:
       std::chrono::milliseconds listener_filters_timeout = std::chrono::milliseconds(15000),
       bool continue_on_listener_filters_timeout = false,
       std::shared_ptr<NiceMock<Network::MockFilterChainManager>> overridden_filter_chain_manager =
-          nullptr) {
+          nullptr,
+      uint32_t tcp_backlog_size = ENVOY_TCP_BACKLOG_SIZE) {
     listeners_.emplace_back(std::make_unique<TestListener>(
         *this, tag, bind_to_port, hand_off_restored_destination_connections, name, socket_type,
         listener_filters_timeout, continue_on_listener_filters_timeout, socket_factory_,
-        overridden_filter_chain_manager));
+        overridden_filter_chain_manager, tcp_backlog_size));
     EXPECT_CALL(*socket_factory_, socketType()).WillOnce(Return(socket_type));
     if (listener == nullptr) {
       // Expecting listener config in place update.
@@ -191,10 +196,10 @@ public:
     }
     EXPECT_CALL(*socket_factory_, getListenSocket()).WillOnce(Return(listeners_.back()->socket_));
     if (socket_type == Network::Socket::Type::Stream) {
-      EXPECT_CALL(dispatcher_, createListener_(_, _, _))
+      EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
           .WillOnce(Invoke([listener, listener_callbacks](Network::SocketSharedPtr&&,
-                                                          Network::ListenerCallbacks& cb,
-                                                          bool) -> Network::Listener* {
+                                                          Network::ListenerCallbacks& cb, bool,
+                                                          uint32_t) -> Network::Listener* {
             if (listener_callbacks != nullptr) {
               *listener_callbacks = &cb;
             }
@@ -1083,6 +1088,22 @@ TEST_F(ConnectionHandlerTest, ShutdownUdpListener) {
 
   ASSERT_TRUE(deleted_before_listener_)
       << "The read_filter_ should be deleted before the udp_listener_ is deleted.";
+}
+
+TEST_F(ConnectionHandlerTest, TcpBacklogCustom) {
+  uint32_t custom_backlog = 100;
+  TestListener* test_listener = addListener(
+      1, true, false, "test_tcp_backlog", nullptr, nullptr, nullptr, nullptr,
+      Network::Socket::Type::Stream, std::chrono::milliseconds(), false, nullptr, custom_backlog);
+  EXPECT_CALL(*socket_factory_, getListenSocket()).WillOnce(Return(listeners_.back()->socket_));
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
+      .WillOnce(Invoke([custom_backlog](Network::SocketSharedPtr&&, Network::ListenerCallbacks&,
+                                        bool, uint32_t backlog) -> Network::Listener* {
+        EXPECT_EQ(custom_backlog, backlog);
+        return nullptr;
+      }));
+  handler_->addListener(absl::nullopt, *test_listener);
 }
 
 } // namespace

@@ -91,9 +91,7 @@ void ListenerImpl::onSocketEvent(short flags) {
 }
 
 void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket) {
-  // TODO(fcoras): make listen backlog configurable. For now use 128, which is what libevent
-  // defaults to for listeners configured with a negative (unspecified) backlog
-  socket.ioHandle().listen(128);
+  socket.ioHandle().listen(backlog_size_);
 
   // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
   // loss of the trigger due to transient accept errors.
@@ -109,8 +107,8 @@ void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& 
 }
 
 ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
-                           ListenerCallbacks& cb, bool bind_to_port)
-    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb) {
+                           ListenerCallbacks& cb, bool bind_to_port, uint32_t backlog_size)
+    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), backlog_size_(backlog_size) {
   if (bind_to_port) {
     setupServerSocket(dispatcher, *socket_);
   }

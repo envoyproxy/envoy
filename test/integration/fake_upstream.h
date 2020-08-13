@@ -731,6 +731,7 @@ private:
       return empty_access_logs_;
     }
     ResourceLimit& openConnections() override { return connection_resource_; }
+    uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
 
     void setMaxConnections(const uint32_t num_connections) {
       connection_resource_.setMax(num_connections);

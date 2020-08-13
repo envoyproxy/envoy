@@ -15,7 +15,7 @@ namespace Network {
 class ListenerImpl : public BaseListenerImpl {
 public:
   ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket, ListenerCallbacks& cb,
-               bool bind_to_port);
+               bool bind_to_port, uint32_t backlog_size);
   void disable() override;
   void enable() override;
 
@@ -25,6 +25,7 @@ protected:
   void setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket);
 
   ListenerCallbacks& cb_;
+  const uint32_t backlog_size_;
 
 private:
   void onSocketEvent(short flags);
