@@ -195,7 +195,7 @@ bool ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::isHostOverload
   uint32_t overall_active = host->cluster().stats().upstream_rq_active_.value();
   uint32_t host_active = host->stats().rq_active_.value();
 
-  uint32_t total_slots = ((overall_active + 1) * hash_balance_factor + 99) / 100;
+  uint32_t total_slots = ((overall_active + 1) * hash_balance_factor_ + 99) / 100;
   uint32_t slots =
       std::max(static_cast<uint32_t>(std::ceil(total_slots * weight)), static_cast<uint32_t>(1));
 
@@ -214,14 +214,14 @@ HostConstSharedPtr
 ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t hash,
                                                                         uint32_t attempt) const {
 
-  if (hlb_ptr == nullptr) {
+  if (hlb_ptr_ == nullptr) {
     return nullptr;
   }
   if (normalized_host_weights_ == nullptr || normalized_host_weights_->empty()) {
     return nullptr;
   }
 
-  HostConstSharedPtr host = hlb_ptr->chooseHost(hash, attempt);
+  HostConstSharedPtr host = hlb_ptr_->chooseHost(hash, attempt);
   if (host == nullptr) {
     return nullptr;
   }
@@ -234,20 +234,20 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
     return host;
   }
 
-  /*
-  Revisiting Consistent Hashing with Bounded Loads
-  https://arxiv.org/abs/1908.08762
+  // Revisiting Consistent Hashing with Bounded Loads
+  // https://arxiv.org/abs/1908.08762
 
-  When a host is overloaded, we choose the next host in a random manner rather than picking the
-  next one in the ring. The random sequence is seeded by the hash, so the same input gets the same
-  sequence of hosts all the time.
-  */
+  // When a host is overloaded, we choose the next host in a random manner rather than picking the
+  // next one in the ring. The random sequence is seeded by the hash, so the same input gets the
+  // same sequence of hosts all the time.
   const uint32_t num_hosts = normalized_host_weights_->size();
   auto host_index = std::vector<uint32_t>(num_hosts);
   for (uint32_t i = 0; i < num_hosts; i++) {
     host_index[i] = i;
   }
 
+  // Not using Random::RandomGenerator as it does not take a seed. Seeded RNG is a
+  // requirement here as we need the same shuffle sequence for the same hash every time.
   const uint64_t seed = hash;
   std::default_random_engine random(seed);
   HostConstSharedPtr h;
