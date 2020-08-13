@@ -185,7 +185,6 @@ private:
   std::string component_log_level_str_;
   std::string log_format_;
   bool log_format_escaped_;
-  bool enable_fancy_log_;
   std::string log_path_;
   uint64_t restart_epoch_;
   std::string service_cluster_;
@@ -203,6 +202,10 @@ private:
   bool fake_symbol_table_enabled_;
   std::vector<std::string> disabled_extensions_;
   uint32_t count_;
+
+  // Initialization added here to avoid integration_admin_test failure caused by uninitialized
+  // enable_fancy_log_.
+  bool enable_fancy_log_ = false;
 };
 
 /**
