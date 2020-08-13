@@ -100,13 +100,6 @@ private:
   std::vector<FormatterProviderPtr> providers_;
 };
 
-struct JsonFormatMap;
-using JsonFormatMapValue =
-    absl::variant<const std::vector<FormatterProviderPtr>, const JsonFormatMap>;
-struct JsonFormatMap {
-  std::unique_ptr<std::map<std::string, JsonFormatMapValue>> value_;
-};
-
 class JsonFormatterImpl : public Formatter {
 public:
   JsonFormatterImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types)
@@ -120,6 +113,13 @@ public:
                      absl::string_view local_reply_body) const override;
 
 private:
+  struct JsonFormatMap;
+  using JsonFormatMapValue =
+    absl::variant<const std::vector<FormatterProviderPtr>, const JsonFormatMap>;
+  struct JsonFormatMap {
+    std::unique_ptr<std::map<std::string, JsonFormatMapValue>> value_;
+  };
+
   const bool preserve_types_;
   const JsonFormatMap json_output_format_;
 

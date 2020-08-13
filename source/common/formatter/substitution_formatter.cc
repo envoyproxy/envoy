@@ -124,8 +124,8 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
   return absl::StrCat(log_line, "\n");
 }
 
-JsonFormatMap JsonFormatterImpl::toFormatMap(const ProtobufWkt::Struct& json_format) const {
-  auto output = std::make_unique<std::map<std::string, JsonFormatMapValue>>();
+JsonFormatterImpl::JsonFormatMap JsonFormatterImpl::toFormatMap(const ProtobufWkt::Struct& json_format) const {
+  auto output = std::make_unique<std::map<std::string, JsonFormatterImpl::JsonFormatMapValue>>();
   for (const auto& pair : json_format.fields()) {
     switch (pair.second.kind_case()) {
     case ProtobufWkt::Value::kStringValue:
@@ -136,7 +136,7 @@ JsonFormatMap JsonFormatterImpl::toFormatMap(const ProtobufWkt::Struct& json_for
       break;
     default:
       throw EnvoyException(
-          "Only string/object values are supported in the JSON access log format.");
+          "Only string values or nested structs are supported in the JSON access log format.");
     }
   }
   return {std::move(output)};
@@ -167,13 +167,13 @@ ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& re
         }
         return ValueUtil::stringValue(str);
       };
-  const std::function<ProtobufWkt::Value(const JsonFormatMap&)> json_format_map_callback =
-      [&](const JsonFormatMap& format) {
+  const std::function<ProtobufWkt::Value(const JsonFormatterImpl::JsonFormatMap&)> json_format_map_callback =
+      [&](const JsonFormatterImpl::JsonFormatMap& format) {
         ProtobufWkt::Struct output;
         auto* fields = output.mutable_fields();
+        JsonFormatMapVisitor visitor{json_format_map_callback, providers_callback};
         for (const auto& pair : *format.value_) {
-          (*fields)[pair.first] = std::visit(
-              JsonFormatMapVisitor{json_format_map_callback, providers_callback}, pair.second);
+          (*fields)[pair.first] = std::visit(visitor, pair.second);
         }
         return ValueUtil::structValue(output);
       };
