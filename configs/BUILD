@@ -25,6 +25,7 @@ filegroup(
         "original-dst-cluster/proxy_config.yaml",
     ] + select({
         "//bazel:apple": [],
+        "//bazel:windows_x86_64": [],
         "//conditions:default": ["freebind/freebind.yaml"],
     }),
 )
