@@ -333,7 +333,7 @@ void Http1ServerConnectionImplTest::testRequestHeadersAccepted(std::string heade
 void Http1ServerConnectionImplTest::testServerAllowChunkedContentLength(uint32_t content_length,
                                                                         bool allow_chunked_length) {
   codec_settings_.allow_chunked_length_ = allow_chunked_length;
-  if (GetParam()) {
+  if (testingNewCodec()) {
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
         max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
@@ -1967,7 +1967,7 @@ INSTANTIATE_TEST_SUITE_P(Codecs, Http1ClientConnectionImplTest, testing::Bool(),
 void Http1ClientConnectionImplTest::testClientAllowChunkedContentLength(uint32_t content_length,
                                                                         bool allow_chunked_length) {
   codec_settings_.allow_chunked_length_ = allow_chunked_length;
-  if (GetParam()) {
+  if (testingNewCodec()) {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_);
   } else {
