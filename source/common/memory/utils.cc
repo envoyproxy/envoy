@@ -65,8 +65,6 @@ void Utils::tryShrinkHeap() {
       free_memory_counter->inc();
     }
   }
-#else
-  UNREFERENCED_PARAMETER(threshold);
 #endif
 }
 
