@@ -48,7 +48,7 @@ std::string formatPerRequestStateParseException(absl::string_view params) {
 //   (["a", "b", "c"])
 // There must be at least 2 array elements (a metadata namespace and at least 1 key).
 std::function<std::string(const Envoy::StreamInfo::StreamInfo&)>
-parseUpstreamMetadataField(absl::string_view params_str) {
+parseMetadataField(absl::string_view params_str, bool upstream = true) {
   params_str = StringUtil::trim(params_str);
   if (params_str.empty() || params_str.front() != '(' || params_str.back() != ')') {
     throw EnvoyException(formatUpstreamMetadataParseException(params_str));
@@ -72,14 +72,20 @@ parseUpstreamMetadataField(absl::string_view params_str) {
     throw EnvoyException(formatUpstreamMetadataParseException(params_str));
   }
 
-  return [params](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
-    Upstream::HostDescriptionConstSharedPtr host = stream_info.upstreamHost();
-    if (!host) {
-      return std::string();
+  return [upstream, params](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
+    const envoy::config::core::v3::Metadata* metadata = nullptr;
+    if (upstream) {
+      Upstream::HostDescriptionConstSharedPtr host = stream_info.upstreamHost();
+      if (!host) {
+        return std::string();
+      }
+      metadata = host->metadata().get();
+    } else {
+      metadata = &(stream_info.dynamicMetadata());
     }
 
     const ProtobufWkt::Value* value =
-        &::Envoy::Config::Metadata::metadataValue(host->metadata().get(), params[0], params[1]);
+        &::Envoy::Config::Metadata::metadataValue(metadata, params[0], params[1]);
     if (value->kind_case() == ProtobufWkt::Value::KIND_NOT_SET) {
       // No kind indicates default ProtobufWkt::Value which means namespace or key not
       // found.
@@ -339,8 +345,10 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
       return formatted;
     };
   } else if (absl::StartsWith(field_name, "UPSTREAM_METADATA")) {
+    field_extractor_ = parseMetadataField(field_name.substr(STATIC_STRLEN("UPSTREAM_METADATA")));
+  } else if (absl::StartsWith(field_name, "DYNAMIC_METADATA")) {
     field_extractor_ =
-        parseUpstreamMetadataField(field_name.substr(STATIC_STRLEN("UPSTREAM_METADATA")));
+        parseMetadataField(field_name.substr(STATIC_STRLEN("DYNAMIC_METADATA")), false);
   } else if (absl::StartsWith(field_name, "PER_REQUEST_STATE")) {
     field_extractor_ =
         parsePerRequestStateField(field_name.substr(STATIC_STRLEN("PER_REQUEST_STATE")));
