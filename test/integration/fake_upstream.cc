@@ -162,8 +162,8 @@ bool waitForWithDispatcherRun(Event::TestTimeSystem& time_system, absl::Mutex& l
                               const std::function<bool()>& condition,
                               Event::Dispatcher& client_dispatcher, milliseconds timeout)
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock) {
-  const auto end_time = time_system.monotonicTime() + timeout;
-  while (time_system.monotonicTime() < end_time) {
+  const auto end_time = time_system.realMonotonicTimeDoNotUseWithoutScrutiny() + timeout;
+  while (time_system.realMonotonicTimeDoNotUseWithoutScrutiny() < end_time) {
     // Wake up every 5ms to run the client dispatcher.
     if (time_system.waitFor(lock, absl::Condition(&condition), 5ms)) {
       return true;
@@ -545,8 +545,8 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
     return AssertionFailure() << "No upstreams configured.";
   }
   Event::TestTimeSystem& time_system = upstreams[0]->timeSystem();
-  auto end_time = time_system.monotonicTime() + timeout;
-  while (time_system.monotonicTime() < end_time) {
+  auto end_time = time_system.realMonotonicTimeDoNotUseWithoutScrutiny() + timeout;
+  while (time_system.realMonotonicTimeDoNotUseWithoutScrutiny() < end_time) {
     for (auto& it : upstreams) {
       FakeUpstream& upstream = *it;
       {

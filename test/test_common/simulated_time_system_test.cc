@@ -312,21 +312,20 @@ TEST_P(SimulatedTimeSystemTest, WaitFor) {
       dispatcher_);
   timer->enableTimer(std::chrono::seconds(60));
 
-  // Wait 50 simulated seconds of simulated time, which won't be enough to
-  // activate the alarm. We'll get a fast automatic timeout in waitFor because
-  // there are no pending timers.
+  // Wait 1ms. waitFor() does not advance simulated time, so this is just going to verify that
+  // we return quickly and nothing has fired.
   {
     absl::MutexLock lock(&mutex);
-    EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(50)));
+    EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::milliseconds(1)));
   }
   EXPECT_FALSE(done);
-  EXPECT_EQ(MonotonicTime(std::chrono::seconds(50)), time_system_.monotonicTime());
+  EXPECT_EQ(MonotonicTime(std::chrono::seconds(0)), time_system_.monotonicTime());
 
-  // Waiting another 20 simulated seconds will activate the alarm after 10,
-  // and the event-loop thread will call the corresponding callback quickly.
+  // Fire the timeout by advancing time and then verify that waitFor() returns without any timeout.
+  time_system_.advanceTimeWait(std::chrono::seconds(60));
   {
     absl::MutexLock lock(&mutex);
-    EXPECT_TRUE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(10)));
+    EXPECT_TRUE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(0)));
   }
   EXPECT_TRUE(done);
   EXPECT_EQ(MonotonicTime(std::chrono::seconds(60)), time_system_.monotonicTime());
@@ -336,10 +335,10 @@ TEST_P(SimulatedTimeSystemTest, WaitFor) {
   done = false;
   {
     absl::MutexLock lock(&mutex);
-    EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(20)));
+    EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(0)));
   }
   EXPECT_FALSE(done);
-  EXPECT_EQ(MonotonicTime(std::chrono::seconds(80)), time_system_.monotonicTime());
+  EXPECT_EQ(MonotonicTime(std::chrono::seconds(60)), time_system_.monotonicTime());
 
   thread->join();
 }
@@ -466,7 +465,14 @@ TEST_P(SimulatedTimeSystemTest, DuplicateTimer) {
 
   {
     absl::MutexLock lock(&mutex);
-    EXPECT_TRUE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(10)));
+    EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(0)));
+  }
+  EXPECT_FALSE(done);
+
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
+  {
+    absl::MutexLock lock(&mutex);
+    EXPECT_TRUE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(0)));
   }
   EXPECT_TRUE(done);
 

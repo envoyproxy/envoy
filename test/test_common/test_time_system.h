@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/time.h"
 #include "envoy/event/timer.h"
 
 #include "common/common/assert.h"
@@ -77,8 +78,17 @@ public:
    * be converted to an event based approach, simulated time, or some other solution. Be ready
    * to explain why you are using this in code review.
    */
-  template <class D> void realSleepDoNotUseWithoutReadingTheAboveComment(const D& duration) {
+  template <class D> void realSleepDoNotUseWithoutScrutiny(const D& duration) {
     std::this_thread::sleep_for(duration); // NO_CHECK_FORMAT(real_time)
+  }
+
+  /**
+   * This function will return the real monotonic team regardless of the time system in use (real
+   * or simulated). This should only be used when time is needed for real timeouts that govern
+   * networking, etc. It should never be used for time that only advances explicitly for alarms.
+   */
+  MonotonicTime realMonotonicTimeDoNotUseWithoutScrutiny() {
+    return std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
   }
 
 protected:
