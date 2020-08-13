@@ -130,14 +130,20 @@ LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& respon
   ASSERT(response_headers);
   LookupResult result;
 
-  // Get the internal response_time header and remove it from the cached response
-  const SystemTime response_time =
-      CacheHeadersUtils::httpTime(response_headers->getInline(response_time_handle.handle()));
-  response_headers->removeInline(response_time_handle.handle());
+  // If the response_time internal header does not exist, set it to the Date header value.
+  const Http::HeaderEntry* response_time_header =
+      response_headers->getInline(response_time_handle.handle());
+  const SystemTime response_time = response_time_header
+                                       ? CacheHeadersUtils::httpTime(response_time_header)
+                                       : CacheHeadersUtils::httpTime(response_headers->Date());
+
   // Assumption: Cache lookup time is negligible. Therefore, now == timestamp_
   SystemTime::duration response_age =
       CacheHeadersUtils::calculateAge(*response_headers, response_time, timestamp_);
+
+  // Add the Age header and remove the response_time header before serving the cached response.
   response_headers->setInline(age_handle.handle(), std::to_string(response_age.count()));
+  response_headers->removeInline(response_time_handle.handle());
 
   result.cache_entry_status_ = requiresValidation(*response_headers, response_age)
                                    ? CacheEntryStatus::RequiresValidation

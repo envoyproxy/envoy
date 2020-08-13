@@ -2,6 +2,7 @@
 
 #include "extensions/filters/http/cache/cache_headers_utils.h"
 #include "extensions/filters/http/cache/http_cache.h"
+#include "extensions/filters/http/cache/inline_headers_handles.h"
 
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/mocks/http/mocks.h"
@@ -22,7 +23,7 @@ namespace {
 
 struct LookupRequestTestCase {
   std::string test_name, request_cache_control, response_cache_control;
-  SystemTime request_time, response_time;
+  SystemTime request_time, response_date;
   CacheEntryStatus expected_cache_entry_status;
 };
 
@@ -45,103 +46,97 @@ public:
                            {"request_requires_revalidation",
                             /*request_cache_control=*/"no-cache",
                             /*response_cache_control=*/"public, max-age=3600",
-                            /*request_time=*/currentTime(),
+                            /*response_date*/currentTime(),
                             /*response_time=*/currentTime(),
                             /*expected_result=*/CacheEntryStatus::RequiresValidation},
                            {"response_requires_revalidation",
                             /*request_cache_control=*/"",
                             /*response_cache_control=*/"no-cache",
-                            /*request_time=*/currentTime(),
+                            /*response_date*/currentTime(),
                             /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
-                           {"future_response_time",
-                            /*request_cache_control=*/"",
-                            /*response_cache_control=*/"public, max-age=3600",
-                            /*request_time=*/currentTime(),
-                            /*response_time=*/currentTime() + Seconds(1),
                             /*expected_result=*/CacheEntryStatus::RequiresValidation},
                            {"request_max_age_satisfied",
                             /*request_cache_control=*/"max-age=10",
                             /*response_cache_control=*/"public, max-age=3600",
-                            /*request_time=*/currentTime() + Seconds(9),
+                            /*response_date*/currentTime() + Seconds(9),
                             /*response_time=*/currentTime(),
                             /*expected_result=*/CacheEntryStatus::Ok},
                            {"request_max_age_unsatisfied",
                             /*request_cache_control=*/"max-age=10",
                             /*response_cache_control=*/"public, max-age=3600",
-                            /*request_time=*/currentTime() + Seconds(11),
+                            /*response_date*/currentTime() + Seconds(11),
                             /*response_time=*/currentTime(),
                             /*expected_result=*/CacheEntryStatus::RequiresValidation},
                            {"request_min_fresh_satisfied",
                             /*request_cache_control=*/"min-fresh=1000",
                             /*response_cache_control=*/"public, max-age=2000",
-                            /*request_time=*/currentTime() + Seconds(999),
+                            /*response_date*/currentTime() + Seconds(999),
                             /*response_time=*/currentTime(),
                             /*expected_result=*/CacheEntryStatus::Ok},
                            {"request_min_fresh_unsatisfied",
                             /*request_cache_control=*/"min-fresh=1000",
                             /*response_cache_control=*/"public, max-age=2000",
-                            /*request_time=*/currentTime() + Seconds(1001),
+                            /*response_date*/currentTime() + Seconds(1001),
                             /*response_time=*/currentTime(),
                             /*expected_result=*/CacheEntryStatus::RequiresValidation},
                            {"request_max_age_satisfied_but_min_fresh_unsatisfied",
                             /*request_cache_control=*/"max-age=1500, min-fresh=1000",
                             /*response_cache_control=*/"public, max-age=2000",
-                            /*request_time=*/currentTime() + Seconds(1001),
+                            /*response_date*/currentTime() + Seconds(1001),
                             /*response_time=*/currentTime(),
                             /*expected_result=*/CacheEntryStatus::RequiresValidation},
                            {"request_max_age_satisfied_but_max_stale_unsatisfied",
                             /*request_cache_control=*/"max-age=1500, max-stale=400",
                             /*response_cache_control=*/"public, max-age=1000",
-                            /*request_time=*/currentTime() + Seconds(1401),
+                            /*response_date*/currentTime() + Seconds(1401),
                             /*response_time=*/currentTime(),
                             /*expected_result=*/CacheEntryStatus::RequiresValidation},
                            {"request_max_stale_satisfied_but_min_fresh_unsatisfied",
                             /*request_cache_control=*/"min-fresh=1000, max-stale=500",
                             /*response_cache_control=*/"public, max-age=2000",
-                            /*request_time=*/currentTime() + Seconds(1001),
+                            /*response_date*/currentTime() + Seconds(1001),
                             /*response_time=*/currentTime(),
                             /*expected_result=*/CacheEntryStatus::RequiresValidation},
                            {"request_max_stale_satisfied_but_max_age_unsatisfied",
                             /*request_cache_control=*/"max-age=1200, max-stale=500",
                             /*response_cache_control=*/"public, max-age=1000",
-                            /*request_time=*/currentTime() + Seconds(1201),
+                            /*response_date*/currentTime() + Seconds(1201),
                             /*response_time=*/currentTime(),
                             /*expected_result=*/CacheEntryStatus::RequiresValidation},
                            {"request_min_fresh_satisfied_but_max_age_unsatisfied",
                             /*request_cache_control=*/"max-age=500, min-fresh=400",
                             /*response_cache_control=*/"public, max-age=1000",
-                            /*request_time=*/currentTime() + Seconds(501),
+                            /*response_date*/currentTime() + Seconds(501),
                             /*response_time=*/currentTime(),
                             /*expected_result=*/CacheEntryStatus::RequiresValidation},
                            {"expired",
                             /*request_cache_control=*/"",
                             /*response_cache_control=*/"public, max-age=1000",
-                            /*request_time=*/currentTime() + Seconds(1001),
+                            /*response_date*/currentTime() + Seconds(1001),
                             /*response_time=*/currentTime(),
                             /*expected_result=*/CacheEntryStatus::RequiresValidation},
                            {"expired_but_max_stale_satisfied",
                             /*request_cache_control=*/"max-stale=500",
                             /*response_cache_control=*/"public, max-age=1000",
-                            /*request_time=*/currentTime() + Seconds(1499),
+                            /*response_date*/currentTime() + Seconds(1499),
                             /*response_time=*/currentTime(),
                             /*expected_result=*/CacheEntryStatus::Ok},
                            {"expired_max_stale_unsatisfied",
                             /*request_cache_control=*/"max-stale=500",
                             /*response_cache_control=*/"public, max-age=1000",
-                            /*request_time=*/currentTime() + Seconds(1501),
+                            /*response_date*/currentTime() + Seconds(1501),
                             /*response_time=*/currentTime(),
                             /*expected_result=*/CacheEntryStatus::RequiresValidation},
                            {"expired_max_stale_satisfied_but_response_must_revalidate",
                             /*request_cache_control=*/"max-stale=500",
                             /*response_cache_control=*/"public, max-age=1000, must-revalidate",
-                            /*request_time=*/currentTime() + Seconds(1499),
+                            /*response_date*/currentTime() + Seconds(1499),
                             /*response_time=*/currentTime(),
                             /*expected_result=*/CacheEntryStatus::RequiresValidation},
                            {"fresh_and_response_must_revalidate",
                             /*request_cache_control=*/"",
                             /*response_cache_control=*/"public, max-age=1000, must-revalidate",
-                            /*request_time=*/currentTime() + Seconds(999),
+                            /*response_date*/currentTime() + Seconds(999),
                             /*response_time=*/currentTime(),
                             /*expected_result=*/CacheEntryStatus::Ok},
 
@@ -163,11 +158,11 @@ INSTANTIATE_TEST_SUITE_P(ResultMatchesExpectation, LookupRequestTest,
 TEST_P(LookupRequestTest, ResultWithoutBodyMatchesExpectation) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
                                    GetParam().request_cache_control);
-  const SystemTime request_time = GetParam().request_time, response_time = GetParam().response_time;
+  const SystemTime request_time = GetParam().request_time, response_date = GetParam().response_date;
   const LookupRequest lookup_request(request_headers_, request_time);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"cache-control", GetParam().response_cache_control},
-       {"date", formatter_.fromTime(response_time)}});
+       {"date", formatter_.fromTime(response_date)}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
 
   EXPECT_EQ(GetParam().expected_cache_entry_status, lookup_response.cache_entry_status_);
@@ -181,11 +176,11 @@ TEST_P(LookupRequestTest, ResultWithoutBodyMatchesExpectation) {
 TEST_P(LookupRequestTest, ResultWithBodyMatchesExpectation) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
                                    GetParam().request_cache_control);
-  const SystemTime request_time = GetParam().request_time, response_time = GetParam().response_time;
+  const SystemTime request_time = GetParam().request_time, response_date = GetParam().response_date;
   const LookupRequest lookup_request(request_headers_, request_time);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"cache-control", GetParam().response_cache_control},
-       {"date", formatter_.fromTime(response_time)}});
+       {"date", formatter_.fromTime(response_date)}});
   const uint64_t content_length = 5;
   const LookupResult lookup_response =
       makeLookupResult(lookup_request, response_headers, content_length);
