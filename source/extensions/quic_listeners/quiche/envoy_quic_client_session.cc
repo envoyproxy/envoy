@@ -64,7 +64,7 @@ void EnvoyQuicClientSession::OnGoAway(const quic::QuicGoAwayFrame& frame) {
   }
 }
 
-void EnvoyQuicClientSession::OnHttp3GoAway(quic::QuicStreamId stream_id) {
+void EnvoyQuicClientSession::OnHttp3GoAway(uint64_t stream_id) {
   ENVOY_CONN_LOG(debug, "HTTP/3 GOAWAY received", *this);
   quic::QuicSpdyClientSession::OnHttp3GoAway(stream_id);
   if (http_connection_callbacks_ != nullptr) {

@@ -305,9 +305,34 @@ message ClusterManager {
 // Envoy process watchdog configuration. When configured, this monitors for
 // nonresponsive threads and kills the process after the configured thresholds.
 // See the :ref:`watchdog documentation <operations_performance_watchdog>` for more information.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message Watchdog {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v2.Watchdog";
+
+  message WatchdogAction {
+    // The events are fired in this order: KILL, MULTIKILL, MEGAMISS, MISS.
+    // Within an event type, actions execute in the order they are configured.
+    // For KILL/MULTIKILL there is a default PANIC that will run after the
+    // registered actions and kills the process if it wasn't already killed.
+    // It might be useful to specify several debug actions, and possibly an
+    // alternate FATAL action.
+    enum WatchdogEvent {
+      UNKNOWN = 0;
+      KILL = 1;
+      MULTIKILL = 2;
+      MEGAMISS = 3;
+      MISS = 4;
+    }
+
+    // Extension specific configuration for the action.
+    core.v3.TypedExtensionConfig config = 1;
+
+    WatchdogEvent event = 2 [(validate.rules).enum = {defined_only: true}];
+  }
+
+  // Register actions that will fire on given WatchDog events.
+  // See *WatchDogAction* for priority of events.
+  repeated WatchdogAction actions = 7;
 
   // The duration after which Envoy counts a nonresponsive thread in the
   // *watchdog_miss* statistic. If not specified the default is 200ms.
