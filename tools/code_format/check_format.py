@@ -905,6 +905,15 @@ def clangFormat(file_path):
     return ["clang-format rewrite error: %s" % (file_path)]
   return []
 
+# Fix for https://github.com/envoyproxy/envoy/issues/10535
+def checkProtoiValidation(file_path):
+  command = "grep -qrnwl -e 'min_bytes' %s" % (file_path)
+  exclude_path = ['v1', 'v2']
+  if os.system(command) == 0:
+      if not any(x in file_path for x in exclude_path):
+          return ["Proto validation Error for min_bytes in file: %s. To fix it use 'min_len'"  % (file_path)]
+  return []  
+
 
 def checkFormat(file_path):
   if file_path.startswith(EXCLUDED_PREFIXES):
@@ -928,6 +937,9 @@ def checkFormat(file_path):
 
   if error_messages:
     return ["From %s" % file_path] + error_messages
+
+  if file_path.endswith(PROTO_SUFFIX): 
+      error_messages += checkProtoiValidation(file_path)
   return error_messages
 
 
