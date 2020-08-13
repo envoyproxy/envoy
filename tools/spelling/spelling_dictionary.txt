@@ -421,6 +421,7 @@ bazel
 behaviour
 benchmarked
 bidi
+bignum
 bitfield
 bitset
 bitwise
@@ -431,6 +432,7 @@ bool
 boolean
 booleans
 bools
+boringssl
 borks
 broadcasted
 buf
@@ -442,6 +444,7 @@ bulkstrings
 bursty
 bytecode
 bytestream
+bytestring
 cacheable
 cacheability
 callee
@@ -970,6 +973,7 @@ restarter
 resync
 retriable
 retriggers
+revalidated
 revalidation
 rmdir
 rocketmq
