@@ -228,8 +228,7 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
     rds.set_route_config_name(scoped_route_config.route_configuration_name());
     std::unique_ptr<RdsRouteConfigProviderHelper> rds_config_provider_helper;
     std::shared_ptr<ScopedRouteInfo> scoped_route_info = nullptr;
-    if (scoped_route_config.priority() ==
-        envoy::config::route::v3::ScopedRouteConfiguration::Primary) {
+    if (scoped_route_config.on_demand() == false) {
       // For primary scopes, create a rds helper with rds provider initialized.
       rds_config_provider_helper =
           std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name, rds, init_manager);

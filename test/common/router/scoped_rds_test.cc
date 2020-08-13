@@ -939,12 +939,12 @@ key:
   EXPECT_EQ(getScopedRouteMap().size(), 2);
 }
 
-// Compare behavior of 2 scopes that share that same route configuration but have different
-// priority. roue config of secondary priority scope shouldn't be loaded.
-TEST_F(ScopedRdsTest, SecondaryPriorityScopeNotLoadedWithoutRequest) {
+// Compare behavior of a lazy scope and an eager scope scopes that share that same route
+// configuration. roue config of on demand scope shouldn't be loaded.
+TEST_F(ScopedRdsTest, OnDemandScopeNotLoadedWithoutRequest) {
   setup();
   init_watcher_.expectReady();
-  // Default priority of a scope is primary, should be loaded eagerly.
+  // Scope should be loaded eagerly by default.
   const std::string config_yaml = R"EOF(
 name: foo_scope
 route_configuration_name: foo_routes
@@ -953,11 +953,11 @@ key:
     - string_key: x-foo-key
 )EOF";
   const auto eager_resource = parseScopedRouteConfigurationFromYaml(config_yaml);
-  // Secondary priority scope should be loaded lazily.
+  // On demand scope should be loaded lazily.
   const std::string config_yaml2 = R"EOF(
 name: foo_scope2
 route_configuration_name: foo_routes
-priority: Secondary
+on_demand: true
 key:
   fragments:
     - string_key: x-bar-key
@@ -1002,7 +1002,7 @@ key:
 TEST_F(ScopedRdsTest, PushRdsAfterOndemandRequest) {
   setup();
   init_watcher_.expectReady();
-  // Default priority of a scope is primary, should be loaded eagerly.
+  // Scope should be loaded eagerly by defalut.
   const std::string config_yaml = R"EOF(
 name: foo_scope
 route_configuration_name: foo_routes
@@ -1011,11 +1011,11 @@ key:
     - string_key: x-foo-key
 )EOF";
   const auto eager_resource = parseScopedRouteConfigurationFromYaml(config_yaml);
-  // Secondary priority scope should be loaded lazily.
+  // On demand scope should be loaded lazily.
   const std::string config_yaml2 = R"EOF(
 name: foo_scope2
 route_configuration_name: foo_routes
-priority: Secondary
+on_demand: true
 key:
   fragments:
     - string_key: x-bar-key
@@ -1065,7 +1065,7 @@ key:
 TEST_F(ScopedRdsTest, PushRdsBeforeOndemandRequest) {
   setup();
   init_watcher_.expectReady();
-  // Default priority of a scope is primary, should be loaded eagerly.
+  // Scope should be loaded eagerly by default.
   const std::string config_yaml = R"EOF(
 name: foo_scope
 route_configuration_name: foo_routes
@@ -1074,11 +1074,11 @@ key:
     - string_key: x-foo-key
 )EOF";
   const auto eager_resource = parseScopedRouteConfigurationFromYaml(config_yaml);
-  // Secondary priority scope should be loaded lazily.
+  // On demand scope should be loaded lazily.
   const std::string config_yaml2 = R"EOF(
 name: foo_scope2
 route_configuration_name: foo_routes
-priority: Secondary
+on_demand: true
 key:
   fragments:
     - string_key: x-bar-key
@@ -1127,16 +1127,16 @@ key:
             "foo_routes");
 }
 
-// Change a scope from secondary to primary will enable eager loading.
-TEST_F(ScopedRdsTest, UpdateSecondaryScopeToPrimaryScope) {
+// Change a scope from lazy to eager will enable eager loading.
+TEST_F(ScopedRdsTest, UpdateOnDemandScopeToEagerScope) {
   setup();
   init_watcher_.expectReady();
-  // Secondary priority scope should be loaded lazily.
+  // On demand scope should be loaded lazily.
   context_init_manager_.initialize(init_watcher_);
   const std::string config_yaml2 = R"EOF(
 name: foo_scope
 route_configuration_name: foo_routes
-priority: Secondary
+on_demand: true
 key:
   fragments:
     - string_key: x-foo-key
@@ -1152,8 +1152,8 @@ key:
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
               IsNull());
-  // Primary priority scope should be loaded eagerly, use a different scope name because we only
-  // have 1  init manager and init watcher.
+  // By default scope should be loaded eagerly, use a different scope name because we only
+  // have 1 init manager and init watcher.
   const std::string config_yaml = R"EOF(
 name: foo_scope2
 route_configuration_name: foo_routes
@@ -1178,12 +1178,12 @@ key:
             "foo_routes");
 }
 
-// Change a scope from primary to secondary will delete the route table.
-TEST_F(ScopedRdsTest, UpdatePrimaryScopeToSecondaryScope) {
+// Change a scope from eager to lazy will delete the route table.
+TEST_F(ScopedRdsTest, UpdateEagerScopeToOnDemandScope) {
   setup();
   init_watcher_.expectReady();
   context_init_manager_.initialize(init_watcher_);
-  // Secondary priority scope should be loaded lazily.
+  // On demand scope should be loaded lazily.
   const std::string config_yaml2 = R"EOF(
 name: foo_scope
 route_configuration_name: foo_routes
@@ -1196,7 +1196,7 @@ key:
   const auto decoded_resources1 = TestUtility::decodeResources({eager_resource});
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources1.refvec_, "1"));
 
-  // The scope is of primary priority and rds update will be accepted.
+  // The scope is  eager loading and rds update will be accepted.
   pushRdsConfig({"foo_routes"}, "111");
   ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
@@ -1205,11 +1205,11 @@ key:
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "foo_routes");
-  // Update the scope to secondary, rds provider and the route config will be deleted.
+  // Update the scope to on demand, rds provider and the route config will be deleted.
   const std::string config_yaml = R"EOF(
   name: foo_scope
   route_configuration_name: foo_routes
-  priority: Secondary
+  on_demand: true
   key:
     fragments:
       - string_key: x-foo-key
@@ -1226,11 +1226,11 @@ key:
 TEST_F(ScopedRdsTest, MultipleOnDemandUpdatedCallback) {
   setup();
   init_watcher_.expectReady();
-  // Secondary priority scope should be loaded lazily.
+  // On demand scope should be loaded lazily.
   const std::string config_yaml2 = R"EOF(
 name: foo_scope2
 route_configuration_name: foo_routes
-priority: Secondary
+on_demand: true
 key:
   fragments:
     - string_key: x-bar-key

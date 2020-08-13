@@ -474,7 +474,7 @@ TEST_P(ScopedRdsIntegrationTest, OnDemandUpdateSuccess) {
   const std::string scope_route1 = R"EOF(
 name: foo_scope1
 route_configuration_name: foo_route1
-priority: Secondary
+on_demand: true
 key:
   fragments:
     - string_key: foo
@@ -618,7 +618,7 @@ key:
 
 // With on demand update filter configured, scope match but virtual host don't match, should still
 // return 404
-TEST_P(ScopedRdsIntegrationTest, OnDemandUpdateSecondaryVirtualHostNotMatch) {
+TEST_P(ScopedRdsIntegrationTest, OnDemandUpdateVirtualHostNotMatch) {
 
   config_helper_.addFilter(R"EOF(
     name: envoy.filters.http.on_demand
@@ -634,7 +634,7 @@ key:
   const std::string scope_route2 = R"EOF(
 name: bar_scope
 route_configuration_name: foo_route1
-priority: Secondary
+on_demand: true
 key:
   fragments:
     - string_key: bar
@@ -672,12 +672,12 @@ key:
   cleanupUpstreamAndDownstream();
 }
 
-// Scopes of different priority share the same route configuration
+// Eager and lazy scopes share the same route configuration
 TEST_P(ScopedRdsIntegrationTest, DifferentPriorityScopeShareRoute) {
   config_helper_.addFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
-  // Primary and secondary priority scope share the same route.
+
   const std::string scope_route1 = R"EOF(
 name: foo_scope
 route_configuration_name: foo_route1
@@ -688,7 +688,7 @@ key:
   const std::string scope_route2 = R"EOF(
 name: bar_scope
 route_configuration_name: foo_route1
-priority: Secondary
+on_demand: true
 key:
   fragments:
     - string_key: bar
@@ -716,7 +716,7 @@ key:
   codec_client_ = makeHttpConnection(lookupPort("http"));
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
   cleanupUpstreamAndDownstream();
-  // "foo" request should succeed because it is of primary priority.
+  // "foo" request should succeed because the foo scope is loaded eagerly by default.
   // "bar" request will initialize rds provider on demand and also succeed.
   for (const std::string& scope_key : std::vector<std::string>{"foo", "bar"}) {
     sendRequestAndVerifyResponse(
