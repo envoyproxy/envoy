@@ -202,5 +202,24 @@ SysCallSizeResult OsSysCallsImpl::write(os_fd_t sockfd, const void* buffer, size
   return {rc, rc != -1 ? 0 : errno};
 }
 
+SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) {
+  os_fd_t rc;
+
+#if defined(__linux__)
+  rc = ::accept4(sockfd, addr, addrlen, SOCK_NONBLOCK);
+  // If failed with EINVAL try without flags
+  if (rc >= 0 || errno != EINVAL) {
+    return {rc, rc != -1 ? 0 : errno};
+  }
+#endif
+
+  rc = ::accept(sockfd, addr, addrlen);
+  if (rc >= 0) {
+    setsocketblocking(rc, false);
+  }
+
+  return {rc, rc != -1 ? 0 : errno};
+}
+
 } // namespace Api
 } // namespace Envoy
