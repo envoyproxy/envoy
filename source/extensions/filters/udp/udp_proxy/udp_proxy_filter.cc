@@ -162,8 +162,8 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
       //       is bound until the first packet is sent to the upstream host.
       socket_(cluster.filter_.createSocket(host)),
       socket_event_(cluster.filter_.read_callbacks_->udpListener().dispatcher().createFileEvent(
-          socket_->ioHandle().fd(), [this](uint32_t) { onReadReady(); }, Event::PlatformDefaultTriggerType,
-          Event::FileReadyType::Read)) {
+          socket_->ioHandle().fd(), [this](uint32_t) { onReadReady(); },
+          Event::PlatformDefaultTriggerType, Event::FileReadyType::Read)) {
   ENVOY_LOG(debug, "creating new session: downstream={} local={} upstream={}",
             addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host->address()->asStringView());

@@ -19,6 +19,7 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listener_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/network:socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:socket_option_lib",

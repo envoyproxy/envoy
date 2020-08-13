@@ -6,8 +6,10 @@
 
 #include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -193,9 +195,11 @@ public:
       : UdpProxyFilterTest(Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000")) {}
 
   explicit UdpProxyFilterTest(Network::Address::InstanceConstSharedPtr&& peer_address)
-      : upstream_address_(Network::Utility::parseInternetAddressAndPort("20.0.0.1:443")),
+      : os_calls_(&os_sys_calls_),
+        upstream_address_(Network::Utility::parseInternetAddressAndPort("20.0.0.1:443")),
         peer_address_(std::move(peer_address)) {
     // Disable strict mock warnings.
+    ON_CALL(os_sys_calls_, supportsIpTransparent()).WillByDefault(Return(true));
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
     EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, address())
         .WillRepeatedly(Return(upstream_address_));
@@ -205,18 +209,21 @@ public:
 
   ~UdpProxyFilterTest() override { EXPECT_CALL(callbacks_.udp_listener_, onDestroy()); }
 
-  void setup(const std::string& yaml, bool has_cluster = true) {
+  void setup(const std::string& yaml, bool has_cluster = true, bool may_occur_exception = false) {
     envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig config;
     TestUtility::loadFromYamlAndValidate(yaml, config);
     config_ = std::make_shared<UdpProxyFilterConfig>(cluster_manager_, time_system_, stats_store_,
                                                      config);
-    EXPECT_CALL(cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
-        .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),
-                        ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
-    if (has_cluster) {
-      EXPECT_CALL(cluster_manager_, get(_));
-    } else {
-      EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(nullptr));
+
+    if (!may_occur_exception) {
+      EXPECT_CALL(cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
+          .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),
+                          ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
+      if (has_cluster) {
+        EXPECT_CALL(cluster_manager_, get(_));
+      } else {
+        EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(nullptr));
+      }
     }
     filter_ = std::make_unique<TestUdpProxyFilter>(callbacks_, config_);
   }
@@ -274,6 +281,8 @@ public:
 
   void checkTransparentSocketOptionsSupport() { checkSocketOptionsSupport(transparent_options); }
 
+  Api::MockOsSysCalls os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_;
   Upstream::MockClusterManager cluster_manager_;
   NiceMock<MockTimeSystem> time_system_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -606,6 +615,8 @@ TEST_F(UdpProxyFilterTest, SocketOptionForUseOriginalSrcIp) {
 
   InSequence s;
 
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent());
+
   setup(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
@@ -632,6 +643,8 @@ TEST_F(UdpProxyFilterTestIpv6, SocketOptionForUseOriginalSrcIpInCaseOfIpv6) {
   checkTransparentSocketOptionsSupport();
 
   InSequence s;
+
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent());
 
   setup(R"EOF(
 stat_prefix: foo
@@ -709,9 +722,9 @@ cluster: fake_cluster
 
 // Make sure socket option is not set correctly if the platform does not support the socket option.
 TEST_F(UdpProxyFilterTest, FallbackToNoOrgSrcIpForNoPlatformSupport) {
-  checkTransparentSocketOptionsSupport();
-
   InSequence s;
+
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent());
 
   setup(R"EOF(
 stat_prefix: foo
@@ -724,14 +737,31 @@ use_original_src_ip: true
   test_sessions_[0].expectUpstreamWrite("hello", 0);
   recvDataFromDownstream(peer_address_->asString(), "10.0.0.2:80", "hello");
 
-  checkSocketOptions(test_sessions_[0], ENVOY_SOCKET_IP_TRANSPARENT, 0,
-                     ENVOY_SOCKET_IPV6_TRANSPARENT, 0);
+  if (ENVOY_SOCKET_IP_TRANSPARENT.hasValue() && ENVOY_SOCKET_IPV6_TRANSPARENT.hasValue()) {
+    checkSocketOptions(test_sessions_[0], ENVOY_SOCKET_IP_TRANSPARENT, 0,
+                       ENVOY_SOCKET_IPV6_TRANSPARENT, 0);
+  }
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
 
   test_sessions_[0].recvDataFromUpstream("world");
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+}
+
+// Make sure exit when use the use_original_src_ip but platform does not support ip transparent
+// option.
+TEST_F(UdpProxyFilterTest, ExitIpTransparentNoPlatformSupport) {
+  InSequence s;
+
+  auto config = R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+use_original_src_ip: true
+)EOF";
+
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent()).WillOnce(Return(false));
+  EXPECT_THROW_WITH_REGEX(setup(config, true), EnvoyException, "The platform does not support .*");
 }
 
 } // namespace

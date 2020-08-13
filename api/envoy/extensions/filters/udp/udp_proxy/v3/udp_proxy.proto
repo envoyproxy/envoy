@@ -48,5 +48,6 @@ message UdpProxyConfig {
   // The another one is that configure the default gw or add routing rules on the upstreams to forward
   // all packets to envoy. And configure iptables rules and add some routing rules on the host of envoy side to
   // forward all packets from upstreams to envoy process so that the envoy can return back the packets to the downstream.
+  // If there are some errors during configure this option, it will fall back to no use_original_src_ip mode even if the this option is set.
   bool use_original_src_ip = 4;
 }

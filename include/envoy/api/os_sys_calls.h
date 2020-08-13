@@ -73,6 +73,11 @@ public:
   virtual bool supportsUdpGso() const PURE;
 
   /**
+   * return true if the OS supports IP_TRANSPARENT option
+   */
+  virtual bool supportsIpTransparent() const PURE;
+
+  /**
    * Release all resources allocated for fd.
    * @return zero on success, -1 returned otherwise.
    */
