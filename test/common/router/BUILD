@@ -289,6 +289,7 @@ envoy_cc_test(
     name = "router_upstream_log_test",
     srcs = ["router_upstream_log_test.cc"],
     external_deps = ["abseil_optional"],
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/network:utility_lib",
@@ -362,5 +363,49 @@ envoy_cc_test(
     deps = [
         "//source/common/router:router_lib",
         "//test/mocks/router:router_filter_interface",
+    ],
+)
+
+envoy_proto_library(
+    name = "router_fuzz_proto",
+    srcs = ["router_fuzz.proto"],
+    deps = ["//test/fuzz:common_proto"]
+)
+
+envoy_cc_fuzz_test(
+    name = "router_fuzz_test",
+    srcs = ["router_fuzz_test.cc"],
+    corpus = "router_corpus",
+    deps = [
+        "//test/fuzz:utility_lib",
+        ":router_fuzz_proto_cc_proto",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:context_lib",
+        "//source/common/network:application_protocol_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/router:router_lib",
+        "//source/common/stream_info:uint32_accessor_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "//source/extensions/upstreams/http/generic:config",
+        "//source/extensions/upstreams/http/http:config",
+        "//source/extensions/upstreams/http/tcp:config",
+        "//test/common/http:common_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/http/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/tcp/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )

@@ -1,0 +1,11 @@
+actions {
+  stream_action {
+    request {
+	  data: 5,
+	  end_stream: true
+	}
+  }
+}
+actions {
+  upstream_bad {}
+}
