@@ -34,11 +34,11 @@ If Fancy Logger is not enabled, existing Envoy's logger is used. In this mode, b
 ### Runtime Update
 Runtime update of Fancy Logger is supported with administration interface, i.e. admin page, and Fancy mode needs to be enabled to use it. Same as Envoy's logger, the following functionalities are provided:
 
-1. `POST /logging`: List all active loggers and their levels;
-2. `POST /logging?<file_path>=<level>`: Given path from Envoy's root directory, change the log level of the file;
+1. `POST /logging`: List all names (i.e. file paths) of all active loggers and their levels;
+2. `POST /logging?<file_path>=<level>`: Given the current file path, change the log level of the file;
 3. `POST /logging?level=<level>`: Change levels of all loggers.
 
-Users can view and change the log level in a granularity of file in runtime through admin page.
+Users can view and change the log level in a granularity of file in runtime through admin page. Note that `file_path` is determined by `__FILE__` macro, which is the path seen by preprocessor.
 
 ### Implementation Details
 Fancy Logger can be divided into two parts: 
