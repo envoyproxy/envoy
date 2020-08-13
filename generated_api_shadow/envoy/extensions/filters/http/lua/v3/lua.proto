@@ -25,7 +25,7 @@ message Lua {
   // further loads code from disk if desired. Note that if JSON configuration is used, the code must
   // be properly escaped. YAML configuration may be easier to read since YAML supports multi-line
   // strings so complex scripts can be easily expressed inline in the configuration.
-  string inline_code = 1 [(validate.rules).string = {min_bytes: 1}];
+  string inline_code = 1 [(validate.rules).string = {min_len: 1}];
 
   // Map of named Lua source codes that can be referenced in :ref:`LuaPerRoute
   // <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>`. The Lua source codes can be

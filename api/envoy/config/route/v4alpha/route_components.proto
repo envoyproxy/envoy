@@ -609,9 +609,8 @@ message RouteAction {
 
       // The name of the request header that will be used to obtain the hash
       // key. If the request header is not present, no hash will be produced.
-      string header_name = 1 [
-        (validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
-      ];
+      string header_name = 1
+          [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
       // If specified, the request header value will be rewritten and used
       // to produce the hash key.
@@ -1496,9 +1495,8 @@ message RateLimit {
       // The header name to be queried from the request headers. The header’s
       // value is used to populate the value of the descriptor entry for the
       // descriptor_key.
-      string header_name = 1 [
-        (validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
-      ];
+      string header_name = 1
+          [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
       // The key to use in the descriptor entry.
       string descriptor_key = 2 [(validate.rules).string = {min_len: 1}];
