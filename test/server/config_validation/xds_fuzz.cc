@@ -328,13 +328,13 @@ void XdsFuzzTest::verifyListeners() {
     // the state should match
     switch (rep.state) {
     case XdsVerifier::DRAINING:
-      EXPECT_TRUE(listener_dump->has_draining_state());
+      FUZZ_ASSERT(listener_dump->has_draining_state());
       break;
     case XdsVerifier::WARMING:
-      EXPECT_TRUE(listener_dump->has_warming_state());
+      FUZZ_ASSERT(listener_dump->has_warming_state());
       break;
     case XdsVerifier::ACTIVE:
-      EXPECT_TRUE(listener_dump->has_active_state());
+      FUZZ_ASSERT(listener_dump->has_active_state());
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
@@ -347,9 +347,9 @@ void XdsFuzzTest::verifyRoutes() {
 
   // go through routes in verifier and make sure each is in the config dump
   auto routes = verifier_.routes();
-  EXPECT_EQ(routes.size(), dump.size());
+  FUZZ_ASSERT(routes.size() == dump.size());
   for (const auto& route : routes) {
-    EXPECT_TRUE(std::any_of(dump.begin(), dump.end(), [&](const auto& dump_route) {
+    FUZZ_ASSERT(std::any_of(dump.begin(), dump.end(), [&](const auto& dump_route) {
       return route.first == dump_route.name();
     }));
   }
@@ -361,12 +361,12 @@ void XdsFuzzTest::verifyState() {
   verifyRoutes();
   ENVOY_LOG_MISC(debug, "Verified routes");
 
-  EXPECT_EQ(test_server_->gauge("listener_manager.total_listeners_draining")->value(),
-            verifier_.numDraining());
-  EXPECT_EQ(test_server_->gauge("listener_manager.total_listeners_warming")->value(),
-            verifier_.numWarming());
-  EXPECT_EQ(test_server_->gauge("listener_manager.total_listeners_active")->value(),
-            verifier_.numActive());
+  FUZZ_ASSERT(test_server_->gauge("listener_manager.total_listeners_draining")->value() ==
+              verifier_.numDraining());
+  FUZZ_ASSERT(test_server_->gauge("listener_manager.total_listeners_warming")->value() ==
+              verifier_.numWarming());
+  FUZZ_ASSERT(test_server_->gauge("listener_manager.total_listeners_active")->value() ==
+              verifier_.numActive());
   ENVOY_LOG_MISC(debug, "Verified stats");
   ENVOY_LOG_MISC(debug, "warming {} ({}), active {} ({}), draining {} ({})", verifier_.numWarming(),
                  test_server_->gauge("listener_manager.total_listeners_warming")->value(),

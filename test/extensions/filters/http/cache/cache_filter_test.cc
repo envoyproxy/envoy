@@ -1,6 +1,11 @@
+#include "envoy/http/header_map.h"
+
+#include "common/http/headers.h"
+
 #include "extensions/filters/http/cache/cache_filter.h"
 #include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
+#include "test/extensions/filters/http/cache/common.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -12,41 +17,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 namespace {
-
-// Wrapper for SimpleHttpCache that delays the onHeaders callback from getHeaders, for verifying
-// that CacheFilter works correctly whether the onHeaders call happens immediately, or after
-// getHeaders and decodeHeaders return.
-class DelayedCache : public SimpleHttpCache {
-public:
-  // HttpCache
-  LookupContextPtr makeLookupContext(LookupRequest&& request) override {
-    return std::make_unique<DelayedLookupContext>(
-        SimpleHttpCache::makeLookupContext(std::move(request)), delayed_cb_);
-  }
-  InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context) override {
-    return SimpleHttpCache::makeInsertContext(
-        std::move(dynamic_cast<DelayedLookupContext&>(*lookup_context).context_));
-  }
-
-  std::function<void()> delayed_cb_;
-
-private:
-  class DelayedLookupContext : public LookupContext {
-  public:
-    DelayedLookupContext(LookupContextPtr&& context, std::function<void()>& delayed_cb)
-        : context_(std::move(context)), delayed_cb_(delayed_cb) {}
-    void getHeaders(LookupHeadersCallback&& cb) override {
-      delayed_cb_ = [this, cb]() mutable { context_->getHeaders(std::move(cb)); };
-    }
-    void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override {
-      context_->getBody(range, std::move(cb));
-    }
-    void getTrailers(LookupTrailersCallback&& cb) override { context_->getTrailers(std::move(cb)); }
-
-    LookupContextPtr context_;
-    std::function<void()>& delayed_cb_;
-  };
-};
 
 class CacheFilterTest : public ::testing::Test {
 protected:
@@ -73,31 +43,135 @@ protected:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
-TEST_F(CacheFilterTest, ImmediateHitNoBody) {
-  request_headers_.setHost("ImmediateHitNoBody");
-  ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
-  ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
+TEST_F(CacheFilterTest, UncacheableRequest) {
+  request_headers_.setHost("UncacheableRequest");
 
-  {
-    // Create filter for request 1
+  // POST requests are uncacheable
+  request_headers_.setMethod(Http::Headers::get().MethodValues.Post);
+
+  for (int i = 0; i < 2; i++) {
+    // Create filter for request i
     CacheFilter filter = makeFilter(simple_cache_);
 
-    // Decode request 1 header
+    // Decode request i header
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // In the first request was cached the second request would return StopAllIterationAndWatermark
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
 
     // Encode response header
     EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
     filter.onDestroy();
   }
-  {
-    // Create filter for request 2
+}
+
+TEST_F(CacheFilterTest, UncacheableResponse) {
+  request_headers_.setHost("UncacheableResponse");
+
+  // Responses with "Cache-Control: no-store" are uncacheable
+  response_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-store");
+
+  for (int i = 0; i < 2; i++) {
+    // Create filter for request i
     CacheFilter filter = makeFilter(simple_cache_);
 
-    // Decode request 2 header
+    // Decode request i header
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // In the first request was cached the second request would return StopAllIterationAndWatermark
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Encode response header
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter.onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, ImmediateMiss) {
+  for (int request = 1; request <= 2; request++) {
+    // Each iteration a request is sent to a different host, therefore the second one is a miss
+    request_headers_.setHost("ImmediateMiss" + std::to_string(request));
+
+    // Create filter for request 1
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Decode request 1 header
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Encode response header
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter.onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, DelayedMiss) {
+  for (int request = 1; request <= 2; request++) {
+    // Each iteration a request is sent to a different host, therefore the second one is a miss
+    request_headers_.setHost("DelayedMiss" + std::to_string(request));
+
+    // Create filter for request 1
+    CacheFilter filter = makeFilter(delayed_cache_);
+
+    // Decode request 1 header
+    // No hit will be found, so the filter should call continueDecoding
+    EXPECT_CALL(decoder_callbacks_, continueDecoding);
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // The filter should stop iteration waiting for cache response
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // Make the delayed callback to call onHeaders
+    delayed_cache_.delayed_headers_cb_();
+
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Encode response header
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter.onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, ImmediateHitNoBody) {
+  request_headers_.setHost("ImmediateHitNoBody");
+
+  {
+    // Create filter for request 1.
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Decode request 1 header
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Encode response header.
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter.onDestroy();
+  }
+  {
+    // Create filter for request 2.
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Decode request 2 header.
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef("age", "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, "0")),
                                true));
+    // Make sure the filter did not encode any data
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // Make sure decoding does not continue
+    EXPECT_CALL(decoder_callbacks_, continueDecoding).Times(0);
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
               Http::FilterHeadersStatus::StopAllIterationAndWatermark);
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
@@ -106,37 +180,47 @@ TEST_F(CacheFilterTest, ImmediateHitNoBody) {
 }
 
 TEST_F(CacheFilterTest, DelayedHitNoBody) {
-  request_headers_.setHost("ImmediateHitNoBody");
-  ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
-  ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
+  request_headers_.setHost("DelayedHitNoBody");
 
   {
-    // Create filter for request 1
+    // Create filter for request 1.
     CacheFilter filter = makeFilter(delayed_cache_);
 
     // Decode request 1 header
+    // No hit will be found, so the filter should call continueDecoding
+    EXPECT_CALL(decoder_callbacks_, continueDecoding);
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // The filter should stop iteration waiting for cache response
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
               Http::FilterHeadersStatus::StopAllIterationAndWatermark);
-    EXPECT_CALL(decoder_callbacks_, continueDecoding);
-    delayed_cache_.delayed_cb_();
+
+    // Make the delayed callback to call onHeaders
+    delayed_cache_.delayed_headers_cb_();
+
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
 
-    // Encode response header
+    // Encode response header.
     EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
     filter.onDestroy();
   }
   {
-    // Create filter for request 2
+    // Create filter for request 2.
     CacheFilter filter = makeFilter(delayed_cache_);
 
     // Decode request 2 header
-    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
-              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef("age", "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, "0")),
                                true));
-    delayed_cache_.delayed_cb_();
+    // Make sure the filter did not encode any data
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // Make sure decoding does not continue
+    EXPECT_CALL(decoder_callbacks_, continueDecoding).Times(0);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+    delayed_cache_.delayed_headers_cb_();
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
     filter.onDestroy();
   }
@@ -144,16 +228,68 @@ TEST_F(CacheFilterTest, DelayedHitNoBody) {
 
 TEST_F(CacheFilterTest, ImmediateHitBody) {
   request_headers_.setHost("ImmediateHitBody");
-  ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
-  ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
+  const std::string body = "abc";
+
+  {
+    // Create filter for request 1.
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Decode request 1 header
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+
+    // Encode response header.
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter.encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    filter.onDestroy();
+  }
+  {
+    // Create filter for request 2.
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Decode request 2 header
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              HeaderHasValueRef(Http::Headers::get().Age, "0")),
+                               false));
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
+    // Make sure decoding does not continue
+    EXPECT_CALL(decoder_callbacks_, continueDecoding).Times(0);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    filter.onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, DelayedHitBody) {
+  request_headers_.setHost("DelayedHitBody");
   const std::string body = "abc";
 
   {
     // Create filter for request 1
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilter filter = makeFilter(delayed_cache_);
 
     // Decode request 1 header
-    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+    // No hit will be found, so the filter should call continueDecoding
+    EXPECT_CALL(decoder_callbacks_, continueDecoding);
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // The filter should stop iteration waiting for cache response
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // Make the delayed callback to call onHeaders
+    delayed_cache_.delayed_headers_cb_();
+
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
 
     // Encode response header
     Buffer::OwnedImpl buffer(body);
@@ -164,19 +300,357 @@ TEST_F(CacheFilterTest, ImmediateHitBody) {
   }
   {
     // Create filter for request 2
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilter filter = makeFilter(delayed_cache_);
 
     // Decode request 2 header
+
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef("age", "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, "0")),
                                false));
     EXPECT_CALL(
         decoder_callbacks_,
         encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
+
+    // Make sure decoding does not continue
+    EXPECT_CALL(decoder_callbacks_, continueDecoding).Times(0);
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
               Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // Make the delayed callbacks to call onHeaders & onBody
+    delayed_cache_.delayed_headers_cb_();
+    delayed_cache_.delayed_body_cb_();
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    filter.onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, ImmediateSuccessfulValidation) {
+  request_headers_.setHost("ImmediateSuccessfulValidation");
+  const std::string body = "abc";
+
+  {
+    // Create filter for request 1
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Decode request 1 header
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+
+    // Encode response
+
+    // Add Etag & Last-Modified headers to the response for validation
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, "abc123");
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
+                                      formatter_.now(time_source_));
+
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter.encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    filter.onDestroy();
+  }
+  {
+    // Create filter for request 2
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Make request require validation
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+
+    // Decode request 2 header
+    // Make sure the filter did not encode any headers or data (during decoding)
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+
+    // Make sure validation conditional headers are added
+    const Http::TestRequestHeaderMapImpl injected_headers = {
+        {"if-none-match", "abc123"}, {"if-modified-since", formatter_.now(time_source_)}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Encode 304 response
+    // Advance time to make sure the cached date is updated with the 304 date
+    time_source_.advanceTimeWait(std::chrono::seconds(10));
+    const std::string not_modified_date = formatter_.now(time_source_);
+    Http::TestResponseHeaderMapImpl not_modified_response_headers = {{":status", "304"},
+                                                                     {"date", not_modified_date}};
+
+    // Check that the cached response body is encoded
+    Buffer::OwnedImpl buffer(body);
+    EXPECT_CALL(
+        encoder_callbacks_,
+        addEncodedData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
+
+    // The cache is immediate so everything should be done before encodeHeaders returns
+    EXPECT_EQ(filter.encodeHeaders(not_modified_response_headers, true),
+              Http::FilterHeadersStatus::Continue);
+
+    // Check for the cached response headers with updated date
+    Http::TestResponseHeaderMapImpl updated_response_headers = response_headers_;
+    updated_response_headers.setDate(not_modified_date);
+    EXPECT_THAT(not_modified_response_headers,
+                testing::AllOf(IsSupersetOfHeaders(updated_response_headers),
+                               HeaderHasValueRef(Http::Headers::get().Age, "0")));
+
+    // The cache is immediate so everything should be done before CacheFilter::encodeData
+    EXPECT_EQ(filter.encodeData(buffer, true), Http::FilterDataStatus::Continue);
+
+    ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
+
+    filter.onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, DelayedSuccessfulValidation) {
+  request_headers_.setHost("DelayedSuccessfulValidation");
+  const std::string body = "abc";
+
+  {
+    // Create filter for request 1
+    CacheFilter filter = makeFilter(delayed_cache_);
+
+    // Decode request 1 header
+    // No hit will be found, so the filter should call continueDecoding
+    EXPECT_CALL(decoder_callbacks_, continueDecoding);
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // The filter should stop iteration waiting for cache response
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // Make the delayed callback to call onHeaders
+    delayed_cache_.delayed_headers_cb_();
+
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Encode response
+
+    // Add Etag & Last-Modified headers to the response for validation
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, "abc123");
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
+                                      formatter_.now(time_source_));
+
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter.encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    filter.onDestroy();
+  }
+  {
+    // Create filter for request 2
+    CacheFilter filter = makeFilter(delayed_cache_);
+
+    // Make request require validation
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+
+    // Decode request 2 header
+    // No hit will be found, so the filter should call continueDecoding
+    EXPECT_CALL(decoder_callbacks_, continueDecoding);
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // The filter should stop iteration waiting for cache response
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // Make the delayed callback to call onHeaders
+    delayed_cache_.delayed_headers_cb_();
+
+    // Make sure validation conditional headers are added
+    const Http::TestRequestHeaderMapImpl injected_headers = {
+        {"if-none-match", "abc123"}, {"if-modified-since", formatter_.now(time_source_)}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Encode 304 response
+    // Advance time to make sure the cached date is updated with the 304 date
+    time_source_.advanceTimeWait(std::chrono::seconds(10));
+    const std::string not_modified_date = formatter_.now(time_source_);
+    Http::TestResponseHeaderMapImpl not_modified_response_headers = {{":status", "304"},
+                                                                     {"date", not_modified_date}};
+
+    // Check that the cached response body is encoded
+    Buffer::OwnedImpl buffer(body);
+    EXPECT_CALL(
+        encoder_callbacks_,
+        addEncodedData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
+
+    // The cache is delayed so encoding iteration should be stopped until the body is encoded
+    // StopIteration does not stop encodeData of the same filter from being called
+    EXPECT_EQ(filter.encodeHeaders(not_modified_response_headers, true),
+              Http::FilterHeadersStatus::StopIteration);
+
+    // Check for the cached response headers with updated date
+    Http::TestResponseHeaderMapImpl updated_response_headers = response_headers_;
+    updated_response_headers.setDate(not_modified_date);
+    EXPECT_THAT(not_modified_response_headers,
+                testing::AllOf(IsSupersetOfHeaders(updated_response_headers),
+                               HeaderHasValueRef(Http::Headers::get().Age, "0")));
+
+    // A 304 response should not have a body, so encodeData should not be called
+    // However, if a body is present by mistake, encodeData should stop iteration until
+    // encoding the cached response is done
+    EXPECT_EQ(filter.encodeData(buffer, true), Http::FilterDataStatus::StopIterationAndBuffer);
+
+    // Delayed call to onBody to encode cached response
+    delayed_cache_.delayed_body_cb_();
+
+    ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
+
+    filter.onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, ImmediateUnsuccessfulValidation) {
+  request_headers_.setHost("ImmediateUnsuccessfulValidation");
+
+  {
+    // Create filter for request 1
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Decode request 1 header
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+
+    // Encode response
+
+    // Add Etag & Last-Modified headers to the response for validation
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, "abc123");
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
+                                      formatter_.now(time_source_));
+
+    const std::string body = "abc";
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter.encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    filter.onDestroy();
+  }
+  {
+    // Create filter for request 2
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Make request require validation
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+
+    // Decode request 2 header
+    // Make sure the filter did not encode any headers or data (during decoding)
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+
+    // Make sure validation conditional headers are added
+    const Http::TestRequestHeaderMapImpl injected_headers = {
+        {"if-none-match", "abc123"}, {"if-modified-since", formatter_.now(time_source_)}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Encode new response
+    // Change the status code to make sure new headers are served, not the cached ones
+    response_headers_.setStatus(201);
+
+    // Check that no cached data is encoded
+    EXPECT_CALL(encoder_callbacks_, addEncodedData).Times(0);
+
+    // The cache is immediate so everything should be done before encodeHeaders returns
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+
+    // Check for the cached response headers with updated date
+    EXPECT_THAT(response_headers_, HeaderHasValueRef(Http::Headers::get().Status, "201"));
+
+    ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
+
+    filter.onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, DelayedUnuccessfulValidation) {
+  request_headers_.setHost("DelayedUnuccessfulValidation");
+
+  {
+    // Create filter for request 1
+    CacheFilter filter = makeFilter(delayed_cache_);
+
+    // Decode request 1 header
+    // No hit will be found, so the filter should call continueDecoding
+    EXPECT_CALL(decoder_callbacks_, continueDecoding);
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // The filter should stop iteration waiting for cache response
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // Make the delayed callback to call onHeaders
+    delayed_cache_.delayed_headers_cb_();
+
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Encode response
+
+    // Add Etag & Last-Modified headers to the response for validation
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, "abc123");
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
+                                      formatter_.now(time_source_));
+
+    const std::string body = "abc";
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter.encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    filter.onDestroy();
+  }
+  {
+    // Create filter for request 2
+    CacheFilter filter = makeFilter(delayed_cache_);
+
+    // Make request require validation
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+
+    // Decode request 2 header
+    // No hit will be found, so the filter should call continueDecoding
+    EXPECT_CALL(decoder_callbacks_, continueDecoding);
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // The filter should stop iteration waiting for cache response
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // Make the delayed callback to call onHeaders
+    delayed_cache_.delayed_headers_cb_();
+
+    // Make sure validation conditional headers are added
+    const Http::TestRequestHeaderMapImpl injected_headers = {
+        {"if-none-match", "abc123"}, {"if-modified-since", formatter_.now(time_source_)}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Encode new response
+    // Change the status code to make sure new headers are served, not the cached ones
+    response_headers_.setStatus(201);
+
+    // Check that no cached response body is encoded
+    EXPECT_CALL(encoder_callbacks_, addEncodedData).Times(0);
+
+    // The delayed cache has no effect here as nothing is fetched from cache
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+
+    // Check for the cached response headers with updated date
+    EXPECT_THAT(response_headers_, HeaderHasValueRef(Http::Headers::get().Status, "201"));
+
+    ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
+
     filter.onDestroy();
   }
 }
@@ -197,6 +671,153 @@ TEST_F(CacheFilterTest, GetRequestWithBodyAndTrailers) {
 
     EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
     filter.onDestroy();
+  }
+}
+
+// A new type alias for a different type of tests that use the exact same class
+using ValidationHeadersTest = CacheFilterTest;
+
+TEST_F(ValidationHeadersTest, EtagAndLastModified) {
+  request_headers_.setHost("EtagAndLastModified");
+  const std::string etag = "abc123";
+
+  // Make request 1 to insert the response into cache
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+    filter.decodeHeaders(request_headers_, true);
+
+    // Add validation headers to the response
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag);
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
+                                      formatter_.now(time_source_));
+
+    filter.encodeHeaders(response_headers_, true);
+  }
+  // Make request 2 to test for added conditional headers
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Make sure the request requires validation
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+    filter.decodeHeaders(request_headers_, true);
+
+    // Make sure validation conditional headers are added
+    const Http::TestRequestHeaderMapImpl injected_headers = {
+        {"if-none-match", "abc123"}, {"if-modified-since", formatter_.now(time_source_)}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+  }
+}
+
+TEST_F(ValidationHeadersTest, EtagOnly) {
+  request_headers_.setHost("EtagOnly");
+  const std::string etag = "abc123";
+
+  // Make request 1 to insert the response into cache
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+    filter.decodeHeaders(request_headers_, true);
+
+    // Add validation headers to the response
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag);
+
+    filter.encodeHeaders(response_headers_, true);
+  }
+  // Make request 2 to test for added conditional headers
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Make sure the request requires validation
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+    filter.decodeHeaders(request_headers_, true);
+
+    // Make sure validation conditional headers are added
+    // If-Modified-Since falls back to date
+    const Http::TestRequestHeaderMapImpl injected_headers = {
+        {"if-none-match", "abc123"}, {"if-modified-since", formatter_.now(time_source_)}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+  }
+}
+
+TEST_F(ValidationHeadersTest, LastModifiedOnly) {
+  request_headers_.setHost("LastModifiedOnly");
+
+  // Make request 1 to insert the response into cache
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+    filter.decodeHeaders(request_headers_, true);
+
+    // Add validation headers to the response
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
+                                      formatter_.now(time_source_));
+
+    filter.encodeHeaders(response_headers_, true);
+  }
+  // Make request 2 to test for added conditional headers
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Make sure the request requires validation
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+    filter.decodeHeaders(request_headers_, true);
+
+    // Make sure validation conditional headers are added
+    const Http::TestRequestHeaderMapImpl injected_headers = {
+        {"if-modified-since", formatter_.now(time_source_)}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+  }
+}
+
+TEST_F(ValidationHeadersTest, NoEtagOrLastModified) {
+  request_headers_.setHost("NoEtagOrLastModified");
+
+  // Make request 1 to insert the response into cache
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+    filter.decodeHeaders(request_headers_, true);
+    filter.encodeHeaders(response_headers_, true);
+  }
+  // Make request 2 to test for added conditional headers
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Make sure the request requires validation
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+    filter.decodeHeaders(request_headers_, true);
+
+    // Make sure validation conditional headers are added
+    // If-Modified-Since falls back to date
+    const Http::TestRequestHeaderMapImpl injected_headers = {
+        {"if-modified-since", formatter_.now(time_source_)}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+  }
+}
+
+TEST_F(ValidationHeadersTest, InvalidLastModified) {
+  request_headers_.setHost("InvalidLastModified");
+
+  // Make request 1 to insert the response into cache
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+    filter.decodeHeaders(request_headers_, true);
+
+    // Add validation headers to the response
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified, "invalid-date");
+
+    filter.encodeHeaders(response_headers_, true);
+  }
+  // Make request 2 to test for added conditional headers
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Make sure the request requires validation
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
+    filter.decodeHeaders(request_headers_, true);
+
+    // Make sure validation conditional headers are added
+    // If-Modified-Since falls back to date
+    const Http::TestRequestHeaderMapImpl injected_headers = {
+        {"if-modified-since", formatter_.now(time_source_)}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
   }
 }
 

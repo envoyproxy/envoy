@@ -625,8 +625,8 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
   Network::Address::PipeInstance unixAddress{"/foo"};
-  Network::Address::Ipv4Instance internalIpAddress{"127.0.0.1", 0};
-  Network::Address::Ipv4Instance externalIpAddress{"12.0.0.1", 0};
+  Network::Address::Ipv4Instance internalIpAddress{"127.0.0.1", 0, nullptr};
+  Network::Address::Ipv4Instance externalIpAddress{"12.0.0.1", 0, nullptr};
   EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(unixAddress));
   EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(internalIpAddress));
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
