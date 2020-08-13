@@ -27,7 +27,7 @@
 #define PROTOBUF_GET_WRAPPED_REQUIRED(message, field_name)                                         \
   ([](const auto& msg) {                                                                           \
     if (!msg.has_##field_name()) {                                                                 \
-      ProtoExceptionUtil::throwMissingFieldException(#field_name, msg);                            \
+      ::Envoy::ProtoExceptionUtil::throwMissingFieldException(#field_name, msg);                   \
     }                                                                                              \
     return msg.field_name().value();                                                               \
   }((message)))
@@ -54,7 +54,7 @@
 #define PROTOBUF_GET_MS_REQUIRED(message, field_name)                                              \
   ([](const auto& msg) {                                                                           \
     if (!msg.has_##field_name()) {                                                                 \
-      ProtoExceptionUtil::throwMissingFieldException(#field_name, msg);                            \
+      ::Envoy::ProtoExceptionUtil::throwMissingFieldException(#field_name, msg);                   \
     }                                                                                              \
     return DurationUtil::durationToMilliseconds(msg.field_name());                                 \
   }((message)))
@@ -64,7 +64,7 @@
 #define PROTOBUF_GET_SECONDS_REQUIRED(message, field_name)                                         \
   ([](const auto& msg) {                                                                           \
     if (!msg.has_##field_name()) {                                                                 \
-      ProtoExceptionUtil::throwMissingFieldException(#field_name, msg);                            \
+      ::Envoy::ProtoExceptionUtil::throwMissingFieldException(#field_name, msg);                   \
     }                                                                                              \
     return DurationUtil::durationToSeconds(msg.field_name());                                      \
   }((message)))
@@ -104,7 +104,8 @@ uint64_t fractionalPercentDenominatorToInt(
 #define PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(message, field_name, default_value)                  \
   ([](const auto& msg) -> double {                                                                 \
     if (std::isnan(msg.field_name().value())) {                                                    \
-      ExceptionUtil::throwEnvoyException(fmt::format("Value not in the range of 0..100 range."));  \
+      ::Envoy::ExceptionUtil::throwEnvoyException(                                                 \
+          fmt::format("Value not in the range of 0..100 range."));                                 \
     }                                                                                              \
     return (msg).has_##field_name() ? (msg).field_name().value() : default_value;                  \
   }((message)))
@@ -120,7 +121,8 @@ uint64_t fractionalPercentDenominatorToInt(
                                                        default_value)                              \
   ([](const auto& msg) {                                                                           \
     if (std::isnan(msg.field_name().value())) {                                                    \
-      ExceptionUtil::throwEnvoyException(fmt::format("Value not in the range of 0..100 range."));  \
+      ::Envoy::ExceptionUtil::throwEnvoyException(                                                 \
+          fmt::format("Value not in the range of 0..100 range."));                                 \
     }                                                                                              \
     return (msg).has_##field_name()                                                                \
                ? ProtobufPercentHelper::convertPercent((msg).field_name().value(), max_value)      \
