@@ -23,6 +23,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -682,6 +683,25 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
   EXPECT_EQ(21, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+TEST_F(StaticLoaderImplTest, InvalidNumerator) {
+  base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
+    invalid_numerator:
+      numerator: 111
+      denominator: HUNDRED
+  )EOF");
+  setup();
+
+  envoy::type::v3::FractionalPercent fractional_percent;
+
+  // There is no assertion here - when numerator is invalid
+  // featureEnabled() will just drop debug log line.
+  EXPECT_CALL(generator_, random()).WillOnce(Return(500000));
+  EXPECT_LOG_CONTAINS("debug",
+                      "runtime key 'invalid_numerator': numerator (111) > denominator (100), "
+                      "condition always evaluates to true",
+                      loader_->snapshot().featureEnabled("invalid_numerator", fractional_percent));
 }
 
 TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
