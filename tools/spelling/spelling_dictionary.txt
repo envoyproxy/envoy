@@ -351,6 +351,7 @@ WRONGPASS
 WRR
 WS
 WSA
+WSABUF
 WSS
 Welford's
 Wi
