@@ -58,6 +58,7 @@ public:
 
     // Advance time so that the latency sample calculations don't underflow if monotonic time is 0.
     time_system_.advanceTimeAsync(std::chrono::hours(42));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     return config;
   }
@@ -259,6 +260,7 @@ min_rtt_calc_params:
   auto controller = makeController(yaml);
   const auto min_rtt = std::chrono::milliseconds(1350);
   time_system_.advanceTimeAsync(min_rtt);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   verifyMinRTTActive();
   EXPECT_EQ(controller->concurrencyLimit(), min_concurrency);
