@@ -122,7 +122,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
 
 void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name,
                                                   Protobuf::Message* config_message) {
-  // System calls such as reading files are prohibited in this fuzzer. Some input that crashes the
+  // System calls such as reading files are prohibited in this fuzzer. Some inputs that crash the
   // mock/fake objects are also prohibited. We could also avoid fuzzing some unfinished features by
   // checking them here. For now there are only three filters {DirectResponse, LocalRateLimit,
   // HttpConnectionManager} on which we have constraints.
@@ -166,9 +166,14 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
         dynamic_cast<envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy&>(
             *config_message);
     if (config.has_delay() && config.mutable_delay()->has_header_delay()) {
-      // Mongo has no header map. Only fixed_delay is supported.
-      throw EnvoyException(
-          absl::StrCat("Header_delay is not supported here. Config:\n{}", config.DebugString()));
+      // MongoProxy filter doesn't allow header_delay because it will pass nullptr to percentage()
+      // which will cause "runtime error: member call on null pointer". (See:
+      // https://github.com/envoyproxy/envoy/blob/master/source/extensions/filters/network/mongo_proxy/proxy.cc#L403
+      // and
+      // https://github.com/envoyproxy/envoy/blob/master/source/extensions/filters/common/fault/fault_config.cc#L16)
+      throw EnvoyException(absl::StrCat(
+          "header delay is not supported in the config of a MongoProxy filter.. Config:\n{}",
+          config.DebugString()));
     }
   }
 }
