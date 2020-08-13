@@ -49,7 +49,7 @@ public:
   ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                  TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
                  bool connected);
-
+  
   ~ConnectionImpl() override;
 
   // Network::FilterManager
@@ -238,6 +238,12 @@ public:
 
   ~ClientPipeImpl() override;
 
+  void enableWrite() {events_ =  Event::FileReadyType::Write;}
+  void enableWriteRead() {events_ =  Event::FileReadyType::Write | Event::FileReadyType::Read;}
+  void enableWriteClose() {events_ =  Event::FileReadyType::Write | Event::FileReadyType::Closed;}
+  bool isReadEnabled() { return events_ | (Event::FileReadyType::Closed | Event::FileReadyType::Read); }
+  bool isWriteEnabled() { return events_ | Event::FileReadyType::Write; }
+
   // Network::FilterManager
   void addWriteFilter(WriteFilterSharedPtr filter) override;
   void addFilter(FilterSharedPtr filter) override;
@@ -402,6 +408,12 @@ public:
                  const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   ~ServerPipeImpl() override;
+
+  void enableWrite() {events_ =  Event::FileReadyType::Write;}
+  void enableWriteRead() {events_ =  Event::FileReadyType::Write | Event::FileReadyType::Read;}
+  void enableWriteClose() {events_ =  Event::FileReadyType::Write | Event::FileReadyType::Closed;}
+  bool isReadEnabled() { return events_ | (Event::FileReadyType::Closed | Event::FileReadyType::Read); }
+  bool isWriteEnabled() { return events_ | Event::FileReadyType::Write; }
 
   // Network::FilterManager
   void addWriteFilter(WriteFilterSharedPtr filter) override;

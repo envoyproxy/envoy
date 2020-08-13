@@ -1026,12 +1026,10 @@ void ClientPipeImpl::readDisable(bool disable) {
       return;
     }
 
-    // If half-close semantics are enabled, we never want early close notifications; we
-    // always want to read all available data, even if the other side has closed.
     if (detect_early_close_ && !enable_half_close_) {
-      events_ |= (Event::FileReadyType::Write | Event::FileReadyType::Closed);
+      enableWriteClose();
     } else {
-      events_ |= Event::FileReadyType::Write;
+      enableWrite();
     }
   } else {
     ASSERT(read_disable_count_ != 0);
@@ -1044,7 +1042,7 @@ void ClientPipeImpl::readDisable(bool disable) {
     if (read_disable_count_ == 0) {
       // We never ask for both early close and read at the same time. If we are reading, we want to
       // consume all available data.
-      events_ |= (Event::FileReadyType::Read | Event::FileReadyType::Write);
+      enableWriteRead();
     }
 
     if (consumerWantsToRead() && read_buffer_.length() > 0) {
@@ -1528,9 +1526,9 @@ void ServerPipeImpl::readDisable(bool disable) {
     // If half-close semantics are enabled, we never want early close notifications; we
     // always want to read all available data, even if the other side has closed.
     if (detect_early_close_ && !enable_half_close_) {
-      events_ |= (Event::FileReadyType::Write | Event::FileReadyType::Closed);
+      enableWriteClose();
     } else {
-      events_ |= Event::FileReadyType::Write;
+      enableWrite();
     }
   } else {
     ASSERT(read_disable_count_ != 0);
@@ -1543,7 +1541,7 @@ void ServerPipeImpl::readDisable(bool disable) {
     if (read_disable_count_ == 0) {
       // We never ask for both early close and read at the same time. If we are reading, we want to
       // consume all available data.
-      events_ |= (Event::FileReadyType::Read | Event::FileReadyType::Write);
+      enableWriteRead();
     }
 
     if (consumerWantsToRead() && read_buffer_.length() > 0) {
