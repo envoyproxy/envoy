@@ -27,7 +27,6 @@
 #include "gtest/gtest.h"
 
 using testing::ElementsAre;
-using testing::HasSubstr;
 using testing::InSequence;
 using testing::NiceMock;
 
