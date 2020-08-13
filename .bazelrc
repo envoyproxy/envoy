@@ -11,7 +11,6 @@
 startup --host_jvm_args=-Xmx2g
 
 build --workspace_status_command="bash bazel/get_workspace_status"
-build --experimental_local_memory_estimate
 build --experimental_strict_action_env=true
 build --host_force_python=PY3
 build --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
@@ -34,6 +33,9 @@ build --action_env=CXX
 build --action_env=LLVM_CONFIG
 build --action_env=PATH
 
+# Skip system ICU linking.
+build --@com_googlesource_googleurl//build_config:system_icu=0
+
 # Common flags for sanitizers
 build:sanitizer --define tcmalloc=disabled
 build:sanitizer --linkopt -ldl
@@ -52,8 +54,7 @@ build:asan --define signal_trace=disabled
 build:asan --define ENVOY_CONFIG_ASAN=1
 build:asan --copt -fsanitize=address,undefined
 build:asan --linkopt -fsanitize=address,undefined
-# TODO(lizan): vptr and function requires C++ UBSAN runtime which we're not currently linking to.
-# Enable them when bazel has better support for that or with explicit linker options.
+# vptr and function sanitizer are enabled in clang-asan if it is set up via bazel/setup_clang.sh.
 build:asan --copt -fno-sanitize=vptr,function
 build:asan --linkopt -fno-sanitize=vptr,function
 build:asan --copt -DADDRESS_SANITIZER=1
@@ -88,6 +89,9 @@ build:clang-tsan --build_tag_filters=-no_san,-no_tsan
 build:clang-tsan --test_tag_filters=-no_san,-no_tsan
 # Needed due to https://github.com/libevent/libevent/issues/777
 build:clang-tsan --copt -DEVENT__DISABLE_DEBUG_MODE
+# https://github.com/abseil/abseil-cpp/issues/760
+# https://github.com/google/sanitizers/issues/953
+build:clang-tsan --test_env="TSAN_OPTIONS=report_atomic_races=0"
 
 # Clang MSAN - this is the base config for remote-msan and docker-msan. To run this config without
 # our build image, follow https://github.com/google/sanitizers/wiki/MemorySanitizerLibcxxHowTo
@@ -260,11 +264,7 @@ build:plain-fuzzer --define=FUZZING_ENGINE=libfuzzer
 build:plain-fuzzer --define ENVOY_CONFIG_ASAN=1
 
 # Compile database generation config
-# We don't care about built binaries so always strip and use fastbuild.
-build:compdb -c fastbuild
-build:compdb --strip=always
 build:compdb --build_tag_filters=-nocompdb
-build:compdb --define=ENVOY_CONFIG_COMPILATION_DATABASE=1
 
 # Windows build quirks
 build:windows --action_env=TMPDIR

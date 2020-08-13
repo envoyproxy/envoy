@@ -8,6 +8,8 @@
 #include "extensions/filters/network/thrift_proxy/thrift_object_impl.h"
 #include "extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
 
+#include "absl/strings/str_replace.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -1022,7 +1024,10 @@ void TwitterProtocolImpl::updateMetadataWithRequestHeader(const ThriftObject& he
     metadata.setFlags(*req_header.flags());
   }
   for (const auto& context : *req_header.contexts()) {
-    headers.addCopy(Http::LowerCaseString{context.key_}, context.value_);
+    // LowerCaseString doesn't allow '\0', '\n', and '\r'.
+    const std::string key =
+        absl::StrReplaceAll(context.key_, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}});
+    headers.addCopy(Http::LowerCaseString{key}, context.value_);
   }
   if (req_header.dest()) {
     headers.addReferenceKey(Headers::get().Dest, *req_header.dest());
@@ -1030,7 +1035,10 @@ void TwitterProtocolImpl::updateMetadataWithRequestHeader(const ThriftObject& he
   // TODO(zuercher): Delegations are stored as headers for now. Consider passing them as simple
   // objects
   for (const auto& delegation : *req_header.delegations()) {
-    std::string key = fmt::format(":d:{}", delegation.src_);
+    // LowerCaseString doesn't allow '\0', '\n', and '\r'.
+    const std::string src =
+        absl::StrReplaceAll(delegation.src_, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}});
+    const std::string key = fmt::format(":d:{}", src);
     headers.addCopy(Http::LowerCaseString{key}, delegation.dst_);
   }
   if (req_header.traceIdHigh()) {
@@ -1050,7 +1058,10 @@ void TwitterProtocolImpl::updateMetadataWithResponseHeader(const ThriftObject& h
 
   Http::HeaderMap& headers = metadata.headers();
   for (const auto& context : resp_header.contexts()) {
-    headers.addCopy(Http::LowerCaseString(context.key_), context.value_);
+    // LowerCaseString doesn't allow '\0', '\n', and '\r'.
+    const std::string key =
+        absl::StrReplaceAll(context.key_, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}});
+    headers.addCopy(Http::LowerCaseString(key), context.value_);
   }
 
   SpanList& spans = resp_header.spans();

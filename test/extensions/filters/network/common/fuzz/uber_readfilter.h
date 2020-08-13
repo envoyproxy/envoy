@@ -35,7 +35,7 @@ private:
   Server::Configuration::FakeFactoryContext factory_context_;
   Network::ReadFilterSharedPtr read_filter_;
   Network::FilterFactoryCb cb_;
-  Network::Address::InstanceConstSharedPtr addr_;
+  Network::Address::InstanceConstSharedPtr pipe_addr_;
   Event::SimulatedTimeSystem& time_source_;
   std::shared_ptr<NiceMock<Network::MockReadFilterCallbacks>> read_filter_callbacks_;
   std::unique_ptr<Grpc::MockAsyncRequest> async_request_;

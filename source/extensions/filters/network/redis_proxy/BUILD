@@ -2,7 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -11,12 +11,13 @@ licenses(["notice"])  # Apache 2
 # clusters.
 # Public docs: docs/root/configuration/network_filters/redis_proxy_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "command_splitter_interface",
     hdrs = ["command_splitter.h"],
     deps = [
+        "//include/envoy/event:dispatcher_interface",
         "//source/extensions/filters/network/common/redis:codec_interface",
     ],
 )
@@ -64,6 +65,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/stats:timespan_lib",
         "//source/extensions/filters/network/common/redis:client_lib",
+        "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/common/redis:supported_commands_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",
     ],
@@ -119,12 +121,18 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "requires_trusted_downstream_and_upstream",
+    # TODO(#9953) clean up.
+    visibility = [
+        "//:extension_config",
+        "//test/integration:__subpackages__",
+    ],
     deps = [
         "//include/envoy/upstream:upstream_interface",
         "//source/extensions/common/redis:cluster_refresh_manager_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
+        "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/common/redis:redis_command_stats_lib",
         "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",

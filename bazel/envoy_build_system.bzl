@@ -18,7 +18,7 @@ load(
     _envoy_select_boringssl = "envoy_select_boringssl",
     _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
-    _envoy_select_legacy_codecs_in_integration_tests = "envoy_select_legacy_codecs_in_integration_tests",
+    _envoy_select_new_codecs_in_integration_tests = "envoy_select_new_codecs_in_integration_tests",
 )
 load(
     ":envoy_test.bzl",
@@ -34,6 +34,11 @@ load(
 )
 
 def envoy_package():
+    native.package(default_visibility = ["//visibility:public"])
+
+def envoy_extension_package():
+    # TODO(rgs1): revert this to //:extension_library once
+    # https://github.com/envoyproxy/envoy/issues/12444 is fixed.
     native.package(default_visibility = ["//visibility:public"])
 
 # A genrule variant that can output a directory. This is useful when doing things like
@@ -169,7 +174,7 @@ def envoy_google_grpc_external_deps():
 envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_google_grpc = _envoy_select_google_grpc
 envoy_select_hot_restart = _envoy_select_hot_restart
-envoy_select_legacy_codecs_in_integration_tests = _envoy_select_legacy_codecs_in_integration_tests
+envoy_select_new_codecs_in_integration_tests = _envoy_select_new_codecs_in_integration_tests
 
 # Binary wrappers (from envoy_binary.bzl)
 envoy_cc_binary = _envoy_cc_binary

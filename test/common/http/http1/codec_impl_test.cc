@@ -68,8 +68,10 @@ protected:
 class Http1ServerConnectionImplTest : public Http1CodecTestBase,
                                       public testing::TestWithParam<bool> {
 public:
+  bool testingNewCodec() { return GetParam(); }
+
   void initialize() {
-    if (GetParam()) {
+    if (testingNewCodec()) {
       codec_ = std::make_unique<Http1::ServerConnectionImpl>(
           connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
           max_request_headers_count_, headers_with_underscores_action_);
@@ -137,7 +139,7 @@ void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_ur
 
   if (allow_absolute_url) {
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
-    if (GetParam()) {
+    if (testingNewCodec()) {
       codec_ = std::make_unique<Http1::ServerConnectionImpl>(
           connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
           max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
@@ -173,7 +175,7 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
   // Make a new 'codec' with the right settings
   if (allow_absolute_url) {
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
-    if (GetParam()) {
+    if (testingNewCodec()) {
       codec_ = std::make_unique<Http1::ServerConnectionImpl>(
           connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
           max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
@@ -200,7 +202,7 @@ void Http1ServerConnectionImplTest::expectTrailersTest(bool enable_trailers) {
   // Make a new 'codec' with the right settings
   if (enable_trailers) {
     codec_settings_.enable_trailers_ = enable_trailers;
-    if (GetParam()) {
+    if (testingNewCodec()) {
       codec_ = std::make_unique<Http1::ServerConnectionImpl>(
           connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
           max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
@@ -242,7 +244,7 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
   initialize();
   // Make a new 'codec' with the right settings
   codec_settings_.enable_trailers_ = enable_trailers;
-  if (GetParam()) {
+  if (testingNewCodec()) {
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
         max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
@@ -1925,8 +1927,10 @@ TEST_P(Http1ServerConnectionImplTest, TestSmugglingAllowChunkedContentLength100)
 class Http1ClientConnectionImplTest : public Http1CodecTestBase,
                                       public testing::TestWithParam<bool> {
 public:
+  bool testingNewCodec() { return GetParam(); }
+
   void initialize() {
-    if (GetParam()) {
+    if (testingNewCodec()) {
       codec_ = std::make_unique<Http1::ClientConnectionImpl>(
           connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_);
     } else {
@@ -1936,7 +1940,7 @@ public:
   }
 
   void readDisableOnRequestEncoder(RequestEncoder* request_encoder, bool disable) {
-    if (GetParam()) {
+    if (testingNewCodec()) {
       dynamic_cast<Http1::RequestEncoderImpl*>(request_encoder)->readDisable(disable);
     } else {
       dynamic_cast<Legacy::Http1::RequestEncoderImpl*>(request_encoder)->readDisable(disable);
@@ -2370,12 +2374,23 @@ TEST_P(Http1ClientConnectionImplTest, BadEncodeParams) {
 
   NiceMock<MockResponseDecoder> response_decoder;
 
-  // Need to set :method and :path
+  // Need to set :method and :path.
+  // New and legacy codecs will behave differently on errors from processing outbound data. The
+  // legacy codecs will throw an exception (that presently will be uncaught in contexts like
+  // sendLocalReply), while the new codecs temporarily RELEASE_ASSERT until Envoy handles errors on
+  // outgoing data.
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
-  EXPECT_THROW(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
-               CodecClientException);
-  EXPECT_THROW(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true),
-               CodecClientException);
+  if (testingNewCodec()) {
+    EXPECT_DEATH(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
+                 ":method and :path must be specified");
+    EXPECT_DEATH(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true),
+                 ":method and :path must be specified");
+  } else {
+    EXPECT_THROW(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
+                 CodecClientException);
+    EXPECT_THROW(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true),
+                 CodecClientException);
+  }
 }
 
 TEST_P(Http1ClientConnectionImplTest, NoContentLengthResponse) {
