@@ -30,8 +30,6 @@ protected:
   }
 
   void SetUp() override {
-    api_ = Api::createApiForTest();
-    dispatcher_ = api_->allocateDispatcher("test_thread");
     ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(::testing::ReturnRef(*dispatcher_));
   }
 
@@ -121,8 +119,8 @@ protected:
                                                     {"cache-control", "public,max-age=3600"}};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
-  Api::ApiPtr api_;
-  Event::DispatcherPtr dispatcher_;
+  Api::ApiPtr api_ = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
 };
 
 TEST_F(CacheFilterTest, UncacheableRequest) {

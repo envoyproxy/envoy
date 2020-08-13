@@ -121,6 +121,9 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
 
 void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
   ASSERT(lookup_, "CacheFilter is trying to call getHeaders with no LookupContext");
+
+  // The dispatcher needs to be captured because there's no guarantee that
+  // decoder_callbacks_->dispatcher() is thread-safe.
   lookup_->getHeaders([this, &request_headers,
                        &dispatcher = decoder_callbacks_->dispatcher()](LookupResult&& result) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
@@ -145,6 +148,8 @@ void CacheFilter::getBody() {
   ASSERT(lookup_, "CacheFilter is trying to call getBody with no LookupContext");
   ASSERT(!remaining_body_.empty(), "No reason to call getBody when there's no body to get.");
 
+  // The dispatcher needs to be captured because there's no guarantee that
+  // decoder_callbacks_->dispatcher() is thread-safe.
   lookup_->getBody(remaining_body_[0], [this, &dispatcher = decoder_callbacks_->dispatcher()](
                                            Buffer::InstancePtr&& body) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
@@ -160,6 +165,8 @@ void CacheFilter::getTrailers() {
   ASSERT(lookup_, "CacheFilter is trying to call getTrailers with no LookupContext");
   ASSERT(response_has_trailers_, "No reason to call getTrailers when there's no trailers to get.");
 
+  // The dispatcher needs to be captured because there's no guarantee that
+  // decoder_callbacks_->dispatcher() is thread-safe.
   lookup_->getTrailers([this, &dispatcher = decoder_callbacks_->dispatcher()](
                            Http::ResponseTrailerMapPtr&& trailers) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
