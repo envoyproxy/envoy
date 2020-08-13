@@ -59,6 +59,11 @@ PrefixRoutes::PrefixRoutes(
                            : nullptr) {
 
   for (auto const& route : config.routes()) {
+    if(route.prefix().size() > 1000){
+      // Avoid a stack overflow issue when prefix_loopup_table_'s depth is great and default
+      // destructor recursively collects unique_ptr.
+      throw EnvoyException(fmt::format("prefix size is too long: size = {}", route.prefix().size()));
+    }
     std::string copy(route.prefix());
 
     if (case_insensitive_) {

@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <set>
 #include <sstream>
-#include <stack>
 #include <string>
 #include <vector>
 
@@ -552,42 +551,6 @@ template <class Value> struct TrieEntry {
  * A trie used for faster lookup with lookup time at most equal to the size of the key.
  */
 template <class Value> struct TrieLookupTable {
-  /**
-   * A custom destructor helps avoid a stack overflow issue when trie depth is great and default
-   * destructor recursively collects unique_ptr.
-   */
-  ~TrieLookupTable() {
-    // Use a stack to store non-nullptr nodes which should be deleted, and their children will be
-    // pushed into this stack and will be deleted later.
-    std::stack<TrieEntry<Value>*> to_delete;
-    moveChildTriesToStack(&root_, to_delete);
-    // Now all unique_ptr in root_ are released and raw pointers are stored inside the stack.
-    while (!to_delete.empty()) {
-      TrieEntry<Value>* current = to_delete.top();
-      to_delete.pop();
-      moveChildTriesToStack(current, to_delete);
-      // Now all the entries inside the current node are released and pushed into the stack.
-      // We can safely delete the current node now.
-      // Finally all raw pointers in to_delete will be popped out and deleted.
-      delete current;
-    }
-  }
-
-  /**
-   * A helper function for the destructor to move child tries' pointers to stack.
-   * @param trie a non-nullptr pointer of the trie entry of which we want to move the children.
-   * @param stack the stack used to store the trie entry pointers.
-   */
-  void moveChildTriesToStack(TrieEntry<Value>* trie, std::stack<TrieEntry<Value>*>& stack) {
-    ASSERT(trie != nullptr);
-    for (unsigned long i = 0; i < trie->entries_.size(); i++) {
-      auto entry = std::move(trie->entries_[i]); // This entry in trie will be nullptr now.
-      if (entry != nullptr) {
-        stack.push(entry.release());
-      }
-    }
-  }
-
   /**
    * Adds an entry to the Trie at the given Key.
    * @param key the key used to add the entry.

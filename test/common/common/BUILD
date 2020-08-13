@@ -190,7 +190,6 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "utility_test",
-    size = "small",
     srcs = ["utility_test.cc"],
     external_deps = [
         "abseil_strings",

@@ -868,18 +868,6 @@ TEST(TrieLookupTable, AddItems) {
   EXPECT_EQ(cstr_c, trie.find("foo"));
 }
 
-TEST(TrieLookupTable, AddDeepTrieEntry) {
-  // Adding a long string may cause the trie to be extremely deep. The default destructor will use
-  // call-stack to find all unique_ptr and reset them recursively. Without a customized destructor,
-  // there will be "stack overflow" if the string size exceeds the size limitation of call-stack.
-  TrieLookupTable<const char*> trie;
-  const char* cstr_value = "a";
-  const std::string long_str(60000, 'a');
-  const char* long_c_str = long_str.c_str();
-  EXPECT_TRUE(trie.add(long_c_str, cstr_value, false));
-  EXPECT_EQ(cstr_value, trie.find(long_c_str));
-}
-
 TEST(TrieLookupTable, LongestPrefix) {
   TrieLookupTable<const char*> trie;
   const char* cstr_a = "a";
