@@ -31,31 +31,38 @@ void Utils::tryShrinkHeap() {
   auto total_physical_bytes = Stats::totalPhysicalBytes();
   auto allocated_size_by_app = Stats::totalCurrentlyAllocated();
   Runtime::Loader* runtime = Runtime::LoaderSingleton::getExisting();
+  static Envoy::Stats::Counter* shrink_attempt_counter = nullptr;
+  static Envoy::Stats::Counter* free_memory_counter = nullptr;
+
   if (runtime) {
     shrink_threshold = runtime->threadsafeSnapshot()->getInteger(
         "envoy.memory.heap_shrink_threshold", shrink_threshold);
-    Envoy::Stats::Scope& root_scope = runtime->getRootScope();
+    if (shrink_attempt_counter) {
+      Envoy::Stats::Scope& root_scope = runtime->getRootScope();
 
-    Envoy::Stats::StatNameManagedStorage shrink_attempt_stat_name("envoy.memory_shrink_attempt",
-                                                                  root_scope.symbolTable());
+      Envoy::Stats::StatNameManagedStorage shrink_attempt_stat_name("envoy.memory_shrink_attempt",
+                                                                    root_scope.symbolTable());
 
-    Envoy::Stats::Counter& shrink_attempt_counter =
-        root_scope.counterFromStatName(shrink_attempt_stat_name.statName());
-    shrink_attempt_counter.inc();
+      shrink_attempt_counter = &root_scope.counterFromStatName(shrink_attempt_stat_name.statName());
+    }
+    if (free_memory_counter) {
+      Envoy::Stats::Scope& root_scope = runtime->getRootScope();
+
+      Envoy::Stats::StatNameManagedStorage free_memory_stat_name("envoy.memory_shrink_succeed",
+                                                                 root_scope.symbolTable());
+      free_memory_counter = &root_scope.counterFromStatName(free_memory_stat_name.statName());
+    }
+  }
+  if (shrink_attempt_counter != nullptr) {
+    shrink_attempt_counter->inc();
   }
 
   ASSERT(total_physical_bytes >= allocated_size_by_app);
 
   if ((total_physical_bytes - allocated_size_by_app) >= shrink_threshold) {
     Utils::releaseFreeMemory();
-    if (runtime) {
-      Envoy::Stats::Scope& root_scope = runtime->getRootScope();
-
-      Envoy::Stats::StatNameManagedStorage free_memory_stat_name("envoy.memory_shrink_succeed",
-                                                                 root_scope.symbolTable());
-      Envoy::Stats::Counter& free_memory_counter =
-          root_scope.counterFromStatName(free_memory_stat_name.statName());
-      free_memory_counter.inc();
+    if (free_memory_counter) {
+      free_memory_counter->inc();
     }
   }
 #else
