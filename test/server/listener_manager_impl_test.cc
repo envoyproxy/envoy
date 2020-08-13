@@ -4759,6 +4759,157 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleOnDemandFilterChain) {
   EXPECT_TRUE(filter_chain->isPlaceholder());
 }
 
+/*
+TEST_F(ListenerManagerImplWithRealFiltersTest, TlsFilterChainWithoutTlsInspector) {
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
+  EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  // Add foo listener again. Will execute in place filter chain update path.
+  const std::string listener_foo_update1_yaml = R"EOF(
+  name: foo
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+  filter_chains:
+  - filters: []
+    filter_chain_match:
+      destination_port: 1234
+    )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerOverridden(false, listener_foo);
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  auto* timer = new Event::MockTimer(dynamic_cast<Event::MockDispatcher*>(&server_.dispatcher()));
+  EXPECT_CALL(*timer, enableTimer(_, _));
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml), "", true));
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  worker_->callAddCompletion(true);
+
+  EXPECT_CALL(*worker_, removeFilterChains(_, _, _));
+  timer->invokeCallback();
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callDrainFilterChainsComplete();
+
+  // Update foo again. This time we disable in place filter chain update in runtime.
+  // The traditional full listener update path is used.
+  auto in_place_update_disabled_guard = disableInplaceUpdateForThisTest();
+  const std::string listener_foo_update2_yaml = R"EOF(
+  name: foo
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+  filter_chains:
+  - filters:
+    filter_chain_match:
+      destination_port: 2345
+    )EOF";
+
+  ListenerHandle* listener_foo_update2 = expectListenerCreate(false, true);
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update2_yaml), "", true));
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo_update1->drain_manager_->drain_sequence_completion_();
+
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  worker_->callRemovalCompletion();
+
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_factory_.socket_, close());
+  EXPECT_CALL(*listener_foo_update2->drain_manager_, startDrainSequence(_));
+  EXPECT_TRUE(manager_->removeListener("foo"));
+
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo_update2->drain_manager_->drain_sequence_completion_();
+
+  EXPECT_CALL(*listener_foo_update2, onDestroy());
+  worker_->callRemovalCompletion();
+  EXPECT_EQ(0UL, manager_->listeners().size());
+
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - filter_chain_match:
+        transport_protocol: "tls"
+      build_on_demand:
+        true
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  auto listener_message = parseListenerFromV3Yaml(yaml);
+  auto filter_chains_message = listener_message.filter_chains();
+  for (auto filter_chain : filter_chains_message) {
+    listener.rebuildFilterChain(&filter_chain, "name");
+  }
+  ls.
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  manager_->addOrUpdateListener(listener_message, "", true);
+
+  // TLS Inspector is automatically injected for filter chains with TLS requirements,
+  // so make sure there is exactly 1 listener filter (and assume it's TLS Inspector).
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
+  auto ls = dynamic_cast<ListenerImpl*>(listener);
+  ls->
+
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
+  EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  manager_->startWorkers(guard_dog_);
+
+  auto fcm = listener.filterChainManager();
+  listener.rebuildFilterChain();
+  worker_->notifyListenersOnRebuilt()
+  Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
+  Network::MockListenerFilterManager manager;
+  EXPECT_CALL(manager, addAcceptFilter_(_, _))
+      .WillOnce(Invoke([&](const Network::ListenerFilterMatcherSharedPtr&,
+                           Network::ListenerFilterPtr&) -> void {}));
+  EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
+}
+*/
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

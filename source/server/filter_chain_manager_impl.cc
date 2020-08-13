@@ -201,12 +201,11 @@ void FilterChainManagerImpl::addFilterChain(
     // ListenerImpl maintains the dependencies of FilterChainFactoryContext
     auto filter_chain_impl = findExistingFilterChain(*filter_chain);
     if (filter_chain_impl == nullptr) {
-      // If the option for this filter chain is build_on_demand, we build a fake placeholder.
+      // If the option for this filter chain is build_on_demand, we build a placeholder.
       // Otherwise, we build the filter chain directly.
       if (filter_chain->build_on_demand()) {
-        ENVOY_LOG(debug, "FilterChainManagerImpl:: build_on_demand, first build a placeholder");
-        filter_chain_impl =
-            std::make_shared<FilterChainImpl>(filter_chain); // fake filter chain placeholder
+        ENVOY_LOG(debug, "build_on_demand is set, first build a placeholder");
+        filter_chain_impl = std::make_shared<FilterChainImpl>(filter_chain);
       } else {
         filter_chain_impl =
             filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);

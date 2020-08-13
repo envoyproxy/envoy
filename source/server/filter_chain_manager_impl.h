@@ -236,8 +236,7 @@ public:
       absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
       FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& context_creator);
 
-  // If a filter chain is first built with a fake placeholder, it will be need to be rebuilt on
-  // demand.
+  // If a filter chain is initially built as a placeholder, it will need to be rebuilt on demand.
   void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
                           FilterChainFactoryBuilder& b,
                           FilterChainFactoryContextCreator& context_creator);

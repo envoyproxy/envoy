@@ -6,6 +6,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/timer.h"
 #include "envoy/init/watcher.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -219,23 +220,36 @@ public:
   ~PerFilterChainRebuilder();
 
   void storeWorkerInCallbackList(const std::string& worker_name);
-  void callbackToWorkers();
-  bool isCompleted() { return rebuild_complete_; }
+  void callbackToWorkers(bool success);
+  bool rebuildCompleted() { return rebuild_complete_; }
+  bool rebuildSuccess() { return rebuild_success_; }
   Init::Manager& initManager() { return *rebuild_init_manager_; }
-  void startRebuilding() { rebuild_init_manager_->initialize(rebuild_watcher_); }
+  void startRebuilding();
 
 private:
+  void startTimer();
+  void onTimeout();
+
   ListenerImpl& listener_;
   const envoy::config::listener::v3::FilterChain* const& filter_chain_;
 
-  // rebuild state:
+  // Rebuilding completion state:
   // true: rebuilding has finished successfully
   // false: still in the rebuilding process
-  bool rebuild_complete_;
+  bool rebuild_complete_{false};
+
+  // Rebuilding success state:
+  // true: dependencies are ready and the filter chain is ready.
+  // false: timeout or dependencies timeout or requiring dependencies failed.
+  bool rebuild_success_{false};
+
   // This init manager is populated with targets from the filter chain factories, namely
   // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
   std::unique_ptr<Init::Manager> rebuild_init_manager_;
   Init::WatcherImpl rebuild_watcher_;
+
+  Event::TimerPtr rebuild_timer_;
+  const std::chrono::milliseconds rebuild_timeout_;
 
   // workers to callback to retry connection.
   absl::flat_hash_set<std::string> workers_to_callback_;

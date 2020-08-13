@@ -228,21 +228,26 @@ PerFilterChainRebuilder::PerFilterChainRebuilder(
     ListenerImpl& listener, const envoy::config::listener::v3::FilterChain* const& filter_chain)
     : listener_(listener), filter_chain_(filter_chain), rebuild_complete_(false),
       rebuild_init_manager_(std::make_unique<Init::ManagerImpl>("rebuild_init_manager")),
-      rebuild_watcher_("rebuild_watcher", [this] {
-        rebuild_complete_ = true;
-        callbackToWorkers();
-      }) {}
+      rebuild_watcher_("rebuild_watcher",
+                       [this] {
+                         if (!rebuild_complete_) {
+                           rebuild_complete_ = true;
+                           rebuild_success_ = true;
+                           callbackToWorkers(rebuild_success_);
+                           // rebuild_timer_->disableTimer();
+                         }
+                       }),
+      rebuild_timer_(listener_.dispatcher().createTimer([this]() -> void { onTimeout(); })),
+      rebuild_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(*filter_chain, rebuild_timeout, 15000)) {}
 PerFilterChainRebuilder::~PerFilterChainRebuilder() = default;
 
 void PerFilterChainRebuilder::storeWorkerInCallbackList(const std::string& worker_name) {
-  // Add this worker to the callback list.
   workers_to_callback_.insert(worker_name);
 }
 
-void PerFilterChainRebuilder::callbackToWorkers() {
-  // TODO(ASOPVII): callback when rebuild fails.
-  bool success = true;
-  if (!success) {
+void PerFilterChainRebuilder::callbackToWorkers(bool success) {
+  // Time out before dependencies response. Already sent callbacks.
+  if (rebuild_complete_) {
     return;
   }
 
@@ -252,6 +257,28 @@ void PerFilterChainRebuilder::callbackToWorkers() {
     listener_.getWorkerByName(worker_name)->notifyListenersOnRebuilt(success, filter_chain_);
   }
   workers_to_callback_.clear();
+}
+void PerFilterChainRebuilder::startRebuilding() {
+  startTimer();
+  rebuild_init_manager_->initialize(rebuild_watcher_);
+}
+
+void PerFilterChainRebuilder::startTimer() {
+  if (rebuild_timeout_.count() > 0) {
+    rebuild_timer_->enableTimer(rebuild_timeout_);
+  }
+}
+
+void PerFilterChainRebuilder::onTimeout() {
+  if (rebuild_complete_) {
+    // if rebuilding has completed before timeout, just stop this timer.
+    rebuild_timer_->disableTimer();
+  } else {
+    // if timeout before getting response from dependencies, rebuilding fails.
+    rebuild_complete_ = true;
+    rebuild_success_ = false;
+    callbackToWorkers(rebuild_success_);
+  }
 }
 
 ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
@@ -539,8 +566,8 @@ void ListenerImpl::rebuildFilterChain(
   const auto& rebuilder = std::move(filter_chain_rebuilder_map_[filter_chain_message]);
   rebuilder->storeWorkerInCallbackList(worker_name);
 
-  if (rebuilder->isCompleted()) {
-    rebuilder->callbackToWorkers();
+  if (rebuilder->rebuildCompleted()) {
+    rebuilder->callbackToWorkers(rebuilder->rebuildSuccess());
     return;
   }
 

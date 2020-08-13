@@ -107,6 +107,10 @@ public:
         std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain},
         filter_chain_factory_builder_, filter_chain_manager_);
   }
+  void rebuildFilterChainHelper(const envoy::config::listener::v3::FilterChain& filter_chain) {
+    filter_chain_manager_.rebuildFilterChain(&filter_chain, rebuilder_filter_chain_factory_builder_,
+                                             filter_chain_manager_);
+  }
 
   // Intermediate states.
   Network::Address::InstanceConstSharedPtr local_address_;
@@ -150,6 +154,7 @@ public:
   envoy::config::listener::v3::FilterChain filter_chain_template_;
   envoy::config::listener::v3::FilterChain on_demand_filter_chain_template_;
   NiceMock<MockFilterChainFactoryBuilder> filter_chain_factory_builder_;
+  NiceMock<MockFilterChainFactoryBuilder> rebuilder_filter_chain_factory_builder_;
   NiceMock<Server::Configuration::MockFactoryContext> parent_context_;
   // Test target.
   FilterChainManagerImpl filter_chain_manager_{
@@ -172,6 +177,19 @@ TEST_F(FilterChainManagerImplTest, AddOnDemandFilterChain) {
   addSingleFilterChainHelper(on_demand_filter_chain_template_);
   auto* filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_TRUE(filter_chain->isPlaceholder());
+}
+
+TEST_F(FilterChainManagerImplTest, RebuildOnDemandFilterChain) {
+  addSingleFilterChainHelper(on_demand_filter_chain_template_);
+  auto* filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_TRUE(filter_chain->isPlaceholder());
+
+  EXPECT_CALL(rebuilder_filter_chain_factory_builder_, buildFilterChain(_, _)).Times(1);
+  rebuildFilterChainHelper(on_demand_filter_chain_template_);
+
+  // expect placeholder->storeRealFilterChain
+  filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain->isPlaceholder(), false);
 }
 
 TEST_F(FilterChainManagerImplTest, LookupFilterChainContextByFilterChainMessage) {
