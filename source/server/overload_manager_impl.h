@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <thread>
 #include <vector>
 
 #include "envoy/api/api.h"
@@ -69,6 +70,11 @@ public:
   // After this returns, overload manager clients should not receive any more callbacks
   // about overload state changes.
   void stop();
+  // Updates stats within specific resource monitor.
+  // Currently only integer values for stats are supported.
+  // todo(nezdolik) switch to ThreadLocalResourceStat struct
+  bool updateResourceStats(const std::thread::id thread_id, const std::string& resource,
+                           const std::string& stat_name, const uint64_t value);
 
 private:
   class Resource : public ResourceMonitor::Callbacks {
@@ -81,6 +87,8 @@ private:
     void onFailure(const EnvoyException& error) override;
 
     void update();
+    bool updateResourceStats(const std::thread::id thread_id, const std::string& stat_name,
+                             uint64_t value);
 
   private:
     const std::string name_;
@@ -98,6 +106,15 @@ private:
     Event::Dispatcher& dispatcher_;
     OverloadActionCb callback_;
   };
+
+  // struct ThreadLocalResourceStat {
+  //   std::thread::id thread_id;
+  //   std::string resource_id;
+  //   std::string stat_name;
+  //   uint64_t value;
+  // };
+
+  // using ThreadLocalResourceStatPtr = std::unique_ptr<ThreadLocalResourceStat>;
 
   void updateResourcePressure(const std::string& resource, double pressure);
 

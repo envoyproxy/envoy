@@ -4,6 +4,9 @@
 #include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/resource_monitor.h"
+
+#include <thread>
+
 #include "envoy/server/resource_monitor_config.h"
 
 namespace Envoy {
@@ -26,6 +29,11 @@ public:
 
   // Server::ResourceMonitor
   void updateResourceUsage(Server::ResourceMonitor::Callbacks& callbacks) override;
+
+  bool updateResourceStats(const std::thread::id thread_id, const std::string& stat_name,
+                           const uint64_t value) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
 protected:
   virtual void onFileChanged();

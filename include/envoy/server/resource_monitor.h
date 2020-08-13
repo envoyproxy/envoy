@@ -5,6 +5,8 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
+#include "common/singleton/const_singleton.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -48,9 +50,33 @@ public:
    * done asynchronously and invoke the callback when finished.
    */
   virtual void updateResourceUsage(Callbacks& callbacks) PURE;
+
+  /**
+   * Update specific stats within resource monitor.
+   * Currently only integer values are supported.
+   */
+  virtual bool updateResourceStats(const std::thread::id thread_id, const std::string& stat_name,
+                                   const uint64_t value) PURE;
 };
 
 using ResourceMonitorPtr = std::unique_ptr<ResourceMonitor>;
+
+/**
+ * Well-known resource stats names.
+ */
+class ResourceStatsNameValues {
+public:
+  // todo(nezdolik) add description
+  const std::string DownstreamConnsTotal = "downstream_cx_total";
+
+  // todo(nezdolik) add description
+  const std::string DownstreamRequestsTotal = "downstream_rq_total";
+
+  // todo(nezdolik) add description
+  const std::string UpstreamConnsTotal = "upstream_cx_total";
+};
+
+using ResourceStatsNames = ConstSingleton<ResourceStatsNameValues>;
 
 } // namespace Server
 } // namespace Envoy

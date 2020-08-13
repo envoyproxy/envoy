@@ -1,7 +1,11 @@
 #pragma once
 
+#include <thread>
+
 #include "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.pb.h"
 #include "envoy/server/resource_monitor.h"
+
+#include "common/common/assert.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -32,6 +36,11 @@ public:
       std::unique_ptr<MemoryStatsReader> stats = std::make_unique<MemoryStatsReader>());
 
   void updateResourceUsage(Server::ResourceMonitor::Callbacks& callbacks) override;
+
+  bool updateResourceStats(const std::thread::id thread_id, const std::string& stat_name,
+                           const uint64_t value) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
 private:
   const uint64_t max_heap_;

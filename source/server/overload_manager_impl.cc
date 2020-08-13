@@ -247,6 +247,17 @@ void OverloadManagerImpl::stop() {
   resources_.clear();
 }
 
+bool OverloadManagerImpl::updateResourceStats(const std::thread::id thread_id,
+                                              const std::string& resource,
+                                              const std::string& stat_name, uint64_t value) {
+  const auto found_resource = resources_.find(resource);
+  if (found_resource == resources_.end()) {
+    ENVOY_LOG(debug, "Failed to update stats for unknown resource {}.", resource);
+    return false;
+  }
+  return found_resource->second.updateResourceStats(thread_id, stat_name, value);
+}
+
 bool OverloadManagerImpl::registerForAction(const std::string& action,
                                             Event::Dispatcher& dispatcher,
                                             OverloadActionCb callback) {
@@ -310,6 +321,12 @@ void OverloadManagerImpl::Resource::update() {
   }
   ENVOY_LOG(debug, "Skipping update for resource {} which has pending update", name_);
   skipped_updates_counter_.inc();
+}
+
+bool OverloadManagerImpl::Resource::updateResourceStats(const std::thread::id thread_id,
+                                                        const std::string& stat_name,
+                                                        const uint64_t value) {
+  return monitor_->updateResourceStats(std::this_thread::get_id(), stat_name, value);
 }
 
 void OverloadManagerImpl::Resource::onSuccess(const ResourceUsage& usage) {

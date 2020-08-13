@@ -16,6 +16,9 @@ public:
   // Heap monitor with statically configured max.
   const std::string FixedHeap = "envoy.resource_monitors.fixed_heap";
 
+  // Downstream connections monitor with statically configured max.
+  const std::string DownstreamConnections = "envoy.resource_monitors.downstream_connections";
+
   // File-based injected resource monitor.
   const std::string InjectedResource = "envoy.resource_monitors.injected_resource";
 };
