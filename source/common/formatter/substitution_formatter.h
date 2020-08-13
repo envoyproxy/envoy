@@ -115,7 +115,7 @@ public:
 private:
   struct JsonFormatMap;
   using JsonFormatMapValue =
-    absl::variant<const std::vector<FormatterProviderPtr>, const JsonFormatMap>;
+      absl::variant<const std::vector<FormatterProviderPtr>, const JsonFormatMap>;
   struct JsonFormatMap {
     std::unique_ptr<std::map<std::string, JsonFormatMapValue>> value_;
   };

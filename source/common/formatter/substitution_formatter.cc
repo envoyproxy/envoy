@@ -124,7 +124,8 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
   return absl::StrCat(log_line, "\n");
 }
 
-JsonFormatterImpl::JsonFormatMap JsonFormatterImpl::toFormatMap(const ProtobufWkt::Struct& json_format) const {
+JsonFormatterImpl::JsonFormatMap
+JsonFormatterImpl::toFormatMap(const ProtobufWkt::Struct& json_format) const {
   auto output = std::make_unique<std::map<std::string, JsonFormatterImpl::JsonFormatMapValue>>();
   for (const auto& pair : json_format.fields()) {
     switch (pair.second.kind_case()) {
@@ -167,8 +168,8 @@ ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& re
         }
         return ValueUtil::stringValue(str);
       };
-  const std::function<ProtobufWkt::Value(const JsonFormatterImpl::JsonFormatMap&)> json_format_map_callback =
-      [&](const JsonFormatterImpl::JsonFormatMap& format) {
+  const std::function<ProtobufWkt::Value(const JsonFormatterImpl::JsonFormatMap&)>
+      json_format_map_callback = [&](const JsonFormatterImpl::JsonFormatMap& format) {
         ProtobufWkt::Struct output;
         auto* fields = output.mutable_fields();
         JsonFormatMapVisitor visitor{json_format_map_callback, providers_callback};
