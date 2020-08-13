@@ -145,7 +145,12 @@ void Context::activate() {
   }
 }
 
-bool Context::useFancyLogger() { return current_context->enable_fancy_log_; }
+bool Context::useFancyLogger() {
+  if (current_context) {
+    return current_context->enable_fancy_log_;
+  }
+  return false;
+}
 
 void Context::enableFancyLogger() {
   current_context->enable_fancy_log_ = true;
@@ -161,7 +166,11 @@ void Context::enableFancyLogger() {
   }
 }
 
-void Context::disableFancyLogger() { current_context->enable_fancy_log_ = false; }
+void Context::disableFancyLogger() {
+  if (current_context) {
+    current_context->enable_fancy_log_ = false;
+  }
+}
 
 std::string Context::getFancyLogFormat() {
   if (!current_context) { // Context is not instantiated in benchmark test
