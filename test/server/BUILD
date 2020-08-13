@@ -75,6 +75,7 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:connection_balancer_lib",
+        "//source/common/network:udp_default_writer_config",
         "//source/common/stats:stats_lib",
         "//source/server:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",
@@ -274,6 +275,7 @@ envoy_cc_test(
         ":utility_lib",
         "//source/extensions/quic_listeners/quiche:active_quic_listener_config_lib",
         "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
+        "//source/extensions/quic_listeners/quiche:udp_gso_batch_writer_config_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -353,7 +355,6 @@ envoy_cc_test(
         ":server_test_data",
         ":static_validation_test_data",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",
