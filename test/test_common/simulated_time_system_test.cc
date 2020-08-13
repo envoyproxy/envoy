@@ -329,6 +329,7 @@ TEST_P(SimulatedTimeSystemTest, WaitFor) {
   }
   EXPECT_TRUE(done);
   EXPECT_EQ(MonotonicTime(std::chrono::seconds(60)), time_system_.monotonicTime());
+  thread->join();
 
   // Waiting a third time, with no pending timeouts, will just sleep out for
   // the max duration and return a timeout.
@@ -339,8 +340,6 @@ TEST_P(SimulatedTimeSystemTest, WaitFor) {
   }
   EXPECT_FALSE(done);
   EXPECT_EQ(MonotonicTime(std::chrono::seconds(60)), time_system_.monotonicTime());
-
-  thread->join();
 }
 
 TEST_P(SimulatedTimeSystemTest, Monotonic) {
