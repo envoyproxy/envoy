@@ -40,24 +40,37 @@ USE_CATEGORIES = [
 # Components with these use categories are not required to specify the 'cpe' annotation.
 USE_CATEGORIES_WITH_CPE_OPTIONAL = ["build", "test", "other"]
 
+BAZEL_COMPDB_VERSION = "0.4.5"
+BAZEL_GAZELLE_VERSION = "0.19.1"
+BAZEL_TOOLCHAINS_VERSION = "3.4.0"
+
 DEPENDENCY_REPOSITORIES = dict(
     bazel_compdb = dict(
+        project_name = "bazil-compilation-database",
+        project_url = "https://github.com/grailbio/bazel-compilation-database",
+        version = BAZEL_COMPDB_VERSION,
         sha256 = "bcecfd622c4ef272fd4ba42726a52e140b961c4eac23025f18b346c968a8cfb4",
-        strip_prefix = "bazel-compilation-database-0.4.5",
-        urls = ["https://github.com/grailbio/bazel-compilation-database/archive/0.4.5.tar.gz"],
+        strip_prefix = "bazel-compilation-database-" + BAZEL_COMPDB_VERSION,
+        urls = ["https://github.com/grailbio/bazel-compilation-database/archive/" + BAZEL_COMPDB_VERSION + ".tar.gz"],
         use_category = ["build"],
     ),
     bazel_gazelle = dict(
+        project_name = "Gazelle",
+        project_url = "https://github.com/bazelbuild/bazel-gazelle",
+        version = BAZEL_GAZELLE_VERSION,
         sha256 = "86c6d481b3f7aedc1d60c1c211c6f76da282ae197c3b3160f54bd3a8f847896f",
-        urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.19.1/bazel-gazelle-v0.19.1.tar.gz"],
+        urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.19.1/bazel-gazelle-v" + BAZEL_GAZELLE_VERSION + ".tar.gz"],
         use_category = ["build"],
     ),
     bazel_toolchains = dict(
+        project_name = "bazel-toolchains",
+        project_url = "https://github.com/bazelbuild/bazel-toolchains",
+        version = BAZEL_TOOLCHAINS_VERSION,
         sha256 = "882fecfc88d3dc528f5c5681d95d730e213e39099abff2e637688a91a9619395",
-        strip_prefix = "bazel-toolchains-3.4.0",
+        strip_prefix = "bazel-toolchains-" + BAZEL_TOOLCHAINS_VERSION,
         urls = [
-            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.4.0/bazel-toolchains-3.4.0.tar.gz",
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.4.0.tar.gz",
+            "https://github.com/bazelbuild/bazel-toolchains/releases/download/" + BAZEL_TOOLCHAINS_VERSION + "/bazel-toolchains-3.4.0.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/" + BAZEL_TOOLCHAINS_VERSION + ".tar.gz",
         ],
         use_category = ["build"],
     ),
