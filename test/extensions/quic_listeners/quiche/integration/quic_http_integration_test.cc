@@ -44,6 +44,10 @@ public:
   Http::StreamResetReason last_stream_reset_reason_{Http::StreamResetReason::LocalReset};
 };
 
+void updateResource(AtomicFileUpdater& updater, double pressure) {
+  updater.update(absl::StrCat(pressure));
+}
+
 class QuicHttpIntegrationTest : public HttpIntegrationTest, public QuicMultiVersionTest {
 public:
   QuicHttpIntegrationTest()
@@ -61,8 +65,10 @@ public:
         }()),
         crypto_config_(std::make_unique<EnvoyQuicFakeProofVerifier>()), conn_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *conn_helper_.GetClock()),
-        injected_resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
-        file_updater_(injected_resource_filename_) {}
+        injected_resource_filename_1_(TestEnvironment::temporaryPath("injected_resource_1")),
+        injected_resource_filename_2_(TestEnvironment::temporaryPath("injected_resource_2")),
+        file_updater_1_(injected_resource_filename_1_),
+        file_updater_2_(injected_resource_filename_2_) {}
 
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
       uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override {
@@ -130,28 +136,38 @@ public:
 
       bootstrap.mutable_static_resources()->mutable_listeners(0)->set_reuse_port(set_reuse_port_);
 
-      const std::string overload_config = fmt::format(R"EOF(
+      const std::string overload_config =
+          fmt::format(R"EOF(
         refresh_interval:
           seconds: 0
           nanos: 1000000
         resource_monitors:
-          - name: "envoy.resource_monitors.injected_resource"
+          - name: "envoy.resource_monitors.injected_resource_1"
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig
+              filename: "{}"
+          - name: "envoy.resource_monitors.injected_resource_2"
             typed_config:
               "@type": type.googleapis.com/envoy.config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig
               filename: "{}"
         actions:
           - name: "envoy.overload_actions.stop_accepting_requests"
             triggers:
-              - name: "envoy.resource_monitors.injected_resource"
+              - name: "envoy.resource_monitors.injected_resource_1"
                 threshold:
                   value: 0.95
           - name: "envoy.overload_actions.stop_accepting_connections"
             triggers:
-              - name: "envoy.resource_monitors.injected_resource"
+              - name: "envoy.resource_monitors.injected_resource_1"
                 threshold:
                   value: 0.9
+          - name: "envoy.overload_actions.disable_http_keepalive"
+            triggers:
+              - name: "envoy.resource_monitors.injected_resource_2"
+                threshold:
+                  value: 0.8
       )EOF",
-                                                      injected_resource_filename_);
+                      injected_resource_filename_1_, injected_resource_filename_2_);
       *bootstrap.mutable_overload_manager() =
           TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(overload_config);
     });
@@ -162,12 +178,11 @@ public:
                                           v3::HttpConnectionManager::HTTP3);
         });
 
-    updateResource(0);
+    updateResource(file_updater_1_, 0);
+    updateResource(file_updater_2_, 0);
     HttpIntegrationTest::initialize();
     registerTestServerPorts({"http"});
   }
-
-  void updateResource(double pressure) { file_updater_.update(absl::StrCat(pressure)); }
 
 protected:
   quic::QuicConfig quic_config_;
@@ -181,8 +196,10 @@ protected:
   Network::Address::InstanceConstSharedPtr server_addr_;
   EnvoyQuicClientConnection* quic_connection_{nullptr};
   bool set_reuse_port_{false};
-  const std::string injected_resource_filename_;
-  AtomicFileUpdater file_updater_;
+  const std::string injected_resource_filename_1_;
+  const std::string injected_resource_filename_2_;
+  AtomicFileUpdater file_updater_1_;
+  AtomicFileUpdater file_updater_2_;
   std::list<quic::QuicConnectionId> designated_connection_ids_;
 };
 
@@ -417,14 +434,14 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Put envoy in overloaded state and check that it doesn't accept the new client connection.
-  updateResource(0.9);
+  updateResource(file_updater_1_, 0.9);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
                                1);
   codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt);
   EXPECT_TRUE(codec_client_->disconnected());
 
   // Reduce load a little to allow the connection to be accepted connection.
-  updateResource(0.8);
+  updateResource(file_updater_1_, 0.8);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
                                0);
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -433,7 +450,7 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   // Send response headers, but hold response body for now.
   upstream_request_->encodeHeaders(default_response_headers_, /*end_stream=*/false);
 
-  updateResource(0.95);
+  updateResource(file_updater_1_, 0.95);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active", 1);
   // Existing request should be able to finish.
   upstream_request_->encodeData(10, true);
@@ -450,6 +467,34 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
 
   EXPECT_TRUE(makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt)
                   ->disconnected());
+}
+
+TEST_P(QuicHttpIntegrationTest, NoNewStreamswhenOverloaded) {
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  updateResource(file_updater_1_, 0.7);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // Send a complete request and start a second.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+
+  // Enable the disable-keepalive overload action. This should send a GOAWAY before encoding the
+  // headers.
+  updateResource(file_updater_2_, 0.9);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.disable_http_keepalive.active", 1);
+
+  upstream_request_->encodeHeaders(default_response_headers_, /*end_stream=*/false);
+  upstream_request_->encodeData(10, true);
+
+  response2->waitForHeaders();
+  EXPECT_TRUE(codec_client_->sawGoAway());
+  codec_client_->close();
 }
 
 TEST_P(QuicHttpIntegrationTest, AdminDrainDrainsListeners) {
