@@ -83,7 +83,6 @@ void UberWriteFilterFuzzer::fuzz(
         Server::Configuration::NamedNetworkFilterConfigFactory>(filter_name);
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         proto_config, factory_context_.messageValidationVisitor(), factory);
-    checkInvalidInputForFuzzer(filter_name, message.get());
     ENVOY_LOG_MISC(debug, "Config content after decoded: {}", message->DebugString());
     cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
     // Add filter to connection_.

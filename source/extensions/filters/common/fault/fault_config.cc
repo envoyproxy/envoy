@@ -13,6 +13,9 @@ namespace Fault {
 
 envoy::type::v3::FractionalPercent
 HeaderPercentageProvider::percentage(const Http::RequestHeaderMap* request_headers) const {
+  if(request_headers == nullptr){
+    return percentage_;
+  }
   const auto header = request_headers->get(header_name_);
   if (header == nullptr) {
     return percentage_;
