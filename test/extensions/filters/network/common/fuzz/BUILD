@@ -84,7 +84,6 @@ envoy_cc_test_library(
         "//test/extensions/filters/network/common/fuzz/utils:network_filter_fuzzer_fakes_lib",
         "//test/fuzz:utility_lib",
         "//test/mocks/network:network_mocks",
-        "@envoy_api//envoy/extensions/filters/network/mongo_proxy/v3:pkg_cc_proto",
     ],
 )
 

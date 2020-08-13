@@ -1,5 +1,3 @@
-#include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.h"
-
 #include "extensions/filters/network/common/utility.h"
 #include "extensions/filters/network/well_known_names.h"
 
