@@ -1086,7 +1086,8 @@ bool ClientConnectionImpl::cannotHaveBody() {
     ASSERT(!pending_response_done_);
     return true;
   } else if (parser_.status_code == 204 || parser_.status_code == 304 ||
-             (parser_.status_code >= 200 && parser_.content_length == 0)) {
+             (parser_.status_code >= 200 && parser_.content_length == 0 &&
+              !(parser_.flags & F_CHUNKED))) {
     return true;
   } else {
     return false;

@@ -2982,36 +2982,5 @@ TEST_P(Http1ClientConnectionImplTest, TestResponseSplitAllowChunkedLength100) {
   testClientAllowChunkedContentLength(100, true);
 }
 
-TEST_P(Http1ClientConnectionImplTest, TestUnknown) {
-  codec_settings_.allow_chunked_length_ = true;
-  initialize();
-
-  NiceMock<MockResponseDecoder> response_decoder;
-  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
-
-  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
-  request_encoder.encodeHeaders(headers, true);
-
-  TestResponseHeaderMapImpl expected_headers{{":status", "200"}, {"transfer-encoding", "chunked"}};
-  Buffer::OwnedImpl expected_data("Hello World");
-
-  EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
-  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false));
-  EXPECT_CALL(response_decoder, decodeData(_, true));
-
-  Buffer::OwnedImpl buffer(
-      "HTTP/1.1 200 OK\r\n"
-      "Content-Length: 0\r\n"
-      "Transfer-Encoding: chunked\r\n"
-      "\r\n"
-      "6\r\nHello \r\n"
-      "5\r\nWorld\r\n"
-      "0\r\n\r\n");
-  auto status = codec_->dispatch(buffer);
-
-  EXPECT_EQ(status.message(), "NONE");
-  // EXPECT_TRUE(status.ok());
-}
-
 } // namespace Http
 } // namespace Envoy
