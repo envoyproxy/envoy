@@ -584,7 +584,7 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
       }));
   // Zero port to match the port of AnyAddress
   Network::Address::InstanceConstSharedPtr alt_address(
-      new Network::Address::Ipv4Instance("127.0.0.2", 0));
+      new Network::Address::Ipv4Instance("127.0.0.2", 0, nullptr));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
         cb.socket().restoreLocalAddress(alt_address);

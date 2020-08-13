@@ -50,7 +50,7 @@ public:
               return Api::SysCallSizeResult{static_cast<ssize_t>(0), 0};
             }));
     EXPECT_CALL(dispatcher_,
-                createFileEvent_(_, _, Event::FileTriggerType::Edge,
+                createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
                                  Event::FileReadyType::Read | Event::FileReadyType::Closed))
         .WillOnce(
             DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
@@ -273,7 +273,7 @@ TEST_P(TlsInspectorTest, InlineReadSucceed) {
 
   // No event is created if the inline recv parse the hello.
   EXPECT_CALL(dispatcher_,
-              createFileEvent_(_, _, Event::FileTriggerType::Edge,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
                                Event::FileReadyType::Read | Event::FileReadyType::Closed))
       .Times(0);
 
