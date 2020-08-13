@@ -551,6 +551,7 @@ template <class Value> struct TrieEntry {
  * A trie used for faster lookup with lookup time at most equal to the size of the key.
  */
 template <class Value> struct TrieLookupTable {
+
   /**
    * Adds an entry to the Trie at the given Key.
    * @param key the key used to add the entry.
