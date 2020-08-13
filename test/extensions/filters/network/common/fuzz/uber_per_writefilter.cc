@@ -40,7 +40,7 @@ void UberWriteFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter
   // constraint.
   const std::string name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(
       std::string(filter_name));
-  else if (filter_name == NetworkFilterNames::get().MongoProxy) {
+  if (filter_name == NetworkFilterNames::get().MongoProxy) {
     envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy& config =
         dynamic_cast<envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy&>(
             *config_message);
@@ -51,7 +51,7 @@ void UberWriteFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter
       // and
       // https://github.com/envoyproxy/envoy/blob/master/source/extensions/filters/common/fault/fault_config.cc#L16)
       throw EnvoyException(absl::StrCat(
-          "header delay is not supported in the config of a MongoProxy filter.. Config:\n{}",
+          "header delay is not supported in the config of a MongoProxy filter. Config:\n{}",
           config.DebugString()));
     }
   }
