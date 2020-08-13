@@ -202,9 +202,9 @@ TEST(Fancy, Iteration) {
 
 TEST(Fancy, Context) {
   FANCY_LOG(info, "Info: context API needs test.");
-  bool enable_fancy_log = Logger::Context::useFancyLogger();
-  printf(" --> If use fancy logger: %d\n", enable_fancy_log);
-  if (enable_fancy_log) {
+  bool enable_fine_grain_logging = Logger::Context::useFancyLogger();
+  printf(" --> If use fancy logger: %d\n", enable_fine_grain_logging);
+  if (enable_fine_grain_logging) {
     FANCY_LOG(critical, "Cmd option set: all previous Envoy Log should be converted now!");
   }
   Logger::Context::enableFancyLogger();

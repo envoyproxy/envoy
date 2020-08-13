@@ -23,7 +23,7 @@ More macros with connection and stream information:
 To flush a logger, `FANCY_FLUSH_LOG()` can be used. 
 
 ### Enable Fancy Logger using Command Line Option
-A command line option is provided to enable Fancy Logger: `--enable-fancy-log`. It enables Fancy Logger for Envoy, i.e. replaces most Envoy's log macros (`ENVOY_LOG, ENVOY_FLUSH_LOG, ENVOY_CONN_LOG, ENVOY_STREAM_LOG`) with corresponding Fancy Logger's macros. 
+A command line option is provided to enable Fancy Logger: `--enable-fine-grain-logging`. It enables Fancy Logger for Envoy, i.e. replaces most Envoy's log macros (`ENVOY_LOG, ENVOY_FLUSH_LOG, ENVOY_CONN_LOG, ENVOY_STREAM_LOG`) with corresponding Fancy Logger's macros. 
 
 If Fancy Logger is enabled, the default log format is `"[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v"`, where the logger name is omitted compared to Envoy's default as it's the same as file name. The default log level is info, if not specidfied by user of any logging context.
 

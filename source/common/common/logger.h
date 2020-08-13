@@ -234,7 +234,7 @@ enum class LoggerMode { Envoy, Fancy };
 class Context {
 public:
   Context(spdlog::level::level_enum log_level, const std::string& log_format,
-          Thread::BasicLockable& lock, bool should_escape, bool enable_fancy_log = false);
+          Thread::BasicLockable& lock, bool should_escape, bool enable_fine_grain_logging = false);
   ~Context();
 
   /**
@@ -255,7 +255,7 @@ private:
   const std::string log_format_;
   Thread::BasicLockable& lock_;
   bool should_escape_;
-  bool enable_fancy_log_;
+  bool enable_fine_grain_logging_;
   Context* const save_context_;
 
   std::string fancy_log_format_ = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";

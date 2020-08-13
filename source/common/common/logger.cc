@@ -111,9 +111,9 @@ DelegatingLogSinkSharedPtr DelegatingLogSink::init() {
 static Context* current_context = nullptr;
 
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
-                 Thread::BasicLockable& lock, bool should_escape, bool enable_fancy_log)
+                 Thread::BasicLockable& lock, bool should_escape, bool enable_fine_grain_logging)
     : log_level_(log_level), log_format_(log_format), lock_(lock), should_escape_(should_escape),
-      enable_fancy_log_(enable_fancy_log), save_context_(current_context) {
+      enable_fine_grain_logging_(enable_fine_grain_logging), save_context_(current_context) {
   current_context = this;
   activate();
 }
@@ -136,7 +136,7 @@ void Context::activate() {
   // sets level and format for Fancy Logger
   fancy_default_level_ = log_level_;
   fancy_log_format_ = log_format_;
-  if (enable_fancy_log_) {
+  if (enable_fine_grain_logging_) {
     // loggers with default level before are set to log_level_ as new default
     getFancyContext().setDefaultFancyLevelFormat(log_level_, log_format_);
     if (log_format_ == Logger::Logger::DEFAULT_LOG_FORMAT) {
@@ -147,13 +147,13 @@ void Context::activate() {
 
 bool Context::useFancyLogger() {
   if (current_context) {
-    return current_context->enable_fancy_log_;
+    return current_context->enable_fine_grain_logging_;
   }
   return false;
 }
 
 void Context::enableFancyLogger() {
-  current_context->enable_fancy_log_ = true;
+  current_context->enable_fine_grain_logging_ = true;
   if (current_context) {
     getFancyContext().setDefaultFancyLevelFormat(current_context->log_level_,
                                                  current_context->log_format_);
@@ -168,7 +168,7 @@ void Context::enableFancyLogger() {
 
 void Context::disableFancyLogger() {
   if (current_context) {
-    current_context->enable_fancy_log_ = false;
+    current_context->enable_fine_grain_logging_ = false;
   }
 }
 

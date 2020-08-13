@@ -69,7 +69,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     logging_context_ =
         std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(), log_lock,
-                                          options_.logFormatEscaped(), options_.enableFancyLog());
+                                          options_.logFormatEscaped(), options_.enableFineGrainLogging());
 
     configureComponentLogLevels();
 

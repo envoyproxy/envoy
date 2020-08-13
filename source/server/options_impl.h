@@ -133,7 +133,7 @@ public:
   }
   const std::string& logFormat() const override { return log_format_; }
   bool logFormatEscaped() const override { return log_format_escaped_; }
-  bool enableFancyLog() const override { return enable_fancy_log_; }
+  bool enableFineGrainLogging() const override { return enable_fine_grain_logging_; }
   const std::string& logPath() const override { return log_path_; }
   uint64_t restartEpoch() const override { return restart_epoch_; }
   Server::Mode mode() const override { return mode_; }
@@ -204,8 +204,8 @@ private:
   uint32_t count_;
 
   // Initialization added here to avoid integration_admin_test failure caused by uninitialized
-  // enable_fancy_log_.
-  bool enable_fancy_log_ = false;
+  // enable_fine_grain_logging_.
+  bool enable_fine_grain_logging_ = false;
 };
 
 /**
