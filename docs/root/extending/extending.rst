@@ -19,6 +19,7 @@ types including:
 * :ref:`Stat sinks <arch_overview_statistics>`
 * :ref:`Tracers <arch_overview_tracing>`
 * :ref:`Request ID <arch_overview_tracing>`
+* :ref:`Compression libraries <arch_overview_compression_libraries>`
 * Transport sockets
 * BoringSSL private key methods
 

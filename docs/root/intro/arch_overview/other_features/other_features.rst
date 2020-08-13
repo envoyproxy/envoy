@@ -8,4 +8,3 @@ Other features
   global_rate_limiting
   scripting
   ip_transparency
-  compression

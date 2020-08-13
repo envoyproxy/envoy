@@ -1,12 +1,12 @@
-.. _arch_overview_compression:
+.. _arch_overview_compression_libraries:
 
-Compression
-===========
+Compression Libraries
+=====================
 
 Underlying implementation
 -------------------------
 
-Currently Envoy uses `zlib <http://zlib.net>`_ as the compression provider.
+Currently Envoy uses `zlib <http://zlib.net>`_ as a compression library.
 
 .. note::
 
@@ -16,6 +16,6 @@ Currently Envoy uses `zlib <http://zlib.net>`_ as the compression provider.
   Envoy can be built to use `zlib-ng <https://github.com/zlib-ng/zlib-ng>`_ instead of regular
   `zlib <http://zlib.net>`_ by using ``--define zlib=ng`` Bazel option. In order to use
   `zlib-ng <https://github.com/zlib-ng/zlib-ng>`_ with optimizations turned on, apply ``--define
-  zlib=ng-with-optimizations``. For further tweaking, one can check :repo:`bazel/foreign_cc/BUILD`
-  and consult to <https://github.com/zlib-ng/zlib-ng>`_ for available build options. Currently,
-  these options are only available on Linux.
+  zlib=ng-with-optimization``. Please note that building Envoy with ``ng-with-optimization`` means
+  having a different behavior to generate checksums. Currently, these options are only
+  available on Linux.
