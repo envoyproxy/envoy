@@ -21,7 +21,6 @@ services:
       context: .
       dockerfile: Dockerfile-service
     volumes:
-      - ./service-envoy.yaml:/etc/service-envoy.yaml
       - ./responses.yaml:/etc/responses.yaml
     networks:
       envoymesh:
@@ -37,7 +36,6 @@ services:
       context: .
       dockerfile: Dockerfile-service
     volumes:
-      - ./service-envoy.yaml:/etc/service-envoy.yaml
       - ./responses.yaml:/etc/responses.yaml
     networks:
       envoymesh:
