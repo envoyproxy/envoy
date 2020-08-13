@@ -11,7 +11,6 @@
 startup --host_jvm_args=-Xmx2g
 
 build --workspace_status_command="bash bazel/get_workspace_status"
-build --experimental_local_memory_estimate
 build --experimental_strict_action_env=true
 build --host_force_python=PY3
 build --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
@@ -55,8 +54,7 @@ build:asan --define signal_trace=disabled
 build:asan --define ENVOY_CONFIG_ASAN=1
 build:asan --copt -fsanitize=address,undefined
 build:asan --linkopt -fsanitize=address,undefined
-# TODO(lizan): vptr and function requires C++ UBSAN runtime which we're not currently linking to.
-# Enable them when bazel has better support for that or with explicit linker options.
+# vptr and function sanitizer are enabled in clang-asan if it is set up via bazel/setup_clang.sh.
 build:asan --copt -fno-sanitize=vptr,function
 build:asan --linkopt -fno-sanitize=vptr,function
 build:asan --copt -DADDRESS_SANITIZER=1
