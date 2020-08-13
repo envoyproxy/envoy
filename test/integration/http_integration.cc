@@ -364,6 +364,7 @@ HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& ups
   if (!fake_upstream_connection_) {
     AssertionResult result = AssertionFailure();
     int upstream_index = 0;
+    // fixfix this timeout needs to use real time.
     Event::TestTimeSystem& time_system = timeSystem();
     auto end_time = time_system.monotonicTime() + connection_wait_timeout;
     // Loop over the upstreams until the call times out or an upstream request is received.

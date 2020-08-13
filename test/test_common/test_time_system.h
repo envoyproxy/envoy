@@ -6,6 +6,7 @@
 #include "common/common/thread.h"
 
 #include "test/test_common/global.h"
+#include "test/test_common/only_one_thread.h"
 
 namespace Envoy {
 namespace Event {
@@ -65,8 +66,9 @@ public:
   template <class D>
   bool waitFor(absl::Mutex& mutex, const absl::Condition& condition, const D& duration) noexcept
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
-        only_one_thread_.checkOneThread();
-  return mutex.AwaitWithTimeout(condition, absl::FromChrono(std::chrono::duration_cast<Duration>(duration)));
+    only_one_thread_.checkOneThread();
+    return mutex.AwaitWithTimeout(condition,
+                                  absl::FromChrono(std::chrono::duration_cast<Duration>(duration)));
   }
 
   /**
@@ -78,6 +80,9 @@ public:
   template <class D> void realSleepDoNotUseWithoutReadingTheAboveComment(const D& duration) {
     std::this_thread::sleep_for(duration); // NO_CHECK_FORMAT(real_time)
   }
+
+protected:
+  Thread::OnlyOneThread only_one_thread_;
 };
 
 // There should only be one instance of any time-system resident in a test

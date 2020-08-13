@@ -6,7 +6,6 @@
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 
-#include "test/test_common/only_one_thread.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -134,7 +133,6 @@ private:
       alarm_registrations_map_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
   uint32_t pending_alarms_ ABSL_GUARDED_BY(mutex_);
-  Thread::OnlyOneThread only_one_thread_;
 };
 
 // Represents a simulated time system, where time is advanced by calling
