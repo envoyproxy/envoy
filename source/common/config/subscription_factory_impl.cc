@@ -84,7 +84,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                                                              api_config_source, scope, true)
                   ->create(),
               dispatcher_, deltaGrpcMethod(type_url, api_config_source.transport_api_version()),
-              api_config_source.transport_api_version(), random_, runtime_, scope,
+              api_config_source.transport_api_version(), random_, scope,
               Utility::parseRateLimitSettings(api_config_source), local_info_),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config), false);

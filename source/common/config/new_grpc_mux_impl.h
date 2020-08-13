@@ -33,7 +33,7 @@ public:
   NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
                  const Protobuf::MethodDescriptor& service_method,
                  envoy::config::core::v3::ApiVersion transport_api_version,
-                 Random::RandomGenerator& random, Runtime::Loader& runtime, Stats::Scope& scope,
+                 Random::RandomGenerator& random, Stats::Scope& scope,
                  const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
 
@@ -141,7 +141,7 @@ private:
   GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
              envoy::service::discovery::v3::DeltaDiscoveryResponse>
       grpc_stream_;
-  Runtime::Loader& runtime_;
+
   const LocalInfo::LocalInfo& local_info_;
 
   const envoy::config::core::v3::ApiVersion transport_api_version_;

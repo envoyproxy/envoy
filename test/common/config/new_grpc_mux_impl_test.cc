@@ -51,7 +51,7 @@ public:
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        envoy::config::core::v3::ApiVersion::AUTO, random_, runtime_, stats_, rate_limit_settings_,
+        envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_,
         local_info_);
   }
 

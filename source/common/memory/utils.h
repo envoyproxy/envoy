@@ -9,7 +9,8 @@ class Utils {
 public:
   static void releaseFreeMemory();
   // Release free memory if the memory to free is greater than the threshold.
-  static void tryShrinkHeap(absl::optional<uint64_t> threshold);
+  // The threshold is fetched from runtime.
+  static void tryShrinkHeap();
 };
 
 } // namespace Memory

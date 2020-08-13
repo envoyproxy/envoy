@@ -811,8 +811,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
     handlerHelp(path_and_query, response_headers, response, admin_stream);
     code = Http::Code::NotFound;
   }
-  Memory::Utils::tryShrinkHeap(server_.runtime().threadsafeSnapshot()->getInteger(
-      "envoy.memory.heap_shrink_threshold", static_cast<uint64_t>(100 * 1024 * 1024UL)));
+  Memory::Utils::tryShrinkHeap();
   return code;
 }
 

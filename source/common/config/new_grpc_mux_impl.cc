@@ -19,12 +19,12 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                Event::Dispatcher& dispatcher,
                                const Protobuf::MethodDescriptor& service_method,
                                envoy::config::core::v3::ApiVersion transport_api_version,
-                               Random::RandomGenerator& random, Runtime::Loader& runtime,
-                               Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
+                               Random::RandomGenerator& random, Stats::Scope& scope,
+                               const RateLimitSettings& rate_limit_settings,
                                const LocalInfo::LocalInfo& local_info)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
-      runtime_(runtime), local_info_(local_info), transport_api_version_(transport_api_version) {}
+      local_info_(local_info), transport_api_version_(transport_api_version) {}
 
 ScopedResume NewGrpcMuxImpl::pause(const std::string& type_url) {
   return pause(std::vector<std::string>{type_url});
@@ -70,9 +70,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   }
 
   kickOffAck(sub->second->sub_state_.handleResponse(*message));
-  auto shrink_threshold = runtime_.threadsafeSnapshot()->getInteger(
-      "envoy.memory.heap_shrink_threshold", static_cast<uint64_t>(100 * 1024 * 1024UL));
-  Memory::Utils::tryShrinkHeap(shrink_threshold);
+  Memory::Utils::tryShrinkHeap();
 }
 
 void NewGrpcMuxImpl::onStreamEstablished() {

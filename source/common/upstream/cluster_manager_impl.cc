@@ -314,7 +314,7 @@ ClusterManagerImpl::ClusterManagerImpl(
                   ? "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."
                     "DeltaAggregatedResources"),
-          dyn_resources.ads_config().transport_api_version(), random_, runtime_, stats_,
+          dyn_resources.ads_config().transport_api_version(), random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
     } else {
       ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(

@@ -25,6 +25,8 @@ envoy_cc_library(
     tcmalloc_dep = 1,
     deps = [
         ":stats_lib",
+        "//source/common/runtime:runtime_lib",
+        "//source/common/stats:symbol_table_lib",
     ],
 )
 

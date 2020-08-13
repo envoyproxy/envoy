@@ -198,7 +198,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we
     // would do that tracking here.
     api_state_[type_url].request_.set_version_info(message->version_info());
-    Memory::Utils::tryShrinkHeap(absl::nullopt);
+    Memory::Utils::tryShrinkHeap();
   } catch (const EnvoyException& e) {
     for (auto watch : api_state_[type_url].watches_) {
       watch->callbacks_.onConfigUpdateFailed(

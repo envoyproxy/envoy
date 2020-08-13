@@ -88,3 +88,13 @@ request tcmalloc to free memory back to the OS.
 The default value is 100MB. Set a smaller value to aggressively free the memory to the OS, or set a bigger
 value when less CPU usage is desired. Heuristically this number is recommended to be set to between 2x and
 3x of the allocated memory. See "allocated" in :ref:`memory admin interface <operations_admin_interface_memory>`.
+
+Below *envoy.* statistics track the shrink behavior.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  memory_shrink_attempt, Counter, Number of try shrink attempt
+  memory_shrink_succeed, Counter, Number of actual free memory
+
