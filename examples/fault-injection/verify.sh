@@ -31,7 +31,8 @@ _fault_injection_test () {
         &> /dev/null
     run_log "Check logs again"
     new_codes=$(docker-compose logs | grep -c "HTTP/1.1\" ${code}")
-    if [ "$new_codes" -le "$existing_codes" ]; then
+    if [[ "$new_codes" -le "$existing_codes" ]]; then
+        echo "ERROR: expected to find new logs with response code $code" >&2
         return 1
     fi
 
@@ -45,7 +46,8 @@ _fault_injection_test () {
         &> /dev/null
     run_log "Check logs again"
     new_200s=$(docker-compose logs | grep -c "HTTP/1.1\" 200")
-    if [ "$new_200s" -le "$existing_200s" ]; then
+    if [[ "$new_200s" -le "$existing_200s" ]]; then
+        echo "ERROR: expected to find new logs with response code 200" >&2
         return 1
     fi
 }

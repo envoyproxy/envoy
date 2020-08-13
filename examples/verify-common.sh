@@ -22,8 +22,6 @@ bring_up_example_stack () {
     echo
     run_log "Bring up services ($path)"
     docker-compose "${up_args[@]}" || return 1
-    docker-compose ps
-    docker-compose logs
 }
 
 bring_up_example () {
@@ -35,12 +33,19 @@ bring_up_example () {
             echo "ERROR: starting ${NAME} ${path}" >&2
             return 1
         }
-        popd > /dev/null || return 1
+        popd > /dev/null
     done
-    if [ "$DELAY" -ne "0" ]; then
+    if [[ "$DELAY" -ne "0" ]]; then
         run_log "Snooze for ${DELAY} while ${NAME} gets started"
         sleep "$DELAY"
     fi
+    for path in "${paths[@]}"; do
+        pushd "$path" > /dev/null || return 1
+        docker-compose ps
+        docker-compose logs
+        popd > /dev/null
+    done
+
 }
 
 cleanup_stack () {
@@ -103,7 +108,7 @@ responds_without_header () {
     local curl_command expected
     expected="$1"
     shift
-    _curl --head "${@}" | grep "$expected" | [ "$(wc -l)" -eq 0 ] || {
+    _curl --head "${@}" | grep "$expected" | [[ "$(wc -l)" -eq 0 ]] || {
         echo "ERROR: curl without header (${*}): $expected" >&2
         return 1
     }
@@ -112,11 +117,11 @@ responds_without_header () {
 
 trap 'cleanup' EXIT
 
-if [ -z "$NAME" ]; then
-    echo "ERROR: You must set the $NAME variable before sourcing this script" >&2
+if [[ -z "$NAME" ]]; then
+    echo "ERROR: You must set the '$NAME' variable before sourcing this script" >&2
     exit 1
 fi
 
-if [ -z "$MANUAL" ]; then
+if [[ -z "$MANUAL" ]]; then
     bring_up_example
 fi

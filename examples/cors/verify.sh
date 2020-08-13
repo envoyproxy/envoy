@@ -19,8 +19,8 @@ responds_with \
     http://localhost:8002/cors/disabled
 responds_without_header \
     access-control-allow-origin \
-     -H "Origin: http://example.com" \
-     http://localhost:8002/cors/disabled
+    -H "Origin: http://example.com" \
+    http://localhost:8002/cors/disabled
 
 run_log "Test cors server: open"
 responds_with \
@@ -29,8 +29,8 @@ responds_with \
     http://localhost:8002/cors/open
 responds_with_header \
     "access-control-allow-origin: http://example.com" \
-     -H "Origin: http://example.com" \
-     http://localhost:8002/cors/open
+    -H "Origin: http://example.com" \
+    http://localhost:8002/cors/open
 
 run_log "Test cors server: restricted"
 responds_with \
@@ -39,9 +39,9 @@ responds_with \
     http://localhost:8002/cors/restricted
 responds_without_header \
     access-control-allow-origin \
-     -H "Origin: http://example.com" \
-     http://localhost:8002/cors/restricted
+    -H "Origin: http://example.com" \
+    http://localhost:8002/cors/restricted
 responds_with_header \
     "access-control-allow-origin: http://foo.envoyproxy.io" \
-     -H "Origin: http://foo.envoyproxy.io" \
-     http://localhost:8002/cors/restricted
+    -H "Origin: http://foo.envoyproxy.io" \
+    http://localhost:8002/cors/restricted
