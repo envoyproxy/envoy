@@ -154,6 +154,8 @@ void CacheFilter::onHeaders(LookupResult&& result) {
       return;
     }
     if (result.content_length_ > 0) {
+      // No range has been added, so add the entire content as a single range.
+      ASSERT(remaining_ranges_.empty());
       remaining_ranges_.emplace_back(0, result.content_length_);
       getBody();
     } else {

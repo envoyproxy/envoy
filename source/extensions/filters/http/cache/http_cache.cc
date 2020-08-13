@@ -68,8 +68,6 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   // TODO(toddmgreer): Let config determine whether to include forwarded_proto, host, and
   // query params.
   // TODO(toddmgreer): get cluster name.
-  // TODO(toddmgreer): handle the resultant vector<AdjustedByteRange> in CacheFilter::onOkHeaders.
-  // Range Requests are only valid for GET requests
   if (request_headers.getMethodValue() == Http::Headers::get().MethodValues.Get) {
     // TODO(cbdm): using a constant limit of 1 range since we don't support multi-part responses nor
     // coalesce multiple overlapping ranges. Could make this into a parameter based on config.
