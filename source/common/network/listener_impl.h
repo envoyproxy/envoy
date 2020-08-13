@@ -25,7 +25,7 @@ protected:
   void setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket);
 
   ListenerCallbacks& cb_;
-  uint32_t backlog_size_;
+  const uint32_t backlog_size_;
 
 private:
   void onSocketEvent(short flags);

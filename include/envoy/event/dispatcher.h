@@ -153,7 +153,7 @@ public:
    */
   virtual Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                               Network::ListenerCallbacks& cb, bool bind_to_port,
-                                              uint32_t backlog_size = ENVOY_TCP_BACKLOG_SIZE) PURE;
+                                              uint32_t backlog_size) PURE;
 
   /**
    * Creates a logical udp listener on a specific port.

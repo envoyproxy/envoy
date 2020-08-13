@@ -34,7 +34,8 @@ static void errorCallbackTest(Address::IpVersion version) {
       Network::Test::getCanonicalLoopbackAddress(version), nullptr, true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher->createListener(socket, listener_callbacks, true);
+  Network::ListenerPtr listener =
+      dispatcher->createListener(socket, listener_callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
 
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -150,7 +151,8 @@ TEST_P(ListenerImplTest, GlobalConnectionLimitEnforcement) {
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher_->createListener(socket, listener_callbacks, true);
+  Network::ListenerPtr listener =
+      dispatcher_->createListener(socket, listener_callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
 
   std::vector<Network::ClientConnectionPtr> client_connections;
   std::vector<Network::ConnectionPtr> server_connections;
