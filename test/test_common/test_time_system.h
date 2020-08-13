@@ -18,6 +18,34 @@ public:
   ~TestTimeSystem() override = default;
 
   /**
+   * This class will use the real monotonic time regardless of the time system in use (real
+   * or simulated). This should only be used when time is needed for real timeouts that govern
+   * networking, etc. It should never be used for time that only advances explicitly for alarms.
+   */
+  class RealTimeBound {
+  public:
+    template <class D>
+    RealTimeBound(const D& duration)
+        : end_time_(std::chrono::steady_clock::now() + duration) // NO_CHECK_FORMAT(real_time)
+    {}
+
+    std::chrono::milliseconds timeLeft() {
+      const auto current_time = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
+      if (current_time > end_time_) {
+        return std::chrono::milliseconds(0);
+      }
+      return std::chrono::duration_cast<std::chrono::milliseconds>(end_time_ - current_time);
+    }
+
+    bool withinBound() {
+      return std::chrono::steady_clock::now() < end_time_; // NO_CHECK_FORMAT(real_time)
+    }
+
+  private:
+    const MonotonicTime end_time_;
+  };
+
+  /**
    * Advances time forward by the specified duration, running any timers
    * scheduled to fire, and blocking until the timer callbacks are complete.
    * See also advanceTimeAsync(), which does not block.
@@ -60,7 +88,7 @@ public:
    *       alarms advanceTimeWait() or advanceTimeAsync() should be used.
    *
    * @param mutex A mutex which must be held before calling this function.
-   * @param condvar The condition to wait on.
+   * @param condition The condition to wait on.
    * @param duration The maximum amount of time to wait.
    * @return Thread::CondVar::WaitStatus whether the condition timed out or not.
    */
@@ -80,15 +108,6 @@ public:
    */
   template <class D> void realSleepDoNotUseWithoutScrutiny(const D& duration) {
     std::this_thread::sleep_for(duration); // NO_CHECK_FORMAT(real_time)
-  }
-
-  /**
-   * This function will return the real monotonic team regardless of the time system in use (real
-   * or simulated). This should only be used when time is needed for real timeouts that govern
-   * networking, etc. It should never be used for time that only advances explicitly for alarms.
-   */
-  MonotonicTime realMonotonicTimeDoNotUseWithoutScrutiny() {
-    return std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
   }
 
 protected:

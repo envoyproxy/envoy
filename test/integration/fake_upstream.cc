@@ -145,10 +145,8 @@ void FakeStream::onResetStream(Http::StreamResetReason, absl::string_view) {
 
 AssertionResult FakeStream::waitForHeadersComplete(milliseconds timeout) {
   absl::MutexLock lock(&lock_);
-  const auto reached = [this]() {
-    lock_.AssertReaderHeld();
-    return headers_ != nullptr;
-  };
+  const auto reached = [this]()
+                           ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return headers_ != nullptr; };
   if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
     return AssertionFailure() << "Timed out waiting for headers.";
   }
@@ -162,8 +160,8 @@ bool waitForWithDispatcherRun(Event::TestTimeSystem& time_system, absl::Mutex& l
                               const std::function<bool()>& condition,
                               Event::Dispatcher& client_dispatcher, milliseconds timeout)
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock) {
-  const auto end_time = time_system.realMonotonicTimeDoNotUseWithoutScrutiny() + timeout;
-  while (time_system.realMonotonicTimeDoNotUseWithoutScrutiny() < end_time) {
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  while (bound.withinBound()) {
     // Wake up every 5ms to run the client dispatcher.
     if (time_system.waitFor(lock, absl::Condition(&condition), 5ms)) {
       return true;
@@ -181,10 +179,8 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, ui
   absl::MutexLock lock(&lock_);
   if (!waitForWithDispatcherRun(
           time_system_, lock_,
-          [this, body_length]() {
-            lock_.AssertReaderHeld();
-            return (body_.length() >= body_length);
-          },
+          [this, body_length]()
+              ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return (body_.length() >= body_length); },
           client_dispatcher, timeout)) {
     return AssertionFailure() << "Timed out waiting for data.";
   }
@@ -208,11 +204,8 @@ AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatche
   absl::MutexLock lock(&lock_);
   if (!waitForWithDispatcherRun(
           time_system_, lock_,
-          [this]() {
-            lock_.AssertReaderHeld();
-            return end_stream_;
-          },
-          client_dispatcher, timeout)) {
+          [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return end_stream_; }, client_dispatcher,
+          timeout)) {
     return AssertionFailure() << "Timed out waiting for end of stream.";
   }
   return AssertionSuccess();
@@ -357,8 +350,7 @@ Http::RequestDecoder& FakeHttpConnection::newStream(Http::ResponseEncoder& encod
 AssertionResult FakeConnectionBase::waitForDisconnect(milliseconds timeout) {
   ENVOY_LOG(trace, "FakeConnectionBase waiting for disconnect");
   absl::MutexLock lock(&lock_);
-  const auto reached = [this]() {
-    lock_.AssertReaderHeld();
+  const auto reached = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
     return !shared_connection_.connectedLockHeld();
   };
 
@@ -383,10 +375,7 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
   absl::MutexLock lock(&lock_);
   if (!waitForWithDispatcherRun(
           time_system_, lock_,
-          [this]() {
-            lock_.AssertReaderHeld();
-            return !new_streams_.empty();
-          },
+          [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return !new_streams_.empty(); },
           client_dispatcher, timeout)) {
     return AssertionFailure() << "Timed out waiting for new stream.";
   }
@@ -518,10 +507,7 @@ AssertionResult FakeUpstream::waitForHttpConnection(
     absl::MutexLock lock(&lock_);
     if (!waitForWithDispatcherRun(
             time_system_, lock_,
-            [this]() {
-              lock_.AssertReaderHeld();
-              return !new_connections_.empty();
-            },
+            [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return !new_connections_.empty(); },
             client_dispatcher, timeout)) {
       return AssertionFailure() << "Timed out waiting for new connection.";
     }
@@ -544,17 +530,15 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
   if (upstreams.empty()) {
     return AssertionFailure() << "No upstreams configured.";
   }
-  Event::TestTimeSystem& time_system = upstreams[0]->timeSystem();
-  auto end_time = time_system.realMonotonicTimeDoNotUseWithoutScrutiny() + timeout;
-  while (time_system.realMonotonicTimeDoNotUseWithoutScrutiny() < end_time) {
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  while (bound.withinBound()) {
     for (auto& it : upstreams) {
       FakeUpstream& upstream = *it;
       {
         absl::MutexLock lock(&upstream.lock_);
         if (!waitForWithDispatcherRun(
-                time_system, upstream.lock_,
-                [&upstream]() {
-                  upstream.lock_.AssertReaderHeld();
+                upstream.time_system_, upstream.lock_,
+                [&upstream]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(upstream.lock_) {
                   return !upstream.new_connections_.empty();
                 },
                 client_dispatcher, 5ms)) {
@@ -577,8 +561,7 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
                                                    milliseconds timeout) {
   {
     absl::MutexLock lock(&lock_);
-    const auto reached = [this]() {
-      lock_.AssertReaderHeld();
+    const auto reached = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
       return !new_connections_.empty();
     };
 
@@ -605,8 +588,7 @@ SharedConnectionWrapper& FakeUpstream::consumeConnection() {
 testing::AssertionResult FakeUpstream::waitForUdpDatagram(Network::UdpRecvData& data_to_fill,
                                                           std::chrono::milliseconds timeout) {
   absl::MutexLock lock(&lock_);
-  const auto reached = [this]() {
-    lock_.AssertReaderHeld();
+  const auto reached = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
     return !received_datagrams_.empty();
   };
 
@@ -636,8 +618,7 @@ void FakeUpstream::sendUdpDatagram(const std::string& buffer,
 AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* data,
                                                milliseconds timeout) {
   absl::MutexLock lock(&lock_);
-  const auto reached = [this, num_bytes]() {
-    lock_.AssertReaderHeld();
+  const auto reached = [this, num_bytes]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
     return data_.size() == num_bytes;
   };
   ENVOY_LOG(debug, "waiting for {} bytes of data", num_bytes);
@@ -654,10 +635,8 @@ AssertionResult
 FakeRawConnection::waitForData(const std::function<bool(const std::string&)>& data_validator,
                                std::string* data, milliseconds timeout) {
   absl::MutexLock lock(&lock_);
-  const auto reached = [this, &data_validator]() {
-    lock_.AssertReaderHeld();
-    return data_validator(data_);
-  };
+  const auto reached = [this, &data_validator]()
+                           ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return data_validator(data_); };
   ENVOY_LOG(debug, "waiting for data");
   if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
     return AssertionFailure() << "Timed out waiting for data.";

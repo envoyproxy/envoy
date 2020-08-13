@@ -41,6 +41,8 @@
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
+// TODO(mattklein123): A lot of code should be moved from this header file into the cc file.
+
 namespace Envoy {
 
 class FakeHttpConnection;
@@ -163,7 +165,7 @@ public:
   ABSL_MUST_USE_RESULT testing::AssertionResult
   waitForGrpcMessage(Event::Dispatcher& client_dispatcher, T& message,
                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
-    auto end_time = timeSystem().realMonotonicTimeDoNotUseWithoutScrutiny() + timeout;
+    Event::TestTimeSystem::RealTimeBound bound(timeout);
     ENVOY_LOG(debug, "Waiting for gRPC message...");
     if (!decoded_grpc_frames_.empty()) {
       decodeGrpcFrame(message);
@@ -180,9 +182,7 @@ public:
       }
     }
     if (decoded_grpc_frames_.empty()) {
-      timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
-          end_time - timeSystem().realMonotonicTimeDoNotUseWithoutScrutiny());
-      if (!waitForData(client_dispatcher, grpc_decoder_.length(), timeout)) {
+      if (!waitForData(client_dispatcher, grpc_decoder_.length(), bound.timeLeft())) {
         return testing::AssertionFailure() << "Timed out waiting for end of gRPC message.";
       }
       {
@@ -259,8 +259,7 @@ public:
   SharedConnectionWrapper(Network::Connection& connection, bool allow_unexpected_disconnects)
       : connection_(connection), allow_unexpected_disconnects_(allow_unexpected_disconnects) {
     connection_.addConnectionCallbacks(*this);
-    addDisconnectCallback([this] {
-      lock_.AssertReaderHeld(); // Locked in onEvent().
+    addDisconnectCallback([this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
       RELEASE_ASSERT(parented_ || allow_unexpected_disconnects_,
                      "An queued upstream connection was torn down without being associated "
                      "with a fake connection. Either manage the connection via "

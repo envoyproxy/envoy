@@ -312,8 +312,8 @@ TEST_P(SimulatedTimeSystemTest, WaitFor) {
       dispatcher_);
   timer->enableTimer(std::chrono::seconds(60));
 
-  // Wait 1ms. waitFor() does not advance simulated time, so this is just going to verify that
-  // we return quickly and nothing has fired.
+  // Wait 1ms of real time. waitFor() does not advance simulated time, so this is just going to
+  // verify that we return quickly and nothing has fired.
   {
     absl::MutexLock lock(&mutex);
     EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::milliseconds(1)));
