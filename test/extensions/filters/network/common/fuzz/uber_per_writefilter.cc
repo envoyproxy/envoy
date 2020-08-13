@@ -1,3 +1,5 @@
+#include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.h"
+
 #include "extensions/filters/network/common/utility.h"
 #include "extensions/filters/network/well_known_names.h"
 
@@ -28,6 +30,26 @@ std::vector<absl::string_view> UberWriteFilterFuzzer::filterNames() {
     }
   }
   return filter_names;
+}
+
+void UberWriteFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name,
+                                                       Protobuf::Message* config_message) {
+  // System calls such as reading files are prohibited in this fuzzer. Some input that crashes the
+  // mock/fake objects are also prohibited. We could also avoid fuzzing some unfinished features by
+  // checking them here. For now there is only one filter {MongoProxy} on which we have a
+  // constraint.
+  const std::string name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(
+      std::string(filter_name));
+  if (filter_name == NetworkFilterNames::get().MongoProxy) {
+    envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy& config =
+        dynamic_cast<envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy&>(
+            *config_message);
+    if (config.has_delay() && config.mutable_delay()->has_header_delay()) {
+      // Mongo has no header map. Only fixed_delay is supported.
+      throw EnvoyException(
+          absl::StrCat("Header_delay is not supported here. Config:\n{}", config.DebugString()));
+    }
+  }
 }
 
 } // namespace NetworkFilters
