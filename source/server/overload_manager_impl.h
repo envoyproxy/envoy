@@ -30,8 +30,8 @@ public:
   // has changed state.
   bool updateResourcePressure(const std::string& name, double pressure);
 
-  // Returns whether the action is currently active or not.
-  bool isActive() const;
+  // Returns the current action state, which is the max state across all registered triggers.
+  OverloadActionState getState() const;
 
   class Trigger {
   public:
@@ -40,15 +40,16 @@ public:
     // Updates the current value of the metric and returns whether the trigger has changed state.
     virtual bool updateValue(double value) PURE;
 
-    // Returns whether the trigger is currently fired or not.
-    virtual bool isFired() const PURE;
+    // Returns the action state for the trigger.
+    virtual OverloadActionState actionState() const PURE;
   };
   using TriggerPtr = std::unique_ptr<Trigger>;
 
 private:
   absl::node_hash_map<std::string, TriggerPtr> triggers_;
-  absl::node_hash_set<std::string> fired_triggers_;
+  OverloadActionState state_;
   Stats::Gauge& active_gauge_;
+  Stats::Gauge& scale_percent_gauge_;
 };
 
 class OverloadManagerImpl : Logger::Loggable<Logger::Id::main>, public OverloadManager {

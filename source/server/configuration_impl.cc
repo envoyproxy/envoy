@@ -108,6 +108,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, multikill_timeout, 0));
   watchdog_multikill_threshold_ =
       PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(watchdog, multikill_threshold, 0.0);
+  watchdog_actions_ = bootstrap.watchdog().actions();
 
   initializeStatsSinks(bootstrap, server);
 }

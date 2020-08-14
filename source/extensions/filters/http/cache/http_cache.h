@@ -41,8 +41,6 @@ enum class CacheEntryStatus {
   SatisfiableRange,
 };
 
-std::ostream& operator<<(std::ostream& os, CacheEntryStatus status);
-
 // Byte range from an HTTP request.
 class RawByteRange {
 public:
@@ -112,8 +110,6 @@ inline bool operator==(const AdjustedByteRange& lhs, const AdjustedByteRange& rh
   return lhs.begin() == rhs.begin() && lhs.end() == rhs.end();
 }
 
-std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range);
-
 // Adjusts request_range_spec to fit a cached response of size content_length, putting the results
 // in response_ranges. Returns true if response_ranges is satisfiable (empty is considered
 // satisfiable, as it denotes the entire body).
@@ -151,6 +147,7 @@ struct LookupResult {
   // True if the cached response has trailers.
   bool has_trailers_ = false;
 };
+using LookupResultPtr = std::unique_ptr<LookupResult>;
 
 // Produces a hash of key that is consistent across restarts, architectures,
 // builds, and configurations. Caches that store persistent entries based on a
@@ -305,8 +302,8 @@ public:
   //
   // This is called when an expired cache entry is successfully validated, to
   // update the cache entry.
-  virtual void updateHeaders(LookupContextPtr&& lookup_context,
-                             Http::ResponseHeaderMapPtr&& response_headers) PURE;
+  virtual void updateHeaders(const LookupContext& lookup_context,
+                             const Http::ResponseHeaderMap& response_headers) PURE;
 
   // Returns statically known information about a cache.
   virtual CacheInfo cacheInfo() const PURE;
