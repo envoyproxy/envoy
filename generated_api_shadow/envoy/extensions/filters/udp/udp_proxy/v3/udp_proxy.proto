@@ -37,7 +37,7 @@ message UdpProxyConfig {
   google.protobuf.Duration idle_timeout = 3;
 
   // Use the remote downstream ip address as sender ip address when send packets to upstreams.
-  // This option requires Envoy to run with the *CAP_NET_ADMIN* capability.
+  // This option requires envoy to run with the *CAP_NET_ADMIN* capability.
   // This option does not preserve the remote downstream port.
   // If this option is enabled, the sender ip address will be changed to remote downstream ip address.
   // It means that the envoy cannot receive the packets that be sent by upstreams because the upstreams
@@ -48,6 +48,7 @@ message UdpProxyConfig {
   // The another one is that configure the default gw or add routing rules on the upstreams to forward
   // all packets to envoy. And configure iptables rules and add some routing rules on the host of envoy side to
   // forward all packets from upstreams to envoy process so that the envoy can return back the packets to the downstream.
-  // If there are some errors during configure this option, it will fall back to no use_original_src_ip mode even if the this option is set.
+  // If there are some errors during set this option to each sessions, it will fall back to no use_original_src_ip mode even if the this option is set.
+  // If the platform does not support this option, envoy will be stopped on initializing phase.
   bool use_original_src_ip = 4;
 }
