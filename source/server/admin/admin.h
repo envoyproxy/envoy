@@ -390,6 +390,7 @@ private:
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return empty_access_logs_;
     }
+    uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
 
     AdminImpl& parent_;
     const std::string name_;
