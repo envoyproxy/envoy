@@ -25,7 +25,7 @@ bring_up_example_stack () {
 }
 
 bring_up_example () {
-    local paths
+    local path paths
     read -ra paths <<< "$(echo "$PATHS" | tr ',' ' ')"
     for path in "${paths[@]}"; do
         pushd "$path" > /dev/null || return 1
@@ -33,7 +33,7 @@ bring_up_example () {
             echo "ERROR: starting ${NAME} ${path}" >&2
             return 1
         }
-        popd > /dev/null
+        popd > /dev/null || return 1
     done
     if [[ "$DELAY" -ne "0" ]]; then
         run_log "Snooze for ${DELAY} while ${NAME} gets started"
@@ -43,9 +43,8 @@ bring_up_example () {
         pushd "$path" > /dev/null || return 1
         docker-compose ps
         docker-compose logs
-        popd > /dev/null
+        popd > /dev/null || return 1
     done
-
 }
 
 cleanup_stack () {
@@ -57,7 +56,7 @@ cleanup_stack () {
 }
 
 cleanup () {
-    local paths
+    local path paths
     read -ra paths <<< "$(echo "$PATHS" | tr ',' ' ')"
     for path in "${paths[@]}"; do
         pushd "$path" > /dev/null || return 1
@@ -70,7 +69,7 @@ cleanup () {
 }
 
 _curl () {
-    local curl_command
+    local arg curl_command
     curl_command=(curl -s)
     if [[ ! "$*" =~ "-X" ]]; then
         curl_command+=(-X GET)
@@ -85,7 +84,7 @@ _curl () {
 }
 
 responds_with () {
-    local curl_command expected
+    local expected
     expected="$1"
     shift
     _curl "${@}" | grep "$expected" || {
@@ -105,7 +104,7 @@ responds_with_header () {
 }
 
 responds_without_header () {
-    local curl_command expected
+    local expected
     expected="$1"
     shift
     _curl --head "${@}" | grep "$expected" | [[ "$(wc -l)" -eq 0 ]] || {
