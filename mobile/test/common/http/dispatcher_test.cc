@@ -1094,6 +1094,123 @@ TEST_F(DispatcherTest, ResetStreamLocal) {
   ASSERT_EQ(cc.on_complete_calls, 0);
 }
 
+TEST_F(DispatcherTest, DoubleResetStreamLocal) {
+  ready();
+
+  envoy_stream_t stream = 1;
+  envoy_http_callbacks bridge_callbacks;
+  callbacks_called cc = {0, 0, 0, 0, 0, 0};
+  bridge_callbacks.context = &cc;
+  bridge_callbacks.on_error = [](envoy_error, void* context) -> void* {
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_error_calls++;
+    return nullptr;
+  };
+  bridge_callbacks.on_complete = [](void* context) -> void* {
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_complete_calls++;
+    return nullptr;
+  };
+  bridge_callbacks.on_cancel = [](void* context) -> void* {
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_cancel_calls++;
+    return nullptr;
+  };
+
+  // Create a stream.
+  Event::PostCb start_stream_post_cb;
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
+
+  // Grab the response encoder in order to dispatch responses on the stream.
+  // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
+  // API.
+  EXPECT_CALL(api_listener_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder_ = &encoder;
+        return request_decoder_;
+      }));
+  start_stream_post_cb();
+
+  Event::PostCb reset_stream_post_cb;
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&reset_stream_post_cb));
+  ASSERT_EQ(http_dispatcher_.resetStream(stream), ENVOY_SUCCESS);
+  ASSERT_EQ(cc.on_cancel_calls, 1);
+
+  // Success because the stream has not been deleted.
+  ASSERT_EQ(http_dispatcher_.resetStream(stream), ENVOY_SUCCESS);
+  // But the callback won't happen because the stream is no longer dispatchable.
+  ASSERT_EQ(cc.on_cancel_calls, 1);
+
+  Event::PostCb stream_deletion_post_cb;
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&stream_deletion_post_cb));
+  reset_stream_post_cb();
+  stream_deletion_post_cb();
+
+  ASSERT_EQ(cc.on_error_calls, 0);
+  ASSERT_EQ(cc.on_complete_calls, 0);
+}
+
+TEST_F(DispatcherTest, DoubleResetStreamLocalEnvoyFailure) {
+  ready();
+
+  envoy_stream_t stream = 1;
+  envoy_http_callbacks bridge_callbacks;
+  callbacks_called cc = {0, 0, 0, 0, 0, 0};
+  bridge_callbacks.context = &cc;
+  bridge_callbacks.on_error = [](envoy_error, void* context) -> void* {
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_error_calls++;
+    return nullptr;
+  };
+  bridge_callbacks.on_complete = [](void* context) -> void* {
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_complete_calls++;
+    return nullptr;
+  };
+  bridge_callbacks.on_cancel = [](void* context) -> void* {
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_cancel_calls++;
+    return nullptr;
+  };
+
+  // Create a stream.
+  Event::PostCb start_stream_post_cb;
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
+
+  // Grab the response encoder in order to dispatch responses on the stream.
+  // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
+  // API.
+  EXPECT_CALL(api_listener_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder_ = &encoder;
+        return request_decoder_;
+      }));
+  start_stream_post_cb();
+
+  Event::PostCb reset_stream_post_cb;
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&reset_stream_post_cb));
+  ASSERT_EQ(http_dispatcher_.resetStream(stream), ENVOY_SUCCESS);
+  ASSERT_EQ(cc.on_cancel_calls, 1);
+
+  Event::PostCb stream_deletion_post_cb;
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&stream_deletion_post_cb));
+  reset_stream_post_cb();
+
+  // The second cancel should end in failure synchronously because the stream is cleaned up from the
+  // dispatcher's container synchronously in the posted resetStream code.
+  ASSERT_EQ(http_dispatcher_.resetStream(stream), ENVOY_FAILURE);
+  ASSERT_EQ(cc.on_cancel_calls, 1);
+
+  stream_deletion_post_cb();
+
+  ASSERT_EQ(cc.on_error_calls, 0);
+  ASSERT_EQ(cc.on_complete_calls, 0);
+}
+
 TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
   ready();
 
