@@ -47,7 +47,8 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
     : transport_socket_options_(transport_socket_options),
       ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)) {
   bssl::UniquePtr<SSL> ssl = ctx_->newSsl(transport_socket_options_.get());
-  info_ = std::make_shared<SslHandshakerImpl>(std::move(ssl), ctx_, this);
+  info_ =
+      std::make_shared<SslHandshakerImpl>(std::move(ssl), ctx_->sslExtendedSocketInfoIndex(), this);
 
   if (state == InitialState::Client) {
     SSL_set_connect_state(rawSsl());
@@ -291,11 +292,11 @@ Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidat
   return certificate_validation_status_;
 }
 
-SslHandshakerImpl::SslHandshakerImpl(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx,
+SslHandshakerImpl::SslHandshakerImpl(bssl::UniquePtr<SSL> ssl, int ssl_extended_socket_info_index,
                                      Ssl::HandshakeCallbacks* handshake_callbacks)
     : ssl_(std::move(ssl)), handshake_callbacks_(handshake_callbacks),
       state_(Ssl::SocketState::PreHandshake) {
-  SSL_set_ex_data(ssl_.get(), ctx->sslExtendedSocketInfoIndex(), &(this->extended_socket_info_));
+  SSL_set_ex_data(ssl_.get(), ssl_extended_socket_info_index, &(this->extended_socket_info_));
 }
 
 bool SslHandshakerImpl::peerCertificatePresented() const {

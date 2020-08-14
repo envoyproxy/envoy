@@ -54,7 +54,7 @@ private:
 
 class SslHandshakerImpl : public Envoy::Ssl::ConnectionInfo, public Envoy::Ssl::Handshaker {
 public:
-  SslHandshakerImpl(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx,
+  SslHandshakerImpl(bssl::UniquePtr<SSL> ssl, int ssl_extended_socket_info_index,
                     Ssl::HandshakeCallbacks* handshake_callbacks);
 
   // Ssl::ConnectionInfo
