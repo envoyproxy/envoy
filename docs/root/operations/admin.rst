@@ -237,7 +237,9 @@ modify different aspects of the server:
 
   .. note::
 
-    Generally only used during development.
+    Generally only used during development. With `--enable-fine-grain-logging` being set, the logger is represented
+    by the path of the file it belongs to (to be specific, the path determined by `__FILE__`), so the logger list
+    will show a list of file paths, and the specific path should be used as <logger_name> to change the log level. 
 
 .. http:get:: /memory
 

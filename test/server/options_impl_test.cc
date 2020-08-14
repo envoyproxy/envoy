@@ -84,7 +84,9 @@ TEST_F(OptionsImplTest, All) {
       "--local-address-ip-version v6 -l info --component-log-level upstream:debug,connection:trace "
       "--service-cluster cluster --service-node node --service-zone zone "
       "--file-flush-interval-msec 9000 "
-      "--drain-time-s 60 --log-format [%v] --parent-shutdown-time-s 90 --log-path /foo/bar "
+      "--drain-time-s 60 --log-format [%v] --enable-fine-grain-logging --parent-shutdown-time-s 90 "
+      "--log-path "
+      "/foo/bar "
       "--disable-hot-restart --cpuset-threads --allow-unknown-static-fields "
       "--reject-unknown-dynamic-fields --use-fake-symbol-table 0 --base-id 5 "
       "--use-dynamic-base-id --base-id-path /foo/baz");
@@ -98,6 +100,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(2, options->componentLogLevels().size());
   EXPECT_EQ("[%v]", options->logFormat());
   EXPECT_EQ("/foo/bar", options->logPath());
+  EXPECT_EQ(true, options->enableFineGrainLogging());
   EXPECT_EQ("cluster", options->serviceClusterName());
   EXPECT_EQ("node", options->serviceNodeName());
   EXPECT_EQ("zone", options->serviceZone());

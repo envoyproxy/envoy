@@ -54,7 +54,7 @@ message ServerInfo {
   CommandLineOptions command_line_options = 6;
 }
 
-// [#next-free-field: 34]
+// [#next-free-field: 35]
 message CommandLineOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.CommandLineOptions";
@@ -176,4 +176,7 @@ message CommandLineOptions {
 
   // See :option:`--bootstrap-version` for details.
   uint32 bootstrap_version = 29;
+
+  // See :option:`--enable-fine-grain-logging` for details.
+  bool enable_fine_grain_logging = 34;
 }

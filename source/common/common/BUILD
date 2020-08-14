@@ -137,30 +137,19 @@ envoy_cc_library(
 # Contains minimal code for logging to stderr.
 envoy_cc_library(
     name = "minimal_logger_lib",
-    srcs = ["logger.cc"],
-    hdrs = ["logger.h"],
+    srcs = [
+        "fancy_logger.cc",
+        "logger.cc",
+    ],
+    hdrs = [
+        "fancy_logger.h",
+        "logger.h",
+    ],
     external_deps = ["abseil_synchronization"],
     deps = [
         ":base_logger_lib",
         ":lock_guard_lib",
         ":macros",
-        ":non_copyable",
-    ] + select({
-        "//bazel:android_logger": ["logger_impl_lib_android"],
-        "//conditions:default": ["logger_impl_lib_standard"],
-    }),
-)
-
-envoy_cc_library(
-    name = "fancy_logger_lib",
-    srcs = ["fancy_logger.cc"],
-    hdrs = ["fancy_logger.h"],
-    external_deps = ["abseil_synchronization"],
-    deps = [
-        ":base_logger_lib",
-        ":lock_guard_lib",
-        ":macros",
-        ":minimal_logger_lib",
         ":non_copyable",
     ] + select({
         "//bazel:android_logger": ["logger_impl_lib_android"],
