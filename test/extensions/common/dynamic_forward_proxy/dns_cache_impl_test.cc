@@ -757,7 +757,7 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
     BackOffStrategyPtr strategy = Config::Utility::prepareDnsRefreshStrategy<
         envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig>(dns_cache_config,
                                                                               5000, random);
-    EXPECT_NE(nullptr, dynamic_cast<JitteredBackOffStrategy*>(strategy.get()));
+    EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
   }
 
   {

@@ -38,14 +38,14 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
                                      const Upstream::ClusterInfo& cluster,
                                      const VirtualCluster* vcluster, Runtime::Loader& runtime,
                                      Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                                     Upstream::ResourcePriority priority) {
+                                     TimeSource& time_source, Upstream::ResourcePriority priority) {
   RetryStatePtr ret;
 
   // We short circuit here and do not bother with an allocation if there is no chance we will retry.
   if (request_headers.EnvoyRetryOn() || request_headers.EnvoyRetryGrpcOn() ||
       route_policy.retryOn()) {
     ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, vcluster, runtime, random,
-                                 dispatcher, priority));
+                                 dispatcher, time_source, priority));
   }
 
   // Consume all retry related headers to avoid them being propagated to the upstream
@@ -66,14 +66,17 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
                                Http::RequestHeaderMap& request_headers,
                                const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
                                Runtime::Loader& runtime, Random::RandomGenerator& random,
-                               Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority)
+                               Event::Dispatcher& dispatcher, TimeSource& time_source,
+                               Upstream::ResourcePriority priority)
     : cluster_(cluster), vcluster_(vcluster), runtime_(runtime), random_(random),
-      dispatcher_(dispatcher), retry_on_(route_policy.retryOn()),
+      dispatcher_(dispatcher), time_source_(time_source), retry_on_(route_policy.retryOn()),
       retries_remaining_(route_policy.numRetries()), priority_(priority),
       retry_host_predicates_(route_policy.retryHostPredicates()),
       retry_priority_(route_policy.retryPriority()),
       retriable_status_codes_(route_policy.retriableStatusCodes()),
-      retriable_headers_(route_policy.retriableHeaders()) {
+      retriable_headers_(route_policy.retriableHeaders()),
+      reset_headers_(route_policy.resetHeaders()),
+      reset_max_interval_(route_policy.resetMaxInterval()) {
 
   std::chrono::milliseconds base_interval(
       runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25));
@@ -88,8 +91,8 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
     max_interval = *route_policy.maxInterval();
   }
 
-  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(base_interval.count(),
-                                                                max_interval.count(), random_);
+  backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
+      base_interval.count(), max_interval.count(), random_);
   host_selection_max_attempts_ = route_policy.hostSelectionMaxAttempts();
 
   // Merge in the headers.
@@ -156,8 +159,23 @@ void RetryStateImpl::enableBackoffTimer() {
     retry_timer_ = dispatcher_.createTimer([this]() -> void { callback_(); });
   }
 
-  // We use a fully jittered exponential backoff algorithm.
-  retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
+  if (ratelimited_backoff_strategy_ != nullptr) {
+    // If we have a backoff strategy based on rate limit feedback from the response we use it.
+    retry_timer_->enableTimer(
+        std::chrono::milliseconds(ratelimited_backoff_strategy_->nextBackOffMs()));
+
+    // The strategy is only valid for the response that sent the ratelimit reset header and cannot
+    // be reused.
+    ratelimited_backoff_strategy_.reset();
+
+    cluster_.stats().upstream_rq_retry_backoff_ratelimited_.inc();
+
+  } else {
+    // Otherwise we use a fully jittered exponential backoff algorithm.
+    retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
+
+    cluster_.stats().upstream_rq_retry_backoff_exponential_.inc();
+  }
 }
 
 std::pair<uint32_t, bool> RetryStateImpl::parseRetryOn(absl::string_view config) {
@@ -210,6 +228,18 @@ std::pair<uint32_t, bool> RetryStateImpl::parseRetryGrpcOn(absl::string_view ret
   }
 
   return {ret, all_fields_valid};
+}
+
+absl::optional<std::chrono::milliseconds>
+RetryStateImpl::parseResetInterval(const Http::ResponseHeaderMap& response_headers) const {
+  for (const auto& reset_header : reset_headers_) {
+    const auto interval = reset_header->parseInterval(time_source_, response_headers);
+    if (interval.has_value() && interval.value() <= reset_max_interval_) {
+      return interval;
+    }
+  }
+
+  return absl::nullopt;
 }
 
 void RetryStateImpl::resetRetry() {
@@ -273,7 +303,19 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
 
 RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
                                                DoRetryCallback callback) {
-  return shouldRetry(wouldRetryFromHeaders(response_headers), callback);
+  const bool would_retry = wouldRetryFromHeaders(response_headers);
+
+  // Yes, we will retry based on the headers - try to parse a rate limited reset interval from the
+  // response.
+  if (would_retry && !reset_headers_.empty()) {
+    const auto backoff_interval = parseResetInterval(response_headers);
+    if (backoff_interval.has_value()) {
+      ratelimited_backoff_strategy_ = std::make_unique<JitteredLowerBoundBackOffStrategy>(
+          backoff_interval.value().count(), random_);
+    }
+  }
+
+  return shouldRetry(would_retry, callback);
 }
 
 RetryStatus RetryStateImpl::shouldRetryReset(Http::StreamResetReason reset_reason,
