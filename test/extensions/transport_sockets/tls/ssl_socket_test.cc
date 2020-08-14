@@ -629,8 +629,8 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
       client_ssl_socket_factory.createTransportSocket(options.transportSocketOptions()), nullptr);
 
   if (!options.clientSession().empty()) {
-    const SslSocketInfo* ssl_socket =
-        dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
+    const SslHandshakerImpl* ssl_socket =
+        dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
     SSL* client_ssl_socket = ssl_socket->ssl();
     SSL_CTX* client_ssl_context = SSL_get_SSL_CTX(client_ssl_socket);
     SSL_SESSION* client_ssl_session =
@@ -672,8 +672,8 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
         EXPECT_EQ(options.expectedALPNProtocol(), client_connection->nextProtocol());
       }
       EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
-      const SslSocketInfo* ssl_socket =
-          dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
+      const SslHandshakerImpl* ssl_socket =
+          dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
       SSL* client_ssl_socket = ssl_socket->ssl();
       if (!options.expectedProtocolVersion().empty()) {
         // Assert twice to ensure a cached value is returned and still valid.
@@ -689,8 +689,8 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
       }
 
       absl::optional<std::string> server_ssl_requested_server_name;
-      const SslSocketInfo* server_ssl_socket =
-          dynamic_cast<const SslSocketInfo*>(server_connection->ssl().get());
+      const SslHandshakerImpl* server_ssl_socket =
+          dynamic_cast<const SslHandshakerImpl*>(server_connection->ssl().get());
       SSL* server_ssl = server_ssl_socket->ssl();
       auto requested_server_name = SSL_get_servername(server_ssl, TLSEXT_NAMETYPE_host_name);
       if (requested_server_name != nullptr) {
@@ -2565,8 +2565,8 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
 
   // Verify that server sent list with 2 acceptable client certificate CA names.
-  const SslSocketInfo* ssl_socket =
-      dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
+  const SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
   SSL_set_cert_cb(
       ssl_socket->ssl(),
       [](SSL* ssl, void*) -> int {
@@ -2681,8 +2681,8 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
-        const SslSocketInfo* ssl_socket =
-            dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
+        const SslHandshakerImpl* ssl_socket =
+            dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
         ssl_session = SSL_get1_session(ssl_socket->ssl());
         EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
         if (expected_lifetime_hint) {
@@ -2704,8 +2704,8 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
       socket2->localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
-  const SslSocketInfo* ssl_socket =
-      dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
+  const SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
   SSL_set_session(ssl_socket->ssl(), ssl_session);
   SSL_SESSION_free(ssl_session);
 
@@ -2811,8 +2811,8 @@ void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
             stream_info);
 
-        const SslSocketInfo* ssl_socket =
-            dynamic_cast<const SslSocketInfo*>(server_connection->ssl().get());
+        const SslHandshakerImpl* ssl_socket =
+            dynamic_cast<const SslHandshakerImpl*>(server_connection->ssl().get());
         SSL* server_ssl_socket = ssl_socket->ssl();
         SSL_CTX* server_ssl_context = SSL_get_SSL_CTX(server_ssl_socket);
         if (expect_support) {
@@ -3267,8 +3267,8 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
-        const SslSocketInfo* ssl_socket =
-            dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
+        const SslHandshakerImpl* ssl_socket =
+            dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
         ssl_session = SSL_get1_session(ssl_socket->ssl());
         EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
         server_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -3286,8 +3286,8 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
       socket2->localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
-  const SslSocketInfo* ssl_socket =
-      dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
+  const SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
   SSL_set_session(ssl_socket->ssl(), ssl_session);
   SSL_SESSION_free(ssl_session);
 
