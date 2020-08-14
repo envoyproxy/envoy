@@ -26,8 +26,7 @@ def _fail_missing_attribute(attr, key):
 # Verification is here so that bazel/repository_locations.bzl can be loaded into other tools written in Python,
 # and as such needs to be free of bazel specific constructs.
 def _repository_locations():
-    locations = dict(DEPENDENCY_REPOSITORIES)
-    for key, location in locations.items():
+    for key, location in DEPENDENCY_REPOSITORIES.items():
         if "sha256" not in location or len(location["sha256"]) == 0:
             _fail_missing_attribute("sha256", key)
 
@@ -50,7 +49,7 @@ def _repository_locations():
             if category not in USE_CATEGORIES:
                 fail("Unknown use_category value '" + category + "' for dependecy " + key)
 
-    return locations
+    return DEPENDENCY_REPOSITORIES
 
 REPOSITORY_LOCATIONS = _repository_locations()
 

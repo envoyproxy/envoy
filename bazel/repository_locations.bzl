@@ -40,55 +40,60 @@ USE_CATEGORIES = [
 # Components with these use categories are not required to specify the 'cpe' annotation.
 USE_CATEGORIES_WITH_CPE_OPTIONAL = ["build", "test", "other"]
 
-BAZEL_COMPDB_VERSION = "0.4.5"
-BAZEL_GAZELLE_VERSION = "0.19.1"
-BAZEL_TOOLCHAINS_VERSION = "3.4.0"
-
-DEPENDENCY_REPOSITORIES = dict(
+DEPENDENCY_REPOSITORIES_SPEC = dict(
     bazel_compdb = dict(
         project_name = "bazil-compilation-database",
         project_url = "https://github.com/grailbio/bazel-compilation-database",
-        version = BAZEL_COMPDB_VERSION,
+        version = "0.4.5",
         sha256 = "bcecfd622c4ef272fd4ba42726a52e140b961c4eac23025f18b346c968a8cfb4",
-        strip_prefix = "bazel-compilation-database-" + BAZEL_COMPDB_VERSION,
-        urls = ["https://github.com/grailbio/bazel-compilation-database/archive/" + BAZEL_COMPDB_VERSION + ".tar.gz"],
+        strip_prefix = "bazel-compilation-database-{version}",
+        urls = ["https://github.com/grailbio/bazel-compilation-database/archive/{version}.tar.gz"],
         use_category = ["build"],
     ),
     bazel_gazelle = dict(
         project_name = "Gazelle",
         project_url = "https://github.com/bazelbuild/bazel-gazelle",
-        version = BAZEL_GAZELLE_VERSION,
+        version = "0.19.1",
         sha256 = "86c6d481b3f7aedc1d60c1c211c6f76da282ae197c3b3160f54bd3a8f847896f",
-        urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.19.1/bazel-gazelle-v" + BAZEL_GAZELLE_VERSION + ".tar.gz"],
+        urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v{version}/bazel-gazelle-v{version}.tar.gz"],
         use_category = ["build"],
     ),
     bazel_toolchains = dict(
         project_name = "bazel-toolchains",
         project_url = "https://github.com/bazelbuild/bazel-toolchains",
-        version = BAZEL_TOOLCHAINS_VERSION,
+        version = "3.4.0",
         sha256 = "882fecfc88d3dc528f5c5681d95d730e213e39099abff2e637688a91a9619395",
-        strip_prefix = "bazel-toolchains-" + BAZEL_TOOLCHAINS_VERSION,
+        strip_prefix = "bazel-toolchains-{version}",
         urls = [
-            "https://github.com/bazelbuild/bazel-toolchains/releases/download/" + BAZEL_TOOLCHAINS_VERSION + "/bazel-toolchains-3.4.0.tar.gz",
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/" + BAZEL_TOOLCHAINS_VERSION + ".tar.gz",
+            "https://github.com/bazelbuild/bazel-toolchains/releases/download/{version}/bazel-toolchains-{version}.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/{version}.tar.gz",
         ],
         use_category = ["build"],
     ),
     build_bazel_rules_apple = dict(
+        project_name = "Apple Rules for Bazel",
+        project_url = "https://github.com/bazelbuild/rules_apple",
+        version = "0.19.0",
         sha256 = "7a7afdd4869bb201c9352eed2daf37294d42b093579b70423490c1b4d4f6ce42",
-        urls = ["https://github.com/bazelbuild/rules_apple/releases/download/0.19.0/rules_apple.0.19.0.tar.gz"],
+        urls = ["https://github.com/bazelbuild/rules_apple/releases/download/{version}/rules_apple.{version}.tar.gz"],
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
+        project_name = "envoy-build-tools",
+        project_url = "https://github.com/envoyproxy/envoy-build-tools",
+        version = "1d6573e60207efaae6436b25ecc594360294f63a",
         sha256 = "88e58fdb42021e64a0b35ae3554a82e92f5c37f630a4dab08a132fc77f8db4b7",
-        strip_prefix = "envoy-build-tools-1d6573e60207efaae6436b25ecc594360294f63a",
+        strip_prefix = "envoy-build-tools-{version}",
         # 2020-07-18
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/1d6573e60207efaae6436b25ecc594360294f63a.tar.gz"],
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/{version}.tar.gz"],
         use_category = ["build"],
     ),
     boringssl = dict(
+        project_name = "BoringSSL",
+        project_url = "https://github.com/google/boringssl",
+        version = "a0899df79b3a63e606448c72d63a090d86bdb75b",
         sha256 = "07f1524766b9ed1543674b48e7fce7e3569b6e2b6c0c43ec124dedee9b60f641",
-        strip_prefix = "boringssl-a0899df79b3a63e606448c72d63a090d86bdb75b",
+        strip_prefix = "boringssl-{version}",
         # To update BoringSSL, which tracks Chromium releases:
         # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/stable release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
@@ -96,29 +101,37 @@ DEPENDENCY_REPOSITORIES = dict(
         #
         # chromium-84.0.4147.45(beta)
         # 2020-05-14
-        urls = ["https://github.com/google/boringssl/archive/a0899df79b3a63e606448c72d63a090d86bdb75b.tar.gz"],
+        urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
     boringssl_fips = dict(
+        project_name = "BoringSSL (FIPS)",
+        project_url = "https://boringssl.googlesource.com/boringssl/+/master/crypto/fipsmodule/FIPS.md",
+        version = "fips-20190808",
         sha256 = "3b5fdf23274d4179c2077b5e8fa625d9debd7a390aac1d165b7e47234f648bb8",
-        # fips-20190808
         urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-fips/boringssl-ae223d6138807a13006342edfeef32e813246b39.tar.xz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
     com_google_absl = dict(
+        project_name = "Abseil",
+        project_url = "https://abseil.io/",
+        version = "ce4bc927755fdf0ed03d679d9c7fa041175bb3cb",
         sha256 = "573baccd67aa591b8c7209bfb0c77e0d15633d77ced39d1ccbb1232828f7f7d9",
-        strip_prefix = "abseil-cpp-ce4bc927755fdf0ed03d679d9c7fa041175bb3cb",
+        strip_prefix = "abseil-cpp-{version}",
         # 2020-08-08
-        urls = ["https://github.com/abseil/abseil-cpp/archive/ce4bc927755fdf0ed03d679d9c7fa041175bb3cb.tar.gz"],
+        urls = ["https://github.com/abseil/abseil-cpp/archive/{version}.tar.gz"],
         use_category = ["dataplane", "controlplane"],
         cpe = "N/A",
     ),
     com_github_apache_thrift = dict(
+        project_name = "Apache Thrift",
+        project_url = "http://thrift.apache.org/",
+        version = "0.11.0",
         sha256 = "7d59ac4fdcb2c58037ebd4a9da5f9a49e3e034bf75b3f26d9fe48ba3d8806e6b",
-        strip_prefix = "thrift-0.11.0",
-        urls = ["https://files.pythonhosted.org/packages/c6/b4/510617906f8e0c5660e7d96fbc5585113f83ad547a3989b80297ac72a74c/thrift-0.11.0.tar.gz"],
+        strip_prefix = "thrift-{version}",
+        urls = ["https://files.pythonhosted.org/packages/c6/b4/510617906f8e0c5660e7d96fbc5585113f83ad547a3989b80297ac72a74c/thrift-{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:apache:thrift:*",
     ),
@@ -541,3 +554,20 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
 )
+
+# Interpolate {version} in the above dependency specs. This code should be capable of running in both Python
+# and Starlark.
+def _dependency_repositories():
+    locations = {}
+    for key, location in DEPENDENCY_REPOSITORIES_SPEC.items():
+        mutable_location = dict(location)
+        locations[key] = mutable_location
+
+        # Fixup with version information.
+        if "version" in location:
+            if "strip_prefix" in location:
+                mutable_location["strip_prefix"] = location["strip_prefix"].format(version = location["version"])
+            mutable_location["urls"] = [url.format(version = location["version"]) for url in location["urls"]]
+    return locations
+
+DEPENDENCY_REPOSITORIES = _dependency_repositories()
