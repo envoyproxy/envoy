@@ -263,10 +263,9 @@ TEST_F(LookupRequestTest, PragmaNoFallback) {
 }
 
 TEST_F(LookupRequestTest, SingleSatisfiableRange) {
-  // add method (GET) and range to headers
-  request_headers_.addReference(Http::Headers::get().Method, Http::Headers::get().MethodValues.Get);
+  // add range info to headers
   request_headers_.addReference(Http::Headers::get().Range, "bytes=1-99");
-  const LookupRequest lookup_request(request_headers_, current_time_);
+  const LookupRequest lookup_request(request_headers_, currentTime());
 
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())},
@@ -296,15 +295,13 @@ TEST_F(LookupRequestTest, MultipleSatisfiableRanges) {
   // range. Thus, multiple ranges are ignored, and a usual "::Ok" should be expected. If multi-part
   // responses are implemented (and the parsing limit is changed), this test should be adjusted.
 
-  // add method (GET) and range to headers
-  request_headers_.addCopy(Http::Headers::get().Method.get(),
-                           Http::Headers::get().MethodValues.Get);
+  // add range info to headers
   request_headers_.addCopy(Http::Headers::get().Range.get(), "bytes=1-99,3-,-3");
 
-  const LookupRequest lookup_request(request_headers_, current_time_);
+  const LookupRequest lookup_request(request_headers_, currentTime());
 
   const Http::TestResponseHeaderMapImpl response_headers(
-      {{"date", formatter_.fromTime(current_time_)},
+      {{"date", formatter_.fromTime(currentTime())},
        {"cache-control", "public, max-age=3600"},
        {"content-length", "4"}});
   const uint64_t content_length = 4;
@@ -323,8 +320,7 @@ TEST_F(LookupRequestTest, MultipleSatisfiableRanges) {
 }
 
 TEST_F(LookupRequestTest, NotSatisfiableRange) {
-  // add method (GET) and range headers
-  request_headers_.addReference(Http::Headers::get().Method, Http::Headers::get().MethodValues.Get);
+  // add range info to headers
   request_headers_.addReference(Http::Headers::get().Range, "bytes=100-");
 
   const LookupRequest lookup_request(request_headers_, currentTime());
