@@ -106,6 +106,18 @@ idle_timeout: 1s
   EXPECT_EQ(std::chrono::seconds(1), config_obj.sharedConfig()->idleTimeout().value());
 }
 
+TEST(ConfigTest, MaxConnectionDuration) {
+  const std::string yaml = R"EOF(
+stat_prefix: name
+cluster: foo
+max_connection_duration: 10s
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
+  EXPECT_EQ(std::chrono::seconds(10), config_obj.maxConnectionDuration().value());
+}
+
 TEST(ConfigTest, NoRouteConfig) {
   const std::string yaml = R"EOF(
   stat_prefix: name
