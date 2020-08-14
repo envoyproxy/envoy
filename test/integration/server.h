@@ -425,7 +425,7 @@ public:
   waitForCounterEq(const std::string& name, uint64_t value,
                    std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
     AssertionResult res =
-        TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout);
+        TestUtility::waitForCounterEq(statStore(), name, value, time_system_, timeout);
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
     ASSERT_TRUE(res);
 #else

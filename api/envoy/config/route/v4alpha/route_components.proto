@@ -1028,9 +1028,14 @@ message RouteAction {
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message RetryPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.RetryPolicy";
+
+  enum ResetHeaderFormat {
+    SECONDS = 0;
+    UNIX_TIMESTAMP = 1;
+  }
 
   message RetryPriority {
     option (udpa.annotations.versioning).previous_message_type =
@@ -1082,6 +1087,75 @@ message RetryPolicy {
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {}}];
   }
 
+  message ResetHeader {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.route.v3.RetryPolicy.ResetHeader";
+
+    string name = 1
+        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+    ResetHeaderFormat format = 2 [(validate.rules).enum = {defined_only: true}];
+  }
+
+  // A retry back-off strategy that applies when the upstream server rate limits
+  // the request.
+  //
+  // Given this configuration:
+  //
+  // .. code-block:: yaml
+  //
+  //   rate_limited_retry_back_off:
+  //     reset_headers:
+  //     - name: Retry-After
+  //       format: SECONDS
+  //     - name: X-RateLimit-Reset
+  //       format: UNIX_TIMESTAMP
+  //     max_interval: "300s"
+  //
+  // The following algorithm will apply:
+  //
+  //  1. If the response contains the header ``Retry-After`` its value must be on
+  //     the form ``120`` (an integer that represents the number of seconds to
+  //     wait before retrying). If so, this value is used as the back-off interval.
+  //  2. Otherwise, if the response contains the header ``X-RateLimit-Reset`` its
+  //     value must be on the form ``1595320702`` (an integer that represents the
+  //     point in time at which to retry, as a Unix timestamp in seconds). If so,
+  //     the current time is subtracted from this value and the result is used as
+  //     the back-off interval.
+  //  3. Otherwise, Envoy will use the default
+  //     :ref:`exponential back-off <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_back_off>`
+  //     strategy.
+  //
+  // No matter which format is used, if the resulting back-off interval exceeds
+  // ``max_interval`` it is discarded and the next header in ``reset_headers``
+  // is tried. If a request timeout is configured for the route it will further
+  // limit how long the request will be allowed to run.
+  //
+  // To prevent many clients retrying at the same point in time jitter is added
+  // to the back-off interval, so the resulting interval is decided by taking:
+  // ``random(interval, interval * 1.5)``.
+  //
+  // .. attention::
+  //
+  //   Configuring ``rate_limited_retry_back_off`` will not by itself cause a request
+  //   to be retried. You will still need to configure the right retry policy to match
+  //   the responses from the upstream server.
+  message RateLimitedRetryBackOff {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.route.v3.RetryPolicy.RateLimitedRetryBackOff";
+
+    // Specifies the reset headers (like ``Retry-After`` or ``X-RateLimit-Reset``)
+    // to match against the response. Headers are tried in order, and matched case
+    // insensitive. The first header to be parsed successfully is used. If no headers
+    // match the default exponential back-off is used instead.
+    repeated ResetHeader reset_headers = 1 [(validate.rules).repeated = {min_items: 1}];
+
+    // Specifies the maximum back off interval that Envoy will allow. If a reset
+    // header contains an interval longer than this then it will be discarded and
+    // the next header will be tried. Defaults to 300 seconds.
+    google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {}}];
+  }
+
   // Specifies the conditions under which retry takes place. These are the same
   // conditions documented for :ref:`config_http_filters_router_x-envoy-retry-on` and
   // :ref:`config_http_filters_router_x-envoy-retry-grpc-on`.
@@ -1124,12 +1198,21 @@ message RetryPolicy {
   // HTTP status codes that should trigger a retry in addition to those specified by retry_on.
   repeated uint32 retriable_status_codes = 7;
 
-  // Specifies parameters that control retry back off. This parameter is optional, in which case the
+  // Specifies parameters that control exponential retry back off. This parameter is optional, in which case the
   // default base interval is 25 milliseconds or, if set, the current value of the
   // `upstream.base_retry_backoff_ms` runtime parameter. The default maximum interval is 10 times
   // the base interval. The documentation for :ref:`config_http_filters_router_x-envoy-max-retries`
   // describes Envoy's back-off algorithm.
   RetryBackOff retry_back_off = 8;
+
+  // Specifies parameters that control a retry back-off strategy that is used
+  // when the request is rate limited by the upstream server. The server may
+  // return a response header like ``Retry-After`` or ``X-RateLimit-Reset`` to
+  // provide feedback to the client on how long to wait before retrying. If
+  // configured, this back-off strategy will be used instead of the
+  // default exponential back off strategy (configured using `retry_back_off`)
+  // whenever a response includes the matching headers.
+  RateLimitedRetryBackOff rate_limited_retry_back_off = 11;
 
   // HTTP response headers that trigger a retry if present in the response. A retry will be
   // triggered if any of the header matches match the upstream response headers.
