@@ -32,9 +32,9 @@ class JvmCallbackContext {
   /**
    * Invokes onHeaders callback using headers passed via passHeaders.
    *
-   * @param length,    the total number of headers included in this header block.
-   * @param endStream, whether this header block is the final remote frame.
-   * @return Object,   not used for response callbacks.
+   * @param headerCount, the total number of headers included in this header block.
+   * @param endStream,   whether this header block is the final remote frame.
+   * @return Object,     not used for response callbacks.
    */
   public Object onResponseHeaders(long headerCount, boolean endStream) {
     assert bridgeUtility.validateCount(headerCount);
@@ -50,10 +50,10 @@ class JvmCallbackContext {
   /**
    * Invokes onTrailers callback using trailers passed via passHeaders.
    *
-   * @param length, the total number of trailers included in this header block.
-   * @return Object,not used for response callbacks.
+   * @param trailerCount, the total number of trailers included in this header block.
+   * @return Object,      not used for response callbacks.
    */
-  public Object onResponseTrailers(long trailerCount, boolean endStream) {
+  public Object onResponseTrailers(long trailerCount) {
     assert bridgeUtility.validateCount(trailerCount);
     final Map trailers = bridgeUtility.retrieveHeaders();
 
