@@ -98,8 +98,7 @@ using IntegrationStreamDecoderPtr = std::unique_ptr<IntegrationStreamDecoder>;
  */
 class IntegrationTcpClient {
 public:
-  IntegrationTcpClient(Event::Dispatcher& dispatcher, Event::TestTimeSystem& time_system,
-                       MockBufferFactory& factory, uint32_t port,
+  IntegrationTcpClient(Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
                        Network::Address::IpVersion version, bool enable_half_close,
                        const Network::ConnectionSocket::OptionsSharedPtr& options);
 
@@ -131,7 +130,6 @@ private:
     IntegrationTcpClient& parent_;
   };
 
-  Event::TestTimeSystem& time_system_;
   std::shared_ptr<WaitForPayloadReader> payload_reader_;
   std::shared_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr connection_;
@@ -191,7 +189,7 @@ public:
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
   void setDeterministic() { deterministic_ = true; }
-  void setLegacyCodecs() { config_helper_.setLegacyCodecs(); }
+  void setNewCodecs() { config_helper_.setNewCodecs(); }
 
   FakeHttpConnection::Type upstreamProtocol() const { return upstream_protocol_; }
 

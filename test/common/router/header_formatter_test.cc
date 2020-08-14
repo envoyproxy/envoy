@@ -615,6 +615,21 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMiss
   testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "");
 }
 
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithRequestMetadata) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  envoy::config::core::v3::Metadata metadata;
+  ProtobufWkt::Struct struct_obj;
+
+  auto& fields_map = *struct_obj.mutable_fields();
+  fields_map["foo"] = ValueUtil::stringValue("bar");
+  (*metadata.mutable_filter_metadata())["envoy.lb"] = struct_obj;
+
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+  EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+
+  testFormatting(stream_info, "DYNAMIC_METADATA([\"envoy.lb\", \"foo\"])", "bar");
+}
+
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
   Envoy::StreamInfo::FilterStateSharedPtr filter_state(
       std::make_shared<Envoy::StreamInfo::FilterStateImpl>(

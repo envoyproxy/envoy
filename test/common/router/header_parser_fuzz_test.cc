@@ -15,8 +15,8 @@ DEFINE_PROTO_FUZZER(const test::common::router::TestCase& input) {
     Router::HeaderParserPtr parser =
         Router::HeaderParser::configure(input.headers_to_add(), input.headers_to_remove());
     Http::TestRequestHeaderMapImpl header_map;
-    TestStreamInfo test_stream_info = fromStreamInfo(input.stream_info());
-    parser->evaluateHeaders(header_map, test_stream_info);
+    std::unique_ptr<TestStreamInfo> test_stream_info = fromStreamInfo(input.stream_info());
+    parser->evaluateHeaders(header_map, *test_stream_info);
     ENVOY_LOG_MISC(trace, "Success");
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
