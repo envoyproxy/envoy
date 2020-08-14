@@ -13,6 +13,8 @@ mock_template:
   dns_failure_refresh_rate:
     base_interval: {{ dns_failure_refresh_rate_seconds_base }}s
     max_interval: {{ dns_failure_refresh_rate_seconds_max }}s
+  platform_filter_chain:
+{{ platform_filter_chain }}
   stats_flush_interval: {{ stats_flush_interval_seconds }}s
   os: {{ device_os }}
   app_version: {{ app_version }}
@@ -20,13 +22,18 @@ mock_template:
   virtual_clusters: {{ virtual_clusters }}
 """
 
+private const val FILTER_CONFIG =
+  """
+    - platform_filter_name: {{ platform_filter_name }}
+"""
+
 class EnvoyConfigurationTest {
 
   @Test
   fun `resolving with default configuration resolves with values`() {
-    val envoyConfiguration = EnvoyConfiguration("stats.foo.com", 123, 234, 345, 456, 567, "v1.2.3", "com.mydomain.myapp", "[test]")
+    val envoyConfiguration = EnvoyConfiguration("stats.foo.com", 123, 234, 345, 456, emptyList(), 567, "v1.2.3", "com.mydomain.myapp", "[test]")
 
-    val resolvedTemplate = envoyConfiguration.resolveTemplate(TEST_CONFIG)
+    val resolvedTemplate = envoyConfiguration.resolveTemplate(TEST_CONFIG, FILTER_CONFIG)
     assertThat(resolvedTemplate).contains("stats_domain: stats.foo.com")
     assertThat(resolvedTemplate).contains("connect_timeout: 123s")
     assertThat(resolvedTemplate).contains("dns_refresh_rate: 234s")
@@ -41,8 +48,8 @@ class EnvoyConfigurationTest {
 
   @Test(expected = EnvoyConfiguration.ConfigurationException::class)
   fun `resolve templates with invalid templates will throw on build`() {
-    val envoyConfiguration = EnvoyConfiguration("stats.foo.com", 123, 234, 345, 456, 567, "v1.2.3", "com.mydomain.myapp", "[test]")
+    val envoyConfiguration = EnvoyConfiguration("stats.foo.com", 123, 234, 345, 456, emptyList(), 567, "v1.2.3", "com.mydomain.myapp", "[test]")
 
-    envoyConfiguration.resolveTemplate("{{ }}")
+    envoyConfiguration.resolveTemplate("{{ }}", "")
   }
 }

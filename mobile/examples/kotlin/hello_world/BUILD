@@ -18,6 +18,7 @@ android_binary(
 kt_android_library(
     name = "hello_envoy_kt_lib",
     srcs = [
+        "DemoFilter.kt",
         "MainActivity.kt",
     ],
     custom_package = "io.envoyproxy.envoymobile.helloenvoykotlin",

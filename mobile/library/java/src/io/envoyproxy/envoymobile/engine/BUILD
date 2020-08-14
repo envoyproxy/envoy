@@ -30,6 +30,8 @@ java_library(
         "JniLibrary.java",
         "JvmBridgeUtility.java",
         "JvmCallbackContext.java",
+        "JvmFilterContext.java",
+        "JvmFilterFactoryContext.java",
     ],
     visibility = ["//visibility:public"],
     deps = [

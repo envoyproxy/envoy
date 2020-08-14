@@ -11,6 +11,18 @@
     native <methods>;
 }
 
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmBridgeUtility {
+   <methods>;
+}
+
 -keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmCallbackContext {
+   <methods>;
+}
+
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmFilterContext {
+   <methods>;
+}
+
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmFilterFactoryContext {
    <methods>;
 }
