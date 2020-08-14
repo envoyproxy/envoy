@@ -327,7 +327,8 @@ private:
   /**
    * Helper methods for the /config_dump url handler to add unready targets config of listeners.
    */
-  ProtobufTypes::MessagePtr dumpListenerUnreadyTargetsConfigs() const;
+  void dumpListenerUnreadyTargetsConfigs(
+      envoy::admin::v3::UnreadyTargetsConfigDumpList& config_dump_list) const;
 
   /**
    * URL handlers.

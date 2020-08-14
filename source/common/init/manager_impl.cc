@@ -69,12 +69,10 @@ const absl::flat_hash_map<std::string, uint32_t>& ManagerImpl::unreadyTargets() 
 
 void ManagerImpl::dumpUnreadyTargetsConfig(
     envoy::admin::v3::UnreadyTargetsConfigDumpList& config_dump_list) {
-  auto message = config_dump_list.mutable_unready_targets_configs()->Add();
-
-  message->set_name(absl::StrCat("init_manager_", name_));
-
+  auto& message = *config_dump_list.mutable_unready_targets_configs()->Add();
+  message.set_name(absl::StrCat("init_manager_", name_));
   for (const auto& [target_name, count] : target_names_count_) {
-    message->add_target_names(absl::StrCat("target_", target_name));
+    message.add_target_names(absl::StrCat("target_", target_name));
   }
 }
 

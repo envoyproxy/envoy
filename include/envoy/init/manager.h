@@ -82,6 +82,9 @@ struct Manager {
    */
   virtual const absl::flat_hash_map<std::string, uint32_t>& unreadyTargets() const PURE;
 
+  /**
+   * Add unready targets information into the config dump.
+   */
   virtual void
   dumpUnreadyTargetsConfig(envoy::admin::v3::UnreadyTargetsConfigDumpList& config_dump_list) PURE;
 };

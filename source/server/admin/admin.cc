@@ -633,20 +633,25 @@ ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
 
 ProtobufTypes::MessagePtr
 AdminImpl::dumpUnreadyTargetsConfigs(const absl::optional<std::string>& mask) const {
-  if (mask.has_value()) {
-    const std::string& mask_string = mask.value();
-    if (mask_string == "listener") {
-      return dumpListenerUnreadyTargetsConfigs();
-    }
-    // More options for unready targets config dump.
-  }
-  return std::make_unique<envoy::admin::v3::UnreadyTargetsConfigDumpList>();
-}
-
-ProtobufTypes::MessagePtr AdminImpl::dumpListenerUnreadyTargetsConfigs() const {
   auto unready_targets_config_dump_list =
       std::make_unique<envoy::admin::v3::UnreadyTargetsConfigDumpList>();
 
+  if (mask.has_value()) {
+    const std::string& mask_string = mask.value();
+    if (mask_string == "listener") {
+      dumpListenerUnreadyTargetsConfigs(*unready_targets_config_dump_list);
+    }
+    // More options for unready targets config dump.
+  } else {
+    // Dump all possible information of unready targets.
+    dumpListenerUnreadyTargetsConfigs(*unready_targets_config_dump_list);
+    // More unready targets to add into config dump.
+  }
+  return unready_targets_config_dump_list;
+}
+
+void AdminImpl::dumpListenerUnreadyTargetsConfigs(
+    envoy::admin::v3::UnreadyTargetsConfigDumpList& unready_targets_config_dump_list) const {
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
   if (server_.listenerManager().isWorkerStarted()) {
     listeners = server_.listenerManager().listeners(ListenerManager::WARMING);
@@ -656,9 +661,8 @@ ProtobufTypes::MessagePtr AdminImpl::dumpListenerUnreadyTargetsConfigs() const {
 
   for (const auto& listener_config : listeners) {
     auto& listener = dynamic_cast<ListenerImpl&>(listener_config.get());
-    listener.initManager().dumpUnreadyTargetsConfig(*unready_targets_config_dump_list);
+    listener.initManager().dumpUnreadyTargetsConfig(unready_targets_config_dump_list);
   }
-  return unready_targets_config_dump_list;
 }
 
 Http::Code AdminImpl::handlerConfigDump(absl::string_view url,

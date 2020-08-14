@@ -236,6 +236,9 @@ public:
    */
   virtual ApiListenerOptRef apiListener() PURE;
 
+  /*
+   * @return TRUE if the worker has started or FALSE if not.
+   */
   virtual bool isWorkerStarted() PURE;
 };
 
