@@ -24,7 +24,7 @@ def kotlin_dependencies():
             "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.3.11",
             "androidx.recyclerview:recyclerview:1.1.0",
             # Test artifacts
-            "org.assertj:assertj-core:3.9.0",
+            "org.assertj:assertj-core:3.12.0",
             "junit:junit:4.12",
             "org.mockito:mockito-inline:2.28.2",
             "org.mockito:mockito-core:2.28.2",
