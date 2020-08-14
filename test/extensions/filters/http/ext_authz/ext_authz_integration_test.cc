@@ -475,8 +475,10 @@ public:
         {"x-append-bat", "append-foo"}, {"x-append-bat", "append-bar"}};
     EXPECT_THAT(request_nonexisted_headers, Http::IsSubsetOfHeaders(upstream_request_->headers()));
 
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
     response_->waitForEndStream();
     EXPECT_TRUE(response_->complete());
+    EXPECT_EQ("200", response_->headers().getStatusValue());
 
     cleanup();
   }
@@ -492,7 +494,7 @@ public:
     server_uri:
       uri: "ext_authz:9000"
       cluster: "ext_authz"
-      timeout: 0.25s
+      timeout: 300s
 
     authorization_request:
       allowed_headers:

@@ -25,6 +25,9 @@ public:
   void setGrpcService(envoy::config::core::v3::GrpcService& grpc_service,
                       const std::string& cluster_name,
                       Network::Address::InstanceConstSharedPtr address) {
+    // Set a 5 minute timeout to avoid flakes. If this causes a real test timeout the test is
+    // broken and/or should be using simulated time.
+    grpc_service.mutable_timeout()->CopyFrom(Protobuf::util::TimeUtil::SecondsToDuration(300));
     switch (clientType()) {
     case ClientType::EnvoyGrpc:
       grpc_service.mutable_envoy_grpc()->set_cluster_name(cluster_name);
