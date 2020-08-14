@@ -38,3 +38,9 @@ java_library(
         "//library/java/src/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
     ],
 )
+
+filegroup(
+    name = "envoy_base_engine_lib_srcs",
+    srcs = ["JvmBridgeUtility.java"],
+    visibility = ["//visibility:public"],
+)
