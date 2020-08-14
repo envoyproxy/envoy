@@ -13,6 +13,10 @@
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 
+#ifndef HEADER_MAP_SIZE_THRESHOLD
+#define HEADER_MAP_SIZE_THRESHOLD 0
+#endif // !HEADER_MAP_SIZE_THRESHOLD
+
 namespace Envoy {
 namespace Http {
 
@@ -114,6 +118,7 @@ protected:
     HeaderString value_;
     std::list<HeaderEntryImpl>::iterator entry_;
   };
+  using HeaderNode = std::list<HeaderEntryImpl>::iterator;
 
   /**
    * This is the static lookup table that is used to determine whether a header is one of the O(1)
@@ -170,6 +175,9 @@ protected:
   /**
    * List of HeaderEntryImpl that keeps the pseudo headers (key starting with ':') in the front
    * of the list (as required by nghttp2) and otherwise maintains insertion order.
+   * When the list size is greater or equal to HEADER_MAP_SIZE_THRESHOLD, all headers are added
+   * to a map, to allow fast access given a header key. Once the map is initialized, it will be
+   * used even if the number of headers decreases below HEADER_MAP_SIZE_THRESHOLD
    *
    * Note: the internal iterators held in fields make this unsafe to copy and move, since the
    * reference to end() is not preserved across a move (see Notes in
@@ -180,42 +188,68 @@ protected:
    */
   class HeaderList : NonCopyable {
   public:
+    using HeaderNodeVector = absl::InlinedVector<HeaderNode, 1>;
+    using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderNodeVector>;
+
     HeaderList() : pseudo_headers_end_(headers_.end()) {}
 
     template <class Key> bool isPseudoHeader(const Key& key) {
       return !key.getStringView().empty() && key.getStringView()[0] == ':';
     }
 
-    template <class Key, class... Value>
-    std::list<HeaderEntryImpl>::iterator insert(Key&& key, Value&&... value) {
+    template <class Key, class... Value> HeaderNode insert(Key&& key, Value&&... value) {
       const bool is_pseudo_header = isPseudoHeader(key);
-      std::list<HeaderEntryImpl>::iterator i =
-          headers_.emplace(is_pseudo_header ? pseudo_headers_end_ : headers_.end(),
-                           std::forward<Key>(key), std::forward<Value>(value)...);
+      HeaderNode i = headers_.emplace(is_pseudo_header ? pseudo_headers_end_ : headers_.end(),
+                                      std::forward<Key>(key), std::forward<Value>(value)...);
+      if (!lazy_map_.empty()) {
+        lazy_map_[i->key().getStringView()].push_back(i);
+      }
       if (!is_pseudo_header && pseudo_headers_end_ == headers_.end()) {
         pseudo_headers_end_ = i;
       }
       return i;
     }
 
-    std::list<HeaderEntryImpl>::iterator erase(std::list<HeaderEntryImpl>::iterator i) {
+    HeaderNode erase(HeaderNode i, bool remove_from_map) {
       if (pseudo_headers_end_ == i) {
         pseudo_headers_end_++;
+      }
+      if (remove_from_map) {
+        lazy_map_.erase(i->key().getStringView());
       }
       return headers_.erase(i);
     }
 
     template <class UnaryPredicate> void remove_if(UnaryPredicate p) {
+      // Lazy map isn't used, remove items from the list directly
       headers_.remove_if([&](const HeaderEntryImpl& entry) {
         const bool to_remove = p(entry);
         if (to_remove) {
           if (pseudo_headers_end_ == entry.entry_) {
             pseudo_headers_end_++;
           }
+          if (!lazy_map_.empty()) {
+            auto& values_vec = lazy_map_[entry.key().getStringView()];
+            if (values_vec.size() == 1) {
+              lazy_map_.erase(entry.key().getStringView());
+            } else {
+              values_vec.erase(std::remove_if(values_vec.begin(), values_vec.end(),
+                                              [&](HeaderNode it) { return it == entry.entry_; }),
+                               values_vec.end());
+            }
+          }
         }
         return to_remove;
       });
     }
+
+    // Creates and populates a map if the number of headers is at least HEADER_MAP_SIZE_THRESHOLD.
+    // Returns true if a map was created
+    bool maybeMakeMap();
+
+    // Removes a given key and its values from the HeaderList, and returns the number of bytes
+    // that were removed
+    size_t remove(absl::string_view key);
 
     std::list<HeaderEntryImpl>::iterator begin() { return headers_.begin(); }
     std::list<HeaderEntryImpl>::iterator end() { return headers_.end(); }
@@ -223,16 +257,20 @@ protected:
     std::list<HeaderEntryImpl>::const_iterator end() const { return headers_.end(); }
     std::list<HeaderEntryImpl>::const_reverse_iterator rbegin() const { return headers_.rbegin(); }
     std::list<HeaderEntryImpl>::const_reverse_iterator rend() const { return headers_.rend(); }
+    HeaderLazyMap::iterator mapFind(absl::string_view key) { return lazy_map_.find(key); }
+    HeaderLazyMap::iterator mapEnd() { return lazy_map_.end(); }
     size_t size() const { return headers_.size(); }
     bool empty() const { return headers_.empty(); }
     void clear() {
       headers_.clear();
       pseudo_headers_end_ = headers_.end();
+      lazy_map_.clear();
     }
 
   private:
     std::list<HeaderEntryImpl> headers_;
-    std::list<HeaderEntryImpl>::iterator pseudo_headers_end_;
+    HeaderNode pseudo_headers_end_;
+    HeaderLazyMap lazy_map_;
   };
 
   void insertByKey(HeaderString&& key, HeaderString&& value);
