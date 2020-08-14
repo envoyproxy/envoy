@@ -211,7 +211,7 @@ private:
 
 /**
  * PerFilterChainRebuilder is used to rebuild filter chain placeholder. It assigns an init manager
- * to dependencies and send callback to workers when the rebuilding is completed.
+ * to dependencies and send callback to workers when the rebuilding is completed or reaches timeout.
  */
 class PerFilterChainRebuilder : Logger::Loggable<Logger::Id::config> {
 public:
@@ -367,13 +367,17 @@ public:
   Event::Dispatcher& dispatcher() override;
   void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
                           const std::string& worker_name) override;
-  void
-  stopRebuildingFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain);
 
+  uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
   Init::Manager& initManager();
   envoy::config::core::v3::TrafficDirection direction() const override {
     return config().traffic_direction();
   }
+
+  // Stop rebuilding filter chain on timeout, make the filter chain back to a placeholder. Will be
+  // called by the rebuilder.
+  void
+  stopRebuildingFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain);
 
   void ensureSocketOptions() {
     if (!listen_socket_options_) {
@@ -437,6 +441,7 @@ private:
   const bool added_via_api_;
   const bool workers_started_;
   const uint64_t hash_;
+  const uint32_t tcp_backlog_size_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 
   // A target is added to Server's InitManager if workers_started_ is false.

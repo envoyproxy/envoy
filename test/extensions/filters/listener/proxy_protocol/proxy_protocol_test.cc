@@ -98,6 +98,7 @@ public:
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const&,
                           const std::string&) override {}
+  uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -1298,6 +1299,7 @@ public:
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const&,
                           const std::string&) override {}
+  uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {

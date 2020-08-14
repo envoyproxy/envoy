@@ -79,6 +79,7 @@ public:
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return empty_access_logs_;
   }
+  uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
 
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const&,

@@ -295,6 +295,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), added_via_api_(added_via_api),
       workers_started_(workers_started), hash_(hash),
+      tcp_backlog_size_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
@@ -372,6 +374,8 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(origin.listener_tag_), name_(name), added_via_api_(added_via_api),
       workers_started_(workers_started), hash_(hash),
+      tcp_backlog_size_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
@@ -550,16 +554,15 @@ void ListenerImpl::rebuildFilterChain(
     const envoy::config::listener::v3::FilterChain* const& filter_chain_message,
     const std::string& worker_name) {
   if (filter_chain_message == nullptr) {
-    ENVOY_LOG(debug, "Filter chain message is empty");
+    ENVOY_LOG(debug, "filter chain message is empty");
   }
-  // auto filter_chain_name = filter_chain_message->name();
 
   // Request rebuilding only on the arrival of the first filter_chain.
   bool on_first_request = false;
 
   // Find/create rebuilder for this filter chain message.
   if (filter_chain_rebuilder_map_.find(filter_chain_message) == filter_chain_rebuilder_map_.end()) {
-    ENVOY_LOG(debug, "Not found filter chain rebuilder, create rebuilder and start rebuilding.");
+    ENVOY_LOG(debug, "filter chain rebuilder not found, create a rebuilder and start rebuilding.");
     filter_chain_rebuilder_map_[filter_chain_message] =
         std::make_unique<PerFilterChainRebuilder>(*this, filter_chain_message);
     on_first_request = true;
@@ -586,7 +589,7 @@ void ListenerImpl::rebuildFilterChain(
     transport_factory_context.setInitManager(rebuilder->initManager());
     ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
     filter_chain_manager_.rebuildFilterChain(filter_chain_message, builder, filter_chain_manager_);
-    // After passing init manager to transport factory context, when should I start init.
+    // Start initializing after passing init manager to transport factory context.
     rebuilder->startRebuilding();
   }
 }

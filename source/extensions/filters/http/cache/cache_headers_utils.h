@@ -82,9 +82,6 @@ struct ResponseCacheControl {
   OptionalDuration max_age_;
 };
 
-std::ostream& operator<<(std::ostream& os, const OptionalDuration& duration);
-std::ostream& operator<<(std::ostream& os, const RequestCacheControl& request_cache_control);
-std::ostream& operator<<(std::ostream& os, const ResponseCacheControl& response_cache_control);
 bool operator==(const RequestCacheControl& lhs, const RequestCacheControl& rhs);
 bool operator==(const ResponseCacheControl& lhs, const ResponseCacheControl& rhs);
 

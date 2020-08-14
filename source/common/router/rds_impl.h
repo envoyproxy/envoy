@@ -226,6 +226,9 @@ private:
   ProtobufMessage::ValidationVisitor& validator_;
   ThreadLocal::SlotPtr tls_;
   std::list<UpdateOnDemandCallback> config_update_callbacks_;
+  // A flag used to determine if this instance of RdsRouteConfigProviderImpl hasn't been
+  // deallocated. Please also see a comment in requestVirtualHostsUpdate() method implementation.
+  std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
 
   friend class RouteConfigProviderManagerImpl;
 };

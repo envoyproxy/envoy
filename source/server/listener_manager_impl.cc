@@ -640,11 +640,30 @@ ListenerManagerImpl::getListenerByName(ListenerList& listeners, const std::strin
   return ret;
 }
 
-std::vector<std::reference_wrapper<Network::ListenerConfig>> ListenerManagerImpl::listeners() {
+std::vector<std::reference_wrapper<Network::ListenerConfig>>
+ListenerManagerImpl::listeners(ListenerState state) {
   std::vector<std::reference_wrapper<Network::ListenerConfig>> ret;
-  ret.reserve(active_listeners_.size());
-  for (const auto& listener : active_listeners_) {
-    ret.push_back(*listener);
+
+  size_t size = 0;
+  size += state & WARMING ? warming_listeners_.size() : 0;
+  size += state & ACTIVE ? active_listeners_.size() : 0;
+  size += state & DRAINING ? draining_listeners_.size() : 0;
+  ret.reserve(size);
+
+  if (state & WARMING) {
+    for (const auto& listener : warming_listeners_) {
+      ret.push_back(*listener);
+    }
+  }
+  if (state & ACTIVE) {
+    for (const auto& listener : active_listeners_) {
+      ret.push_back(*listener);
+    }
+  }
+  if (state & DRAINING) {
+    for (const auto& draining_listener : draining_listeners_) {
+      ret.push_back(*(draining_listener.listener_));
+    }
   }
   return ret;
 }

@@ -109,9 +109,13 @@ void ConnectionHandlerImpl::enableListeners() {
   }
 }
 
-// TODO(ASIPVII): add case when rebuilding fails.
 void ConnectionHandlerImpl::retryAllConnections(
     bool success, const envoy::config::listener::v3::FilterChain* const& filter_chain_message) {
+  // If the filter_chain_message has been cleared, we have no connections to retry.
+  if (filter_chain_message == nullptr) {
+    ENVOY_LOG(debug, "filter chain has been cleared.");
+    return;
+  }
   if (sockets_using_filter_chain_.find(filter_chain_message) == sockets_using_filter_chain_.end()) {
     ENVOY_LOG(debug, "filter chain is not found to store any sockets to retry connection.");
     return;
@@ -141,8 +145,6 @@ void ConnectionHandlerImpl::retryAllConnections(
       }
     }
   }
-  // TODO(ASOPVII): check whether to erase this part. For future usage(this filter chain has been
-  // rebuilt).
   sockets_using_filter_chain_.erase(filter_chain_message);
 }
 
@@ -180,7 +182,7 @@ ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImp
     : ActiveTcpListener(
           parent,
           parent.dispatcher_.createListener(config.listenSocketFactory().getListenSocket(), *this,
-                                            config.bindToPort()),
+                                            config.bindToPort(), config.tcpBacklogSize()),
           config) {}
 
 ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImpl& parent,
@@ -450,6 +452,9 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     const auto& filter_chain_message = filter_chain->getFilterChainMessage();
 
     // Store the socket and dynamic_metadata for later connection retry.
+    // TODO(ASOPVII): listener update during old filter chain rebuilding sent to master.
+    // New/old listeners share the same name. If new listener deletes one filter chain , it can not
+    // find
     parent_.sockets_using_filter_chain_[filter_chain_message][listener_name].emplace_back(
         std::move(socket), dynamic_metadata);
 

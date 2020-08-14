@@ -136,6 +136,7 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/server:main_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
@@ -355,7 +356,6 @@ envoy_cc_test(
         ":server_test_data",
         ":static_validation_test_data",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",

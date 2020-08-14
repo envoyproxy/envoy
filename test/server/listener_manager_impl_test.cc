@@ -4815,6 +4815,22 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsFilterChainWithoutTlsInspector
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
 }
 */
+TEST_F(ListenerManagerImplTest, TcpBacklogCustomConfig) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: TcpBacklogConfigListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    tcp_backlog_size: 100
+    filter_chains:
+    - filters:
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _));
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+  EXPECT_EQ(100U, manager_->listeners().back().get().tcpBacklogSize());
+}
 
 } // namespace
 } // namespace Server

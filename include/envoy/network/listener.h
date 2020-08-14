@@ -174,6 +174,11 @@ public:
   virtual void
   rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
                      const std::string& worker_name) PURE;
+
+  /**
+   * @return pending connection backlog for TCP listeners.
+   */
+  virtual uint32_t tcpBacklogSize() const PURE;
 };
 
 /**

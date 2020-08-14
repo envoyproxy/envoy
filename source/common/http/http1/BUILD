@@ -55,7 +55,7 @@ envoy_cc_library(
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
     external_deps = ["http_parser"],
-    deps = CODEC_LIB_DEPS,
+    deps = CODEC_LIB_DEPS + ["//source/common/common:cleanup_lib"],
 )
 
 envoy_cc_library(
