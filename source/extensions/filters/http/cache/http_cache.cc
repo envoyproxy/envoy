@@ -138,14 +138,14 @@ LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& respon
                                        : CacheHeadersUtils::httpTime(response_headers->Date());
 
   // Assumption: Cache lookup time is negligible. Therefore, now == timestamp_
-  SystemTime::duration response_age =
+  const std::chrono::seconds age =
       CacheHeadersUtils::calculateAge(*response_headers, response_time, timestamp_);
 
   // Add the Age header and remove the response_time header before serving the cached response.
-  response_headers->setInline(age_handle.handle(), std::to_string(response_age.count()));
+  response_headers->setInline(age_handle.handle(), std::to_string(age.count()));
   response_headers->removeInline(response_time_handle.handle());
 
-  result.cache_entry_status_ = requiresValidation(*response_headers, response_age)
+  result.cache_entry_status_ = requiresValidation(*response_headers, age)
                                    ? CacheEntryStatus::RequiresValidation
                                    : CacheEntryStatus::Ok;
   result.headers_ = std::move(response_headers);

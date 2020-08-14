@@ -59,10 +59,11 @@ protected:
   }
 
   void testDecodeRequestHitNoBody(CacheFilterSharedPtr filter) {
+    const std::string age = std::to_string(delay_.count());
     // The filter should encode cached headers.
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef(Http::Headers::get().Age, "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
                                true));
 
     // The filter should not encode any data as the response has no body.
@@ -85,10 +86,11 @@ protected:
   }
 
   void testDecodeRequestHitWithBody(CacheFilterSharedPtr filter, std::string body) {
+    const std::string age = std::to_string(delay_.count());
     // The filter should encode cached headers.
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef(Http::Headers::get().Age, "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
                                false));
 
     // The filter should encode cached data.
@@ -114,6 +116,8 @@ protected:
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
   }
 
+  void waitBeforeSecondRequest() { time_source_.advanceTimeWait(delay_); }
+
   SimpleHttpCache simple_cache_;
   envoy::extensions::filters::http::cache::v3alpha::CacheConfig config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
@@ -127,6 +131,7 @@ protected:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Api::ApiPtr api_ = Api::createApiForTest();
   Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
+  std::chrono::seconds delay_ = std::chrono::seconds(10);
 };
 
 TEST_F(CacheFilterTest, UncacheableRequest) {
@@ -201,6 +206,7 @@ TEST_F(CacheFilterTest, CacheHitNoBody) {
     EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
     filter->onDestroy();
   }
+  waitBeforeSecondRequest();
   {
     // Create filter for request 2.
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
@@ -229,6 +235,7 @@ TEST_F(CacheFilterTest, CacheHitWithBody) {
 
     filter->onDestroy();
   }
+  waitBeforeSecondRequest();
   {
     // Create filter for request 2
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
@@ -242,7 +249,8 @@ TEST_F(CacheFilterTest, CacheHitWithBody) {
 TEST_F(CacheFilterTest, SuccessfulValidation) {
   request_headers_.setHost("SuccessfulValidation");
   const std::string body = "abc";
-
+  const std::string etag = "abc123";
+  const std::string last_modified_date = formatter_.now(time_source_);
   {
     // Create filter for request 1
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
@@ -251,9 +259,8 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
 
     // Encode response
     // Add Etag & Last-Modified headers to the response for validation
-    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, "abc123");
-    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
-                                      formatter_.now(time_source_));
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag);
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified, last_modified_date);
 
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
@@ -261,6 +268,7 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
     filter->onDestroy();
   }
+  waitBeforeSecondRequest();
   {
     // Create filter for request 2
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
@@ -275,12 +283,11 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
 
     // Make sure validation conditional headers are added
     const Http::TestRequestHeaderMapImpl injected_headers = {
-        {"if-none-match", "abc123"}, {"if-modified-since", formatter_.now(time_source_)}};
+        {"if-none-match", etag}, {"if-modified-since", last_modified_date}};
     EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
 
     // Encode 304 response
     // Advance time to make sure the cached date is updated with the 304 date
-    time_source_.advanceTimeWait(std::chrono::seconds(10));
     const std::string not_modified_date = formatter_.now(time_source_);
     Http::TestResponseHeaderMapImpl not_modified_response_headers = {{":status", "304"},
                                                                      {"date", not_modified_date}};
@@ -322,18 +329,18 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
 TEST_F(CacheFilterTest, UnsuccessfulValidation) {
   request_headers_.setHost("UnsuccessfulValidation");
   const std::string body = "abc";
-
+  const std::string etag = "abc123";
+  const std::string last_modified_date = formatter_.now(time_source_);
   {
     // Create filter for request 1
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     testDecodeRequestMiss(filter);
 
-    // Encode response.
+    // Encode response
     // Add Etag & Last-Modified headers to the response for validation.
-    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, "abc123");
-    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
-                                      formatter_.now(time_source_));
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag);
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified, last_modified_date);
 
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
@@ -341,6 +348,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
     filter->onDestroy();
   }
+  waitBeforeSecondRequest();
   {
     // Create filter for request 2.
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
@@ -355,7 +363,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
 
     // Make sure validation conditional headers are added.
     const Http::TestRequestHeaderMapImpl injected_headers = {
-        {"if-none-match", "abc123"}, {"if-modified-since", formatter_.now(time_source_)}};
+        {"if-none-match", etag}, {"if-modified-since", last_modified_date}};
     EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
 
     // Encode new response.
@@ -368,7 +376,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     EXPECT_EQ(filter->encodeData(new_body, true), Http::FilterDataStatus::Continue);
 
     // The response headers should have the new status.
-    EXPECT_THAT(response_headers_, HeaderHasValueRef(":status", "201"));
+    EXPECT_THAT(response_headers_, HeaderHasValueRef(Http::Headers::get().Status, "201"));
 
     // The filter should not encode any data.
     EXPECT_CALL(encoder_callbacks_, addEncodedData).Times(0);

@@ -149,7 +149,7 @@ SystemTime CacheHeadersUtils::httpTime(const Http::HeaderEntry* header_entry) {
   return {};
 }
 
-SystemTime::duration
+std::chrono::seconds
 CacheHeadersUtils::calculateAge(const Http::ResponseHeaderMap& response_headers,
                                 const SystemTime response_time, const SystemTime now) {
   // Age headers calculations follow: https://httpwg.org/specs/rfc7234.html#age.calculations

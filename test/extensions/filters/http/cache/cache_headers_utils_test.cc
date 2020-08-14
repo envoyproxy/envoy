@@ -319,19 +319,19 @@ TEST(HttpTime, InvalidFormat) {
 
 TEST(HttpTime, Null) { EXPECT_EQ(CacheHeadersUtils::httpTime(nullptr), SystemTime()); }
 
+using Seconds = std::chrono::seconds;
+
 struct CalculateAgeTestCase {
   std::string test_name;
   Http::TestResponseHeaderMapImpl response_headers;
   SystemTime response_time, now;
-  SystemTime::duration expected_age;
+  Seconds expected_age;
 };
-
-using Seconds = std::chrono::seconds;
 
 class CalculateAgeTest : public testing::TestWithParam<CalculateAgeTestCase> {
 public:
   static std::string durationToString(const SystemTime::duration& duration) {
-    return std::to_string(std::chrono::duration_cast<std::chrono::seconds>(duration).count());
+    return std::to_string(duration.count());
   }
   static std::string formatTime(const SystemTime& time) { return formatter().fromTime(time); }
   static const DateFormatter& formatter() {
@@ -409,9 +409,9 @@ INSTANTIATE_TEST_SUITE_P(CalculateAgeTest, CalculateAgeTest,
                          [](const auto& info) { return info.param.test_name; });
 
 TEST_P(CalculateAgeTest, CalculateAgeTest) {
-  const SystemTime::duration calculated_age = CacheHeadersUtils::calculateAge(
+  const Seconds calculated_age = CacheHeadersUtils::calculateAge(
       GetParam().response_headers, GetParam().response_time, GetParam().now);
-  const SystemTime::duration expected_age = GetParam().expected_age;
+  const Seconds expected_age = GetParam().expected_age;
   EXPECT_EQ(calculated_age, expected_age)
       << "Expected age: " << durationToString(expected_age)
       << ", Calculated age: " << durationToString(calculated_age);

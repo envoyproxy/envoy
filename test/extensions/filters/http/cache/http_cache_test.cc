@@ -1,4 +1,5 @@
 #include <chrono>
+#include <string>
 
 #include "extensions/filters/http/cache/cache_headers_utils.h"
 #include "extensions/filters/http/cache/http_cache.h"
@@ -21,13 +22,14 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
+using Seconds = std::chrono::seconds;
+
 struct LookupRequestTestCase {
   std::string test_name, request_cache_control, response_cache_control;
   SystemTime request_time, response_date;
   CacheEntryStatus expected_cache_entry_status;
+  std::string expected_age;
 };
-
-using Seconds = std::chrono::seconds;
 
 class LookupRequestTest : public testing::TestWithParam<LookupRequestTestCase> {
 public:
@@ -46,99 +48,115 @@ public:
                            {"request_requires_revalidation",
                             /*request_cache_control=*/"no-cache",
                             /*response_cache_control=*/"public, max-age=3600",
-                            /*response_date*/currentTime(),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*request_time=*/currentTime(),
+                            /*resoponse_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"0"},
                            {"response_requires_revalidation",
                             /*request_cache_control=*/"",
                             /*response_cache_control=*/"no-cache",
-                            /*response_date*/currentTime(),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*request_time=*/currentTime(),
+                            /*resoponse_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"0"},
                            {"request_max_age_satisfied",
                             /*request_cache_control=*/"max-age=10",
                             /*response_cache_control=*/"public, max-age=3600",
-                            /*response_date*/currentTime() + Seconds(9),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::Ok},
+                            /*request_time=*/currentTime() + Seconds(9),
+                            /*resoponse_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::Ok,
+                            /*expected_age=*/"9"},
                            {"request_max_age_unsatisfied",
                             /*request_cache_control=*/"max-age=10",
                             /*response_cache_control=*/"public, max-age=3600",
-                            /*response_date*/currentTime() + Seconds(11),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*request_time=*/currentTime() + Seconds(11),
+                            /*resoponse_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"11"},
                            {"request_min_fresh_satisfied",
                             /*request_cache_control=*/"min-fresh=1000",
                             /*response_cache_control=*/"public, max-age=2000",
-                            /*response_date*/currentTime() + Seconds(999),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::Ok},
+                            /*request_time=*/currentTime() + Seconds(999),
+                            /*resoponse_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::Ok,
+                            /*expected_age=*/"999"},
                            {"request_min_fresh_unsatisfied",
                             /*request_cache_control=*/"min-fresh=1000",
                             /*response_cache_control=*/"public, max-age=2000",
-                            /*response_date*/currentTime() + Seconds(1001),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*request_time=*/currentTime() + Seconds(1001),
+                            /*resoponse_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1001"},
                            {"request_max_age_satisfied_but_min_fresh_unsatisfied",
                             /*request_cache_control=*/"max-age=1500, min-fresh=1000",
                             /*response_cache_control=*/"public, max-age=2000",
-                            /*response_date*/currentTime() + Seconds(1001),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*request_time=*/currentTime() + Seconds(1001),
+                            /*resoponse_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1001"},
                            {"request_max_age_satisfied_but_max_stale_unsatisfied",
                             /*request_cache_control=*/"max-age=1500, max-stale=400",
                             /*response_cache_control=*/"public, max-age=1000",
-                            /*response_date*/currentTime() + Seconds(1401),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*request_time=*/currentTime() + Seconds(1401),
+                            /*resoponse_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1401"},
                            {"request_max_stale_satisfied_but_min_fresh_unsatisfied",
                             /*request_cache_control=*/"min-fresh=1000, max-stale=500",
                             /*response_cache_control=*/"public, max-age=2000",
-                            /*response_date*/currentTime() + Seconds(1001),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*request_time=*/currentTime() + Seconds(1001),
+                            /*resoponse_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1001"},
                            {"request_max_stale_satisfied_but_max_age_unsatisfied",
                             /*request_cache_control=*/"max-age=1200, max-stale=500",
                             /*response_cache_control=*/"public, max-age=1000",
-                            /*response_date*/currentTime() + Seconds(1201),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*request_time=*/currentTime() + Seconds(1201),
+                            /*resoponse_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1201"},
                            {"request_min_fresh_satisfied_but_max_age_unsatisfied",
                             /*request_cache_control=*/"max-age=500, min-fresh=400",
                             /*response_cache_control=*/"public, max-age=1000",
-                            /*response_date*/currentTime() + Seconds(501),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*request_time=*/currentTime() + Seconds(501),
+                            /*resoponse_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"501"},
                            {"expired",
                             /*request_cache_control=*/"",
                             /*response_cache_control=*/"public, max-age=1000",
-                            /*response_date*/currentTime() + Seconds(1001),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*request_time=*/currentTime() + Seconds(1001),
+                            /*resoponse_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1001"},
                            {"expired_but_max_stale_satisfied",
                             /*request_cache_control=*/"max-stale=500",
                             /*response_cache_control=*/"public, max-age=1000",
-                            /*response_date*/currentTime() + Seconds(1499),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::Ok},
+                            /*request_time=*/currentTime() + Seconds(1499),
+                            /*resoponse_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::Ok,
+                            /*expected_age=*/"1499"},
                            {"expired_max_stale_unsatisfied",
                             /*request_cache_control=*/"max-stale=500",
                             /*response_cache_control=*/"public, max-age=1000",
-                            /*response_date*/currentTime() + Seconds(1501),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*request_time=*/currentTime() + Seconds(1501),
+                            /*resoponse_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1501"},
                            {"expired_max_stale_satisfied_but_response_must_revalidate",
                             /*request_cache_control=*/"max-stale=500",
                             /*response_cache_control=*/"public, max-age=1000, must-revalidate",
-                            /*response_date*/currentTime() + Seconds(1499),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*request_time=*/currentTime() + Seconds(1499),
+                            /*resoponse_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1499"},
                            {"fresh_and_response_must_revalidate",
                             /*request_cache_control=*/"",
                             /*response_cache_control=*/"public, max-age=1000, must-revalidate",
-                            /*response_date*/currentTime() + Seconds(999),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::Ok},
+                            /*request_time=*/currentTime() + Seconds(999),
+                            /*resoponse_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::Ok,
+                            /*expected_age=*/"999"},
 
     );
   }
@@ -168,6 +186,8 @@ TEST_P(LookupRequestTest, ResultWithoutBodyMatchesExpectation) {
   EXPECT_EQ(GetParam().expected_cache_entry_status, lookup_response.cache_entry_status_);
   ASSERT_TRUE(lookup_response.headers_);
   EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_THAT(*lookup_response.headers_,
+              HeaderHasValueRef(Http::Headers::get().Age, GetParam().expected_age));
   EXPECT_EQ(lookup_response.content_length_, 0);
   EXPECT_TRUE(lookup_response.response_ranges_.empty());
   EXPECT_FALSE(lookup_response.has_trailers_);
@@ -188,6 +208,8 @@ TEST_P(LookupRequestTest, ResultWithBodyMatchesExpectation) {
   EXPECT_EQ(GetParam().expected_cache_entry_status, lookup_response.cache_entry_status_);
   ASSERT_TRUE(lookup_response.headers_);
   EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_THAT(*lookup_response.headers_,
+              HeaderHasValueRef(Http::Headers::get().Age, GetParam().expected_age));
   EXPECT_EQ(lookup_response.content_length_, content_length);
   EXPECT_TRUE(lookup_response.response_ranges_.empty());
   EXPECT_FALSE(lookup_response.has_trailers_);
