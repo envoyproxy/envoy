@@ -73,6 +73,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "api_listener_integration_test",
     srcs = ["api_listener_integration_test.cc"],
+    tags = ["retry_on_windows"],
     deps = [
         ":http_integration_lib",
         "//test/mocks/http:stream_encoder_mock",
@@ -83,6 +84,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "api_version_integration_test",
     srcs = ["api_version_integration_test.cc"],
+    tags = ["retry_on_windows"],
     deps = [
         ":http_integration_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
@@ -210,8 +212,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    tags = [
-    ],
+    tags = ["retry_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/config:protobuf_link_hacks",
@@ -321,6 +322,7 @@ envoy_cc_test(
         "http2_integration_test.h",
     ],
     shard_count = 4,
+    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
@@ -346,6 +348,7 @@ envoy_cc_test(
     srcs = [
         "http_subset_lb_integration_test.cc",
     ],
+    tags = ["retry_on_windows"],
     deps = [
         ":http_integration_lib",
         "//test/common/upstream:utility_lib",
@@ -408,6 +411,7 @@ envoy_cc_test(
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 5,
+    tags = ["retry_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -428,6 +432,7 @@ envoy_cc_test(
         "http2_upstream_integration_test.cc",
         "http2_upstream_integration_test.h",
     ],
+    tags = ["retry_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
@@ -448,6 +453,7 @@ envoy_cc_test(
         "integration_admin_test.cc",
         "integration_admin_test.h",
     ],
+    tags = ["retry_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//include/envoy/http:header_map_interface",
@@ -528,6 +534,7 @@ envoy_cc_test(
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 2,
+    tags = ["retry_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//test/integration/filters:backpressure_filter_config_lib",
@@ -694,7 +701,7 @@ envoy_cc_test(
         "websocket_integration_test.cc",
         "websocket_integration_test.h",
     ],
-    # Times out on Windows
+    tags = ["retry_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -731,6 +738,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "socket_interface_integration_test",
     srcs = ["socket_interface_integration_test.cc"],
+    tags = ["retry_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/network:socket_interface_lib",
@@ -761,6 +769,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_stats_integration_test",
     srcs = ["load_stats_integration_test.cc"],
+    tags = ["retry_on_windows"],
     deps = [
         ":http_integration_lib",
         "//test/config:utility_lib",
@@ -779,6 +788,7 @@ envoy_cc_test(
     name = "hds_integration_test",
     srcs = ["hds_integration_test.cc"],
     shard_count = 2,
+    tags = ["retry_on_windows"],
     deps = [
         ":http_integration_lib",
         ":integration_lib",
@@ -811,6 +821,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "overload_integration_test",
     srcs = ["overload_integration_test.cc"],
+    tags = ["flaky_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//source/extensions/resource_monitors/injected_resource:config",
@@ -825,6 +836,7 @@ envoy_cc_test(
         "proxy_proto_integration_test.cc",
         "proxy_proto_integration_test.h",
     ],
+    tags = ["retry_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
@@ -983,6 +995,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    tags = ["retry_on_windows"],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
@@ -1062,6 +1075,7 @@ envoy_cc_test(
         "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",
     ],
+    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
