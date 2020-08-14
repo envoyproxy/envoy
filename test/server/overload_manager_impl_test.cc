@@ -389,7 +389,8 @@ TEST_F(OverloadManagerImplTest, FlushesUpdatesEvenWithOneUnresponsive) {
   timer_cb_();
 
   EXPECT_FALSE(action_state.isSaturated());
-  // A second timer callback will flush the update from monitor 2, even though monitor 1 is unresponsive.
+  // A second timer callback will flush the update from monitor 2, even though monitor 1 is
+  // unresponsive.
   timer_cb_();
   EXPECT_TRUE(action_state.isSaturated());
 }
