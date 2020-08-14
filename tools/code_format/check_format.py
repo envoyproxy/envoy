@@ -755,10 +755,10 @@ def checkSourceLine(line, file_path, reportError):
                     "Grpc::GoogleGrpcContext. See #8282")
 
   if denylistedForExceptions(file_path):
-    # changed to accommodate cases where throw is a substring of a token like in "foothrowBar" 
+    # changed to accommodate cases where throw is a substring of a token like in "foothrowBar"
     if "throw" in line.split():
       comment_match = COMMENT_REGEX.search(line)
-      if comment_match is None or comment_match.start(0) > line.split().index("throw"):
+      if comment_match is None or comment_match.start(0) > line.find("throw"):
         reportError("Don't introduce throws into exception-free files, use error " +
                     "statuses instead.")
 
