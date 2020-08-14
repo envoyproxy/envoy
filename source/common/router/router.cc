@@ -569,9 +569,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
 
-  retry_state_ = createRetryState(route_entry_->retryPolicy(), headers, *cluster_,
-                                  request_vcluster_, config_.runtime_, config_.random_,
-                                  callbacks_->dispatcher(), route_entry_->priority());
+  retry_state_ = createRetryState(
+      route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, config_.runtime_,
+      config_.random_, callbacks_->dispatcher(), config_.timeSource(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
   // runtime keys.
@@ -1575,13 +1575,15 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
                        [](const auto& req) -> bool { return req->awaitingHeaders(); });
 }
 
-RetryStatePtr
-ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
-                             const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                             Runtime::Loader& runtime, Random::RandomGenerator& random,
-                             Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) {
+RetryStatePtr ProdFilter::createRetryState(const RetryPolicy& policy,
+                                           Http::RequestHeaderMap& request_headers,
+                                           const Upstream::ClusterInfo& cluster,
+                                           const VirtualCluster* vcluster, Runtime::Loader& runtime,
+                                           Random::RandomGenerator& random,
+                                           Event::Dispatcher& dispatcher, TimeSource& time_source,
+                                           Upstream::ResourcePriority priority) {
   return RetryStateImpl::create(policy, request_headers, cluster, vcluster, runtime, random,
-                                dispatcher, priority);
+                                dispatcher, time_source, priority);
 }
 
 } // namespace Router

@@ -151,6 +151,23 @@ public:
 };
 
 /**
+ * An interface to be implemented by rate limited reset header parsers.
+ */
+class ResetHeaderParser {
+public:
+  virtual ~ResetHeaderParser() = default;
+
+  /**
+   * Iterate over the headers, choose the first one that matches by name, and try to parse its
+   * value.
+   */
+  virtual absl::optional<std::chrono::milliseconds>
+  parseInterval(TimeSource& time_source, const Http::HeaderMap& headers) const PURE;
+};
+
+using ResetHeaderParserSharedPtr = std::shared_ptr<ResetHeaderParser>;
+
+/**
  * Route level retry policy.
  */
 class RetryPolicy {
@@ -235,6 +252,18 @@ public:
    * @return absl::optional<std::chrono::milliseconds> maximum retry interval
    */
   virtual absl::optional<std::chrono::milliseconds> maxInterval() const PURE;
+
+  /**
+   * @return std::vector<Http::ResetHeaderParserSharedPtr>& list of reset header
+   * parsers that will be used to extract a retry back-off interval from response headers.
+   */
+  virtual const std::vector<ResetHeaderParserSharedPtr>& resetHeaders() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds upper limit placed on a retry
+   * back-off interval parsed from response headers.
+   */
+  virtual std::chrono::milliseconds resetMaxInterval() const PURE;
 };
 
 /**
@@ -293,6 +322,14 @@ public:
    * @return true if a policy is in place for the active request that allows retries.
    */
   virtual bool enabled() PURE;
+
+  /**
+   * Attempts to parse any matching rate limited reset headers (RFC 7231), either in the form of an
+   * interval directly, or in the form of a unix timestamp relative to the current system time.
+   * @return the interval if parsing was successful.
+   */
+  virtual absl::optional<std::chrono::milliseconds>
+  parseResetInterval(const Http::ResponseHeaderMap& response_headers) const PURE;
 
   /**
    * Determine whether a request should be retried based on the response headers.

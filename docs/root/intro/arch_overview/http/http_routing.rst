@@ -106,8 +106,9 @@ Envoy allows retries to be configured both in the :ref:`route configuration
 <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>` as well as for specific requests via :ref:`request
 headers <config_http_filters_router_headers_consumed>`. The following configurations are possible:
 
-* **Maximum number of retries**: Envoy will continue to retry any number of times. An exponential
-  backoff algorithm is used between each retry. Additionally, *all retries are contained within the
+* **Maximum number of retries**: Envoy will continue to retry any number of times. The intervals between
+  retries are decided either by an exponential backoff algorithm (the default), or based on feedback
+  from the upstream server via headers (if present). Additionally, *all retries are contained within the
   overall request timeout*. This avoids long request times due to a large number of retries.
 * **Retry conditions**: Envoy can retry on different types of conditions depending on application
   requirements. For example, network failure, all 5xx response codes, idempotent 4xx response codes,

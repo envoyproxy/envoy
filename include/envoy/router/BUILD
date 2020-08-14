@@ -58,6 +58,7 @@ envoy_cc_library(
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/common:conn_pool_interface",
         "//include/envoy/common:matchers_interface",
+        "//include/envoy/common:time_interface",
         "//include/envoy/config:typed_metadata_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:codes_interface",

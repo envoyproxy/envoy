@@ -48,8 +48,8 @@ public:
     // TODO(htuch): Make this configurable.
     static constexpr uint32_t RetryInitialDelayMs = 500;
     static constexpr uint32_t RetryMaxDelayMs = 30000; // Do not cross more than 30s
-    backoff_strategy_ =
-        std::make_unique<JitteredBackOffStrategy>(RetryInitialDelayMs, RetryMaxDelayMs, random_);
+    backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
+        RetryInitialDelayMs, RetryMaxDelayMs, random_);
   }
 
   void establishNewStream() {
