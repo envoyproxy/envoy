@@ -36,7 +36,7 @@ message ListenerCollection {
   udpa.core.v1.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 24]
+// [#next-free-field: 25]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -259,4 +259,8 @@ message Listener {
   // If not present, treat it as "udp_default_writer".
   // [#not-implemented-hide:]
   core.v3.TypedExtensionConfig udp_writer_config = 23;
+
+  // The maximum length a tcp listener's pending connections queue can grow to. If no value is
+  // provided net.core.somaxconn will be used on Linux and 128 otherwise.
+  google.protobuf.UInt32Value tcp_backlog_size = 24;
 }
