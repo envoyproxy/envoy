@@ -65,7 +65,7 @@ public:
             return quic::CurrentSupportedVersionsWithQuicCrypto();
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
-          SetQuicReloadableFlag(quic_enable_version_draft_29, use_http3);
+          SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
           SetQuicReloadableFlag(quic_disable_version_draft_27, !use_http3);
           SetQuicReloadableFlag(quic_disable_version_draft_25, !use_http3);
           return quic::CurrentSupportedVersions();
@@ -128,7 +128,7 @@ public:
     EnvoyQuicClock clock(*dispatcher_);
     Buffer::OwnedImpl payload = generateChloPacketToSend(
         quic_version_, quic_config_, crypto_config_, connection_id_, clock,
-        envoyAddressInstanceToQuicSocketAddress(listen_socket_->localAddress()), peer_addr,
+        envoyIpAddressToQuicSocketAddress(listen_socket_->localAddress()->ip()), peer_addr,
         "test.example.org");
     Buffer::RawSliceVector slice = payload.getRawSlices();
     ASSERT(slice.size() == 1);
@@ -139,7 +139,7 @@ public:
             quic::test::ConstructReceivedPacket(*encrypted_packet, clock.Now()));
 
     envoy_quic_dispatcher_.ProcessPacket(
-        envoyAddressInstanceToQuicSocketAddress(listen_socket_->localAddress()), peer_addr,
+        envoyIpAddressToQuicSocketAddress(listen_socket_->localAddress()->ip()), peer_addr,
         *received_packet);
 
     if (should_buffer) {
@@ -165,7 +165,7 @@ public:
     auto envoy_connection = static_cast<EnvoyQuicServerSession*>(session);
     EXPECT_EQ("test.example.org", envoy_connection->requestedServerName());
     EXPECT_EQ(peer_addr,
-              envoyAddressInstanceToQuicSocketAddress(envoy_connection->remoteAddress()));
+              envoyIpAddressToQuicSocketAddress(envoy_connection->remoteAddress()->ip()));
     ASSERT(envoy_connection->localAddress() != nullptr);
     EXPECT_EQ(*listen_socket_->localAddress(), *envoy_connection->localAddress());
   }

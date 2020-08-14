@@ -1,8 +1,8 @@
-#include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/extension/v3/config_discovery.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/integration/filters/set_response_code_filter_config.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
@@ -13,38 +13,14 @@ namespace {
 
 std::string denyPrivateConfig() {
   return R"EOF(
-      rules:
-        action: DENY
-        policies:
-          "test":
-            permissions:
-              - url_path: { path: { prefix: "/private" } }
-            principals:
-              - any: true
+    prefix: "/private"
+    code: 403
 )EOF";
 }
 
-std::string allowAllConfig() {
-  return R"EOF(
-      rules:
-        action: ALLOW
-        policies:
-          "test":
-            permissions:
-              - any: true
-            principals:
-              - any: true
-)EOF";
-}
+std::string allowAllConfig() { return "code: 200"; }
 
-std::string invalidConfig() {
-  return R"EOF(
-      rules:
-        action: DENY
-        policies:
-          "test": {}
-)EOF";
-}
+std::string invalidConfig() { return "code: 90"; }
 
 class ExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                           public HttpIntegrationTest {
@@ -62,20 +38,12 @@ public:
           filter->set_name(name);
           auto* discovery = filter->mutable_config_discovery();
           discovery->add_type_urls(
-              "type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC");
+              "type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig");
           if (set_default_config) {
-            const auto rbac_configuration =
-                TestUtility::parseYaml<envoy::extensions::filters::http::rbac::v3::RBAC>(R"EOF(
-                rules:
-                  action: DENY
-                  policies:
-                    "test":
-                      permissions:
-                        - any: true
-                      principals:
-                        - any: true
-              )EOF");
-            discovery->mutable_default_config()->PackFrom(rbac_configuration);
+            const auto default_configuration =
+                TestUtility::parseYaml<test::integration::filters::SetResponseCodeFilterConfig>(
+                    "code: 403");
+            discovery->mutable_default_config()->PackFrom(default_configuration);
           }
           discovery->set_apply_default_config_without_warming(apply_without_warming);
           auto* api_config_source = discovery->mutable_config_source()->mutable_api_config_source();
@@ -145,15 +113,16 @@ public:
   }
 
   void sendXdsResponse(const std::string& name, const std::string& version,
-                       const std::string& rbac_config) {
+                       const std::string& yaml_config) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
-    const auto rbac_configuration =
-        TestUtility::parseYaml<envoy::extensions::filters::http::rbac::v3::RBAC>(rbac_config);
+    const auto configuration =
+        TestUtility::parseYaml<test::integration::filters::SetResponseCodeFilterConfig>(
+            yaml_config);
     envoy::config::core::v3::TypedExtensionConfig typed_config;
     typed_config.set_name(name);
-    typed_config.mutable_typed_config()->PackFrom(rbac_configuration);
+    typed_config.mutable_typed_config()->PackFrom(configuration);
     response.add_resources()->PackFrom(typed_config);
     ecds_stream_->sendGrpcMessage(response);
   }
