@@ -302,12 +302,16 @@ public:
   Network::ActiveUdpListenerFactory* udpListenerFactory() override {
     return udp_listener_factory_.get();
   }
+  Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
+    return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
+  }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
 
   ResourceLimit& openConnections() override { return *open_connections_; }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return access_logs_;
   }
+  uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
   Init::Manager& initManager();
   envoy::config::core::v3::TrafficDirection direction() const override {
     return config().traffic_direction();
@@ -341,6 +345,7 @@ private:
   // Helpers for constructor.
   void buildAccessLog();
   void buildUdpListenerFactory(Network::Socket::Type socket_type, uint32_t concurrency);
+  void buildUdpWriterFactory(Network::Socket::Type socket_type);
   void buildListenSocketOptions(Network::Socket::Type socket_type);
   void createListenerFilterFactories(Network::Socket::Type socket_type);
   void validateFilterChains(Network::Socket::Type socket_type);
@@ -367,6 +372,7 @@ private:
   const bool added_via_api_;
   const bool workers_started_;
   const uint64_t hash_;
+  const uint32_t tcp_backlog_size_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 
   // A target is added to Server's InitManager if workers_started_ is false.
@@ -386,6 +392,7 @@ private:
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
   Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
+  Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
   Network::ConnectionBalancerPtr connection_balancer_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;

@@ -131,6 +131,16 @@ public:
     All,
   };
 
+  // The types of listeners to be returned from listeners(ListenerState).
+  // An enum instead of enum class so the underlying type is an int and bitwise operations can be
+  // used without casting.
+  enum ListenerState : uint8_t {
+    ACTIVE = 1 << 0,
+    WARMING = 1 << 1,
+    DRAINING = 1 << 2,
+    ALL = ACTIVE | WARMING | DRAINING
+  };
+
   virtual ~ListenerManager() = default;
 
   /**
@@ -161,11 +171,15 @@ public:
   virtual void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) PURE;
 
   /**
-   * @return std::vector<std::reference_wrapper<Network::ListenerConfig>> a list of the currently
-   * loaded listeners. Note that this routine returns references to the existing listeners. The
-   * references are only valid in the context of the current call stack and should not be stored.
+   * @param state the type of listener to be returned (defaults to ACTIVE), states can be OR'd
+   * together to return multiple different types
+   * @return std::vector<std::reference_wrapper<Network::ListenerConfig>> a list of currently known
+   * listeners in the requested state. Note that this routine returns references to the existing
+   * listeners. The references are only valid in the context of the current call stack and should
+   * not be stored.
    */
-  virtual std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners() PURE;
+  virtual std::vector<std::reference_wrapper<Network::ListenerConfig>>
+  listeners(ListenerState state = ListenerState::ACTIVE) PURE;
 
   /**
    * @return uint64_t the total number of connections owned by all listeners across all workers.
@@ -222,6 +236,14 @@ public:
    */
   virtual ApiListenerOptRef apiListener() PURE;
 };
+
+// overload operator| to allow ListenerManager::listeners(ListenerState) to be called using a
+// combination of flags, such as listeners(ListenerState::WARMING|ListenerState::ACTIVE)
+constexpr ListenerManager::ListenerState operator|(const ListenerManager::ListenerState lhs,
+                                                   const ListenerManager::ListenerState rhs) {
+  return static_cast<ListenerManager::ListenerState>(static_cast<uint8_t>(lhs) |
+                                                     static_cast<uint8_t>(rhs));
+}
 
 } // namespace Server
 } // namespace Envoy

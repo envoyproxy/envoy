@@ -375,7 +375,7 @@ TEST_F(DispatcherImplTest, TimerWithScope) {
       timer = dispatcher_->createTimer([this]() {
         {
           Thread::LockGuard lock(mu_);
-          static_cast<DispatcherImpl*>(dispatcher_.get())->onFatalError();
+          static_cast<DispatcherImpl*>(dispatcher_.get())->onFatalError(std::cerr);
           work_finished_ = true;
         }
         cv_.notifyOne();

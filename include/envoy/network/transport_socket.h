@@ -5,6 +5,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/io_handle.h"
+#include "envoy/network/post_io_action.h"
 #include "envoy/network/proxy_protocol.h"
 #include "envoy/ssl/connection.h"
 
@@ -15,16 +16,6 @@ namespace Network {
 
 class Connection;
 enum class ConnectionEvent;
-
-/**
- * Action that should occur on a connection after I/O.
- */
-enum class PostIoAction {
-  // Close the connection.
-  Close,
-  // Keep the connection open.
-  KeepOpen
-};
 
 /**
  * Result of each I/O event.

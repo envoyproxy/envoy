@@ -129,6 +129,23 @@ public:
   MOCK_METHOD(Envoy::Ssl::PrivateKeyMethodProviderSharedPtr, privateKeyMethod, (), (const));
 };
 
+class MockCertificateValidationContextConfig : public CertificateValidationContextConfig {
+public:
+  MOCK_METHOD(const std::string&, caCert, (), (const));
+  MOCK_METHOD(const std::string&, caCertPath, (), (const));
+  MOCK_METHOD(const std::string&, certificateRevocationList, (), (const));
+  MOCK_METHOD(const std::string&, certificateRevocationListPath, (), (const));
+  MOCK_METHOD(const std::vector<std::string>&, verifySubjectAltNameList, (), (const));
+  MOCK_METHOD(const std::vector<envoy::type::matcher::v3::StringMatcher>&, subjectAltNameMatchers,
+              (), (const));
+  MOCK_METHOD(const std::vector<std::string>&, verifyCertificateHashList, (), (const));
+  MOCK_METHOD(const std::vector<std::string>&, verifyCertificateSpkiList, (), (const));
+  MOCK_METHOD(bool, allowExpiredCertificate, (), (const));
+  MOCK_METHOD(envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+                  TrustChainVerification,
+              trustChainVerification, (), (const));
+};
+
 class MockPrivateKeyMethodManager : public PrivateKeyMethodManager {
 public:
   MockPrivateKeyMethodManager();
