@@ -421,11 +421,11 @@ public:
              Server::FieldValidationConfig validation_config, uint32_t concurrency,
              std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy);
 
-  void
-  waitForCounterEq(const std::string& name, uint64_t value,
-                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+  void waitForCounterEq(const std::string& name, uint64_t value,
+                        std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+                        Event::Dispatcher* dispatcher = nullptr) override {
     AssertionResult res =
-        TestUtility::waitForCounterEq(statStore(), name, value, time_system_, timeout);
+        TestUtility::waitForCounterEq(statStore(), name, value, time_system_, timeout, dispatcher);
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
     ASSERT_TRUE(res);
 #else
