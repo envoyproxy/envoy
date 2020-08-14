@@ -1,6 +1,5 @@
 #include "envoy/extensions/filters/network/direct_response/v3/config.pb.h"
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
-#include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit_impl.h"
@@ -159,20 +158,6 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
       // So we won't fuzz it here with complex mocks.
       throw EnvoyException(absl::StrCat(
           "http_conn_manager trying to use Quiche which we won't fuzz here. Config:\n{}",
-          config.DebugString()));
-    }
-  } else if (filter_name == NetworkFilterNames::get().MongoProxy) {
-    envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy& config =
-        dynamic_cast<envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy&>(
-            *config_message);
-    if (config.has_delay() && config.mutable_delay()->has_header_delay()) {
-      // MongoProxy filter doesn't allow header_delay because it will pass nullptr to percentage()
-      // which will cause "runtime error: member call on null pointer". (See:
-      // https://github.com/envoyproxy/envoy/blob/master/source/extensions/filters/network/mongo_proxy/proxy.cc#L403
-      // and
-      // https://github.com/envoyproxy/envoy/blob/master/source/extensions/filters/common/fault/fault_config.cc#L16)
-      throw EnvoyException(absl::StrCat(
-          "header delay is not supported in the config of a MongoProxy filter.. Config:\n{}",
           config.DebugString()));
     }
   }
