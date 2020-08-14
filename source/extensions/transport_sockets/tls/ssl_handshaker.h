@@ -71,6 +71,7 @@ public:
   Ssl::SocketState state() { return state_; }
   void setState(Ssl::SocketState state) { state_ = state; }
   SSL* ssl() const { return ssl_.get(); }
+  Ssl::HandshakeCallbacks* handshakeCallbacks() { return handshake_callbacks_; }
 
   bssl::UniquePtr<SSL> ssl_;
 
