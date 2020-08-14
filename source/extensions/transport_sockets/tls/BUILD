@@ -29,6 +29,30 @@ envoy_cc_extension(
 )
 
 envoy_cc_library(
+    name = "ssl_handshaker_lib",
+    srcs = ["ssl_handshaker.cc"],
+    hdrs = ["ssl_handshaker.h"],
+    external_deps = ["ssl"],
+    deps = [
+        ":context_lib",
+        ":utility_lib",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/ssl:handshaker_interface",
+        "//include/envoy/ssl:ssl_socket_extended_info_interface",
+        "//include/envoy/ssl:ssl_socket_state",
+        "//include/envoy/ssl/private_key:private_key_callbacks_interface",
+        "//include/envoy/ssl/private_key:private_key_interface",
+        "//include/envoy/stats:stats_macros",
+        "//source/common/common:assert_lib",
+        "//source/common/common:empty_string",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/common:thread_annotations",
+        "//source/common/http:headers_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "ssl_socket_lib",
     srcs = ["ssl_socket.cc"],
     hdrs = ["ssl_socket.h"],
@@ -44,6 +68,7 @@ envoy_cc_library(
     deps = [
         ":context_config_lib",
         ":context_lib",
+        ":ssl_handshaker_lib",
         ":utility_lib",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:transport_socket_interface",
