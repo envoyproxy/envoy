@@ -1578,6 +1578,24 @@ const uint32_t ControlFrameFloodLimit = 100;
 const uint32_t AllFrameFloodLimit = 1000;
 } // namespace
 
+Http2FloodMitigationTest::Http2FloodMitigationTest() {
+  Envoy::Network::SocketInterfaceSingleton::clear();
+  test_socket_interface_loader_ = std::make_unique<Envoy::Network::SocketInterfaceLoader>(
+      std::make_unique<Envoy::Network::TestSocketInterface>(
+          [this](uint32_t socket_index, const Buffer::RawSlice*,
+                 uint64_t) -> absl::optional<Api::IoCallUint64Result> {
+            if (*writev_returns_egain_ && socket_index == 0) {
+              return Api::IoCallUint64Result(
+                  0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                                     Network::IoSocketError::deleteIoError));
+            }
+            return absl::nullopt;
+          }));
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
+}
+
 void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
   // nghttp2 library has its own internal mitigation for outbound control frames (see
   // NGHTTP2_DEFAULT_MAX_OBQ_FLOOD_ITEM). The default nghttp2 mitigation threshold of 1K is modified
@@ -1634,15 +1652,14 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::s
 // Verify that the server detects the flood using specified request parameters.
 void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_view path,
                                            Http2Frame::ResponseStatus expected_http_status,
-                                           const std::string& flood_stat, uint32_t num_frames,
-                                           std::shared_ptr<bool> writev_returns_egain) {
+                                           const std::string& flood_stat, uint32_t num_frames) {
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeRequest(request_idx, host, path);
   sendFrame(request);
   auto frame = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
   EXPECT_EQ(expected_http_status, frame.responseStatus());
-  *writev_returns_egain = true;
+  *writev_returns_egain_ = true;
   for (uint32_t frame = 0; frame < num_frames; ++frame) {
     request = Http2Frame::makeRequest(++request_idx, host, path);
     sendFrame(request);
@@ -1655,58 +1672,39 @@ void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
-std::shared_ptr<bool> Http2FloodMitigationTest::overrideWritev() {
-  std::shared_ptr<bool> writev_returns_egain = std::make_shared<bool>(false);
-  test_socket_interface_.overrideWritev(
-      [writev_returns_egain](uint32_t socket_index, const Buffer::RawSlice*,
-                             uint64_t) -> absl::optional<Api::IoCallUint64Result> {
-        if (*writev_returns_egain && socket_index == 0) {
-          return Api::IoCallUint64Result(
-              0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                                 Network::IoSocketError::deleteIoError));
-        }
-        return absl::nullopt;
-      });
-  return writev_returns_egain;
-}
-
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FloodMitigationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
 TEST_P(Http2FloodMitigationTest, Ping) {
-  auto writev_returns_egain = overrideWritev();
   setNetworkConnectionBufferSize();
   beginSession();
-  *writev_returns_egain = true;
+  *writev_returns_egain_ = true;
   floodServer(Http2Frame::makePingFrame(), "http2.outbound_control_flood",
               ControlFrameFloodLimit + 1);
 }
 
 TEST_P(Http2FloodMitigationTest, Settings) {
-  auto writev_returns_egain = overrideWritev();
   setNetworkConnectionBufferSize();
   beginSession();
-  *writev_returns_egain = true;
+  *writev_returns_egain_ = true;
   floodServer(Http2Frame::makeEmptySettingsFrame(), "http2.outbound_control_flood",
               ControlFrameFloodLimit + 1);
 }
 
 // Verify that the server can detect flood of internally generated 404 responses.
 TEST_P(Http2FloodMitigationTest, 404) {
-  auto writev_returns_egain = overrideWritev();
   // Change the default route to be restrictive, and send a request to a non existent route.
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
   beginSession();
 
   // Send requests to a non existent path to generate 404s
   floodServer("host", "/notfound", Http2Frame::ResponseStatus::NotFound, "http2.outbound_flood",
-              AllFrameFloodLimit + 1, writev_returns_egain);
+              AllFrameFloodLimit + 1);
 }
 
 // Verify that the server can detect flood of response DATA frames
 TEST_P(Http2FloodMitigationTest, Data) {
-  auto writev_returns_egain = overrideWritev();
   // Set large buffer limits so the test is not affected by the flow control.
   config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
   autonomous_upstream_ = true;
@@ -1720,7 +1718,7 @@ TEST_P(Http2FloodMitigationTest, Data) {
   // 1000 DATA frames should trigger flood protection.
   // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames start
   // to accumulate in the transport socket buffer.
-  *writev_returns_egain = true;
+  *writev_returns_egain_ = true;
 
   auto request = Http2Frame::makeRequest(0, "host", "/test/long/url",
                                          {Http2Frame::Header("response_data_blocks", "1000")});
@@ -1757,7 +1755,6 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
             ->mutable_override_stream_error_on_invalid_http_message()
             ->set_value(true);
       });
-  auto writev_returns_egain = overrideWritev();
   beginSession();
 
   uint32_t stream_index = 0;
@@ -1769,7 +1766,7 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
 
   // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames start
   // to accumulate in the transport socket buffer.
-  *writev_returns_egain = true;
+  *writev_returns_egain_ = true;
 
   for (++stream_index; stream_index < ControlFrameFloodLimit + 2; ++stream_index) {
     request = Http::Http2::Http2Frame::makeMalformedRequest(stream_index);
@@ -1789,14 +1786,12 @@ TEST_P(Http2FloodMitigationTest, TooManyStreams) {
         hcm.mutable_http2_protocol_options()->mutable_max_concurrent_streams()->set_value(2);
       });
   autonomous_upstream_ = true;
-  auto writev_returns_egain = overrideWritev();
   beginSession();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Exceed the number of streams allowed by the server. The server should stop reading from the
   // client. Verify that the client was unable to stuff a lot of data into the server.
-  floodServer("host", "/test/long/url", Http2Frame::ResponseStatus::Ok, "", 3,
-              writev_returns_egain);
+  floodServer("host", "/test/long/url", Http2Frame::ResponseStatus::Ok, "", 3);
 }
 
 TEST_P(Http2FloodMitigationTest, EmptyHeaders) {

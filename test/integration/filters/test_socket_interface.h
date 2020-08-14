@@ -46,37 +46,28 @@ private:
 
 class TestSocketInterface : public SocketInterfaceImpl {
 public:
-  TestSocketInterface();
-  ~TestSocketInterface() override;
-
   /**
    * Override the behavior of the IoSocketHandleImpl::writev() method.
-   * The supplied callback is invoked with the arguments of the writev method.
+   * The supplied callback is invoked with the arguments of the writev method and the index
+   * of the accepted socket.
    * Returning absl::nullopt from the callback continues normal execution of the
    * IoSocketHandleImpl::writev() method. Returning a Api::IoCallUint64Result from callback skips
    * the IoSocketHandleImpl::writev() with the returned result value.
-   * NOTE: this method must be called before any sockets are created to avoid race condition in
-   * setting the `writev_overide_proc_` member.
    */
-  void overrideWritev(TestIoSocketHandle::WritevOverrideProc writev);
+  TestSocketInterface(TestIoSocketHandle::WritevOverrideProc writev)
+      : writev_overide_proc_(writev) {}
 
 private:
   // SocketInterface
   using SocketInterfaceImpl::socket;
   IoHandlePtr socket(os_fd_t fd) override;
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  std::string name() const override {
-    return "envoy.extensions.network.socket_interface.test_socket_interface";
-  };
-
   uint32_t getAcceptedSocketIndex() {
     absl::MutexLock lock(&mutex_);
     return accepted_socket_index_++;
   }
 
-  SocketInterface* const previous_socket_interface_;
-  TestIoSocketHandle::WritevOverrideProc writev_overide_proc_;
+  const TestIoSocketHandle::WritevOverrideProc writev_overide_proc_;
   mutable absl::Mutex mutex_;
   uint32_t accepted_socket_index_ ABSL_GUARDED_BY(mutex_) = 0;
 };

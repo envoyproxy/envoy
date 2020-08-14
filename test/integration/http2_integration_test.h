@@ -86,22 +86,18 @@ protected:
 
 class Http2FloodMitigationTest : public Http2FrameIntegrationTest {
 public:
-  Http2FloodMitigationTest() {
-    config_helper_.addConfigModifier(
-        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-               hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
-  }
+  Http2FloodMitigationTest();
 
 protected:
   void floodServer(const Http2Frame& frame, const std::string& flood_stat, uint32_t num_frames);
   void floodServer(absl::string_view host, absl::string_view path,
                    Http2Frame::ResponseStatus expected_http_status, const std::string& flood_stat,
-                   uint32_t num_frames, std::shared_ptr<bool> writev_returns_egain);
+                   uint32_t num_frames);
 
   void setNetworkConnectionBufferSize();
   void beginSession() override;
-  std::shared_ptr<bool> overrideWritev();
 
-  Envoy::Network::TestSocketInterface test_socket_interface_;
+  std::shared_ptr<bool> writev_returns_egain_{std::make_shared<bool>(false)};
+  std::unique_ptr<Envoy::Network::SocketInterfaceLoader> test_socket_interface_loader_;
 };
 } // namespace Envoy

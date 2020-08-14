@@ -24,30 +24,8 @@ Api::IoCallUint64Result TestIoSocketHandle::writev(const Buffer::RawSlice* slice
   return IoSocketHandleImpl::writev(slices, num_slice);
 }
 
-TestSocketInterface::TestSocketInterface()
-    : previous_socket_interface_(SocketInterfaceSingleton::getExisting()) {
-  SocketInterfaceSingleton::clear();
-  SocketInterfaceSingleton::initialize(this);
-}
-
-TestSocketInterface::~TestSocketInterface() {
-  SocketInterfaceSingleton::clear();
-  if (previous_socket_interface_) {
-    SocketInterfaceSingleton::initialize(previous_socket_interface_);
-  }
-}
-
-void TestSocketInterface::overrideWritev(TestIoSocketHandle::WritevOverrideProc writev) {
-  writev_overide_proc_ = writev;
-}
-
 IoHandlePtr TestSocketInterface::socket(os_fd_t fd) {
   return std::make_unique<TestIoSocketHandle>(getAcceptedSocketIndex(), writev_overide_proc_, fd);
-}
-
-ProtobufTypes::MessagePtr TestSocketInterface::createEmptyConfigProto() {
-  return std::make_unique<
-      envoy::extensions::network::socket_interface::v3::DefaultSocketInterface>();
 }
 
 } // namespace Network
