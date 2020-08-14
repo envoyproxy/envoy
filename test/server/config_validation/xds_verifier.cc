@@ -266,26 +266,6 @@ void XdsVerifier::markForRemoval(ListenerRepresentation& rep) {
 }
 
 /**
- * called when a route that was previously added is re-added
- * the original route might have been ignored if no resources refer to it, so we can add it here
- */
-void XdsVerifier::routeUpdated(const envoy::config::route::v3::RouteConfiguration& route) {
-  if (!all_routes_.contains(route.name()) &&
-      std::any_of(listeners_.begin(), listeners_.end(),
-                  [&](auto& rep) { return getRoute(rep.listener) == route.name(); })) {
-    all_routes_.insert({route.name(), route});
-    active_routes_.insert({route.name(), route});
-  }
-
-  ENVOY_LOG_MISC(debug, "Updating {}", route.name());
-  if (sotw_or_delta_ == DELTA) {
-    updateDeltaListeners(route);
-  } else {
-    updateSotwListeners();
-  }
-}
-
-/**
  * add a new route and update any listeners that refer to this route
  */
 void XdsVerifier::routeAdded(const envoy::config::route::v3::RouteConfiguration& route) {
