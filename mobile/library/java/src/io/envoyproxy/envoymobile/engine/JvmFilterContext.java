@@ -31,9 +31,9 @@ class JvmFilterContext {
   /**
    * Invokes onHeaders callback using headers passed via passHeaders.
    *
-   * @param length,    the total number of headers included in this header block.
-   * @param endStream, whether this header block is the final remote frame.
-   * @return Object,   not used for request filter.
+   * @param headerCount, the total number of headers included in this header block.
+   * @param endStream,   whether this header block is the final remote frame.
+   * @return Object,     not used for request filter.
    */
   public Object onRequestHeaders(long headerCount, boolean endStream) {
     assert bridgeUtility.validateCount(headerCount);
@@ -56,10 +56,10 @@ class JvmFilterContext {
   /**
    * Invokes onTrailers callback using trailers passed via passHeaders.
    *
-   * @param length, the total number of trailers included in this header block.
-   * @return Object,not used for request filter.
+   * @param trailerCount, the total number of trailers included in this header block.
+   * @return Object,      not used for request filter.
    */
-  public Object onRequestTrailers(long trailerCount, boolean endStream) {
+  public Object onRequestTrailers(long trailerCount) {
     assert bridgeUtility.validateCount(trailerCount);
     final Map trailers = bridgeUtility.retrieveHeaders();
     return filter.onRequestTrailers(trailers);
@@ -68,9 +68,9 @@ class JvmFilterContext {
   /**
    * Invokes onHeaders callback using headers passed via passHeaders.
    *
-   * @param length,    the total number of headers included in this header block.
-   * @param endStream, whether this header block is the final remote frame.
-   * @return Object,   not used for response filter.
+   * @param headerCount, the total number of headers included in this header block.
+   * @param endStream,   whether this header block is the final remote frame.
+   * @return Object,     not used for response filter.
    */
   public Object onResponseHeaders(long headerCount, boolean endStream) {
     assert bridgeUtility.validateCount(headerCount);
@@ -93,10 +93,10 @@ class JvmFilterContext {
   /**
    * Invokes onTrailers callback using trailers passed via passHeaders.
    *
-   * @param length, the total number of trailers included in this header block.
-   * @return Object,not used for response filter.
+   * @param trailerCount, the total number of trailers included in this header block.
+   * @return Object,      not used for response filter.
    */
-  public Object onResponseTrailers(long trailerCount, boolean endStream) {
+  public Object onResponseTrailers(long trailerCount) {
     assert bridgeUtility.validateCount(trailerCount);
     final Map trailers = bridgeUtility.retrieveHeaders();
     return filter.onResponseTrailers(trailers);
