@@ -998,7 +998,7 @@ key:
               IsNull());
 }
 
-// Push Rds update after on demand request, route confguration should be initialized.
+// Push Rds update after on demand request, route configuration should be initialized.
 TEST_F(ScopedRdsTest, PushRdsAfterOndemandRequest) {
   setup();
   init_watcher_.expectReady();
