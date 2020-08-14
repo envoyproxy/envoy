@@ -23,10 +23,14 @@
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, throw
 // a MissingFieldException.
-#define PROTOBUF_GET_WRAPPED_REQUIRED(message, field_name)                                         \
-  ((message).has_##field_name() ? (message).field_name().value()                                   \
-                                : throw MissingFieldException(#field_name, (message)))
 
+#define PROTOBUF_GET_WRAPPED_REQUIRED(message, field_name)                                         \
+  ([](const auto& msg) {                                                                           \
+    if (!msg.has_##field_name()) {                                                                 \
+      ::Envoy::ProtoExceptionUtil::throwMissingFieldException(#field_name, msg);                   \
+    }                                                                                              \
+    return msg.field_name().value();                                                               \
+  }((message)))
 // Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, return the
 // default value.
 #define PROTOBUF_GET_MS_OR_DEFAULT(message, field_name, default_value)                             \
@@ -48,14 +52,22 @@
 // Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, throw a
 // MissingFieldException.
 #define PROTOBUF_GET_MS_REQUIRED(message, field_name)                                              \
-  ((message).has_##field_name() ? DurationUtil::durationToMilliseconds((message).field_name())     \
-                                : throw MissingFieldException(#field_name, (message)))
+  ([](const auto& msg) {                                                                           \
+    if (!msg.has_##field_name()) {                                                                 \
+      ::Envoy::ProtoExceptionUtil::throwMissingFieldException(#field_name, msg);                   \
+    }                                                                                              \
+    return DurationUtil::durationToMilliseconds(msg.field_name());                                 \
+  }((message)))
 
 // Obtain the seconds value of a google.protobuf.Duration field if set. Otherwise, throw a
 // MissingFieldException.
 #define PROTOBUF_GET_SECONDS_REQUIRED(message, field_name)                                         \
-  ((message).has_##field_name() ? DurationUtil::durationToSeconds((message).field_name())          \
-                                : throw MissingFieldException(#field_name, (message)))
+  ([](const auto& msg) {                                                                           \
+    if (!msg.has_##field_name()) {                                                                 \
+      ::Envoy::ProtoExceptionUtil::throwMissingFieldException(#field_name, msg);                   \
+    }                                                                                              \
+    return DurationUtil::durationToSeconds(msg.field_name());                                      \
+  }((message)))
 
 namespace Envoy {
 namespace ProtobufPercentHelper {
@@ -90,10 +102,13 @@ uint64_t fractionalPercentDenominatorToInt(
 // @param field_name supplies the field name in the message.
 // @param default_value supplies the default if the field is not present.
 #define PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(message, field_name, default_value)                  \
-  (!std::isnan((message).field_name().value())                                                     \
-       ? (message).has_##field_name() ? (message).field_name().value() : default_value             \
-       : throw EnvoyException(fmt::format("Value not in the range of 0..100 range.")))
-
+  ([](const auto& msg) -> double {                                                                 \
+    if (std::isnan(msg.field_name().value())) {                                                    \
+      ::Envoy::ExceptionUtil::throwEnvoyException(                                                 \
+          fmt::format("Value not in the range of 0..100 range."));                                 \
+    }                                                                                              \
+    return (msg).has_##field_name() ? (msg).field_name().value() : default_value;                  \
+  }((message)))
 // Convert an envoy::type::v3::Percent to a rounded integer or a default.
 // @param message supplies the proto message containing the field.
 // @param field_name supplies the field name in the message.
@@ -104,11 +119,15 @@ uint64_t fractionalPercentDenominatorToInt(
 // Issue: https://github.com/envoyproxy/protoc-gen-validate/issues/85
 #define PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(message, field_name, max_value,             \
                                                        default_value)                              \
-  (!std::isnan((message).field_name().value())                                                     \
-       ? (message).has_##field_name()                                                              \
-             ? ProtobufPercentHelper::convertPercent((message).field_name().value(), max_value)    \
-             : ProtobufPercentHelper::checkAndReturnDefault(default_value, max_value)              \
-       : throw EnvoyException(fmt::format("Value not in the range of 0..100 range.")))
+  ([](const auto& msg) {                                                                           \
+    if (std::isnan(msg.field_name().value())) {                                                    \
+      ::Envoy::ExceptionUtil::throwEnvoyException(                                                 \
+          fmt::format("Value not in the range of 0..100 range."));                                 \
+    }                                                                                              \
+    return (msg).has_##field_name()                                                                \
+               ? ProtobufPercentHelper::convertPercent((msg).field_name().value(), max_value)      \
+               : ProtobufPercentHelper::checkAndReturnDefault(default_value, max_value);           \
+  }((message)))
 
 namespace Envoy {
 
@@ -185,6 +204,17 @@ public:
   ProtoValidationException(const std::string& validation_error, const Protobuf::Message& message);
 };
 
+/**
+ * utility functions to call when throwing exceptions in header files
+ */
+class ProtoExceptionUtil {
+public:
+  static void throwMissingFieldException(const std::string& field_name,
+                                         const Protobuf::Message& message);
+  static void throwProtoValidationException(const std::string& validation_error,
+                                            const Protobuf::Message& message);
+};
+
 class MessageUtil {
 public:
   // std::hash
@@ -256,7 +286,7 @@ public:
 
     std::string err;
     if (!Validate(message, &err)) {
-      throw ProtoValidationException(err, API_RECOVER_ORIGINAL(message));
+      ProtoExceptionUtil::throwProtoValidationException(err, API_RECOVER_ORIGINAL(message));
     }
   }
 
