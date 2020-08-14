@@ -67,8 +67,8 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
 
   // We want to keep this pointing at the latest filter in the filter list that has received the
   // onData callback. To do so, we compare the current latest with the *previous* filter. If they
-  // match, then we must be processing a new filter for the first time. We omit this check if
-  // we're the first filter, since the above check handles that case.
+  // match, then we must be processing a new filter for the first time. We omit this check if we're
+  // the first filter, since the above check handles that case.
   //
   // We compare against the previous filter to avoid multiple filter iterations from resetting the
   // pointer: If we just set latest to current, then the first onData filter iteration would
@@ -189,10 +189,10 @@ void ConnectionManagerImpl::checkForDeferredClose() {
 void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   // The order of what happens in this routine is important and a little complicated. We first see
   // if the stream needs to be reset. If it needs to be, this will end up invoking reset callbacks
-  // and then moving the stream to the deferred destruction list. If the stream has not been
-  // reset, we move it to the deferred deletion list here. Then, we potentially close the
-  // connection. This must be done after deleting the stream since the stream refers to the
-  // connection and must be deleted first.
+  // and then moving the stream to the deferred destruction list. If the stream has not been reset,
+  // we move it to the deferred deletion list here. Then, we potentially close the connection. This
+  // must be done after deleting the stream since the stream refers to the connection and must be
+  // deleted first.
   bool reset_stream = false;
   // If the response encoder is still associated with the stream, reset the stream. The exception
   // here is when Envoy "ends" the stream by calling recreateStream at which point recreateStream
@@ -399,13 +399,14 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
       stats_.named_.downstream_cx_destroy_remote_.inc();
     }
     // TODO(mattklein123): It is technically possible that something outside of the filter causes
-    // a local connection close, so we still guard against that here. A better solution would be
-    // to have some type of "pre-close" callback that we could hook for cleanup that would get
-    // called regardless of where local close is invoked from. NOTE: that this will cause
-    // doConnectionClose() to get called twice in the common local close cases, but the method
-    // protects against that. NOTE: In the case where a local close comes from outside the filter,
-    // this will cause any stream closures to increment remote close stats. We should do better
-    // here in the future, via the pre-close callback mentioned above.
+    // a local connection close, so we still guard against that here. A better solution would be to
+    // have some type of "pre-close" callback that we could hook for cleanup that would get called
+    // regardless of where local close is invoked from.
+    // NOTE: that this will cause doConnectionClose() to get called twice in the common local close
+    // cases, but the method protects against that.
+    // NOTE: In the case where a local close comes from outside the filter, this will cause any
+    // stream closures to increment remote close stats. We should do better here in the future,
+    // via the pre-close callback mentioned above.
     doConnectionClose(absl::nullopt, absl::nullopt);
   }
 }
@@ -724,8 +725,8 @@ void ConnectionManagerImpl::FilterManager::addStreamDecoderFilterWorker(
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
   filter->setDecoderFilterCallbacks(*wrapper);
   // Note: configured decoder filters are appended to decoder_filters_.
-  // This means that if filters are configured in the following order (assume all three filters
-  // are both decoder/encoder filters):
+  // This means that if filters are configured in the following order (assume all three filters are
+  // both decoder/encoder filters):
   //   http_filters:
   //     - A
   //     - B
@@ -739,8 +740,8 @@ void ConnectionManagerImpl::FilterManager::addStreamEncoderFilterWorker(
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
   // Note: configured encoder filters are prepended to encoder_filters_.
-  // This means that if filters are configured in the following order (assume all three filters
-  // are both decoder/encoder filters):
+  // This means that if filters are configured in the following order (assume all three filters are
+  // both decoder/encoder filters):
   //   http_filters:
   //     - A
   //     - B
@@ -1041,8 +1042,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       idle_timeout_ms_ = route_entry->idleTimeout().value();
       response_encoder_->getStream().setFlushTimeout(idle_timeout_ms_);
       if (idle_timeout_ms_.count()) {
-        // If we have a route-level idle timeout but no global stream idle timeout, create a
-        // timer.
+        // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
         if (stream_idle_timer_ == nullptr) {
           stream_idle_timer_ =
               connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
@@ -1160,9 +1160,9 @@ void ConnectionManagerImpl::FilterManager::decodeHeaders(ActiveStreamDecoderFilt
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
     const bool new_metadata_added = processNewlyAddedMetadata();
-    // If end_stream is set in headers, and a filter adds new metadata, we need to delay
-    // end_stream in headers by inserting an empty data frame with end_stream set. The empty data
-    // frame is sent after the new metadata.
+    // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
+    // in headers by inserting an empty data frame with end_stream set. The empty data frame is sent
+    // after the new metadata.
     if ((*entry)->end_stream_ && new_metadata_added && !buffered_request_data_) {
       Buffer::OwnedImpl empty_data("");
       ENVOY_STREAM_LOG(trace,
@@ -1272,8 +1272,8 @@ void ConnectionManagerImpl::FilterManager::decodeData(
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeData));
 
     // We check the request_trailers_ pointer here in case addDecodedTrailers
-    // is called in decodeData during a previous filter invocation, at which point we communicate
-    // to the current and future filters that the stream has not yet ended.
+    // is called in decodeData during a previous filter invocation, at which point we communicate to
+    // the current and future filters that the stream has not yet ended.
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
