@@ -26,6 +26,7 @@ CAS
 CB
 CDS
 CEL
+DSR
 ceil
 CHACHA
 CHLO
@@ -622,6 +623,7 @@ func
 functor
 functors
 gRPC
+gateway
 gcov
 genrule
 getaddrinfo

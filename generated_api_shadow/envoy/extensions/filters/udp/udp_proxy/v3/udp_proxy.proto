@@ -45,7 +45,7 @@ message UdpProxyConfig {
   // to the remote downstream directly if there are route rules on the upstreams side.
   // There are two options the return back to remote downstream.
   // The one is that use the DSR(Direct Server Return).
-  // The another one is that configure the default gw or add routing rules on the upstreams to forward
+  // The another one is that configure the default gateway or add routing rules on the upstreams to forward
   // all packets to envoy. And configure iptables rules and add some routing rules on the host of envoy side to
   // forward all packets from upstreams to envoy process so that the envoy can return back the packets to the downstream.
   // If there are some errors during set this option to each sessions, it will fall back to no use_original_src_ip mode even if the this option is set.
