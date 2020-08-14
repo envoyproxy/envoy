@@ -1002,7 +1002,7 @@ key:
 TEST_F(ScopedRdsTest, PushRdsAfterOndemandRequest) {
   setup();
   init_watcher_.expectReady();
-  // Scope should be loaded eagerly by defalut.
+  // Scope should be loaded eagerly by default.
   const std::string config_yaml = R"EOF(
 name: foo_scope
 route_configuration_name: foo_routes
