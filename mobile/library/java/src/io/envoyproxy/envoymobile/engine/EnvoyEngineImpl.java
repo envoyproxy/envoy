@@ -1,6 +1,7 @@
 package io.envoyproxy.envoymobile.engine;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
+import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 
 /* Concrete implementation of the `EnvoyEngine` interface. */
 public class EnvoyEngineImpl implements EnvoyEngine {
@@ -54,7 +55,14 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    */
   @Override
   public int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
-    return runWithConfig(envoyConfiguration.resolveTemplate(JniLibrary.templateString()), logLevel);
+    for (EnvoyHTTPFilterFactory filterFactory : envoyConfiguration.httpFilterFactories) {
+      JniLibrary.registerFilterFactory(filterFactory.getFilterName(),
+                                       new JvmFilterFactoryContext(filterFactory));
+    }
+
+    return runWithConfig(envoyConfiguration.resolveTemplate(JniLibrary.templateString(),
+                                                            JniLibrary.filterTemplateString()),
+                         logLevel);
   }
 
   /**

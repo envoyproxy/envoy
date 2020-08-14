@@ -1,5 +1,9 @@
 package io.envoyproxy.envoymobile.engine;
 
+import java.util.List;
+
+import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
+
 /* Typed configuration that may be used for starting Envoy. */
 public class EnvoyConfiguration {
   public final String statsDomain;
@@ -7,6 +11,7 @@ public class EnvoyConfiguration {
   public final Integer dnsRefreshSeconds;
   public final Integer dnsFailureRefreshSecondsBase;
   public final Integer dnsFailureRefreshSecondsMax;
+  public final List<EnvoyHTTPFilterFactory> httpFilterFactories;
   public final Integer statsFlushSeconds;
   public final String appVersion;
   public final String appId;
@@ -28,13 +33,14 @@ public class EnvoyConfiguration {
    */
   public EnvoyConfiguration(String statsDomain, int connectTimeoutSeconds, int dnsRefreshSeconds,
                             int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
-                            int statsFlushSeconds, String appVersion, String appId,
-                            String virtualClusters) {
+                            List<EnvoyHTTPFilterFactory> httpFilterFactories, int statsFlushSeconds,
+                            String appVersion, String appId, String virtualClusters) {
     this.statsDomain = statsDomain;
     this.connectTimeoutSeconds = connectTimeoutSeconds;
     this.dnsRefreshSeconds = dnsRefreshSeconds;
     this.dnsFailureRefreshSecondsBase = dnsFailureRefreshSecondsBase;
     this.dnsFailureRefreshSecondsMax = dnsFailureRefreshSecondsMax;
+    this.httpFilterFactories = httpFilterFactories;
     this.statsFlushSeconds = statsFlushSeconds;
     this.appVersion = appVersion;
     this.appId = appId;
@@ -50,11 +56,18 @@ public class EnvoyConfiguration {
    * @throws ConfigurationException, when the template provided is not fully
    *                                 resolved.
    */
-  String resolveTemplate(String templateYAML) {
-    // TODO(goaway): update when Android filter chain wiring is complete.
+  String resolveTemplate(final String templateYAML, final String filterTemplateYAML) {
+    final StringBuilder filterConfigBuilder = new StringBuilder();
+    for (EnvoyHTTPFilterFactory filterFactory : httpFilterFactories) {
+      String filterConfig =
+          filterTemplateYAML.replace("{{ platform_filter_name }}", filterFactory.getFilterName());
+      filterConfigBuilder.append(filterConfig);
+    }
+    String filterConfigChain = filterConfigBuilder.toString();
+
     String resolvedConfiguration =
         templateYAML.replace("{{ stats_domain }}", statsDomain)
-            .replace("{{ platform_filter_chain }}", "")
+            .replace("{{ platform_filter_chain }}", filterConfigChain)
             .replace("{{ connect_timeout_seconds }}", String.format("%s", connectTimeoutSeconds))
             .replace("{{ dns_refresh_rate_seconds }}", String.format("%s", dnsRefreshSeconds))
             .replace("{{ dns_failure_refresh_rate_seconds_base }}",

@@ -36,7 +36,9 @@ class MainActivity : Activity() {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
 
-    engine = AndroidEngineBuilder(application).build()
+    engine = AndroidEngineBuilder(application)
+      .addFilter { DemoFilter() }
+      .build()
 
     recyclerView = findViewById(R.id.recycler_view) as RecyclerView
     recyclerView.layoutManager = LinearLayoutManager(this)

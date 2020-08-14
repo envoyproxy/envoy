@@ -3,6 +3,7 @@ package io.envoyproxy.envoymobile
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.EnvoyEngineImpl
+import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import java.util.UUID
 
 sealed class BaseConfiguration
@@ -24,7 +25,7 @@ open class EngineBuilder(
   private var dnsRefreshSeconds = 60
   private var dnsFailureRefreshSecondsBase = 2
   private var dnsFailureRefreshSecondsMax = 10
-  private var filterChain = mutableListOf<FilterFactory>()
+  private var filterChain = mutableListOf<EnvoyHTTPFilterFactory>()
   private var statsFlushSeconds = 60
   private var appVersion = "unspecified"
   private var appId = "unspecified"
@@ -169,7 +170,7 @@ open class EngineBuilder(
           EnvoyConfiguration(
             statsDomain, connectTimeoutSeconds,
             dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
-            statsFlushSeconds, appVersion, appId, virtualClusters
+            filterChain, statsFlushSeconds, appVersion, appId, virtualClusters
           ),
           logLevel
         )
