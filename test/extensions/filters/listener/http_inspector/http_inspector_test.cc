@@ -594,7 +594,7 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
                                                        int) -> Api::SysCallSizeResult {
           size_t len = (*ctr);
           if (num_loops == 2) {
-            ASSERT(*ctx != 3);
+            ASSERT(*ctr != 3);
             len = size_t(Config::MAX_INSPECT_SIZE / (3 - (*ctr)));
           }
           ASSERT(length >= len);
