@@ -102,13 +102,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     const size_t space_v4 = CMSG_SPACE(sizeof(in_pktinfo));
 
     // FreeBSD only needs in_addr size, but allocates more to unify code in two platforms.
-    const size_t cmsg_space = std::max(space_v6, space_v4);
+    const size_t cmsg_space = (self_ip->version() == Address::IpVersion::v4) ? space_v4 : space_v6;
     // kSpaceForIp should be big enough to hold both IPv4 and IPv6 packet info.
     absl::FixedArray<char> cbuf(cmsg_space);
     memset(cbuf.begin(), 0, cmsg_space);
 
     message.msg_control = cbuf.begin();
-    message.msg_controllen = (self_ip->version() == Address::IpVersion::v4) ? space_v4 : space_v6;
+    message.msg_controllen = cmsg_space;
     cmsghdr* const cmsg = CMSG_FIRSTHDR(&message);
     RELEASE_ASSERT(cmsg != nullptr, fmt::format("cbuf with size {} is not enough, cmsghdr size {}",
                                                 sizeof(cbuf), sizeof(cmsghdr)));
