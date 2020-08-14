@@ -96,7 +96,6 @@ def envoy_cc_fuzz_test(
         srcs = tar_src,
         testonly = 1,
     )
-    fuzz_copts = []
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,
@@ -110,7 +109,7 @@ def envoy_cc_fuzz_test(
     )
     cc_test(
         name = name,
-        copts = fuzz_copts + envoy_copts("@envoy", test = True),
+        copts = envoy_copts("@envoy", test = True),
         linkopts = _envoy_test_linkopts() + select({
             "@envoy//bazel:libfuzzer": ["-fsanitize=fuzzer"],
             "//conditions:default": [],
@@ -144,7 +143,7 @@ def envoy_cc_fuzz_test(
     # provide a path to FuzzingEngine.
     cc_binary(
         name = name + "_driverless",
-        copts = fuzz_copts + envoy_copts("@envoy", test = True),
+        copts = envoy_copts("@envoy", test = True),
         linkopts = ["-lFuzzingEngine"] + _envoy_test_linkopts(),
         linkstatic = 1,
         testonly = 1,
