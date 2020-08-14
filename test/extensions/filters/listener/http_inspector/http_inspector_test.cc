@@ -567,6 +567,9 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
 }
 
 TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
+  // Verify that the http inspector can detect http requests
+  // with large request line even when they are splitted over
+  // multiple recv calls.
   init();
   absl::string_view method = "GET", http = "/index HTTP/1.0\r";
   std::string spaces(Config::MAX_INSPECT_SIZE - method.size() - http.size(), ' ');
@@ -591,11 +594,12 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
                                                        int) -> Api::SysCallSizeResult {
           size_t len = (*ctr);
           if (num_loops == 2) {
+            ASSERT(*ctx != 3)
             len = size_t(Config::MAX_INSPECT_SIZE / (3 - (*ctr)));
           }
           ASSERT(length >= len);
           memcpy(buffer, data.data(), len);
-          (*ctr) += 1;
+          *ctr += 1;
           return Api::SysCallSizeResult{ssize_t(len), 0};
         }));
   }
