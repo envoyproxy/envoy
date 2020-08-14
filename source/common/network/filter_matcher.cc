@@ -2,6 +2,8 @@
 
 #include "envoy/network/filter.h"
 
+#include "common/common/assert.h"
+
 #include "absl/strings/str_format.h"
 
 namespace Envoy {

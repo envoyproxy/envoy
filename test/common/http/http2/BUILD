@@ -45,7 +45,6 @@ envoy_cc_test(
         "--runtime-feature-override-for-tests=envoy.reloadable_features.new_codec_behavior",
     ],
     shard_count = 5,
-    tags = ["fails_on_windows"],
     deps = CODEC_TEST_DEPS,
 )
 
@@ -57,7 +56,6 @@ envoy_cc_test(
         "--runtime-feature-disable-for-tests=envoy.reloadable_features.new_codec_behavior",
     ],
     shard_count = 5,
-    tags = ["fails_on_windows"],
     deps = CODEC_TEST_DEPS,
 )
 
@@ -128,7 +126,6 @@ envoy_cc_test(
         "response_header_corpus/simple_example_huffman",
         "response_header_corpus/simple_example_plain",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         ":frame_replay_lib",
         "//test/common/http/http2:codec_impl_test_util",

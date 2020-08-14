@@ -22,7 +22,7 @@ public:
 
   ~JwksFetcherImpl() override { cancel(); }
 
-  void cancel() override {
+  void cancel() final {
     if (request_ && !complete_) {
       request_->cancel();
       ENVOY_LOG(debug, "fetch pubkey [uri = {}]: canceled", uri_->uri());
