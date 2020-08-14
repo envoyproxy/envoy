@@ -30,7 +30,8 @@ AbstractResponseSharedPtr MetadataRequestHolder::computeAnswer() const {
   const ResponseMetadata metadata = {header.api_key_, header.api_version_, header.correlation_id_};
 
   const auto advertised_address = clustering_configuration_.getAdvertisedAddress();
-  MetadataResponseBroker broker = {ENVOY_BROKER_ID, advertised_address.first,advertised_address.second};
+  MetadataResponseBroker broker = {ENVOY_BROKER_ID, advertised_address.first,
+                                   advertised_address.second};
   std::vector<MetadataResponseTopic> response_topics;
   if (request_->data_.topics_) {
     for (const auto& topic : *(request_->data_.topics_)) {

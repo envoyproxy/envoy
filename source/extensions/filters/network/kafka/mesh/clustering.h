@@ -44,20 +44,23 @@ struct ClusterConfig {
  */
 class ClusteringConfiguration {
 public:
-  virtual ~ClusteringConfiguration() {};
-  virtual absl::optional<ClusterConfig> computeClusterConfigForTopic(const std::string& topic) const PURE;
+  virtual ~ClusteringConfiguration(){};
+  virtual absl::optional<ClusterConfig>
+  computeClusterConfigForTopic(const std::string& topic) const PURE;
   virtual std::pair<std::string, int32_t> getAdvertisedAddress() const PURE;
 };
 
 using ClusteringConfigurationSharedPtr = std::shared_ptr<const ClusteringConfiguration>;
 
-class ClusteringConfigurationImpl : public ClusteringConfiguration, private Logger::Loggable<Logger::Id::kafka> {
+class ClusteringConfigurationImpl : public ClusteringConfiguration,
+                                    private Logger::Loggable<Logger::Id::kafka> {
 public:
   ClusteringConfigurationImpl(const KafkaMeshProtoConfig& config);
-  absl::optional<ClusterConfig> computeClusterConfigForTopic(const std::string& topic) const override;
+  absl::optional<ClusterConfig>
+  computeClusterConfigForTopic(const std::string& topic) const override;
   std::pair<std::string, int32_t> getAdvertisedAddress() const override;
 
-private: 
+private:
   const std::pair<std::string, int32_t> advertised_address_;
   std::map<std::string, ClusterConfig> topic_prefix_to_cluster_config_;
 };

@@ -6,29 +6,70 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
+class KPWImpl : public KPW {
+public:
+  KPWImpl(RdKafka::Producer* arg) : producer_{arg} {};
+
+  virtual RdKafka::ErrorCode produce(const std::string topic_name, int32_t partition, int msgflags,
+                                     void* payload, size_t len, const void* key, size_t key_len,
+                                     int64_t timestamp, void* msg_opaque) override {
+    return producer_->produce(topic_name, partition, msgflags, payload, len, key, key_len,
+                              timestamp, msg_opaque);
+  };
+
+  virtual int poll(int timeout_ms) override { return producer_->poll(timeout_ms); }
+
+private:
+  std::unique_ptr<RdKafka::Producer> producer_;
+};
+
+class LibRdKafkaUtilsImpl : public LibRdKafkaUtils {
+  RdKafka::Conf::ConfResult setConfProperty(RdKafka::Conf& conf, const std::string& name,
+                                            const std::string& value,
+                                            std::string& errstr) const override {
+    return conf.set(name, value, errstr);
+  }
+
+  RdKafka::Conf::ConfResult setConfDeliveryCallback(RdKafka::Conf& conf,
+                                                    RdKafka::DeliveryReportCb* dr_cb,
+                                                    std::string& errstr) const override {
+    return conf.set("dr_cb", dr_cb, errstr);
+  }
+
+  std::unique_ptr<KPW> createProducer(RdKafka::Conf* conf, std::string& errstr) const override {
+    return std::make_unique<KPWImpl>(RdKafka::Producer::create(conf, errstr));
+  }
+};
+
 KafkaProducerWrapper::KafkaProducerWrapper(Event::Dispatcher& dispatcher,
                                            Thread::ThreadFactory& thread_factory,
                                            const RawKafkaProducerConfig& configuration)
+    : KafkaProducerWrapper(dispatcher, thread_factory, configuration, LibRdKafkaUtilsImpl{}){};
+
+KafkaProducerWrapper::KafkaProducerWrapper(Event::Dispatcher& dispatcher,
+                                           Thread::ThreadFactory& thread_factory,
+                                           const RawKafkaProducerConfig& configuration,
+                                           const LibRdKafkaUtils& utils)
     : dispatcher_{dispatcher} {
 
   std::unique_ptr<RdKafka::Conf> conf =
       std::unique_ptr<RdKafka::Conf>(RdKafka::Conf::create(RdKafka::Conf::CONF_GLOBAL));
   std::string errstr;
   for (const auto& e : configuration) {
-    if (conf->set(e.first, e.second, errstr) != RdKafka::Conf::CONF_OK) {
+    if (utils.setConfProperty(*conf, e.first, e.second, errstr) != RdKafka::Conf::CONF_OK) {
       throw EnvoyException(absl::StrCat("Could not set producer property [", e.first, "] to [",
                                         e.second, "]:", errstr));
     }
   }
 
-  if (conf->set("dr_cb", this, errstr) != RdKafka::Conf::CONF_OK) {
+  if (utils.setConfDeliveryCallback(*conf, this, errstr) != RdKafka::Conf::CONF_OK) {
     ENVOY_LOG(warn, "dr_cb", errstr);
     throw EnvoyException(absl::StrCat("Could not set producer callback:", errstr));
   }
 
-  producer_ = std::unique_ptr<RdKafka::Producer>(RdKafka::Producer::create(conf.get(), errstr));
+  producer_ = utils.createProducer(conf.get(), errstr);
   if (!producer_) {
-    throw EnvoyException(absl::StrCat("Could not set create producer:", errstr));
+    throw EnvoyException(absl::StrCat("Could not create producer:", errstr));
   }
 
   poller_thread_active_ = true;
@@ -56,7 +97,7 @@ void KafkaProducerWrapper::send(const ProduceFinishCbSharedPtr origin, const std
     const int flags = 0;
     void* value_data = const_cast<char*>(value.data());
     RdKafka::ErrorCode ec = producer_->produce(topic, partition, flags, value_data, value.size(),
-                                               key.data(), key.size(), 0, nullptr, nullptr);
+                                               key.data(), key.size(), 0, nullptr);
     if (RdKafka::ERR_NO_ERROR == ec) {
       // We have succeeded with submitting data to producer, so we register a callback.
       unfinished_produce_requests_.push_back(origin);
