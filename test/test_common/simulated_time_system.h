@@ -6,7 +6,6 @@
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 
-#include "test/test_common/only_one_thread.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -29,11 +28,8 @@ public:
   SchedulerPtr createScheduler(Scheduler& base_scheduler, CallbackScheduler& cb_scheduler) override;
 
   // TestTimeSystem
-  void advanceTimeWait(const Duration& duration) override;
-  void advanceTimeAsync(const Duration& duration) override;
-  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-                                      const Duration& duration) noexcept
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
+  void advanceTimeWaitImpl(const Duration& duration) override;
+  void advanceTimeAsyncImpl(const Duration& duration) override;
 
   // TimeSource
   SystemTime systemTime() override;
@@ -104,10 +100,17 @@ private:
   void setMonotonicTimeLockHeld(const MonotonicTime& monotonic_time)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
+  /**
+   * Schedule expired alarms so they execute in their event loops.
+   */
+  void scheduleReadyAlarms();
+  void scheduleReadyAlarmsLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+
   void alarmActivateLockHeld(Alarm& alarm) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Adds/removes an alarm.
-  void addAlarmLockHeld(Alarm&, const std::chrono::microseconds& duration)
+  void addAlarmLockHeld(Alarm&, const std::chrono::microseconds& duration,
+                        SimulatedScheduler& simulated_scheduler)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void removeAlarmLockHeld(Alarm&) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
@@ -130,7 +133,6 @@ private:
       alarm_registrations_map_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
   uint32_t pending_alarms_ ABSL_GUARDED_BY(mutex_);
-  Thread::OnlyOneThread only_one_thread_;
 };
 
 // Represents a simulated time system, where time is advanced by calling

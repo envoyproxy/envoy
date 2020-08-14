@@ -194,6 +194,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::
     throwWithMalformedIp(ip_address);
   }
   sockaddr_in sa4;
+  memset(&sa4, 0, sizeof(sa4));
   if (ip_str.empty() || inet_pton(AF_INET, ip_str.c_str(), &sa4.sin_addr) != 1) {
     throwWithMalformedIp(ip_address);
   }
@@ -330,11 +331,12 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
 
 Address::InstanceConstSharedPtr Utility::getCanonicalIpv4LoopbackAddress() {
   CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr,
-                         new Address::Ipv4Instance("127.0.0.1", 0));
+                         new Address::Ipv4Instance("127.0.0.1", 0, nullptr));
 }
 
 Address::InstanceConstSharedPtr Utility::getIpv6LoopbackAddress() {
-  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr, new Address::Ipv6Instance("::1", 0));
+  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr,
+                         new Address::Ipv6Instance("::1", 0, nullptr));
 }
 
 Address::InstanceConstSharedPtr Utility::getIpv4AnyAddress() {

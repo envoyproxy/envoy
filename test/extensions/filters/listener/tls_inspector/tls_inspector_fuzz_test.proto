@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package test.extensions.filters.listener.tls_inspector;
+
+import "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.proto";
+import "validate/validate.proto";
+
+message TlsInspectorTestCase {
+  uint32 max_size = 1 [(validate.rules).uint32.lte = 65536];
+  test.extensions.filters.listener.FilterFuzzTestCase fuzzed = 2
+      [(validate.rules).message.required = true];
+}
