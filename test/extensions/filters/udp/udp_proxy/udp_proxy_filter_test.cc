@@ -30,7 +30,9 @@ namespace {
 
 class MockSocket : public Network::Socket {
 public:
-  MockSocket() : io_handle_(std::make_unique<Network::MockIoHandle>()){};
+  MockSocket()
+      : io_handle_(std::make_unique<Network::MockIoHandle>()),
+        options_(std::make_shared<std::vector<OptionConstSharedPtr>>()){};
   ~MockSocket() override = default;
 
   Network::IoHandle& ioHandle() override { return *io_handle_; };
@@ -40,6 +42,10 @@ public:
   Api::SysCallIntResult setSocketOption(int level, int optname, const void* optval,
                                         socklen_t len) override {
     return io_handle_->setOption(level, optname, optval, len);
+  }
+
+  void addOptions(const Network::Socket::OptionsSharedPtr& options) override {
+    Network::Socket::appendOptions(options_, options);
   }
 
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
@@ -59,9 +65,9 @@ public:
               (const, override));
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool), (override));
   MOCK_METHOD(void, addOption, (const Network::Socket::OptionConstSharedPtr&), (override));
-  MOCK_METHOD(void, addOptions, (const Network::Socket::OptionsSharedPtr&), (override));
 
   const std::unique_ptr<Network::MockIoHandle> io_handle_;
+  Network::Socket::OptionsSharedPtr options_;
 };
 
 class TestUdpProxyFilter : public UdpProxyFilter {
@@ -103,9 +109,6 @@ public:
               return Api::SysCallIntResult{0, 0};
             }
           }));
-      if (!no_support) {
-        EXPECT_CALL(*socket_, addOptions(_)).Times(1);
-      }
     }
 
     void expectUpstreamWrite(const std::string& data, int sys_errno = 0,
@@ -181,6 +184,19 @@ public:
 
       // Kick off the receive.
       file_event_cb_(Event::FileReadyType::Read);
+    }
+
+    absl::optional<Network::Socket::Option::Details>
+    findOptionDetails(const Network::SocketOptionName& name,
+                      envoy::config::core::v3::SocketOption::SocketState state) {
+      for (const auto& option : *socket_->options_) {
+        const auto details = option->getOptionDetails(*socket_, state);
+        if (details.has_value() && details->name_ == name) {
+          return details;
+        }
+      }
+
+      return absl::nullopt;
     }
 
     UdpProxyFilterTest& parent_;
@@ -268,6 +284,14 @@ public:
                           int ipv6_expect) {
     EXPECT_EQ(ipv4_expect, session.sock_opts_[ipv4_option.level()][ipv4_option.option()]);
     EXPECT_EQ(ipv6_expect, session.sock_opts_[ipv6_option.level()][ipv6_option.option()]);
+
+    const auto ipv4_option_details = session.findOptionDetails(
+        ENVOY_SOCKET_IP_TRANSPARENT, envoy::config::core::v3::SocketOption::STATE_PREBIND);
+    const auto ipv6_option_details = session.findOptionDetails(
+        ENVOY_SOCKET_IPV6_TRANSPARENT, envoy::config::core::v3::SocketOption::STATE_PREBIND);
+
+    EXPECT_EQ(ipv4_expect == 1, ipv4_option_details.has_value());
+    EXPECT_EQ(ipv6_expect == 1, ipv6_option_details.has_value());
   }
 
   void checkSocketOptionsSupport(const std::vector<Network::SocketOptionName>& option_names) {
