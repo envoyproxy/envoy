@@ -529,6 +529,7 @@ TEST_P(QuicHttpIntegrationTest, NoNewStreamswhenOverloaded) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
 
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
