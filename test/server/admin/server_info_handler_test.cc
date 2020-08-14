@@ -60,6 +60,42 @@ TEST_P(AdminInstanceTest, Memory) {
                                   Property(&envoy::admin::v3::Memory::total_thread_cache, Ge(0))));
 }
 
+// TODO(lambdai): Enable the test after surfacing the memory_shrink_succeed stats.
+#ifdef TCMALLOC
+TEST_P(AdminInstanceTest, DISABLED_MemoryShrinkAttemptStats) {
+  {
+    // Trigger stats creation.
+    Http::TestResponseHeaderMapImpl response_headers;
+    Buffer::OwnedImpl response;
+    EXPECT_EQ(Http::Code::OK, getCallback("/memory", response_headers, response));
+  }
+  {
+    Http::TestResponseHeaderMapImpl response_headers;
+    std::string body;
+    EXPECT_EQ(Http::Code::OK, admin_.request("/stats", "GET", response_headers, body));
+    EXPECT_THAT(body, HasSubstr("memory_shrink_attempt:"));
+    // The value is greater than 0.
+    EXPECT_THAT(body, Not(HasSubstr("memory_shrink_attempt: 0")));
+    // By default shrink would be triggered only if the gap is greater than 100MB.
+    EXPECT_THAT(body, HasSubstr("envoy.memory_shrink_succeed: 0"));
+  }
+  {
+    Http::TestResponseHeaderMapImpl response_headers;
+    Buffer::OwnedImpl response;
+    EXPECT_EQ(Http::Code::OK, postCallback("/runtime_modify?envoy.memory.heap_shrink_threshold=1",
+                                           response_headers, response));
+    EXPECT_EQ("OK\n", response.toString());
+  }
+  {
+    // The above runtime modify should have triggered a successful shrink.
+    Http::TestResponseHeaderMapImpl response_headers;
+    std::string body;
+    EXPECT_EQ(Http::Code::OK, admin_.request("/stats", "GET", response_headers, body));
+    EXPECT_THAT(body, HasSubstr("envoy.memory_shrink_succeed: 1"));
+  }
+}
+#ifdef TCMALLOC
+
 TEST_P(AdminInstanceTest, GetReadyRequest) {
   NiceMock<Init::MockManager> initManager;
   ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
