@@ -568,7 +568,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
 
 TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
   // Verify that the http inspector can detect http requests
-  // with large request line even when they are splitted over
+  // with large request line even when they are split over
   // multiple recv calls.
   init();
   absl::string_view method = "GET", http = "/index HTTP/1.0\r";
