@@ -100,6 +100,10 @@ bool StringMatcherImpl::match(const absl::string_view value) const {
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSuffix:
     return matcher_.ignore_case() ? absl::EndsWithIgnoreCase(value, matcher_.suffix())
                                   : absl::EndsWith(value, matcher_.suffix());
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kContains:
+    return matcher_.ignore_case() ? absl::StrContains(absl::AsciiStrToLower(value),
+                                                      absl::AsciiStrToLower(matcher_.contains()))
+                                  : absl::StrContains(value, matcher_.contains());
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
     FALLTHRU;
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:
