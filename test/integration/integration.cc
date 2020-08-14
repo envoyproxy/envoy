@@ -149,10 +149,10 @@ void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason, abs
 }
 
 IntegrationTcpClient::IntegrationTcpClient(
-    Event::Dispatcher& dispatcher, Event::TestTimeSystem& time_system, MockBufferFactory& factory,
-    uint32_t port, Network::Address::IpVersion version, bool enable_half_close,
+    Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
+    Network::Address::IpVersion version, bool enable_half_close,
     const Network::ConnectionSocket::OptionsSharedPtr& options)
-    : time_system_(time_system), payload_reader_(new WaitForPayloadReader(dispatcher)),
+    : payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
   EXPECT_CALL(factory, create_(_, _, _))
       .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
@@ -225,7 +225,7 @@ void IntegrationTcpClient::readDisable(bool disabled) { connection_->readDisable
 
 AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_stream, bool verify,
                                             std::chrono::milliseconds timeout) {
-  auto end_time = time_system_.monotonicTime() + timeout;
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
   Buffer::OwnedImpl buffer(data);
   if (verify) {
     EXPECT_CALL(*client_write_buffer_, move(_));
@@ -242,9 +242,9 @@ AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_st
     if (client_write_buffer_->bytes_written() == bytes_expected || disconnected_) {
       break;
     }
-  } while (time_system_.monotonicTime() < end_time);
+  } while (bound.withinBound());
 
-  if (time_system_.monotonicTime() >= end_time) {
+  if (!bound.withinBound()) {
     return AssertionFailure() << "Timed out completing write";
   } else if (verify && (disconnected_ || client_write_buffer_->bytes_written() != bytes_expected)) {
     return AssertionFailure()
@@ -279,7 +279,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // notification and clear the pool connection if necessary. A real fix would require adding fairly
   // complex test hooks to the server and/or spin waiting on stats, neither of which I think are
   // necessary right now.
-  timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+  timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
   ON_CALL(*mock_buffer_factory_, create_(_, _, _))
       .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                std::function<void()> above_overflow) -> Buffer::Instance* {
@@ -412,8 +412,8 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
 IntegrationTcpClientPtr
 BaseIntegrationTest::makeTcpConnection(uint32_t port,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options) {
-  return std::make_unique<IntegrationTcpClient>(*dispatcher_, time_system_, *mock_buffer_factory_,
-                                                port, version_, enable_half_close_, options);
+  return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
+                                                enable_half_close_, options);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
@@ -485,7 +485,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
 
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
     // needs to know about the bound listener ports.
-    auto end_time = time_system_.monotonicTime() + TestUtility::DefaultTimeout;
+    Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
     const char* success = "listener_manager.listener_create_success";
     const char* rejected = "listener_manager.lds.update_rejected";
     for (Stats::CounterSharedPtr success_counter = test_server_->counter(success),
@@ -496,7 +496,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
          (!allow_lds_rejection || rejected_counter == nullptr || rejected_counter->value() == 0);
          success_counter = test_server_->counter(success),
                                  rejected_counter = test_server_->counter(rejected)) {
-      if (time_system_.monotonicTime() >= end_time) {
+      if (!bound.withinBound()) {
         RELEASE_ASSERT(0, "Timed out waiting for listeners.");
       }
       if (!allow_lds_rejection) {
@@ -504,7 +504,8 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
                        absl::StrCat("Lds update failed. Details\n",
                                     getListenerDetails(test_server_->server())));
       }
-      time_system_.advanceTimeWait(std::chrono::milliseconds(10));
+      // TODO(mattklein123): Switch to events and waitFor().
+      time_system_.realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
     }
 
     registerTestServerPorts(port_names);
@@ -698,15 +699,16 @@ AssertionResult compareSets(const std::set<std::string>& set1, const std::set<st
 
 AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
                                                           std::chrono::milliseconds timeout) {
-  const auto end_time = time_system_.monotonicTime() + timeout;
-  while (time_system_.monotonicTime() < end_time) {
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  while (bound.withinBound()) {
     try {
       Network::TcpListenSocket(Network::Utility::getAddressWithPort(
                                    *Network::Test::getCanonicalLoopbackAddress(version_), port),
                                nullptr, true);
       return AssertionSuccess();
     } catch (const EnvoyException&) {
-      timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+      // The nature of this function requires using a real sleep here.
+      timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(100));
     }
   }
 

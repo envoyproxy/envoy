@@ -130,10 +130,17 @@ envoy_cc_library(
     hdrs = ["transport_socket.h"],
     deps = [
         ":io_handle_interface",
+        ":post_io_action_interface",
         ":proxy_protocol_options_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/ssl:connection_interface",
     ],
+)
+
+envoy_cc_library(
+    name = "post_io_action_interface",
+    hdrs = ["post_io_action.h"],
+    deps = [],
 )
 
 envoy_cc_library(

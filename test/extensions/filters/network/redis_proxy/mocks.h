@@ -7,6 +7,7 @@
 #include "extensions/common/redis/cluster_refresh_manager.h"
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/codec_impl.h"
+#include "extensions/filters/network/common/redis/fault.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
 #include "extensions/filters/network/redis_proxy/router.h"
@@ -49,6 +50,15 @@ public:
   MOCK_METHOD(bool, shouldMirror, (const std::string&), (const));
 
   ConnPool::InstanceSharedPtr conn_pool_;
+};
+
+class MockFaultManager : public Common::Redis::FaultManager {
+public:
+  MockFaultManager();
+  MockFaultManager(const MockFaultManager& other);
+  ~MockFaultManager() override;
+
+  MOCK_METHOD(const Common::Redis::Fault*, getFaultForCommand, (const std::string&), (const));
 };
 
 namespace ConnPool {
@@ -110,13 +120,14 @@ public:
   MockInstance();
   ~MockInstance() override;
 
-  SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
-                              SplitCallbacks& callbacks) override {
-    return SplitRequestPtr{makeRequest_(*request, callbacks)};
+  SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
+                              Event::Dispatcher& dispatcher) override {
+    return SplitRequestPtr{makeRequest_(*request, callbacks, dispatcher)};
   }
 
   MOCK_METHOD(SplitRequest*, makeRequest_,
-              (const Common::Redis::RespValue& request, SplitCallbacks& callbacks));
+              (const Common::Redis::RespValue& request, SplitCallbacks& callbacks,
+               Event::Dispatcher& dispatcher));
 };
 
 } // namespace CommandSplitter
