@@ -37,7 +37,7 @@ void Utils::tryShrinkHeap() {
   if (runtime) {
     shrink_threshold = runtime->threadsafeSnapshot()->getInteger(
         "envoy.memory.heap_shrink_threshold", shrink_threshold);
-    if (shrink_attempt_counter) {
+    if (!shrink_attempt_counter) {
       Envoy::Stats::Scope& root_scope = runtime->getRootScope();
 
       Envoy::Stats::StatNameManagedStorage shrink_attempt_stat_name("envoy.memory_shrink_attempt",
@@ -45,7 +45,7 @@ void Utils::tryShrinkHeap() {
 
       shrink_attempt_counter = &root_scope.counterFromStatName(shrink_attempt_stat_name.statName());
     }
-    if (free_memory_counter) {
+    if (!free_memory_counter) {
       Envoy::Stats::Scope& root_scope = runtime->getRootScope();
 
       Envoy::Stats::StatNameManagedStorage free_memory_stat_name("envoy.memory_shrink_succeed",

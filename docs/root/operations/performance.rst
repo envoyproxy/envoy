@@ -77,7 +77,7 @@ Heap Shrink
 -----------
 
 Envoy by default uses tcmalloc as its memory allocator which provides a function to return unused pages to the
-OS and reduce the physical memory usage. Currently envoy Envoy will attempt to shrink the heap when an xDS response
+OS and reduce the physical memory usage. Currently Envoy will attempt to shrink the heap when an xDS response
 is received and also when any :ref:`admin handler<operations_admin_interface>` is hit. 
 
 Since shrinking the heap can be expensive, Envoy will free memory only if there is a chance to reclaim physical memory back.
