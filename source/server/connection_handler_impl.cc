@@ -458,17 +458,14 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     auto& server_dispatcher = config_->dispatcher();
 
     server_dispatcher.post([&filter_chain_message, &worker_name, &listener = config_]() {
-      ENVOY_LOG(debug, "info: worker_name: {}, listener: {}", worker_name, listener->name());
       listener->rebuildFilterChain(filter_chain_message, worker_name);
     });
     // Temporarily decrease num_listener_connections_, will increase when retry this connection. To
     // avoid assert inside listener destructor.
     decNumConnections();
 
-    int num_to_report = numConnections();
-    ENVOY_LOG(debug, "num_Listener_connection when close newConnection: ", num_to_report, "].");
+    ENVOY_LOG(debug, "num_Listener_connection when close newConnection: {}", numConnections());
     // Waiting for later callbacks from master thread to retry this connection.
-
     return;
   }
 

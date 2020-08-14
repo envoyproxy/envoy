@@ -261,6 +261,12 @@ void FilterChainManagerImpl::rebuildFilterChain(
   placeholder->storeRealFilterChain(std::move(filter_chain_impl));
 }
 
+void FilterChainManagerImpl::stopRebuildingFilterChain(
+    const envoy::config::listener::v3::FilterChain* const& filter_chain) {
+  auto placeholder = std::move(fc_contexts_[*filter_chain]);
+  placeholder->backToPlaceholder();
+}
+
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(
     DestinationPortsMap& destination_ports_map, uint16_t destination_port,
     const std::vector<std::string>& destination_ips,

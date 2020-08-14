@@ -144,13 +144,9 @@ public:
   EmptyFilterChain(const envoy::config::listener::v3::FilterChain* filter_chain)
       : filter_chain_message_(filter_chain), is_placeholder_(true) {}
 
-  void storeRealFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
-    is_placeholder_ = false;
-    has_rebuilt_filter_chain_ = true;
-    rebuilt_filter_chain_ = rebuilt_filter_chain;
-  }
-
   // Network::FilterChain
+  bool isPlaceholder() const override { return is_placeholder_; }
+
   const TransportSocketFactory& transportSocketFactory() const override {
     if (has_rebuilt_filter_chain_) {
       return rebuilt_filter_chain_->transportSocketFactory();
@@ -166,11 +162,19 @@ public:
       return empty_network_filter_factory_;
     }
   }
-
-  bool isPlaceholder() const override { return is_placeholder_; }
-
   const envoy::config::listener::v3::FilterChain* const& getFilterChainMessage() const override {
     return filter_chain_message_;
+  }
+  void storeRealFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
+    is_placeholder_ = false;
+    has_rebuilt_filter_chain_ = true;
+    rebuilt_filter_chain_ = rebuilt_filter_chain;
+  }
+  void backToPlaceholder() override {
+    is_placeholder_ = true;
+    has_rebuilt_filter_chain_ = false;
+    // rebuilt_filter_chain_.reset();
+    rebuilt_filter_chain_ = nullptr;
   }
 
 private:

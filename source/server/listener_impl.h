@@ -367,6 +367,8 @@ public:
   Event::Dispatcher& dispatcher() override;
   void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
                           const std::string& worker_name) override;
+  void
+  stopRebuildingFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain);
 
   Init::Manager& initManager();
   envoy::config::core::v3::TrafficDirection direction() const override {

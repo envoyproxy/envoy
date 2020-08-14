@@ -183,12 +183,13 @@ public:
 
   // Network::DrainableFilterChain
   MOCK_METHOD(const TransportSocketFactory&, transportSocketFactory, (), (const));
-  MOCK_METHOD(void, storeRealFilterChain, (Network::FilterChainSharedPtr));
-  MOCK_METHOD(const std::vector<FilterFactoryCb>&, networkFilterFactories, (), (const));
-  MOCK_METHOD(void, startDraining, ());
   MOCK_METHOD(bool, isPlaceholder, (), (const));
+  MOCK_METHOD(const std::vector<FilterFactoryCb>&, networkFilterFactories, (), (const));
   MOCK_METHOD(const envoy::config::listener::v3::FilterChain* const&, getFilterChainMessage, (),
               (const));
+  MOCK_METHOD(void, storeRealFilterChain, (Network::FilterChainSharedPtr));
+  MOCK_METHOD(void, backToPlaceholder, ());
+  MOCK_METHOD(void, startDraining, ());
 };
 
 class MockFilterChainManager : public FilterChainManager {

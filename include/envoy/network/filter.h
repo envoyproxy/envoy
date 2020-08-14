@@ -355,7 +355,10 @@ class FilterChain {
 public:
   virtual ~FilterChain() = default;
 
-  virtual void storeRealFilterChain(Network::FilterChainSharedPtr real_filter_chain) PURE;
+  /**
+   * @return TRUE if this filter chain is a place holder. FALSE if it is not.
+   */
+  virtual bool isPlaceholder() const PURE;
 
   /**
    * @return const TransportSocketFactory& a transport socket factory to be used by the new
@@ -368,9 +371,23 @@ public:
    */
   virtual const std::vector<FilterFactoryCb>& networkFilterFactories() const PURE;
 
-  virtual bool isPlaceholder() const PURE;
-
+  /**
+   * @return the filter chain protobuf message stored inside filter chain placeholder. This will
+   * help to provide config information when rebuilding is requested.
+   */
   virtual const envoy::config::listener::v3::FilterChain* const& getFilterChainMessage() const PURE;
+
+  /**
+   * After a filter chain placeholder is rebuilt, this function will store the real filter chain
+   * inside the placeholder to provide transportSocketFactory and networkFilterFactories.
+   */
+  virtual void storeRealFilterChain(Network::FilterChainSharedPtr real_filter_chain) PURE;
+
+  /**
+   * If the filter chain rebuilding fails or timeout, the rebuilt filter chain will be deleted. And
+   * the original filter chain will become a placeholder again.
+   */
+  virtual void backToPlaceholder() PURE;
 };
 
 /**

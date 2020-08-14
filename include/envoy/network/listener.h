@@ -163,8 +163,14 @@ public:
    */
   virtual const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const PURE;
 
+  /**
+   * @return the dispatcher of the master thread.
+   */
   virtual Event::Dispatcher& dispatcher() PURE;
 
+  /**
+   * This function will be called by a worker to rebuild a filter chain placeholder.
+   */
   virtual void
   rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
                      const std::string& worker_name) PURE;

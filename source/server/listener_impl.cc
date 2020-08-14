@@ -234,7 +234,7 @@ PerFilterChainRebuilder::PerFilterChainRebuilder(
                            rebuild_complete_ = true;
                            rebuild_success_ = true;
                            callbackToWorkers(rebuild_success_);
-                           // rebuild_timer_->disableTimer();
+                           rebuild_timer_->disableTimer();
                          }
                        }),
       rebuild_timer_(listener_.dispatcher().createTimer([this]() -> void { onTimeout(); })),
@@ -246,12 +246,12 @@ void PerFilterChainRebuilder::storeWorkerInCallbackList(const std::string& worke
 }
 
 void PerFilterChainRebuilder::callbackToWorkers(bool success) {
-  // Time out before dependencies response. Already sent callbacks.
+  // Already sent callbacks.
   if (rebuild_complete_) {
     return;
   }
 
-  // Find all matching workers and listeners, send callback.
+  // Find all matching workers and listeners, sending callbacks.
   for (const auto& worker_name : workers_to_callback_) {
     ENVOY_LOG(debug, "rebuilding completed, callback to worker: {}", worker_name);
     listener_.getWorkerByName(worker_name)->notifyListenersOnRebuilt(success, filter_chain_);
@@ -275,9 +275,11 @@ void PerFilterChainRebuilder::onTimeout() {
     rebuild_timer_->disableTimer();
   } else {
     // if timeout before getting response from dependencies, rebuilding fails.
+    listener_.stopRebuildingFilterChain(filter_chain_);
     rebuild_complete_ = true;
     rebuild_success_ = false;
     callbackToWorkers(rebuild_success_);
+    // go back to placeholder.
   }
 }
 
@@ -563,10 +565,12 @@ void ListenerImpl::rebuildFilterChain(
     on_first_request = true;
   }
 
+  ENVOY_LOG(debug, "receive rebuilding request from worker: {}", worker_name);
   const auto& rebuilder = std::move(filter_chain_rebuilder_map_[filter_chain_message]);
   rebuilder->storeWorkerInCallbackList(worker_name);
 
   if (rebuilder->rebuildCompleted()) {
+    ENVOY_LOG(debug, "rebuilding for this filter chain has completed");
     rebuilder->callbackToWorkers(rebuilder->rebuildSuccess());
     return;
   }
@@ -582,8 +586,14 @@ void ListenerImpl::rebuildFilterChain(
     transport_factory_context.setInitManager(rebuilder->initManager());
     ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
     filter_chain_manager_.rebuildFilterChain(filter_chain_message, builder, filter_chain_manager_);
+    // After passing init manager to transport factory context, when should I start init.
     rebuilder->startRebuilding();
   }
+}
+
+void ListenerImpl::stopRebuildingFilterChain(
+    const envoy::config::listener::v3::FilterChain* const& filter_chain_message) {
+  filter_chain_manager_.stopRebuildingFilterChain(filter_chain_message);
 }
 
 WorkerPtr& ListenerImpl::getWorkerByName(const std::string& name) {

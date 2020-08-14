@@ -96,15 +96,12 @@ public:
   FilterChainImpl(const envoy::config::listener::v3::FilterChain* filter_chain)
       : filter_chain_message_(filter_chain), is_placeholder_(true) {}
 
-  void storeRealFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
+  // Network::FilterChain
+  bool isPlaceholder() const override {
     absl::MutexLock lock(&lock_);
-
-    is_placeholder_ = false;
-    has_rebuilt_filter_chain_ = true;
-    rebuilt_filter_chain_ = std::move(rebuilt_filter_chain);
+    return is_placeholder_;
   }
 
-  // Network::FilterChain
   const Network::TransportSocketFactory& transportSocketFactory() const override {
     if (has_rebuilt_filter_chain_) {
       return rebuilt_filter_chain_->transportSocketFactory();
@@ -121,21 +118,33 @@ public:
     }
   }
 
+  const envoy::config::listener::v3::FilterChain* const& getFilterChainMessage() const override {
+    return filter_chain_message_;
+  }
+
+  void storeRealFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
+    absl::MutexLock lock(&lock_);
+
+    is_placeholder_ = false;
+    has_rebuilt_filter_chain_ = true;
+    rebuilt_filter_chain_ = std::move(rebuilt_filter_chain);
+  }
+
+  void backToPlaceholder() override {
+    absl::MutexLock lock(&lock_);
+
+    is_placeholder_ = true;
+    has_rebuilt_filter_chain_ = false;
+    rebuilt_filter_chain_.reset();
+    rebuilt_filter_chain_ = nullptr;
+  }
+
   void startDraining() override { factory_context_->startDraining(); }
 
   void setFilterChainFactoryContext(
       Configuration::FilterChainFactoryContextPtr filter_chain_factory_context) {
     ASSERT(factory_context_ == nullptr);
     factory_context_ = std::move(filter_chain_factory_context);
-  }
-
-  bool isPlaceholder() const override {
-    absl::MutexLock lock(&lock_);
-    return is_placeholder_;
-  }
-
-  const envoy::config::listener::v3::FilterChain* const& getFilterChainMessage() const override {
-    return filter_chain_message_;
   }
 
 private:
@@ -240,6 +249,11 @@ public:
   void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
                           FilterChainFactoryBuilder& b,
                           FilterChainFactoryContextCreator& context_creator);
+
+  // If a filter chain rebuilding reaches timeout, we will stop the rebuilding, make the filter
+  // chain back to a placeholder.
+  void
+  stopRebuildingFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain);
 
   static bool isWildcardServerName(const std::string& name);
 
