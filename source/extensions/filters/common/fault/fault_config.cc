@@ -13,7 +13,7 @@ namespace Fault {
 
 envoy::type::v3::FractionalPercent
 HeaderPercentageProvider::percentage(const Http::RequestHeaderMap* request_headers) const {
-  if(request_headers == nullptr){
+  if (request_headers == nullptr) {
     // If request_headers is nullptr, return the default percentage.
     return percentage_;
   }
