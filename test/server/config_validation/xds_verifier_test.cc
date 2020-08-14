@@ -224,4 +224,23 @@ TEST(XdsVerifier, RemoveThenAddListener) {
   EXPECT_TRUE(verifier.hasListener("listener_0", verifier.ACTIVE));
 }
 
+TEST(XdsVerifier, UpdateBackToOriginal) {
+  XdsVerifier verifier(test::server::config_validation::Config::SOTW);
+
+  // add an active listener
+  verifier.listenerAdded(buildListener("listener_0", "route_config_0"));
+  verifier.routeAdded(buildRoute("route_config_0"));
+  EXPECT_TRUE(verifier.hasListener("listener_0", verifier.ACTIVE));
+
+  // update it to a new route, should warm
+  verifier.listenerUpdated(buildListener("listener_0", "route_config_1"));
+  EXPECT_TRUE(verifier.hasListener("listener_0", verifier.ACTIVE));
+  EXPECT_TRUE(verifier.hasListener("listener_0", verifier.WARMING));
+
+  // update it back to original, should remove warming listener
+  verifier.listenerUpdated(buildListener("listener_0", "route_config_0"));
+  EXPECT_FALSE(verifier.hasListener("listener_0", verifier.WARMING));
+  EXPECT_TRUE(verifier.hasListener("listener_0", verifier.ACTIVE));
+}
+
 } // namespace Envoy

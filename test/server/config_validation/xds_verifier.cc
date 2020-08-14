@@ -81,10 +81,37 @@ void XdsVerifier::listenerUpdated(const envoy::config::listener::v3::Listener& l
   ENVOY_LOG_MISC(debug, "About to update listener {} to {}", listener.name(), getRoute(listener));
   dumpState();
 
-  if (std::any_of(listeners_.begin(), listeners_.end(), [&](auto& rep) {
+  const auto existing_warming =
+      std::find_if(listeners_.begin(), listeners_.end(), [&](const auto& rep) {
         return rep.listener.name() == listener.name() &&
-               getRoute(listener) == getRoute(rep.listener) && rep.state != DRAINING;
-      })) {
+               getRoute(rep.listener) == getRoute(listener) && rep.state == WARMING;
+      });
+  const auto existing_active =
+      std::find_if(listeners_.begin(), listeners_.end(), [&](const auto& rep) {
+        return rep.listener.name() == listener.name() &&
+               getRoute(rep.listener) == getRoute(listener) && rep.state == ACTIVE;
+      });
+
+  // return early if the listener is a duplicate
+  if (existing_active != listeners_.end()) {
+    const auto warming_to_remove =
+        std::find_if(listeners_.begin(), listeners_.end(), [&](const auto& rep) {
+          return rep.listener.name() == listener.name() && rep.state == WARMING;
+        });
+
+    // the listener should be updated back to its original state and the warming removed
+    if (warming_to_remove != listeners_.end()) {
+      ENVOY_LOG_MISC(debug, "Removing warming listener {} after update", listener.name());
+      num_modified_++;
+      num_warming_--;
+      listeners_.erase(warming_to_remove);
+      return;
+    }
+    ENVOY_LOG_MISC(debug, "Ignoring duplicate add of {}", listener.name());
+    return;
+  }
+
+  if (existing_warming != listeners_.end()) {
     ENVOY_LOG_MISC(debug, "Ignoring duplicate add of {}", listener.name());
     return;
   }
