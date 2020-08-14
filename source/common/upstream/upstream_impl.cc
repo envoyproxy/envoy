@@ -706,7 +706,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       source_address_(getSourceAddress(config, bind_config)),
       lb_least_request_config_(config.least_request_lb_config()),
-      lb_key_config_(config.key_lb_config()), lb_ring_hash_config_(config.ring_hash_lb_config()),
+      lb_ring_hash_config_(config.ring_hash_lb_config()),
       lb_original_dst_config_(config.original_dst_lb_config()),
       upstream_config_(config.has_upstream_config()
                            ? absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
@@ -763,12 +763,6 @@ ClusterInfoImpl::ClusterInfoImpl(
     break;
   case envoy::config::cluster::v3::Cluster::MAGLEV:
     lb_type_ = LoadBalancerType::Maglev;
-    break;
-  case envoy::config::cluster::v3::Cluster::KEY:
-    if (config.lb_config_case() != envoy::config::cluster::v3::Cluster::kKeyLbConfig) {
-      throw EnvoyException("Cluster config `key_lb_config` must be set when lb_policy is `KEY`");
-    }
-    lb_type_ = LoadBalancerType::Key;
     break;
   case envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED:
     if (config.has_lb_subset_config()) {

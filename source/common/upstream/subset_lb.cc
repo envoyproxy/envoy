@@ -27,12 +27,10 @@ SubsetLoadBalancer::SubsetLoadBalancer(
         lb_ring_hash_config,
     const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
         least_request_config,
-    const absl::optional<envoy::config::cluster::v3::Cluster::KeyLbConfig>& key_config,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config),
-      least_request_config_(least_request_config), key_config_(key_config),
-      common_config_(common_config), stats_(stats), scope_(scope), runtime_(runtime),
-      random_(random), fallback_policy_(subsets.fallbackPolicy()),
+      least_request_config_(least_request_config), common_config_(common_config), stats_(stats),
+      scope_(scope), runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
       default_subset_metadata_(subsets.defaultSubset().fields().begin(),
                                subsets.defaultSubset().fields().end()),
       subset_selectors_(subsets.subsetSelectors()), original_priority_set_(priority_set),
@@ -64,14 +62,21 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     panic_mode_subset_ = subset_any_;
   }
 
+  initSubsetSelectorMap();
+
   // Create filtered default subset (if necessary) and other subsets based on current hosts.
   refreshSubsets();
 
-  initSubsetSelectorMap();
+  // This must happen after `initSubsetSelectorMap()` because that initializes `single_`.
+  rebuildSingle();
 
   // Configure future updates.
   original_priority_set_callback_handle_ = priority_set.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
+        auto start = std::chrono::steady_clock::now();
+
+        rebuildSingle();
+
         if (hosts_added.empty() && hosts_removed.empty()) {
           // It's possible that metadata changed, without hosts being added nor removed.
           // If so we need to add any new subsets, remove unused ones, and regroup hosts into
@@ -88,6 +93,10 @@ SubsetLoadBalancer::SubsetLoadBalancer(
         }
 
         purgeEmptySubsets(subsets_);
+        auto end = std::chrono::steady_clock::now();
+        auto elapsed = end - start;
+        ENVOY_LOG_MISC(info, "subset load balancer rebuild time: {}us",
+                       std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count());
       });
 }
 
@@ -101,6 +110,30 @@ SubsetLoadBalancer::~SubsetLoadBalancer() {
       stats_.lb_subsets_active_.dec();
     }
   });
+}
+
+void SubsetLoadBalancer::rebuildSingle() {
+  if (single_) {
+    // Because PriorityUpdateCb doesn't give a modified list (only added and removed), it is
+    // faster to just rebuild this map than try to figure out if any hosts had their metadata
+    // changed, and then figure out the old and new value (to remove from the old key in this map
+    // and insert in the new key).
+    single_host_per_subset_map_.clear();
+    for (const auto& host_set : original_priority_set_.hostSetsPerPriority()) {
+      for (const auto& host : host_set->hosts()) {
+        MetadataConstSharedPtr metadata = host->metadata();
+        const auto& filter_metadata = metadata->filter_metadata();
+        auto filter_it = filter_metadata.find(Config::MetadataFilters::get().ENVOY_LB);
+        if (filter_it != filter_metadata.end()) {
+          const auto& fields = filter_it->second.fields();
+          auto fields_it = fields.find(single_key_);
+          if (fields_it != fields.end()) {
+            single_host_per_subset_map_[fields_it->second] = host;
+          }
+        }
+      }
+    }
+  }
 }
 
 void SubsetLoadBalancer::refreshSubsets() {
@@ -131,6 +164,23 @@ void SubsetLoadBalancer::initSubsetSelectorMap() {
     const auto& selector_keys = subset_selector->selectorKeys();
     const auto& selector_fallback_policy = subset_selector->fallbackPolicy();
     const auto& selector_fallback_keys_subset = subset_selector->fallbackKeysSubset();
+
+    if (subset_selector->singleHostPerSubset()) {
+      if (subset_selectors_.size() > 1) {
+        throw EnvoyException("subset_lb selector: single_host_per_subset cannot be set when there "
+                             "are multiple subset selectors.");
+      }
+      if (selector_keys.size() > 1) {
+        throw EnvoyException("subset_lb selector: single_host_per_subset cannot bet set when there "
+                             "are multiple selector keys.");
+      }
+      single_ = true;
+      single_key_ = *selector_keys.begin();
+
+      subset_selectors_.clear();
+      return;
+    }
+
     if (selector_fallback_policy ==
         envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED) {
       continue;
@@ -280,6 +330,22 @@ HostConstSharedPtr SubsetLoadBalancer::tryChooseHostFromContext(LoadBalancerCont
   host_chosen = false;
   const Router::MetadataMatchCriteria* match_criteria = context->metadataMatchCriteria();
   if (!match_criteria) {
+    return nullptr;
+  }
+
+  if (single_) {
+    for (const auto& entry : match_criteria->metadataMatchCriteria()) {
+      if (entry->name() == single_key_) {
+        auto it = single_host_per_subset_map_.find(entry->value());
+        if (it != single_host_per_subset_map_.end()) {
+          if (it->second->health() != Host::Health::Unhealthy) {
+            host_chosen = true;
+            return it->second;
+          }
+        }
+        break;
+      }
+    }
     return nullptr;
   }
 
@@ -676,15 +742,6 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
         subset_lb.common_config_);
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
-    break;
-
-  case LoadBalancerType::Key:
-    ASSERT(subset_lb.key_config_.has_value()); // Validated when constructing ClusterEntry
-
-    lb_ = std::make_unique<KeyLoadBalancer>(*this, subset_lb.original_local_priority_set_,
-                                            subset_lb.stats_, subset_lb.runtime_, subset_lb.random_,
-                                            subset_lb.common_config_, *subset_lb.key_config_,
-                                            subset_lb.least_request_config_);
     break;
 
   case LoadBalancerType::OriginalDst:

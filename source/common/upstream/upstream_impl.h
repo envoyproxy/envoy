@@ -559,10 +559,6 @@ public:
   lbLeastRequestConfig() const override {
     return lb_least_request_config_;
   }
-  const absl::optional<envoy::config::cluster::v3::Cluster::KeyLbConfig>&
-  lbKeyConfig() const override {
-    return lb_key_config_;
-  }
   const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
   lbRingHashConfig() const override {
     return lb_ring_hash_config_;
@@ -678,7 +674,6 @@ private:
   LoadBalancerType lb_type_;
   absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
       lb_least_request_config_;
-  absl::optional<envoy::config::cluster::v3::Cluster::KeyLbConfig> lb_key_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
   absl::optional<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;

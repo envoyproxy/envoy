@@ -1241,7 +1241,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
         cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
         cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
         cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbLeastRequestConfig(),
-        cluster->lbKeyConfig(), cluster->lbConfig());
+        cluster->lbConfig());
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
@@ -1265,14 +1265,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
                                                      parent.parent_.random_, cluster->lbConfig());
       break;
     }
-    case LoadBalancerType::Key:
-      ASSERT(lb_factory_ == nullptr);
-      ASSERT(cluster->lbKeyConfig().has_value());
-      lb_ = std::make_unique<KeyLoadBalancer>(
-          priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
-          parent.parent_.random_, cluster->lbConfig(), *cluster->lbKeyConfig(),
-          cluster->lbLeastRequestConfig());
-      break;
     case LoadBalancerType::ClusterProvided:
     case LoadBalancerType::RingHash:
     case LoadBalancerType::Maglev:

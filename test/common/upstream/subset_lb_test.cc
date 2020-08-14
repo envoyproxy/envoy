@@ -293,7 +293,7 @@ public:
     }
 
     return std::make_shared<SubsetSelectorImpl>(selector_keys_mapped, fallback_policy,
-                                                fallback_keys_subset_mapped);
+                                                fallback_keys_subset_mapped, false);
   }
 
   SubsetSelectorPtr makeSelector(

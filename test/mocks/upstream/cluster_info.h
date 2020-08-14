@@ -107,8 +107,6 @@ public:
               lbRingHashConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&,
               lbLeastRequestConfig, (), (const));
-  MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::KeyLbConfig>&, lbKeyConfig,
-              (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&,
               lbOriginalDstConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&, upstreamConfig,
