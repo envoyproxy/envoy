@@ -1,4 +1,4 @@
-#include "extensions/filters/listener/http_inspector/http_inspector.h"
+#include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.h"
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"
@@ -7,9 +7,10 @@
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
-namespace HttpInspector {
+namespace ProxyProtocol {
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCase& input) {
+
   try {
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {
@@ -17,15 +18,9 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCas
     return;
   }
 
-  Stats::IsolatedStoreImpl store;
-  ConfigSharedPtr cfg = std::make_shared<Config>(store);
-  auto filter = std::make_unique<Filter>(cfg);
-
-  ListenerFilterFuzzer fuzzer;
-  fuzzer.fuzz(*filter, input);
 }
 
-} // namespace HttpInspector
+} // namespace ProxyProtocol
 } // namespace ListenerFilters
 } // namespace Extensions
 } // namespace Envoy

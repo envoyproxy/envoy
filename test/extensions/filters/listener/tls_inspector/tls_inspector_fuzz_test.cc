@@ -11,12 +11,11 @@ namespace TlsInspector {
 
 DEFINE_PROTO_FUZZER(
     const test::extensions::filters::listener::tls_inspector::TlsInspectorTestCase& input) {
-
   try {
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {
     ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
-    return;
+     return;
   }
 
   Stats::IsolatedStoreImpl store;
