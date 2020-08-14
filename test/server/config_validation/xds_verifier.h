@@ -24,7 +24,6 @@ public:
   void drainedListener(const std::string& name);
 
   void routeAdded(const envoy::config::route::v3::RouteConfiguration& route);
-  void routeUpdated(const envoy::config::route::v3::RouteConfiguration& route);
 
   enum ListenerState { WARMING, ACTIVE, DRAINING, REMOVED };
   struct ListenerRepresentation {

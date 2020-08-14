@@ -79,6 +79,7 @@ public:
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return empty_access_logs_;
   }
+  uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {

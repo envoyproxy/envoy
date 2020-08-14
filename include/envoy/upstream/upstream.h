@@ -577,6 +577,8 @@ public:
   COUNTER(upstream_rq_pending_total)                                                               \
   COUNTER(upstream_rq_per_try_timeout)                                                             \
   COUNTER(upstream_rq_retry)                                                                       \
+  COUNTER(upstream_rq_retry_backoff_exponential)                                                   \
+  COUNTER(upstream_rq_retry_backoff_ratelimited)                                                   \
   COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
   COUNTER(upstream_rq_retry_overflow)                                                              \
   COUNTER(upstream_rq_retry_success)                                                               \

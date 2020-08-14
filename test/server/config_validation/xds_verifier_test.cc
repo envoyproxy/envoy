@@ -187,7 +187,7 @@ TEST(XdsVerifier, ResendRouteSOTW) {
   EXPECT_TRUE(verifier.hasListener("listener_0", verifier.WARMING));
 
   // send the same route again, make sure listener becomes active
-  verifier.routeUpdated(buildRoute("route_config_0"));
+  verifier.routeAdded(buildRoute("route_config_0"));
   EXPECT_TRUE(verifier.hasListener("listener_0", verifier.ACTIVE));
 }
 
@@ -202,7 +202,7 @@ TEST(XdsVerifier, ResendRouteDelta) {
   EXPECT_TRUE(verifier.hasListener("listener_0", verifier.WARMING));
 
   // send the same route again, make sure listener becomes active
-  verifier.routeUpdated(buildRoute("route_config_0"));
+  verifier.routeAdded(buildRoute("route_config_0"));
   EXPECT_TRUE(verifier.hasListener("listener_0", verifier.ACTIVE));
 }
 
