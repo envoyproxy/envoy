@@ -97,6 +97,45 @@ private:
 
 using SslHandshakerImplSharedPtr = std::shared_ptr<SslHandshakerImpl>;
 
+class HandshakerFactoryContextImpl : public Ssl::HandshakerFactoryContext {
+public:
+  HandshakerFactoryContextImpl(Api::Api& api, absl::string_view alpn_protocols)
+      : api_(api), alpn_protocols_(alpn_protocols) {}
+
+  // HandshakerFactoryContext
+  Api::Api& api() override { return api_; }
+  absl::string_view alpnProtocols() const override { return alpn_protocols_; }
+
+private:
+  Api::Api& api_;
+  const std::string alpn_protocols_;
+};
+
+class HandshakerFactoryImpl : public Ssl::HandshakerFactory {
+public:
+  std::string name() const override { return "envoy.default_tls_handshaker"; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  }
+
+  Ssl::HandshakerFactoryCb createHandshakerCb(const Protobuf::Message&,
+                                              Ssl::HandshakerFactoryContext&,
+                                              ProtobufMessage::ValidationVisitor&) override {
+    // The default HandshakerImpl doesn't take a config or use the HandshakerFactoryContext.
+    return [](bssl::UniquePtr<SSL> ssl, int ssl_extended_socket_info_index,
+              Ssl::HandshakeCallbacks* handshake_callbacks) {
+      return std::make_shared<SslHandshakerImpl>(std::move(ssl), ssl_extended_socket_info_index,
+                                                 handshake_callbacks);
+    };
+  }
+
+  static HandshakerFactory* getDefaultHandshakerFactory() {
+    static HandshakerFactoryImpl default_handshaker_factory;
+    return &default_handshaker_factory;
+  }
+};
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

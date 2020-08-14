@@ -215,6 +215,24 @@ ContextConfigImpl::ContextConfigImpl(
       }
     }
   }
+
+  HandshakerFactoryContextImpl handshaker_factory_context(api_, alpnProtocols());
+  Ssl::HandshakerFactory* handshaker_factory;
+  if (config.has_custom_listener_handshaker()) {
+    // If a custom handshaker is configured, derive the factory from the config.
+    const auto& handshaker_config = config.custom_listener_handshaker();
+    handshaker_factory =
+        &Config::Utility::getAndCheckFactory<Ssl::HandshakerFactory>(handshaker_config);
+    handshaker_factory_cb_ = handshaker_factory->createHandshakerCb(
+        handshaker_config.typed_config(), handshaker_factory_context,
+        factory_context.messageValidationVisitor());
+  } else {
+    // Otherwise, derive the config from the default factory.
+    handshaker_factory = HandshakerFactoryImpl::getDefaultHandshakerFactory();
+    handshaker_factory_cb_ = handshaker_factory->createHandshakerCb(
+        *handshaker_factory->createEmptyConfigProto(), handshaker_factory_context,
+        factory_context.messageValidationVisitor());
+  }
 }
 
 Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(
@@ -273,11 +291,7 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
 }
 
 Ssl::HandshakerFactoryCb ContextConfigImpl::createHandshaker() const {
-  return [](bssl::UniquePtr<SSL> ssl, int ssl_extended_socket_info_index,
-            Ssl::HandshakeCallbacks* handshake_callbacks) {
-    return std::make_shared<SslHandshakerImpl>(std::move(ssl), ssl_extended_socket_info_index,
-                                               handshake_callbacks);
-  };
+  return handshaker_factory_cb_;
 }
 
 ContextConfigImpl::~ContextConfigImpl() {

@@ -95,6 +95,8 @@ private:
   Envoy::Common::CallbackHandle* cvc_validation_callback_handle_{};
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
+
+  Ssl::HandshakerFactoryCb handshaker_factory_cb_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {
