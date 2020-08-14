@@ -23,7 +23,10 @@ public:
                       ThreadLocal::SlotAllocator& slot_allocator,
                       Thread::ThreadFactory& thread_factory);
 
+  // WRITE DOC
   KafkaProducerWrapper& getProducerForTopic(const std::string& topic);
+
+  size_t getProducerCountForTest();
 
 private:
   ThreadLocal::SlotPtr tls_;

@@ -20,6 +20,8 @@ public:
 
   KafkaProducerWrapper& getProducerForTopic(const std::string& topic);
 
+  size_t getProducerCountForTest() const;
+
 private:
   // Mutates 'cluster_to_kafka_client_'.
   KafkaProducerWrapper& registerNewProducer(const ClusterConfig& cluster_config);
@@ -65,6 +67,10 @@ ThreadLocalKafkaFacade::registerNewProducer(const ClusterConfig& cluster_config)
   return *(result.first->second);
 }
 
+size_t ThreadLocalKafkaFacade::getProducerCountForTest() const {
+  return cluster_to_kafka_client_.size();
+}
+
 UpstreamKafkaFacade::UpstreamKafkaFacade(const ClusteringConfiguration& clustering_configuration,
                                          ThreadLocal::SlotAllocator& slot_allocator,
                                          Thread::ThreadFactory& thread_factory)
@@ -82,6 +88,10 @@ UpstreamKafkaFacade::UpstreamKafkaFacade(const ClusteringConfiguration& clusteri
 // Return Producer instance that is local to given thread, via ThreadLocalKafkaFacade.
 KafkaProducerWrapper& UpstreamKafkaFacade::getProducerForTopic(const std::string& topic) {
   return tls_->getTyped<ThreadLocalKafkaFacade>().getProducerForTopic(topic);
+}
+
+size_t UpstreamKafkaFacade::getProducerCountForTest() {
+  return tls_->getTyped<ThreadLocalKafkaFacade>().getProducerCountForTest();
 }
 
 } // namespace Mesh
