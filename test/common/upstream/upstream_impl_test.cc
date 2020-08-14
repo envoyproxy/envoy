@@ -2549,7 +2549,7 @@ TEST_F(StrictDnsClusterImplTest, CircuitBreakersMaxRetriesAndRetryBudgetExclusio
   EXPECT_THROW_WITH_REGEX(StrictDnsClusterImpl(cluster_config, runtime_, dns_resolver_,
                                                factory_context, std::move(scope), false),
                           EnvoyException,
-                          "Cannot use both max_retries and retry_budget in cluster: 'my-cluster'");
+                          "Cannot use both max_retries and retry_budget in cluster");
 }
 
 TEST_F(ClusterInfoImplTest, Timeouts) {

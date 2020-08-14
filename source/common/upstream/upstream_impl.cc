@@ -1181,8 +1181,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
   if (it != thresholds.cend()) {
     // Catch case where max_retries is set but will be ignored!
     if (it->has_max_retries() && it->has_retry_budget()) {
-      throw EnvoyException(fmt::format(
-          "Cannot use both max_retries and retry_budget in cluster: '{}'", cluster_name));
+      throw EnvoyException("Cannot use both max_retries and retry_budget in cluster");
     }
 
     max_connections = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connections, max_connections);
