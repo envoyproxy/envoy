@@ -44,13 +44,13 @@ public:
 } // namespace
 
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
-                     const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
+                     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                     Ssl::HandshakerFactoryCb handshaker_factory_cb)
     : transport_socket_options_(transport_socket_options),
-      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)) {
-  bssl::UniquePtr<SSL> ssl = ctx_->newSsl(transport_socket_options_.get());
-  info_ =
-      std::make_shared<SslHandshakerImpl>(std::move(ssl), ctx_->sslExtendedSocketInfoIndex(), this);
-
+      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
+      info_(std::dynamic_pointer_cast<SslHandshakerImpl>(
+          handshaker_factory_cb(ctx_->newSsl(transport_socket_options_.get()),
+                                ctx_->sslExtendedSocketInfoIndex(), this))) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(rawSsl());
   } else {
@@ -336,7 +336,7 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
   }
   if (ssl_ctx) {
     return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Client,
-                                       transport_socket_options);
+                                       transport_socket_options, config_->createHandshaker());
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.upstream_context_secrets_not_ready_.inc();
@@ -376,7 +376,8 @@ ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsSha
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
-    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server, nullptr);
+    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server, nullptr,
+                                       config_->createHandshaker());
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.downstream_context_secrets_not_ready_.inc();

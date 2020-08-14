@@ -43,5 +43,9 @@ public:
   virtual Network::PostIoAction doHandshake() PURE;
 };
 
+using HandshakerSharedPtr = std::shared_ptr<Handshaker>;
+using HandshakerFactoryCb =
+    std::function<HandshakerSharedPtr(bssl::UniquePtr<SSL>, int, HandshakeCallbacks*)>;
+
 } // namespace Ssl
 } // namespace Envoy

@@ -12,6 +12,8 @@
 #include "common/secret/sds_api.h"
 #include "common/ssl/certificate_validation_context_config_impl.h"
 
+#include "extensions/transport_sockets/tls/ssl_handshaker.h"
+
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -268,6 +270,14 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
           });
     }
   }
+}
+
+Ssl::HandshakerFactoryCb ContextConfigImpl::createHandshaker() const {
+  return [](bssl::UniquePtr<SSL> ssl, int ssl_extended_socket_info_index,
+            Ssl::HandshakeCallbacks* handshake_callbacks) {
+    return std::make_shared<SslHandshakerImpl>(std::move(ssl), ssl_extended_socket_info_index,
+                                               handshake_callbacks);
+  };
 }
 
 ContextConfigImpl::~ContextConfigImpl() {

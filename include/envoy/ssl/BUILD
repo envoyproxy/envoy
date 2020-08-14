@@ -29,6 +29,7 @@ envoy_cc_library(
     hdrs = ["context_config.h"],
     deps = [
         ":certificate_validation_context_config_interface",
+        ":handshaker_interface",
         ":tls_certificate_config_interface",
     ],
 )

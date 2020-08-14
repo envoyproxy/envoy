@@ -49,7 +49,8 @@ class SslSocket : public Network::TransportSocket,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
-            const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+            const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+            Ssl::HandshakerFactoryCb handshaker_factory_cb);
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
