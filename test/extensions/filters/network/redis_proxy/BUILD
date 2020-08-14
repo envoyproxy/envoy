@@ -153,7 +153,6 @@ envoy_extension_cc_test(
     name = "redis_proxy_integration_test",
     srcs = ["redis_proxy_integration_test.cc"],
     extension_name = "envoy.filters.network.redis_proxy",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/redis_proxy:config",

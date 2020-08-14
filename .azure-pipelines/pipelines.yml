@@ -7,11 +7,6 @@ trigger:
     include:
       - "v*"
 
-parameters:
-  - name: flakyBuildOption
-    type: string
-    default: "--flaky_test_attempts=2"
-
 # PR build config is manually overridden in Azure pipelines UI with different secrets
 pr: none
 
@@ -27,20 +22,20 @@ jobs:
           path: $(Build.StagingDirectory)/repository_cache
         continueOnError: true
 
-      - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
-        workingDirectory: $(Build.SourcesDirectory)
-        env:
-          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-          GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-        displayName: "Run check format scripts"
+      # - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
+      #   workingDirectory: $(Build.SourcesDirectory)
+      #   env:
+      #     ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+      #     BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+      #     BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+      #     GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+      #   displayName: "Run check format scripts"
 
-      - task: PublishBuildArtifacts@1
-        inputs:
-          pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
-          artifactName: format
-        condition: failed()
+      # - task: PublishBuildArtifacts@1
+      #   inputs:
+      #     pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
+      #     artifactName: format
+      #   condition: failed()
 
   - job: release
     displayName: "Linux-x64 release"
@@ -128,8 +123,7 @@ jobs:
 
   - job: docker
     displayName: "Linux multi-arch docker"
-    dependsOn: ["release","release_arm64"]
-    condition: and(succeeded(), eq(variables['PostSubmit'], 'true'), ne(variables['Build.Reason'], 'PullRequest'))
+    dependsOn: ["release", "release_arm64"]
     pool:
       vmImage: "ubuntu-18.04"
     steps:
@@ -158,6 +152,11 @@ jobs:
           AZP_SHA1: $(Build.SourceVersion)
           DOCKERHUB_USERNAME: $(DockerUsername)
           DOCKERHUB_PASSWORD: $(DockerPassword)
+      - task: PublishBuildArtifacts@1
+        inputs:
+          pathtoPublish: "$(Build.StagingDirectory)/build_images"
+          artifactName: docker
+        condition: always()
 
   - job: macOS
     dependsOn: ["format"]
@@ -171,7 +170,7 @@ jobs:
       - script: ./ci/mac_ci_steps.sh
         displayName: "Run Mac CI"
         env:
-          BAZEL_BUILD_EXTRA_OPTIONS: "--remote_download_toplevel ${{flakyBuildOption}}"
+          BAZEL_BUILD_EXTRA_OPTIONS: "--cache_test_results=no --remote_download_toplevel --flaky_test_attempts=2"
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
@@ -181,6 +180,13 @@ jobs:
           testResultsFiles: "**/bazel-testlogs/**/test.xml"
           testRunTitle: "macOS"
         condition: always()
+
+      - script: ./tools/flaky_test/process_xml.py
+        displayName: "Process Test Results"
+        env:
+          TEST_TMPDIR: $(Build.SourcesDirectory)
+          SLACK_TOKEN: $(SLACK_TOKEN)
+          CI_TARGET: "MacOS"
 
   - job: Windows
     dependsOn: ["format"]
@@ -192,7 +198,7 @@ jobs:
         displayName: "Run Windows CI"
         env:
           ENVOY_RBE: "true"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs) ${{flakyBuildOption}}"
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs)"
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)

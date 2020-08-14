@@ -16,7 +16,7 @@ parameters:
     default: true
   - name: bazelBuildExtraOptions
     type: string
-    default: "--flaky_test_attempts=2"
+    default: "--cache_test_results=no --flaky_test_attempts=5"
 
 steps:
   - task: Cache@2
@@ -48,6 +48,7 @@ steps:
     workingDirectory: $(Build.SourcesDirectory)
     env:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+      SLACK_TOKEN: $(SLACK_TOKEN)
       ${{ if parameters.rbe }}:
         ENVOY_RBE: "1"
         BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs) ${{ parameters.bazelBuildExtraOptions }}"
@@ -72,7 +73,7 @@ steps:
       testRunTitle: "${{ parameters.ciTarget }}"
       searchFolder: $(Build.StagingDirectory)/tmp
     condition: always()
-
+  
   - task: PublishBuildArtifacts@1
     inputs:
       pathtoPublish: "$(Build.StagingDirectory)/envoy"

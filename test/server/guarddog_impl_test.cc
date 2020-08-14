@@ -7,6 +7,7 @@
 #include "envoy/common/time.h"
 #include "envoy/server/guarddog_config.h"
 #include "envoy/server/watchdog.h"
+#include "envoy/thread/thread.h"
 
 #include "common/api/api_impl.h"
 #include "common/common/macros.h"
@@ -183,7 +184,7 @@ class GuardDogAlmostDeadTest : public GuardDogDeathTest {};
 
 INSTANTIATE_TEST_SUITE_P(
     TimeSystemType, GuardDogAlmostDeadTest,
-    testing::ValuesIn({// TODO(#6464): TimeSystemType::Real -- fails in this suite 30/1000 times.
+    testing::ValuesIn({// TODO(#6465): TimeSystemType::Real -- fails in this suite 30/1000 times.
                        TimeSystemType::Simulated}));
 
 TEST_P(GuardDogDeathTest, KillDeathTest) {
@@ -320,7 +321,7 @@ TEST_P(GuardDogMissTest, MissTest) {
 }
 
 TEST_P(GuardDogMissTest, MegaMissTest) {
-  // TODO(#6464): This test fails in real-time 1/1000 times, but passes in simulated time.
+  // TODO(#6465): This test fails in real-time 1/1000 times, but passes in simulated time.
   if (GetParam() == TimeSystemType::Real) {
     return;
   }
@@ -345,7 +346,7 @@ TEST_P(GuardDogMissTest, MegaMissTest) {
 }
 
 TEST_P(GuardDogMissTest, MissCountTest) {
-  // TODO(#6464): This test fails in real-time 9/1000 times, but passes in simulated time.
+  // TODO(#6465): This test fails in real-time 9/1000 times, but passes in simulated time.
   if (GetParam() == TimeSystemType::Real) {
     return;
   }
@@ -578,9 +579,9 @@ protected:
       )EOF"};
   }
 
-  void setupFirstDog(const NiceMock<Configuration::MockMain>& config) {
+  void setupFirstDog(const NiceMock<Configuration::MockMain>& config, Thread::ThreadId tid) {
     initGuardDog(fake_stats_, config);
-    first_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+    first_dog_ = guard_dog_->createWatchDog(tid, "test_thread");
     guard_dog_->forceCheckForTest();
   }
 
@@ -601,120 +602,124 @@ INSTANTIATE_TEST_SUITE_P(TimeSystemType, GuardDogActionsTest,
 TEST_P(GuardDogActionsTest, MissShouldOnlyReportRelevantThreads) {
   const NiceMock<Configuration::MockMain> config(100, DISABLE_MEGAMISS, DISABLE_KILL,
                                                  DISABLE_MULTIKILL, 0, getActionsConfig());
-  setupFirstDog(config);
-  second_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
-  time_system_->advanceTimeWait(std::chrono::milliseconds(99));
+  setupFirstDog(config, Thread::ThreadId(10));
+  second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
+  time_system_->advanceTimeWait(std::chrono::milliseconds(50));
   second_dog_->touch();
 
-  time_system_->advanceTimeWait(std::chrono::milliseconds(2));
+  // This will reset the loop interval timer, and should help us
+  // synchronize with the guard dog.
   guard_dog_->forceCheckForTest();
 
-  EXPECT_THAT(events_, ElementsAre(absl::StrCat(
-                           "MISS : ", api_->threadFactory().currentThreadId().debugString())));
+  time_system_->advanceTimeWait(std::chrono::milliseconds(51));
+  guard_dog_->forceCheckForTest();
+
+  EXPECT_THAT(events_, ElementsAre("MISS : 10"));
 }
 
 TEST_P(GuardDogActionsTest, MissShouldBeAbleToReportMultipleThreads) {
   const NiceMock<Configuration::MockMain> config(100, DISABLE_MEGAMISS, DISABLE_KILL,
                                                  DISABLE_MULTIKILL, 0, getActionsConfig());
   initGuardDog(fake_stats_, config);
-  first_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
-  second_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+  first_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread");
+  second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
 
   first_dog_->touch();
   second_dog_->touch();
+  // This should ensure that when the next call to step() occurs, both of the
+  // dogs will be over last touch time threshold and be reported in the event.
+  // The next call to step() will either be triggered by the timer or after
+  // advanceTimeWait() below, but only one of them will append to events_
+  // because of saturation.
+  guard_dog_->forceCheckForTest();
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
-  EXPECT_THAT(events_, ElementsAre(absl::StrCat(
-                           "MISS : ", api_->threadFactory().currentThreadId().debugString(), ",",
-                           api_->threadFactory().currentThreadId().debugString())));
+  EXPECT_THAT(events_, ElementsAre("MISS : 10,11"));
 }
 
 TEST_P(GuardDogActionsTest, MissShouldSaturateOnMissEvent) {
   const NiceMock<Configuration::MockMain> config(100, DISABLE_MISS, DISABLE_KILL, DISABLE_MULTIKILL,
                                                  0, getActionsConfig());
-  setupFirstDog(config);
+  setupFirstDog(config, Thread::ThreadId(10));
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
-  EXPECT_THAT(events_, ElementsAre(absl::StrCat(
-                           "MISS : ", api_->threadFactory().currentThreadId().debugString())));
+  EXPECT_THAT(events_, ElementsAre("MISS : 10"));
 
   // Should saturate and not add an additional "event_"
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
-  EXPECT_THAT(events_, ElementsAre(absl::StrCat(
-                           "MISS : ", api_->threadFactory().currentThreadId().debugString())));
+  EXPECT_THAT(events_, ElementsAre("MISS : 10"));
 
   // Touch the watchdog, which should allow the event to trigger again.
   first_dog_->touch();
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
-  EXPECT_THAT(
-      events_,
-      ElementsAre(absl::StrCat("MISS : ", api_->threadFactory().currentThreadId().debugString()),
-                  absl::StrCat("MISS : ", api_->threadFactory().currentThreadId().debugString())));
+  EXPECT_THAT(events_, ElementsAre("MISS : 10", "MISS : 10"));
 }
 
 TEST_P(GuardDogActionsTest, MegaMissShouldOnlyReportRelevantThreads) {
   const NiceMock<Configuration::MockMain> config(DISABLE_MISS, 100, DISABLE_KILL, DISABLE_MULTIKILL,
                                                  0, getActionsConfig());
-  setupFirstDog(config);
-  second_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
-  time_system_->advanceTimeWait(std::chrono::milliseconds(99));
+  setupFirstDog(config, Thread::ThreadId(10));
+  second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
+  time_system_->advanceTimeWait(std::chrono::milliseconds(50));
   second_dog_->touch();
 
-  time_system_->advanceTimeWait(std::chrono::milliseconds(2));
+  // This will reset the loop interval timer, and should help us
+  // synchronize with the guard dog.
   guard_dog_->forceCheckForTest();
 
-  EXPECT_THAT(events_, ElementsAre(absl::StrCat(
-                           "MEGAMISS : ", api_->threadFactory().currentThreadId().debugString())));
+  time_system_->advanceTimeWait(std::chrono::milliseconds(51));
+  guard_dog_->forceCheckForTest();
+
+  EXPECT_THAT(events_, ElementsAre("MEGAMISS : 10"));
 }
 
 TEST_P(GuardDogActionsTest, MegaMissShouldBeAbleToReportMultipleThreads) {
   const NiceMock<Configuration::MockMain> config(DISABLE_MISS, 100, DISABLE_KILL, DISABLE_MULTIKILL,
                                                  0, getActionsConfig());
   initGuardDog(fake_stats_, config);
-  first_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
-  second_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+  first_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread");
+  second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
 
   first_dog_->touch();
   second_dog_->touch();
 
-  time_system_->advanceTimeWait(std::chrono::milliseconds(101));
+  // This should ensure that when the next call to step() occurs, both of the
+  // dogs will be over last touch time threshold and be reported in the event.
+  // The next call to step() will either be triggered by the timer or after
+  // advanceTimeWait() below, but only one of them will append to events_
+  // because of saturation.
   guard_dog_->forceCheckForTest();
-  EXPECT_THAT(events_, ElementsAre(absl::StrCat(
-                           "MEGAMISS : ", api_->threadFactory().currentThreadId().debugString(),
-                           ",", api_->threadFactory().currentThreadId().debugString())));
+  time_system_->advanceTimeWait(std::chrono::milliseconds(101));
+
+  guard_dog_->forceCheckForTest();
+  EXPECT_THAT(events_, ElementsAre("MEGAMISS : 10,11"));
 }
 
 TEST_P(GuardDogActionsTest, MegaMissShouldSaturateOnMegaMissEvent) {
   const NiceMock<Configuration::MockMain> config(DISABLE_MISS, 100, DISABLE_KILL, DISABLE_MULTIKILL,
                                                  0, getActionsConfig());
-  setupFirstDog(config);
+  setupFirstDog(config, Thread::ThreadId(10));
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
-  EXPECT_THAT(events_, ElementsAre(absl::StrCat(
-                           "MEGAMISS : ", api_->threadFactory().currentThreadId().debugString())));
+  EXPECT_THAT(events_, ElementsAre("MEGAMISS : 10"));
 
   // Should saturate and not add an additional "event_"
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
-  EXPECT_THAT(events_, ElementsAre(absl::StrCat(
-                           "MEGAMISS : ", api_->threadFactory().currentThreadId().debugString())));
+  EXPECT_THAT(events_, ElementsAre("MEGAMISS : 10"));
 
   // Touch the watchdog, which should allow the event to trigger again.
   first_dog_->touch();
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
-  EXPECT_THAT(
-      events_,
-      ElementsAre(
-          absl::StrCat("MEGAMISS : ", api_->threadFactory().currentThreadId().debugString()),
-          absl::StrCat("MEGAMISS : ", api_->threadFactory().currentThreadId().debugString())));
+  EXPECT_THAT(events_, ElementsAre("MEGAMISS : 10", "MEGAMISS : 10"));
 }
 
 TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
@@ -724,10 +729,8 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
   auto kill_function = [&]() -> void {
     const NiceMock<Configuration::MockMain> config(100, 100, 100, 100, 0, getActionsConfig());
     initGuardDog(fake_stats_, config);
-    auto first_dog =
-        guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
-    auto second_dog =
-        guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+    auto first_dog = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread");
+    auto second_dog = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
     time_system_->advanceTimeWait(std::chrono::milliseconds(101));
     guard_dog_->forceCheckForTest();
   };
@@ -740,10 +743,8 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
     const NiceMock<Configuration::MockMain> config(100, 100, DISABLE_KILL, 100, 0,
                                                    getActionsConfig());
     initGuardDog(fake_stats_, config);
-    auto first_dog =
-        guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
-    auto second_dog =
-        guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+    auto first_dog = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread");
+    auto second_dog = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
     time_system_->advanceTimeWait(std::chrono::milliseconds(101));
     guard_dog_->forceCheckForTest();
   };
@@ -753,21 +754,17 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
   // We expect megamiss to fire before miss
   const NiceMock<Configuration::MockMain> config(100, 100, DISABLE_KILL, DISABLE_MULTIKILL, 0,
                                                  getActionsConfig());
-  setupFirstDog(config);
+  setupFirstDog(config, Thread::ThreadId(10));
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
-  EXPECT_THAT(
-      events_,
-      ElementsAre(
-          absl::StrCat("MEGAMISS : ", api_->threadFactory().currentThreadId().debugString()),
-          absl::StrCat("MISS : ", api_->threadFactory().currentThreadId().debugString())));
+  EXPECT_THAT(events_, ElementsAre("MEGAMISS : 10", "MISS : 10"));
 }
 
 TEST_P(GuardDogActionsTest, KillShouldTriggerGuardDogActions) {
   auto die_function = [&]() -> void {
     const NiceMock<Configuration::MockMain> config(DISABLE_MISS, DISABLE_MEGAMISS, 100, 0, 0,
                                                    getActionsConfig());
-    setupFirstDog(config);
+    setupFirstDog(config, Thread::ThreadId(10));
     time_system_->advanceTimeWait(std::chrono::milliseconds(101));
     guard_dog_->forceCheckForTest();
   };
@@ -779,9 +776,8 @@ TEST_P(GuardDogActionsTest, MultikillShouldTriggerGuardDogActions) {
   auto die_function = [&]() -> void {
     const NiceMock<Configuration::MockMain> config(DISABLE_MISS, DISABLE_MEGAMISS, DISABLE_KILL,
                                                    100, 0, getActionsConfig());
-    setupFirstDog(config);
-    second_dog_ =
-        guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+    setupFirstDog(config, Thread::ThreadId(10));
+    second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
     guard_dog_->forceCheckForTest();
     time_system_->advanceTimeWait(std::chrono::milliseconds(101));
     guard_dog_->forceCheckForTest();

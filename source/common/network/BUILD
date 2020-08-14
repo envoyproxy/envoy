@@ -10,21 +10,11 @@ envoy_package()
 
 envoy_cc_library(
     name = "address_lib",
-    srcs = [
-        "address_impl.cc",
-        "io_socket_handle_impl.cc",
-    ],
-    hdrs = [
-        "address_impl.h",
-        "io_socket_handle_impl.h",
-    ],
+    srcs = ["address_impl.cc"],
+    hdrs = ["address_impl.h"],
     deps = [
-        ":io_socket_error_lib",
         ":socket_interface_lib",
-        "//include/envoy/buffer:buffer_interface",
         "//include/envoy/network:address_interface",
-        "//include/envoy/network:io_handle_interface",
-        "//include/envoy/network:socket_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
@@ -180,29 +170,43 @@ envoy_cc_library(
     hdrs = ["socket_interface.h"],
     deps = [
         "//include/envoy/config:typed_config_interface",
-        "//include/envoy/network:socket_interface",
+        "//include/envoy/network:socket_interface_interface",
         "//include/envoy/registry",
         "//include/envoy/server:bootstrap_extension_config_interface",
     ],
 )
 
 envoy_cc_library(
-    name = "socket_lib",
+    name = "default_socket_interface_lib",
     srcs = [
-        "socket_impl.cc",
+        "io_socket_handle_impl.cc",
         "socket_interface_impl.cc",
     ],
     hdrs = [
-        "socket_impl.h",
+        "io_socket_handle_impl.h",
         "socket_interface_impl.h",
     ],
     deps = [
         ":address_lib",
+        ":io_socket_error_lib",
         ":socket_interface_lib",
+        ":socket_lib",
+        "//include/envoy/network:io_handle_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "socket_lib",
+    srcs = ["socket_impl.cc"],
+    hdrs = ["socket_impl.h"],
+    deps = [
         "//include/envoy/network:socket_interface",
+        "//include/envoy/network:socket_interface_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
-        "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ],
 )
 
@@ -338,6 +342,7 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     deps = [
         ":address_lib",
+        ":default_socket_interface_lib",
         ":socket_lib",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:listener_interface",

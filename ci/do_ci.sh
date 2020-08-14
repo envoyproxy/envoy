@@ -109,6 +109,17 @@ function bazel_binary_build() {
   cp_binary_for_image_build "${BINARY_TYPE}"
 }
 
+function run_process_test_result() {
+  echo "entering processing test result \n"
+  if [[ "$CI_TARGET" == "bazel.release" || "$CI_TARGET" == "bazel.gcc" || "$CI_TARGET" == "bazel.asan" || "$CI_TARGET" == "bazel.tsan" || \
+    "$CI_TARGET" == "bazel.compile_time_options" || "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage" ]];
+  then
+    echo "running flaky test reporting script"
+    tools/flaky_test/run_process_xml.sh "$CI_TARGET"
+  fi
+
+}
+
 CI_TARGET=$1
 shift
 
@@ -131,22 +142,19 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_MEMORY_TEST_EXACT=true"
 
   setup_clang_toolchain
-  echo "Testing ${TEST_TARGETS}"
+  echo "Testing ${TEST_TARGETS} with options: ${BAZEL_BUILD_OPTIONS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c opt ${TEST_TARGETS}
 
   echo "bazel release build with tests..."
   bazel_binary_build release
-  exit 0
 elif [[ "$CI_TARGET" == "bazel.release.server_only" ]]; then
   setup_clang_toolchain
   echo "bazel release build..."
   bazel_binary_build release
-  exit 0
 elif [[ "$CI_TARGET" == "bazel.sizeopt.server_only" ]]; then
   setup_clang_toolchain
   echo "bazel size optimized build..."
   bazel_binary_build sizeopt
-  exit 0
 elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
   setup_clang_toolchain
   echo "Testing ${TEST_TARGETS}"
@@ -154,7 +162,6 @@ elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
 
   echo "bazel size optimized build with tests..."
   bazel_binary_build sizeopt
-  exit 0
 elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HEAPCHECK="
   setup_gcc_toolchain
@@ -164,7 +171,6 @@ elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
 
   echo "bazel release build with gcc..."
   bazel_binary_build release
-  exit 0
 elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   setup_clang_toolchain
   echo "Testing ${TEST_TARGETS}"
@@ -197,7 +203,6 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} \
     --run_under=@envoy//bazel/test:verify_tap_test.sh \
     //test/extensions/transport_sockets/tls/integration:ssl_integration_test
-  exit 0
 elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
   setup_clang_toolchain
   echo "bazel TSAN debug build with tests"
@@ -209,7 +214,6 @@ elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
     bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan ${ENVOY_FILTER_EXAMPLE_TESTS}
     popd
   fi
-  exit 0
 elif [[ "$CI_TARGET" == "bazel.msan" ]]; then
   ENVOY_STDLIB=libc++
   setup_clang_toolchain
@@ -227,7 +231,6 @@ elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
 
   echo "Building and testing ${TEST_TARGETS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c fastbuild ${TEST_TARGETS}
-  exit 0
 elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
   # changes, this build type may need to be broken up.
@@ -268,7 +271,6 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   collect_build_profile build
 
-  exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   setup_clang_toolchain
   echo "Validating API structure..."
@@ -283,7 +285,7 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   echo "Testing API boosting (golden C++ tests)..."
   # We use custom BAZEL_BUILD_OPTIONS here; the API booster isn't capable of working with libc++ yet.
   LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config BAZEL_BUILD_OPTIONS="--config=clang" python3.8 ./tools/api_boost/api_boost_test.py
-  exit 0
+
 elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
   setup_clang_toolchain
   echo "${CI_TARGET} build with tests ${COVERAGE_TEST_TARGETS}"
@@ -292,13 +294,13 @@ elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage
 
   test/run_envoy_bazel_coverage.sh ${COVERAGE_TEST_TARGETS}
   collect_build_profile coverage
-  exit 0
+
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   # clang-tidy will warn on standard library issues with libc++
   ENVOY_STDLIB="libstdc++"
   setup_clang_toolchain
   NUM_CPUS=$NUM_CPUS ci/run_clang_tidy.sh "$@"
-  exit 0
+
 elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   # Coverity Scan version 2017.07 fails to analyze the entirely of the Envoy
   # build when compiled with Clang 5. Revisit when Coverity Scan explicitly
@@ -315,14 +317,14 @@ elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   cp -f \
      "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz \
      "${ENVOY_DELIVERY_DIR}"/envoy-coverity-output.tgz
-  exit 0
+
 elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   setup_clang_toolchain
   FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',${TEST_TARGETS})")"
   echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
   echo "Building envoy fuzzers and executing 100 fuzz iterations..."
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} --test_arg="-runs=10"
-  exit 0
+
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
@@ -330,7 +332,7 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
   ./tools/code_format/check_format.py fix
   ./tools/code_format/format_python_tools.sh fix
   ./tools/proto_format/proto_format.sh fix --test
-  exit 0
+
 elif [[ "$CI_TARGET" == "check_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
@@ -340,32 +342,35 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   ./tools/code_format/check_format.py check
   ./tools/code_format/format_python_tools.sh check
   ./tools/proto_format/proto_format.sh check --test
-  exit 0
+
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
   echo "check_repositories..."
   ./tools/check_repositories.sh
-  exit 0
+
 elif [[ "$CI_TARGET" == "check_spelling" ]]; then
   echo "check_spelling..."
   ./tools/spelling/check_spelling.sh check
-  exit 0
+
 elif [[ "$CI_TARGET" == "fix_spelling" ]];then
   echo "fix_spell..."
   ./tools/spelling/check_spelling.sh fix
-  exit 0
+
 elif [[ "$CI_TARGET" == "check_spelling_pedantic" ]]; then
   echo "check_spelling_pedantic..."
   ./tools/spelling/check_spelling_pedantic.py --mark check
-  exit 0
+
 elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
   echo "fix_spelling_pedantic..."
   ./tools/spelling/check_spelling_pedantic.py fix
-  exit 0
+
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."
   docs/build.sh
-  exit 0
+
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."
   exit 1
 fi
+
+run_process_test_result
+exit 0
