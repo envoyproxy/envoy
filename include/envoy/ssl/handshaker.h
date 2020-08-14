@@ -78,6 +78,12 @@ public:
                      ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.tls_handshakers"; }
+
+  /**
+   * Implementations should return true if the tls context accompanying this
+   * handshaker expects certificates.
+   */
+  virtual bool requireCertificates() const PURE;
 };
 
 } // namespace Ssl

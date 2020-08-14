@@ -56,6 +56,7 @@ public:
 
   void setSecretUpdateCallback(std::function<void()> callback) override;
   Ssl::HandshakerFactoryCb createHandshaker() const override;
+  bool requireCertificates() const override { return require_certificates_; }
 
   Ssl::CertificateValidationContextConfigPtr getCombinedValidationContextConfig(
       const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
@@ -97,6 +98,7 @@ private:
   const unsigned max_protocol_version_;
 
   Ssl::HandshakerFactoryCb handshaker_factory_cb_;
+  bool require_certificates_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {

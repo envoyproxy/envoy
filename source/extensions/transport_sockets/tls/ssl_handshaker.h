@@ -131,6 +131,11 @@ public:
     };
   }
 
+  bool requireCertificates() const override {
+    // The default handshaker impl does require certificates.
+    return true;
+  }
+
   static HandshakerFactory* getDefaultHandshakerFactory() {
     static HandshakerFactoryImpl default_handshaker_factory;
     return &default_handshaker_factory;

@@ -79,6 +79,12 @@ public:
    * @return a callback which can be used to create Handshakers.
    */
   virtual HandshakerFactoryCb createHandshaker() const PURE;
+
+  /**
+   * @return whether or not this context requires certificates for TLS
+   * handshakes.
+   */
+  virtual bool requireCertificates() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {

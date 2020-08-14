@@ -74,7 +74,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       ssl_ciphers_(stat_name_set_->add("ssl.ciphers")),
       ssl_versions_(stat_name_set_->add("ssl.versions")),
       ssl_curves_(stat_name_set_->add("ssl.curves")),
-      ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")) {
+      ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")),
+      require_certificates_(config.requireCertificates()) {
   const auto tls_certificates = config.tlsCertificates();
   tls_contexts_.resize(std::max(static_cast<size_t>(1), tls_certificates.size()));
 
@@ -986,7 +987,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      const std::vector<std::string>& server_names,
                                      TimeSource& time_source)
     : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()) {
-  if (config.tlsCertificates().empty()) {
+  if (config.tlsCertificates().empty() && config.requireCertificates()) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
 
@@ -1065,67 +1066,69 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
   // case that different Envoy instances each have their own certs. All certificates in a
   // ServerContextImpl context are hashed together, since they all constitute a match on a filter
   // chain for resumption purposes.
-  for (const auto& ctx : tls_contexts_) {
-    X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
-    RELEASE_ASSERT(cert != nullptr, "TLS context should have an active certificate");
-    X509_NAME* cert_subject = X509_get_subject_name(cert);
-    RELEASE_ASSERT(cert_subject != nullptr, "TLS certificate should have a subject");
+  if (require_certificates_) {
+    for (const auto& ctx : tls_contexts_) {
+      X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
+      RELEASE_ASSERT(cert != nullptr, "TLS context should have an active certificate");
+      X509_NAME* cert_subject = X509_get_subject_name(cert);
+      RELEASE_ASSERT(cert_subject != nullptr, "TLS certificate should have a subject");
 
-    const int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
-    if (cn_index >= 0) {
-      X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
-      RELEASE_ASSERT(cn_entry != nullptr, "certificate subject CN should be present");
+      const int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
+      if (cn_index >= 0) {
+        X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
+        RELEASE_ASSERT(cn_entry != nullptr, "certificate subject CN should be present");
 
-      ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
-      if (ASN1_STRING_length(cn_asn1) <= 0) {
-        throw EnvoyException("Invalid TLS context has an empty subject CN");
+        ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
+        if (ASN1_STRING_length(cn_asn1) <= 0) {
+          throw EnvoyException("Invalid TLS context has an empty subject CN");
+        }
+
+        rc = EVP_DigestUpdate(md.get(), ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
+        RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
       }
 
-      rc = EVP_DigestUpdate(md.get(), ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
-      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
-    }
+      unsigned san_count = 0;
+      bssl::UniquePtr<GENERAL_NAMES> san_names(static_cast<GENERAL_NAMES*>(
+          X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
 
-    unsigned san_count = 0;
-    bssl::UniquePtr<GENERAL_NAMES> san_names(static_cast<GENERAL_NAMES*>(
-        X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
-
-    if (san_names != nullptr) {
-      for (const GENERAL_NAME* san : san_names.get()) {
-        switch (san->type) {
-        case GEN_IPADD:
-          rc = EVP_DigestUpdate(md.get(), san->d.iPAddress->data, san->d.iPAddress->length);
-          RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
-          ++san_count;
-          break;
-        case GEN_DNS:
-          rc = EVP_DigestUpdate(md.get(), ASN1_STRING_data(san->d.dNSName),
-                                ASN1_STRING_length(san->d.dNSName));
-          RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
-          ++san_count;
-          break;
-        case GEN_URI:
-          rc = EVP_DigestUpdate(md.get(), ASN1_STRING_data(san->d.uniformResourceIdentifier),
-                                ASN1_STRING_length(san->d.uniformResourceIdentifier));
-          RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
-          ++san_count;
-          break;
+      if (san_names != nullptr) {
+        for (const GENERAL_NAME* san : san_names.get()) {
+          switch (san->type) {
+          case GEN_IPADD:
+            rc = EVP_DigestUpdate(md.get(), san->d.iPAddress->data, san->d.iPAddress->length);
+            RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+            ++san_count;
+            break;
+          case GEN_DNS:
+            rc = EVP_DigestUpdate(md.get(), ASN1_STRING_data(san->d.dNSName),
+                                  ASN1_STRING_length(san->d.dNSName));
+            RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+            ++san_count;
+            break;
+          case GEN_URI:
+            rc = EVP_DigestUpdate(md.get(), ASN1_STRING_data(san->d.uniformResourceIdentifier),
+                                  ASN1_STRING_length(san->d.uniformResourceIdentifier));
+            RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+            ++san_count;
+            break;
+          }
         }
       }
+
+      // It's possible that the certificate doesn't have a subject, but
+      // does have SANs. Make sure that we have one or the other.
+      if (cn_index < 0 && san_count == 0) {
+        throw EnvoyException("Invalid TLS context has neither subject CN nor SAN names");
+      }
+
+      rc = X509_NAME_digest(X509_get_issuer_name(cert), EVP_sha256(), hash_buffer, &hash_length);
+      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+      RELEASE_ASSERT(hash_length == SHA256_DIGEST_LENGTH,
+                     fmt::format("invalid SHA256 hash length {}", hash_length));
+
+      rc = EVP_DigestUpdate(md.get(), hash_buffer, hash_length);
+      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
     }
-
-    // It's possible that the certificate doesn't have a subject, but
-    // does have SANs. Make sure that we have one or the other.
-    if (cn_index < 0 && san_count == 0) {
-      throw EnvoyException("Invalid TLS context has neither subject CN nor SAN names");
-    }
-
-    rc = X509_NAME_digest(X509_get_issuer_name(cert), EVP_sha256(), hash_buffer, &hash_length);
-    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
-    RELEASE_ASSERT(hash_length == SHA256_DIGEST_LENGTH,
-                   fmt::format("invalid SHA256 hash length {}", hash_length));
-
-    rc = EVP_DigestUpdate(md.get(), hash_buffer, hash_length);
-    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
   }
 
   // Hash all the settings that affect whether the server will allow/accept
