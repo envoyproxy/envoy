@@ -18,18 +18,13 @@ TestTimeSystem& GlobalTimeSystem::timeSystem() {
   return singleton_->timeSystem(make_real_time_system);
 }
 
-void TestRealTimeSystem::advanceTimeWait(const Duration& duration) {
+void TestRealTimeSystem::advanceTimeWaitImpl(const Duration& duration) {
   only_one_thread_.checkOneThread();
   std::this_thread::sleep_for(duration);
 }
 
-void TestRealTimeSystem::advanceTimeAsync(const Duration& duration) { advanceTimeWait(duration); }
-
-Thread::CondVar::WaitStatus TestRealTimeSystem::waitFor(Thread::MutexBasicLockable& lock,
-                                                        Thread::CondVar& condvar,
-                                                        const Duration& duration) noexcept {
-  only_one_thread_.checkOneThread();
-  return condvar.waitFor(lock, duration);
+void TestRealTimeSystem::advanceTimeAsyncImpl(const Duration& duration) {
+  advanceTimeWait(duration);
 }
 
 SystemTime TestRealTimeSystem::systemTime() { return real_time_system_.systemTime(); }

@@ -40,7 +40,7 @@ typed_config:
   ASSERT_TRUE(fake_upstream_connection->write("world"));
   tcp_client->waitForData("world");
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   EXPECT_EQ(0,
             test_server_->counter("local_rate_limit.local_rate_limit_stats.rate_limited")->value());

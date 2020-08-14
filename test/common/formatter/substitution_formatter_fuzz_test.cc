@@ -19,9 +19,9 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
         Fuzz::fromHeaders<Http::TestResponseHeaderMapImpl>(input.response_headers());
     const auto& response_trailers =
         Fuzz::fromHeaders<Http::TestResponseTrailerMapImpl>(input.response_trailers());
-    const auto& stream_info = Fuzz::fromStreamInfo(input.stream_info());
+    const std::unique_ptr<TestStreamInfo> stream_info = Fuzz::fromStreamInfo(input.stream_info());
     for (const auto& it : formatters) {
-      it->format(request_headers, response_headers, response_trailers, stream_info,
+      it->format(request_headers, response_headers, response_trailers, *stream_info,
                  absl::string_view());
     }
     ENVOY_LOG_MISC(trace, "Success");

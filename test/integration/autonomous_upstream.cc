@@ -48,7 +48,7 @@ void AutonomousStream::sendResponse() {
   int32_t request_body_length = -1;
   HeaderToInt(EXPECT_REQUEST_SIZE_BYTES, request_body_length, headers);
   if (request_body_length >= 0) {
-    EXPECT_EQ(request_body_length, bodyLength());
+    EXPECT_EQ(request_body_length, body_.length());
   }
 
   if (!headers.get_(RESET_AFTER_REQUEST).empty()) {

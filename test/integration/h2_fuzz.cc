@@ -244,7 +244,7 @@ void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCas
       AssertionResult result = fake_upstream_connection->close();
       RELEASE_ASSERT(result, result.message());
     }
-    AssertionResult result = fake_upstream_connection->waitForDisconnect(true);
+    AssertionResult result = fake_upstream_connection->waitForDisconnect();
     RELEASE_ASSERT(result, result.message());
   }
   if (tcp_client->connected()) {

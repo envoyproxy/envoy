@@ -896,7 +896,10 @@ envoy_cc_test(
 envoy_cc_test_library(
     name = "server_stats_interface",
     hdrs = ["server_stats.h"],
-    deps = ["//include/envoy/stats:stats_interface"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/stats:stats_interface",
+    ],
 )
 
 envoy_cc_test(

@@ -242,7 +242,7 @@ public:
   waitForLoadStatsRequest(const std::vector<envoy::config::endpoint::v3::UpstreamLocalityStats>&
                               expected_locality_stats,
                           uint64_t dropped = 0) {
-    auto end_time = timeSystem().monotonicTime() + TestUtility::DefaultTimeout;
+    Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
     Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::ClusterStats> expected_cluster_stats;
     if (!expected_locality_stats.empty() || dropped != 0) {
       auto* cluster_stats = expected_cluster_stats.Add();
@@ -289,7 +289,7 @@ public:
                                               "StreamLoadStats", apiVersion()),
           loadstats_stream_->headers().getPathValue());
       EXPECT_EQ("application/grpc", loadstats_stream_->headers().getContentTypeValue());
-      if (timeSystem().monotonicTime() >= end_time) {
+      if (!bound.withinBound()) {
         return TestUtility::assertRepeatedPtrFieldEqual(expected_cluster_stats,
                                                         loadstats_request.cluster_stats(), true);
       }

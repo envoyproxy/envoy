@@ -124,7 +124,7 @@ TEST_P(ClusterFilterIntegrationTest, TestClusterFilter) {
   ASSERT_TRUE(tcp_client->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->write("", true));
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForDisconnect();
 }
 

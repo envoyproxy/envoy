@@ -209,7 +209,7 @@ TEST_P(VhdsInitializationTest, InitializeVhdsAfterRdsHasBeenInitialized) {
       {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(RdsConfigWithVhosts)},
       "2");
 
-  auto result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_, true);
+  auto result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_);
   RELEASE_ASSERT(result, result.message());
   vhds_stream_->startGrpcStream();
 
@@ -301,7 +301,7 @@ public:
     sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
         Config::TypeUrl::get().RouteConfiguration, {rdsConfig()}, "1");
 
-    result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_, true);
+    result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_);
     RELEASE_ASSERT(result, result.message());
     vhds_stream_->startGrpcStream();
 

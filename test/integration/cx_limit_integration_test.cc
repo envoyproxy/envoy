@@ -47,7 +47,8 @@ public:
       if (Network::AcceptedSocketImpl::acceptedSocketCount() == expected_connections) {
         return AssertionSuccess();
       }
-      timeSystem().advanceTimeWait(std::chrono::milliseconds(500));
+      // TODO(mattklein123): Do not use a real sleep here. Switch to events with waitFor().
+      timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(500));
     }
     if (Network::AcceptedSocketImpl::acceptedSocketCount() == expected_connections) {
       return AssertionSuccess();

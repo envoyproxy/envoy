@@ -48,8 +48,8 @@ protected:
     FakeStreamPtr new_stream = nullptr;
     auto wait_new_stream_fn = [this,
                                &new_stream](FakeHttpConnectionPtr& connection) -> AssertionResult {
-      AssertionResult result = connection->waitForNewStream(*dispatcher_, new_stream, false,
-                                                            std::chrono::milliseconds(50));
+      AssertionResult result =
+          connection->waitForNewStream(*dispatcher_, new_stream, std::chrono::milliseconds(50));
       if (result) {
         ASSERT(new_stream);
       }

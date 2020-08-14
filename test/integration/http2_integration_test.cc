@@ -1318,8 +1318,7 @@ void Http2RingHashIntegrationTest::sendMultipleRequests(
     // As data and streams are interwoven, make sure waitForNewStream()
     // ignores incoming data and waits for actual stream establishment.
     upstream_requests.emplace_back();
-    ASSERT_TRUE(
-        fake_upstream_connection->waitForNewStream(*dispatcher_, upstream_requests.back(), true));
+    ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, upstream_requests.back()));
     upstream_requests.back()->setAddServedByHeader(true);
     fake_upstream_connections_.push_back(std::move(fake_upstream_connection));
   }
