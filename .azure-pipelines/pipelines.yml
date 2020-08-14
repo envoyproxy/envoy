@@ -7,6 +7,11 @@ trigger:
     include:
       - "v*"
 
+parameters:
+  - name: flakyBuildOption
+    type: string
+    default: "--flaky_test_attempts=2"
+
 # PR build config is manually overridden in Azure pipelines UI with different secrets
 pr: none
 
@@ -166,7 +171,7 @@ jobs:
       - script: ./ci/mac_ci_steps.sh
         displayName: "Run Mac CI"
         env:
-          BAZEL_BUILD_EXTRA_OPTIONS: --remote_download_toplevel
+          BAZEL_BUILD_EXTRA_OPTIONS: "--remote_download_toplevel ${{flakyBuildOption}}"
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
@@ -187,7 +192,7 @@ jobs:
         displayName: "Run Windows CI"
         env:
           ENVOY_RBE: "true"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs)"
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs) ${{flakyBuildOption}}"
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)

@@ -16,7 +16,7 @@ parameters:
     default: true
   - name: bazelBuildExtraOptions
     type: string
-    default: ""
+    default: "--flaky_test_attempts=2"
 
 steps:
   - task: Cache@2
