@@ -60,6 +60,7 @@ void ListenerFilterFuzzer::fuzz(
     while (!got_continue) {
       if (header.done()) { // End of stream reached but not done
         file_event_callback_(Event::FileReadyType::Closed);
+        return;
       } else {
         file_event_callback_(Event::FileReadyType::Read);
       }
@@ -74,11 +75,11 @@ FuzzedHeader::FuzzedHeader(const test::extensions::filters::listener::FilterFuzz
     len += input.data(i).size();
   }
 
-  header_.reserve(len);
+  data_.reserve(len);
 
   for (int i = 0; i < nreads_; i++) {
-    header_ += input.data(i);
-    indices_.push_back(header_.size());
+    data_.insert(data_.end(), input.data(i).begin(), input.data(i).end());
+    indices_.push_back(data_.size());
   }
 }
 
@@ -86,7 +87,7 @@ Api::SysCallSizeResult FuzzedHeader::next(void* buffer, size_t length) {
   if (done()) {           // End of stream reached
     nread_ = nreads_ - 1; // Decrement to avoid out-of-range for last recv() call
   }
-  memcpy(buffer, header_.data(), std::min(indices_[nread_], length));
+  memcpy(buffer, data_.data(), std::min(indices_[nread_], length));
   return Api::SysCallSizeResult{static_cast<ssize_t>(indices_[nread_++]), 0};
 }
 

@@ -44,9 +44,9 @@ public:
   bool empty();
 
 private:
-  const int nreads_;            // Number of reads
-  int nread_;                   // Counter of current read
-  std::string header_;          // Construct header from single or multiple reads
+  const int nreads_; // Number of reads
+  int nread_;        // Counter of current read
+  std::vector<uint8_t> data_;
   std::vector<size_t> indices_; // Ending indices for each read
 };
 
