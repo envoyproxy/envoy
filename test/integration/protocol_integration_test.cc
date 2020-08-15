@@ -1557,6 +1557,7 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
     ASSERT(downstreamProtocol() == Http::CodecClient::Type::HTTP2);
     if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
       auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+      fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
       ASSERT_TRUE(
           fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
       response->waitForEndStream();
