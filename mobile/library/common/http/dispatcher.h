@@ -41,6 +41,8 @@ struct DispatcherStats {
 class Dispatcher : public Logger::Loggable<Logger::Id::http> {
 public:
   Dispatcher(std::atomic<envoy_network_t>& preferred_network);
+  // TODO: delete once https://github.com/lyft/envoy-mobile/issues/1016 is fixed.
+  ~Dispatcher() { destroyed_ = true; }
 
   void ready(Event::Dispatcher& event_dispatcher, Stats::Scope& scope, ApiListener& api_listener);
 
@@ -181,6 +183,8 @@ private:
      */
     bool dispatchable(bool close);
 
+    bool destroyed() const { return destroyed_; }
+
     const envoy_stream_t stream_handle_;
     // https://github.com/lyft/envoy-mobile/pull/616 moved stream cancellation (and its atomic
     // state) from the platform layer to the core layer, here. This change was made to solidify two
@@ -202,6 +206,8 @@ private:
     bool local_closed_{};
     bool hcm_stream_pending_destroy_{};
 
+    // TODO: delete once https://github.com/lyft/envoy-mobile/issues/1016 is fixed.
+    bool destroyed_{};
     // Used to issue outgoing HTTP stream operations.
     RequestDecoder* request_decoder_;
     // Used to receive incoming HTTP stream operations.
@@ -223,6 +229,13 @@ private:
   void cleanup(envoy_stream_t stream_handle);
   void setDestinationCluster(HeaderMap& headers);
 
+  // TODO: delete once https://github.com/lyft/envoy-mobile/issues/1016 is fixed.
+  bool destroyed() const { return destroyed_; }
+  static void checkGarbage(Dispatcher* dispatcher) { ASSERT(!dispatcher->destroyed()); }
+  static void checkGarbage(DirectStream* stream) { ASSERT(!stream->destroyed()); }
+
+  // TODO: delete once https://github.com/lyft/envoy-mobile/issues/1016 is fixed.
+  bool destroyed_{};
   Thread::MutexBasicLockable ready_lock_;
   std::list<Event::PostCb> init_queue_ GUARDED_BY(ready_lock_);
   Event::Dispatcher* event_dispatcher_ GUARDED_BY(ready_lock_){};
