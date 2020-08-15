@@ -7,14 +7,6 @@ import java.nio.ByteBuffer
  */
 interface RequestFilter : Filter {
   /**
-   * Called by the filter manager once to initialize the filter callbacks that the filter should
-   * use.
-   *
-   * @param callbacks: The callbacks for this filter to use to interact with the chain.
-   */
-  fun setRequestFilterCallbacks(callbacks: RequestFilterCallbacks)
-
-  /**
    * Called once when the request is initiated.
    *
    * Filters may mutate or delay the request headers.
@@ -37,16 +29,16 @@ interface RequestFilter : Filter {
    *
    * @return: The data status containing body with which to continue or buffer.
    */
-  fun onRequestData(body: ByteBuffer, endStream: Boolean): FilterDataStatus
+  fun onRequestData(body: ByteBuffer, endStream: Boolean): FilterDataStatus<RequestHeaders>
 
   /**
    * Called at most once when the request is closed from the client with trailers.
    *
-   * Filters may mutate or delay the trailers.
+   * Filters may mutate or delay the trailers. Note trailers imply the stream has ended.
    *
    * @param trailers: The outbound trailers.
    *
    * @return: The trailer status containing body with which to continue or buffer.
    */
-  fun onRequestTrailers(trailers: RequestTrailers): FilterTrailersStatus<RequestTrailers>
+  fun onRequestTrailers(trailers: RequestTrailers): FilterTrailersStatus<RequestHeaders, RequestTrailers>
 }
