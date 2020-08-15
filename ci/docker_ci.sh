@@ -43,11 +43,11 @@ push_images(){
     else
         docker tag "${DOCKER_IMAGE_PREFIX}${TYPE}:local" ${BUILD_TAG}
     fi
-    
+
     if [[ -z "${SAVE_IMAGES}" ]]; then
         docker push ${BUILD_TAG}
     else
-        docker save ${BUILD_TAG} | xz -T0 -1 > "${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy-docker${TYPE}-${BUILD_TAG}.tar.xz"
+        docker save ${BUILD_TAG} | xz -T0 -1 > "${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy-docker${TYPE}.tar.xz"
     fi
 }
 
