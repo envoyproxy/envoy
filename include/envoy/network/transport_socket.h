@@ -256,5 +256,20 @@ public:
 
 using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;
 
+class WritablePeer {
+  public:
+  virtual ~WritablePeer() = default;
+  
+  /**
+   * Set the flag to indicate no further write.
+   */
+  virtual void setWriteEnd() PURE;
+
+  /**
+   * @return the buffer to be written.
+   */
+  virtual Buffer::Instance* getWriteBuffer() PURE;
+};
+
 } // namespace Network
 } // namespace Envoy

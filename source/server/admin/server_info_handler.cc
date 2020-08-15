@@ -52,8 +52,6 @@ Http::Code ServerInfoHandler::handlerMemory(absl::string_view,
   memory.set_pageheap_unmapped(Memory::Stats::totalPageHeapUnmapped());
   memory.set_pageheap_free(Memory::Stats::totalPageHeapFree());
   memory.set_total_physical_bytes(Memory::Stats::totalPhysicalBytes());
-  memory.set_total_shrink_attempt();
-  memory.set_shrink_made();
   response.add(MessageUtil::getJsonStringFromMessage(memory, true, true)); // pretty-print
   return Http::Code::OK;
 }

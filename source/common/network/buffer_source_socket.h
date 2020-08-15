@@ -11,12 +11,13 @@ namespace Envoy {
 namespace Network {
 
 class BufferSourceSocket : public TransportSocket,
+                           public WritablePeer,
                            protected Logger::Loggable<Logger::Id::connection> {
 public:
   uint64_t bsid() { return bsid_; }
 
   BufferSourceSocket();
-
+  
   // Network::TransportSocket
   void setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
@@ -33,15 +34,43 @@ public:
                    callbacks_->connection().id(), static_cast<void*>(read_source_buf));
     // read_source_buf_ = read_source_buf;
   }
-  void setWriteDestBuffer(Buffer::Instance* write_dest_buf) {
-    ENVOY_LOG_MISC(debug, "lambdai: C{} set write dst buffer to {}", callbacks_->connection().id(),
-                   static_cast<void*>(write_dest_buf));
-    write_dest_buf_ = write_dest_buf;
-  }
 
   Buffer::WatermarkBuffer& getTransportSocketBuffer() { return read_buffer_; }
+  
   uint64_t bsid_;
   Buffer::WatermarkBuffer read_buffer_;
+  // True if read_buffer_ is not addable. Note that read_buffer_ may have pending data to drain.
+  bool no_more_readable_ {false};
+
+  // WritablePeer
+  void setWriteEnd() override {
+    ASSERT(!no_more_readable_);
+    no_more_readable_ = true;
+  }
+   Buffer::Instance* getWriteBuffer() override {
+     return &read_buffer_;
+   }
+
+  void setWritablePeer(WritablePeer* writable_peer) {
+    // Swapping writable peer is undefined behavior.
+    ASSERT(!writable_peer_);
+    ASSERT(!peer_closed_); 
+
+    ENVOY_LOG_MISC(debug, "lambdai: C{} set write dst buffer to B{}", callbacks_->connection().id(),
+                   writable_peer->getWriteBuffer()->bid());
+    writable_peer_= writable_peer;
+  }
+  void clearWritablePeer() {
+    ASSERT(writable_peer_);
+    writable_peer_ = nullptr;
+    ASSERT(!peer_closed_);
+    peer_closed_ = true;
+  }
+  bool isWritablePeerValid() const {
+    return !peer_closed_;
+  }
+
+
 
 private:
   static uint64_t next_bsid_;
@@ -49,7 +78,10 @@ private:
   bool shutdown_{};
   // Buffer::WatermarkBuffer read_buffer_;
   bool read_end_stream_{false};
-  Buffer::Instance* write_dest_buf_;
+
+  WritablePeer* writable_peer_;
+  // The flag whether the peer is valid. Any write attempt should check flag.
+  bool peer_closed_{false};
 };
 
 class BufferSourceSocketFactory : public TransportSocketFactory {

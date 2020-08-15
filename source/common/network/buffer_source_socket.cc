@@ -41,7 +41,7 @@ IoResult BufferSourceSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
   // TODO: check if the peer exist and want to write.
   lambdaiCheckSeeEndStream(end_stream);
   ASSERT(!shutdown_ || buffer.length() == 0);
-  if (write_dest_buf_ == nullptr) {
+  if (!isWritablePeerValid()) {
     ENVOY_CONN_LOG(debug, "lambdai: bs write error: {} {}", callbacks_->connection(),
                    buffer.length(), " bytes to write but no buffer to write to, closing. ");
     ENVOY_CONN_LOG(trace, "write error: {} {}", callbacks_->connection(), buffer.length(),
@@ -51,7 +51,15 @@ IoResult BufferSourceSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
   uint64_t bytes_written = 0;
   if (buffer.length() > 0) {
     bytes_written = buffer.length();
-    write_dest_buf_->move(buffer);
+    writable_peer_->getWriteBuffer()->move(buffer);
+  }
+  // Since we move all bytes to the peer. doWrite always drain the buffer. It's safe to shutdown.
+  // VS TCP: shutdown_ could be delayed if os buffer is full.
+  if (end_stream) {
+    // Debug only.
+    shutdown_ = true;
+    // Notify peer that no more data will be written. Think it sending the FIN.
+    writable_peer_->setWriteEnd();
   }
   ENVOY_CONN_LOG(debug, "lambdai: bs write returns: {}", callbacks_->connection(), bytes_written);
   ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), bytes_written);

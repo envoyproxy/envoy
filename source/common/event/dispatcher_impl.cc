@@ -160,9 +160,9 @@ DispatcherImpl::createUserspacePipe(Network::Address::InstanceConstSharedPtr pee
   // TODO(lambdai): Retrieve buffer each time when supporting close.
   // TODO(lambdai): Add to dest buffer to generic IoHandle, or TransportSocketCallback.
   // client_socket_raw->setReadSourceBuffer(&server_conn->getWriteBuffer().buffer);
-  client_socket_raw->setWriteDestBuffer(&server_socket_raw->getTransportSocketBuffer());
+  client_socket_raw->setWritablePeer(server_socket_raw);
   // server_socket_raw->setReadSourceBuffer(&client_conn->getWriteBuffer().buffer);
-  server_socket_raw->setWriteDestBuffer(&client_socket_raw->getTransportSocketBuffer());
+  server_socket_raw->setWritablePeer(client_socket_raw);
   (iter->second)(peer_address, std::move(server_conn));
   return client_conn;
 }
