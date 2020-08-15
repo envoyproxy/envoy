@@ -2,12 +2,6 @@ import Foundation
 
 /// Filter executed for inbound responses, providing the ability to observe and mutate streams.
 public protocol ResponseFilter: Filter {
-  /// Called by the filter manager once to initialize the filter callbacks that the filter should
-  /// use.
-  ///
-  /// - parameter callbacks: The callbacks for this filter to use to interact with the chain.
-  func setResponseFilterCallbacks(_ callbacks: ResponseFilterCallbacks)
-
   /// Called once when the response is initiated.
   ///
   /// Filters may mutate or delay the response headers.
@@ -27,16 +21,17 @@ public protocol ResponseFilter: Filter {
   /// - parameter endStream: Whether this is the last data frame.
   ///
   /// - returns: The data status containing body with which to continue or buffer.
-  func onResponseData(_ body: Data, endStream: Bool) -> FilterDataStatus
+  func onResponseData(_ body: Data, endStream: Bool) -> FilterDataStatus<ResponseHeaders>
 
   /// Called at most once when the response is closed from the server with trailers.
   ///
-  /// Filters may mutate or delay the trailers.
+  /// Filters may mutate or delay the trailers. Note trailers imply the stream has ended.
   ///
   /// - parameter trailers: The outbound trailers.
   ///
   /// - returns: The trailer status containing body with which to continue or buffer.
-  func onResponseTrailers(_ trailers: ResponseTrailers) -> FilterTrailersStatus<ResponseTrailers>
+  func onResponseTrailers(_ trailers: ResponseTrailers)
+    -> FilterTrailersStatus<ResponseHeaders, ResponseTrailers>
 
   /// Called at most once when an error within Envoy occurs.
   ///

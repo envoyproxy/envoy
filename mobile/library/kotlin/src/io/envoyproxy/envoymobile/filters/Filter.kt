@@ -29,7 +29,7 @@ internal class EnvoyHTTPFilterAdapter(
       val result = requestFilter.onRequestHeaders(RequestHeaders(headers), endStream)
       return when (result) {
         is FilterHeadersStatus.Continue -> arrayOf(0 /*EnvoyHTTPHeadersStatusContinue*/, result.headers.headers)
-        is FilterHeadersStatus.StopIteration -> arrayOf(1 /*EnvoyHTTPHeadersStatusStopIteration*/, result.headers.headers)
+        is FilterHeadersStatus.StopIteration -> arrayOf(1 /*EnvoyHTTPHeadersStatusStopIteration*/, headers)
       }
     }
     return arrayOf(0, headers)
@@ -40,7 +40,7 @@ internal class EnvoyHTTPFilterAdapter(
       val result = responseFilter.onResponseHeaders(ResponseHeaders(headers), endStream)
       return when (result) {
         is FilterHeadersStatus.Continue -> arrayOf(0 /*EnvoyHTTPHeadersStatusContinue*/, result.headers.headers)
-        is FilterHeadersStatus.StopIteration -> arrayOf(1 /*EnvoyHTTPHeadersStatusStopIteration*/, result.headers.headers)
+        is FilterHeadersStatus.StopIteration -> arrayOf(1 /*EnvoyHTTPHeadersStatusStopIteration*/, headers)
       }
     }
     return arrayOf(0, headers)

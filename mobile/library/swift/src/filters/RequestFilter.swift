@@ -2,12 +2,6 @@ import Foundation
 
 /// Filter executed for outbound requests, providing the ability to observe and mutate streams.
 public protocol RequestFilter: Filter {
-  /// Called by the filter manager once to initialize the filter callbacks that the filter should
-  /// use.
-  ///
-  /// - parameter callbacks: The callbacks for this filter to use to interact with the chain.
-  func setRequestFilterCallbacks(_ callbacks: RequestFilterCallbacks)
-
   /// Called once when the request is initiated.
   ///
   /// Filters may mutate or delay the request headers.
@@ -27,14 +21,15 @@ public protocol RequestFilter: Filter {
   /// - parameter endStream: Whether this is the last data frame.
   ///
   /// - returns: The data status containing body with which to continue or buffer.
-  func onRequestData(_ body: Data, endStream: Bool) -> FilterDataStatus
+  func onRequestData(_ body: Data, endStream: Bool) -> FilterDataStatus<RequestHeaders>
 
   /// Called at most once when the request is closed from the client with trailers.
   ///
-  /// Filters may mutate or delay the trailers.
+  /// Filters may mutate or delay the trailers. Note trailers imply the stream has ended.
   ///
   /// - parameter trailers: The outbound trailers.
   ///
   /// - returns: The trailer status containing body with which to continue or buffer.
-  func onRequestTrailers(_ trailers: RequestTrailers) -> FilterTrailersStatus<RequestTrailers>
+  func onRequestTrailers(_ trailers: RequestTrailers)
+    -> FilterTrailersStatus<RequestHeaders, RequestTrailers>
 }
