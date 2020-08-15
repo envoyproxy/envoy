@@ -47,10 +47,6 @@ private:
 
 class BoundedLoadHashingLoadBalancerTest : public testing::Test {
 public:
-  HostOverloadedPredicate getHostOverloadedPredicate(bool always) {
-    bool always_return = always;
-    return [&always_return](HostConstSharedPtr, double) -> bool { return always_return; };
-  }
   HostOverloadedPredicate getHostOverloadedPredicate(HostConstSharedPtr overloaded_host) {
     HostConstSharedPtr host = overloaded_host;
     return [&host](HostConstSharedPtr h, double) -> bool { return h == host; };
@@ -128,7 +124,8 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, NoHashingLoadBalancer) {
 // Works correctly for the case when no host is ever overloaded.
 TEST_F(BoundedLoadHashingLoadBalancerTest, NoHostEverOverloaded) {
   // setup: 5 hosts, none ever overloaded.
-  hostOverLoadedPredicate_ = getHostOverloadedPredicate(false);
+  std::vector<std::string> addresses;
+  hostOverLoadedPredicate_ = getHostOverloadedPredicate(addresses);
 
   NormalizedHostWeightVector normalized_host_weights;
   createHosts(5, normalized_host_weights);
