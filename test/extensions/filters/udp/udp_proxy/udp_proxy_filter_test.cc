@@ -109,6 +109,9 @@ public:
               return Api::SysCallIntResult{0, 0};
             }
           }));
+      if (no_support) {
+        EXPECT_CALL(*socket_->io_handle_, fd()).Times(AtLeast(0));
+      }
     }
 
     void expectUpstreamWrite(const std::string& data, int sys_errno = 0,
@@ -294,16 +297,19 @@ public:
     EXPECT_EQ(ipv6_expect == 1, ipv6_option_details.has_value());
   }
 
-  void checkSocketOptionsSupport(const std::vector<Network::SocketOptionName>& option_names) {
+  bool isSocketOptionsSupported(const std::vector<Network::SocketOptionName>& option_names) {
     for (const auto& option_name : option_names) {
       if (!option_name.hasValue()) {
-        // The option is not supported on this platform. Just skip the test.
-        GTEST_SKIP();
+        return false;
       }
     }
+
+    return true;
   }
 
-  void checkTransparentSocketOptionsSupport() { checkSocketOptionsSupport(transparent_options); }
+  bool isTransparentSocketOptionsSupported() {
+    return isSocketOptionsSupported(transparent_options);
+  }
 
   Api::MockOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_;
@@ -635,7 +641,10 @@ cluster: fake_cluster
 
 // Make sure socket option is set correctly if use_original_src_ip is set.
 TEST_F(UdpProxyFilterTest, SocketOptionForUseOriginalSrcIp) {
-  checkTransparentSocketOptionsSupport();
+  if (!isTransparentSocketOptionsSupported()) {
+    // The option is not supported on this platform. Just skip the test.
+    GTEST_SKIP();
+  }
 
   InSequence s;
 
@@ -664,7 +673,10 @@ use_original_src_ip: true
 
 // Make sure socket option is set correctly if use_original_src_ip is set in case of ipv6.
 TEST_F(UdpProxyFilterTestIpv6, SocketOptionForUseOriginalSrcIpInCaseOfIpv6) {
-  checkTransparentSocketOptionsSupport();
+  if (!isTransparentSocketOptionsSupported()) {
+    // The option is not supported on this platform. Just skip the test.
+    GTEST_SKIP();
+  }
 
   InSequence s;
 
@@ -693,7 +705,10 @@ use_original_src_ip: true
 
 // Make sure socket option is not set correctly if use_original_src_ip is not set.
 TEST_F(UdpProxyFilterTestIpv4Ipv6, NoSocketOptionForDontUseOriginalSrcIp) {
-  checkTransparentSocketOptionsSupport();
+  if (!isTransparentSocketOptionsSupported()) {
+    // The option is not supported on this platform. Just skip the test.
+    GTEST_SKIP();
+  }
 
   InSequence s;
 
@@ -720,7 +735,10 @@ use_original_src_ip: false
 
 // Make sure socket option is not set correctly if use_original_src_ip is not mentioned.
 TEST_F(UdpProxyFilterTestIpv4Ipv6, NoSocketOptionForNoUseOriginalSrcIp) {
-  checkTransparentSocketOptionsSupport();
+  if (!isTransparentSocketOptionsSupported()) {
+    // The option is not supported on this platform. Just skip the test.
+    GTEST_SKIP();
+  }
 
   InSequence s;
 
