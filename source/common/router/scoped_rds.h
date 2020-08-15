@@ -77,14 +77,22 @@ private:
  * All SRDS stats. @see stats_macros.h
  */
 // clang-format off
-#define ALL_SCOPED_RDS_STATS(COUNTER)                                                              \
+#define ALL_SCOPED_RDS_STATS(COUNTER, GAUGE)                                                       \
   COUNTER(config_reload)                                                                           \
-  COUNTER(update_empty)
+  COUNTER(update_empty)                                                                            \
+  GAUGE(all_scopes, Accumulate)                                                                    \
+  GAUGE(on_demand_scopes, Accumulate)                                                              \
+  GAUGE(active_scopes, Accumulate)
 
 // clang-format on
 
 struct ScopedRdsStats {
-  ALL_SCOPED_RDS_STATS(GENERATE_COUNTER_STRUCT)
+  ALL_SCOPED_RDS_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+
+  static ScopedRdsStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    return ScopedRdsStats{
+        ALL_SCOPED_RDS_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix))};
+  }
 };
 
 // A scoped RDS subscription to be used with the dynamic scoped RDS ConfigProvider.
@@ -131,6 +139,10 @@ private:
       // Only remove the rds update when the rds provider has been initialized.
       if (route_provider_) {
         rds_update_callback_handle_->remove();
+        parent_.stats_.active_scopes_.dec();
+      }
+      if (on_demand_) {
+        parent_.stats_.on_demand_scopes_.dec();
       }
     }
     ConfigConstSharedPtr routeConfig() { return route_provider_->config(); }
@@ -141,6 +153,7 @@ private:
 
     ScopedRdsConfigSubscription& parent_;
     std::string scope_name_;
+    bool on_demand_;
     RdsRouteConfigProviderImplSharedPtr route_provider_;
     // This handle_ is owned by the route config provider's RDS subscription, when the helper
     // destructs, the handle is deleted as well.
@@ -194,10 +207,6 @@ private:
   // ScopedRouteInfo by scope name.
   ScopedRouteMap scoped_route_map_;
 
-  // RdsRouteConfigProvider by scope name.
-  absl::flat_hash_map<std::string, RdsRouteConfigProviderHelperPtr> route_provider_by_scope_;
-  // A map of (hash, scope-name), used to detect the key conflict between scopes.
-  absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash_;
   // For creating RDS subscriptions.
   Server::Configuration::ServerFactoryContext& factory_context_;
   const std::string name_;
@@ -209,6 +218,11 @@ private:
   const envoy::config::core::v3::ConfigSource rds_config_source_;
   const std::string stat_prefix_;
   RouteConfigProviderManager& route_config_provider_manager_;
+
+  // RdsRouteConfigProvider by scope name.
+  absl::flat_hash_map<std::string, RdsRouteConfigProviderHelperPtr> route_provider_by_scope_;
+  // A map of (hash, scope-name), used to detect the key conflict between scopes.
+  absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash_;
 };
 
 using ScopedRdsConfigSubscriptionSharedPtr = std::shared_ptr<ScopedRdsConfigSubscription>;

@@ -105,7 +105,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       factory_context_(factory_context), name_(name), scope_key_builder_(scope_key_builder),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
-      stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}),
+      stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
       rds_config_source_(std::move(rds_config_source)), stat_prefix_(stat_prefix),
       route_config_provider_manager_(route_config_provider_manager) {
   const auto resource_name = getResourceName();
@@ -125,7 +125,7 @@ ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProvide
     ScopedRdsConfigSubscription& parent, std::string scope_name,
     envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
     Init::Manager& init_manager)
-    : parent_(parent), scope_name_(scope_name),
+    : parent_(parent), scope_name_(scope_name), on_demand_(false),
       route_provider_(std::dynamic_pointer_cast<RdsRouteConfigProviderImpl>(
           parent_.route_config_provider_manager_.createRdsRouteConfigProvider(
               rds, parent_.factory_context_, parent_.stat_prefix_, init_manager))),
@@ -133,11 +133,15 @@ ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProvide
       rds_update_callback_handle_(route_provider_->subscription().addUpdateCallback([this]() {
         // Subscribe to RDS update.
         parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());
-      })) {}
+      })) {
+  parent_.stats_.active_scopes_.inc();
+}
 
 ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProviderHelper(
     ScopedRdsConfigSubscription& parent, std::string scope_name)
-    : parent_(parent), scope_name_(scope_name) {}
+    : parent_(parent), scope_name_(scope_name), on_demand_(true) {
+  parent_.stats_.on_demand_scopes_.inc();
+}
 
 void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::addOnDemandUpdateCallback(
     std::function<void()> callback) {
@@ -189,6 +193,7 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::initRdsConfigPro
     // Subscribe to RDS update.
     parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());
   });
+  parent_.stats_.active_scopes_.inc();
   ENVOY_LOG(debug, fmt::format("Scope on demand update: {}", scope_name_));
   // If route configuration hasn't been initialized, return.
   if (routeConfig() == std::make_shared<NullConfigImpl>()) {
@@ -361,6 +366,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   if (any_applied) {
     setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));
   }
+  stats_.all_scopes_.set(route_provider_by_scope_.size());
   stats_.config_reload_.inc();
 }
 
