@@ -37,6 +37,10 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     if (overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
         if (listener.second.listener_->listenerTag() == overridden_listener) {
+          // Since the listener is updated, the sockets stored inside 'sockets_using_filter_chain_'
+          // have no original tcp_listener to retry A brute force solution is that we close all the
+          // sockets stored for the old active tcp listener.
+          closeAllSocketsOfOldListener(config.name());
           listener.second.tcp_listener_->get().updateListenerConfig(config);
           return;
         }
@@ -109,6 +113,21 @@ void ConnectionHandlerImpl::enableListeners() {
   }
 }
 
+void ConnectionHandlerImpl::closeAllSocketsOfOldListener(const std::string& listener_name) {
+  ENVOY_LOG(debug, "close all sockets that listener:{} has stored because it is updated.",
+            listener_name);
+  for (auto& [filter_chain_message, listener_sockets_map] : sockets_using_filter_chain_) {
+    for (auto& [name, socket_metadata_pairs] : listener_sockets_map) {
+      if (name == listener_name) {
+        for (auto& [socket, metadata] : socket_metadata_pairs) {
+          socket->close();
+        }
+      }
+    }
+    listener_sockets_map.erase(listener_name);
+  }
+}
+
 void ConnectionHandlerImpl::retryAllConnections(
     bool success, const envoy::config::listener::v3::FilterChain* const& filter_chain_message) {
   // If the filter_chain_message has been cleared, we have no connections to retry.
@@ -129,6 +148,7 @@ void ConnectionHandlerImpl::retryAllConnections(
       const auto& listener_name = active_tcp_listener.config_->name();
       // Find all SocketMetadataPair of this active tcp listener.
       if (listener_sockets_map.find(listener_name) != listener_sockets_map.end()) {
+        ENVOY_LOG(debug, "found listener: {} that has sockets to retry.", listener_name);
         for (auto& [socket, metadata] : listener_sockets_map[listener_name]) {
           // Retry connection with that socket on this active tcp listener.
           // Should point real filter chain before retry connection, to avoid meet filter chain
@@ -475,23 +495,27 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   }
 
   ENVOY_LOG(debug, "required filter chain is not a placeholder.");
+  ENVOY_LOG(debug, "1111111111111111111.");
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
+  ENVOY_LOG(debug, "222222222222222222222.");
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);
   auto server_conn_ptr = parent_.dispatcher_.createServerConnection(
       std::move(socket), std::move(transport_socket), *stream_info);
+  ENVOY_LOG(debug, "3333333333333333333333.");
   ActiveTcpConnectionPtr active_connection(
       new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
                               parent_.dispatcher_.timeSource(), std::move(stream_info)));
   active_connection->connection_->setBufferLimits(config_->perConnectionBufferLimitBytes());
 
+  ENVOY_LOG(debug, "444444444444444444444444.");
   const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
       *active_connection->connection_, filter_chain->networkFilterFactories());
   if (empty_filter_chain) {
     ENVOY_CONN_LOG(debug, "closing connection: no filters", *active_connection->connection_);
     active_connection->connection_->close(Network::ConnectionCloseType::NoFlush);
   }
-
+  ENVOY_LOG(debug, "5555555555555555555.");
   // If the connection is already closed, we can just let this connection immediately die.
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
     ENVOY_CONN_LOG(debug, "new connection", *active_connection->connection_);

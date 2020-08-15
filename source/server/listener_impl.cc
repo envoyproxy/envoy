@@ -226,7 +226,7 @@ Init::Manager& ListenerFactoryContextBaseImpl::initManager() { NOT_IMPLEMENTED_G
 
 PerFilterChainRebuilder::PerFilterChainRebuilder(
     ListenerImpl& listener, const envoy::config::listener::v3::FilterChain* const& filter_chain)
-    : listener_(listener), filter_chain_(filter_chain), rebuild_complete_(false),
+    : listener_(listener), filter_chain_(filter_chain),
       rebuild_init_manager_(std::make_unique<Init::ManagerImpl>("rebuild_init_manager")),
       rebuild_watcher_("rebuild_watcher",
                        [this] {

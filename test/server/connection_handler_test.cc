@@ -570,7 +570,6 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingSuccess) {
   // called again. At this time, the same filter chain is found not to be a placeholder. Will call
   // createServerConnection.
   handler_->retryAllConnections(true, &on_demand_filter_chain_template_);
-
   EXPECT_EQ(1UL, handler_->numConnections());
 
   connection->close(Network::ConnectionCloseType::NoFlush);
@@ -614,6 +613,53 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingFail) {
   EXPECT_EQ(0UL, handler_->numConnections());
 
   EXPECT_CALL(*listener, onDestroy());
+}
+
+TEST_F(ConnectionHandlerTest, ListenerUpdateDuringOnDemandFilterChainRebuilding) {
+  uint64_t old_listener_tag = 1;
+  uint64_t new_listener_tag = 2;
+  Network::ListenerCallbacks* old_listener_callbacks;
+  auto old_listener = new NiceMock<Network::MockListener>();
+  TestListener* old_test_listener = addListener(old_listener_tag, true, false, "test_listener",
+                                                old_listener, &old_listener_callbacks);
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *old_test_listener);
+  ASSERT_NE(old_test_listener, nullptr);
+
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(on_demand_filter_chain_.get()));
+
+  // After calling onAccept, newConnection will find filter chain is placeholder. Rebuilding request
+  // will be post to master thread and the currently no createServerConnection will be called.
+  EXPECT_CALL(dispatcher_, createServerConnection_()).Times(0);
+  EXPECT_CALL(master_dispatcher_, post(_)).Times(1);
+
+  Network::MockConnectionSocket* old_socket = new NiceMock<Network::MockConnectionSocket>();
+  old_listener_callbacks->onAccept(Network::ConnectionSocketPtr{old_socket});
+  // Rebuilding request has been sent.
+
+  // After start rebuilding, rebuilt filter chain will be stored inside placeholder.
+  on_demand_filter_chain_->storeRealFilterChain(filter_chain_);
+
+  // listener update before receiveing rebuilding callback.
+  Network::ListenerCallbacks* new_listener_callbacks = nullptr;
+
+  auto overridden_filter_chain_manager =
+      std::make_shared<NiceMock<Network::MockFilterChainManager>>();
+  TestListener* new_test_listener =
+      addListener(new_listener_tag, true, false, "test_listener", /* Network::Listener */ nullptr,
+                  &new_listener_callbacks, nullptr, nullptr, Network::Socket::Type::Stream,
+                  std::chrono::milliseconds(15000), false, overridden_filter_chain_manager);
+  // Will close all sockets of the old listener when listener update.
+  // EXPECT_CALL(handler_, closeAllSocketsOfOldListener(_).Times(1));
+  handler_->addListener(old_listener_tag, *new_test_listener);
+
+  ASSERT_EQ(new_listener_callbacks, nullptr)
+      << "new listener should be inplace added and callback should not change";
+
+  // All sockets closed, no new connection will be created.
+  handler_->retryAllConnections(true, &on_demand_filter_chain_template_);
+  EXPECT_EQ(0UL, handler_->numConnections());
+  EXPECT_CALL(*old_listener, onDestroy());
 }
 
 TEST_F(ConnectionHandlerTest, NormalRedirect) {

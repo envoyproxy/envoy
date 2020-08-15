@@ -94,7 +94,13 @@ public:
   virtual const std::string& statPrefix() const PURE;
 
   /**
-   * retry all connections requiring this filter chain.
+   * Close all sockets that were stored to retry when rebuilding succeeded. This function helps to
+   * avoid using updated listener to retry connections that belongs to old active tcp listeners.
+   */
+  virtual void closeAllSocketsOfOldListener(const std::string& listener_name) PURE;
+
+  /**
+   * Retry all connections requiring this filter chain.
    */
   virtual void retryAllConnections(
       bool success,
