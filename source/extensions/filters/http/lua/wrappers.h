@@ -227,7 +227,7 @@ public:
 
 private:
   /**
-   * Get public key avalue.
+   * Get public key value.
    * @return public key value or nil if key is empty.
    */
   DECLARE_LUA_FUNCTION(PublicKeyWrapper, luaGet);
