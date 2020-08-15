@@ -925,6 +925,7 @@ bool ClientPipeImpl::consumerWantsToRead() {
 }
 
 void ClientPipeImpl::closeSocket(ConnectionEvent close_type) {
+  ENVOY_LOG_MISC(debug, "lambdai: Closing socket C{} type {}", id(), static_cast<int>(close_type));
   if (!isOpen()) {
     return;
   }
@@ -956,8 +957,10 @@ void ClientPipeImpl::closeSocket(ConnectionEvent close_type) {
   ClientPipeImpl::raiseEvent(close_type);
 
   // Close peer using the opposite event type.
-  peer_->closeSocket(close_type == ConnectionEvent::LocalClose ? ConnectionEvent::RemoteClose
-                                                               : ConnectionEvent::LocalClose);
+  // TOOD(lambdai): gurantee peer exists.
+  if (close_type == ConnectionEvent::LocalClose) {
+    peer_->closeSocket(ConnectionEvent::RemoteClose);
+  }
 }
 
 void ClientPipeImpl::noDelay(bool enable) {
@@ -1302,6 +1305,8 @@ void ClientPipeImpl::onWriteReady() {
     // callback, raise a connected event, and close the connection.
     closeSocket(ConnectionEvent::RemoteClose);
   } else if ((inDelayedClose() && new_buffer_size == 0) || bothSidesHalfClosed()) {
+    peer_->onReadReady();
+
     ENVOY_CONN_LOG(debug, "write flush complete", *this);
     if (delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
       ASSERT(delayed_close_timer_ != nullptr);
@@ -1312,12 +1317,14 @@ void ClientPipeImpl::onWriteReady() {
     }
   } else {
     ASSERT(result.action_ == PostIoAction::KeepOpen);
+    ENVOY_LOG_MISC(debug,
+                   "lambdai: {} trigger peer read ready, with bytes={}, write_end_stream_={}",
+                   connection().id(), result.bytes_processed_, write_end_stream_);
+    peer_->onReadReady();
     if (delayed_close_timer_ != nullptr) {
       delayed_close_timer_->enableTimer(delayed_close_timeout_);
     }
     if (result.bytes_processed_ > 0) {
-      ENVOY_LOG_MISC(debug, "lambdai: {} trigger peer read ready", connection().id());
-      peer_->onReadReady();
       for (BytesSentCb& cb : bytes_sent_callbacks_) {
         cb(result.bytes_processed_);
 
@@ -1472,8 +1479,9 @@ void ServerPipeImpl::closeSocket(ConnectionEvent close_type) {
   ServerPipeImpl::raiseEvent(close_type);
 
   // Close peer using the opposite event type.
-  peer_->closeSocket(close_type == ConnectionEvent::LocalClose ? ConnectionEvent::RemoteClose
-                                                               : ConnectionEvent::LocalClose);
+  if (close_type == ConnectionEvent::LocalClose) {
+    peer_->closeSocket(ConnectionEvent::RemoteClose);
+  }
 }
 
 void ServerPipeImpl::noDelay(bool enable) {
@@ -1778,9 +1786,7 @@ void ServerPipeImpl::onWriteReady() {
 
   IoResult result = transport_socket_->doWrite(*write_buffer_, write_end_stream_);
   ASSERT(!result.end_stream_read_); // The interface guarantees that only read operations set this.
-  if (result.bytes_processed_ > 0) {
-    peer_->onReadReady();
-  }
+
   uint64_t new_buffer_size = write_buffer_->length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 
@@ -1794,6 +1800,7 @@ void ServerPipeImpl::onWriteReady() {
     // callback, raise a connected event, and close the connection.
     closeSocket(ConnectionEvent::RemoteClose);
   } else if ((inDelayedClose() && new_buffer_size == 0) || bothSidesHalfClosed()) {
+    peer_->onReadReady();
     ENVOY_CONN_LOG(debug, "write flush complete", *this);
     if (delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
       ASSERT(delayed_close_timer_ != nullptr);
@@ -1804,13 +1811,12 @@ void ServerPipeImpl::onWriteReady() {
     }
   } else {
     ASSERT(result.action_ == PostIoAction::KeepOpen);
+    ENVOY_LOG_MISC(debug, "lambdai: C{} trigger peer read ready", connection().id());
+    peer_->onReadReady();
     if (delayed_close_timer_ != nullptr) {
       delayed_close_timer_->enableTimer(delayed_close_timeout_);
     }
     if (result.bytes_processed_ > 0) {
-      ENVOY_LOG_MISC(debug, "lambdai: {} trigger peer read ready", connection().id());
-      peer_->onReadReady();
-
       for (BytesSentCb& cb : bytes_sent_callbacks_) {
         cb(result.bytes_processed_);
 

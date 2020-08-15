@@ -257,9 +257,9 @@ public:
 using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;
 
 class WritablePeer {
-  public:
+public:
   virtual ~WritablePeer() = default;
-  
+
   /**
    * Set the flag to indicate no further write.
    */
