@@ -39,14 +39,15 @@ push_images(){
 
     if [[ -z "${TYPE}" ]]; then
         # Only push envoyproxy/envoy multi-arch images since others still do not support.
-        docker buildx build --platform linux/arm64,linux/amd64 --push -f ci/Dockerfile-envoy"${TYPE}" -t ${BUILD_TAG} .
+        docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy"${TYPE}" -t ${BUILD_TAG} .
     else
         docker tag "${DOCKER_IMAGE_PREFIX}${TYPE}:local" ${BUILD_TAG}
-        if [[ -z "${SAVE_IMAGES}" ]]; then
-            docker push ${BUILD_TAG}
-        else
-            docker save ${BUILD_TAG} | xz -T0 -1 > "${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy-docker${TYPE}-${BUILD_TAG}.tar.xz"
-        fi
+    fi
+    
+    if [[ -z "${SAVE_IMAGES}" ]]; then
+        docker push ${BUILD_TAG}
+    else
+        docker save ${BUILD_TAG} | xz -T0 -1 > "${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy-docker${TYPE}-${BUILD_TAG}.tar.xz"
     fi
 }
 
