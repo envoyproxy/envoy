@@ -54,7 +54,7 @@ push_images(){
 DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
 
 # "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
-BUILD_TYPES=("") # "-alpine" "-alpine-debug" "-google-vrp")
+BUILD_TYPES=("" "-alpine" "-alpine-debug" "-google-vrp")
 
 # Configure docker-buildx tools
 config_env
@@ -84,13 +84,12 @@ fi
 
 # For master builds and release branch builds use the dev repo. Otherwise we assume it's a tag and
 # we push to the primary repo.
-if [[ "${AZP_BRANCH}" == "${MASTER_BRANCH}" ]] || \
-   [[ "${AZP_BRANCH}" =~ ${RELEASE_BRANCH_REGEX} ]]; then
-  IMAGE_POSTFIX="-dev"
-  IMAGE_NAME="$AZP_SHA1"
-else
+if [[ "${AZP_BRANCH}" =~ "${RELEASE_TAG_REGEX}" ]]; then
   IMAGE_POSTFIX=""
   IMAGE_NAME="${AZP_BRANCH/refs\/tags\//}"
+else
+  IMAGE_POSTFIX="-dev"
+  IMAGE_NAME="$AZP_SHA1"
 fi
 
 [[ -z "${SAVE_IMAGES}" ]] && docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
