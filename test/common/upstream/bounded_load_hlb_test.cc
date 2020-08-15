@@ -153,7 +153,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, OneHostOverloaded) {
     In this host 2 is overloaded. The random shuffle sequence of 5
     elements with seed 2 is 3 1 4 0 2. When the host picked up for
     hash 2 (which is 127.0.0.12) is overloaded, host 3 (127.0.0.13)
-    is picked up,
+    is picked up.
   */
 
   // setup: 5 hosts, one of them is overloaded.
@@ -176,7 +176,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, OneHostOverloaded) {
   // test
   HostConstSharedPtr host = lb_->chooseHost(2, 1);
   EXPECT_NE(host, nullptr);
-  EXPECT_EQ(host->address()->asString(), "127.0.0.13:90");
+  EXPECT_EQ(host->address()->asString(), "127.0.0.10:90");
 };
 
 // Works correctly for the case a few hosts are overloaded.
@@ -185,8 +185,8 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHostOverloaded) {
     In this case hosts 1, 2 & 3 are overloaded. The random shuffle
     sequence of 5 elements with seed 2 is 3 1 4 0 2. When the host
     picked up for hash 2 (which is 127.0.0.12) is overloaded, the
-    method passes over hosts 3 & 1 and picks host 4 (127.0.0.10)
-    is picked up,
+    method passes over hosts 3 & 1 and picks host 4 (127.0.0.14)
+    is picked up.
 
   */
 
@@ -194,7 +194,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHostOverloaded) {
   std::vector<std::string> addresses;
   addresses.push_back("127.0.0.11:90");
   addresses.push_back("127.0.0.12:90");
-  addresses.push_back("127.0.0.13:90");
+  addresses.push_back("127.0.0.10:90");
   hostOverLoadedPredicate_ = getHostOverloadedPredicate(addresses);
 
   NormalizedHostWeightVector normalized_host_weights;
@@ -218,7 +218,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHostOverloaded) {
 // Works correctly for the case a few hosts are overloaded.
 TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHashSameHostOverloaded) {
   /*
-    In this case hosts 2 is overloaded. The random shuffle
+    In this case host 2 is overloaded. The random shuffle
     sequence of 5 elements with seed 2 is 3 1 4 0 2. When the host
     picked up for hash 2 (which is 127.0.0.12) is overloaded, the
     method passes over hosts 3 & 1 and picks host 4 (127.0.0.10)
@@ -227,7 +227,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHashSameHostOverloaded) {
   */
   // setup: 5 hosts, one of them is overloaded.
   std::vector<std::string> addresses;
-  addresses.push_back("127.0.0.12:90");
+  addresses.push_back("127.0.0.13:90");
   hostOverLoadedPredicate_ = getHostOverloadedPredicate(addresses);
 
   NormalizedHostWeightVector normalized_host_weights, hosts_on_ring;
@@ -243,18 +243,18 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHashSameHostOverloaded) {
                                                              hostOverLoadedPredicate_);
 
   // test
-  HostConstSharedPtr host1 = lb_->chooseHost(4, 1);
+  HostConstSharedPtr host1 = lb_->chooseHost(6, 1);
   EXPECT_NE(host1, nullptr);
-  HostConstSharedPtr host2 = lb_->chooseHost(5, 1);
+  HostConstSharedPtr host2 = lb_->chooseHost(7, 1);
   EXPECT_NE(host2, nullptr);
 
   // they are different
   EXPECT_NE(host1->address()->asString(), host2->address()->asString());
 
   // sequence for 4 is 34021;
-  EXPECT_EQ(host1->address()->asString(), "127.0.0.13:90");
+  EXPECT_EQ(host1->address()->asString(), "127.0.0.12:90");
   // sequence for 5 is 20134
-  EXPECT_EQ(host2->address()->asString(), "127.0.0.10:90");
+  EXPECT_EQ(host2->address()->asString(), "127.0.0.14:90");
 };
 
 } // namespace

@@ -249,7 +249,7 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
   // Not using Random::RandomGenerator as it does not take a seed. Seeded RNG is a
   // requirement here as we need the same shuffle sequence for the same hash every time.
   const uint64_t seed = hash;
-  std::default_random_engine random(seed);
+  std::mt19937 random(seed);
   HostConstSharedPtr h;
   for (uint32_t i = 0; i < num_hosts; i++) {
     // The random shuffle algorithm
