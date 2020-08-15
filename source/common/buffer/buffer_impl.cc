@@ -19,6 +19,7 @@ constexpr uint64_t CopyThreshold = 512;
 } // namespace
 
 void OwnedImpl::addImpl(const void* data, uint64_t size) {
+  ENVOY_LOG_MISC(debug, "lambdai: buffer B{} add {}", bid(), size);
   const char* src = static_cast<const char*>(data);
   bool new_slice_needed = slices_.empty();
   while (size != 0) {
@@ -41,6 +42,7 @@ void OwnedImpl::addDrainTracker(std::function<void()> drain_tracker) {
 void OwnedImpl::add(const void* data, uint64_t size) { addImpl(data, size); }
 
 void OwnedImpl::addBufferFragment(BufferFragment& fragment) {
+  ENVOY_LOG_MISC(debug, "lambdai: buffer B{} add fragment {}", bid(), fragment.size());
   length_ += fragment.size();
   slices_.emplace_back(std::make_unique<UnownedSlice>(fragment));
 }
@@ -49,6 +51,8 @@ void OwnedImpl::add(absl::string_view data) { add(data.data(), data.size()); }
 
 void OwnedImpl::add(const Instance& data) {
   ASSERT(&data != this);
+  ENVOY_LOG_MISC(debug, "lambdai: buffer B{} add {} from B{}", bid(), data.length(), data.bid());
+
   for (const RawSlice& slice : data.getRawSlices()) {
     add(slice.mem_, slice.len_);
   }
@@ -56,6 +60,8 @@ void OwnedImpl::add(const Instance& data) {
 
 void OwnedImpl::prepend(absl::string_view data) {
   uint64_t size = data.size();
+  ENVOY_LOG_MISC(debug, "lambdai: buffer B{} prepend {}", bid(), size);
+
   bool new_slice_needed = slices_.empty();
   while (size != 0) {
     if (new_slice_needed) {
@@ -71,6 +77,9 @@ void OwnedImpl::prepend(absl::string_view data) {
 void OwnedImpl::prepend(Instance& data) {
   ASSERT(&data != this);
   OwnedImpl& other = static_cast<OwnedImpl&>(data);
+  ENVOY_LOG_MISC(debug, "lambdai: buffer B{} prepend {} from B{}", bid(), other.length_,
+                 data.bid());
+
   while (!other.slices_.empty()) {
     uint64_t slice_size = other.slices_.back()->dataSize();
     length_ += slice_size;
@@ -100,7 +109,7 @@ void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
       return;
     }
   }
-
+  uint64_t prelen = length_;
   // Next, scan forward and attempt to match the slices against iovecs.
   uint64_t num_slices_committed = 0;
   while (num_slices_committed < num_iovecs) {
@@ -113,6 +122,9 @@ void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
       break;
     }
   }
+  prelen++;
+  prelen--;
+  ENVOY_LOG_MISC(debug, "lambdai: B{} commit {}", bid(), length_ - prelen);
 
   // In case an extra slice was reserved, remove empty slices from the end of the buffer.
   while (!slices_.empty() && slices_.back()->dataSize() == 0) {
@@ -151,6 +163,8 @@ void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
 void OwnedImpl::drain(uint64_t size) { drainImpl(size); }
 
 void OwnedImpl::drainImpl(uint64_t size) {
+  ENVOY_LOG_MISC(debug, "lambdai: buffer B{} drain {} ", bid(), size);
+
   while (size != 0) {
     if (slices_.empty()) {
       break;
@@ -265,6 +279,7 @@ void OwnedImpl::move(Instance& rhs) {
   // now and this is safe. This is a reasonable compromise in a high performance path where we
   // want to maintain an abstraction.
   OwnedImpl& other = static_cast<OwnedImpl&>(rhs);
+  ENVOY_LOG_MISC(debug, "lambdai: buffer B{} move {} from B{} ", bid(), other.length_, rhs.bid());
   while (!other.slices_.empty()) {
     const uint64_t slice_size = other.slices_.front()->dataSize();
     coalesceOrAddSlice(std::move(other.slices_.front()));
@@ -275,6 +290,7 @@ void OwnedImpl::move(Instance& rhs) {
 }
 
 void OwnedImpl::move(Instance& rhs, uint64_t length) {
+  ENVOY_LOG_MISC(debug, "lambdai: buffer B{} move {} from B{} ", bid(), length, rhs.bid());
   ASSERT(&rhs != this);
   // See move() above for why we do the static cast.
   OwnedImpl& other = static_cast<OwnedImpl&>(rhs);
@@ -499,6 +515,7 @@ Api::IoCallUint64Result OwnedImpl::write(Network::IoHandle& io_handle) {
 }
 
 OwnedImpl::OwnedImpl() = default;
+OwnedImpl::OwnedImpl(int fortest) : LibEventInstance(fortest) {}
 
 OwnedImpl::OwnedImpl(absl::string_view data) : OwnedImpl() { add(data); }
 

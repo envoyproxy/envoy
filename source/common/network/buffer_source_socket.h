@@ -13,7 +13,10 @@ namespace Network {
 class BufferSourceSocket : public TransportSocket,
                            protected Logger::Loggable<Logger::Id::connection> {
 public:
+  uint64_t bsid() { return bsid_; }
+
   BufferSourceSocket();
+
   // Network::TransportSocket
   void setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
@@ -37,11 +40,14 @@ public:
   }
 
   Buffer::WatermarkBuffer& getTransportSocketBuffer() { return read_buffer_; }
+  uint64_t bsid_;
+  Buffer::WatermarkBuffer read_buffer_;
 
 private:
+  static uint64_t next_bsid_;
   TransportSocketCallbacks* callbacks_{};
   bool shutdown_{};
-  Buffer::WatermarkBuffer read_buffer_;
+  // Buffer::WatermarkBuffer read_buffer_;
   bool read_end_stream_{false};
   Buffer::Instance* write_dest_buf_;
 };

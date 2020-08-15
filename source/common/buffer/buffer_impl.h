@@ -486,6 +486,8 @@ private:
 
 class LibEventInstance : public Instance {
 public:
+  LibEventInstance() : Instance() {}
+  LibEventInstance(int testid) : Instance(testid) {}
   // Called after accessing the memory in buffer() directly to allow any post-processing.
   virtual void postProcess() PURE;
 };
@@ -523,6 +525,8 @@ private:
 class OwnedImpl : public LibEventInstance {
 public:
   OwnedImpl();
+  OwnedImpl(int);
+
   OwnedImpl(absl::string_view data);
   OwnedImpl(const Instance& data);
   OwnedImpl(const void* data, uint64_t size);

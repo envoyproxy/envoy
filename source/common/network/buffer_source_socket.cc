@@ -9,8 +9,14 @@
 
 namespace Envoy {
 namespace Network {
+
+uint64_t BufferSourceSocket::next_bsid_ = 0;
+
 BufferSourceSocket::BufferSourceSocket()
-    : read_buffer_([]() -> void {}, []() -> void {}, []() -> void {}) {}
+    : bsid_(next_bsid_++), read_buffer_([]() -> void {}, []() -> void {}, []() -> void {}) {
+  ENVOY_LOG_MISC(debug, "lambdai: BufferSourceTS {} owns B{}", bsid(), read_buffer_.bid());
+}
+
 void BufferSourceSocket::setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) {
   ASSERT(!callbacks_);
   callbacks_ = &callbacks;
@@ -32,8 +38,12 @@ IoResult BufferSourceSocket::doRead(Buffer::Instance& buffer) {
 }
 
 IoResult BufferSourceSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
+  // TODO: check if the peer exist and want to write.
+  lambdaiCheckSeeEndStream(end_stream);
   ASSERT(!shutdown_ || buffer.length() == 0);
   if (write_dest_buf_ == nullptr) {
+    ENVOY_CONN_LOG(debug, "lambdai: bs write error: {} {}", callbacks_->connection(),
+                   buffer.length(), " bytes to write but no buffer to write to, closing. ");
     ENVOY_CONN_LOG(trace, "write error: {} {}", callbacks_->connection(), buffer.length(),
                    " bytes to write but no buffer to write to, closing. ");
     return {PostIoAction::Close, 0, false};
@@ -43,9 +53,9 @@ IoResult BufferSourceSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
     bytes_written = buffer.length();
     write_dest_buf_->move(buffer);
   }
+  ENVOY_CONN_LOG(debug, "lambdai: bs write returns: {}", callbacks_->connection(), bytes_written);
   ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), bytes_written);
-  return {buffer.length() == 0 && end_stream ? PostIoAction::Close : PostIoAction::KeepOpen,
-          bytes_written, false};
+  return {PostIoAction::KeepOpen, bytes_written, false};
 }
 
 std::string BufferSourceSocket::protocol() const { return EMPTY_STRING; }

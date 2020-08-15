@@ -48,6 +48,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
 }
 
 IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
+  lambdaiCheckSeeEndStream(end_stream);
   PostIoAction action;
   uint64_t bytes_written = 0;
   ASSERT(!shutdown_ || buffer.length() == 0);

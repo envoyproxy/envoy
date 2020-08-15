@@ -226,7 +226,9 @@ void IntegrationTcpClient::readDisable(bool disabled) { connection_->readDisable
 AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_stream, bool verify,
                                             std::chrono::milliseconds timeout) {
   auto end_time = time_system_.monotonicTime() + timeout;
-  Buffer::OwnedImpl buffer(data);
+  int lambdaifortest = 1;
+  Buffer::OwnedImpl buffer(lambdaifortest);
+  buffer.add(data);
   if (verify) {
     EXPECT_CALL(*client_write_buffer_, move(_));
     if (!data.empty()) {

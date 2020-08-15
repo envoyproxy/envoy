@@ -8,6 +8,9 @@
 #include "envoy/network/proxy_protocol.h"
 #include "envoy/ssl/connection.h"
 
+#include "common/common/assert.h"
+#include "common/common/logger.h"
+
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -98,6 +101,20 @@ public:
  */
 class TransportSocket {
 public:
+  bool see_write_end_stream_{false};
+
+  void lambdaiCheckSeeEndStream(bool end_stream) {
+    if (see_write_end_stream_) {
+      RELEASE_ASSERT(end_stream,
+                     "once end_stream is seen, the follow up write must provide end_stream = true");
+    } else {
+      if (end_stream) {
+        see_write_end_stream_ = true;
+        ENVOY_LOG_MISC(debug, "lambdai: first see end_stream in this buffer socket");
+      }
+    }
+  }
+
   virtual ~TransportSocket() = default;
 
   /**

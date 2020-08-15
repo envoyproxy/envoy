@@ -54,12 +54,31 @@ public:
    */
   virtual void done() PURE;
 };
+class BufferIdGenerator {
+public:
+  static int nextId() {
+    static int next_id_ = 0;
+    return ++next_id_;
+  }
+};
 
+class TestBufferIdGenerator {
+public:
+  static int nextId() {
+    static int next_id_ = 1000;
+    return ++next_id_;
+  }
+};
 /**
  * A basic buffer abstraction.
  */
 class Instance {
 public:
+  Instance() : buffer_id_(BufferIdGenerator::nextId()) {}
+  Instance(int) : buffer_id_(TestBufferIdGenerator::nextId()) {}
+
+  const int buffer_id_;
+  int bid() const { return buffer_id_; }
   virtual ~Instance() = default;
 
   /**

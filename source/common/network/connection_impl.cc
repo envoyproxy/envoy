@@ -57,6 +57,8 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       write_buffer_above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false) {
+  ENVOY_LOG_MISC(debug, "lambdai: C{} owns rb B{} and wb B{}", id(), read_buffer_.bid(),
+                 write_buffer_->bid());
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
   RELEASE_ASSERT(SOCKET_VALID(ConnectionImpl::ioHandle().fd()), "");
@@ -801,6 +803,8 @@ ClientPipeImpl::ClientPipeImpl(Event::Dispatcher& dispatcher,
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
       remote_address_(remote_address), source_address_(source_address),
       io_timer_(dispatcher.createTimer([this]() { onFileEvent(); })) {
+  ENVOY_LOG_MISC(debug, "lambdai: client pipe C{} owns rb B{} and wb B{}", id(), read_buffer_.bid(),
+                 write_buffer_->bid());
 
   connecting_ = true;
   transport_socket_->setTransportSocketCallbacks(*this);
@@ -1388,6 +1392,8 @@ ServerPipeImpl::ServerPipeImpl(Event::Dispatcher& dispatcher,
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
       remote_address_(remote_address), source_address_(source_address),
       io_timer_(dispatcher.createTimer([this]() { onFileEvent(); })) {
+  ENVOY_LOG_MISC(debug, "lambdai: server pipe C{} owns rb B{} and wb B{}", id(), read_buffer_.bid(),
+                 write_buffer_->bid());
 
   transport_socket_->setTransportSocketCallbacks(*this);
 }
