@@ -142,15 +142,11 @@ void ScopedConfigImpl::removeRoutingScopes(const std::vector<std::string>& scope
 
 Router::ConfigConstSharedPtr
 ScopedConfigImpl::getRouteConfig(const Http::HeaderMap& headers) const {
-  return getRouteConfig(computeKeyHash(headers));
-}
-
-Router::ConfigConstSharedPtr
-ScopedConfigImpl::getRouteConfig(absl::optional<uint64_t> key_hash) const {
-  if (!key_hash) {
+  ScopeKeyPtr scope_key = scope_key_builder_.computeScopeKey(headers);
+  if (scope_key == nullptr) {
     return nullptr;
   }
-  auto iter = scoped_route_info_by_key_.find(*key_hash);
+  auto iter = scoped_route_info_by_key_.find(scope_key->hash());
   if (iter != scoped_route_info_by_key_.end()) {
     return iter->second->routeConfig();
   }
@@ -163,7 +159,6 @@ absl::optional<uint64_t> ScopedConfigImpl::computeKeyHash(const Http::HeaderMap&
       scoped_route_info_by_key_.find(scope_key->hash()) != scoped_route_info_by_key_.end()) {
     return scope_key->hash();
   }
-
   return {};
 }
 

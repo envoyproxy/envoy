@@ -190,7 +190,6 @@ public:
 
   // Envoy::Router::ScopedConfig
   Router::ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap& headers) const override;
-  Router::ConfigConstSharedPtr getRouteConfig(absl::optional<uint64_t> key_hash) const override;
   // The return value is not null only if the scope corresponding to the header exists.
   absl::optional<uint64_t> computeKeyHash(const Http::HeaderMap& headers) const override;
 

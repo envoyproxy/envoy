@@ -22,9 +22,6 @@ public:
    * @return ConfigConstSharedPtr the router's Config matching the request headers.
    */
   virtual ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap& headers) const PURE;
-  virtual Router::ConfigConstSharedPtr getRouteConfig(absl::optional<uint64_t>) const {
-    return nullptr;
-  };
   virtual absl::optional<uint64_t> computeKeyHash(const Http::HeaderMap&) const { return {}; }
 };
 
