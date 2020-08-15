@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Network {
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
-                                        Address::IpVersion version, bool socket_v6only) {
+                                        Address::IpVersion version, bool socket_v6only) const {
 #if defined(__APPLE__) || defined(WIN32)
   int flags = 0;
 #else
@@ -54,15 +54,14 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 }
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
-                                        const Address::InstanceConstSharedPtr addr) {
+                                        const Address::InstanceConstSharedPtr addr) const {
   Address::IpVersion ip_version = addr->ip() ? addr->ip()->version() : Address::IpVersion::v4;
   int v6only = 0;
   if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6) {
     v6only = addr->ip()->ipv6()->v6only();
   }
 
-  IoHandlePtr io_handle =
-      SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version, v6only);
+  IoHandlePtr io_handle = socket(socket_type, addr->type(), ip_version, v6only);
   if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6) {
     // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
     const Api::SysCallIntResult result = Api::OsSysCallsSingleton::get().setsockopt(

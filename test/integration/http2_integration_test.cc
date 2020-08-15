@@ -1581,9 +1581,10 @@ Http2FloodMitigationTest::Http2FloodMitigationTest() {
   Envoy::Network::SocketInterfaceSingleton::clear();
   test_socket_interface_loader_ = std::make_unique<Envoy::Network::SocketInterfaceLoader>(
       std::make_unique<Envoy::Network::TestSocketInterface>(
-          [this](uint32_t socket_index, const Buffer::RawSlice*,
-                 uint64_t) -> absl::optional<Api::IoCallUint64Result> {
-            if (*writev_returns_egain_ && socket_index == 0) {
+          [writev_matcher = writev_matcher_](Envoy::Network::TestIoSocketHandle* io_handle,
+                                             const Buffer::RawSlice*,
+                                             uint64_t) -> absl::optional<Api::IoCallUint64Result> {
+            if (writev_matcher->shouldReturnEgain(io_handle->localAddress()->ip()->port())) {
               return Api::IoCallUint64Result(
                   0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
                                      Network::IoSocketError::deleteIoError));
@@ -1593,6 +1594,11 @@ Http2FloodMitigationTest::Http2FloodMitigationTest() {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
+}
+
+Http2FloodMitigationTest::~Http2FloodMitigationTest() {
+  test_socket_interface_loader_.reset();
+  Envoy::Network::SocketInterfaceSingleton::initialize(previous_socket_interface_);
 }
 
 void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
@@ -1625,6 +1631,7 @@ void Http2FloodMitigationTest::beginSession() {
   options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_PREBIND,
       ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 1024));
+  writev_matcher_->setSourcePort(lookupPort("http"));
   tcp_client_ = makeTcpConnection(lookupPort("http"), options);
   startHttp2Session();
 }
@@ -1658,7 +1665,7 @@ void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_
   auto frame = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
   EXPECT_EQ(expected_http_status, frame.responseStatus());
-  *writev_returns_egain_ = true;
+  writev_matcher_->setWritevReturnsEgain();
   for (uint32_t frame = 0; frame < num_frames; ++frame) {
     request = Http2Frame::makeRequest(++request_idx, host, path);
     sendFrame(request);
@@ -1678,7 +1685,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FloodMitigationTest,
 TEST_P(Http2FloodMitigationTest, Ping) {
   setNetworkConnectionBufferSize();
   beginSession();
-  *writev_returns_egain_ = true;
+  writev_matcher_->setWritevReturnsEgain();
   floodServer(Http2Frame::makePingFrame(), "http2.outbound_control_flood",
               ControlFrameFloodLimit + 1);
 }
@@ -1686,7 +1693,7 @@ TEST_P(Http2FloodMitigationTest, Ping) {
 TEST_P(Http2FloodMitigationTest, Settings) {
   setNetworkConnectionBufferSize();
   beginSession();
-  *writev_returns_egain_ = true;
+  writev_matcher_->setWritevReturnsEgain();
   floodServer(Http2Frame::makeEmptySettingsFrame(), "http2.outbound_control_flood",
               ControlFrameFloodLimit + 1);
 }
@@ -1717,7 +1724,7 @@ TEST_P(Http2FloodMitigationTest, Data) {
   // 1000 DATA frames should trigger flood protection.
   // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames start
   // to accumulate in the transport socket buffer.
-  *writev_returns_egain_ = true;
+  writev_matcher_->setWritevReturnsEgain();
 
   auto request = Http2Frame::makeRequest(0, "host", "/test/long/url",
                                          {Http2Frame::Header("response_data_blocks", "1000")});
@@ -1765,7 +1772,7 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
 
   // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames start
   // to accumulate in the transport socket buffer.
-  *writev_returns_egain_ = true;
+  writev_matcher_->setWritevReturnsEgain();
 
   for (++stream_index; stream_index < ControlFrameFloodLimit + 2; ++stream_index) {
     request = Http::Http2::Http2Frame::makeMalformedRequest(stream_index);

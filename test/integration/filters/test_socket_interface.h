@@ -8,7 +8,6 @@
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/socket_interface_impl.h"
 
-#include "absl/synchronization/mutex.h"
 #include "absl/types/optional.h"
 
 /**
@@ -19,20 +18,19 @@ namespace Network {
 
 class TestIoSocketHandle : public IoSocketHandleImpl {
 public:
-  using WritevOverrideType = absl::optional<Api::IoCallUint64Result>(uint32_t index,
+  using WritevOverrideType = absl::optional<Api::IoCallUint64Result>(TestIoSocketHandle* io_handle,
                                                                      const Buffer::RawSlice* slices,
                                                                      uint64_t num_slice);
   using WritevOverrideProc = std::function<WritevOverrideType>;
 
-  TestIoSocketHandle(uint32_t index, WritevOverrideProc writev_override_proc,
-                     os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false)
-      : IoSocketHandleImpl(fd, socket_v6only), index_(index),
-        writev_override_(writev_override_proc) {}
+  TestIoSocketHandle(WritevOverrideProc writev_override_proc, os_fd_t fd = INVALID_SOCKET,
+                     bool socket_v6only = false)
+      : IoSocketHandleImpl(fd, socket_v6only), writev_override_(writev_override_proc) {}
 
 private:
+  IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
 
-  const uint32_t index_;
   const WritevOverrideProc writev_override_;
 };
 
@@ -55,21 +53,15 @@ public:
    * the IoSocketHandleImpl::writev() with the returned result value.
    */
   TestSocketInterface(TestIoSocketHandle::WritevOverrideProc writev)
-      : writev_overide_proc_(writev) {}
+      : writev_override_proc_(writev) {}
 
 private:
   // SocketInterface
   using SocketInterfaceImpl::socket;
-  IoHandlePtr socket(os_fd_t fd) override;
+  IoHandlePtr socket(Socket::Type socket_type, Address::Type addr_type, Address::IpVersion version,
+                     bool socket_v6only) const override;
 
-  uint32_t getAcceptedSocketIndex() {
-    absl::MutexLock lock(&mutex_);
-    return accepted_socket_index_++;
-  }
-
-  const TestIoSocketHandle::WritevOverrideProc writev_overide_proc_;
-  mutable absl::Mutex mutex_;
-  uint32_t accepted_socket_index_ ABSL_GUARDED_BY(mutex_) = 0;
+  const TestIoSocketHandle::WritevOverrideProc writev_override_proc_;
 };
 
 } // namespace Network

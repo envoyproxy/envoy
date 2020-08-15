@@ -354,7 +354,6 @@ envoy_cc_test_library(
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:socket_lib",
-        "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ],

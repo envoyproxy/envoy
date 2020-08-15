@@ -43,7 +43,7 @@ class SocketInterfaceBase : public SocketInterface,
  * @param name Name of the socket interface to be looked up
  * @return Pointer to @ref SocketInterface instance that registered using the name of nullptr
  */
-static inline SocketInterface* socketInterface(std::string name) {
+static inline const SocketInterface* socketInterface(std::string name) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::getFactory(name);
   return dynamic_cast<SocketInterface*>(factory);
