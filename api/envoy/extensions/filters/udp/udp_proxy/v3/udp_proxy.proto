@@ -43,7 +43,7 @@ message UdpProxyConfig {
   // It means that the envoy cannot receive the packets that be sent by upstreams because the upstreams
   // will send the packets with remote downstream ip address. So, basically, all packets will be routed
   // to the remote downstream directly if there are route rules on the upstreams side.
-  // There are two options the return back to remote downstream.
+  // There are two options to return back to remote downstream.
   // The one is that use the DSR(Direct Server Return).
   // The another one is that configure the default gateway or add routing rules on the upstreams to forward
   // all packets to envoy. And configure iptables rules and add some routing rules on the host of envoy side to
