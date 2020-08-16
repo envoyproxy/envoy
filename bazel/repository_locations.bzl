@@ -622,7 +622,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         use_category = ["test"],
     ),
     upb = dict(
-        project_name = "μpb",
+        project_name = "upb",
         project_url = "https://github.com/protocolbuffers/upb",
         # 2019-11-19
         version = "8a3ae1ef3e3e3f26b45dec735c5776737fc7247f",
