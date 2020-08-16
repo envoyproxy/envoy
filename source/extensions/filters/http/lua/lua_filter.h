@@ -309,6 +309,7 @@ private:
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
 
+  // The inserted crypto object pointers will not be removed from this map.
   absl::flat_hash_map<std::string, Envoy::Common::Crypto::CryptoObjectPtr> public_key_storage_;
 };
 
