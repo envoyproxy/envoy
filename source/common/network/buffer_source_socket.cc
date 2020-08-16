@@ -36,7 +36,7 @@ IoResult BufferSourceSocket::doRead(Buffer::Instance& buffer) {
     bytes_read = read_buffer_.length();
     buffer.move(read_buffer_);
   }
-  ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), bytes_read);
+  ENVOY_CONN_LOG(trace, "read returns: {} read_end_stream_={}", callbacks_->connection(), bytes_read, read_end_stream_);
   return {PostIoAction::KeepOpen, bytes_read, read_end_stream_};
 }
 

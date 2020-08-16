@@ -46,6 +46,7 @@ public:
   void setWriteEnd() override {
     ASSERT(!read_end_stream_);
     read_end_stream_ = true;
+    ENVOY_LOG_MISC(debug, "lambdai: B{} set write end = true", bsid());
   }
   Buffer::Instance* getWriteBuffer() override { return &read_buffer_; }
 

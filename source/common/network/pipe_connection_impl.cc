@@ -777,8 +777,25 @@ void ServerPipeImpl::onRead(uint64_t read_buffer_size) {
   }
   ASSERT(isOpen());
 
-  if (read_buffer_size == 0) {
+  if (read_buffer_size == 0 && !read_end_stream_) {
     return;
+  }
+
+  if (read_end_stream_) {
+    // read() on a raw socket will repeatedly return 0 (EOF) once EOF has
+    // occurred, so filter out the repeats so that filters don't have
+    // to handle repeats.
+    //
+    // I don't know of any cases where this actually happens (we should stop
+    // reading the socket after EOF), but this check guards against any bugs
+    // in ConnectionImpl or strangeness in the OS events (epoll, kqueue, etc)
+    // and maintains the guarantee for filters.
+    if (read_end_stream_raised_) {
+      // No further data can be delivered after end_stream
+      ASSERT(read_buffer_size == 0);
+      return;
+    }
+    read_end_stream_raised_ = true;
   }
 
   filter_manager_.onRead();
