@@ -22,6 +22,7 @@
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
 #include "common/network/listener_impl.h"
+#include "common/network/pipe_connection_impl.h"
 #include "common/network/udp_listener_impl.h"
 
 #include "event2/event.h"

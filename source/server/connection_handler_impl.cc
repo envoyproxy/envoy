@@ -10,6 +10,7 @@
 #include "common/event/deferred_task.h"
 #include "common/network/buffer_source_socket.h"
 #include "common/network/connection_impl.h"
+#include "common/network/pipe_connection_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/timespan_impl.h"
 

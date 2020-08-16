@@ -72,7 +72,7 @@ private:
   bool shutdown_{};
   // Buffer::WatermarkBuffer read_buffer_;
 
-  WritablePeer* writable_peer_;
+  WritablePeer* writable_peer_{nullptr};
   // The flag whether the peer is valid. Any write attempt should check flag.
   bool peer_closed_{false};
 };
