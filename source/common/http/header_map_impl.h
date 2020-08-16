@@ -221,7 +221,6 @@ protected:
     }
 
     template <class UnaryPredicate> void remove_if(UnaryPredicate p) {
-      // Lazy map isn't used, remove items from the list directly
       headers_.remove_if([&](const HeaderEntryImpl& entry) {
         const bool to_remove = p(entry);
         if (to_remove) {
@@ -243,12 +242,18 @@ protected:
       });
     }
 
-    // Creates and populates a map if the number of headers is at least HEADER_MAP_SIZE_THRESHOLD.
-    // Returns true if a map was created
+    /*
+     * Creates and populates a map if the number of headers is at least HEADER_MAP_SIZE_THRESHOLD.
+     *
+     * @return if a map was created.
+     */
     bool maybeMakeMap();
 
-    // Removes a given key and its values from the HeaderList, and returns the number of bytes
-    // that were removed
+    /*
+     * Removes a given key and its values from the HeaderList.
+     *
+     * @return the number of bytes that were removed.
+     */
     size_t remove(absl::string_view key);
 
     std::list<HeaderEntryImpl>::iterator begin() { return headers_.begin(); }

@@ -30,19 +30,19 @@ static void manyCountryRoutesLongHeaders(benchmark::State& state) {
   TestScopedRuntime scoped_runtime;
 
   // Add a route configuration with multiple route, each has a different
-  // x-country<N> header required to that route
+  // x-country<N> header required to that route.
   const size_t countries_num = 250;
   const Http::LowerCaseString country_header_name("x-country");
   envoy::config::route::v3::RouteConfiguration proto_config;
   auto main_virtual_host = proto_config.mutable_virtual_hosts()->Add();
   main_virtual_host->set_name("default");
   main_virtual_host->mutable_domains()->Add("*");
-  // Add countries routes
+  // Add countries routes.
   std::vector<std::string> countries;
   for (size_t i = 0; i < countries_num; i++) {
     auto country_name = absl::StrCat("country", i);
     countries.push_back(country_name);
-    // Add the country route
+    // Add the country route.
     auto new_routes = main_virtual_host->mutable_routes()->Add();
     new_routes->mutable_match()->set_prefix("/");
     new_routes->mutable_route()->set_cluster(country_name);
@@ -50,12 +50,12 @@ static void manyCountryRoutesLongHeaders(benchmark::State& state) {
     headers_matcher->set_name(country_header_name.get());
     headers_matcher->set_exact_match(country_name);
   }
-  // Add the default route
+  // Add the default route.
   auto new_routes = main_virtual_host->mutable_routes()->Add();
   new_routes->mutable_match()->set_prefix("/");
   new_routes->mutable_route()->set_cluster("default");
 
-  // Setup the config parsing
+  // Setup the config parsing.
   Api::ApiPtr api(Api::createApiForTest());
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
@@ -67,12 +67,12 @@ static void manyCountryRoutesLongHeaders(benchmark::State& state) {
                                                     {":path", "/"},
                                                     {":method", "GET"},
                                                     {"x-forwarded-proto", "http"}};
-  // Add dummy headers to reach ~100 headers (limit per request)
+  // Add dummy headers to reach ~100 headers (limit per request).
   for (int i = 0; i < 90; i++) {
     req_headers.addCopy(Http::LowerCaseString(absl::StrCat("dummyheader", i)), "some_value");
   }
   req_headers.addReferenceKey(country_header_name, absl::StrCat("country", countries_num));
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     auto& result = config.route(req_headers, stream_info, 0)->routeEntry()->clusterName();
     benchmark::DoNotOptimize(result);
   }

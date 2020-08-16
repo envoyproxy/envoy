@@ -185,7 +185,7 @@ bool HeaderMapImpl::HeaderList::maybeMakeMap() {
       return false;
     }
 #endif
-    // add all entries from the list into the map
+    // Add all entries from the list into the map.
     for (auto node = headers_.begin(); node != headers_.end(); ++node) {
       HeaderNodeVector& v = lazy_map_[node->key().getStringView()];
       v.push_back(node);
@@ -199,7 +199,7 @@ size_t HeaderMapImpl::HeaderList::remove(absl::string_view key) {
   if (maybeMakeMap()) {
     auto iter = lazy_map_.find(key);
     if (iter != lazy_map_.end()) {
-      // erase from the map, and all same key entries from the list
+      // Erase from the map, and all same key entries from the list.
       HeaderNodeVector header_nodes = std::move(iter->second);
       lazy_map_.erase(iter);
       for (const HeaderNode& node : header_nodes) {
@@ -209,7 +209,7 @@ size_t HeaderMapImpl::HeaderList::remove(absl::string_view key) {
       }
     }
   } else {
-    // erase all same key entries from the list
+    // Erase all same key entries from the list.
     for (auto i = headers_.begin(); i != headers_.end();) {
       if (i->key() == key) {
         removed_bytes += i->key().size() + i->value().size();

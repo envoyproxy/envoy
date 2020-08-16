@@ -214,17 +214,17 @@ BENCHMARK(headerMapImplPopulate);
  *       a varying number of headers (set by the benchmark's argument).
  */
 static void headerMapImplEmulateH1toH2Upgrade(benchmark::State& state) {
-  uint32_t total_len = 0; // Accumulates the length of all header keys and values
+  uint32_t total_len = 0; // Accumulates the length of all header keys and values.
   auto headers = Http::RequestHeaderMapImpl::create();
   addDummyHeaders(*headers, state.range(0));
   headers->setConnection(Http::Headers::get().ConnectionValues.Upgrade);
   headers->setUpgrade(Http::Headers::get().UpgradeValues.H2c);
 
   for (auto _ : state) { // NOLINT
-    // emulate the encodeHeaders method upgrade part
+    // Emulate the encodeHeaders method upgrade part.
     Http::RequestHeaderMapPtr modified_headers = createHeaderMap<RequestHeaderMapImpl>(*headers);
     benchmark::DoNotOptimize(headers->getUpgradeValue());
-    // emulate the Http::Utility::transformUpgradeRequestFromH1toH2 function
+    // Emulate the Http::Utility::transformUpgradeRequestFromH1toH2 function.
     modified_headers->setReferenceMethod(Http::Headers::get().MethodValues.Connect);
     modified_headers->setProtocol(headers->getUpgradeValue());
     modified_headers->removeUpgrade();
@@ -232,14 +232,14 @@ static void headerMapImplEmulateH1toH2Upgrade(benchmark::State& state) {
     if (modified_headers->getContentLengthValue() == "0") {
       modified_headers->removeContentLength();
     }
-    // emulate the headers iteration in the buildHeaders method
+    // Emulate the headers iteration in the buildHeaders method.
     modified_headers->iterate([&total_len](const HeaderEntry& header) -> HeaderMap::Iterate {
       const absl::string_view header_key = header.key().getStringView();
       const absl::string_view header_value = header.value().getStringView();
       total_len += header_key.length() + header_value.length();
       return HeaderMap::Iterate::Continue;
     });
-    // modified_headers destruction time also being measured
+    // modified_headers destruction time also being measured.
   }
   benchmark::DoNotOptimize(headers->size());
   benchmark::DoNotOptimize(total_len);
@@ -252,18 +252,18 @@ BENCHMARK(headerMapImplEmulateH1toH2Upgrade)->Arg(0)->Arg(1)->Arg(5)->Arg(10)->A
  *       a varying number of headers (set by the benchmark's argument).
  */
 static void headerMapImplEmulateH2toH1Upgrade(benchmark::State& state) {
-  uint32_t total_len = 0; // Accumulates the length of all header keys and values
+  uint32_t total_len = 0; // Accumulates the length of all header keys and values.
   auto headers = Http::ResponseHeaderMapImpl::create();
   addDummyHeaders(*headers, state.range(0));
   headers->setStatus(200);
 
   for (auto _ : state) { // NOLINT
-    // emulate the Http::Utility::transformUpgradeResponseFromH2toH1 function
+    // Emulate the Http::Utility::transformUpgradeResponseFromH2toH1 function.
     benchmark::DoNotOptimize(headers->getStatusValue());
     headers->setUpgrade(Http::Headers::get().UpgradeValues.H2c);
     headers->setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
     headers->setStatus(101);
-    // emulate a decodeHeaders function that iterates over the headers
+    // Emulate a decodeHeaders function that iterates over the headers.
     headers->iterate([&total_len](const HeaderEntry& header) -> HeaderMap::Iterate {
       const absl::string_view header_key = header.key().getStringView();
       const absl::string_view header_value = header.value().getStringView();

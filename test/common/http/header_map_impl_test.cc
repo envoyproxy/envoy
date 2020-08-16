@@ -556,7 +556,7 @@ TEST(HeaderMapImplTest, RemoveIf) {
     EXPECT_EQ(expected, headers);
   }
 
-  // Test multiple entries with same key but different value
+  // Test multiple entries with same key but different value.
   {
     TestRequestHeaderMapImpl headers;
     headers.addReference(key1, "valueA");
@@ -570,7 +570,7 @@ TEST(HeaderMapImplTest, RemoveIf) {
       return absl::EndsWith(entry.value().getStringView(), "B");
     }));
 
-    // Make sure key1 other values still exist
+    // Make sure key1 other values still exist.
     TestRequestHeaderMapImpl expected{
         {key1.get(), "valueA"}, {key1.get(), "valueC"}, {key3.get(), "valueC"}};
     EXPECT_EQ(expected, headers);
