@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.udp.udp_proxy.v3;
 
+import "envoy/type/v3/hash_policy.proto";
+
 import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
@@ -18,6 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.udp_listener.udp_proxy]
 
 // Configuration for the UDP proxy filter.
+// [#next-free-field: 6]
 message UdpProxyConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig";
@@ -35,4 +38,9 @@ message UdpProxyConfig {
   // The idle timeout for sessions. Idle is defined as no datagrams between received or sent by
   // the session. The default if not specified is 1 minute.
   google.protobuf.Duration idle_timeout = 3;
+
+  // Optional configuration for UDP proxy hash policy. If hash_policy is not set, the hash-based
+  // load balancing algorithms will select a host randomly. Currently the number of hash policies is
+  // limited to 1.
+  repeated type.v3.HashPolicy hash_policy = 5 [(validate.rules).repeated = {max_items: 1}];
 }

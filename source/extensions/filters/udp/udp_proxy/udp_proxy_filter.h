@@ -6,8 +6,10 @@
 #include "envoy/network/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/network/hash_policy.h"
 #include "common/network/socket_interface_impl.h"
 #include "common/network/utility.h"
+#include "common/upstream/load_balancer_impl.h"
 
 #include "absl/container/flat_hash_set.h"
 
@@ -63,11 +65,16 @@ public:
                        const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config)
       : cluster_manager_(cluster_manager), time_source_(time_source), cluster_(config.cluster()),
         session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
-        stats_(generateStats(config.stat_prefix(), root_scope)) {}
+        stats_(generateStats(config.stat_prefix(), root_scope)) {
+    if (!config.hash_policy().empty()) {
+      hash_policy_ = std::make_unique<Network::HashPolicyImpl>(config.hash_policy());
+    }
+  }
 
   const std::string& cluster() const { return cluster_; }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   std::chrono::milliseconds sessionTimeout() const { return session_timeout_; }
+  const Network::HashPolicy* hashPolicy() const { return hash_policy_.get(); }
   UdpProxyDownstreamStats& stats() const { return stats_; }
   TimeSource& timeSource() const { return time_source_; }
 
@@ -83,10 +90,30 @@ private:
   TimeSource& time_source_;
   const std::string cluster_;
   const std::chrono::milliseconds session_timeout_;
+  std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
   mutable UdpProxyDownstreamStats stats_;
 };
 
 using UdpProxyFilterConfigSharedPtr = std::shared_ptr<const UdpProxyFilterConfig>;
+
+/**
+ * Currently, it only implements the hash based routing.
+ */
+class UdpLoadBalancerContext : public Upstream::LoadBalancerContextBase {
+public:
+  UdpLoadBalancerContext(const Network::HashPolicy* hash_policy,
+                         const Network::UdpRecvData::LocalPeerAddresses& addresses) {
+    if (hash_policy) {
+      hash_ = hash_policy->generateHash(addresses.peer_.get(), addresses.local_.get());
+    }
+  }
+  ~UdpLoadBalancerContext() override = default;
+
+  absl::optional<uint64_t> computeHashKey() override { return hash_; }
+
+private:
+  absl::optional<uint64_t> hash_{};
+};
 
 class UdpProxyFilter : public Network::UdpListenerReadFilter,
                        public Upstream::ClusterUpdateCallbacks,

@@ -93,8 +93,8 @@ void UdpProxyFilter::ClusterInfo::onData(Network::UdpRecvData& data) {
       return;
     }
 
-    // TODO(mattklein123): Pass a context and support hash based routing.
-    Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(nullptr);
+    UdpLoadBalancerContext context(filter_.config_->hashPolicy(), data.addresses_);
+    Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(&context);
     if (host == nullptr) {
       cluster_.info()->stats().upstream_cx_none_healthy_.inc();
       return;
@@ -108,8 +108,8 @@ void UdpProxyFilter::ClusterInfo::onData(Network::UdpRecvData& data) {
       // to a healthy host. We may eventually want to make this behavior configurable, but for now
       // this will be the universal behavior.
 
-      // TODO(mattklein123): Pass a context and support hash based routing.
-      Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(nullptr);
+      UdpLoadBalancerContext context(filter_.config_->hashPolicy(), data.addresses_);
+      Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(&context);
       if (host != nullptr && host->health() != Upstream::Host::Health::Unhealthy &&
           host.get() != &active_session->host()) {
         ENVOY_LOG(debug, "upstream session unhealthy, recreating the session");

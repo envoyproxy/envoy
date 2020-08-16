@@ -19,7 +19,9 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listener_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/network:hash_policy_lib",
         "//source/common/network:utility_lib",
+        "//source/common/upstream:load_balancer_lib",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
     ],
 )
