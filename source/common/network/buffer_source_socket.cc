@@ -25,7 +25,7 @@ void BufferSourceSocket::setTransportSocketCallbacks(TransportSocketCallbacks& c
 IoResult BufferSourceSocket::doRead(Buffer::Instance& buffer) {
   // Pipe impl: allow doRead any time before introducing error state.
   // So peer can only notify EOF(FIN) but not RST.
-  
+
   // if (read_end_stream_ && read_buffer_.length() == 0) {
   //   ENVOY_CONN_LOG(trace, "read error: {}", callbacks_->connection(),
   //                  "no buffer to read from, closing.");
