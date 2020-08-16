@@ -374,7 +374,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutHttp) {
   ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
 
   // Endpoint doesn't respond to the health check
-  ASSERT_TRUE(host_fake_raw_connection_->waitForDisconnect(true));
+  ASSERT_TRUE(host_fake_raw_connection_->waitForDisconnect());
 
   // Receive updates until the one we expect arrives
   waitForEndpointHealthResponse(envoy::config::core::v3::TIMEOUT);
@@ -448,7 +448,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
   ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
 
   // No response from the endpoint
-  ASSERT_TRUE(host_fake_raw_connection_->waitForDisconnect(true));
+  ASSERT_TRUE(host_fake_raw_connection_->waitForDisconnect());
 
   // Receive updates until the one we expect arrives
   waitForEndpointHealthResponse(envoy::config::core::v3::TIMEOUT);
