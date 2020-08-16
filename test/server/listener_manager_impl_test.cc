@@ -4743,6 +4743,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleOnDemandFilterChain) {
         true
   )EOF",
                                                        Network::Address::IpVersion::v4);
+  const auto filter_chain_message = parseListenerFromV3Yaml(yaml).filter_chains().Get(0);
 
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
@@ -4757,6 +4758,15 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleOnDemandFilterChain) {
   filter_chain = findFilterChain(8080, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->isPlaceholder());
+
+  // Rebuild the filter chain placeholder.
+  auto& listener = manager_->listeners().back().get();
+  listener.rebuildFilterChain(&filter_chain_message, "test_worker");
+
+  // After rebuilding, the filter chain is not placeholder anymore.
+  filter_chain = findFilterChain(8080, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_FALSE(filter_chain->isPlaceholder());
 }
 
 /*

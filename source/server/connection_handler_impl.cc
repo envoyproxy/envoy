@@ -40,6 +40,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           // Since the listener is updated, the sockets stored inside 'sockets_using_filter_chain_'
           // have no original tcp_listener to retry A brute force solution is that we close all the
           // sockets stored for the old active tcp listener.
+          // TODO(ASOPVII): Possible optimization: Only close sockets that requires filter chain
+          // that have been removed in the new listener.
           closeAllSocketsOfOldListener(config.name());
           listener.second.tcp_listener_->get().updateListenerConfig(config);
           return;
@@ -131,6 +133,8 @@ void ConnectionHandlerImpl::closeAllSocketsOfOldListener(const std::string& list
 void ConnectionHandlerImpl::retryAllConnections(
     bool success, const envoy::config::listener::v3::FilterChain* const& filter_chain_message) {
   // If the filter_chain_message has been cleared, we have no connections to retry.
+  // TODO(ASOPVII): the sockets stored are still there, even though the listener has been updated.
+  // They should be carefully closed.
   if (filter_chain_message == nullptr) {
     ENVOY_LOG(debug, "filter chain has been cleared.");
     return;
@@ -473,15 +477,12 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
 
     // Store the socket and dynamic_metadata for later connection retry.
     // TODO(ASOPVII): listener update during old filter chain rebuilding sent to master.
-    // New/old listeners share the same name. If new listener deletes one filter chain , it can not
-    // find
+    // New/old listeners share the same name. If new listener deletes one filter chain , some
+    // sockets stored will be forgotten.
     parent_.sockets_using_filter_chain_[filter_chain_message][listener_name].emplace_back(
         std::move(socket), dynamic_metadata);
 
-    // auto& listener = dynamic_cast<ListenerImpl&>(*config_);
-    // auto& server_dispatcher = listener.dispatcher();
     auto& server_dispatcher = config_->dispatcher();
-
     server_dispatcher.post([&filter_chain_message, &worker_name, &listener = config_]() {
       listener->rebuildFilterChain(filter_chain_message, worker_name);
     });
@@ -495,27 +496,23 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   }
 
   ENVOY_LOG(debug, "required filter chain is not a placeholder.");
-  ENVOY_LOG(debug, "1111111111111111111.");
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
-  ENVOY_LOG(debug, "222222222222222222222.");
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);
   auto server_conn_ptr = parent_.dispatcher_.createServerConnection(
       std::move(socket), std::move(transport_socket), *stream_info);
-  ENVOY_LOG(debug, "3333333333333333333333.");
   ActiveTcpConnectionPtr active_connection(
       new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
                               parent_.dispatcher_.timeSource(), std::move(stream_info)));
   active_connection->connection_->setBufferLimits(config_->perConnectionBufferLimitBytes());
 
-  ENVOY_LOG(debug, "444444444444444444444444.");
   const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
       *active_connection->connection_, filter_chain->networkFilterFactories());
   if (empty_filter_chain) {
     ENVOY_CONN_LOG(debug, "closing connection: no filters", *active_connection->connection_);
     active_connection->connection_->close(Network::ConnectionCloseType::NoFlush);
   }
-  ENVOY_LOG(debug, "5555555555555555555.");
+
   // If the connection is already closed, we can just let this connection immediately die.
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
     ENVOY_CONN_LOG(debug, "new connection", *active_connection->connection_);

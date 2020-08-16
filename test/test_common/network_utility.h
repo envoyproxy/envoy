@@ -165,7 +165,7 @@ public:
   const envoy::config::listener::v3::FilterChain* const& getFilterChainMessage() const override {
     return filter_chain_message_;
   }
-  void storeRealFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
+  void storeRebuiltFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
     is_placeholder_ = false;
     has_rebuilt_filter_chain_ = true;
     rebuilt_filter_chain_ = rebuilt_filter_chain;

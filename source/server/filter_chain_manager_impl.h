@@ -122,7 +122,7 @@ public:
     return filter_chain_message_;
   }
 
-  void storeRealFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
+  void storeRebuiltFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
     absl::MutexLock lock(&lock_);
 
     is_placeholder_ = false;
@@ -135,7 +135,7 @@ public:
 
     is_placeholder_ = true;
     has_rebuilt_filter_chain_ = false;
-    rebuilt_filter_chain_.reset();
+    // rebuilt_filter_chain_.reset();
     rebuilt_filter_chain_ = nullptr;
   }
 

@@ -197,6 +197,7 @@ public:
   void endListenerUpdate(FailureStates&& failure_state) override;
   Http::Context& httpContext() { return server_.httpContext(); }
   ApiListenerOptRef apiListener() override;
+  bool hasWorker(const std::string& name);
   WorkerPtr& getWorkerByName(const std::string& name);
   Instance& server_;
   ListenerComponentFactory& factory_;

@@ -527,7 +527,9 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingNoCallback) {
   handler_->addListener(absl::nullopt, *test_listener);
 
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(on_demand_filter_chain_.get()));
+  // When the filter chain is found to be a placeholder, the handler will not create a connection.
   EXPECT_CALL(dispatcher_, createServerConnection_()).Times(0);
+  // It is expected that a rebuilding request will be post to master thread.
   EXPECT_CALL(master_dispatcher_, post(_)).Times(1);
   Network::MockConnectionSocket* socket = new NiceMock<Network::MockConnectionSocket>();
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{socket});
@@ -565,7 +567,7 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingSuccess) {
   EXPECT_CALL(*connection, addConnectionCallbacks(_)).Times(1);
 
   // After start rebuilding, rebuilt filter chain will be stored inside placeholder.
-  on_demand_filter_chain_->storeRealFilterChain(filter_chain_);
+  on_demand_filter_chain_->storeRebuiltFilterChain(filter_chain_);
   // Master thread sends callback to worker to call retryAllConnections. Then newConnection will be
   // called again. At this time, the same filter chain is found not to be a placeholder. Will call
   // createServerConnection.
@@ -601,10 +603,10 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingFail) {
   // Rebuilding request has been sent.
 
   // After start rebuilding, rebuilt filter chain will be stored inside placeholder.
-  on_demand_filter_chain_->storeRealFilterChain(filter_chain_);
+  on_demand_filter_chain_->storeRebuiltFilterChain(filter_chain_);
 
-  // When rebuilding fails, the filter chain will be back to a placeholder. Will be called by filter
-  // chain manager inside stopRebuildingFilterChain
+  // When rebuilding failed or timeout, the filter chain will be back to a placeholder.
+  // Filter chain manager will make the filter chain back to a placeholder.
   on_demand_filter_chain_->backToPlaceholder();
 
   // Master thread sends callback to worker to call retryAllConnections.
@@ -637,10 +639,10 @@ TEST_F(ConnectionHandlerTest, ListenerUpdateDuringOnDemandFilterChainRebuilding)
   old_listener_callbacks->onAccept(Network::ConnectionSocketPtr{old_socket});
   // Rebuilding request has been sent.
 
-  // After start rebuilding, rebuilt filter chain will be stored inside placeholder.
-  on_demand_filter_chain_->storeRealFilterChain(filter_chain_);
+  // After start rebuilding, rebuilt filter chain will be stored inside the placeholder.
+  on_demand_filter_chain_->storeRebuiltFilterChain(filter_chain_);
 
-  // listener update before receiveing rebuilding callback.
+  // Listener update before receiveing rebuilding callback.
   Network::ListenerCallbacks* new_listener_callbacks = nullptr;
 
   auto overridden_filter_chain_manager =

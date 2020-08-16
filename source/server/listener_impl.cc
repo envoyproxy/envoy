@@ -224,6 +224,7 @@ Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *d
 // Must be overridden
 Init::Manager& ListenerFactoryContextBaseImpl::initManager() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
+// Since we use non-virtual function of listenerImpl, we can not make the rebuilder a virtual class.
 PerFilterChainRebuilder::PerFilterChainRebuilder(
     ListenerImpl& listener, const envoy::config::listener::v3::FilterChain* const& filter_chain)
     : listener_(listener), filter_chain_(filter_chain),
@@ -252,9 +253,15 @@ void PerFilterChainRebuilder::callbackToWorkers(bool success) {
   }
 
   // Find all matching workers and listeners, sending callbacks.
+  // TODO(ASOPVII): Possible optimization: send callback to all workers.
   for (const auto& worker_name : workers_to_callback_) {
     ENVOY_LOG(debug, "rebuilding completed, callback to worker: {}", worker_name);
-    listener_.getWorkerByName(worker_name)->notifyListenersOnRebuilt(success, filter_chain_);
+    if (listener_.hasWorker(worker_name)) {
+      auto& worker = listener_.getWorkerByName(worker_name);
+      worker->notifyListenersOnRebuilt(success, filter_chain_);
+    } else {
+      ENVOY_LOG(debug, "worker with name: {} does not exists", worker_name);
+    }
   }
   workers_to_callback_.clear();
 }
@@ -271,15 +278,15 @@ void PerFilterChainRebuilder::startTimer() {
 
 void PerFilterChainRebuilder::onTimeout() {
   if (rebuild_complete_) {
-    // if rebuilding has completed before timeout, just stop this timer.
+    // If rebuilding has completed before timeout, just stop this timer.
     rebuild_timer_->disableTimer();
   } else {
-    // if timeout before getting response from dependencies, rebuilding fails.
+    // If timeout before getting response from dependencies, rebuilding fails. Filter chain go back
+    // to placeholder.
     listener_.stopRebuildingFilterChain(filter_chain_);
     rebuild_complete_ = true;
     rebuild_success_ = false;
     callbackToWorkers(rebuild_success_);
-    // go back to placeholder.
   }
 }
 
@@ -569,7 +576,8 @@ void ListenerImpl::rebuildFilterChain(
   }
 
   ENVOY_LOG(debug, "receive rebuilding request from worker: {}", worker_name);
-  const auto& rebuilder = std::move(filter_chain_rebuilder_map_[filter_chain_message]);
+  // const auto& rebuilder = std::move(filter_chain_rebuilder_map_[filter_chain_message]);
+  const auto& rebuilder = filter_chain_rebuilder_map_[filter_chain_message];
   rebuilder->storeWorkerInCallbackList(worker_name);
 
   if (rebuilder->rebuildCompleted()) {
@@ -586,6 +594,7 @@ void ListenerImpl::rebuildFilterChain(
         parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
         parent_.server_.threadLocal(), validation_visitor_, parent_.server_.api());
 
+    // Use init manager of rebuilder to request dependencies.
     transport_factory_context.setInitManager(rebuilder->initManager());
     ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
     filter_chain_manager_.rebuildFilterChain(filter_chain_message, builder, filter_chain_manager_);
@@ -599,6 +608,7 @@ void ListenerImpl::stopRebuildingFilterChain(
   filter_chain_manager_.stopRebuildingFilterChain(filter_chain_message);
 }
 
+bool ListenerImpl::hasWorker(const std::string& name) { return parent_.hasWorker(name); }
 WorkerPtr& ListenerImpl::getWorkerByName(const std::string& name) {
   return parent_.getWorkerByName(name);
 }

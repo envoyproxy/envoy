@@ -381,7 +381,7 @@ public:
    * After a filter chain placeholder is rebuilt, this function will store the real filter chain
    * inside the placeholder to provide transportSocketFactory and networkFilterFactories.
    */
-  virtual void storeRealFilterChain(Network::FilterChainSharedPtr real_filter_chain) PURE;
+  virtual void storeRebuiltFilterChain(Network::FilterChainSharedPtr real_filter_chain) PURE;
 
   /**
    * If the filter chain rebuilding fails or timeout, the rebuilt filter chain will be deleted. And

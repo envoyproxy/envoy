@@ -65,9 +65,8 @@ public:
     TestUtility::loadFromYaml(
         TestEnvironment::substitute(filter_chain_yaml, Network::Address::IpVersion::v4),
         filter_chain_template_);
-    TestUtility::loadFromYaml(
-        TestEnvironment::substitute(on_demand_filter_chain_yaml, Network::Address::IpVersion::v4),
-        on_demand_filter_chain_template_);
+    on_demand_filter_chain_template_ = filter_chain_template_;
+    on_demand_filter_chain_template_.set_build_on_demand(true);
   }
 
   const Network::FilterChain*
@@ -111,6 +110,10 @@ public:
     filter_chain_manager_.rebuildFilterChain(&filter_chain, rebuilder_filter_chain_factory_builder_,
                                              filter_chain_manager_);
   }
+  void
+  stopRebuildingFilterChainHelper(const envoy::config::listener::v3::FilterChain& filter_chain) {
+    filter_chain_manager_.stopRebuildingFilterChain(&filter_chain);
+  }
 
   // Intermediate states.
   Network::Address::InstanceConstSharedPtr local_address_;
@@ -133,28 +136,12 @@ public:
             keys:
             - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
   )EOF";
-  const std::string on_demand_filter_chain_yaml = R"EOF(
-      filter_chain_match:
-        destination_port: 10000
-      transport_socket:
-        name: tls
-        typed_config:
-          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
-          common_tls_context:
-            tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
-          session_ticket_keys:
-            keys:
-            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
-      build_on_demand:
-        true
-  )EOF";
   Init::ManagerImpl init_manager_{"for_filter_chain_manager_test"};
   envoy::config::listener::v3::FilterChain filter_chain_template_;
   envoy::config::listener::v3::FilterChain on_demand_filter_chain_template_;
   NiceMock<MockFilterChainFactoryBuilder> filter_chain_factory_builder_;
   NiceMock<MockFilterChainFactoryBuilder> rebuilder_filter_chain_factory_builder_;
+
   NiceMock<Server::Configuration::MockFactoryContext> parent_context_;
   // Test target.
   FilterChainManagerImpl filter_chain_manager_{
@@ -174,22 +161,36 @@ TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
 }
 
 TEST_F(FilterChainManagerImplTest, AddOnDemandFilterChain) {
+  // Given filter chain config with build_on_demand=true.
   addSingleFilterChainHelper(on_demand_filter_chain_template_);
-  auto* filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
-  EXPECT_TRUE(filter_chain->isPlaceholder());
+  auto* on_demand_filter_chain =
+      findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_TRUE(on_demand_filter_chain->isPlaceholder());
+  // The placeholder will store the filter chain message inside.
+  EXPECT_NE(on_demand_filter_chain->getFilterChainMessage(), nullptr);
 }
 
 TEST_F(FilterChainManagerImplTest, RebuildOnDemandFilterChain) {
   addSingleFilterChainHelper(on_demand_filter_chain_template_);
-  auto* filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
-  EXPECT_TRUE(filter_chain->isPlaceholder());
+  auto* on_demand_filter_chain =
+      findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_TRUE(on_demand_filter_chain->isPlaceholder());
 
-  EXPECT_CALL(rebuilder_filter_chain_factory_builder_, buildFilterChain(_, _)).Times(1);
+  auto filter_chain_impl = std::make_shared<FilterChainImpl>(&on_demand_filter_chain_template_);
+  // EXPECT_CALL(rebuilder_filter_chain_factory_builder_, buildFilterChain(_, _)).Times(1);
+  EXPECT_CALL(rebuilder_filter_chain_factory_builder_, buildFilterChain(_, _))
+      .WillOnce(Return(filter_chain_impl));
+
+  // expect call placeholder->storeRebuiltFilterChain.
   rebuildFilterChainHelper(on_demand_filter_chain_template_);
+  on_demand_filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_FALSE(on_demand_filter_chain->isPlaceholder());
 
-  // expect placeholder->storeRealFilterChain
-  filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
-  EXPECT_EQ(filter_chain->isPlaceholder(), false);
+  // When the rebuilding fails or timeout, will call stopRebuildingFilterChain.
+  // expect call placeholder->backToPlaceholder();
+  stopRebuildingFilterChainHelper(on_demand_filter_chain_template_);
+  on_demand_filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_TRUE(on_demand_filter_chain->isPlaceholder());
 }
 
 TEST_F(FilterChainManagerImplTest, LookupFilterChainContextByFilterChainMessage) {

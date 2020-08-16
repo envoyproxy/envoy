@@ -392,8 +392,8 @@ public:
   bool createListenerFilterChain(Network::ListenerFilterManager& manager) override;
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
-
-  WorkerPtr& getWorkerByName(const std::string& worker_name);
+  bool hasWorker(const std::string& name);
+  WorkerPtr& getWorkerByName(const std::string& name);
 
   SystemTime last_updated_;
 
