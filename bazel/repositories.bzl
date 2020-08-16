@@ -25,31 +25,44 @@ def _fail_missing_attribute(attr, key):
 # Method for verifying content of the DEPENDENCY_REPOSITORIES defined in bazel/repository_locations.bzl
 # Verification is here so that bazel/repository_locations.bzl can be loaded into other tools written in Python,
 # and as such needs to be free of bazel specific constructs.
+#
+# We also remove the attributes for further consumption in this file, since rules such as http_archive
+# don't recognize them.
 def _repository_locations():
+    locations = {}
     for key, location in DEPENDENCY_REPOSITORIES.items():
+        mutable_location = dict(location)
+        locations[key] = mutable_location
+
         if "sha256" not in location or len(location["sha256"]) == 0:
             _fail_missing_attribute("sha256", key)
 
-        #if "project_name" not in location:
-        #    _fail_missing_attribute("project_name", key)
+        if "project_name" not in location:
+            _fail_missing_attribute("project_name", key)
+        mutable_location.pop("project_name")
 
-        #if "project_url" not in location:
-        #    _fail_missing_attribute("project_url", key)
+        if "project_url" not in location:
+            _fail_missing_attribute("project_url", key)
+        mutable_location.pop("project_url")
 
-        #if "version" not in location:
-        #    _fail_missing_attribute("version", key)
+        if "version" not in location:
+            _fail_missing_attribute("version", key)
+        mutable_location.pop("version")
 
         if "use_category" not in location:
             _fail_missing_attribute("use_category", key)
+        mutable_location.pop("use_category")
 
-        if "cpe" not in location and not [category for category in USE_CATEGORIES_WITH_CPE_OPTIONAL if category in location["use_category"]]:
+        if "cpe" in location:
+          mutable_location.pop("cpe")
+        elif not [category for category in USE_CATEGORIES_WITH_CPE_OPTIONAL if category in location["use_category"]]:
             _fail_missing_attribute("cpe", key)
 
         for category in location["use_category"]:
             if category not in USE_CATEGORIES:
                 fail("Unknown use_category value '" + category + "' for dependecy " + key)
 
-    return DEPENDENCY_REPOSITORIES
+    return locations
 
 REPOSITORY_LOCATIONS = _repository_locations()
 
