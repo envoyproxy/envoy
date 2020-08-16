@@ -3,40 +3,35 @@
 External dependencies
 =====================
 
-Below we enumerate the external dependencies that may be linked into the Envoy binary.
+Below we enumerate the external dependencies that may be linked into the Envoy binary. We exclude
+dependencies that only are used in CI or developer tooling above.
 
-Data plane dependencies:
+Data plane
+----------
 
 .. include:: external_dep_dataplane.rst
 
-Control plane dependencies:
+Control plane
+-------------
 
 .. include:: external_dep_controlplane.rst
 
-Observability dependencies:
+Observability
+-------------
 
 .. include:: external_dep_observability.rst
 
-Test dependencies:
+Test
+----
 
 .. include:: external_dep_test.rst
 
-Build dependencies:
+Build
+-----
 
 .. include:: external_dep_build.rst
 
-Miscellaneous dependencies:
+Miscellaneous
+-------------
 
 .. include:: external_dep_other.rst
-
-We exclude dependencies that only are used in CI or developer tooling above.
-
-TODO: also analyze `api/bazel/repository_locations.py` and `bazel/dependency_imports.bzl`.
-
-TODO: distinguish deps in core vs. extensions.
-
-TODO: add last updated column.
-
-TODO: integrate version into CPE links.
-
-TODO: populate with external dep maturity status.

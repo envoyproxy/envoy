@@ -54,7 +54,7 @@ def _repository_locations():
         mutable_location.pop("use_category")
 
         if "cpe" in location:
-          mutable_location.pop("cpe")
+            mutable_location.pop("cpe")
         elif not [category for category in USE_CATEGORIES_WITH_CPE_OPTIONAL if category in location["use_category"]]:
             _fail_missing_attribute("cpe", key)
 
