@@ -246,8 +246,10 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
     host_index[i] = i;
   }
 
-  // Not using Random::RandomGenerator as it does not take a seed. Seeded RNG is a
-  // requirement here as we need the same shuffle sequence for the same hash every time.
+  // Not using Random::RandomGenerator as it does not take a seed. Seeded RNG is a requirement
+  // here as we need the same shuffle sequence for the same hash every time.
+  // Further, not using std::default_random_engine and std::uniform_int_distribution as they
+  // are not consistent across Linux and Windows platforms.
   const uint64_t seed = hash;
   std::mt19937 random(seed);
 

@@ -48,8 +48,8 @@ public:
         normalized_host_weights_map_[item.first] = item.second;
       }
     }
-    virtual ~BoundedLoadHashingLoadBalancer() = default;
-    virtual HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const;
+    virtual ~BoundedLoadHashingLoadBalancer() override = default;
+    virtual HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
 
   protected:
     virtual bool isHostOverloaded(HostConstSharedPtr host, double weight) const;

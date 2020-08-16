@@ -144,12 +144,10 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, NoHostEverOverloaded) {
 
 // Works correctly for the case one host is overloaded.
 TEST_F(BoundedLoadHashingLoadBalancerTest, OneHostOverloaded) {
-  /*
-    In this host 2 is overloaded. The random shuffle sequence of 5
-    elements with seed 2 is 3 1 4 0 2. When the host picked up for
-    hash 2 (which is 127.0.0.12) is overloaded, host 3 (127.0.0.13)
-    is picked up.
-  */
+  // In this test host 2 is overloaded. The random shuffle sequence of 5
+  // elements with seed 2 is 2 0 3 1 4. When the host picked up for
+  // hash 2 (which is 127.0.0.12) is overloaded, host 0 (127.0.0.10)
+  // is picked up.
 
   // setup: 5 hosts, one of them is overloaded.
   std::vector<std::string> addresses;
@@ -176,14 +174,10 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, OneHostOverloaded) {
 
 // Works correctly for the case a few hosts are overloaded.
 TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHostOverloaded) {
-  /*
-    In this case hosts 1, 2 & 3 are overloaded. The random shuffle
-    sequence of 5 elements with seed 2 is 3 1 4 0 2. When the host
-    picked up for hash 2 (which is 127.0.0.12) is overloaded, the
-    method passes over hosts 3 & 1 and picks host 4 (127.0.0.14)
-    is picked up.
-
-  */
+  // In this test hosts 0, 1 & 2 are overloaded. The random shuffle
+  // sequence of 5 elements with seed 2 is 2 0 3 1 4. When the host
+  // picked up for hash 2 (which is 127.0.0.12) is overloaded, the
+  // method passes over host 0 and picks host 3 (127.0.0.13) up.
 
   // setup: 5 hosts, few of them are overloaded.
   std::vector<std::string> addresses;
@@ -210,16 +204,15 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHostOverloaded) {
   EXPECT_EQ(host->address()->asString(), "127.0.0.13:90");
 };
 
-// Works correctly for the case a few hosts are overloaded.
+// Works correctly for the case when requests with different hash map to the same
+// overloaded host.
 TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHashSameHostOverloaded) {
-  /*
-    In this case host 2 is overloaded. The random shuffle
-    sequence of 5 elements with seed 2 is 3 1 4 0 2. When the host
-    picked up for hash 2 (which is 127.0.0.12) is overloaded, the
-    method passes over hosts 3 & 1 and picks host 4 (127.0.0.10)
-    is picked up,
+  // In this case host 3 is overloaded and the CH ring has same host repeated on
+  // consecutive indices (0 0 1 1 2 2 3 3 4 4). The hashes 6 and 7 map to same host
+  // 3 which is overloaded. The random shuffle sequence of 5 elements with seed 6 is
+  // 4 0 1 2 3 and with 7 it is 0 1 2 3 4. Hence hosts 4 and 0 are picked up for these
+  // hashes.
 
-  */
   // setup: 5 hosts, one of them is overloaded.
   std::vector<std::string> addresses;
   addresses.push_back("127.0.0.13:90");
