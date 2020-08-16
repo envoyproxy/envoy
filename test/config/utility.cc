@@ -780,7 +780,11 @@ void ConfigHelper::setDefaultHostAndRoute(const std::string& domains, const std:
 void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
                                    uint32_t downstream_buffer_limit) {
   RELEASE_ASSERT(!finalized_, "");
-  RELEASE_ASSERT(bootstrap_.mutable_static_resources()->listeners_size() == 1, "");
+  for (int i = 0; i < bootstrap_.mutable_static_resources()->listeners_size(); ++i) {
+    auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(i);
+    listener->mutable_per_connection_buffer_limit_bytes()->set_value(downstream_buffer_limit);
+  }
+
   auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
   listener->mutable_per_connection_buffer_limit_bytes()->set_value(downstream_buffer_limit);
 
