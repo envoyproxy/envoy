@@ -250,11 +250,21 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
   // requirement here as we need the same shuffle sequence for the same hash every time.
   const uint64_t seed = hash;
   std::mt19937 random(seed);
+
+  // generates a random number in the range [0,k) uniformly.
+  auto uniform_int = [](std::mt19937 random, uint32_t k) -> uint32_t {
+    // Note: 1+random()%k is biased
+    uint32_t x = k;
+    while (x >= k) {
+      x = random() / ((static_cast<uint64_t>(random.max()) + 1u) / k);
+    }
+    return x;
+  };
+
   HostConstSharedPtr h;
   for (uint32_t i = 0; i < num_hosts; i++) {
     // The random shuffle algorithm
-    std::uniform_int_distribution<int> uniform_dist(0, num_hosts - i - 1); // inclusive,inclusive
-    uint32_t j = uniform_dist(random);
+    uint32_t j = uniform_int(random, num_hosts - i);
     std::swap(host_index[i], host_index[i + j]);
 
     uint32_t k = host_index[i];

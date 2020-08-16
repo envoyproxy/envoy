@@ -77,8 +77,9 @@ private:
     HashingLoadBalancerSharedPtr hlb_ptr =
         std::make_shared<Ring>(*normalized_host_weights, min_normalized_weight, min_ring_size_,
                                max_ring_size_, hash_function_, use_hostname_for_hashing_, stats_);
-    if (hash_balance_factor_ == 0)
+    if (hash_balance_factor_ == 0) {
       return hlb_ptr;
+    }
 
     return std::make_shared<BoundedLoadHashingLoadBalancer>(hlb_ptr, normalized_host_weights,
                                                             hash_balance_factor_);

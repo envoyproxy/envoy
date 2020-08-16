@@ -86,8 +86,9 @@ private:
         std::make_shared<MaglevTable>(*normalized_host_weights, max_normalized_weight, table_size_,
                                       use_hostname_for_hashing_, stats_);
 
-    if (hash_balance_factor_ == 0)
+    if (hash_balance_factor_ == 0) {
       return hlb_ptr;
+    }
 
     return std::make_shared<BoundedLoadHashingLoadBalancer>(hlb_ptr, normalized_host_weights,
                                                             hash_balance_factor_);
