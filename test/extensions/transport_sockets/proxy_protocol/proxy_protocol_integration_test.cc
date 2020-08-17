@@ -1,8 +1,8 @@
-#include "test/integration/integration.h"
-
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/transport_sockets/proxy_protocol/v3/upstream_proxy_protocol.pb.h"
+
+#include "test/integration/integration.h"
 
 namespace Envoy {
 namespace {
@@ -18,19 +18,21 @@ public:
     fake_upstreams_.clear();
   }
 
-  void setVersion(envoy::config::core::v3::ProxyProtocolConfig_Version version) { version_ = version; }
+  void setVersion(envoy::config::core::v3::ProxyProtocolConfig_Version version) {
+    version_ = version;
+  }
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* transport_socket = bootstrap.mutable_static_resources()
-                                   ->mutable_clusters(0)
-                                   ->mutable_transport_socket();
+      auto* transport_socket =
+          bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
       transport_socket->set_name("envoy.transport_sockets.upstream_proxy_protocol");
       envoy::config::core::v3::TransportSocket raw_transport_socket;
       raw_transport_socket.set_name("envoy.transport_sockets.raw_buffer");
       envoy::config::core::v3::ProxyProtocolConfig proxy_proto_config;
       proxy_proto_config.set_version(version_);
-      envoy::extensions::transport_sockets::proxy_protocol::v3::ProxyProtocolUpstreamTransport proxy_proto_transport;
+      envoy::extensions::transport_sockets::proxy_protocol::v3::ProxyProtocolUpstreamTransport
+          proxy_proto_transport;
       proxy_proto_transport.mutable_transport_socket()->MergeFrom(raw_transport_socket);
       proxy_proto_transport.mutable_config()->MergeFrom(proxy_proto_config);
       transport_socket->mutable_typed_config()->PackFrom(proxy_proto_transport);
@@ -131,5 +133,5 @@ TEST_P(ProxyProtocolIntegrationTest, TestV2ProxyProtocol) {
   auto _ = fake_upstream_connection->waitForDisconnect();
 }
 
-}
+} // namespace
 } // namespace Envoy
