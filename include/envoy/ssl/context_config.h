@@ -123,6 +123,10 @@ public:
    */
   virtual bool requireClientCertificate() const PURE;
 
+  /**
+   * @return OcspStaplePolicy The rule for determining whether to staple OCSP
+   * responses on new connections.
+   */
   virtual OcspStaplePolicy ocspStaplePolicy() const PURE;
 
   /**

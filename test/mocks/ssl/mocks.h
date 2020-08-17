@@ -112,6 +112,7 @@ public:
   MOCK_METHOD(void, setSecretUpdateCallback, (std::function<void()> callback));
 
   MOCK_METHOD(bool, requireClientCertificate, (), (const));
+  MOCK_METHOD(OcspStaplePolicy, ocspStaplePolicy, (), (const));
   MOCK_METHOD(const std::vector<SessionTicketKey>&, sessionTicketKeys, (), (const));
   MOCK_METHOD(bool, disableStatelessSessionResumption, (), (const));
 };
