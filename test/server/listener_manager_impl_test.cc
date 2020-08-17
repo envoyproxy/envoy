@@ -1307,8 +1307,7 @@ filter_chains:
 
   // Update foo back to original active, should cause the warming listener to be removed.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
-  EXPECT_TRUE(
-      manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
 
   checkStats(__LINE__, 1, 2, 0, 0, 1, 0, 0);
   EXPECT_EQ(0UL, manager_->listeners(ListenerManager::WARMING).size());

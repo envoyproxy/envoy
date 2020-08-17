@@ -165,7 +165,7 @@ TEST(XdsVerifier, WarmMultipleListenersSOTW) {
 TEST(XdsVerifier, WarmMultipleListenersDelta) {
   XdsVerifier verifier(test::server::config_validation::Config::DELTA);
 
-  // Sdd two warming listener to the same route.
+  // Add two warming listener to the same route.
   verifier.listenerAdded(buildListener("listener_0", "route_config_0"));
   verifier.listenerAdded(buildListener("listener_1", "route_config_0"));
 
