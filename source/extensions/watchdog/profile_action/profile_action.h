@@ -22,7 +22,7 @@ public:
                 Server::Configuration::GuardDogActionFactoryContext& context);
 
   void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
-           std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs,
+           const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs,
            MonotonicTime now) override;
 
 private:
@@ -34,6 +34,7 @@ private:
   bool running_profile_;
   const uint64_t max_profiles_per_tid_;
   uint64_t profiles_started_;
+  std::string profile_filename_;
   const std::chrono::milliseconds duration_;
   absl::flat_hash_map<Thread::ThreadId, uint64_t> tid_to_profile_count_;
   Server::Configuration::GuardDogActionFactoryContext& context_;

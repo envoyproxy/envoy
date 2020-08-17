@@ -29,15 +29,16 @@ ProfileAction::ProfileAction(
     envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig& config,
     Server::Configuration::GuardDogActionFactoryContext& context)
     : path_(config.profile_path()), running_profile_(false),
-      max_profiles_per_tid_(config.max_profiles_per_thread() ? config.max_profiles_per_thread()
-                                                             : DefaultMaxProfilePerTid),
+      max_profiles_per_tid_(config.max_profiles_per_thread() == 0
+                                ? DefaultMaxProfilePerTid
+                                : config.max_profiles_per_thread()),
       profiles_started_(0), duration_(std::chrono::milliseconds(
                                 PROTOBUF_GET_MS_OR_DEFAULT(config, profile_duration, 5000))),
-      context_(context) {}
+      context_(context), timer_cb_(nullptr) {}
 
 void ProfileAction::run(
     envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent /*event*/,
-    std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs,
+    const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs,
     MonotonicTime /*now*/) {
   if (running_profile_) {
     return;
@@ -52,43 +53,44 @@ void ProfileAction::run(
 
   auto& fs = context_.api_.fileSystem();
   if (!fs.directoryExists(path_)) {
-    ENVOY_LOG_MISC(error, "Directory path {} doesn't exists.", path_);
+    ENVOY_LOG_MISC(error, "Directory path {} doesn't exist.", path_);
     return;
   }
 
   // Generate file path for output and try to profile
-  const auto& profile_filename =
-      generateProfileFilePath(path_, context_.api_.timeSource().systemTime());
+  profile_filename_ = generateProfileFilePath(path_, context_.api_.timeSource().systemTime());
 
   if (!Profiler::Cpu::profilerEnabled()) {
-    if (Profiler::Cpu::startProfiler(profile_filename)) {
+    if (Profiler::Cpu::startProfiler(profile_filename_)) {
       // Update state
       running_profile_ = true;
       ++profiles_started_;
       tid_to_profile_count_[*trigger_tid] += 1;
 
       // Schedule callback to stop
-      timer_cb_ = context_.dispatcher_.createTimer([this, profile_filename] {
-        if (Profiler::Cpu::profilerEnabled()) {
-          Profiler::Cpu::stopProfiler();
-          running_profile_ = false;
-          timer_cb_->disableTimer();
-        } else {
-          ENVOY_LOG_MISC(error,
-                         "Profile Action's stop() was scheduled, but profiler isn't running!");
-        }
+      if (timer_cb_ == nullptr) {
+        // Create the timer once.
+        timer_cb_ = context_.dispatcher_.createTimer([this] {
+          if (Profiler::Cpu::profilerEnabled()) {
+            Profiler::Cpu::stopProfiler();
+            running_profile_ = false;
+          } else {
+            ENVOY_LOG_MISC(error,
+                           "Profile Action's stop() was scheduled, but profiler isn't running!");
+          }
 
-        if (!context_.api_.fileSystem().fileExists(profile_filename)) {
-          ENVOY_LOG_MISC(error, "Profile file {} wasn't created!", profile_filename);
-        }
-      });
+          if (!context_.api_.fileSystem().fileExists(profile_filename_)) {
+            ENVOY_LOG_MISC(error, "Profile file {} wasn't created!", profile_filename_);
+          }
+        });
+      }
 
       timer_cb_->enableTimer(duration_);
     } else {
-      ENVOY_LOG_MISC(warn, "Profile Action failed to start the profiler.");
+      ENVOY_LOG_MISC(error, "Profile Action failed to start the profiler.");
     }
   } else {
-    ENVOY_LOG_MISC(warn, "Profile Action unable to start the profiler as it is in use elsewhere.");
+    ENVOY_LOG_MISC(error, "Profile Action unable to start the profiler as it is in use elsewhere.");
   }
 }
 
@@ -98,9 +100,7 @@ absl::optional<Thread::ThreadId> ProfileAction::getTidTriggeringProfile(
   absl::optional<Thread::ThreadId> tid_to_profile;
 
   // Find a TID not over the max_profiles threshold
-  for (const auto& tid_time_pair : thread_ltt_pairs) {
-    const auto tid = tid_time_pair.first;
-
+  for (const auto& [tid, ltt] : thread_ltt_pairs) {
     if (tid_to_profile_count_[tid] < max_profiles_per_tid_) {
       tid_to_profile = tid;
       break;
