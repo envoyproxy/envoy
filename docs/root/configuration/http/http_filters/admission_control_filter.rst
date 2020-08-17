@@ -65,7 +65,7 @@ The aggression value affects the rejection probabilities as shown in the followi
 .. image:: images/aggression_graph_50.png
 
 Since the success rate threshold in the first figure is set to 95%, the rejection probability
-remains 0 until then. In the second figure, ther rejection probability remains 0 until the success
+remains 0 until then. In the second figure, there rejection probability remains 0 until the success
 rate reaches 50%. In both cases, as success rate drops to 0%, the rejection probability approaches a
 value just under 100%. The aggression values dictate how high the rejection probability will be at a
 given request success rate, so it will shed load more *aggressively*.
