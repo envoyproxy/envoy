@@ -363,9 +363,6 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
   response_headers.setStatus(lookup_result_->headers_->getStatusValue());
   response_headers.setContentLength(lookup_result_->headers_->getContentLengthValue());
 
-  // A cache entry was successfully validated -> encode cached body and trailers.
-  encodeCachedResponse();
-
   // A response that has been validated should not contain an Age header as it is equivalent to a
   // freshly served response from the origin, unless the 304 response has an Age header, which
   // means it was served by an upstream cache.
@@ -391,6 +388,9 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
     // Then remove the internal header from the response served to the client
     response_headers.removeInline(response_time_handle.handle());
   }
+
+  // A cache entry was successfully validated -> encode cached body and trailers.
+  encodeCachedResponse();
 }
 
 // TODO(yosrym93): Write a test that exercises this when SimpleHttpCache implements updateHeaders
