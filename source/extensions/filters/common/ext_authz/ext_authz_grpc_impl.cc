@@ -71,12 +71,12 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     }
   }
 
-  authz_response->dynamic_metadata = response->dynamic_metadata();
-
   // OkHttpResponse.dynamic_metadata is deprecated. Until OkHttpResponse.dynamic_metadata is
   // removed, it overrides dynamic_metadata field of the outer check response.
   if (response->has_ok_response() && response->ok_response().has_dynamic_metadata()) {
     authz_response->dynamic_metadata = response->ok_response().dynamic_metadata();
+  } else {
+    authz_response->dynamic_metadata = response->dynamic_metadata();
   }
 
   callbacks_->onComplete(std::move(authz_response));
