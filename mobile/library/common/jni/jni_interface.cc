@@ -101,6 +101,100 @@ Java_io_envoyproxy_envoymobile_engine_AndroidJniLibrary_flushStats(JNIEnv* env,
   flush_stats();
 }
 
+// Utility functions
+static JNIEnv* get_env() {
+  JNIEnv* env = nullptr;
+  int get_env_res = static_jvm->GetEnv((void**)&env, JNI_VERSION);
+  if (get_env_res == JNI_EDETACHED) {
+    __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "environment is JNI_EDETACHED");
+    // Note: the only thread that should need to be attached is Envoy's engine std::thread.
+    // TODO: harden this piece of code to make sure that we are only needing to attach Envoy
+    // engine's std::thread, and that we detach it successfully.
+    static_jvm->AttachCurrentThread(&env, nullptr);
+    static_jvm->GetEnv((void**)&env, JNI_VERSION);
+  }
+  return env;
+}
+
+static void jni_delete_global_ref(void* context) {
+  JNIEnv* env = get_env();
+  jobject ref = static_cast<jobject>(context);
+  env->DeleteGlobalRef(ref);
+}
+
+static void jni_delete_const_global_ref(const void* context) {
+  jni_delete_global_ref(const_cast<void*>(context));
+}
+
+static int unbox_integer(JNIEnv* env, jobject boxedInteger) {
+  jclass jcls_Integer = env->FindClass("java/lang/Integer");
+  jmethodID jmid_intValue = env->GetMethodID(jcls_Integer, "intValue", "()I");
+  return env->CallIntMethod(boxedInteger, jmid_intValue);
+}
+
+static envoy_data array_to_native_data(JNIEnv* env, jbyteArray j_data) {
+  size_t data_length = env->GetArrayLength(j_data);
+  uint8_t* native_bytes = (uint8_t*)malloc(data_length);
+  void* critical_data = env->GetPrimitiveArrayCritical(j_data, 0);
+  memcpy(native_bytes, critical_data, data_length);
+  env->ReleasePrimitiveArrayCritical(j_data, critical_data, 0);
+  return {data_length, native_bytes, free, native_bytes};
+}
+
+static envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data) {
+  uint8_t* direct_address = static_cast<uint8_t*>(env->GetDirectBufferAddress(j_data));
+
+  if (direct_address == nullptr) {
+    jclass jcls_ByteBuffer = env->FindClass("java/nio/ByteBuffer");
+    // We skip checking hasArray() because only direct ByteBuffers or array-backed ByteBuffers
+    // are supported. We will crash here if this is an invalid buffer, but guards may be
+    // implemented in the JVM layer.
+    jmethodID jmid_array = env->GetMethodID(jcls_ByteBuffer, "array", "()[B");
+    jbyteArray array = static_cast<jbyteArray>(env->CallObjectMethod(j_data, jmid_array));
+    return array_to_native_data(env, array);
+  }
+
+  envoy_data native_data;
+  native_data.bytes = direct_address;
+  native_data.length = env->GetDirectBufferCapacity(j_data);
+  native_data.release = jni_delete_global_ref;
+  native_data.context = env->NewGlobalRef(j_data);
+
+  return native_data;
+}
+
+static envoy_headers to_native_headers(JNIEnv* env, jobjectArray headers) {
+  // Note that headers is a flattened array of key/value pairs.
+  // Therefore, the length of the native header array is n envoy_data or n/2 envoy_header.
+  envoy_header_size_t length = env->GetArrayLength(headers);
+  envoy_header* header_array = (envoy_header*)safe_malloc(sizeof(envoy_header) * length / 2);
+
+  for (envoy_header_size_t i = 0; i < length; i += 2) {
+    // Copy native byte array for header key
+    jbyteArray j_key = (jbyteArray)env->GetObjectArrayElement(headers, i);
+    size_t key_length = env->GetArrayLength(j_key);
+    uint8_t* native_key = (uint8_t*)safe_malloc(key_length);
+    void* critical_key = env->GetPrimitiveArrayCritical(j_key, 0);
+    memcpy(native_key, critical_key, key_length);
+    env->ReleasePrimitiveArrayCritical(j_key, critical_key, 0);
+    envoy_data header_key = {key_length, native_key, free, native_key};
+
+    // Copy native byte array for header value
+    jbyteArray j_value = (jbyteArray)env->GetObjectArrayElement(headers, i + 1);
+    size_t value_length = env->GetArrayLength(j_value);
+    uint8_t* native_value = (uint8_t*)safe_malloc(value_length);
+    void* critical_value = env->GetPrimitiveArrayCritical(j_value, 0);
+    memcpy(native_value, critical_value, value_length);
+    env->ReleasePrimitiveArrayCritical(j_value, critical_value, 0);
+    envoy_data header_value = {value_length, native_value, free, native_value};
+
+    header_array[i / 2] = {header_key, header_value};
+  }
+
+  envoy_headers native_headers = {length / 2, header_array};
+  return native_headers;
+}
+
 // JvmCallbackContext
 
 static void pass_headers(JNIEnv* env, envoy_headers headers, jobject j_context) {
@@ -148,20 +242,6 @@ static void pass_headers(JNIEnv* env, envoy_headers headers, jobject j_context) 
 }
 
 // Platform callback implementation
-static JNIEnv* get_env() {
-  JNIEnv* env = nullptr;
-  int get_env_res = static_jvm->GetEnv((void**)&env, JNI_VERSION);
-  if (get_env_res == JNI_EDETACHED) {
-    __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "environment is JNI_EDETACHED");
-    // Note: the only thread that should need to be attached is Envoy's engine std::thread.
-    // TODO: harden this piece of code to make sure that we are only needing to attach Envoy
-    // engine's std::thread, and that we detach it successfully.
-    static_jvm->AttachCurrentThread(&env, nullptr);
-    static_jvm->GetEnv((void**)&env, JNI_VERSION);
-  }
-  return env;
-}
-
 static void* jvm_on_headers(const char* method, envoy_headers headers, bool end_stream,
                             void* context) {
   __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "jvm_on_headers");
@@ -187,20 +267,28 @@ static void* jvm_on_response_headers(envoy_headers headers, bool end_stream, voi
 
 static envoy_filter_headers_status
 jvm_http_filter_on_request_headers(envoy_headers headers, bool end_stream, const void* context) {
-  envoy_headers return_headers = copy_envoy_headers(headers);
-  jobject result = static_cast<jobject>(
+  JNIEnv* env = get_env();
+  jobjectArray result = static_cast<jobjectArray>(
       jvm_on_headers("onRequestHeaders", headers, end_stream, const_cast<void*>(context)));
-  return (envoy_filter_headers_status){/*status*/ kEnvoyFilterHeadersStatusContinue,
-                                       /*headers*/ return_headers};
+
+  jobject status = env->GetObjectArrayElement(result, 0);
+  jobjectArray j_headers = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
+
+  return (envoy_filter_headers_status){/*status*/ unbox_integer(env, status),
+                                       /*headers*/ to_native_headers(env, j_headers)};
 }
 
 static envoy_filter_headers_status
 jvm_http_filter_on_response_headers(envoy_headers headers, bool end_stream, const void* context) {
-  envoy_headers return_headers = copy_envoy_headers(headers);
-  jobject result = static_cast<jobject>(
+  JNIEnv* env = get_env();
+  jobjectArray result = static_cast<jobjectArray>(
       jvm_on_headers("onResponseHeaders", headers, end_stream, const_cast<void*>(context)));
-  return (envoy_filter_headers_status){/*status*/ kEnvoyFilterHeadersStatusContinue,
-                                       /*headers*/ return_headers};
+
+  jobject status = env->GetObjectArrayElement(result, 0);
+  jobjectArray j_headers = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
+
+  return (envoy_filter_headers_status){/*status*/ unbox_integer(env, status),
+                                       /*headers*/ to_native_headers(env, j_headers)};
 }
 
 static void* jvm_on_data(const char* method, envoy_data data, bool end_stream, void* context) {
@@ -236,20 +324,28 @@ static void* jvm_on_response_data(envoy_data data, bool end_stream, void* contex
 
 static envoy_filter_data_status jvm_http_filter_on_request_data(envoy_data data, bool end_stream,
                                                                 const void* context) {
-  envoy_data return_data = copy_envoy_data(data.length, data.bytes);
-  jobject result = static_cast<jobject>(
+  JNIEnv* env = get_env();
+  jobjectArray result = static_cast<jobjectArray>(
       jvm_on_data("onRequestData", data, end_stream, const_cast<void*>(context)));
-  return (envoy_filter_data_status){/*status*/ kEnvoyFilterDataStatusContinue,
-                                    /*data*/ return_data};
+
+  jobject status = env->GetObjectArrayElement(result, 0);
+  jobject j_data = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
+
+  return (envoy_filter_data_status){/*status*/ unbox_integer(env, status),
+                                    /*data*/ buffer_to_native_data(env, j_data)};
 }
 
 static envoy_filter_data_status jvm_http_filter_on_response_data(envoy_data data, bool end_stream,
                                                                  const void* context) {
-  envoy_data return_data = copy_envoy_data(data.length, data.bytes);
-  jobject result = static_cast<jobject>(
+  JNIEnv* env = get_env();
+  jobjectArray result = static_cast<jobjectArray>(
       jvm_on_data("onResponseData", data, end_stream, const_cast<void*>(context)));
-  return (envoy_filter_data_status){/*status*/ kEnvoyFilterDataStatusContinue,
-                                    /*data*/ return_data};
+
+  jobject status = env->GetObjectArrayElement(result, 0);
+  jobject j_data = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
+
+  return (envoy_filter_data_status){/*status*/ unbox_integer(env, status),
+                                    /*data*/ buffer_to_native_data(env, j_data)};
 }
 
 static void* jvm_on_metadata(envoy_headers metadata, void* context) {
@@ -282,20 +378,28 @@ static void* jvm_on_response_trailers(envoy_headers trailers, void* context) {
 
 static envoy_filter_trailers_status jvm_http_filter_on_request_trailers(envoy_headers trailers,
                                                                         const void* context) {
-  envoy_headers return_trailers = copy_envoy_headers(trailers);
-  jobject result = static_cast<jobject>(
+  JNIEnv* env = get_env();
+  jobjectArray result = static_cast<jobjectArray>(
       jvm_on_trailers("onRequestTrailers", trailers, const_cast<void*>(context)));
-  return (envoy_filter_trailers_status){/*status*/ kEnvoyFilterTrailersStatusContinue,
-                                        /*trailers*/ return_trailers};
+
+  jobject status = env->GetObjectArrayElement(result, 0);
+  jobjectArray j_trailers = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
+
+  return (envoy_filter_trailers_status){/*status*/ unbox_integer(env, status),
+                                        /*trailers*/ to_native_headers(env, j_trailers)};
 }
 
 static envoy_filter_trailers_status jvm_http_filter_on_response_trailers(envoy_headers trailers,
                                                                          const void* context) {
-  envoy_headers return_trailers = copy_envoy_headers(trailers);
-  jobject result = static_cast<jobject>(
+  JNIEnv* env = get_env();
+  jobjectArray result = static_cast<jobjectArray>(
       jvm_on_trailers("onResponseTrailers", trailers, const_cast<void*>(context)));
-  return (envoy_filter_trailers_status){/*status*/ kEnvoyFilterTrailersStatusContinue,
-                                        /*trailers*/ return_trailers};
+
+  jobject status = env->GetObjectArrayElement(result, 0);
+  jobjectArray j_trailers = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
+
+  return (envoy_filter_trailers_status){/*status*/ unbox_integer(env, status),
+                                        /*trailers*/ to_native_headers(env, j_trailers)};
 }
 
 static void* jvm_on_error(envoy_error error, void* context) {
@@ -368,70 +472,6 @@ static const void* jvm_http_filter_init(const void* context) {
   return retained_filter;
 }
 
-static void jni_delete_global_ref(void* context);
-static void jvm_http_filter_release(const void* context) {
-  jni_delete_global_ref(const_cast<void*>(context));
-}
-
-// Utility functions
-static void jni_delete_global_ref(void* context) {
-  JNIEnv* env = get_env();
-  jobject ref = static_cast<jobject>(context);
-  env->DeleteGlobalRef(ref);
-}
-
-static envoy_data buffer_to_native_data(JNIEnv* env, jobject data) {
-  jobject j_data = env->NewGlobalRef(data);
-  envoy_data native_data;
-  native_data.bytes = static_cast<uint8_t*>(env->GetDirectBufferAddress(j_data));
-  native_data.length = env->GetDirectBufferCapacity(j_data);
-  native_data.release = jni_delete_global_ref;
-  native_data.context = j_data;
-
-  return native_data;
-}
-
-static envoy_data array_to_native_data(JNIEnv* env, jbyteArray data) {
-  size_t data_length = env->GetArrayLength(data);
-  uint8_t* native_bytes = (uint8_t*)malloc(data_length);
-  void* critical_data = env->GetPrimitiveArrayCritical(data, 0);
-  memcpy(native_bytes, critical_data, data_length);
-  env->ReleasePrimitiveArrayCritical(data, critical_data, 0);
-  return {data_length, native_bytes, free, native_bytes};
-}
-
-static envoy_headers to_native_headers(JNIEnv* env, jobjectArray headers) {
-  // Note that headers is a flattened array of key/value pairs.
-  // Therefore, the length of the native header array is n envoy_data or n/2 envoy_header.
-  envoy_header_size_t length = env->GetArrayLength(headers);
-  envoy_header* header_array = (envoy_header*)safe_malloc(sizeof(envoy_header) * length / 2);
-
-  for (envoy_header_size_t i = 0; i < length; i += 2) {
-    // Copy native byte array for header key
-    jbyteArray j_key = (jbyteArray)env->GetObjectArrayElement(headers, i);
-    size_t key_length = env->GetArrayLength(j_key);
-    uint8_t* native_key = (uint8_t*)safe_malloc(key_length);
-    void* critical_key = env->GetPrimitiveArrayCritical(j_key, 0);
-    memcpy(native_key, critical_key, key_length);
-    env->ReleasePrimitiveArrayCritical(j_key, critical_key, 0);
-    envoy_data header_key = {key_length, native_key, free, native_key};
-
-    // Copy native byte array for header value
-    jbyteArray j_value = (jbyteArray)env->GetObjectArrayElement(headers, i + 1);
-    size_t value_length = env->GetArrayLength(j_value);
-    uint8_t* native_value = (uint8_t*)safe_malloc(value_length);
-    void* critical_value = env->GetPrimitiveArrayCritical(j_value, 0);
-    memcpy(native_value, critical_value, value_length);
-    env->ReleasePrimitiveArrayCritical(j_value, critical_value, 0);
-    envoy_data header_value = {value_length, native_value, free, native_value};
-
-    header_array[i / 2] = {header_key, header_value};
-  }
-
-  envoy_headers native_headers = {length / 2, header_array};
-  return native_headers;
-}
-
 // EnvoyHTTPStream
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initStream(
@@ -486,7 +526,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerFilterFactory(JNIEnv* e
   api->on_response_headers = jvm_http_filter_on_response_headers;
   api->on_response_data = jvm_http_filter_on_response_data;
   api->on_response_trailers = jvm_http_filter_on_response_trailers;
-  api->release_filter = jvm_http_filter_release;
+  api->release_filter = jni_delete_const_global_ref;
   api->static_context = retained_context;
   api->instance_context = NULL;
 

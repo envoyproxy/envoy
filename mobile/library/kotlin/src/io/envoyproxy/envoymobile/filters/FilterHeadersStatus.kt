@@ -3,13 +3,15 @@ package io.envoyproxy.envoymobile
 /*
  * Status to be returned by filters when transmitting or receiving headers.
  */
-sealed class FilterHeadersStatus<T : Headers> {
+sealed class FilterHeadersStatus<T : Headers>(
+  val status: Int
+) {
   /**
    * Continue filter chain iteration, passing the provided headers through.
    *
    * @param headers: The (potentially-modified) headers to be forwarded along the filter chain.
    */
-  class Continue<T : Headers>(val headers: T) : FilterHeadersStatus<T>()
+  class Continue<T : Headers>(val headers: T) : FilterHeadersStatus<T>(0)
 
   /**
    * Do not iterate to any of the remaining filters in the chain with headers.
@@ -18,5 +20,5 @@ sealed class FilterHeadersStatus<T : Headers> {
    * `resumeRequest()`/`resumeResponse()` MUST occur when continued filter iteration is
    * desired.
    */
-  class StopIteration<T : Headers> : FilterHeadersStatus<T>()
+  class StopIteration<T : Headers> : FilterHeadersStatus<T>(1)
 }

@@ -35,7 +35,7 @@ public class EnvoyHTTPStream {
    * @param endStream, supplies whether this is headers only.
    */
   public void sendHeaders(Map<String, List<String>> headers, boolean endStream) {
-    JniLibrary.sendHeaders(streamHandle, toJniLibraryHeaders(headers), endStream);
+    JniLibrary.sendHeaders(streamHandle, JniBridgeUtility.toJniHeaders(headers), endStream);
   }
 
   /**
@@ -66,7 +66,7 @@ public class EnvoyHTTPStream {
    * @param trailers, the trailers to send.
    */
   public void sendTrailers(Map<String, List<String>> trailers) {
-    JniLibrary.sendTrailers(streamHandle, toJniLibraryHeaders(trailers));
+    JniLibrary.sendTrailers(streamHandle, JniBridgeUtility.toJniHeaders(trailers));
   }
 
   /**
@@ -76,17 +76,4 @@ public class EnvoyHTTPStream {
    * @return int, success unless the stream has already been canceled.
    */
   public int cancel() { return JniLibrary.resetStream(streamHandle); }
-
-  private static byte[][] toJniLibraryHeaders(Map<String, List<String>> headers) {
-    // Create array with some room for potential headers that have more than one
-    // value.
-    final List<byte[]> convertedHeaders = new ArrayList<byte[]>(2 * headers.size());
-    for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
-      for (String value : entry.getValue()) {
-        convertedHeaders.add(entry.getKey().getBytes(StandardCharsets.UTF_8));
-        convertedHeaders.add(value.getBytes(StandardCharsets.UTF_8));
-      }
-    }
-    return convertedHeaders.toArray(new byte[0][0]);
-  }
 }

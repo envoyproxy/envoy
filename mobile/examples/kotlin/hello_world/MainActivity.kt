@@ -89,7 +89,11 @@ class MainActivity : Activity() {
       .newStreamPrototype()
       .setOnResponseHeaders { responseHeaders, _ ->
         val status = responseHeaders.httpStatus ?: 0L
-        val message = "received headers with status $status"
+        var message = "received headers with status $status"
+        val filterDemoValue = responseHeaders?.value("filter-demo")?.first() ?: ""
+        if (filterDemoValue != null) {
+          message = message + " and filter-demo set to $filterDemoValue"
+        }
         Log.d("MainActivity", message)
         if (status == 200) {
           val serverHeaderField = responseHeaders?.value(ENVOY_SERVER_HEADER)?.first() ?: ""
