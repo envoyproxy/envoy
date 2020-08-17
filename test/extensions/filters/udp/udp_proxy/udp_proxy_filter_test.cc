@@ -2,6 +2,7 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 
 #include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
+#include "common/common/hash.h"
 
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/upstream/mocks.h"
@@ -478,6 +479,59 @@ cluster: fake_cluster
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+}
+
+TEST_F(UdpProxyFilterTest, HashWithSourceIpConfig) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+hash_policy:
+- source_ip: {}
+  )EOF");
+
+  EXPECT_NE(nullptr, config_->hashPolicy());
+}
+
+TEST_F(UdpProxyFilterTest, HashWithSourceIpDefaultConfig) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+  )EOF");
+
+  EXPECT_EQ(nullptr, config_->hashPolicy());
+}
+
+TEST_F(UdpProxyFilterTest, HashWithSourceIp) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+hash_policy:
+- source_ip: {}
+  )EOF");
+
+  auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  ON_CALL(*host, address()).WillByDefault(Return(upstream_address_));
+  ON_CALL(*host, health()).WillByDefault(Return(Upstream::Host::Health::Healthy));
+
+  auto generated_hash = HashUtil::xxHash64("10.0.0.1");
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
+  .WillOnce(
+              Invoke([host, generated_hash](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+                auto hash = context->computeHashKey();
+                EXPECT_TRUE(hash.has_value());
+                EXPECT_EQ(generated_hash, hash.value());
+                return host;
+              }));
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectUpstreamWrite("hello");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  test_sessions_[0].recvDataFromUpstream("world");
 }
 
 } // namespace
