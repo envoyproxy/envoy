@@ -486,12 +486,12 @@ Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePo
   switch (policy) {
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
       SKIP_STAPLING_IF_EXPIRED:
-    return Ssl::ServerContextConfig::OcspStaplePolicy::SKIP_STAPLING_IF_EXPIRED;
+    return Ssl::ServerContextConfig::OcspStaplePolicy::SkipStaplingIfExpired;
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::STAPLING_REQUIRED:
-    return Ssl::ServerContextConfig::OcspStaplePolicy::STAPLING_REQUIRED;
+    return Ssl::ServerContextConfig::OcspStaplePolicy::StaplingRequired;
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
       REJECT_CONNECTION_ON_EXPIRED:
-    return Ssl::ServerContextConfig::OcspStaplePolicy::REJECT_CONNECTION_ON_EXPIRED;
+    return Ssl::ServerContextConfig::OcspStaplePolicy::RejectConnectionOnExpired;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

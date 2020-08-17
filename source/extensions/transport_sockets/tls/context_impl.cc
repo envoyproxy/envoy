@@ -1102,7 +1102,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
           ctx.is_must_staple_) {
         throw EnvoyException("OCSP response is required for must-staple certificate");
       }
-      if (ocsp_staple_policy_ == Ssl::ServerContextConfig::OcspStaplePolicy::STAPLING_REQUIRED) {
+      if (ocsp_staple_policy_ == Ssl::ServerContextConfig::OcspStaplePolicy::StaplingRequired) {
         throw EnvoyException("Required OCSP response is missing from TLS context");
       }
     } else {
@@ -1401,11 +1401,11 @@ OcspStapleAction ServerContextImpl::passesOcspPolicy(const ContextImpl::TlsConte
 
   // `response` is either not present or expired, and the action depends on the policy.
   switch (ocsp_staple_policy_) {
-  case Ssl::ServerContextConfig::OcspStaplePolicy::SKIP_STAPLING_IF_EXPIRED:
+  case Ssl::ServerContextConfig::OcspStaplePolicy::SkipStaplingIfExpired:
     return OcspStapleAction::NoStaple;
-  case Ssl::ServerContextConfig::OcspStaplePolicy::STAPLING_REQUIRED:
+  case Ssl::ServerContextConfig::OcspStaplePolicy::StaplingRequired:
     return OcspStapleAction::Fail;
-  case Ssl::ServerContextConfig::OcspStaplePolicy::REJECT_CONNECTION_ON_EXPIRED:
+  case Ssl::ServerContextConfig::OcspStaplePolicy::RejectConnectionOnExpired:
     return response ? OcspStapleAction::Fail : OcspStapleAction::NoStaple;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

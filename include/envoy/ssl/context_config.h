@@ -113,9 +113,9 @@ public:
   };
 
   enum class OcspStaplePolicy {
-    SKIP_STAPLING_IF_EXPIRED,
-    STAPLING_REQUIRED,
-    REJECT_CONNECTION_ON_EXPIRED,
+    SkipStaplingIfExpired,
+    StaplingRequired,
+    RejectConnectionOnExpired,
   };
 
   /**
