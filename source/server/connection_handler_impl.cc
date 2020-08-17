@@ -144,8 +144,8 @@ void ConnectionHandlerImpl::retryAllConnections(
     return;
   }
   auto& listener_sockets_map = sockets_using_filter_chain_[filter_chain_message];
-  // Go through all listeners on this worker, if a listener has sockets sending to rebuild
-  // filter_chain, now retry connection with those sockets.
+  // Go through all listeners on this worker, if a listener has sent request to rebuild
+  // filter_chain, now retry connection with those stored sockets.
   for (auto& listener : listeners_) {
     if (listener.second.tcp_listener_.has_value()) {
       auto& active_tcp_listener = listener.second.tcp_listener_->get();
@@ -155,8 +155,6 @@ void ConnectionHandlerImpl::retryAllConnections(
         ENVOY_LOG(debug, "found listener: {} that has sockets to retry.", listener_name);
         for (auto& [socket, metadata] : listener_sockets_map[listener_name]) {
           // Retry connection with that socket on this active tcp listener.
-          // Should point real filter chain before retry connection, to avoid meet filter chain
-          // placeholder again.
           if (success) {
             active_tcp_listener.incNumConnections();
             active_tcp_listener.newConnection(std::move(socket), metadata);

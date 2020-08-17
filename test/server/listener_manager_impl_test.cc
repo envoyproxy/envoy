@@ -4168,6 +4168,106 @@ api_listener:
   EXPECT_EQ("test_api_listener", manager_->apiListener()->get().name());
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, OnDemandFilterChainSingleRebuildingRequest) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.filters.listener.tls_inspector"
+      typed_config: {}
+    filter_chains:
+    - filter_chain_match:
+        destination_port: 8080
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      build_on_demand:
+        true
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+  const auto filter_chain_message = parseListenerFromV3Yaml(yaml).filter_chains().Get(0);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // IPv4 client connects to unknown port - no match.
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain, nullptr);
+
+  // IPv4 client connects to valid port - using 1st filter chain.
+  filter_chain = findFilterChain(8080, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->isPlaceholder());
+
+  // Rebuild the filter chain placeholder.
+  auto& listener = manager_->listeners().back().get();
+  listener.rebuildFilterChain(&filter_chain_message, "test_worker");
+
+  // After rebuilding, the filter chain is not placeholder anymore.
+  // Workers will retry all connections and find the filter chain is not placeholder.
+  filter_chain = findFilterChain(8080, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_FALSE(filter_chain->isPlaceholder());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, OnDemandFilterChainMultipleRebuildingRequest) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.filters.listener.tls_inspector"
+      typed_config: {}
+    filter_chains:
+    - filter_chain_match:
+        destination_port: 8080
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      build_on_demand:
+        true
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  envoy::config::listener::v3::Listener listener_config = parseListenerFromV3Yaml(yaml);
+  const auto& filter_chain_message = listener_config.filter_chains().Get(0);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  manager_->addOrUpdateListener(listener_config, "", true);
+
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // IPv4 client connects to valid port - using 1st filter chain.
+  auto filter_chain = findFilterChain(8080, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->isPlaceholder());
+
+  // Two rebuilding requests for the same filter chain from the same listener.
+  auto& listener = manager_->listeners().back().get();
+  listener.rebuildFilterChain(&filter_chain_message, "test_worker");
+  // After the first rebuilding completes. The same listener will post request again only when the
+  // first rebuilding failed.
+  listener.rebuildFilterChain(&filter_chain_message, "test_worker");
+
+  // After rebuilding, the filter chain is not placeholder anymore.
+  // Workers will retry all connections and find the filter chain is not placeholder.
+  filter_chain = findFilterChain(8080, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_FALSE(filter_chain->isPlaceholder());
+}
+
 TEST_F(ListenerManagerImplTest, StopInplaceWarmingListener) {
   InSequence s;
 
@@ -4721,110 +4821,6 @@ filter_chains:
   EXPECT_FALSE(udp_packet_writer->isBatchMode());
 }
 
-TEST_F(ListenerManagerImplWithRealFiltersTest, SingleOnDemandFilterChain) {
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
-    address:
-      socket_address: { address: 127.0.0.1, port_value: 1234 }
-    listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
-    filter_chains:
-    - filter_chain_match:
-        destination_port: 8080
-      transport_socket:
-        name: tls
-        typed_config:
-          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
-          common_tls_context:
-            tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
-      build_on_demand:
-        true
-  )EOF",
-                                                       Network::Address::IpVersion::v4);
-  const auto filter_chain_message = parseListenerFromV3Yaml(yaml).filter_chains().Get(0);
-
-  EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
-  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
-  EXPECT_EQ(1U, manager_->listeners().size());
-
-  // IPv4 client connects to unknown port - no match.
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
-  EXPECT_EQ(filter_chain, nullptr);
-
-  // IPv4 client connects to valid port - using 1st filter chain.
-  filter_chain = findFilterChain(8080, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
-  ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->isPlaceholder());
-
-  // Rebuild the filter chain placeholder.
-  auto& listener = manager_->listeners().back().get();
-  listener.rebuildFilterChain(&filter_chain_message, "test_worker");
-
-  // After rebuilding, the filter chain is not placeholder anymore.
-  filter_chain = findFilterChain(8080, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
-  ASSERT_NE(filter_chain, nullptr);
-  EXPECT_FALSE(filter_chain->isPlaceholder());
-}
-
-/*
-TEST_F(ListenerManagerImplWithRealFiltersTest, TlsFilterChainWithoutTlsInspector) {
-  EXPECT_CALL(*worker_, start(_));
-  manager_->startWorkers(guard_dog_);
-
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
-    address:
-      socket_address: { address: 127.0.0.1, port_value: 1234 }
-    filter_chains:
-    - filter_chain_match:
-        transport_protocol: "tls"
-      build_on_demand:
-        true
-  )EOF",
-                                                       Network::Address::IpVersion::v4);
-
-  EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
-  auto listener_message = parseListenerFromV3Yaml(yaml);
-  auto filter_chains_message = listener_message.filter_chains();
-  for (auto filter_chain : filter_chains_message) {
-    listener.rebuildFilterChain(&filter_chain, "name");
-  }
-  ls.
-  EXPECT_EQ(1U, manager_->listeners().size());
-
-  manager_->addOrUpdateListener(listener_message, "", true);
-
-  // TLS Inspector is automatically injected for filter chains with TLS requirements,
-  // so make sure there is exactly 1 listener filter (and assume it's TLS Inspector).
-  Network::ListenerConfig& listener = manager_->listeners().back().get();
-  auto ls = dynamic_cast<ListenerImpl*>(listener);
-  ls->
-
-  EXPECT_CALL(*worker_, addListener(_, _, _));
-
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
-  EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
-
-  worker_->callAddCompletion(true);
-  EXPECT_EQ(1UL, manager_->listeners().size());
-  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
-
-  manager_->startWorkers(guard_dog_);
-
-  auto fcm = listener.filterChainManager();
-  listener.rebuildFilterChain();
-  worker_->notifyListenersOnRebuilt()
-  Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
-  Network::MockListenerFilterManager manager;
-  EXPECT_CALL(manager, addAcceptFilter_(_, _))
-      .WillOnce(Invoke([&](const Network::ListenerFilterMatcherSharedPtr&,
-                           Network::ListenerFilterPtr&) -> void {}));
-  EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
-}
-*/
 TEST_F(ListenerManagerImplTest, TcpBacklogCustomConfig) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: TcpBacklogConfigListener

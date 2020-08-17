@@ -229,15 +229,16 @@ PerFilterChainRebuilder::PerFilterChainRebuilder(
     ListenerImpl& listener, const envoy::config::listener::v3::FilterChain* const& filter_chain)
     : listener_(listener), filter_chain_(filter_chain),
       rebuild_init_manager_(std::make_unique<Init::ManagerImpl>("rebuild_init_manager")),
-      rebuild_watcher_("rebuild_watcher",
-                       [this] {
-                         if (!rebuild_complete_) {
-                           rebuild_complete_ = true;
-                           rebuild_success_ = true;
-                           callbackToWorkers(rebuild_success_);
-                           rebuild_timer_->disableTimer();
-                         }
-                       }),
+      rebuild_watcher_(
+          "rebuild_watcher",
+          [this] {
+            if (!rebuild_complete_) {
+              ENVOY_LOG(debug, "rebuild_watcher is ready, rebuilder will callback to workers");
+              rebuild_success_ = true;
+              callbackToWorkers(rebuild_success_);
+              rebuild_timer_->disableTimer();
+            }
+          }),
       rebuild_timer_(listener_.dispatcher().createTimer([this]() -> void { onTimeout(); })),
       rebuild_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(*filter_chain, rebuild_timeout, 15000)) {}
 PerFilterChainRebuilder::~PerFilterChainRebuilder() = default;
@@ -247,10 +248,7 @@ void PerFilterChainRebuilder::storeWorkerInCallbackList(const std::string& worke
 }
 
 void PerFilterChainRebuilder::callbackToWorkers(bool success) {
-  // Already sent callbacks.
-  if (rebuild_complete_) {
-    return;
-  }
+  rebuild_complete_ = true;
 
   // Find all matching workers and listeners, sending callbacks.
   // TODO(ASOPVII): Possible optimization: send callback to all workers.
@@ -284,7 +282,6 @@ void PerFilterChainRebuilder::onTimeout() {
     // If timeout before getting response from dependencies, rebuilding fails. Filter chain go back
     // to placeholder.
     listener_.stopRebuildingFilterChain(filter_chain_);
-    rebuild_complete_ = true;
     rebuild_success_ = false;
     callbackToWorkers(rebuild_success_);
   }
@@ -564,7 +561,7 @@ void ListenerImpl::rebuildFilterChain(
     ENVOY_LOG(debug, "filter chain message is empty");
   }
 
-  // Request rebuilding only on the arrival of the first filter_chain.
+  // Rebuilding only on the arrival of the first request.
   bool on_first_request = false;
 
   // Find/create rebuilder for this filter chain message.
@@ -576,12 +573,19 @@ void ListenerImpl::rebuildFilterChain(
   }
 
   ENVOY_LOG(debug, "receive rebuilding request from worker: {}", worker_name);
-  // const auto& rebuilder = std::move(filter_chain_rebuilder_map_[filter_chain_message]);
   const auto& rebuilder = filter_chain_rebuilder_map_[filter_chain_message];
   rebuilder->storeWorkerInCallbackList(worker_name);
 
+  // Two cases for duplicate requests:
+  // 1. Receive requests before rebuild completed, worker name already exists in the list. Do
+  // nothing.
+  // 2. Receive requests after rebuild completed, this will happen only when the previous rebuild
+  // fails.
+  // TODO(ASOPVII): Retry rebuilding, instead of just callback with failure signal.
   if (rebuilder->rebuildCompleted()) {
+    // Should start the rebuilding again, instead of callback with failure.
     ENVOY_LOG(debug, "rebuilding for this filter chain has completed");
+    // Should callback again
     rebuilder->callbackToWorkers(rebuilder->rebuildSuccess());
     return;
   }
@@ -595,10 +599,12 @@ void ListenerImpl::rebuildFilterChain(
         parent_.server_.threadLocal(), validation_visitor_, parent_.server_.api());
 
     // Use init manager of rebuilder to request dependencies.
+    ENVOY_LOG(debug, "Pass init manager of rebuilder to transport factory context");
     transport_factory_context.setInitManager(rebuilder->initManager());
     ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
     filter_chain_manager_.rebuildFilterChain(filter_chain_message, builder, filter_chain_manager_);
     // Start initializing after passing init manager to transport factory context.
+    ENVOY_LOG(debug, "Start rebuilding");
     rebuilder->startRebuilding();
   }
 }
