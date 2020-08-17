@@ -21,6 +21,7 @@ Minor Behavior Changes
 * http: fixed the 100-continue response path to properly handle upstream failure by sending 5xx responses. This behavior can be temporarily reverted by setting `envoy.reloadable_features.allow_500_after_100` to false.
 * http: the per-stream FilterState maintained by the HTTP connection manager will now provide read/write access to the downstream connection FilterState. As such, code that relies on interacting with this might
   see a change in behavior.
+* logging: add fine-grain logging for file level log control with logger management at administration interface. It can be enabled by option `--enable-fine-grain-logging`.
 * logging: change default log format to `"[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v"` and default value of :option:`--log-format-prefix-with-location` to `0`.
 * logging: nghttp2 log messages no longer appear at trace level unless `ENVOY_NGHTTP2_TRACE` is set
   in the environment.
@@ -45,6 +46,7 @@ Removed Config or Runtime
 * http: removed legacy header sanitization and the runtime guard `envoy.reloadable_features.strict_header_validation`.
 * http: removed legacy transfer-encoding enforcement and runtime guard `envoy.reloadable_features.reject_unsupported_transfer_encodings`.
 * http: removed configurable strict host validation and runtime guard `envoy.reloadable_features.strict_authority_validation`.
+* http: removed the connection header sanitization runtime guard `envoy.reloadable_features.connection_header_sanitization`.
 
 New Features
 ------------
