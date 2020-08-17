@@ -76,8 +76,8 @@ TEST_P(AutoSniIntegrationTest, BasicAutoSniTest) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response_->complete());
 
-  const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
-      dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
           fake_upstream_connection_->connection().ssl().get());
   EXPECT_STREQ("localhost", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
 }
@@ -93,8 +93,8 @@ TEST_P(AutoSniIntegrationTest, PassingNotDNS) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response_->complete());
 
-  const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
-      dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
           fake_upstream_connection_->connection().ssl().get());
   EXPECT_STREQ(nullptr, SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
 }
@@ -112,8 +112,8 @@ TEST_P(AutoSniIntegrationTest, PassingHostWithoutPort) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response_->complete());
 
-  const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
-      dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
           fake_upstream_connection_->connection().ssl().get());
   EXPECT_STREQ("example.com", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
 }

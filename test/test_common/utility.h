@@ -201,13 +201,15 @@ public:
    * @param value supplies the value of the counter.
    * @param time_system the time system to use for waiting.
    * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
+   * @param dispatcher the dispatcher to run non-blocking periodically during the wait.
    * @return AssertionSuccess() if the counter was == to the value within the timeout, else
    * AssertionFailure().
    */
   static AssertionResult
   waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
                    Event::TestTimeSystem& time_system,
-                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+                   Event::Dispatcher* dispatcher = nullptr);
 
   /**
    * Wait for a counter to >= a given value.
@@ -792,9 +794,8 @@ public:
   void wait();
 
 private:
-  Thread::CondVar cv_;
-  Thread::MutexBasicLockable mutex_;
-  bool ready_{false};
+  absl::Mutex mutex_;
+  bool ready_ ABSL_GUARDED_BY(mutex_){false};
 };
 
 namespace Http {
