@@ -185,6 +185,7 @@ following are the command line options that Envoy supports.
   variable which should be passed to this option in most cases.
 
 .. option:: --enable-fine-grain-logging
+
   *(optional)* Enables fine-grain logger with file level log control and runtime update at administration
   interface. If enabled, main log macros including `ENVOY_LOG`, `ENVOY_CONN_LOG`, `ENVOY_STREAM_LOG` and
   `ENVOY_FLUSH_LOG` will use a per-file logger, and the usage doesn't need `Envoy::Logger::Loggable` any 
