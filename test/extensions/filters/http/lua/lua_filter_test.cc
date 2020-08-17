@@ -2191,6 +2191,33 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodeNotExist) {
   EXPECT_EQ(nullptr, request_headers.get(Http::LowerCaseString("hello")));
 }
 
+TEST_F(LuaHttpFilterTest, LuaFilterBase64Escape) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local base64Encoded = request_handle:base64Escape("foobar")
+      request_handle:logTrace(base64Encoded)
+    end
+
+    function envoy_on_response(response_handle)
+      local base64Encoded = response_handle:base64Escape("barfoo")
+      response_handle:logTrace(base64Encoded)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Zm9vYmFy")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("YmFyZm9v")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+}
+
 } // namespace
 } // namespace Lua
 } // namespace HttpFilters

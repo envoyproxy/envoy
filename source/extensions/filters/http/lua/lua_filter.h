@@ -165,7 +165,8 @@ public:
             {"streamInfo", static_luaStreamInfo},
             {"connection", static_luaConnection},
             {"importPublicKey", static_luaImportPublicKey},
-            {"verifySignature", static_luaVerifySignature}};
+            {"verifySignature", static_luaVerifySignature},
+            {"base64Escape", static_luaBase64Escape}};
   }
 
 private:
@@ -267,6 +268,13 @@ private:
    * This is the closure/iterator returned by luaBodyChunks() above.
    */
   DECLARE_LUA_CLOSURE(StreamHandleWrapper, luaBodyIterator);
+
+  /**
+   * Base64 escape a string.
+   * @param1 (string) string to be base64 escaped.
+   * @return (string) base64 escaped string.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaBase64Escape);
 
   int doSynchronousHttpCall(lua_State* state, Tracing::Span& span);
   int doAsynchronousHttpCall(lua_State* state, Tracing::Span& span);

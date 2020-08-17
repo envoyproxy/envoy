@@ -12,6 +12,8 @@
 #include "common/crypto/utility.h"
 #include "common/http/message_impl.h"
 
+#include "absl/strings/escaping.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -611,6 +613,15 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
     public_key_storage_.insert({std::string(str).substr(0, n), std::move(crypto_ptr)});
     public_key_wrapper_.reset(PublicKeyWrapper::create(state, str), true);
   }
+
+  return 1;
+}
+
+int StreamHandleWrapper::luaBase64Escape(lua_State* state) {
+  // Get input string.
+  absl::string_view input = luaL_checkstring(state, 2);
+  auto output = absl::Base64Escape(input);
+  lua_pushlstring(state, output.data(), output.length());
 
   return 1;
 }
