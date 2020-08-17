@@ -56,10 +56,8 @@ public:
       : writev_override_proc_(writev) {}
 
 private:
-  // SocketInterface
-  using SocketInterfaceImpl::socket;
-  IoHandlePtr socket(Socket::Type socket_type, Address::Type addr_type, Address::IpVersion version,
-                     bool socket_v6only) const override;
+  // SocketInterfaceImpl
+  IoHandlePtr makeSocket(int socket_fd, bool socket_v6only) const override;
 
   const TestIoSocketHandle::WritevOverrideProc writev_override_proc_;
 };
