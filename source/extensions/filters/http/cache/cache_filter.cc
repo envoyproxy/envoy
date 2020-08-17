@@ -33,6 +33,7 @@ CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3alpha:
     : time_source_(time_source), cache_(http_cache) {}
 
 void CacheFilter::onDestroy() {
+  filter_state_ = FilterState::Destroyed;
   if (lookup_) {
     lookup_->onDestroy();
   }
@@ -180,6 +181,9 @@ void CacheFilter::getTrailers() {
 }
 
 void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers) {
+  if (filter_state_ == FilterState::Destroyed) {
+    return;
+  }
   // TODO(yosrym93): Handle request only-if-cached directive
   switch (result.cache_entry_status_) {
   case CacheEntryStatus::FoundNotModified:
@@ -214,6 +218,10 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
 void CacheFilter::onBody(Buffer::InstancePtr&& body) {
   // Can be called during decoding if a valid cache hit is found,
   // or during encoding if a cache entry was being validated.
+  if (filter_state_ == FilterState::Destroyed) {
+    // The filter is being destroyed, any callbacks should be ignored.
+    return;
+  }
   ASSERT(!remaining_body_.empty(),
          "CacheFilter doesn't call getBody unless there's more body to get, so this is a "
          "bogus callback.");
@@ -249,6 +257,10 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
 void CacheFilter::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   // Can be called during decoding if a valid cache hit is found,
   // or during encoding if a cache entry was being validated.
+  if (filter_state_ == FilterState::Destroyed) {
+    // The filter is being destroyed, any callbacks should be ignored.
+    return;
+  }
   if (filter_state_ == FilterState::DecodeServingFromCache) {
     decoder_callbacks_->encodeTrailers(std::move(trailers));
   } else {

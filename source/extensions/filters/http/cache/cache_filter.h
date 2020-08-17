@@ -106,7 +106,11 @@ private:
 
     // The cached response was successfully added to the encoding stream (either during decoding or
     // encoding).
-    ResponseServedFromCache
+    ResponseServedFromCache,
+
+    // CacheFilter::onDestroy has been called, the filter will be destroyed soon. Any triggered
+    // callbacks should be ignored.
+    Destroyed
   };
 
   FilterState filter_state_ = FilterState::Initial;
