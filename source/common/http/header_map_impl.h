@@ -16,6 +16,9 @@
 #ifndef HEADER_MAP_SIZE_THRESHOLD
 #define HEADER_MAP_SIZE_THRESHOLD 0
 #endif // !HEADER_MAP_SIZE_THRESHOLD
+#define HEADERMAP_TYPE_MULTIMAP
+#define MULTIMAP_ABSL_BTREE
+#include "absl/container/btree_map.h"
 
 namespace Envoy {
 namespace Http {
@@ -188,8 +191,16 @@ protected:
    */
   class HeaderList : NonCopyable {
   public:
+#ifdef HEADERMAP_TYPE_MULTIMAP
+#ifdef MULTIMAP_ABSL_BTREE
+    using HeaderLazyMap = absl::btree_multimap<absl::string_view, HeaderNode>;
+#else  // !MULTIMAP_ABSL_BTREE
+    using HeaderLazyMap = std::multimap<absl::string_view, HeaderNode>;
+#endif // !MULTIMAP_ABSL_BTREE
+#else  // !HEADERMAP_TYPE_MULTIMAP
     using HeaderNodeVector = absl::InlinedVector<HeaderNode, 1>;
     using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderNodeVector>;
+#endif // !HEADERMAP_TYPE_MULTIMAP
 
     HeaderList() : pseudo_headers_end_(headers_.end()) {}
 
@@ -202,7 +213,12 @@ protected:
       HeaderNode i = headers_.emplace(is_pseudo_header ? pseudo_headers_end_ : headers_.end(),
                                       std::forward<Key>(key), std::forward<Value>(value)...);
       if (!lazy_map_.empty()) {
+#ifdef HEADERMAP_TYPE_MULTIMAP
+        // Adds i after the last value with the same key (if exists).
+        lazy_map_.insert(std::make_pair(i->key().getStringView(), i));
+#else  // !HEADERMAP_TYPE_MULTIMAP
         lazy_map_[i->key().getStringView()].push_back(i);
+#endif // !HEADERMAP_TYPE_MULTIMAP
       }
       if (!is_pseudo_header && pseudo_headers_end_ == headers_.end()) {
         pseudo_headers_end_ = i;
@@ -228,6 +244,18 @@ protected:
             pseudo_headers_end_++;
           }
           if (!lazy_map_.empty()) {
+#ifdef HEADERMAP_TYPE_MULTIMAP
+            auto map_entries_range = lazy_map_.equal_range(entry.key().getStringView());
+            for (auto map_entry = map_entries_range.first; map_entry != map_entries_range.second;
+                 map_entry++) {
+              if (map_entry->second == entry.entry_) {
+                // We can erase the element during the iteration because we only
+                // remove a single item, and exit the iteration immediately after.
+                lazy_map_.erase(map_entry);
+                break;
+              }
+            }
+#else  // !HEADERMAP_TYPE_MULTIMAP
             auto& values_vec = lazy_map_[entry.key().getStringView()];
             if (values_vec.size() == 1) {
               lazy_map_.erase(entry.key().getStringView());
@@ -236,6 +264,7 @@ protected:
                                               [&](HeaderNode it) { return it == entry.entry_; }),
                                values_vec.end());
             }
+#endif // !HEADERMAP_TYPE_MULTIMAP
           }
         }
         return to_remove;
@@ -262,7 +291,14 @@ protected:
     std::list<HeaderEntryImpl>::const_iterator end() const { return headers_.end(); }
     std::list<HeaderEntryImpl>::const_reverse_iterator rbegin() const { return headers_.rbegin(); }
     std::list<HeaderEntryImpl>::const_reverse_iterator rend() const { return headers_.rend(); }
-    HeaderLazyMap::iterator mapFind(absl::string_view key) { return lazy_map_.find(key); }
+    HeaderLazyMap::iterator mapFind(absl::string_view key) {
+#ifdef HEADERMAP_TYPE_MULTIMAP
+      // Returns the first occurrence of the given key (if any)
+      return lazy_map_.lower_bound(key);
+#else  //! HEADERMAP_TYPE_MULTIMAP
+      return lazy_map_.find(key);
+#endif //! HEADERMAP_TYPE_MULTIMAP
+    }
     HeaderLazyMap::iterator mapEnd() { return lazy_map_.end(); }
     size_t size() const { return headers_.size(); }
     bool empty() const { return headers_.empty(); }

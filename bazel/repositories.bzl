@@ -581,6 +581,11 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/status",
     )
 
+    native.bind(
+        name = "abseil_btree",
+        actual = "@com_google_absl//absl/container:btree",
+    )
+
 def _com_google_protobuf():
     _repository_impl("rules_python")
     _repository_impl(
