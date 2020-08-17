@@ -76,7 +76,7 @@ public:
   virtual void setSecretUpdateCallback(std::function<void()> callback) PURE;
 
   /**
-   * @return a callback which can be used to create Handshakers.
+   * @return a callback which can be used to create Handshaker instances.
    */
   virtual HandshakerFactoryCb createHandshaker() const PURE;
 
