@@ -94,7 +94,7 @@ protected:
     bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(file.data(), file.size()));
 
     uint8_t* data = nullptr;
-    long len; // NOLINT (runtime/int)
+    long len = 0;
     ASSERT(PEM_bytes_read_bio(&data, &len, nullptr, PEM_STRING_X509, bio.get(), nullptr, nullptr));
     bssl::UniquePtr<uint8_t> tmp(data); // Prevents memory leak.
     return bssl::UniquePtr<CRYPTO_BUFFER>(CRYPTO_BUFFER_new(data, len, nullptr));
