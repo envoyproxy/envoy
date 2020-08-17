@@ -247,7 +247,7 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
       scoped_route_info =
           std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config), nullptr);
     }
-    route_provider_by_scope_.insert({scope_name, std::move(rds_config_provider_helper)});
+    route_provider_by_scope_[scope_name] = std::move(rds_config_provider_helper);
     scope_name_by_hash_[scoped_route_info->scopeKey().hash()] = scoped_route_info->scopeName();
     scoped_route_map_[scoped_route_info->scopeName()] = scoped_route_info;
     updated_scopes.push_back(scoped_route_info);

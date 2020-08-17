@@ -254,6 +254,14 @@ key:
   EXPECT_EQ(1UL,
             server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
+  EXPECT_EQ(2, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.all_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
+  EXPECT_EQ(2, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.active_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
 
   // Verify the config is a ScopedConfigImpl instance, both scopes point to "" as RDS hasn't kicked
   // in yet(NullConfigImpl returned).
@@ -996,6 +1004,18 @@ key:
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
               IsNull());
+  EXPECT_EQ(2, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.all_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
+  EXPECT_EQ(1, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.active_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
+  EXPECT_EQ(1, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.on_demand_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
 }
 
 // Push Rds update after on demand request, route configuration should be initialized.
@@ -1043,6 +1063,11 @@ key:
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
               IsNull());
+  EXPECT_EQ(1, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.active_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
+
   absl::optional<uint64_t> key_hash =
       getScopedRdsProvider()->config<ScopedConfigImpl>()->computeKeyHash(
           TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
@@ -1060,6 +1085,18 @@ key:
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
                 ->name(),
             "foo_routes");
+  EXPECT_EQ(2, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.all_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
+  EXPECT_EQ(2, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.active_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
+  EXPECT_EQ(1, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.on_demand_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
 }
 
 TEST_F(ScopedRdsTest, PushRdsBeforeOndemandRequest) {
@@ -1152,10 +1189,18 @@ key:
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
               IsNull());
+  EXPECT_EQ(0, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.active_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
+  EXPECT_EQ(1, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.on_demand_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
   // By default scope should be loaded eagerly, use a different scope name because we only
   // have 1 init manager and init watcher.
   const std::string config_yaml = R"EOF(
-name: foo_scope2
+name: foo_scope
 route_configuration_name: foo_routes
 key:
   fragments:
@@ -1176,6 +1221,14 @@ key:
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "foo_routes");
+  EXPECT_EQ(1, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.active_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
+  EXPECT_EQ(0, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.on_demand_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
 }
 
 // Change a scope from eager to lazy will delete the route table.
@@ -1195,8 +1248,15 @@ key:
 
   const auto decoded_resources1 = TestUtility::decodeResources({eager_resource});
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources1.refvec_, "1"));
-
-  // The scope is  eager loading and rds update will be accepted.
+  EXPECT_EQ(1, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.active_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
+  EXPECT_EQ(0, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.on_demand_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
+  // The scope is eager loading and rds update will be accepted.
   pushRdsConfig({"foo_routes"}, "111");
   ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
@@ -1212,7 +1272,7 @@ key:
   on_demand: true
   key:
     fragments:
-      - string_key: x-foo-key
+      - string_key: x-bar-key
   )EOF";
   const auto lazy_resource = parseScopedRouteConfigurationFromYaml(config_yaml);
   const auto decoded_resources2 = TestUtility::decodeResources({lazy_resource});
@@ -1220,6 +1280,18 @@ key:
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
               IsNull());
+  EXPECT_EQ(0, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.active_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
+  EXPECT_EQ(1, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.on_demand_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
+  EXPECT_EQ(1, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.all_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
 }
 
 // Post on demand callbacks multiple times, all should be executed after rds update.
@@ -1258,6 +1330,14 @@ key:
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
                 ->name(),
             "foo_routes");
+  EXPECT_EQ(1, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.active_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
+  EXPECT_EQ(1, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.on_demand_scopes",
+                          Stats::Gauge::ImportMode::Accumulate)
+                   .value());
 }
 
 TEST_F(ScopedRdsTest, DanglingSubscriptionOnDemandUpdate) {
