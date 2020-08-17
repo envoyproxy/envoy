@@ -265,7 +265,7 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
     BackOffStrategyPtr strategy =
         Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(cluster, 5000,
                                                                                 random);
-    EXPECT_NE(nullptr, dynamic_cast<JitteredBackOffStrategy*>(strategy.get()));
+    EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
   }
 
   {

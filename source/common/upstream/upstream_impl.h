@@ -196,7 +196,7 @@ public:
   }
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
-  void healthFlagSet(HealthFlag flag) override { health_flags_ |= enumToInt(flag); }
+  void healthFlagSet(HealthFlag flag) final { health_flags_ |= enumToInt(flag); }
 
   ActiveHealthFailureType getActiveHealthFailureType() const override {
     return active_health_failure_type_;

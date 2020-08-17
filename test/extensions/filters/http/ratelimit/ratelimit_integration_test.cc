@@ -333,7 +333,7 @@ TEST_P(RatelimitIntegrationTest, ConnectImmediateDisconnect) {
   initiateClientConnection();
   ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_ratelimit_connection_));
   ASSERT_TRUE(fake_ratelimit_connection_->close());
-  ASSERT_TRUE(fake_ratelimit_connection_->waitForDisconnect(true));
+  ASSERT_TRUE(fake_ratelimit_connection_->waitForDisconnect());
   fake_ratelimit_connection_ = nullptr;
   // Rate limiter fails open
   waitForSuccessfulUpstreamResponse();
