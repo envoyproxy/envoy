@@ -23,14 +23,16 @@ void ListenerFilterFuzzer::fuzz(
   FuzzedHeader header(input);
 
   if (!header.empty()) {
-    ON_CALL(os_sys_calls_, recv(kFakeSocketFd, _, _, MSG_PEEK))
+    ON_CALL(os_sys_calls_, recv(kFakeSocketFd, _, _, _))
         .WillByDefault(testing::Return(Api::SysCallSizeResult{static_cast<ssize_t>(0), 0}));
 
     ON_CALL(dispatcher_,
-            createFileEvent_(_, _, Event::FileTriggerType::Edge,
-                             Event::FileReadyType::Read | Event::FileReadyType::Closed))
+            createFileEvent_(_, _, _, _))
         .WillByDefault(testing::DoAll(testing::SaveArg<1>(&file_event_callback_),
                                       testing::ReturnNew<NiceMock<Event::MockFileEvent>>()));
+
+    ON_CALL(os_sys_calls_, ioctl(kFakeSocketFd, FIONREAD, _))
+        .WillByDefault(testing::Return(Api::SysCallIntResult{static_cast<int>(header.size()), 0}));
   }
 
   filter.onAccept(cb_);
@@ -44,11 +46,11 @@ void ListenerFilterFuzzer::fuzz(
     {
       testing::InSequence s;
 
-      EXPECT_CALL(os_sys_calls_, recv(kFakeSocketFd, _, _, MSG_PEEK))
+      EXPECT_CALL(os_sys_calls_, recv(kFakeSocketFd, _, _, _))
           .Times(testing::AnyNumber())
           .WillRepeatedly(Invoke(
-              [&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                return header.next(buffer, length);
+              [&header](os_fd_t, void* buffer, size_t length, int flags) -> Api::SysCallSizeResult {
+                return header.read(buffer, length, flags);
               }));
     }
 
@@ -59,17 +61,19 @@ void ListenerFilterFuzzer::fuzz(
 
     while (!got_continue) {
       if (header.done()) { // End of stream reached but not done
-        file_event_callback_(Event::FileReadyType::Closed);
+        // file_event_callback_(Event::FileReadyType::Closed);
         return;
       } else {
         file_event_callback_(Event::FileReadyType::Read);
       }
+
+      header.next();
     }
   }
 }
 
 FuzzedHeader::FuzzedHeader(const test::extensions::filters::listener::FilterFuzzTestCase& input)
-    : nreads_(input.data_size()), nread_(0) {
+    : nreads_(input.data_size()) {
   size_t len = 0;
   for (int i = 0; i < nreads_; i++) {
     len += input.data(i).size();
@@ -83,12 +87,26 @@ FuzzedHeader::FuzzedHeader(const test::extensions::filters::listener::FilterFuzz
   }
 }
 
-Api::SysCallSizeResult FuzzedHeader::next(void* buffer, size_t length) {
-  if (done()) {           // End of stream reached
-    nread_ = nreads_ - 1; // Decrement to avoid out-of-range for last recv() call
+void FuzzedHeader::next() {
+  if (!done()) {
+    nread_++;
   }
-  memcpy(buffer, data_.data(), std::min(indices_[nread_], length));
-  return Api::SysCallSizeResult{static_cast<ssize_t>(indices_[nread_++]), 0};
+}
+
+Api::SysCallSizeResult FuzzedHeader::read(void* buffer, size_t length, int flags) {
+  size_t len = std::min(indices_[nread_], length); // Number of bytes to write
+  memcpy(buffer, data_.data() + index_, len);
+
+  if (flags != MSG_PEEK) {
+    // If not peeking, written bytes will be marked as read
+    index_ += len;
+  }
+
+  return Api::SysCallSizeResult{static_cast<ssize_t>(len), 0};
+}
+
+size_t FuzzedHeader::size() {
+  return indices_[nreads_] - index_ + 1;
 }
 
 bool FuzzedHeader::done() { return nread_ >= nreads_; }

@@ -35,9 +35,15 @@ class FuzzedHeader {
 public:
   FuzzedHeader(const test::extensions::filters::listener::FilterFuzzTestCase& input);
 
-  // Copies next read into buffer and returns the number of bytes written
-  Api::SysCallSizeResult next(void* buffer, size_t length);
+  // Makes data from the next read available to read()
+  void next();
 
+  // Copies data into buffer and returns the number of bytes written
+  Api::SysCallSizeResult read(void* buffer, size_t length, int flags);
+
+  size_t size();
+
+  // Returns true if end of stream reached
   bool done();
 
   // Returns true if data field in proto is empty
@@ -45,7 +51,8 @@ public:
 
 private:
   const int nreads_; // Number of reads
-  int nread_;        // Counter of current read
+  int nread_ = 0;    // Counter of current read
+  size_t index_ = 0; // Index of first unread byte
   std::vector<uint8_t> data_;
   std::vector<size_t> indices_; // Ending indices for each read
 };
