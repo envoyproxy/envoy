@@ -1,5 +1,7 @@
 #pragma once
 
+#include <bits/stdint-uintn.h>
+
 #include <iosfwd>
 #include <string>
 #include <vector>
@@ -146,6 +148,12 @@ struct LookupResult {
   // TODO(toddmgreer): Implement trailer support.
   // True if the cached response has trailers.
   bool has_trailers_ = false;
+
+  // Update the content length of the object and its response headers.
+  void setContentLength(uint64_t new_length) {
+    content_length_ = new_length;
+    headers_->setContentLength(new_length);
+  }
 };
 using LookupResultPtr = std::unique_ptr<LookupResult>;
 

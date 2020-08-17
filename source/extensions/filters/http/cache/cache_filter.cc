@@ -168,11 +168,10 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
     lookup_result_ = std::make_unique<LookupResult>(std::move(result));
     filter_state_ = FilterState::DecodeServingFromCache;
     lookup_result_->headers_->setStatus(static_cast<uint64_t>(Http::Code::RangeNotSatisfiable));
-    lookup_result_->headers_->setContentLength(0);
     lookup_result_->headers_->addCopy(Http::Headers::get().ContentRange,
                                       absl::StrCat("bytes */", lookup_result_->content_length_));
     // We shouldn't serve any of the body, so the response content length is 0.
-    lookup_result_->content_length_ = 0;
+    lookup_result_->setContentLength(0);
     encodeCachedResponse();
     break;
   case CacheEntryStatus::SatisfiableRange:
@@ -180,14 +179,13 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
       lookup_result_ = std::make_unique<LookupResult>(std::move(result));
       filter_state_ = FilterState::DecodeServingFromCache;
       lookup_result_->headers_->setStatus(static_cast<uint64_t>(Http::Code::PartialContent));
-      lookup_result_->headers_->setContentLength(lookup_result_->response_ranges_[0].length());
       lookup_result_->headers_->addCopy(
           Http::Headers::get().ContentRange,
           absl::StrCat("bytes ", lookup_result_->response_ranges_[0].begin(), "-",
                        lookup_result_->response_ranges_[0].end() - 1, "/",
                        lookup_result_->content_length_));
       // We serve only the desired range, so adjust the length accordingly.
-      lookup_result_->content_length_ = lookup_result_->response_ranges_[0].length();
+      lookup_result_->setContentLength(lookup_result_->response_ranges_[0].length());
       remaining_ranges_ = std::move(lookup_result_->response_ranges_);
       encodeCachedResponse();
       break;
