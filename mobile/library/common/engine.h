@@ -38,7 +38,7 @@ public:
   /**
    * Increment a counter with a given string of elements and by the given count.
    */
-  void recordCounter(std::string elements, uint64_t count);
+  void recordCounter(const std::string& elements, uint64_t count);
 
   /**
    * Flush the stats sinks outside of a flushing interval.
@@ -50,6 +50,7 @@ public:
 private:
   envoy_status_t run(std::string config, std::string log_level);
 
+  Stats::ScopePtr client_scope_;
   envoy_engine_callbacks callbacks_;
   Thread::MutexBasicLockable mutex_;
   Thread::CondVar cv_;
