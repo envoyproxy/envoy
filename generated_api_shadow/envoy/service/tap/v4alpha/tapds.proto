@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.service.tap.v4alpha;
 
 import "envoy/config/tap/v4alpha/common.proto";
-import "envoy/service/discovery/v3/discovery.proto";
+import "envoy/service/discovery/v4alpha/discovery.proto";
 
 import "google/api/annotations.proto";
 
@@ -21,15 +21,16 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 
 // [#not-implemented-hide:] Tap discovery service.
 service TapDiscoveryService {
-  rpc StreamTapConfigs(stream discovery.v3.DiscoveryRequest)
-      returns (stream discovery.v3.DiscoveryResponse) {
+  rpc StreamTapConfigs(stream discovery.v4alpha.DiscoveryRequest)
+      returns (stream discovery.v4alpha.DiscoveryResponse) {
   }
 
-  rpc DeltaTapConfigs(stream discovery.v3.DeltaDiscoveryRequest)
-      returns (stream discovery.v3.DeltaDiscoveryResponse) {
+  rpc DeltaTapConfigs(stream discovery.v4alpha.DeltaDiscoveryRequest)
+      returns (stream discovery.v4alpha.DeltaDiscoveryResponse) {
   }
 
-  rpc FetchTapConfigs(discovery.v3.DiscoveryRequest) returns (discovery.v3.DiscoveryResponse) {
+  rpc FetchTapConfigs(discovery.v4alpha.DiscoveryRequest)
+      returns (discovery.v4alpha.DiscoveryResponse) {
     option (google.api.http).post = "/v3/discovery:tap_configs";
     option (google.api.http).body = "*";
   }

@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.config.core.v4alpha;
 
-import "envoy/config/core/v4alpha/address.proto";
 import "envoy/config/core/v4alpha/backoff.proto";
 import "envoy/config/core/v4alpha/http_uri.proto";
 import "envoy/type/v3/percent.proto";
@@ -135,9 +134,9 @@ message Extension {
 message Node {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.core.v3.Node";
 
-  reserved 5;
+  reserved 5, 11;
 
-  reserved "build_version";
+  reserved "build_version", "listening_addresses";
 
   // An opaque node identifier for the Envoy node. This also provides the local
   // service node name. It should be set if any of the following features are
@@ -190,12 +189,6 @@ message Node {
   // See :ref:`the list of features <client_features>` that xDS client may
   // support.
   repeated string client_features = 10;
-
-  // Known listening ports on the node as a generic hint to the management server
-  // for filtering :ref:`listeners <config_listeners>` to be returned. For example,
-  // if there is a listener bound to port 80, the list can optionally contain the
-  // SocketAddress `(0.0.0.0,80)`. The field is optional and just a hint.
-  repeated Address listening_addresses = 11;
 }
 
 // Metadata provides additional inputs to filters based on matched listeners,
