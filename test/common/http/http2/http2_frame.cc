@@ -213,9 +213,16 @@ Http2Frame Http2Frame::makeWindowUpdateFrame(uint32_t stream_index, uint32_t inc
 }
 
 Http2Frame Http2Frame::makeEmptyMetadataFrame(uint32_t stream_index, MetadataFlags flags) {
-    Http2Frame frame;
-    frame.buildHeader(Type::Metadata, 0, static_cast<uint8_t>(flags), makeRequestStreamId(stream_index));
-    return frame;
+  Http2Frame frame;
+  frame.buildHeader(Type::Metadata, 0, static_cast<uint8_t>(flags), makeRequestStreamId(stream_index));
+  return frame;
+}
+
+Http2Frame Http2Frame::makeMetadataFrameFromHex(uint32_t stream_index, absl::string_view metadata, MetadataFlags flags) {
+  Http2Frame frame;
+  frame.buildHeader(Type::Metadata, metadata.size(), static_cast<uint8_t>(flags), makeRequestStreamId(stream_index));
+  frame.appendData(Hex::decode(std::string(metadata)));
+  return frame;
 }
 
 Http2Frame Http2Frame::makeMalformedRequest(uint32_t stream_index) {

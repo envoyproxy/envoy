@@ -109,6 +109,7 @@ public:
 
   static Http2Frame makeWindowUpdateFrame(uint32_t stream_index, uint32_t increment);
   static Http2Frame makeEmptyMetadataFrame(uint32_t stream_index, MetadataFlags flags = MetadataFlags::None);
+  static Http2Frame makeMetadataFrameFromHex(uint32_t stream_index, absl::string_view metadata, MetadataFlags flags);
 
   static Http2Frame makeMalformedRequest(uint32_t stream_index);
   static Http2Frame makeMalformedRequestWithZerolenHeader(uint32_t stream_index,
