@@ -26,6 +26,7 @@ CAS
 CB
 CDS
 CEL
+LTT
 ceil
 CHACHA
 CHLO
@@ -972,6 +973,7 @@ restarter
 resync
 retriable
 retriggers
+revalidated
 revalidation
 rmdir
 rocketmq
