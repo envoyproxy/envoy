@@ -27,6 +27,7 @@ java_library(
         "EnvoyEngine.java",
         "EnvoyEngineImpl.java",
         "EnvoyHTTPStream.java",
+        "JniBridgeUtility.java",
         "JniLibrary.java",
         "JvmBridgeUtility.java",
         "JvmCallbackContext.java",

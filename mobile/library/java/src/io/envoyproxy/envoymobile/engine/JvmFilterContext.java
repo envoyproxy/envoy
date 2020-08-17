@@ -1,6 +1,7 @@
 package io.envoyproxy.envoymobile.engine;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Map;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilter;
@@ -24,7 +25,7 @@ class JvmFilterContext {
    * @param value,      the value of the HTTP header.
    * @param start,      indicates this is the first header pair of the block.
    */
-  void passHeader(byte[] key, byte[] value, boolean start) {
+  public void passHeader(byte[] key, byte[] value, boolean start) {
     bridgeUtility.passHeader(key, value, start);
   }
 
@@ -38,7 +39,7 @@ class JvmFilterContext {
   public Object onRequestHeaders(long headerCount, boolean endStream) {
     assert bridgeUtility.validateCount(headerCount);
     final Map headers = bridgeUtility.retrieveHeaders();
-    return filter.onRequestHeaders(headers, endStream);
+    return toJniFilterHeadersStatus(filter.onRequestHeaders(headers, endStream));
   }
 
   /**
@@ -62,7 +63,7 @@ class JvmFilterContext {
   public Object onRequestTrailers(long trailerCount) {
     assert bridgeUtility.validateCount(trailerCount);
     final Map trailers = bridgeUtility.retrieveHeaders();
-    return filter.onRequestTrailers(trailers);
+    return toJniFilterHeadersStatus(filter.onRequestTrailers(trailers));
   }
 
   /**
@@ -75,7 +76,7 @@ class JvmFilterContext {
   public Object onResponseHeaders(long headerCount, boolean endStream) {
     assert bridgeUtility.validateCount(headerCount);
     final Map headers = bridgeUtility.retrieveHeaders();
-    return filter.onResponseHeaders(headers, endStream);
+    return toJniFilterHeadersStatus(filter.onResponseHeaders(headers, endStream));
   }
 
   /**
@@ -99,6 +100,16 @@ class JvmFilterContext {
   public Object onResponseTrailers(long trailerCount) {
     assert bridgeUtility.validateCount(trailerCount);
     final Map trailers = bridgeUtility.retrieveHeaders();
-    return filter.onResponseTrailers(trailers);
+    return toJniFilterHeadersStatus(filter.onResponseTrailers(trailers));
+  }
+
+  private static byte[][] toJniHeaders(Object headers) {
+    return JniBridgeUtility.toJniHeaders((Map<String, List<String>>)headers);
+  }
+
+  private static Object[] toJniFilterHeadersStatus(Object[] result) {
+    assert result.length == 2;
+    result[1] = toJniHeaders(result[1]);
+    return result;
   }
 }
