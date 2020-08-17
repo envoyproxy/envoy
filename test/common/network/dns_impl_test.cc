@@ -393,12 +393,13 @@ public:
   const sockaddr* sockAddr() const override { return instance_.sockAddr(); }
   socklen_t sockAddrLen() const override { return instance_.sockAddrLen(); }
   Address::Type type() const override { return instance_.type(); }
-  const std::string& socketInterface() const override { return socket_interface_; }
+  const SocketInterface& socketInterface() const override {
+    return SocketInterfaceSingleton::get();
+  }
 
 private:
   std::string antagonistic_name_;
   Address::Ipv4Instance instance_;
-  std::string socket_interface_{""};
 };
 
 TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
@@ -436,7 +437,7 @@ public:
     server_ = std::make_unique<TestDnsServer>(*dispatcher_);
     socket_ = std::make_shared<Network::TcpListenSocket>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ = dispatcher_->createListener(socket_, *server_, true);
+    listener_ = dispatcher_->createListener(socket_, *server_, true, ENVOY_TCP_BACKLOG_SIZE);
 
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_ = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver_.get()));

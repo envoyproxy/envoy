@@ -70,7 +70,9 @@ def envoy_cc_extension(
         undocumented = False,
         status = "stable",
         tags = [],
-        visibility = ["//:extension_config"],
+        # TODO(rgs1): revert this to //:extension_config once
+        # https://github.com/envoyproxy/envoy/issues/12444 is fixed.
+        visibility = ["//visibility:public"],
         **kwargs):
     if security_posture not in EXTENSION_SECURITY_POSTURES:
         fail("Unknown extension security posture: " + security_posture)

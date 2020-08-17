@@ -272,6 +272,10 @@ public:
   }
   absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
   absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
+  const std::vector<ResetHeaderParserSharedPtr>& resetHeaders() const override {
+    return reset_headers_;
+  }
+  std::chrono::milliseconds resetMaxInterval() const override { return reset_max_interval_; }
 
 private:
   std::chrono::milliseconds per_try_timeout_{0};
@@ -294,6 +298,8 @@ private:
   std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
   absl::optional<std::chrono::milliseconds> base_interval_;
   absl::optional<std::chrono::milliseconds> max_interval_;
+  std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
+  std::chrono::milliseconds reset_max_interval_{300000};
   ProtobufMessage::ValidationVisitor* validation_visitor_{};
 };
 
@@ -745,6 +751,8 @@ private:
                                  // to virtual host is currently safe.
   const bool auto_host_rewrite_;
   const absl::optional<Http::LowerCaseString> auto_host_rewrite_header_;
+  const Regex::CompiledMatcherPtr host_rewrite_path_regex_;
+  const std::string host_rewrite_path_regex_substitution_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
   const Http::Code cluster_not_found_response_code_;
