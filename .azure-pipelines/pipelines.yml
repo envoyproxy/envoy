@@ -154,7 +154,7 @@ jobs:
           DOCKERHUB_PASSWORD: $(DockerPassword)
       - task: PublishBuildArtifacts@1
         inputs:
-          pathtoPublish: "$(Build.StagingDirectory)/docker_images"
+          pathtoPublish: "$(Build.StagingDirectory)/build_images"
           artifactName: docker
         condition: always()
 
