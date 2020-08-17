@@ -103,6 +103,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "linked_object_test",
+    srcs = ["linked_object_test.cc"],
+    deps = [
+        "//source/common/common:linked_object",
+    ],
+)
+
+envoy_cc_test(
     name = "log_macros_test",
     srcs = ["log_macros_test.cc"],
     deps = [
@@ -112,6 +120,31 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:logging_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "fancy_log_macros_test",
+    srcs = ["log_macros_test.cc"],
+    args = ["--enable-fine-grain-logging"],
+    deps = [
+        "//source/common/common:minimal_logger_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:logging_lib",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "logger_speed_test",
+    srcs = ["logger_speed_test.cc"],
+    external_deps = ["benchmark"],
+    deps = ["//source/common/common:minimal_logger_lib"],
+)
+
+envoy_benchmark_test(
+    name = "logger_speed_test_benchmark_test",
+    benchmark_binary = "logger_speed_test",
 )
 
 envoy_cc_test(
@@ -157,8 +190,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "random_generator_test",
     srcs = ["random_generator_test.cc"],
-    # Fails on windows with cr/lf yaml file checkouts
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/common:random_generator_lib",
         "//test/mocks/runtime:runtime_mocks",
@@ -295,7 +326,7 @@ envoy_cc_test(
         "abseil_strings",
     ],
     deps = [
-        "//source/common/common:version_lib",
+        "//source/common/version:version_lib",
     ],
 )
 

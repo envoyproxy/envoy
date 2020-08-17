@@ -43,8 +43,7 @@ template <typename T> class NetworkListenSocket : public ListenSocketImpl {
 public:
   NetworkListenSocket(const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
-      : ListenSocketImpl(Network::SocketInterfaceSingleton::get().socket(T::type, address),
-                         address) {
+      : ListenSocketImpl(Network::ioHandleForAddr(T::type, address), address) {
     RELEASE_ASSERT(SOCKET_VALID(io_handle_->fd()), "");
 
     setPrebindSocketOptions();
@@ -165,9 +164,8 @@ class ClientSocketImpl : public ConnectionSocketImpl {
 public:
   ClientSocketImpl(const Address::InstanceConstSharedPtr& remote_address,
                    const OptionsSharedPtr& options)
-      : ConnectionSocketImpl(
-            Network::SocketInterfaceSingleton::get().socket(Socket::Type::Stream, remote_address),
-            nullptr, remote_address) {
+      : ConnectionSocketImpl(Network::ioHandleForAddr(Socket::Type::Stream, remote_address),
+                             nullptr, remote_address) {
     if (options) {
       addOptions(options);
     }

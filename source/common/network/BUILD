@@ -163,7 +163,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "lc_trie_lib",
     hdrs = ["lc_trie.h"],
-    external_deps = ["abseil_int128"],
+    external_deps = [
+        "abseil_node_hash_set",
+        "abseil_int128",
+    ],
     deps = [
         ":address_lib",
         ":cidr_range_lib",
@@ -232,6 +235,7 @@ envoy_cc_library(
     deps = [
         ":address_lib",
         ":listen_socket_lib",
+        ":udp_default_writer_config",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
         "//include/envoy/network:exception_interface",
@@ -244,7 +248,6 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/event:dispatcher_includes",
-        "//source/common/event:libevent_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -355,8 +358,10 @@ envoy_cc_library(
     hdrs = ["transport_socket_options_impl.h"],
     deps = [
         ":application_protocol_lib",
+        ":proxy_protocol_filter_state_lib",
         ":upstream_server_name_lib",
         ":upstream_subject_alt_names_lib",
+        "//include/envoy/network:proxy_protocol_options_lib",
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/stream_info:filter_state_interface",
         "//source/common/common:scalar_to_byte_vector_lib",
@@ -397,5 +402,42 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "udp_packet_writer_handler_lib",
+    srcs = ["udp_packet_writer_handler_impl.cc"],
+    hdrs = ["udp_packet_writer_handler_impl.h"],
+    deps = [
+        ":io_socket_error_lib",
+        ":utility_lib",
+        "//include/envoy/network:socket_interface",
+        "//include/envoy/network:udp_packet_writer_config_interface",
+        "//include/envoy/network:udp_packet_writer_handler_interface",
+        "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "udp_default_writer_config",
+    srcs = ["udp_default_writer_config.cc"],
+    hdrs = ["udp_default_writer_config.h"],
+    deps = [
+        ":udp_packet_writer_handler_lib",
+        "//include/envoy/network:udp_packet_writer_config_interface",
+        "//include/envoy/registry",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "proxy_protocol_filter_state_lib",
+    srcs = ["proxy_protocol_filter_state.cc"],
+    hdrs = ["proxy_protocol_filter_state.h"],
+    deps = [
+        "//include/envoy/network:proxy_protocol_options_lib",
+        "//include/envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
     ],
 )

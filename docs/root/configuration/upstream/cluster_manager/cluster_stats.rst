@@ -74,6 +74,8 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_rx_reset, Counter, Total requests that were reset remotely
   upstream_rq_tx_reset, Counter, Total requests that were reset locally
   upstream_rq_retry, Counter, Total request retries
+  upstream_rq_retry_backoff_exponential, Counter, Total retries using the exponential backoff strategy
+  upstream_rq_retry_backoff_ratelimited, Counter, Total retries using the ratelimited backoff strategy
   upstream_rq_retry_limit_exceeded, Counter, Total requests not retried due to exceeding :ref:`the configured number of maximum retries <config_http_filters_router_x-envoy-max-retries>`
   upstream_rq_retry_success, Counter, Total request retry successes
   upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking or exceeding the :ref:`retry budget <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`
@@ -314,3 +316,20 @@ Statistics for monitoring effective host weights when using the
 
   min_entries_per_host, Gauge, Minimum number of entries for a single host
   max_entries_per_host, Gauge, Maximum number of entries for a single host
+
+.. _config_cluster_manager_cluster_stats_request_response_sizes:
+
+Request Response Size statistics
+--------------------------------
+
+If :ref:`request response size statistics <envoy_v3_api_field_config.cluster.v3.Cluster.track_cluster_stats>` are tracked,
+statistics will be added to *cluster.<name>* and contain the following:
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   upstream_rq_headers_size, Histogram, Request headers size in bytes per upstream
+   upstream_rq_body_size, Histogram, Request body size in bytes per upstream
+   upstream_rs_headers_size, Histogram, Response headers size in bytes per upstream
+   upstream_rs_body_size, Histogram, Response body size in bytes per upstream

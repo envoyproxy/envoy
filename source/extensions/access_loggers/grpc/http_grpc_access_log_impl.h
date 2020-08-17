@@ -1,6 +1,6 @@
 #pragma once
 
-#include <unordered_map>
+#include <memory>
 #include <vector>
 
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
@@ -58,6 +58,8 @@ private:
   std::vector<Http::LowerCaseString> response_trailers_to_log_;
   std::vector<std::string> filter_states_to_log_;
 };
+
+using HttpGrpcAccessLogPtr = std::unique_ptr<HttpGrpcAccessLog>;
 
 } // namespace HttpGrpc
 } // namespace AccessLoggers

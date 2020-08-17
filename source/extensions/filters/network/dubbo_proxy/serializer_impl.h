@@ -11,7 +11,7 @@ namespace DubboProxy {
 class RpcInvocationImpl : public RpcInvocationBase {
 public:
   // TODO(gengleilei) Add parameter data types and implement Dubbo data type mapping.
-  using ParameterValueMap = std::unordered_map<uint32_t, std::string>;
+  using ParameterValueMap = absl::node_hash_map<uint32_t, std::string>;
   using ParameterValueMapPtr = std::unique_ptr<ParameterValueMap>;
 
   RpcInvocationImpl() = default;

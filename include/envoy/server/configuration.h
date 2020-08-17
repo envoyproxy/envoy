@@ -64,6 +64,22 @@ public:
    *         multiple nonresponsive threads.
    */
   virtual std::chrono::milliseconds wdMultiKillTimeout() const PURE;
+
+  /**
+   * @return double the percentage of threads that need to meet the MultiKillTimeout before we
+   *         kill the process. This is used in the calculation below
+   *         Max(2, ceil(registered_threads * Fraction(MultiKillThreshold)))
+   *         which computes the number of threads that need to be be nonresponsive
+   *         for at least MultiKillTimeout before we kill the process.
+   */
+  virtual double wdMultiKillThreshold() const PURE;
+
+  /**
+   * @return Protobuf::RepeatedPtrField<envoy::config::bootstrap::v3::Watchdog::WatchdogAction>
+   *         the WatchDog Actions that trigger on WatchDog Events.
+   */
+  virtual Protobuf::RepeatedPtrField<envoy::config::bootstrap::v3::Watchdog::WatchdogAction>
+  wdActions() const PURE;
 };
 
 /**

@@ -36,6 +36,7 @@
 #include "common/router/debug_config.h"
 #include "common/router/retry_state_impl.h"
 #include "common/router/upstream_request.h"
+#include "common/runtime/runtime_features.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -568,9 +569,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
 
-  retry_state_ = createRetryState(route_entry_->retryPolicy(), headers, *cluster_,
-                                  request_vcluster_, config_.runtime_, config_.random_,
-                                  callbacks_->dispatcher(), route_entry_->priority());
+  retry_state_ = createRetryState(
+      route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, config_.runtime_,
+      config_.random_, callbacks_->dispatcher(), config_.timeSource(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
   // runtime keys.
@@ -588,7 +589,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   UpstreamRequestPtr upstream_request =
       std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
-  upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
+  LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
     onRequestComplete();
@@ -902,13 +903,15 @@ void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
   upstream_request.removeFromList(upstream_requests_);
   cleanup();
 
-  if (downstream_response_started_) {
+  if (downstream_response_started_ &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_500_after_100")) {
     callbacks_->streamInfo().setResponseCodeDetails(
         StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
     callbacks_->resetStream();
   } else {
     callbacks_->streamInfo().setResponseFlag(
         StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached);
+    // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
     callbacks_->sendLocalReply(
         Http::Code::RequestTimeout, "upstream max stream duration reached", modify_headers_,
         absl::nullopt, StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
@@ -945,12 +948,13 @@ void Filter::chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest&
 
 void Filter::onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flags,
                                     absl::string_view details) {
-  if (cluster_->timeoutBudgetStats().has_value()) {
+  Upstream::ClusterTimeoutBudgetStatsOptRef tb_stats = cluster()->timeoutBudgetStats();
+  if (tb_stats.has_value()) {
     Event::Dispatcher& dispatcher = callbacks_->dispatcher();
     std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
         dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
 
-    cluster_->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.recordValue(
+    tb_stats->get().upstream_rq_timeout_budget_percent_used_.recordValue(
         FilterUtility::percentageOfTimeout(response_time, timeout_.global_timeout_));
   }
 
@@ -963,7 +967,8 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
                              absl::string_view body, bool dropped, absl::string_view details) {
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
-  if (downstream_response_started_) {
+  if (downstream_response_started_ &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_500_after_100")) {
     // This will destroy any created retry timers.
     callbacks_->streamInfo().setResponseCodeDetails(details);
     cleanup();
@@ -974,6 +979,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 
     callbacks_->streamInfo().setResponseFlag(response_flags);
 
+    // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
     callbacks_->sendLocalReply(
         code, body,
         [dropped, this](Http::ResponseHeaderMap& headers) {
@@ -1019,8 +1025,9 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
 void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                              absl::string_view transport_failure_reason,
                              UpstreamRequest& upstream_request) {
-  ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_,
-                   Http::Utility::resetReasonToString(reset_reason));
+  ENVOY_STREAM_LOG(debug, "upstream reset: reset reason: {}, transport failure reason: {}",
+                   *callbacks_, Http::Utility::resetReasonToString(reset_reason),
+                   transport_failure_reason);
 
   // TODO: The reset may also come from upstream over the wire. In this case it should be
   // treated as external origin error and distinguished from local origin error.
@@ -1044,10 +1051,16 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   }
 
   const StreamInfo::ResponseFlag response_flags = streamResetReasonToResponseFlag(reset_reason);
+
   const std::string body =
       absl::StrCat("upstream connect error or disconnect/reset before headers. reset reason: ",
-                   Http::Utility::resetReasonToString(reset_reason));
-
+                   Http::Utility::resetReasonToString(reset_reason),
+                   Runtime::runtimeFeatureEnabled(
+                       "envoy.reloadable_features.http_transport_failure_reason_in_body") &&
+                           !transport_failure_reason.empty()
+                       ? ", transport failure reason: "
+                       : "",
+                   transport_failure_reason);
   callbacks_->streamInfo().setUpstreamTransportFailureReason(transport_failure_reason);
   const std::string& basic_details =
       downstream_response_started_ ? StreamInfo::ResponseCodeDetails::get().LateUpstreamReset
@@ -1119,7 +1132,17 @@ void Filter::onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
   // the complexity until someone asks for it.
   retry_state_.reset();
 
-  callbacks_->encode100ContinueHeaders(std::move(headers));
+  // We coalesce 100-continue headers here, to prevent encoder filters and HCM from having to worry
+  // about this. This is done in the router filter, rather than UpstreamRequest, since we want to
+  // potentially coalesce across retries and multiple upstream requests in the future, even though
+  // we currently don't support retry after 100.
+  // It's plausible that this functionality might need to move to HCM in the future for internal
+  // redirects, but we would need to maintain the "only call encode100ContinueHeaders() once"
+  // invariant.
+  if (!downstream_100_continue_headers_encoded_) {
+    downstream_100_continue_headers_encoded_ = true;
+    callbacks_->encode100ContinueHeaders(std::move(headers));
+  }
 }
 
 void Filter::resetAll() {
@@ -1146,7 +1169,7 @@ void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
 
   ASSERT(final_upstream_request);
   // Now put the final request back on this list.
-  final_upstream_request->moveIntoList(std::move(final_upstream_request), upstream_requests_);
+  LinkedList::moveIntoList(std::move(final_upstream_request), upstream_requests_);
 }
 
 void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
@@ -1335,8 +1358,9 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
   std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
       dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
 
-  if (cluster_->timeoutBudgetStats().has_value()) {
-    cluster_->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.recordValue(
+  Upstream::ClusterTimeoutBudgetStatsOptRef tb_stats = cluster()->timeoutBudgetStats();
+  if (tb_stats.has_value()) {
+    tb_stats->get().upstream_rq_timeout_budget_percent_used_.recordValue(
         FilterUtility::percentageOfTimeout(response_time, timeout_.global_timeout_));
   }
 
@@ -1527,7 +1551,7 @@ void Filter::doRetry() {
   }
 
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
-  upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
+  LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(!callbacks_->decodingBuffer() &&
                                             !downstream_trailers_ && downstream_end_stream_);
   // It's possible we got immediately reset which means the upstream request we just
@@ -1551,13 +1575,15 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
                        [](const auto& req) -> bool { return req->awaitingHeaders(); });
 }
 
-RetryStatePtr
-ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
-                             const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                             Runtime::Loader& runtime, Random::RandomGenerator& random,
-                             Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) {
+RetryStatePtr ProdFilter::createRetryState(const RetryPolicy& policy,
+                                           Http::RequestHeaderMap& request_headers,
+                                           const Upstream::ClusterInfo& cluster,
+                                           const VirtualCluster* vcluster, Runtime::Loader& runtime,
+                                           Random::RandomGenerator& random,
+                                           Event::Dispatcher& dispatcher, TimeSource& time_source,
+                                           Upstream::ResourcePriority priority) {
   return RetryStateImpl::create(policy, request_headers, cluster, vcluster, runtime, random,
-                                dispatcher, priority);
+                                dispatcher, time_source, priority);
 }
 
 } // namespace Router

@@ -1,6 +1,9 @@
 #include <sstream>
 #include <vector>
 
+#include "common/common/fmt.h"
+
+#include "extensions/filters/network/common/redis/fault_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
 #include "test/integration/integration.h"
@@ -16,9 +19,9 @@ namespace {
 // in the cluster. The load balancing policy must be set
 // to random for proper test operation.
 
-const std::string CONFIG = R"EOF(
+const std::string CONFIG = fmt::format(R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
@@ -52,14 +55,15 @@ static_resources:
       filters:
         name: redis
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
           stat_prefix: redis_stats
           prefix_routes:
             catch_all_route:
               cluster: cluster_0
           settings:
             op_timeout: 5s
-)EOF";
+)EOF",
+                                       TestEnvironment::nullDevicePath());
 
 // This is a configuration with command stats enabled.
 const std::string CONFIG_WITH_COMMAND_STATS = CONFIG + R"EOF(
@@ -77,9 +81,9 @@ const std::string CONFIG_WITH_BATCHING = CONFIG + R"EOF(
             buffer_flush_timeout: 0.003s 
 )EOF";
 
-const std::string CONFIG_WITH_ROUTES_BASE = R"EOF(
+const std::string CONFIG_WITH_ROUTES_BASE = fmt::format(R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
@@ -114,12 +118,12 @@ static_resources:
                 address:
                   socket_address:
                     address: 127.0.0.1
-                    port_value: 1
+                    port_value: 0
             - endpoint:
                 address:
                   socket_address:
                     address: 127.0.0.1
-                    port_value: 1
+                    port_value: 0
     - name: cluster_2
       type: STATIC
       lb_policy: RANDOM
@@ -131,12 +135,12 @@ static_resources:
                 address:
                   socket_address:
                     address: 127.0.0.1
-                    port_value: 2
+                    port_value: 0
             - endpoint:
                 address:
                   socket_address:
                     address: 127.0.0.1
-                    port_value: 2
+                    port_value: 0
   listeners:
     name: listener_0
     address:
@@ -151,7 +155,8 @@ static_resources:
           stat_prefix: redis_stats
           settings:
             op_timeout: 5s
-)EOF";
+)EOF",
+                                                        TestEnvironment::nullDevicePath());
 
 const std::string CONFIG_WITH_ROUTES = CONFIG_WITH_ROUTES_BASE + R"EOF(
           prefix_routes:
@@ -192,9 +197,10 @@ const std::string CONFIG_WITH_DOWNSTREAM_AUTH_PASSWORD_SET = CONFIG + R"EOF(
           downstream_auth_password: { inline_string: somepassword }
 )EOF";
 
-const std::string CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS = R"EOF(
+const std::string CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS =
+    fmt::format(R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
@@ -206,7 +212,7 @@ static_resources:
       typed_extension_protocol_options:
         envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
-          auth_password: { inline_string: cluster_0_password }
+          auth_password: {{ inline_string: cluster_0_password }}
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_0
@@ -223,7 +229,7 @@ static_resources:
       typed_extension_protocol_options:
         envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
-          auth_password: { inline_string: cluster_1_password }
+          auth_password: {{ inline_string: cluster_1_password }}
       load_assignment:
         cluster_name: cluster_1
         endpoints:
@@ -232,13 +238,13 @@ static_resources:
                 address:
                   socket_address:
                     address: 127.0.0.1
-                    port_value: 1
+                    port_value: 0
     - name: cluster_2
       type: STATIC
       typed_extension_protocol_options:
         envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
-          auth_password: { inline_string: cluster_2_password }
+          auth_password: {{ inline_string: cluster_2_password }}
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_2
@@ -248,7 +254,7 @@ static_resources:
                 address:
                   socket_address:
                     address: 127.0.0.1
-                    port_value: 2
+                    port_value: 0
   listeners:
     name: listener_0
     address:
@@ -271,6 +277,28 @@ static_resources:
               cluster: cluster_1
             - prefix: "baz:"
               cluster: cluster_2
+)EOF",
+                TestEnvironment::nullDevicePath());
+
+// This is a configuration with fault injection enabled.
+const std::string CONFIG_WITH_FAULT_INJECTION = CONFIG + R"EOF(
+          faults:
+          - fault_type: ERROR
+            fault_enabled:
+              default_value:
+                numerator: 100
+                denominator: HUNDRED
+            commands:
+            - GET
+          - fault_type: DELAY
+            fault_enabled:
+              default_value:
+                numerator: 20
+                denominator: HUNDRED
+              runtime_key: "bogus_key"
+            delay: 2s
+            commands:
+            - SET
 )EOF";
 
 // This function encodes commands as an array of bulkstrings as transmitted by Redis clients to
@@ -436,6 +464,12 @@ public:
       : RedisProxyIntegrationTest(CONFIG_WITH_COMMAND_STATS, 2) {}
 };
 
+class RedisProxyWithFaultInjectionIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyWithFaultInjectionIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_WITH_FAULT_INJECTION, 2) {}
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -465,6 +499,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithMirrorsIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithCommandStatsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithFaultInjectionIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -1060,6 +1098,26 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, EnabledViaRuntimeFraction) {
   EXPECT_TRUE(fake_upstream_connection[0]->close());
   EXPECT_TRUE(fake_upstream_connection[1]->close());
   redis_client->close();
+}
+
+TEST_P(RedisProxyWithFaultInjectionIntegrationTest, ErrorFault) {
+  std::string fault_response =
+      fmt::format("-{}\r\n", Extensions::NetworkFilters::Common::Redis::FaultMessages::get().Error);
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"get", "foo"}), fault_response);
+
+  EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.get.error")->value());
+  EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.get.error_fault")->value());
+}
+
+TEST_P(RedisProxyWithFaultInjectionIntegrationTest, DelayFault) {
+  const std::string& set_request = makeBulkStringArray({"set", "write_only:toto", "bar"});
+  const std::string& set_response = ":1\r\n";
+  initialize();
+  simpleRequestAndResponse(set_request, set_response);
+
+  EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.set.success")->value());
+  EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.set.delay_fault")->value());
 }
 
 } // namespace

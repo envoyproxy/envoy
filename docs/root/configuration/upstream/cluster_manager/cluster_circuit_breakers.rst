@@ -11,7 +11,7 @@ The following is an example circuit breaker configuration:
 .. code-block:: yaml
 
   circuit_breakers:
-  thresholds:
+    thresholds:
     - priority: "DEFAULT"
       max_requests: 75
       max_pending_requests: 35

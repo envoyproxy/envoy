@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Network {
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
-                                        Address::IpVersion version) {
+                                        Address::IpVersion version, bool socket_v6only) const {
 #if defined(__APPLE__) || defined(WIN32)
   int flags = 0;
 #else
@@ -42,7 +42,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
   const Api::SysCallSocketResult result = Api::OsSysCallsSingleton::get().socket(domain, flags, 0);
   RELEASE_ASSERT(SOCKET_VALID(result.rc_),
                  fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(result.rc_);
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(result.rc_, socket_v6only);
 
 #if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
@@ -54,12 +54,17 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 }
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
-                                        const Address::InstanceConstSharedPtr addr) {
+                                        const Address::InstanceConstSharedPtr addr) const {
   Address::IpVersion ip_version = addr->ip() ? addr->ip()->version() : Address::IpVersion::v4;
-  IoHandlePtr io_handle = SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version);
-  if (addr->type() == Address::Type::Ip && addr->ip()->version() == Address::IpVersion::v6) {
+  int v6only = 0;
+  if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6) {
+    v6only = addr->ip()->ipv6()->v6only();
+  }
+
+  IoHandlePtr io_handle =
+      SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version, v6only);
+  if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6) {
     // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
-    const int v6only = addr->ip()->ipv6()->v6only();
     const Api::SysCallIntResult result = Api::OsSysCallsSingleton::get().setsockopt(
         io_handle->fd(), IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<const char*>(&v6only),
         sizeof(v6only));

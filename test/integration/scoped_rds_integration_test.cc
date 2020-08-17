@@ -77,17 +77,34 @@ fragments:
           scoped_routes->set_name(srds_config_name_);
           *scoped_routes->mutable_scope_key_builder() = scope_key_builder;
 
+          // Set resource api version for rds.
+          envoy::config::core::v3::ConfigSource* rds_config_source =
+              scoped_routes->mutable_rds_config_source();
+          rds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+
+          // Set transport api version for rds.
           envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
-              scoped_routes->mutable_rds_config_source()->mutable_api_config_source();
+              rds_config_source->mutable_api_config_source();
+          rds_api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+
+          // Add grpc service for rds.
           rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
           envoy::config::core::v3::GrpcService* grpc_service =
               rds_api_config_source->add_grpc_services();
           setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
 
+          // Set resource api version for scoped rds.
+          envoy::config::core::v3::ConfigSource* srds_config_source =
+              scoped_routes->mutable_scoped_rds()->mutable_scoped_rds_config_source();
+          srds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+
+          // Set Transport api version for scoped_rds.
           envoy::config::core::v3::ApiConfigSource* srds_api_config_source =
-              scoped_routes->mutable_scoped_rds()
-                  ->mutable_scoped_rds_config_source()
-                  ->mutable_api_config_source();
+              srds_config_source->mutable_api_config_source();
+          srds_api_config_source->set_transport_api_version(
+              envoy::config::core::v3::ApiVersion::V3);
+
+          // Add grpc service for scoped rds.
           if (isDelta()) {
             srds_api_config_source->set_api_type(
                 envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
@@ -161,12 +178,14 @@ fragments:
   }
 
   void sendRdsResponse(const std::string& route_config, const std::string& version) {
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) response;
+    envoy::service::discovery::v3::DiscoveryResponse response;
+    std::string route_conguration_type_url =
+        "type.googleapis.com/envoy.config.route.v3.RouteConfiguration";
     response.set_version_info(version);
-    response.set_type_url(Config::TypeUrl::get().RouteConfiguration);
+    response.set_type_url(route_conguration_type_url);
     auto route_configuration =
         TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(route_config);
-    response.add_resources()->PackFrom(API_DOWNGRADE(route_configuration));
+    response.add_resources()->PackFrom(route_configuration);
     ASSERT(rds_upstream_info_.stream_by_resource_name_[route_configuration.name()] != nullptr);
     rds_upstream_info_.stream_by_resource_name_[route_configuration.name()]->sendGrpcMessage(
         response);
@@ -187,10 +206,11 @@ fragments:
                                   const std::vector<std::string>& to_delete_list,
                                   const std::string& version) {
     ASSERT(scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_] != nullptr);
-
-    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) response;
+    std::string scoped_route_configuration_type_url =
+        "type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration";
+    envoy::service::discovery::v3::DeltaDiscoveryResponse response;
     response.set_system_version_info(version);
-    response.set_type_url(Config::TypeUrl::get().ScopedRouteConfiguration);
+    response.set_type_url(scoped_route_configuration_type_url);
 
     for (const auto& scope_name : to_delete_list) {
       *response.add_removed_resources() = scope_name;
@@ -201,7 +221,7 @@ fragments:
       auto resource = response.add_resources();
       resource->set_name(scoped_route_proto.name());
       resource->set_version(version);
-      resource->mutable_resource()->PackFrom(API_DOWNGRADE(scoped_route_proto));
+      resource->mutable_resource()->PackFrom(scoped_route_proto);
     }
     scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
         response);
@@ -211,14 +231,16 @@ fragments:
                                  const std::string& version) {
     ASSERT(scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_] != nullptr);
 
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) response;
+    std::string scoped_route_configuration_type_url =
+        "type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration";
+    envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
-    response.set_type_url(Config::TypeUrl::get().ScopedRouteConfiguration);
+    response.set_type_url(scoped_route_configuration_type_url);
 
     for (const auto& resource_proto : resource_protos) {
       envoy::config::route::v3::ScopedRouteConfiguration scoped_route_proto;
       TestUtility::loadFromYaml(resource_proto, scoped_route_proto);
-      response.add_resources()->PackFrom(API_DOWNGRADE(scoped_route_proto));
+      response.add_resources()->PackFrom(scoped_route_proto);
     }
     scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
         response);

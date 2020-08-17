@@ -26,6 +26,8 @@ CAS
 CB
 CDS
 CEL
+LTT
+ceil
 CHACHA
 CHLO
 CHMOD
@@ -89,6 +91,7 @@ ENV
 EOF
 EOS
 EOY
+EPOLLOUT
 EPOLLRDHUP
 EQ
 ERANGE
@@ -145,6 +148,7 @@ IDL
 IETF
 INADDR
 INET
+INVAL
 IO
 IOS
 IP
@@ -283,6 +287,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SMTP
 SNI
 SOTW
 SPD
@@ -416,6 +421,7 @@ bazel
 behaviour
 benchmarked
 bidi
+bignum
 bitfield
 bitset
 bitwise
@@ -426,9 +432,11 @@ bool
 boolean
 booleans
 bools
+boringssl
 borks
 broadcasted
 buf
+buflen
 bugprone
 builtin
 builtins
@@ -436,6 +444,8 @@ bulkstrings
 bursty
 bytecode
 bytestream
+bytestring
+cacheable
 cacheability
 callee
 callsite
@@ -630,6 +640,7 @@ gmock
 goog
 google
 goto
+gso
 gzip
 hackery
 hacky
@@ -857,6 +868,7 @@ postfix
 postfixes
 postgres
 postgresql
+pragma
 pre
 preallocate
 preallocating
@@ -868,6 +880,8 @@ precompute
 precomputed
 predeclared
 prefetch
+prefetched
+prefetches
 preflight
 preorder
 prepend
@@ -959,6 +973,8 @@ restarter
 resync
 retriable
 retriggers
+revalidated
+revalidation
 rmdir
 rocketmq
 rewriter
@@ -983,6 +999,7 @@ sched
 schedulable
 schemas
 scopekey
+secp
 sendmsg
 sendmmsg
 sendto
@@ -1111,6 +1128,7 @@ tuples
 typedef
 typeid
 typesafe
+uber
 ucontext
 udpa
 uint
@@ -1164,6 +1182,7 @@ vptr
 wakeup
 wakeups
 websocket
+wepoll
 whitespace
 whitespaces
 wildcard

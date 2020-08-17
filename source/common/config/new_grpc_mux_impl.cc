@@ -37,22 +37,11 @@ ScopedResume NewGrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
   return std::make_unique<Cleanup>([this, type_urls]() {
     for (const auto& type_url : type_urls) {
       pausable_ack_queue_.resume(type_url);
-      trySendDiscoveryRequests();
+      if (!pausable_ack_queue_.paused(type_url)) {
+        trySendDiscoveryRequests();
+      }
     }
   });
-}
-
-bool NewGrpcMuxImpl::paused(const std::string& type_url) const {
-  return pausable_ack_queue_.paused(type_url);
-}
-
-bool NewGrpcMuxImpl::paused(const std::vector<std::string> type_urls) const {
-  for (const auto& type_url : type_urls) {
-    if (paused(type_url)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 void NewGrpcMuxImpl::onDiscoveryResponse(
@@ -84,8 +73,8 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
 }
 
 void NewGrpcMuxImpl::onStreamEstablished() {
-  for (auto& sub : subscriptions_) {
-    sub.second->sub_state_.markStreamFresh();
+  for (auto& [type_url, subscription] : subscriptions_) {
+    subscription->sub_state_.markStreamFresh();
   }
   trySendDiscoveryRequests();
 }
@@ -99,8 +88,8 @@ void NewGrpcMuxImpl::onEstablishmentFailure() {
   absl::flat_hash_map<std::string, DeltaSubscriptionState*> all_subscribed;
   absl::flat_hash_map<std::string, DeltaSubscriptionState*> already_called;
   do {
-    for (auto& sub : subscriptions_) {
-      all_subscribed[sub.first] = &sub.second->sub_state_;
+    for (auto& [type_url, subscription] : subscriptions_) {
+      all_subscribed[type_url] = &subscription->sub_state_;
     }
     for (auto& sub : all_subscribed) {
       if (already_called.insert(sub).second) { // insert succeeded ==> not already called

@@ -81,7 +81,7 @@ TEST_P(AdminInstanceTest, RuntimeModify) {
   Runtime::MockLoader loader;
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
 
-  std::unordered_map<std::string, std::string> overrides;
+  absl::node_hash_map<std::string, std::string> overrides;
   overrides["foo"] = "bar";
   overrides["x"] = "42";
   overrides["nothing"] = "";
@@ -97,7 +97,7 @@ TEST_P(AdminInstanceTest, RuntimeModifyParamsInBody) {
 
   const std::string key = "routing.traffic_shift.foo";
   const std::string value = "numerator: 1\ndenominator: TEN_THOUSAND\n";
-  const std::unordered_map<std::string, std::string> overrides = {{key, value}};
+  const absl::node_hash_map<std::string, std::string> overrides = {{key, value}};
   EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
 
   const std::string body = fmt::format("{}={}", key, value);

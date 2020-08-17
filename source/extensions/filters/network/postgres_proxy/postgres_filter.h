@@ -40,6 +40,8 @@ namespace PostgresProxy {
   COUNTER(transactions)                                                                            \
   COUNTER(transactions_commit)                                                                     \
   COUNTER(transactions_rollback)                                                                   \
+  COUNTER(statements_parsed)                                                                       \
+  COUNTER(statements_parse_error)                                                                  \
   COUNTER(notices)                                                                                 \
   COUNTER(notices_notice)                                                                          \
   COUNTER(notices_warning)                                                                         \
@@ -60,9 +62,11 @@ struct PostgresProxyStats {
  */
 class PostgresFilterConfig {
 public:
-  PostgresFilterConfig(const std::string& stat_prefix, Stats::Scope& scope);
+  PostgresFilterConfig(const std::string& stat_prefix, bool enable_sql_parsing,
+                       Stats::Scope& scope);
 
   const std::string stat_prefix_;
+  bool enable_sql_parsing_{true};
   Stats::Scope& scope_;
   PostgresProxyStats stats_;
 
@@ -101,6 +105,7 @@ public:
   void incTransactions() override;
   void incTransactionsCommit() override;
   void incTransactionsRollback() override;
+  void processQuery(const std::string&) override;
 
   void doDecode(Buffer::Instance& data, bool);
   DecoderPtr createDecoder(DecoderCallbacks* callbacks);
@@ -111,6 +116,8 @@ public:
   uint32_t getFrontendBufLength() const { return frontend_buffer_.length(); }
   uint32_t getBackendBufLength() const { return backend_buffer_.length(); }
   const PostgresProxyStats& getStats() const { return config_->stats_; }
+  Network::Connection& connection() const { return read_callbacks_->connection(); }
+  const PostgresFilterConfigSharedPtr& getConfig() const { return config_; }
 
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};

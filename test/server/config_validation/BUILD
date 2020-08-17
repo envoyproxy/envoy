@@ -113,13 +113,42 @@ envoy_proto_library(
 )
 
 envoy_cc_test_library(
+    name = "xds_verifier_lib",
+    srcs = ["xds_verifier.cc"],
+    hdrs = ["xds_verifier.h"],
+    deps = [
+        ":xds_fuzz_proto_cc_proto",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "xds_verifier_test",
+    srcs = ["xds_verifier_test.cc"],
+    deps = [
+        ":xds_verifier_lib",
+        "//test/config:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "xds_fuzz_lib",
     srcs = ["xds_fuzz.cc"],
     hdrs = ["xds_fuzz.h"],
     deps = [
         ":xds_fuzz_proto_cc_proto",
+        ":xds_verifier_lib",
+        "//test/fuzz:utility_lib",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",

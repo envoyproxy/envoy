@@ -41,7 +41,7 @@ public:
         subscription_factory_(local_info_, dispatcher_, cm_, random_, validation_visitor_, *api_,
                               runtime_) {}
 
-  std::unique_ptr<Subscription>
+  SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
     return subscription_factory_.subscriptionFromConfigSource(
         config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_,
@@ -70,7 +70,7 @@ TEST_F(SubscriptionFactoryTest, NoConfigSpecifier) {
   envoy::config::core::v3::ConfigSource config;
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config), EnvoyException,
-      "Missing config source specifier in envoy::api::v2::core::ConfigSource");
+      "Missing config source specifier in envoy::config::core::v3::ConfigSource");
 }
 
 TEST_F(SubscriptionFactoryTest, RestClusterEmpty) {

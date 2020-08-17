@@ -15,7 +15,6 @@ envoy_package()
 
 envoy_cc_test(
     name = "config_impl_test",
-    tags = ["fails_on_windows"],
     deps = [":config_impl_test_lib"],
 )
 
@@ -31,7 +30,7 @@ envoy_cc_test_library(
         "//source/common/stream_info:filter_state_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/fuzz:utility_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
@@ -63,6 +62,18 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_test(
+    name = "reset_header_parser_test",
+    srcs = ["reset_header_parser_test.cc"],
+    deps = [
+        "//source/common/http:header_utility_lib",
+        "//source/common/router:reset_header_parser_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "rds_impl_test",
     srcs = ["rds_impl_test.cc"],
     deps = [
@@ -72,7 +83,7 @@ envoy_cc_test(
         "//source/server/admin:admin_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
@@ -118,7 +129,7 @@ envoy_cc_test(
         "//test/mocks/init:init_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/router:router_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
@@ -141,7 +152,7 @@ envoy_cc_test(
         "//source/server/admin:admin_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
@@ -156,6 +167,7 @@ envoy_cc_test(
     srcs = ["retry_state_impl_test.cc"],
     deps = [
         "//source/common/http:header_map_lib",
+        "//source/common/router:reset_header_parser_lib",
         "//source/common/router:retry_state_lib",
         "//source/common/upstream:resource_manager_lib",
         "//test/mocks/router:router_mocks",
@@ -229,7 +241,7 @@ envoy_cc_fuzz_test(
         ":route_fuzz_proto_cc_proto",
         "//source/common/router:config_lib",
         "//test/fuzz:utility_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:instance_mocks",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -245,7 +257,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/ratelimit:ratelimit_mocks",
         "//test/mocks/router:router_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
@@ -290,7 +302,6 @@ envoy_cc_test(
     name = "router_upstream_log_test",
     srcs = ["router_upstream_log_test.cc"],
     external_deps = ["abseil_optional"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/network:utility_lib",
@@ -307,7 +318,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
@@ -355,5 +366,14 @@ envoy_cc_test(
     srcs = ["string_accessor_impl_test.cc"],
     deps = [
         "//source/common/router:string_accessor_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "upstream_request_test",
+    srcs = ["upstream_request_test.cc"],
+    deps = [
+        "//source/common/router:router_lib",
+        "//test/mocks/router:router_filter_interface",
     ],
 )

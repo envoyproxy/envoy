@@ -397,6 +397,37 @@ ConfigHelper::buildCluster(const std::string& name, const std::string& lb_policy
   return cluster;
 }
 
+envoy::config::cluster::v3::Cluster
+ConfigHelper::buildTlsCluster(const std::string& name, const std::string& lb_policy,
+                              envoy::config::core::v3::ApiVersion api_version) {
+  API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
+  TestUtility::loadFromYaml(
+      fmt::format(R"EOF(
+      name: {}
+      connect_timeout: 5s
+      type: EDS
+      eds_cluster_config:
+        eds_config:
+          resource_api_version: {}
+          ads: {{}}
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+          common_tls_context:
+            validation_context:
+              trusted_ca:
+                filename: {}
+      lb_policy: {}
+      http2_protocol_options: {{}}
+    )EOF",
+                  name, apiVersionStr(api_version),
+                  TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"),
+                  lb_policy),
+      cluster, shouldBoost(api_version));
+  return cluster;
+}
+
 envoy::config::endpoint::v3::ClusterLoadAssignment
 ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::string& address,
                                          uint32_t port,
@@ -586,6 +617,10 @@ void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string&
   (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
 }
 
+void ConfigHelper::setNewCodecs() {
+  addRuntimeOverride("envoy.reloadable_features.new_codec_behavior", "true");
+}
+
 void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   RELEASE_ASSERT(!finalized_, "");
 
@@ -636,11 +671,16 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
         for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
           auto lb_endpoint = locality_lb->mutable_lb_endpoints(k);
           if (lb_endpoint->endpoint().address().has_socket_address()) {
-            RELEASE_ASSERT(ports.size() > port_idx, "");
-            lb_endpoint->mutable_endpoint()
-                ->mutable_address()
-                ->mutable_socket_address()
-                ->set_port_value(ports[port_idx++]);
+            if (lb_endpoint->endpoint().address().socket_address().port_value() == 0) {
+              RELEASE_ASSERT(ports.size() > port_idx, "");
+              lb_endpoint->mutable_endpoint()
+                  ->mutable_address()
+                  ->mutable_socket_address()
+                  ->set_port_value(ports[port_idx++]);
+            } else {
+              ENVOY_LOG_MISC(debug, "Not overriding preset port",
+                             lb_endpoint->endpoint().address().socket_address().port_value());
+            }
           }
         }
       }

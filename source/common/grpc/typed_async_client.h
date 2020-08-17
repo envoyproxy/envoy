@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <memory>
 
 #include "envoy/grpc/async_client.h"
 
@@ -62,17 +63,19 @@ private:
   RawAsyncStream* stream_{};
 };
 
+template <typename Response> using ResponsePtr = std::unique_ptr<Response>;
+
 /**
  * Convenience subclasses for AsyncRequestCallbacks.
  */
 template <typename Response> class AsyncRequestCallbacks : public RawAsyncRequestCallbacks {
 public:
   ~AsyncRequestCallbacks() override = default;
-  virtual void onSuccess(std::unique_ptr<Response>&& response, Tracing::Span& span) PURE;
+  virtual void onSuccess(ResponsePtr<Response>&& response, Tracing::Span& span) PURE;
 
 private:
   void onSuccessRaw(Buffer::InstancePtr&& response, Tracing::Span& span) override {
-    auto message = std::unique_ptr<Response>(dynamic_cast<Response*>(
+    auto message = ResponsePtr<Response>(dynamic_cast<Response*>(
         Internal::parseMessageUntyped(std::make_unique<Response>(), std::move(response))
             .release()));
     if (!message) {
@@ -138,11 +141,11 @@ private:
 template <typename Response> class AsyncStreamCallbacks : public RawAsyncStreamCallbacks {
 public:
   ~AsyncStreamCallbacks() override = default;
-  virtual void onReceiveMessage(std::unique_ptr<Response>&& message) PURE;
+  virtual void onReceiveMessage(ResponsePtr<Response>&& message) PURE;
 
 private:
   bool onReceiveMessageRaw(Buffer::InstancePtr&& response) override {
-    auto message = std::unique_ptr<Response>(dynamic_cast<Response*>(
+    auto message = ResponsePtr<Response>(dynamic_cast<Response*>(
         Internal::parseMessageUntyped(std::make_unique<Response>(), std::move(response))
             .release()));
     if (!message) {

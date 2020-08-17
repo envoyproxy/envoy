@@ -8,6 +8,7 @@ load(
     "envoy_package",
     "envoy_proto_library",
     "envoy_select_hot_restart",
+    "envoy_select_new_codecs_in_integration_tests",
     "envoy_sh_test",
 )
 
@@ -29,10 +30,10 @@ envoy_cc_test_library(
     ],
     deps = [
         ":http_integration_lib",
-        "//source/common/common:version_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:version_converter_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/version:version_lib",
         "//source/extensions/filters/network/redis_proxy:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:network_utility_lib",
@@ -470,6 +471,7 @@ envoy_cc_test(
     deps = [
         ":http_protocol_integration_lib",
         "//include/envoy/http:header_map_interface",
+        "//source/common/stats:histogram_lib",
         "//source/common/stats:stats_matcher_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
@@ -574,6 +576,10 @@ envoy_cc_test_library(
         "ssl_utility.h",
         "utility.h",
     ],
+    copts = envoy_select_new_codecs_in_integration_tests(
+        ["-DENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS"],
+        "@envoy",
+    ),
     data = ["//test/common/runtime:filesystem_test_data"],
     deps = [
         ":server_stats_interface",
@@ -605,7 +611,9 @@ envoy_cc_test_library(
         "//source/common/http:codec_client_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http/http1:codec_legacy_lib",
         "//source/common/http/http1:codec_lib",
+        "//source/common/http/http2:codec_legacy_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/network:filter_lib",
@@ -797,6 +805,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hds_integration_test",
     srcs = ["hds_integration_test.cc"],
+    shard_count = 2,
     tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
@@ -869,10 +878,28 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "extension_discovery_integration_test",
+    srcs = ["extension_discovery_integration_test.cc"],
+    tags = ["fails_on_windows"],
+    deps = [
+        ":http_integration_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
+        "//test/integration/filters:set_response_code_filter_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/extension/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test_library(
     name = "server_stats_interface",
     hdrs = ["server_stats.h"],
-    deps = ["//include/envoy/stats:stats_interface"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/stats:stats_interface",
+    ],
 )
 
 envoy_cc_test(

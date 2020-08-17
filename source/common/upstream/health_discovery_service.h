@@ -42,7 +42,7 @@ class HdsCluster : public Cluster, Logger::Loggable<Logger::Id::upstream> {
 public:
   static ClusterSharedPtr create();
   HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
-             const envoy::config::cluster::v3::Cluster& cluster,
+             envoy::config::cluster::v3::Cluster cluster,
              const envoy::config::core::v3::BindConfig& bind_config, Stats::Store& stats,
              Ssl::ContextManager& ssl_context_manager, bool added_via_api,
              ClusterInfoFactory& info_factory, ClusterManager& cm,
@@ -78,7 +78,7 @@ private:
   std::function<void()> initialization_complete_callback_;
 
   Runtime::Loader& runtime_;
-  const envoy::config::cluster::v3::Cluster& cluster_;
+  const envoy::config::cluster::v3::Cluster cluster_;
   const envoy::config::core::v3::BindConfig& bind_config_;
   Stats::Store& stats_;
   Ssl::ContextManager& ssl_context_manager_;

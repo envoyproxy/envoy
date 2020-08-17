@@ -4,7 +4,6 @@
 
 #include "common/stats/isolated_store_impl.h"
 
-#include "test/common/http/http2/codec_impl_test_util.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/utility.h"

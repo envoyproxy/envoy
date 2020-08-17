@@ -91,6 +91,7 @@ private:
 
     // ProtocolConverter
     FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
+    FilterStatus messageEnd() override;
     FilterStatus fieldBegin(absl::string_view name, FieldType& field_type,
                             int16_t& field_id) override;
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override {
@@ -221,7 +222,7 @@ private:
     void addDecoderFilter(ThriftFilters::DecoderFilterSharedPtr filter) override {
       ActiveRpcDecoderFilterPtr wrapper = std::make_unique<ActiveRpcDecoderFilter>(*this, filter);
       filter->setDecoderFilterCallbacks(*wrapper);
-      wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
+      LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
     }
 
     FilterStatus applyDecoderFilters(ActiveRpcDecoderFilter* filter);

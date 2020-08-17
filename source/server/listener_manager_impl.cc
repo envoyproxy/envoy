@@ -312,11 +312,11 @@ ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
     fillState(*dump_listener, *listener);
   }
 
-  for (const auto& state_and_name : error_state_tracker_) {
+  for (const auto& [error_name, error_state] : error_state_tracker_) {
     DynamicListener* dynamic_listener =
-        getOrCreateDynamicListener(state_and_name.first, *config_dump, listener_map);
+        getOrCreateDynamicListener(error_name, *config_dump, listener_map);
 
-    const envoy::admin::v3::UpdateFailureState& state = *state_and_name.second;
+    const envoy::admin::v3::UpdateFailureState& state = *error_state;
     dynamic_listener->mutable_error_state()->CopyFrom(state);
   }
 
@@ -426,13 +426,23 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
   // avoids confusion during updates and allows us to use the same bound address. Note that in
   // the case of port 0 binding, the new listener will implicitly use the same bound port from
   // the existing listener.
-  if ((existing_warming_listener != warming_listeners_.end() &&
-       *(*existing_warming_listener)->address() != *new_listener->address()) ||
-      (existing_active_listener != active_listeners_.end() &&
-       *(*existing_active_listener)->address() != *new_listener->address())) {
-    const std::string message = fmt::format(
-        "error updating listener: '{}' has a different address '{}' from existing listener", name,
-        new_listener->address()->asString());
+  bool active_listener_exists = false;
+  bool warming_listener_exists = false;
+  if (existing_warming_listener != warming_listeners_.end() &&
+      *(*existing_warming_listener)->address() != *new_listener->address()) {
+    warming_listener_exists = true;
+  }
+  if (existing_active_listener != active_listeners_.end() &&
+      *(*existing_active_listener)->address() != *new_listener->address()) {
+    active_listener_exists = true;
+  }
+  if (active_listener_exists || warming_listener_exists) {
+    const std::string message =
+        fmt::format("error updating listener: '{}' has a different address '{}' from existing "
+                    "listener address '{}'",
+                    name, new_listener->address()->asString(),
+                    warming_listener_exists ? (*existing_warming_listener)->address()->asString()
+                                            : (*existing_active_listener)->address()->asString());
     ENVOY_LOG(warn, "{}", message);
     throw EnvoyException(message);
   }
@@ -629,11 +639,30 @@ ListenerManagerImpl::getListenerByName(ListenerList& listeners, const std::strin
   return ret;
 }
 
-std::vector<std::reference_wrapper<Network::ListenerConfig>> ListenerManagerImpl::listeners() {
+std::vector<std::reference_wrapper<Network::ListenerConfig>>
+ListenerManagerImpl::listeners(ListenerState state) {
   std::vector<std::reference_wrapper<Network::ListenerConfig>> ret;
-  ret.reserve(active_listeners_.size());
-  for (const auto& listener : active_listeners_) {
-    ret.push_back(*listener);
+
+  size_t size = 0;
+  size += state & WARMING ? warming_listeners_.size() : 0;
+  size += state & ACTIVE ? active_listeners_.size() : 0;
+  size += state & DRAINING ? draining_listeners_.size() : 0;
+  ret.reserve(size);
+
+  if (state & WARMING) {
+    for (const auto& listener : warming_listeners_) {
+      ret.push_back(*listener);
+    }
+  }
+  if (state & ACTIVE) {
+    for (const auto& listener : active_listeners_) {
+      ret.push_back(*listener);
+    }
+  }
+  if (state & DRAINING) {
+    for (const auto& draining_listener : draining_listeners_) {
+      ret.push_back(*(draining_listener.listener_));
+    }
   }
   return ret;
 }

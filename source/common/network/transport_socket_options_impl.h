@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/network/proxy_protocol.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/stream_info/filter_state.h"
 
@@ -25,6 +26,9 @@ public:
   const absl::optional<std::string>& applicationProtocolFallback() const override {
     return alpn_fallback_;
   }
+  absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
+    return inner_options_->proxyProtocolOptions();
+  }
   void hashKey(std::vector<uint8_t>& key) const override;
 
 private:
@@ -34,15 +38,18 @@ private:
 
 class TransportSocketOptionsImpl : public TransportSocketOptions {
 public:
-  TransportSocketOptionsImpl(absl::string_view override_server_name = "",
-                             std::vector<std::string>&& override_verify_san_list = {},
-                             std::vector<std::string>&& override_alpn = {},
-                             absl::optional<std::string>&& fallback_alpn = {})
+  TransportSocketOptionsImpl(
+      absl::string_view override_server_name = "",
+      std::vector<std::string>&& override_verify_san_list = {},
+      std::vector<std::string>&& override_alpn = {},
+      absl::optional<std::string>&& fallback_alpn = {},
+      absl::optional<Network::ProxyProtocolData> proxy_proto_options = absl::nullopt)
       : override_server_name_(override_server_name.empty()
                                   ? absl::nullopt
                                   : absl::optional<std::string>(override_server_name)),
         override_verify_san_list_{std::move(override_verify_san_list)},
-        override_alpn_list_{std::move(override_alpn)}, alpn_fallback_{std::move(fallback_alpn)} {}
+        override_alpn_list_{std::move(override_alpn)}, alpn_fallback_{std::move(fallback_alpn)},
+        proxy_protocol_options_(proxy_proto_options) {}
 
   // Network::TransportSocketOptions
   const absl::optional<std::string>& serverNameOverride() const override {
@@ -57,6 +64,9 @@ public:
   const absl::optional<std::string>& applicationProtocolFallback() const override {
     return alpn_fallback_;
   }
+  absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
+    return proxy_protocol_options_;
+  }
   void hashKey(std::vector<uint8_t>& key) const override;
 
 private:
@@ -64,6 +74,7 @@ private:
   const std::vector<std::string> override_verify_san_list_;
   const std::vector<std::string> override_alpn_list_;
   const absl::optional<std::string> alpn_fallback_;
+  const absl::optional<Network::ProxyProtocolData> proxy_protocol_options_;
 };
 
 class TransportSocketOptionsUtility {

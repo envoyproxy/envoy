@@ -16,7 +16,8 @@ namespace Network {
  */
 class IoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
 public:
-  explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET) : fd_(fd) {}
+  explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false)
+      : fd_(fd), socket_v6only_(socket_v6only) {}
 
   // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;
@@ -48,6 +49,7 @@ public:
 
   Api::SysCallIntResult bind(Address::InstanceConstSharedPtr address) override;
   Api::SysCallIntResult listen(int backlog) override;
+  IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
   Api::SysCallIntResult connect(Address::InstanceConstSharedPtr address) override;
   Api::SysCallIntResult setOption(int level, int optname, const void* optval,
                                   socklen_t optlen) override;
@@ -77,6 +79,7 @@ private:
   }
 
   os_fd_t fd_;
+  int socket_v6only_{false};
 
   // The minimum cmsg buffer size to filled in destination address, packets dropped and gso
   // size when receiving a packet. It is possible for a received packet to contain both IPv4

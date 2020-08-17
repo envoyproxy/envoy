@@ -4,7 +4,7 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
@@ -61,7 +61,7 @@ TEST_F(HeapShrinkerTest, ShrinkWhenTriggered) {
 
   Envoy::Stats::Counter& shrink_count =
       stats_.counter("overload.envoy.overload_actions.shrink_heap.shrink_count");
-  action_cb(Server::OverloadActionState::Active);
+  action_cb(Server::OverloadActionState::saturated());
   step();
   EXPECT_EQ(1, shrink_count.value());
 
@@ -77,7 +77,7 @@ TEST_F(HeapShrinkerTest, ShrinkWhenTriggered) {
   step();
   EXPECT_EQ(2, shrink_count.value());
 
-  action_cb(Server::OverloadActionState::Inactive);
+  action_cb(Server::OverloadActionState::inactive());
   step();
   step();
   EXPECT_EQ(2, shrink_count.value());

@@ -265,7 +265,7 @@ bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
 
 /**
  * @return Http1Settings An Http1Settings populated from the
- * envoy::api::v2::core::Http1ProtocolOptions config.
+ * envoy::config::core::v3::Http1ProtocolOptions config.
  */
 Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config);
 

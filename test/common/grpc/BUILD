@@ -145,10 +145,12 @@ envoy_cc_test_library(
         ":utility_lib",
         "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/grpc:context_lib",
+        "//source/common/http:context_lib",
         "//source/common/http/http2:conn_pool_lib",
         "//test/integration:integration_lib",
         "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:global_lib",
         "//test/test_common:test_time_lib",
@@ -161,8 +163,6 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "grpc_client_integration_test",
     srcs = ["grpc_client_integration_test.cc"],
-    # Fails on windows; Connection is terminated early testing BasicStream/IPv4_EnvoyGrpc
-    tags = ["fails_on_windows"],
     deps = [
         ":grpc_client_integration_test_harness_lib",
         "//source/common/grpc:async_client_lib",

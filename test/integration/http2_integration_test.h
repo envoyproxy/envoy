@@ -67,25 +67,33 @@ public:
   void runHeaderOnlyTest(bool send_request_body, size_t body_size);
 };
 
-class Http2FloodMitigationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                 public HttpIntegrationTest {
+class Http2FrameIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                  public HttpIntegrationTest {
 public:
-  Http2FloodMitigationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {
+  Http2FrameIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+
+protected:
+  void startHttp2Session();
+  Http2Frame readFrame();
+  void sendFrame(const Http2Frame& frame);
+  virtual void beginSession();
+
+  IntegrationTcpClientPtr tcp_client_;
+};
+
+class Http2FloodMitigationTest : public Http2FrameIntegrationTest {
+public:
+  Http2FloodMitigationTest() {
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
   }
 
 protected:
-  void startHttp2Session();
   void floodServer(const Http2Frame& frame, const std::string& flood_stat);
   void floodServer(absl::string_view host, absl::string_view path,
                    Http2Frame::ResponseStatus expected_http_status, const std::string& flood_stat);
-  Http2Frame readFrame();
-  void sendFrame(const Http2Frame& frame);
   void setNetworkConnectionBufferSize();
-  void beginSession();
-
-  IntegrationTcpClientPtr tcp_client_;
+  void beginSession() override;
 };
 } // namespace Envoy

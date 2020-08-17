@@ -271,9 +271,10 @@ const std::string HystrixSink::printRollingWindows() {
   return out_str.str();
 }
 
-HystrixSink::HystrixSink(Server::Instance& server, const uint64_t num_buckets)
+HystrixSink::HystrixSink(Server::Configuration::ServerFactoryContext& server,
+                         const uint64_t num_buckets)
     : server_(server), current_index_(num_buckets > 0 ? num_buckets : DEFAULT_NUM_BUCKETS),
-      window_size_(current_index_ + 1), stat_name_pool_(server.stats().symbolTable()),
+      window_size_(current_index_ + 1), stat_name_pool_(server.scope().symbolTable()),
       cluster_name_(stat_name_pool_.add(Config::TagNames::get().CLUSTER_NAME)),
       cluster_upstream_rq_time_(stat_name_pool_.add("cluster.upstream_rq_time")),
       membership_total_(stat_name_pool_.add("membership_total")),
@@ -341,14 +342,14 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
   Upstream::ClusterManager::ClusterInfoMap clusters = server_.clusterManager().clusters();
 
   // Save a map of the relevant histograms per cluster in a convenient format.
-  std::unordered_map<std::string, QuantileLatencyMap> time_histograms;
+  absl::node_hash_map<std::string, QuantileLatencyMap> time_histograms;
   for (const auto& histogram : snapshot.histograms()) {
     if (histogram.get().tagExtractedStatName() == cluster_upstream_rq_time_) {
       absl::optional<Stats::StatName> value =
           Stats::Utility::findTag(histogram.get(), cluster_name_);
       // Make sure we found the cluster name tag
       ASSERT(value);
-      std::string value_str = server_.stats().symbolTable().toString(*value);
+      std::string value_str = server_.scope().symbolTable().toString(*value);
       auto it_bool_pair = time_histograms.emplace(std::make_pair(value_str, QuantileLatencyMap()));
       // Make sure histogram with this name was not already added
       ASSERT(it_bool_pair.second);
@@ -409,7 +410,9 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
   if (clusters.size() < cluster_stats_cache_map_.size()) {
     for (auto it = cluster_stats_cache_map_.begin(); it != cluster_stats_cache_map_.end();) {
       if (clusters.find(it->first) == clusters.end()) {
-        it = cluster_stats_cache_map_.erase(it);
+        auto next_it = std::next(it);
+        cluster_stats_cache_map_.erase(it);
+        it = next_it;
       } else {
         ++it;
       }
