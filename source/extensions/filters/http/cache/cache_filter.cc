@@ -182,6 +182,7 @@ void CacheFilter::getTrailers() {
 
 void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers) {
   if (filter_state_ == FilterState::Destroyed) {
+    // The filter is being destroyed, any callbacks should be ignored.
     return;
   }
   // TODO(yosrym93): Handle request only-if-cached directive
