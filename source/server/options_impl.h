@@ -133,6 +133,7 @@ public:
   }
   const std::string& logFormat() const override { return log_format_; }
   bool logFormatEscaped() const override { return log_format_escaped_; }
+  bool enableFineGrainLogging() const override { return enable_fine_grain_logging_; }
   const std::string& logPath() const override { return log_path_; }
   uint64_t restartEpoch() const override { return restart_epoch_; }
   Server::Mode mode() const override { return mode_; }
@@ -201,6 +202,10 @@ private:
   bool fake_symbol_table_enabled_;
   std::vector<std::string> disabled_extensions_;
   uint32_t count_;
+
+  // Initialization added here to avoid integration_admin_test failure caused by uninitialized
+  // enable_fine_grain_logging_.
+  bool enable_fine_grain_logging_ = false;
 };
 
 /**
