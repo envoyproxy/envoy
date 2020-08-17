@@ -68,6 +68,7 @@ public:
   ~MockClientContext() override;
 
   MOCK_METHOD(size_t, daysUntilFirstCertExpires, (), (const));
+  MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(CertificateDetailsPtr, getCaCertInformation, (), (const));
   MOCK_METHOD(std::vector<CertificateDetailsPtr>, getCertChainInformation, (), (const));
 };
@@ -126,6 +127,8 @@ public:
   MOCK_METHOD(const std::string&, certificateChainPath, (), (const));
   MOCK_METHOD(const std::string&, privateKey, (), (const));
   MOCK_METHOD(const std::string&, privateKeyPath, (), (const));
+  MOCK_METHOD(const std::vector<uint8_t>&, ocspStaple, (), (const));
+  MOCK_METHOD(const std::string&, ocspStaplePath, (), (const));
   MOCK_METHOD(const std::string&, password, (), (const));
   MOCK_METHOD(const std::string&, passwordPath, (), (const));
   MOCK_METHOD(Envoy::Ssl::PrivateKeyMethodProviderSharedPtr, privateKeyMethod, (), (const));
