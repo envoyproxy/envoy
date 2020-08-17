@@ -52,12 +52,12 @@ TEST_F(LuaHeaderMapWrapperTest, Methods) {
 
   Http::TestRequestHeaderMapImpl headers;
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
-  EXPECT_CALL(*this, testPrint("WORLD"));
-  EXPECT_CALL(*this, testPrint("'hello' 'WORLD'"));
-  EXPECT_CALL(*this, testPrint("'header1' ''"));
-  EXPECT_CALL(*this, testPrint("'header2' 'foo'"));
-  EXPECT_CALL(*this, testPrint("'hello' 'WORLD'"));
-  EXPECT_CALL(*this, testPrint("'header2' 'foo'"));
+  EXPECT_CALL(printer_, testPrint("WORLD"));
+  EXPECT_CALL(printer_, testPrint("'hello' 'WORLD'"));
+  EXPECT_CALL(printer_, testPrint("'header1' ''"));
+  EXPECT_CALL(printer_, testPrint("'header2' 'foo'"));
+  EXPECT_CALL(printer_, testPrint("'hello' 'WORLD'"));
+  EXPECT_CALL(printer_, testPrint("'header2' 'foo'"));
   start("callMe");
 }
 
@@ -169,9 +169,9 @@ TEST_F(LuaHeaderMapWrapperTest, ModifyAfterIteration) {
 
   Http::TestRequestHeaderMapImpl headers{{"foo", "bar"}};
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
-  EXPECT_CALL(*this, testPrint("'foo' 'bar'"));
-  EXPECT_CALL(*this, testPrint("'foo' 'bar'"));
-  EXPECT_CALL(*this, testPrint("'hello' 'world'"));
+  EXPECT_CALL(printer_, testPrint("'foo' 'bar'"));
+  EXPECT_CALL(printer_, testPrint("'foo' 'bar'"));
+  EXPECT_CALL(printer_, testPrint("'hello' 'world'"));
   start("callMe");
 }
 
@@ -242,7 +242,7 @@ protected:
     ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
     Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
         StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
-    EXPECT_CALL(*this,
+    EXPECT_CALL(printer_,
                 testPrint(fmt::format("'{}'", Http::Utility::getProtocolString(protocol.value()))));
     start("callMe");
     wrapper.reset();
@@ -295,12 +295,12 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetAndIterateDynamicMetadata) {
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
-  EXPECT_CALL(*this, testPrint("userdata"));
-  EXPECT_CALL(*this, testPrint("bar"));
-  EXPECT_CALL(*this, testPrint("cool"));
-  EXPECT_CALL(*this, testPrint("'foo' 'bar'"));
-  EXPECT_CALL(*this, testPrint("'so' 'cool'"));
-  EXPECT_CALL(*this, testPrint("0"));
+  EXPECT_CALL(printer_, testPrint("userdata"));
+  EXPECT_CALL(printer_, testPrint("bar"));
+  EXPECT_CALL(printer_, testPrint("cool"));
+  EXPECT_CALL(printer_, testPrint("'foo' 'bar'"));
+  EXPECT_CALL(printer_, testPrint("'so' 'cool'"));
+  EXPECT_CALL(printer_, testPrint("0"));
   start("callMe");
 
   EXPECT_EQ(1, stream_info.dynamicMetadata().filter_metadata_size());
@@ -337,13 +337,13 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetComplexDynamicMetadata) {
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
-  EXPECT_CALL(*this, testPrint("1234"));
-  EXPECT_CALL(*this, testPrint("baz"));
-  EXPECT_CALL(*this, testPrint("true"));
-  EXPECT_CALL(*this, testPrint("cool"));
-  EXPECT_CALL(*this, testPrint("and"));
-  EXPECT_CALL(*this, testPrint("dynamic"));
-  EXPECT_CALL(*this, testPrint("true"));
+  EXPECT_CALL(printer_, testPrint("1234"));
+  EXPECT_CALL(printer_, testPrint("baz"));
+  EXPECT_CALL(printer_, testPrint("true"));
+  EXPECT_CALL(printer_, testPrint("cool"));
+  EXPECT_CALL(printer_, testPrint("and"));
+  EXPECT_CALL(printer_, testPrint("dynamic"));
+  EXPECT_CALL(printer_, testPrint("true"));
   start("callMe");
 
   EXPECT_EQ(1, stream_info.dynamicMetadata().filter_metadata_size());
@@ -440,12 +440,12 @@ TEST_F(LuaStreamInfoWrapperTest, ModifyAfterIterationForDynamicMetadata) {
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
-  EXPECT_CALL(*this, testPrint("envoy.lb"));
-  EXPECT_CALL(*this, testPrint("'hello' 'world'"));
-  EXPECT_CALL(*this, testPrint("envoy.proxy"));
-  EXPECT_CALL(*this, testPrint("'proto' 'grpc'"));
-  EXPECT_CALL(*this, testPrint("envoy.lb"));
-  EXPECT_CALL(*this, testPrint("'hello' 'envoy'"));
+  EXPECT_CALL(printer_, testPrint("envoy.lb"));
+  EXPECT_CALL(printer_, testPrint("'hello' 'world'"));
+  EXPECT_CALL(printer_, testPrint("envoy.proxy"));
+  EXPECT_CALL(printer_, testPrint("'proto' 'grpc'"));
+  EXPECT_CALL(printer_, testPrint("envoy.lb"));
+  EXPECT_CALL(printer_, testPrint("'hello' 'envoy'"));
   start("callMe");
 }
 

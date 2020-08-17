@@ -762,6 +762,11 @@ def checkSourceLine(line, file_path, reportError):
         reportError("Don't introduce throws into exception-free files, use error " +
                     "statuses instead.")
 
+  if "lua_pushlightuserdata" in line:
+    reportError("Don't use lua_pushlightuserdata, since it can cause unprotected error in call to" +
+                "Lua API (bad light userdata pointer) on ARM64 architecture. See " +
+                "https://github.com/LuaJIT/LuaJIT/issues/450#issuecomment-433659873 for details.")
+
 
 def checkBuildLine(line, file_path, reportError):
   if "@bazel_tools" in line and not (isSkylarkFile(file_path) or file_path.startswith("./bazel/") or
