@@ -120,6 +120,20 @@ vhds:
                EnvoyException);
 }
 
+// if chosen ads source, skip the api_type verify in prev test
+TEST_F(VhdsTest, VhdsInstantiationWithAdsSource) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    ads: {}
+  )EOF");
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  EXPECT_NO_THROW(VhdsSubscription(config_update_info, factory_context_, context_, providers_));
+}
+
 // verify addition/updating of virtual hosts
 TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
   const auto route_config =

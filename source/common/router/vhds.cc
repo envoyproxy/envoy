@@ -35,19 +35,17 @@ VhdsSubscription::VhdsSubscription(
       init_target_(fmt::format("VhdsConfigSubscription {}", config_update_info_->routeConfigName()),
                    [this]() { subscription_->start({}); }),
       route_config_providers_(route_config_providers) {
-  const auto& config_source = config_update_info_->routeConfiguration()
-                                  .vhds()
-                                  .config_source()
-                                  .api_config_source()
-                                  .api_type();
-  if (config_source != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
+  const auto& config_source = config_update_info_->routeConfiguration().vhds().config_source();
+  if (config_source.has_api_config_source() &&
+      config_source.api_config_source().api_type() !=
+          envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
+
     throw EnvoyException("vhds: only 'DELTA_GRPC' is supported as an api_type.");
   }
   const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          config_update_info_->routeConfiguration().vhds().config_source(),
-          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
+          config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
 }
 
 void VhdsSubscription::updateOnDemand(const std::string& with_route_config_name_prefix) {
