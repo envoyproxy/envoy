@@ -52,8 +52,8 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
                             TestEnvironment::getIpVersionsForTest().front(),
                             ConfigHelper::httpProxyConfig()),
-        num_hosts_{4}, is_hash_lb_(GetParam() == envoy::config::cluster::v3::Cluster::RING_HASH ||
-                                   GetParam() == envoy::config::cluster::v3::Cluster::MAGLEV) {
+        is_hash_lb_(GetParam() == envoy::config::cluster::v3::Cluster::RING_HASH ||
+                    GetParam() == envoy::config::cluster::v3::Cluster::MAGLEV) {
     autonomous_upstream_ = true;
     setUpstreamCount(num_hosts_);
 
@@ -186,7 +186,7 @@ public:
     }
   }
 
-  const uint32_t num_hosts_;
+  const uint32_t num_hosts_{4};
   const bool is_hash_lb_;
 
   const std::string hash_header_{"x-hash"};

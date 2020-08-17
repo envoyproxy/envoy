@@ -11,6 +11,7 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
+#include "test/fuzz/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/server/config_validation/xds_fuzz.pb.h"
 #include "test/server/config_validation/xds_verifier.h"
@@ -78,6 +79,7 @@ private:
 
   Network::Address::IpVersion ip_version_;
 
+  std::chrono::seconds timeout_{5};
   uint64_t lds_update_success_{0};
 };
 

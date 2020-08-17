@@ -4,12 +4,21 @@
 
 #include <chrono>
 #include <memory>
+#include <utility>
+#include <vector>
 
+#include "envoy/common/time.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/server/guarddog.h"
+#include "envoy/server/guarddog_config.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
+#include "common/common/logger.h"
+#include "common/config/utility.h"
+#include "common/protobuf/utility.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "server/watchdog_impl.h"
@@ -42,7 +51,25 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
           Stats::StatNameManagedStorage("server.watchdog_mega_miss", stats_scope.symbolTable())
               .statName())),
       dispatcher_(api.allocateDispatcher("guarddog_thread")),
-      loop_timer_(dispatcher_->createTimer([this]() { step(); })), run_thread_(true) {
+      loop_timer_(dispatcher_->createTimer([this]() { step(); })),
+      events_to_actions_([&](const Server::Configuration::Main& config) -> EventToActionsMap {
+        EventToActionsMap map;
+
+        // We should be able to share the dispatcher since guard dog's lifetime
+        // should eclipse those of actions.
+        Configuration::GuardDogActionFactoryContext context = {api, *dispatcher_};
+
+        const auto& actions = config.wdActions();
+        for (const auto& action : actions) {
+          // Get factory and add the created cb
+          auto& factory = Config::Utility::getAndCheckFactory<Configuration::GuardDogActionFactory>(
+              action.config());
+          map[action.event()].push_back(factory.createGuardDogActionFromProto(action, context));
+        }
+
+        return map;
+      }(config)),
+      run_thread_(true) {
   start(api);
 }
 
@@ -61,9 +88,11 @@ void GuardDogImpl::step() {
   }
 
   const auto now = time_source_.monotonicTime();
+  std::vector<std::pair<Thread::ThreadId, MonotonicTime>> miss_threads;
+  std::vector<std::pair<Thread::ThreadId, MonotonicTime>> mega_miss_threads;
 
   {
-    size_t multi_kill_count = 0;
+    std::vector<std::pair<Thread::ThreadId, MonotonicTime>> multi_kill_threads;
     Thread::LockGuard guard(wd_lock_);
 
     // Compute the multikill threshold
@@ -73,6 +102,7 @@ void GuardDogImpl::step() {
 
     for (auto& watched_dog : watched_dogs_) {
       const auto ltt = watched_dog->dog_->lastTouchTime();
+      const auto tid = watched_dog->dog_->threadId();
       const auto delta = now - ltt;
       if (watched_dog->last_alert_time_ && watched_dog->last_alert_time_.value() < ltt) {
         watched_dog->miss_alerted_ = false;
@@ -84,6 +114,7 @@ void GuardDogImpl::step() {
           watched_dog->miss_counter_.inc();
           watched_dog->last_alert_time_ = ltt;
           watched_dog->miss_alerted_ = true;
+          miss_threads.emplace_back(tid, ltt);
         }
       }
       if (delta > megamiss_timeout_) {
@@ -92,20 +123,36 @@ void GuardDogImpl::step() {
           watched_dog->megamiss_counter_.inc();
           watched_dog->last_alert_time_ = ltt;
           watched_dog->megamiss_alerted_ = true;
+          mega_miss_threads.emplace_back(tid, ltt);
         }
       }
       if (killEnabled() && delta > kill_timeout_) {
+        invokeGuardDogActions(WatchDogAction::KILL, {{tid, ltt}}, now);
+
         PANIC(fmt::format("GuardDog: one thread ({}) stuck for more than watchdog_kill_timeout",
                           watched_dog->dog_->threadId().debugString()));
       }
       if (multikillEnabled() && delta > multi_kill_timeout_) {
-        if (++multi_kill_count >= required_for_multi_kill) {
+        multi_kill_threads.emplace_back(tid, ltt);
+
+        if (multi_kill_threads.size() >= required_for_multi_kill) {
+          invokeGuardDogActions(WatchDogAction::MULTIKILL, multi_kill_threads, now);
+
           PANIC(fmt::format("GuardDog: At least {} threads ({},...) stuck for more than "
                             "watchdog_multikill_timeout",
-                            multi_kill_count, watched_dog->dog_->threadId().debugString()));
+                            multi_kill_threads.size(), tid.debugString()));
         }
       }
     }
+  }
+
+  // Run megamiss and miss handlers
+  if (!mega_miss_threads.empty()) {
+    invokeGuardDogActions(WatchDogAction::MEGAMISS, mega_miss_threads, now);
+  }
+
+  if (!miss_threads.empty()) {
+    invokeGuardDogActions(WatchDogAction::MISS, miss_threads, now);
   }
 
   {
@@ -164,6 +211,17 @@ void GuardDogImpl::stop() {
   if (thread_) {
     thread_->join();
     thread_.reset();
+  }
+}
+
+void GuardDogImpl::invokeGuardDogActions(
+    WatchDogAction::WatchdogEvent event,
+    std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs, MonotonicTime now) {
+  const auto& registered_actions = events_to_actions_.find(event);
+  if (registered_actions != events_to_actions_.end()) {
+    for (auto& action : registered_actions->second) {
+      action->run(event, thread_ltt_pairs, now);
+    }
   }
 }
 

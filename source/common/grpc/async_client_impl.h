@@ -37,6 +37,8 @@ public:
 private:
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
+  // The host header value in the http transport.
+  const std::string host_name_;
   const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> initial_metadata_;
   std::list<AsyncStreamImplPtr> active_streams_;
   TimeSource& time_source_;
@@ -48,7 +50,7 @@ private:
 class AsyncStreamImpl : public RawAsyncStream,
                         Http::AsyncClient::StreamCallbacks,
                         public Event::DeferredDeletable,
-                        LinkedObject<AsyncStreamImpl> {
+                        public LinkedObject<AsyncStreamImpl> {
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
                   absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,

@@ -75,8 +75,7 @@ class ProxyFilter : public Network::ReadFilter,
                     public Network::ConnectionCallbacks {
 public:
   ProxyFilter(Common::Redis::DecoderFactory& factory, Common::Redis::EncoderPtr&& encoder,
-              CommandSplitter::CommandSplitterFactory& splitter_factory,
-              ProxyFilterConfigSharedPtr config);
+              CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config);
   ~ProxyFilter() override;
 
   // Network::ReadFilter
@@ -122,8 +121,7 @@ private:
 
   Common::Redis::DecoderPtr decoder_;
   Common::Redis::EncoderPtr encoder_;
-  CommandSplitter::CommandSplitterFactory& splitter_factory_;
-  CommandSplitter::CommandSplitterPtr splitter_;
+  CommandSplitter::Instance& splitter_;
   ProxyFilterConfigSharedPtr config_;
   Buffer::OwnedImpl encoder_buffer_;
   Network::ReadFilterCallbacks* callbacks_{};

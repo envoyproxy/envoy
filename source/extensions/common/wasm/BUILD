@@ -1,12 +1,12 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "well_known_names",
@@ -30,6 +30,7 @@ envoy_cc_library(
     name = "wasm_vm_base",
     hdrs = ["wasm_vm_base.h"],
     deps = [
+        ":wasm_vm_interface",
         "//source/common/stats:stats_lib",
     ],
 )

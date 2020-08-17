@@ -24,6 +24,8 @@
 #include "quiche/quic/platform/api/quic_ip_address.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
 
+#include "openssl/ssl.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -32,8 +34,7 @@ namespace Quic {
 Network::Address::InstanceConstSharedPtr
 quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address);
 
-quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
-    const Network::Address::InstanceConstSharedPtr& envoy_address);
+quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address::Ip* envoy_ip);
 
 // The returned header map has all keys in lower case.
 template <class T>
@@ -79,6 +80,15 @@ Network::ConnectionSocketPtr
 createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
                        const Network::ConnectionSocket::OptionsSharedPtr& options);
+
+// Convert a cert in string form to X509 object.
+// Return nullptr if the bytes passed cannot be passed.
+bssl::UniquePtr<X509> parseDERCertificate(const std::string& der_bytes, std::string* error_details);
+
+// Deduce the suitable signature algorithm according to the public key.
+// Return the sign algorithm id works with the public key; If the public key is
+// not supported, return 0 with error_details populated correspondingly.
+int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::string* error_details);
 
 } // namespace Quic
 } // namespace Envoy

@@ -191,8 +191,12 @@ def envoy_dependencies(skip_targets = []):
     _io_opentracing_cpp()
     _net_zlib()
     _upb()
+    _proxy_wasm_cpp_sdk()
+    _proxy_wasm_cpp_host()
+    _emscripten_toolchain()
     _repository_impl("com_googlesource_code_re2")
     _com_google_cel_cpp()
+    _repository_impl("com_github_google_flatbuffers")
     _repository_impl("bazel_toolchains")
     _repository_impl("bazel_compdb")
     _repository_impl("envoy_build_tools")
@@ -335,15 +339,12 @@ def _com_github_google_libprotobuf_mutator():
     )
 
 def _com_github_jbeder_yaml_cpp():
-    location = _get_location("com_github_jbeder_yaml_cpp")
-    http_archive(
+    _repository_impl(
         name = "com_github_jbeder_yaml_cpp",
-        build_file_content = BUILD_ALL_CONTENT,
-        **location
     )
     native.bind(
         name = "yaml_cpp",
-        actual = "@envoy//bazel/foreign_cc:yaml",
+        actual = "@com_github_jbeder_yaml_cpp//:yaml-cpp",
     )
 
 def _com_github_libevent_libevent():
@@ -379,6 +380,24 @@ def _net_zlib():
 
 def _com_google_cel_cpp():
     _repository_impl("com_google_cel_cpp")
+    _repository_impl("rules_antlr")
+    location = _get_location("antlr4_runtimes")
+    http_archive(
+        name = "antlr4_runtimes",
+        build_file_content = """
+package(default_visibility = ["//visibility:public"])
+cc_library(
+    name = "cpp",
+    srcs = glob(["runtime/Cpp/runtime/src/**/*.cpp"]),
+    hdrs = glob(["runtime/Cpp/runtime/src/**/*.h"]),
+    includes = ["runtime/Cpp/runtime/src"],
+)
+""",
+        patch_args = ["-p1"],
+        # Patches ASAN violation of initialization fiasco
+        patches = ["@envoy//bazel:antlr.patch"],
+        **location
+    )
 
 def _com_github_nghttp2_nghttp2():
     location = _get_location("com_github_nghttp2_nghttp2")
@@ -770,6 +789,22 @@ def _upb():
         actual = "@upb//:upb",
     )
 
+def _proxy_wasm_cpp_sdk():
+    _repository_impl(name = "proxy_wasm_cpp_sdk")
+
+def _proxy_wasm_cpp_host():
+    _repository_impl(
+        name = "proxy_wasm_cpp_host",
+        build_file = "@envoy//bazel/external:proxy_wasm_cpp_host.BUILD",
+    )
+
+def _emscripten_toolchain():
+    _repository_impl(
+        name = "emscripten_toolchain",
+        build_file_content = BUILD_ALL_CONTENT,
+        patch_cmds = REPOSITORY_LOCATIONS["emscripten_toolchain"]["patch_cmds"],
+    )
+
 def _com_github_google_jwt_verify():
     _repository_impl("com_github_google_jwt_verify")
 
@@ -865,11 +900,6 @@ def _org_unicode_icuuc():
     _repository_impl(
         name = "org_unicode_icuuc",
         build_file = "@envoy//bazel/external:icuuc.BUILD",
-        # TODO(dio): Consider patching udata when we need to embed some data.
-    )
-    native.bind(
-        name = "icuuc",
-        actual = "@org_unicode_icuuc//:common",
     )
 
 def _foreign_cc_dependencies():

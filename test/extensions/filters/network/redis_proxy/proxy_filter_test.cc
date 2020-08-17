@@ -19,7 +19,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::ByMove;
 using testing::ByRef;
 using testing::DoAll;
 using testing::Eq;
@@ -132,12 +131,8 @@ public:
         parseProtoFromYaml(yaml_string);
     config_ =
         std::make_shared<ProxyFilterConfig>(proto_config, store_, drain_decision_, runtime_, api_);
-
-    std::unique_ptr<CommandSplitter::MockInstance> splitter_ptr =
-        std::make_unique<CommandSplitter::MockInstance>();
-    EXPECT_CALL(splitter_factory_, create_(_)).WillOnce(Return(ByMove(std::move(splitter_ptr))));
-    filter_ = std::make_unique<ProxyFilter>(*this, Common::Redis::EncoderPtr{encoder_},
-                                            splitter_factory_, config_);
+    filter_ = std::make_unique<ProxyFilter>(*this, Common::Redis::EncoderPtr{encoder_}, splitter_,
+                                            config_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
     EXPECT_EQ(1UL, config_->stats_.downstream_cx_total_.value());
@@ -157,10 +152,6 @@ public:
     }
   }
 
-  CommandSplitter::MockInstance& getSplitter() {
-    return reinterpret_cast<CommandSplitter::MockInstance&>(*filter_->splitter_);
-  }
-
   // Common::Redis::DecoderFactory
   Common::Redis::DecoderPtr create(Common::Redis::DecoderCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
@@ -170,7 +161,7 @@ public:
   Common::Redis::MockEncoder* encoder_{new Common::Redis::MockEncoder()};
   Common::Redis::MockDecoder* decoder_{new Common::Redis::MockDecoder()};
   Common::Redis::DecoderCallbacks* decoder_callbacks_{};
-  CommandSplitter::MockCommandSplitterFactory splitter_factory_;
+  CommandSplitter::MockInstance splitter_;
   Stats::TestUtil::TestStore store_;
   NiceMock<Network::MockDrainDecision> drain_decision_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -180,25 +171,34 @@ public:
   NiceMock<Api::MockApi> api_;
 };
 
-TEST_F(RedisProxyFilterTest, OutOfOrderResponseWithDrainClose) {
-  InSequence s;
+class RedisProxyFilterTestWithTwoCallbacks : public RedisProxyFilterTest {
+public:
+  CommandSplitter::MockSplitRequest* request_handle1_{new CommandSplitter::MockSplitRequest()};
+  CommandSplitter::MockSplitRequest* request_handle2_{new CommandSplitter::MockSplitRequest()};
+  CommandSplitter::SplitCallbacks* request_callbacks1_;
+  CommandSplitter::SplitCallbacks* request_callbacks2_;
 
-  Buffer::OwnedImpl fake_data;
-  CommandSplitter::MockSplitRequest* request_handle1 = new CommandSplitter::MockSplitRequest();
-  CommandSplitter::SplitCallbacks* request_callbacks1;
-  CommandSplitter::MockSplitRequest* request_handle2 = new CommandSplitter::MockSplitRequest();
-  CommandSplitter::SplitCallbacks* request_callbacks2;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  void decodeHelper(Buffer::Instance&) {
     Common::Redis::RespValuePtr request1(new Common::Redis::RespValue());
-    EXPECT_CALL(getSplitter(), makeRequest_(Ref(*request1), _))
-        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&request_callbacks1)), Return(request_handle1)));
+    EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _, _))
+        .WillOnce(
+            DoAll(WithArg<1>(SaveArgAddress(&request_callbacks1_)), Return(request_handle1_)));
     decoder_callbacks_->onRespValue(std::move(request1));
 
     Common::Redis::RespValuePtr request2(new Common::Redis::RespValue());
-    EXPECT_CALL(getSplitter(), makeRequest_(Ref(*request2), _))
-        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&request_callbacks2)), Return(request_handle2)));
+    EXPECT_CALL(splitter_, makeRequest_(Ref(*request2), _, _))
+        .WillOnce(
+            DoAll(WithArg<1>(SaveArgAddress(&request_callbacks2_)), Return(request_handle2_)));
     decoder_callbacks_->onRespValue(std::move(request2));
-  }));
+  }
+};
+
+TEST_F(RedisProxyFilterTestWithTwoCallbacks, OutOfOrderResponseWithDrainClose) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data)))
+      .WillOnce(Invoke(this, &RedisProxyFilterTestWithTwoCallbacks::decodeHelper));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 
   EXPECT_EQ(2UL, config_->stats_.downstream_rq_total_.value());
@@ -206,7 +206,7 @@ TEST_F(RedisProxyFilterTest, OutOfOrderResponseWithDrainClose) {
 
   Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
   Common::Redis::RespValue* response2_ptr = response2.get();
-  request_callbacks2->onResponse(std::move(response2));
+  request_callbacks2_->onResponse(std::move(response2));
 
   Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
   EXPECT_CALL(*encoder_, encode(Ref(*response1), _));
@@ -216,38 +216,25 @@ TEST_F(RedisProxyFilterTest, OutOfOrderResponseWithDrainClose) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("redis.drain_close_enabled", 100))
       .WillOnce(Return(true));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
-  request_callbacks1->onResponse(std::move(response1));
+  request_callbacks1_->onResponse(std::move(response1));
 
   EXPECT_EQ(1UL, config_->stats_.downstream_cx_drain_close_.value());
 }
 
-TEST_F(RedisProxyFilterTest, OutOfOrderResponseDownstreamDisconnectBeforeFlush) {
+TEST_F(RedisProxyFilterTestWithTwoCallbacks, OutOfOrderResponseDownstreamDisconnectBeforeFlush) {
   InSequence s;
 
   Buffer::OwnedImpl fake_data;
-  CommandSplitter::MockSplitRequest* request_handle1 = new CommandSplitter::MockSplitRequest();
-  CommandSplitter::SplitCallbacks* request_callbacks1;
-  CommandSplitter::MockSplitRequest* request_handle2 = new CommandSplitter::MockSplitRequest();
-  CommandSplitter::SplitCallbacks* request_callbacks2;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    Common::Redis::RespValuePtr request1(new Common::Redis::RespValue());
-    EXPECT_CALL(getSplitter(), makeRequest_(Ref(*request1), _))
-        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&request_callbacks1)), Return(request_handle1)));
-    decoder_callbacks_->onRespValue(std::move(request1));
-
-    Common::Redis::RespValuePtr request2(new Common::Redis::RespValue());
-    EXPECT_CALL(getSplitter(), makeRequest_(Ref(*request2), _))
-        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&request_callbacks2)), Return(request_handle2)));
-    decoder_callbacks_->onRespValue(std::move(request2));
-  }));
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data)))
+      .WillOnce(Invoke(this, &RedisProxyFilterTestWithTwoCallbacks::decodeHelper));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 
   EXPECT_EQ(2UL, config_->stats_.downstream_rq_total_.value());
   EXPECT_EQ(2UL, config_->stats_.downstream_rq_active_.value());
 
   Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
-  request_callbacks2->onResponse(std::move(response2));
-  EXPECT_CALL(*request_handle1, cancel());
+  request_callbacks2_->onResponse(std::move(response2));
+  EXPECT_CALL(*request_handle1_, cancel());
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
@@ -260,7 +247,7 @@ TEST_F(RedisProxyFilterTest, DownstreamDisconnectWithActive) {
   CommandSplitter::SplitCallbacks* request_callbacks1;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Common::Redis::RespValuePtr request1(new Common::Redis::RespValue());
-    EXPECT_CALL(getSplitter(), makeRequest_(Ref(*request1), _))
+    EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _, _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&request_callbacks1)), Return(request_handle1)));
     decoder_callbacks_->onRespValue(std::move(request1));
   }));
@@ -278,10 +265,10 @@ TEST_F(RedisProxyFilterTest, ImmediateResponse) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request1));
   }));
-  EXPECT_CALL(getSplitter(), makeRequest_(Ref(*request1), _))
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _, _))
       .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&,
-                     CommandSplitter::SplitCallbacks& callbacks) -> CommandSplitter::SplitRequest* {
+          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
+                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
             Common::Redis::RespValuePtr error(new Common::Redis::RespValue());
             error->type(Common::Redis::RespType::Error);
             error->asString() = "no healthy upstream";
@@ -322,10 +309,10 @@ TEST_F(RedisProxyFilterTest, AuthWhenNotRequired) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(getSplitter(), makeRequest_(Ref(*request), _))
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
       .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&,
-                     CommandSplitter::SplitCallbacks& callbacks) -> CommandSplitter::SplitRequest* {
+          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
+                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
             EXPECT_TRUE(callbacks.connectionAllowed());
             Common::Redis::RespValuePtr error(new Common::Redis::RespValue());
             error->type(Common::Redis::RespType::Error);
@@ -349,10 +336,10 @@ TEST_F(RedisProxyFilterTest, AuthAclWhenNotRequired) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(getSplitter(), makeRequest_(Ref(*request), _))
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
       .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&,
-                     CommandSplitter::SplitCallbacks& callbacks) -> CommandSplitter::SplitRequest* {
+          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
+                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
             EXPECT_TRUE(callbacks.connectionAllowed());
             Common::Redis::RespValuePtr error(new Common::Redis::RespValue());
             error->type(Common::Redis::RespType::Error);
@@ -392,10 +379,10 @@ TEST_F(RedisProxyFilterWithAuthPasswordTest, AuthPasswordCorrect) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(getSplitter(), makeRequest_(Ref(*request), _))
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
       .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&,
-                     CommandSplitter::SplitCallbacks& callbacks) -> CommandSplitter::SplitRequest* {
+          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
+                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
             EXPECT_FALSE(callbacks.connectionAllowed());
             Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
             reply->type(Common::Redis::RespType::SimpleString);
@@ -419,10 +406,10 @@ TEST_F(RedisProxyFilterWithAuthPasswordTest, AuthPasswordIncorrect) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(getSplitter(), makeRequest_(Ref(*request), _))
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
       .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&,
-                     CommandSplitter::SplitCallbacks& callbacks) -> CommandSplitter::SplitRequest* {
+          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
+                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
             EXPECT_FALSE(callbacks.connectionAllowed());
             Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
             reply->type(Common::Redis::RespType::Error);
@@ -464,10 +451,10 @@ TEST_F(RedisProxyFilterWithAuthAclTest, AuthAclCorrect) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(getSplitter(), makeRequest_(Ref(*request), _))
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
       .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&,
-                     CommandSplitter::SplitCallbacks& callbacks) -> CommandSplitter::SplitRequest* {
+          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
+                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
             EXPECT_FALSE(callbacks.connectionAllowed());
             Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
             reply->type(Common::Redis::RespType::SimpleString);
@@ -491,10 +478,10 @@ TEST_F(RedisProxyFilterWithAuthAclTest, AuthAclUsernameIncorrect) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(getSplitter(), makeRequest_(Ref(*request), _))
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
       .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&,
-                     CommandSplitter::SplitCallbacks& callbacks) -> CommandSplitter::SplitRequest* {
+          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
+                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
             EXPECT_FALSE(callbacks.connectionAllowed());
             Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
             reply->type(Common::Redis::RespType::Error);
@@ -518,10 +505,10 @@ TEST_F(RedisProxyFilterWithAuthAclTest, AuthAclPasswordIncorrect) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder_callbacks_->onRespValue(std::move(request));
   }));
-  EXPECT_CALL(getSplitter(), makeRequest_(Ref(*request), _))
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _))
       .WillOnce(
-          Invoke([&](const Common::Redis::RespValue&,
-                     CommandSplitter::SplitCallbacks& callbacks) -> CommandSplitter::SplitRequest* {
+          Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& callbacks,
+                     Event::Dispatcher&) -> CommandSplitter::SplitRequest* {
             EXPECT_FALSE(callbacks.connectionAllowed());
             Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
             reply->type(Common::Redis::RespType::Error);

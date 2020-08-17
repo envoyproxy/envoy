@@ -70,12 +70,15 @@ def envoy_cc_extension(
         undocumented = False,
         status = "stable",
         tags = [],
+        # TODO(rgs1): revert this to //:extension_config once
+        # https://github.com/envoyproxy/envoy/issues/12444 is fixed.
+        visibility = ["//visibility:public"],
         **kwargs):
     if security_posture not in EXTENSION_SECURITY_POSTURES:
         fail("Unknown extension security posture: " + security_posture)
     if status not in EXTENSION_STATUS_VALUES:
         fail("Unknown extension status: " + status)
-    envoy_cc_library(name, tags = tags, **kwargs)
+    envoy_cc_library(name, tags = tags, visibility = visibility, **kwargs)
 
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(
@@ -94,13 +97,6 @@ def envoy_cc_library(
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
 
-    # Intended for compilation database generation. This generates an empty cc
-    # source file so Bazel generates virtual includes and recognize them as C++.
-    # Workaround for https://github.com/bazelbuild/bazel/issues/10845.
-    srcs += select({
-        "@envoy//bazel:compdb_build": ["@envoy//bazel/external:empty.cc"],
-        "//conditions:default": [],
-    })
     cc_library(
         name = name,
         srcs = srcs,

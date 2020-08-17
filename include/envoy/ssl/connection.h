@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "envoy/common/pure.h"
@@ -30,8 +31,8 @@ public:
   virtual bool peerCertificateValidated() const PURE;
 
   /**
-   * @return std::string the URIs in the SAN field of the local certificate. Returns {} if there is
-   *         no local certificate, or no SAN field, or no URI.
+   * @return absl::Span<const std::string>the URIs in the SAN field of the local certificate.
+   *         Returns {} if there is no local certificate, or no SAN field, or no URI.
    **/
   virtual absl::Span<const std::string> uriSanLocalCertificate() const PURE;
 
@@ -72,8 +73,8 @@ public:
   virtual const std::string& subjectPeerCertificate() const PURE;
 
   /**
-   * @return std::string the URIs in the SAN field of the peer certificate. Returns {} if there is
-   *no peer certificate, or no SAN field, or no URI.
+   * @return absl::Span<const std::string> the URIs in the SAN field of the peer certificate.
+   *         Returns {} if there is no peer certificate, or no SAN field, or no URI.
    **/
   virtual absl::Span<const std::string> uriSanPeerCertificate() const PURE;
 
@@ -142,7 +143,7 @@ public:
    * if a peer cert exists and it contains the specified extension.
    *
    * Note: This is used out of tree, check with @snowp before removing.
-   * @param extension_name name of extension to look up
+   * @param extension_name name of extension to look up.
    * @return absl::optional<std::string> the raw octets of the extension ``ASN.1`` object, if it
    * exists.
    */

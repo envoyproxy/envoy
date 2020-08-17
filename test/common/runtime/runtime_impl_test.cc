@@ -23,6 +23,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -140,12 +141,14 @@ TEST_F(DiskLoaderImplTest, All) {
 
   // Basic string getting.
   EXPECT_EQ("world", loader_->snapshot().get("file2").value().get());
-  EXPECT_EQ("hello\nworld", loader_->snapshot().get("subdir.file3").value().get());
+  EXPECT_EQ("hello", loader_->snapshot().get("subdir.file").value().get());
+  EXPECT_EQ("hello\nworld", loader_->snapshot().get("file_lf").value().get());
+  EXPECT_EQ("hello\r\nworld", loader_->snapshot().get("file_crlf").value().get());
   EXPECT_FALSE(loader_->snapshot().get("invalid").has_value());
 
   // Existence checking.
   EXPECT_EQ(true, loader_->snapshot().get("file2").has_value());
-  EXPECT_EQ(true, loader_->snapshot().get("subdir.file3").has_value());
+  EXPECT_EQ(true, loader_->snapshot().get("subdir.file").has_value());
   EXPECT_EQ(false, loader_->snapshot().get("invalid").has_value());
 
   // Integer getting.
@@ -255,7 +258,7 @@ TEST_F(DiskLoaderImplTest, All) {
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(23, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(25, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(4, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
@@ -556,7 +559,7 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
     file12: FaLSe
     file13: false
     subdir:
-      file3: "hello\nworld"
+      file: "hello"
     numerator_only:
       numerator: 52
     denominator_only:
@@ -567,6 +570,8 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
     empty: {}
     file_with_words: "some words"
     file_with_double: 23.2
+    file_lf: "hello\nworld"
+    file_crlf: "hello\r\nworld"
     bool_as_int0: 0
     bool_as_int1: 1
   )EOF");
@@ -574,7 +579,9 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
 
   // Basic string getting.
   EXPECT_EQ("world", loader_->snapshot().get("file2").value().get());
-  EXPECT_EQ("hello\nworld", loader_->snapshot().get("subdir.file3").value().get());
+  EXPECT_EQ("hello", loader_->snapshot().get("subdir.file").value().get());
+  EXPECT_EQ("hello\nworld", loader_->snapshot().get("file_lf").value().get());
+  EXPECT_EQ("hello\r\nworld", loader_->snapshot().get("file_crlf").value().get());
   EXPECT_FALSE(loader_->snapshot().get("invalid").has_value());
 
   // Integer getting.
@@ -674,8 +681,27 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(19, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(21, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+TEST_F(StaticLoaderImplTest, InvalidNumerator) {
+  base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
+    invalid_numerator:
+      numerator: 111
+      denominator: HUNDRED
+  )EOF");
+  setup();
+
+  envoy::type::v3::FractionalPercent fractional_percent;
+
+  // There is no assertion here - when numerator is invalid
+  // featureEnabled() will just drop debug log line.
+  EXPECT_CALL(generator_, random()).WillOnce(Return(500000));
+  EXPECT_LOG_CONTAINS("debug",
+                      "runtime key 'invalid_numerator': numerator (111) > denominator (100), "
+                      "condition always evaluates to true",
+                      loader_->snapshot().featureEnabled("invalid_numerator", fractional_percent));
 }
 
 TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {

@@ -8,6 +8,8 @@
 
 namespace Envoy {
 
+using testing::HasSubstr;
+
 namespace {
 constexpr char HandleThreeHopLocationFormat[] =
     "http://handle.internal.redirect.max.three.hop/path{}";
@@ -46,8 +48,8 @@ protected:
     FakeStreamPtr new_stream = nullptr;
     auto wait_new_stream_fn = [this,
                                &new_stream](FakeHttpConnectionPtr& connection) -> AssertionResult {
-      AssertionResult result = connection->waitForNewStream(*dispatcher_, new_stream, false,
-                                                            std::chrono::milliseconds(50));
+      AssertionResult result =
+          connection->waitForNewStream(*dispatcher_, new_stream, std::chrono::milliseconds(50));
       if (result) {
         ASSERT(new_stream);
       }
@@ -110,6 +112,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPassedThrough) {
 }
 
 TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   // Validate that header sanitization is only called once.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -141,6 +144,7 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
                    ->value());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("internal_redirect"));
 }
 
 TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {

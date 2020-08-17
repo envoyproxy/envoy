@@ -120,23 +120,14 @@ public:
   MockInstance();
   ~MockInstance() override;
 
-  SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
-                              SplitCallbacks& callbacks) override {
-    return SplitRequestPtr{makeRequest_(*request, callbacks)};
+  SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
+                              Event::Dispatcher& dispatcher) override {
+    return SplitRequestPtr{makeRequest_(*request, callbacks, dispatcher)};
   }
 
   MOCK_METHOD(SplitRequest*, makeRequest_,
-              (const Common::Redis::RespValue& request, SplitCallbacks& callbacks));
-};
-
-class MockCommandSplitterFactory : public CommandSplitterFactory {
-public:
-  MockCommandSplitterFactory();
-  ~MockCommandSplitterFactory() override;
-
-  CommandSplitterPtr create(Event::Dispatcher& dispatcher) override { return create_(dispatcher); };
-
-  MOCK_METHOD(CommandSplitterPtr, create_, (Event::Dispatcher & dispatcher));
+              (const Common::Redis::RespValue& request, SplitCallbacks& callbacks,
+               Event::Dispatcher& dispatcher));
 };
 
 } // namespace CommandSplitter

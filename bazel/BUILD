@@ -125,11 +125,6 @@ config_setting(
 )
 
 config_setting(
-    name = "compdb_build",
-    values = {"define": "ENVOY_CONFIG_COMPILATION_DATABASE=1"},
-)
-
-config_setting(
     name = "clang_build",
     flag_values = {
         "@bazel_tools//tools/cpp:compiler": "clang",
@@ -200,8 +195,8 @@ config_setting(
 )
 
 config_setting(
-    name = "enable_legacy_codecs_in_integration_tests",
-    values = {"define": "use_legacy_codecs_in_integration_tests=true"},
+    name = "enable_new_codecs_in_integration_tests",
+    values = {"define": "use_new_codecs_in_integration_tests=true"},
 )
 
 cc_proto_library(

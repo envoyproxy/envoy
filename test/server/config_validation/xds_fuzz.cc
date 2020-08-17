@@ -242,7 +242,7 @@ void XdsFuzzTest::replay() {
       addListener(listener_name, route_name);
       if (!sent_listener) {
         addRoute(route_name);
-        test_server_->waitForCounterEq("listener_manager.listener_create_success", 1);
+        test_server_->waitForCounterEq("listener_manager.listener_create_success", 1, timeout_);
       }
       sent_listener = true;
       break;
@@ -270,15 +270,19 @@ void XdsFuzzTest::replay() {
     if (sent_listener) {
       // wait for all of the updates to take effect
       test_server_->waitForGaugeEq("listener_manager.total_listeners_warming",
-                                   verifier_.numWarming());
-      test_server_->waitForGaugeEq("listener_manager.total_listeners_active",
-                                   verifier_.numActive());
+                                   verifier_.numWarming(), timeout_);
+      test_server_->waitForGaugeEq("listener_manager.total_listeners_active", verifier_.numActive(),
+                                   timeout_);
       test_server_->waitForGaugeEq("listener_manager.total_listeners_draining",
-                                   verifier_.numDraining());
-      test_server_->waitForCounterEq("listener_manager.listener_modified", verifier_.numModified());
-      test_server_->waitForCounterEq("listener_manager.listener_added", verifier_.numAdded());
-      test_server_->waitForCounterEq("listener_manager.listener_removed", verifier_.numRemoved());
-      test_server_->waitForCounterEq("listener_manager.lds.update_success", lds_update_success_);
+                                   verifier_.numDraining(), timeout_);
+      test_server_->waitForCounterEq("listener_manager.listener_modified", verifier_.numModified(),
+                                     timeout_);
+      test_server_->waitForCounterEq("listener_manager.listener_added", verifier_.numAdded(),
+                                     timeout_);
+      test_server_->waitForCounterEq("listener_manager.listener_removed", verifier_.numRemoved(),
+                                     timeout_);
+      test_server_->waitForCounterEq("listener_manager.lds.update_success", lds_update_success_,
+                                     timeout_);
     }
     ENVOY_LOG_MISC(debug, "warming {} ({}), active {} ({}), draining {} ({})",
                    verifier_.numWarming(),
@@ -324,13 +328,13 @@ void XdsFuzzTest::verifyListeners() {
     // the state should match
     switch (rep.state) {
     case XdsVerifier::DRAINING:
-      EXPECT_TRUE(listener_dump->has_draining_state());
+      FUZZ_ASSERT(listener_dump->has_draining_state());
       break;
     case XdsVerifier::WARMING:
-      EXPECT_TRUE(listener_dump->has_warming_state());
+      FUZZ_ASSERT(listener_dump->has_warming_state());
       break;
     case XdsVerifier::ACTIVE:
-      EXPECT_TRUE(listener_dump->has_active_state());
+      FUZZ_ASSERT(listener_dump->has_active_state());
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
@@ -343,9 +347,9 @@ void XdsFuzzTest::verifyRoutes() {
 
   // go through routes in verifier and make sure each is in the config dump
   auto routes = verifier_.routes();
-  EXPECT_EQ(routes.size(), dump.size());
+  FUZZ_ASSERT(routes.size() == dump.size());
   for (const auto& route : routes) {
-    EXPECT_TRUE(std::any_of(dump.begin(), dump.end(), [&](const auto& dump_route) {
+    FUZZ_ASSERT(std::any_of(dump.begin(), dump.end(), [&](const auto& dump_route) {
       return route.first == dump_route.name();
     }));
   }
@@ -357,12 +361,12 @@ void XdsFuzzTest::verifyState() {
   verifyRoutes();
   ENVOY_LOG_MISC(debug, "Verified routes");
 
-  EXPECT_EQ(test_server_->gauge("listener_manager.total_listeners_draining")->value(),
-            verifier_.numDraining());
-  EXPECT_EQ(test_server_->gauge("listener_manager.total_listeners_warming")->value(),
-            verifier_.numWarming());
-  EXPECT_EQ(test_server_->gauge("listener_manager.total_listeners_active")->value(),
-            verifier_.numActive());
+  FUZZ_ASSERT(test_server_->gauge("listener_manager.total_listeners_draining")->value() ==
+              verifier_.numDraining());
+  FUZZ_ASSERT(test_server_->gauge("listener_manager.total_listeners_warming")->value() ==
+              verifier_.numWarming());
+  FUZZ_ASSERT(test_server_->gauge("listener_manager.total_listeners_active")->value() ==
+              verifier_.numActive());
   ENVOY_LOG_MISC(debug, "Verified stats");
   ENVOY_LOG_MISC(debug, "warming {} ({}), active {} ({}), draining {} ({})", verifier_.numWarming(),
                  test_server_->gauge("listener_manager.total_listeners_warming")->value(),
