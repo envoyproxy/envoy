@@ -113,16 +113,45 @@ protected:
 INSTANTIATE_TEST_SUITE_P(TimeSystemType, ProfileActionTest,
                          testing::ValuesIn({TimeSystemType::Real, TimeSystemType::Simulated}));
 
+TEST_P(ProfileActionTest, CanDoSingleProfile) {
+  // Create configuration.
+  envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
+  config.set_profile_path(test_path_);
+  config.mutable_profile_duration()->set_seconds(1);
+  setupAction(config);
+
+  // Create vector of relevant threads
+  const auto now = api_->timeSource().monotonicTime();
+  std::vector<std::pair<Thread::ThreadId, MonotonicTime>> tid_ltt_pairs = {
+      {Thread::ThreadId(10), now}};
+
+  // Check that we can do at least a single profile
+  dispatcher_->post([&tid_ltt_pairs, &now, this]() -> void {
+    action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, tid_ltt_pairs, now);
+    absl::MutexLock lock(&mutex_);
+    outstanding_notifies_ += 1;
+  });
+
+  absl::MutexLock lock(&mutex_);
+  waitForOutstandingNotify();
+  time_system_->advanceTimeWait(std::chrono::seconds(2));
+
+  dispatcher_->exit();
+  thread_->join();
+
+#ifdef PROFILER_AVAILABLE
+  EXPECT_EQ(countNumberOfProfileInPath(test_path_), 1);
+#else
+  // Profiler won't run in this case, so there should be no files generated.
+  EXPECT_EQ(countNumberOfProfileInPath(test_path_), 0);
+#endif
+}
+
 TEST_P(ProfileActionTest, CanDoMultipleProfiles) {
   // Create configuration.
   envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
-  TestUtility::loadFromJson(absl::Substitute(R"EOF({
-          "profile_duration": "1s",
-          "profile_path": "$0",
-        }
-      )EOF",
-                                             test_path_),
-                            config);
+  config.set_profile_path(test_path_);
+  config.mutable_profile_duration()->set_seconds(1);
   setupAction(config);
 
   // Create vector of relevant threads
@@ -142,10 +171,10 @@ TEST_P(ProfileActionTest, CanDoMultipleProfiles) {
   time_system_->advanceTimeWait(std::chrono::seconds(2));
 
 #ifdef PROFILER_AVAILABLE
-  EXPECT_EQ(countNumberOfProfileInPath(test_path_), 1);
+  ASSERT_EQ(countNumberOfProfileInPath(test_path_), 1);
 #else
   // Profiler won't run in this case, so there should be no files generated.
-  EXPECT_EQ(countNumberOfProfileInPath(test_path_), 0);
+  ASSERT_EQ(countNumberOfProfileInPath(test_path_), 0);
 #endif
 
   // Check we can do multiple profiles

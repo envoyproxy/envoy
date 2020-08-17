@@ -97,17 +97,15 @@ void ProfileAction::run(
 // Helper to determine if we have a valid tid to start profiling.
 absl::optional<Thread::ThreadId> ProfileAction::getTidTriggeringProfile(
     const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs) {
-  absl::optional<Thread::ThreadId> tid_to_profile;
 
   // Find a TID not over the max_profiles threshold
   for (const auto& [tid, ltt] : thread_ltt_pairs) {
     if (tid_to_profile_count_[tid] < max_profiles_per_tid_) {
-      tid_to_profile = tid;
-      break;
+      return tid;
     }
   }
 
-  return tid_to_profile;
+  return absl::nullopt;
 }
 } // namespace ProfileAction
 } // namespace Watchdog
