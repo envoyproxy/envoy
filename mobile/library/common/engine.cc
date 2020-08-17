@@ -50,6 +50,7 @@ envoy_status_t Engine::run(std::string config, std::string log_level) {
     postinit_callback_handler_ = main_common_->server()->lifecycleNotifier().registerCallback(
         Envoy::Server::ServerLifecycleNotifier::Stage::PostInit, [this]() -> void {
           server_ = TS_UNCHECKED_READ(main_common_)->server();
+          client_scope_ = server_->serverFactoryContext().scope().createScope("client.");
           auto api_listener = server_->listenerManager().apiListener()->get().http();
           ASSERT(api_listener.has_value());
           http_dispatcher_->ready(server_->dispatcher(), server_->serverFactoryContext().scope(),
@@ -93,14 +94,10 @@ Engine::~Engine() {
   main_thread_.join();
 }
 
-void Engine::recordCounter(std::string elements, uint64_t count) {
-  if (server_) {
+void Engine::recordCounter(const std::string& elements, uint64_t count) {
+  if (server_ && client_scope_) {
     server_->dispatcher().post([this, elements, count]() -> void {
-      static const std::string client = "client";
-      absl::string_view prefix{client};
-      absl::string_view dynamic_elements{elements};
-      Stats::Utility::counterFromElements(server_->serverFactoryContext().scope(),
-                                          {prefix, dynamic_elements})
+      Stats::Utility::counterFromElements(*client_scope_, {Stats::DynamicName(elements)})
           .add(count);
     });
   }
