@@ -14,7 +14,6 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "robust_to_untrusted_downstream",
-    undocumented = True,
     deps = [
         ":upstream_proxy_protocol",
         "//include/envoy/network:transport_socket_interface",
