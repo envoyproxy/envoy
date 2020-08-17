@@ -149,7 +149,10 @@ private:
 
     void addOnDemandUpdateCallback(std::function<void()> callback);
     void runOnDemandUpdateCallback();
-    void initRdsConfigProvider();
+    void maybeInitRdsConfigProvider();
+    void initRdsConfigProvider(
+        envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
+        Init::Manager& init_manager);
 
     ScopedRdsConfigSubscription& parent_;
     std::string scope_name_;
