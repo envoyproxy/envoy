@@ -129,16 +129,17 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
           if (host->health() == Host::Health::Healthy) {
             endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
           } else {
-            if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::TIMEOUT) {
+            switch (host->getActiveHealthFailureType()) {
+            case Host::ActiveHealthFailureType::TIMEOUT:
               endpoint->set_health_status(envoy::config::core::v3::TIMEOUT);
-            } else if (host->getActiveHealthFailureType() ==
-                       Host::ActiveHealthFailureType::UNHEALTHY) {
+              break;
+            case Host::ActiveHealthFailureType::UNHEALTHY:
+            case Host::ActiveHealthFailureType::UNKNOWN:
               endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
-            } else if (host->getActiveHealthFailureType() ==
-                       Host::ActiveHealthFailureType::UNKNOWN) {
-              endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
-            } else {
+              break;
+            default:
               NOT_REACHED_GCOVR_EXCL_LINE;
+              break;
             }
           }
 
