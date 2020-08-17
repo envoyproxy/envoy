@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <iomanip>
 #include <sstream>
 #include <vector>
