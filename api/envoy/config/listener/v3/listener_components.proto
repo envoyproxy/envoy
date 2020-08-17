@@ -209,6 +209,8 @@ message FilterChain {
   string name = 7;
 
   // [#not-implemented-hide:] Whether the filter chain will be built on demand or not.
+  // The initialization of on-demand filter chains will be postponed until the first incoming traffic.
+  // On-demand filter chains will not block listener updates.
   bool build_on_demand = 8;
 
   // [#not-implemented-hide:] The timeout to wait for filter chain placeholder to complete rebuilding.
