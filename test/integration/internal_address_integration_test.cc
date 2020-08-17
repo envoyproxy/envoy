@@ -280,7 +280,8 @@ TEST_P(InternalAddressIntegrationTest, TcpProxyLargeWrite) {
   uint32_t upstream_resumes =
       test_server_->counter("cluster.cluster_0.upstream_flow_control_resumed_reading_total")
           ->value();
-          ENVOY_LOG_MISC(debug, "lambdai: cluster_0 pause reading = {} resume reading = {}", upstream_pauses, upstream_resumes );
+  ENVOY_LOG_MISC(debug, "lambdai: cluster_0 pause reading = {} resume reading = {}",
+                 upstream_pauses, upstream_resumes);
   EXPECT_EQ(upstream_pauses, upstream_resumes);
 
   uint32_t downstream_pauses =

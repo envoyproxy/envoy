@@ -10,10 +10,11 @@
 #include "common/common/fmt.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
+#include "common/network/buffer_source_socket.h"
 #include "common/network/connection_impl.h"
-#include "common/network/pipe_connection_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/network/pipe_connection_impl.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 
@@ -48,7 +49,8 @@ namespace {
 
 class PipeConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
-  PipeConnectionImplTest() : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_) {}
+  PipeConnectionImplTest()
+      : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_) {}
 
   void setUpBasicConnection() {
     if (dispatcher_.get() == nullptr) {
@@ -66,31 +68,56 @@ protected:
     EXPECT_EQ(nullptr, const_connection.ssl());
   }
 
-//   void connect() {
-//     int expected_callbacks = 2;
-//     client_connection_->connect();
-//     read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
-//     EXPECT_CALL(listener_callbacks_, onAccept_(_))
-//         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-//           server_connection_ = dispatcher_->createServerConnection(
-//               std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
-//           server_connection_->addConnectionCallbacks(server_callbacks_);
-//           server_connection_->addReadFilter(read_filter_);
+  void setupPipe() {
+    if (dispatcher_.get() == nullptr) {
+      dispatcher_ = api_->allocateDispatcher("test_thread");
+    }
+    client_address_ = std::make_shared<Network::Address::EnvoyInternalInstance>("client_address");
+    server_address_ = std::make_shared<Network::Address::EnvoyInternalInstance>("server_address");
+    auto client_socket = std::make_unique<Network::BufferSourceSocket>();
+    auto server_socket = std::make_unique<Network::BufferSourceSocket>();
+    auto client_socket_raw = client_socket.get();
+    auto server_socket_raw = server_socket.get();
+    auto client_conn = std::make_unique<Network::ClientPipeImpl>(
+        *dispatcher_, server_address_, client_address_, std::move(client_socket), nullptr);
+    ENVOY_LOG_MISC(debug, "lambdai: client pipe C{} owns TS{} and B{}", client_conn->id(),
+                   client_socket_raw->bsid(), client_socket_raw->read_buffer_.bid());
 
-//           expected_callbacks--;
-//           if (expected_callbacks == 0) {
-//             dispatcher_->exit();
-//           }
-//         }));
-//     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
-//         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
-//           expected_callbacks--;
-//           if (expected_callbacks == 0) {
-//             dispatcher_->exit();
-//           }
-//         }));
-//     dispatcher_->run(Event::Dispatcher::RunType::Block);
-//   }
+    auto server_conn = std::make_unique<Network::ServerPipeImpl>(
+        *dispatcher_, client_address_, server_address_, std::move(server_socket), nullptr);
+    ENVOY_LOG_MISC(debug, "lambdai: server pipe C{} owns TS{} and B{}", server_conn->id(),
+                   server_socket_raw->bsid(), server_socket_raw->read_buffer_.bid());
+
+    server_conn->setPeer(client_conn.get());
+    client_conn->setPeer(server_conn.get());
+    // TODO(lambdai): Retrieve buffer each time when supporting close.
+    // TODO(lambdai): Add to dest buffer to generic IoHandle, or TransportSocketCallback.
+    // client_socket_raw->setReadSourceBuffer(&server_conn->getWriteBuffer().buffer);
+    client_socket_raw->setWritablePeer(server_socket_raw);
+    // server_socket_raw->setReadSourceBuffer(&client_conn->getWriteBuffer().buffer);
+    server_socket_raw->setWritablePeer(client_socket_raw);
+    server_connection_ = std::move(server_conn);
+    client_connection_ = std::move(client_conn);
+  }
+
+  void doConnect() {
+    Network::ConnectionSocketPtr socket =
+        std::make_unique<Network::ConnectionSocketImpl>(nullptr,
+                                                        // Local
+                                                        server_address_,
+                                                        // Remote
+                                                        client_address_);
+    // TODO(lambdai): setup filter chain based on socket
+    UNREFERENCED_PARAMETER(socket);
+
+    server_stream_info_ = std::make_unique<StreamInfo::StreamInfoImpl>(
+        dispatcher_->timeSource(), StreamInfo::FilterState::LifeSpan::Connection);
+    server_connection_->setStreamInfo(server_stream_info_.get());
+
+    server_connection_->addConnectionCallbacks(server_callbacks_);
+    read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
+    server_connection_->addReadFilter(read_filter_);
+  }
 
   void disconnect(bool wait_for_remote_close) {
     if (client_write_buffer_) {
@@ -173,6 +200,7 @@ protected:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::shared_ptr<Network::TcpListenSocket> socket_{nullptr};
+  std::unique_ptr<StreamInfo::StreamInfoImpl> server_stream_info_;
   Network::MockListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
   Network::ListenerPtr listener_;
@@ -185,46 +213,27 @@ protected:
   Address::InstanceConstSharedPtr source_address_;
   Socket::OptionsSharedPtr socket_options_;
   StreamInfo::StreamInfoImpl stream_info_;
+  Address::InstanceConstSharedPtr client_address_;
+  Address::InstanceConstSharedPtr server_address_;
 };
 
 TEST_P(PipeConnectionImplTest, UniqueId) {
-  setUpBasicConnection();
-  disconnect(false);
-  uint64_t first_id = client_connection_->id();
-  setUpBasicConnection();
-  EXPECT_NE(first_id, client_connection_->id());
-  disconnect(false);
+  setupPipe();
+  uint64_t client_id = client_connection_->id();
+  uint64_t server_id = server_connection_->id();
+  EXPECT_NE(server_id, client_id);
+  client_connection_->close(ConnectionCloseType::NoFlush);
 }
 
-// TEST_P(PipeConnectionImplTest, CloseDuringConnectCallback) {
-//   setUpBasicConnection();
+TEST_P(PipeConnectionImplTest, ClientClose) {
+  setupPipe();
+  doConnect();
+  Buffer::OwnedImpl buffer("hello world");
+  client_connection_->write(buffer, false);
 
-//   Buffer::OwnedImpl buffer("hello world");
-//   client_connection_->write(buffer, false);
-//   client_connection_->connect();
-
-//   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
-//       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
-//         client_connection_->close(ConnectionCloseType::NoFlush);
-//       }));
-//   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
-
-//   read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
-
-//   EXPECT_CALL(listener_callbacks_, onAccept_(_))
-//       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-//         server_connection_ = dispatcher_->createServerConnection(
-//             std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
-//         server_connection_->addConnectionCallbacks(server_callbacks_);
-//         server_connection_->addReadFilter(read_filter_);
-//       }));
-
-//   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-//       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
-
-//   dispatcher_->run(Event::Dispatcher::RunType::Block);
-// }
-
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  client_connection_->close(ConnectionCloseType::NoFlush);
+}
 
 // // Ensure the new counter logic in ReadDisable avoids tripping asserts in ReadDisable guarding
 // // against actual enabling twice in a row.
@@ -266,7 +275,8 @@ TEST_P(PipeConnectionImplTest, UniqueId) {
 //   connection->close(ConnectionCloseType::NoFlush);
 // }
 
-// // The HTTP/1 codec handles pipelined connections by relying on readDisable(false) resulting in the
+// // The HTTP/1 codec handles pipelined connections by relying on readDisable(false) resulting in
+// the
 // // subsequent request being dispatched. Regression test this behavior.
 // TEST_P(PipeConnectionImplTest, ReadEnableDispatches) {
 //   setUpBasicConnection();
@@ -340,15 +350,17 @@ TEST_P(PipeConnectionImplTest, UniqueId) {
 //     connection_buffer->drain(connection_buffer->length());
 //     client_connection_->readDisable(false);
 //     EXPECT_CALL(*client_read_filter, onData(_, _)).Times(0);
-//     // Data no longer buffered - even if dispatch_buffered_data_ lingered it should have no effect.
-//     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+//     // Data no longer buffered - even if dispatch_buffered_data_ lingered it should have no
+//     effect. dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 //   }
 
 //   disconnect(true);
 // }
 
-// // Ensure that calls to readDisable on a closed connection are handled gracefully. Known past issues
-// // include a crash on https://github.com/envoyproxy/envoy/issues/3639, and ASSERT failure followed
+// // Ensure that calls to readDisable on a closed connection are handled gracefully. Known past
+// issues
+// // include a crash on https://github.com/envoyproxy/envoy/issues/3639, and ASSERT failure
+// followed
 // // by infinite loop in https://github.com/envoyproxy/envoy/issues/9508
 // TEST_P(PipeConnectionImplTest, ReadDisableAfterCloseHandledGracefully) {
 //   setUpBasicConnection();
@@ -365,7 +377,8 @@ TEST_P(PipeConnectionImplTest, UniqueId) {
 //   client_connection_->readDisable(true);
 //   disconnect(false);
 // #ifndef NDEBUG
-//   // When running in debug mode, verify that calls to readDisable and readEnabled on a closed socket
+//   // When running in debug mode, verify that calls to readDisable and readEnabled on a closed
+//   socket
 //   // trigger ASSERT failures.
 //   EXPECT_DEBUG_DEATH(client_connection_->readEnabled(), "");
 //   EXPECT_DEBUG_DEATH(client_connection_->readDisable(true), "");
@@ -458,7 +471,6 @@ TEST_P(PipeConnectionImplTest, UniqueId) {
 //       }));
 //   dispatcher_->run(Event::Dispatcher::RunType::Block);
 // }
-
 
 // // Test that as watermark levels are changed, the appropriate callbacks are triggered.
 // TEST_P(PipeConnectionImplTest, WriteWatermarks) {
@@ -742,9 +754,9 @@ TEST_P(PipeConnectionImplTest, UniqueId) {
 //     // The number of bytes buffered at the end of this loop.
 //     new_bytes_buffered = bytes_buffered + bytes_to_write - bytes_to_flush;
 //     ENVOY_LOG_MISC(trace,
-//                    "Loop iteration {} bytes_to_write {} bytes_to_flush {} bytes_buffered is {} and "
-//                    "will be be {}",
-//                    i, bytes_to_write, bytes_to_flush, bytes_buffered, new_bytes_buffered);
+//                    "Loop iteration {} bytes_to_write {} bytes_to_flush {} bytes_buffered is {}
+//                    and " "will be be {}", i, bytes_to_write, bytes_to_flush, bytes_buffered,
+//                    new_bytes_buffered);
 
 //     std::string data(bytes_to_write, 'a');
 //     Buffer::OwnedImpl buffer_to_write(data);
@@ -774,7 +786,8 @@ TEST_P(PipeConnectionImplTest, UniqueId) {
 //         .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
 //     EXPECT_CALL(*client_write_buffer_, write(_))
 //         .WillOnce(
-//             DoAll(Invoke([&](IoHandle&) -> void { client_write_buffer_->drain(bytes_to_flush); }),
+//             DoAll(Invoke([&](IoHandle&) -> void { client_write_buffer_->drain(bytes_to_flush);
+//             }),
 //                   Return(testing::ByMove(Api::IoCallUint64Result(
 //                       bytes_to_flush, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}))))))
 //         .WillRepeatedly(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::failWrite));
@@ -790,6 +803,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, PipeConnectionImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-}
+} // namespace
 } // namespace Network
 } // namespace Envoy

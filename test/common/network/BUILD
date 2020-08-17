@@ -103,6 +103,8 @@ envoy_cc_test(
         "//source/common/common:empty_string",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:buffer_source_socket_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
@@ -118,7 +120,6 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
-
 
 envoy_cc_test(
     name = "dns_impl_test",
