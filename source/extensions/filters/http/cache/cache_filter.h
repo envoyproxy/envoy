@@ -65,7 +65,6 @@ private:
   void injectValidationHeaders(Http::RequestHeaderMap& request_headers);
 
   // Precondition: lookup_result_ points to a fresh or validated cache look up result.
-  //               filter_state_ is ValidatingCachedResponse.
   // Adds a cache lookup result to the response encoding stream.
   // Can be called during decoding if a valid cache hit is found,
   // or during encoding if a cache entry was validated successfully.
