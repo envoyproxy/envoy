@@ -1375,13 +1375,11 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadata) {
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, dynamicMetadata())
       .WillOnce(ReturnRef(metadata));
 
-  // filter_callbacks_.connection.raise
   filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   Upstream::LoadBalancerContext* context;
 
-  // EXPECT_CALL(factory_context_.random_, random()).WillOnce(Return(0));
   EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
       .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
@@ -1430,13 +1428,11 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, dynamicMetadata())
       .WillOnce(ReturnRef(metadata));
 
-  // filter_callbacks_.connection.raise
   filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   Upstream::LoadBalancerContext* context;
 
-  // EXPECT_CALL(factory_context_.random_, random()).WillOnce(Return(0));
   EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
       .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());

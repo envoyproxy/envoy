@@ -861,7 +861,7 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
 
 class InjectDynamicMetadata : public Network::ReadFilter {
 public:
-  InjectDynamicMetadata(const std::string& key) : key_(key) {}
+  explicit InjectDynamicMetadata(const std::string& key) : key_(key) {}
 
   Network::FilterStatus onData(Buffer::Instance& data, bool) override {
     if (!metadata_set_) {
@@ -876,9 +876,8 @@ public:
         return Network::FilterStatus::StopIteration;
       }
 
-      const char* str = reinterpret_cast<const char*>(data.linearize(data.length()));
       ProtobufWkt::Value val;
-      val.set_string_value(std::string(str, data.length()));
+      val.set_string_value(data.toString());
 
       ProtobufWkt::Struct& map =
           (*read_callbacks_->connection()
