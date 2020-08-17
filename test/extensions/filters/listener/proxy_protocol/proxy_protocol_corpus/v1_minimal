@@ -3,5 +3,5 @@ config {
 }
 
 fuzzed {
-  data: "PROXY UNKNOWN\r\nmore data"
+  data: "PROXY UNKNOWN\r\n"
 }
