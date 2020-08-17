@@ -767,6 +767,7 @@ def checkSourceLine(line, file_path, reportError):
                 "Lua API (bad light userdata pointer) on ARM64 architecture. See " +
                 "https://github.com/LuaJIT/LuaJIT/issues/450#issuecomment-433659873 for details.")
 
+
 def checkBuildLine(line, file_path, reportError):
   if "@bazel_tools" in line and not (isSkylarkFile(file_path) or file_path.startswith("./bazel/") or
                                      "python/runfiles" in line):
