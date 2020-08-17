@@ -72,6 +72,8 @@ message OkHttpResponse {
   repeated config.core.v4alpha.HeaderValueOption headers = 2;
 
   // This field has been deprecated in favor of :ref:`CheckResponse.dynamic_metadata
+  // <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>`. Until it is removed,
+  // setting this field overrides :ref:`CheckResponse.dynamic_metadata
   // <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>`.
   google.protobuf.Struct hidden_envoy_deprecated_dynamic_metadata = 3 [deprecated = true];
 }
