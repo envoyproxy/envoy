@@ -2132,208 +2132,76 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
   conn_manager_->onData(fake_input, false);
 }
 
-TEST_F(HttpConnectionManagerImplTest, ConnectionTerminatedIfCodecOverridesStreamError) {
-  setup(false, "");
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+class StreamErrorOnInvalidHttpMessageTest : public HttpConnectionManagerImplTest {
+public:
+  void sendInvalidRequestAndVerifyConnectionState(
+      bool hcm_stream_error_on_invalid_http_message,
+      absl::optional<bool> stream_error_on_invalid_http_message, bool is_connection_terminated) {
+    setup(false, "");
+    // HCM stream error
+    stream_error_on_invalid_http_messaging_ = hcm_stream_error_on_invalid_http_message;
 
-        // These request headers are missing the necessary ":host"
-        RequestHeaderMapPtr headers{
-            new TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
-        decoder->decodeHeaders(std::move(headers), true);
-        data.drain(0);
-        return Http::okStatus();
-      }));
+    EXPECT_CALL(*codec_, dispatch(_))
+        .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+          RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
 
-  auto* filter = new MockStreamFilter();
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
-      }));
-  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
-  EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
+          // These request headers are missing the necessary ":host"
+          RequestHeaderMapPtr headers{
+              new TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
+          decoder->decodeHeaders(std::move(headers), true);
+          data.drain(0);
+          return Http::okStatus();
+        }));
 
-  // stream_error from codec, if specified, determines whether the HTTP/1 connection is terminated
-  // or left open (irrespective of behaviour configured in HCM)
-  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
-      .WillOnce(Return(absl::optional<bool>(false)));
-  EXPECT_CALL(*filter, encodeHeaders(_, true));
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ("400", headers.getStatusValue());
-        EXPECT_EQ("missing_host_header",
-                  filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
-        EXPECT_NE(nullptr, headers.Connection());
-        EXPECT_EQ("close", headers.getConnectionValue());
-      }));
-  EXPECT_CALL(*filter, onDestroy());
+    auto* filter = new MockStreamFilter();
+    EXPECT_CALL(filter_factory_, createFilterChain(_))
+        .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+          callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
+        }));
+    EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+    EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
-  Buffer::OwnedImpl fake_input;
-  conn_manager_->onData(fake_input, false);
+    // codec stream error
+    EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
+        .WillOnce(Return(stream_error_on_invalid_http_message));
+    EXPECT_CALL(*filter, encodeHeaders(_, true));
+    EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+        .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+          EXPECT_EQ("400", headers.getStatusValue());
+          EXPECT_EQ("missing_host_header",
+                    filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
+          if (is_connection_terminated) {
+            EXPECT_NE(nullptr, headers.Connection());
+            EXPECT_EQ("close", headers.getConnectionValue());
+          } else {
+            EXPECT_EQ(nullptr, headers.Connection());
+          }
+        }));
+    EXPECT_CALL(*filter, onDestroy());
+
+    Buffer::OwnedImpl fake_input;
+    conn_manager_->onData(fake_input, false);
+  }
+};
+
+TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionTerminatedIfCodecOverridesStreamError) {
+  // codec stream error, if set, drives behavior (irrespective of HCM stream error)
+  sendInvalidRequestAndVerifyConnectionState(false, false, true);
 }
 
-TEST_F(HttpConnectionManagerImplTest, ConnectionOpenIfCodecOverridesStreamError) {
-  setup(false, "");
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
-
-        // These request headers are missing the necessary ":host"
-        RequestHeaderMapPtr headers{
-            new TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
-        decoder->decodeHeaders(std::move(headers), true);
-        data.drain(0);
-        return Http::okStatus();
-      }));
-
-  auto* filter = new MockStreamFilter();
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
-      }));
-  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
-  EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
-
-  // stream_error from codec, if specified, determines whether the HTTP/1 connection is terminated
-  // or left open (irrespective of behaviour configured in HCM)
-  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
-      .WillOnce(Return(absl::optional<bool>(true)));
-  EXPECT_CALL(*filter, encodeHeaders(_, true));
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ("400", headers.getStatusValue());
-        EXPECT_EQ("missing_host_header",
-                  filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
-        EXPECT_EQ(nullptr, headers.Connection());
-      }));
-  EXPECT_CALL(*filter, onDestroy());
-
-  Buffer::OwnedImpl fake_input;
-  conn_manager_->onData(fake_input, false);
+TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionOpenIfCodecOverridesStreamError) {
+  // codec stream error, if set, drives behavior (irrespective of HCM stream error)
+  sendInvalidRequestAndVerifyConnectionState(false, true, false);
 }
 
-TEST_F(HttpConnectionManagerImplTest, ConnectionTerminatedIfCodecDoesntOverrideStreamError) {
-  setup(false, "");
-  // HCM stream error
-  stream_error_on_invalid_http_messaging_ = false;
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
-
-        // These request headers are missing the necessary ":host"
-        RequestHeaderMapPtr headers{
-            new TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
-        decoder->decodeHeaders(std::move(headers), true);
-        data.drain(0);
-        return Http::okStatus();
-      }));
-
-  auto* filter = new MockStreamFilter();
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
-      }));
-  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
-  EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
-
-  // stream_error from codec is not specified, so HCM config determines whether the
-  // HTTP/1 connection is terminated or not
-  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
-      .WillOnce(Return(absl::optional<bool>()));
-  EXPECT_CALL(*filter, encodeHeaders(_, true));
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ("400", headers.getStatusValue());
-        EXPECT_EQ("missing_host_header",
-                  filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
-        EXPECT_NE(nullptr, headers.Connection());
-        EXPECT_EQ("close", headers.getConnectionValue());
-      }));
-  EXPECT_CALL(*filter, onDestroy());
-
-  Buffer::OwnedImpl fake_input;
-  conn_manager_->onData(fake_input, false);
+TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionTerminatedIfCodecDoesntOverrideStreamError) {
+  // codec stream error not set, so fall back to HCM stream error
+  sendInvalidRequestAndVerifyConnectionState(false, absl::nullopt, true);
 }
 
-TEST_F(HttpConnectionManagerImplTest, ConnectionLeftOpenIfCodecDoesntOverrideStreamError) {
-  setup(false, "");
-  // HCM stream_error
-  stream_error_on_invalid_http_messaging_ = true;
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
-
-        // These request headers are missing the necessary ":host"
-        RequestHeaderMapPtr headers{
-            new TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
-        decoder->decodeHeaders(std::move(headers), true);
-        data.drain(0);
-        return Http::okStatus();
-      }));
-
-  auto* filter = new MockStreamFilter();
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
-      }));
-  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
-  EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
-
-  // stream_error from codec is not specified, so HCM config determines whether the
-  // HTTP/1 connection is terminated or not
-  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
-      .WillOnce(Return(absl::optional<bool>()));
-  EXPECT_CALL(*filter, encodeHeaders(_, true));
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ("400", headers.getStatusValue());
-        EXPECT_EQ("missing_host_header",
-                  filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
-        EXPECT_EQ(nullptr, headers.Connection());
-      }));
-  EXPECT_CALL(*filter, onDestroy());
-
-  Buffer::OwnedImpl fake_input;
-  conn_manager_->onData(fake_input, false);
-}
-
-TEST_F(HttpConnectionManagerImplTest, ConnectionLeftOpenIfOnCodecDoesntOverrideStreamError) {
-  setup(false, "");
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
-
-        // These request headers are missing the necessary ":host"
-        RequestHeaderMapPtr headers{
-            new TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
-        decoder->decodeHeaders(std::move(headers), true);
-        data.drain(0);
-        return Http::okStatus();
-      }));
-
-  auto* filter = new MockStreamFilter();
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
-      }));
-  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
-  EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
-
-  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
-      .WillOnce(Return(absl::optional<bool>(true)));
-  EXPECT_CALL(*filter, encodeHeaders(_, true));
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ("400", headers.getStatusValue());
-        EXPECT_EQ("missing_host_header",
-                  filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
-        EXPECT_EQ(nullptr, headers.Connection());
-      }));
-  EXPECT_CALL(*filter, onDestroy());
-
-  Buffer::OwnedImpl fake_input;
-  conn_manager_->onData(fake_input, false);
+TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionLeftOpenIfCodecDoesntOverrideStreamError) {
+  // codec stream error not set, so fall back to HCM stream error
+  sendInvalidRequestAndVerifyConnectionState(true, absl::nullopt, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {

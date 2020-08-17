@@ -145,7 +145,7 @@ public:
 
   /**
    * Indicates whether invalid HTTP messaging should be handled with a stream error or a connection
-   * error.
+   * error; if value is missing, then HCM drives behaviour on invalid HTTP messaging.
    */
   virtual absl::optional<bool> streamErrorOnInvalidHttpMessage() const PURE;
 };
