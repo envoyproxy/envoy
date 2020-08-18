@@ -245,8 +245,8 @@ public:
 
   const std::string& expectedOcspResponse() const { return expected_ocsp_response_; }
 
-  TestUtilOptions& setOcspStaplingEnabled(bool ocsp_stapling_enabled) {
-    ocsp_stapling_enabled_ = ocsp_stapling_enabled;
+  TestUtilOptions& enableOcspStapling() {
+    ocsp_stapling_enabled_ = true;
     return *this;
   }
 
@@ -5268,7 +5268,7 @@ TEST_P(SslSocketTest, TestStaplesOcspResponseSuccess) {
   std::string expected_response =
       TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ocsp_response_path));
 
-  testUtil(test_options.setOcspStaplingEnabled(true)
+  testUtil(test_options.enableOcspStapling()
                .setExpectedOcspResponse(expected_response)
                .setExpectedServerStats("ssl.ocsp_staple_responses"));
 }
@@ -5293,7 +5293,7 @@ TEST_P(SslSocketTest, TestNoOcspStapleWhenNotEnabledOnClient) {
       - TLS_RSA_WITH_AES_128_GCM_SHA256
 )EOF";
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
-  testUtil(test_options.setOcspStaplingEnabled(false));
+  testUtil(test_options);
 }
 
 TEST_P(SslSocketTest, TestOcspStapleOmittedOnSkipStaplingAndResponseExpired) {
@@ -5319,8 +5319,7 @@ TEST_P(SslSocketTest, TestOcspStapleOmittedOnSkipStaplingAndResponseExpired) {
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.validate_ocsp_expiration_at_config_time", "false"}});
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
-  testUtil(
-      test_options.setExpectedServerStats("ssl.ocsp_staple_omitted").setOcspStaplingEnabled(true));
+  testUtil(test_options.setExpectedServerStats("ssl.ocsp_staple_omitted").enableOcspStapling());
 }
 
 TEST_P(SslSocketTest, TestConnectionFailsOnStapleRequiredAndOcspExpired) {
@@ -5346,8 +5345,7 @@ TEST_P(SslSocketTest, TestConnectionFailsOnStapleRequiredAndOcspExpired) {
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.validate_ocsp_expiration_at_config_time", "false"}});
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
-  testUtil(
-      test_options.setExpectedServerStats("ssl.ocsp_staple_failed").setOcspStaplingEnabled(true));
+  testUtil(test_options.setExpectedServerStats("ssl.ocsp_staple_failed").enableOcspStapling());
 }
 
 TEST_P(SslSocketTest, TestConnectionSucceedsWhenRejectOnExpiredNoOcspResponse) {
@@ -5368,8 +5366,7 @@ TEST_P(SslSocketTest, TestConnectionSucceedsWhenRejectOnExpiredNoOcspResponse) {
       - TLS_RSA_WITH_AES_128_GCM_SHA256
 )EOF";
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
-  testUtil(
-      test_options.setExpectedServerStats("ssl.ocsp_staple_omitted").setOcspStaplingEnabled(true));
+  testUtil(test_options.setExpectedServerStats("ssl.ocsp_staple_omitted").enableOcspStapling());
 }
 
 TEST_P(SslSocketTest, TestConnectionFailsWhenRejectOnExpiredAndResponseExpired) {
@@ -5396,8 +5393,7 @@ TEST_P(SslSocketTest, TestConnectionFailsWhenRejectOnExpiredAndResponseExpired) 
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.validate_ocsp_expiration_at_config_time", "false"}});
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
-  testUtil(
-      test_options.setExpectedServerStats("ssl.ocsp_staple_failed").setOcspStaplingEnabled(true));
+  testUtil(test_options.setExpectedServerStats("ssl.ocsp_staple_failed").enableOcspStapling());
 }
 
 TEST_P(SslSocketTest, TestConnectionFailsWhenCertIsMustStapleAndResponseExpired) {
@@ -5456,7 +5452,7 @@ TEST_P(SslSocketTest, TestConnectionSucceedsForMustStapleCertExpirationValidatio
   std::string ocsp_response_path = "{{ test_tmpdir }}/ocsp_test_data/revoked_ocsp_resp.der";
   std::string expected_response =
       TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ocsp_response_path));
-  testUtil(test_options.setOcspStaplingEnabled(true)
+  testUtil(test_options.enableOcspStapling()
                .setExpectedServerStats("ssl.ocsp_staple_responses")
                .setExpectedOcspResponse(expected_response));
 }
@@ -5486,7 +5482,7 @@ TEST_P(SslSocketTest, TestConnectionSucceedsForMustStapleCertNoValidationNoRespo
        {"envoy.reloadable_features.validate_ocsp_expiration_on_connection", "false"}});
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setExpectedServerStats("ssl.ocsp_staple_omitted")
-               .setOcspStaplingEnabled(true)
+               .enableOcspStapling()
                .setExpectedOcspResponse(""));
 }
 
@@ -5524,7 +5520,7 @@ TEST_P(SslSocketTest, TestFilterMultipleCertsFilterByOcspPolicyFallbackOnFirst) 
   std::string expected_response =
       TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ocsp_response_path));
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
-  testUtil(test_options.setOcspStaplingEnabled(true)
+  testUtil(test_options.enableOcspStapling()
                .setExpectedServerStats("ssl.ocsp_staple_responses")
                .setExpectedOcspResponse(expected_response));
 }
@@ -5560,8 +5556,7 @@ TEST_P(SslSocketTest, TestConnectionFailsOnMultipleCertificatesNonePassOcspPolic
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.validate_ocsp_expiration_at_config_time", "false"}});
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
-  testUtil(
-      test_options.setExpectedServerStats("ssl.ocsp_staple_failed").setOcspStaplingEnabled(true));
+  testUtil(test_options.setExpectedServerStats("ssl.ocsp_staple_failed").enableOcspStapling());
 }
 
 } // namespace Tls
