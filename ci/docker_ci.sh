@@ -102,7 +102,7 @@ BUILD_TYPES=("" "-alpine" "-alpine-debug" "-google-vrp")
 config_env
 
 # VRP base image is only for amd64
-VRP_BASE_IMAGE="${DOCKER_IMAGE_PREFIX}${IMAGE_POSTFIX}:${IMAGE_NAME}-amd64"
+VRP_BASE_IMAGE="${DOCKER_IMAGE_PREFIX}${IMAGE_POSTFIX}:${IMAGE_NAME}"
 
 # Test the docker build in all cases, but use a local tag that we will overwrite before push in the
 # cases where we do push.
