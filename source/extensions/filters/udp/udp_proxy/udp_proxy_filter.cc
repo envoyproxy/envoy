@@ -179,6 +179,9 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
 }
 
 UdpProxyFilter::ActiveSession::~ActiveSession() {
+  ENVOY_LOG(debug, "deleting the session: downstream={} local={} upstream={}",
+            addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
+            host_->address()->asStringView());
   cluster_.filter_.config_->stats().downstream_sess_active_.dec();
   cluster_.cluster_.info()
       ->resourceManager(Upstream::ResourcePriority::Default)
