@@ -93,6 +93,9 @@ envoy_cc_test_library(
     name = "http2_frame",
     srcs = ["http2_frame.cc"],
     hdrs = ["http2_frame.h"],
+    external_deps = [
+        "nghttp2",
+    ],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
