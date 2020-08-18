@@ -629,17 +629,15 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainMultipleRebuildingRequests) {
   // findFilterChain(_)).WillRepeatedly(Return(on_demand_filter_chain_.get()));
 
   // // Will call newConnection twice. After calling onAccept, newConnection will find filter chain
-  // is
-  // // placeholder. Rebuilding request will be post to master thread and the currently no
-  // // createServerConnection will be called.
-  // EXPECT_CALL(dispatcher_, createServerConnection_()).Times(0);
-  // EXPECT_CALL(master_dispatcher_, post(_)).Times(3);
+  // is  placeholder. Rebuilding request will be post to master thread and the currently no
+  // createServerConnection will be called. EXPECT_CALL(dispatcher_,
+  // createServerConnection_()).Times(0); EXPECT_CALL(master_dispatcher_, post(_)).Times(3);
 
   // // Network::MockConnection* connection = new NiceMock<Network::MockConnection>();
-  // Network::MockConnectionSocket* socket = new NiceMock<Network::MockConnectionSocket>();
-  // listener_callbacks->onAccept(Network::ConnectionSocketPtr{socket});
   // // Network::MockConnection* connection2 = new NiceMock<Network::MockConnection>();
   // // Network::MockConnection* connection3 = new NiceMock<Network::MockConnection>();
+  // Network::MockConnectionSocket* socket = new NiceMock<Network::MockConnectionSocket>();
+  // listener_callbacks->onAccept(Network::ConnectionSocketPtr{socket});
   // Network::MockConnectionSocket* socket2 = new NiceMock<Network::MockConnectionSocket>();
   // listener_callbacks->onAccept(Network::ConnectionSocketPtr{socket2});
   // Network::MockConnectionSocket* socket3 = new NiceMock<Network::MockConnectionSocket>();
@@ -648,9 +646,9 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainMultipleRebuildingRequests) {
 
   // // Expect call after rebuilding succeeded.
   // EXPECT_CALL(dispatcher_, createServerConnection_()).WillRepeatedly(Return(new
-  // NiceMock<Network::MockConnection>())); EXPECT_CALL(factory_, createNetworkFilterChain(_,
-  // _)).WillRepeatedly(Return(true));
-  // // EXPECT_CALL(*connection, addConnectionCallbacks(_)).Times(3);
+  // NiceMock<Network::MockConnection>())); EXPECT_CALL(factory_,
+  // createNetworkFilterChain(_,_)).WillRepeatedly(Return(true));
+  // // EXPECT_CALL(*connection, addConnectionCallbacks(_)).Times(1);
 
   // // After start rebuilding, rebuilt filter chain will be stored inside placeholder.
   // on_demand_filter_chain_->storeRebuiltFilterChain(filter_chain_);
@@ -664,7 +662,7 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainMultipleRebuildingRequests) {
 
   // // connection->close(Network::ConnectionCloseType::NoFlush);
   // // dispatcher_.clearDeferredDeleteList();
-  // EXPECT_EQ(0UL, handler_->numConnections());
+  // // EXPECT_EQ(0UL, handler_->numConnections());
   // EXPECT_CALL(*listener, onDestroy());
 }
 
