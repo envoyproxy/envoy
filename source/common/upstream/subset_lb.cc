@@ -73,8 +73,6 @@ SubsetLoadBalancer::SubsetLoadBalancer(
   // Configure future updates.
   original_priority_set_callback_handle_ = priority_set.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
-        auto start = std::chrono::steady_clock::now();
-
         rebuildSingle();
 
         if (hosts_added.empty() && hosts_removed.empty()) {
@@ -93,10 +91,6 @@ SubsetLoadBalancer::SubsetLoadBalancer(
         }
 
         purgeEmptySubsets(subsets_);
-        auto end = std::chrono::steady_clock::now();
-        auto elapsed = end - start;
-        ENVOY_LOG_MISC(info, "subset load balancer rebuild time: {}us",
-                       std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count());
       });
 }
 
