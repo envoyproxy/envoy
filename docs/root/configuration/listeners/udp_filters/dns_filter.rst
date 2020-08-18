@@ -83,15 +83,15 @@ Example Configuration
                       protocol: { number: 6 }
                       ttl: 86400s
                       targets:
-                      - name: "primary.voip.domain5.com"
+                      - name: { host_name: "primary.voip.domain5.com" }
                         priority: 10
                         weight: 30
                         port: 5060
-                      - name: "secondary.voip.domain5.com"
+                      - name: { host_name: "secondary.voip.domain5.com" }
                         priority: 10
                         weight: 20
                         port: 5060
-                      - name: "backup.voip.domain5.com"
+                      - name: { host_name: "backup.voip.domain5.com" }
                         priority: 10
                         weight: 10
                         port: 5060

@@ -285,9 +285,9 @@ virtual_domains:
           protocol: { number: 6 }
           ttl: 86400s
           targets: [
-            {name: "primary.voip.subzero.com", weight: 30, priority: 10, port: 5060},
-            {name: "secondary.voip.subzero.com", weight: 20, priority: 10, port: 5061},
-            {name: "backup.voip.subzero.com", weight: 10, priority: 10, port: 5062}
+            { name: { host_name: "primary.voip.subzero.com" }, weight: 30, priority: 10, port: 5060 },
+            { name: { host_name: "secondary.voip.subzero.com" }, weight: 20, priority: 10, port: 5061 },
+            { name: { host_name: "backup.voip.subzero.com" }, weight: 10, priority: 10, port: 5062 }
           ]
   - name: "web.subzero.com"
     endpoint:
@@ -298,20 +298,23 @@ virtual_domains:
           ttl: 43200s
           port: 80
           targets:
-          - name: "fake_http_cluster_0"
+          - name:
+              cluster_name: "fake_http_cluster_0"
             weight: 10
             priority: 1
         - service_name: "https"
           protocol: { name: "tcp" }
           ttl: 43200s
           targets:
-          - name: "fake_http_cluster_1"
+          - name:
+              cluster_name: "fake_http_cluster_1"
             weight: 10
             priority: 1
         - service_name: "for_coverage_no_protocol_defined_so_record_is_skipped"
           ttl: 86400s
           targets:
-          - name: "fake_http_cluster_3"
+          - name:
+              cluster_name: "fake_http_cluster_3"
             weight: 3
             priority: 99
 )EOF";

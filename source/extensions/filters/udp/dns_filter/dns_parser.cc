@@ -123,14 +123,8 @@ bool DnsSrvRecord::serialize(Buffer::OwnedImpl& output) {
   return (output.length() > 0);
 }
 
-void DnsSrvRecord::addTarget(const absl::string_view target, const uint16_t priority,
-                             const uint16_t weight, const uint16_t port) {
-  DnsTargetAttributes attr{};
-  attr.weight = weight;
-  attr.priority = priority;
-  attr.port = port;
-
-  targets_.emplace(std::make_pair(std::string(target), attr));
+void DnsSrvRecord::addTarget(const absl::string_view target, const DnsTargetAttributes& attrs) {
+  targets_.emplace(std::make_pair(std::string(target), attrs));
 }
 
 DnsQueryContextPtr DnsMessageParser::createQueryContext(Network::UdpRecvData& client_request,
@@ -356,18 +350,16 @@ DnsSrvRecordPtr DnsMessageParser::parseDnsSrvRecord(DnsAnswerCtx& ctx) {
     return nullptr;
   }
 
-  uint16_t priority;
-  priority = ctx.buffer_->peekBEInt<uint16_t>(ctx.offset_);
+  DnsSrvRecord::DnsTargetAttributes attrs{};
+  attrs.priority = ctx.buffer_->peekBEInt<uint16_t>(ctx.offset_);
   ctx.offset_ += sizeof(uint16_t);
   available_bytes -= sizeof(uint16_t);
 
-  uint16_t weight;
-  weight = ctx.buffer_->peekBEInt<uint16_t>(ctx.offset_);
+  attrs.weight = ctx.buffer_->peekBEInt<uint16_t>(ctx.offset_);
   ctx.offset_ += sizeof(uint16_t);
   available_bytes -= sizeof(uint16_t);
 
-  uint16_t port;
-  port = ctx.buffer_->peekBEInt<uint16_t>(ctx.offset_);
+  attrs.port = ctx.buffer_->peekBEInt<uint16_t>(ctx.offset_);
   ctx.offset_ += sizeof(uint16_t);
   available_bytes -= sizeof(uint16_t);
 
@@ -377,7 +369,7 @@ DnsSrvRecordPtr DnsMessageParser::parseDnsSrvRecord(DnsAnswerCtx& ctx) {
   if (!proto.empty() && !target_name.empty()) {
     auto srv_record =
         std::make_unique<DnsSrvRecord>(ctx.record_name_, proto, std::chrono::seconds(ctx.ttl_));
-    srv_record->addTarget(target_name, priority, weight, port);
+    srv_record->addTarget(target_name, attrs);
     return srv_record;
   }
   return nullptr;

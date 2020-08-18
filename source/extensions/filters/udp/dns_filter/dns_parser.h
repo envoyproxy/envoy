@@ -93,7 +93,7 @@ public:
       : DnsAnswerRecord(other.name_, other.type_, other.class_, other.ttl_, nullptr),
         proto_(other.proto_) {
     for (const auto& entry : other.targets_) {
-      addTarget(entry.first, entry.second.priority, entry.second.weight, entry.second.port);
+      addTarget(entry.first, entry.second);
     }
   }
 
@@ -101,11 +101,11 @@ public:
     uint16_t priority;
     uint16_t weight;
     uint16_t port;
+    bool is_cluster;
   };
 
   bool serialize(Buffer::OwnedImpl& output) override;
-  void addTarget(const absl::string_view target, const uint16_t priority, const uint16_t weight,
-                 const uint16_t port);
+  void addTarget(const absl::string_view target, const DnsTargetAttributes& attrs);
 
   std::string proto_;
   absl::flat_hash_map<std::string, DnsTargetAttributes> targets_;

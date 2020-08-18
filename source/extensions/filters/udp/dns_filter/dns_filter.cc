@@ -99,13 +99,19 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         // be a fully qualified domain name. If the target name is not a fully qualified name, we
         // will consider this name to be that of a cluster
         for (const auto& target : dns_service.targets()) {
-          const absl::string_view target_name = target.name();
-          const uint16_t priority = target.priority();
-          const uint16_t weight = target.weight();
-          const uint16_t port = target.port();
+          DnsSrvRecord::DnsTargetAttributes attributes{};
+          attributes.priority = target.priority();
+          attributes.weight = target.weight();
+          attributes.port = target.port();
+
+          absl::string_view target_name = target.name().host_name();
+          if (target_name.empty()) {
+            target_name = target.name().cluster_name();
+            attributes.is_cluster = true;
+          }
 
           ENVOY_LOG(trace, "Storing service {} target {}", full_service_name, target_name);
-          service_record_ptr->addTarget(target_name, priority, weight, port);
+          service_record_ptr->addTarget(target_name, attributes);
         }
 
         DnsEndpointConfig endpoint_config{};
@@ -388,6 +394,11 @@ bool DnsFilter::resolveClusterService(DnsQueryContextPtr& context, const DnsQuer
     const auto& target_name = cluster_target->first;
     const auto& attributes = cluster_target->second;
 
+    if (!attributes.is_cluster) {
+      ENVOY_LOG(trace, "Service target [{}] is not a cluster", target_name);
+      return false;
+    }
+
     // Determine if there is a cluster
     Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(target_name);
     if (cluster == nullptr) {
@@ -403,18 +414,16 @@ bool DnsFilter::resolveClusterService(DnsQueryContextPtr& context, const DnsQuer
         // If the target port is zero, use the port from the cluster host.
         // If the cluster host port is zero also, then this is the value that will
         // appear in the service record. Zero is a permitted value in the record
-        uint16_t target_port = 0;
-        if (attributes.port != 0) {
-          target_port = attributes.port;
-        } else {
-          target_port = host->address()->ip()->port();
+        DnsSrvRecord::DnsTargetAttributes new_attributes = attributes;
+        if (!new_attributes.port) {
+          new_attributes.port = host->address()->ip()->port();
         }
 
         // Create the service record element and increment the SRV record answer count
         auto config = std::make_unique<DnsSrvRecord>(service_config->name_, service_config->proto_,
                                                      service_config->ttl_);
 
-        config->addTarget(target_name, attributes.priority, attributes.weight, target_port);
+        config->addTarget(target_name, new_attributes);
         message_parser_.storeDnsSrvAnswerRecord(context, query, std::move(config));
         incrementClusterQueryTypeAnswerCount(query.type_);
 
@@ -434,7 +443,7 @@ bool DnsFilter::resolveClusterService(DnsQueryContextPtr& context, const DnsQuer
     }
   }
   return (cluster_endpoints != 0);
-} // namespace DnsFilter
+}
 
 bool DnsFilter::resolveClusterHost(DnsQueryContextPtr& context, const DnsQueryRecord& query) {
   // Determine if the domain name is being redirected to a cluster
@@ -509,13 +518,10 @@ bool DnsFilter::resolveConfiguredService(DnsQueryContextPtr& context, const DnsQ
     // for each service target address, we must resolve the target's IP. The target record does not
     // specify the address type, so we must deduce it when building the record. It is possible that
     // the configured target's IP addresses are a mix of A and AAAA records.
-    for (const auto& target : service_config->targets_) {
-      const auto* configured_address_list = getAddressListForDomain(target.first);
+    for (const auto& [target_name, attributes] : service_config->targets_) {
+      const auto* configured_address_list = getAddressListForDomain(target_name);
 
       if (configured_address_list != nullptr) {
-        const absl::string_view target_name = target.first;
-        const auto attributes = target.second;
-
         // Build an SRV answer record for the service. We need a new SRV record for each target.
         // Although the same class is used, the target storage is different than the way the service
         // config is modeled. We store one SrvRecord per target so that we can enforce the response
@@ -525,7 +531,7 @@ bool DnsFilter::resolveConfiguredService(DnsQueryContextPtr& context, const DnsQ
         incrementLocalQueryTypeAnswerCount(query.type_);
         auto config = std::make_unique<DnsSrvRecord>(service_config->name_, service_config->proto_,
                                                      service_config->ttl_);
-        config->addTarget(target_name, attributes.priority, attributes.weight, attributes.port);
+        config->addTarget(target_name, attributes);
         message_parser_.storeDnsSrvAnswerRecord(context, query, std::move(config));
 
         for (const auto& configured_address : *configured_address_list) {

@@ -115,7 +115,7 @@ listener_filters:
                 protocol: {{ name: "tcp" }}
                 ttl: 43200s
                 targets:
-                - name: "cluster_0"
+                - name: {{ cluster_name: "cluster_0" }}
                   weight: 10
                   priority: 40
                   port: 80
@@ -123,7 +123,7 @@ listener_filters:
                 protocol: {{ name: "tcp" }}
                 ttl: 43200s
                 targets:
-                - name: "cluster_0"
+                - name: {{ cluster_name: "cluster_0" }}
                   weight: 20
                   priority: 10
 )EOF",
