@@ -10,6 +10,7 @@
 
 #include "extensions/filters/http/well_known_names.h"
 
+#include "absl/strings/escaping.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
 
@@ -165,7 +166,10 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
   }
 
   if (encode == envoy::extensions::filters::http::header_to_metadata::v3::Config::BASE64) {
-    value = Base64::decodeWithoutPadding(value);
+    std::string decoded_value;
+    absl::WebSafeBase64Unescape(value, &decoded_value);
+    value = decoded_value;
+    // value = Base64::decodeWithoutPadding(value);
     if (value.empty()) {
       ENVOY_LOG(debug, "Base64 decode failed");
       return false;

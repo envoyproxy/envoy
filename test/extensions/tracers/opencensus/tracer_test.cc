@@ -15,6 +15,8 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 
+#include "absl/strings/escaping.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "opencensus/trace/exporter/span_data.h"
@@ -240,7 +242,8 @@ void testIncomingHeaders(
                                   ::opencensus::trace::propagation::ToTraceParentHeader(ctx)));
   {
     std::string expected = ::opencensus::trace::propagation::ToGrpcTraceBinHeader(ctx);
-    expected = Base64::encode(expected.data(), expected.size(), /*add_padding=*/false);
+    expected = absl::WebSafeBase64Escape(expected);
+    // expected = Base64::encode(expected.data(), expected.size(), /*add_padding=*/false);
     EXPECT_THAT(hdrs, ContainHeader("grpc-trace-bin", expected));
   }
   EXPECT_THAT(hdrs,

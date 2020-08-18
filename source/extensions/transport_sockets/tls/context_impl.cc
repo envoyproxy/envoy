@@ -25,6 +25,7 @@
 #include "extensions/transport_sockets/tls/utility.h"
 
 #include "absl/container/node_hash_set.h"
+#include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "openssl/evp.h"
@@ -252,7 +253,9 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
     if (!cert_validation_config->verifyCertificateSpkiList().empty()) {
       for (const auto& hash : cert_validation_config->verifyCertificateSpkiList()) {
-        const auto decoded = Base64::decode(hash);
+        std::string decoded;
+        absl::Base64Unescape(hash, &decoded);
+        // const auto decoded = Base64::decode(hash);
         if (decoded.size() != SHA256_DIGEST_LENGTH) {
           throw EnvoyException(absl::StrCat("Invalid base64-encoded SHA-256 ", hash));
         }

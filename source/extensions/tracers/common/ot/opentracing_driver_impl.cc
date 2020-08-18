@@ -9,6 +9,8 @@
 #include "common/common/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "absl/strings/escaping.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -124,7 +126,8 @@ void OpenTracingSpan::injectContext(Http::RequestHeaderMap& request_headers) {
     const std::string current_span_context = oss.str();
     request_headers.setInline(
         ot_span_context_handle.handle(),
-        Base64::encode(current_span_context.c_str(), current_span_context.length()));
+        absl::Base64Escape(current_span_context));
+        // Base64::encode(current_span_context.c_str(), current_span_context.length()));
   } else {
     // Inject the context using the tracer's standard HTTP header format.
     const OpenTracingHTTPHeadersWriter writer{request_headers};
@@ -165,8 +168,11 @@ Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
   if (propagation_mode == PropagationMode::SingleHeader &&
       request_headers.getInline(ot_span_context_handle.handle())) {
     opentracing::expected<std::unique_ptr<opentracing::SpanContext>> parent_span_ctx_maybe;
-    std::string parent_context = Base64::decode(
-        std::string(request_headers.getInlineValue(ot_span_context_handle.handle())));
+    std::string parent_context;
+    absl::Base64Unescape(
+        std::string(request_headers.getInlineValue(ot_span_context_handle.handle())), &parent_context);
+    // std::string parent_context = Base64::decode(
+    //     std::string(request_headers.getInlineValue(ot_span_context_handle.handle())));
 
     if (!parent_context.empty()) {
       InputConstMemoryStream istream{parent_context.data(), parent_context.size()};

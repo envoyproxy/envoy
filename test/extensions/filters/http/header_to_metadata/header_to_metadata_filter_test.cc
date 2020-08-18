@@ -13,6 +13,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/escaping.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -235,7 +236,8 @@ response_rules:
 )EOF";
   initializeFilter(response_config_yaml);
   std::string data = "Non-ascii-characters";
-  const auto encoded = Base64::encode(data.c_str(), data.size());
+  const auto encoded = absl::Base64Escape(data);
+  // const auto encoded = Base64::encode(data.c_str(), data.size());
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-authenticated", encoded}};
   std::map<std::string, std::string> expected = {{"auth", data}};
   Http::TestResponseHeaderMapImpl empty_headers;
@@ -273,7 +275,8 @@ response_rules:
 
   std::string data;
   ASSERT_TRUE(value.SerializeToString(&data));
-  const auto encoded = Base64::encode(data.c_str(), data.size());
+  const auto encoded = absl::Base64Escape(data);
+  // const auto encoded = Base64::encode(data.c_str(), data.size());
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-authenticated", encoded}};
   std::map<std::string, ProtobufWkt::Value> expected = {{"auth", value}};
 
@@ -317,7 +320,8 @@ response_rules:
 )EOF";
   initializeFilter(response_config_yaml);
   std::string data = "invalid";
-  const auto encoded = Base64::encode(data.c_str(), data.size());
+  const auto encoded = absl::Base64Escape(data);
+  // const auto encoded = Base64::encode(data.c_str(), data.size());
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-authenticated", encoded}};
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));

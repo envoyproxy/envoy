@@ -17,6 +17,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/escaping.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -363,7 +364,10 @@ TEST_P(GrpcWebFilterTest, Unary) {
   if (accept_binary_response()) {
     EXPECT_EQ(std::string(TRAILERS, TRAILERS_SIZE), trailers_buffer.toString());
   } else if (accept_text_response()) {
-    EXPECT_EQ(std::string(TRAILERS, TRAILERS_SIZE), Base64::decode(trailers_buffer.toString()));
+    std::string decoded;
+    absl::Base64Unescape(trailers_buffer.toString(), &decoded);
+    EXPECT_EQ(std::string(TRAILERS, TRAILERS_SIZE), decoded);
+    // EXPECT_EQ(std::string(TRAILERS, TRAILERS_SIZE), Base64::decode(trailers_buffer.toString()));
   } else {
     FAIL() << "Unsupported gRPC-Web response content-type: "
            << response_headers.getContentTypeValue();

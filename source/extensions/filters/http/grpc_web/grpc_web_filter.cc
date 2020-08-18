@@ -12,6 +12,8 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
+#include "absl/strings/escaping.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -121,9 +123,13 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool en
 
   const uint64_t needed = available / 4 * 4 - decoding_buffer_.length();
   decoding_buffer_.move(data, needed);
-  const std::string decoded = Base64::decode(
+  std::string decoded;
+  absl::Base64Unescape(
       std::string(static_cast<const char*>(decoding_buffer_.linearize(decoding_buffer_.length())),
-                  decoding_buffer_.length()));
+                  decoding_buffer_.length()), &decoded);
+  // const std::string decoded = Base64::decode(
+  //     std::string(static_cast<const char*>(decoding_buffer_.linearize(decoding_buffer_.length())),
+  //                 decoding_buffer_.length()));
   if (decoded.empty()) {
     // Error happened when decoding base64.
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,

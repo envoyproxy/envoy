@@ -22,6 +22,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/escaping.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -289,27 +290,34 @@ api_config_source:
       credentials_factory_name: envoy.grpc_credentials.file_based_metadata
   )",
                             config_source);
+  std::string decoded;
+  absl::Base64Unescape("CjUKMy92YXIvcnVuL3NlY3JldHMva3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3Vud"
+                                 "C90b2tlbhILeC10b2tlbi1iaW4=", &decoded);
   config_source.mutable_api_config_source()
       ->mutable_grpc_services(0)
       ->mutable_google_grpc()
       ->mutable_call_credentials(0)
       ->mutable_from_plugin()
       ->mutable_typed_config()
-      ->set_value(Base64::decode("CjUKMy92YXIvcnVuL3NlY3JldHMva3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3Vud"
-                                 "C90b2tlbhILeC10b2tlbi1iaW4="));
+      ->set_value(decoded);
+      // ->set_value(Base64::decode("CjUKMy92YXIvcnVuL3NlY3JldHMva3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3Vud"
+      //                            "C90b2tlbhILeC10b2tlbi1iaW4="));
   auto secret_provider1 =
       secret_manager->findOrCreateTlsCertificateProvider(config_source, "abc.com", secret_context);
 
   // The base64 encoded proto binary is identical to the one above, but in different field order.
   // It is also identical to the YAML below.
+  absl::Base64Unescape("Egt4LXRva2VuLWJpbgo1CjMvdmFyL3J1bi9zZWNyZXRzL2t1YmVybmV0ZXMuaW8vc"
+                                 "2VydmljZWFjY291bnQvdG9rZW4=", &decoded);
   config_source.mutable_api_config_source()
       ->mutable_grpc_services(0)
       ->mutable_google_grpc()
       ->mutable_call_credentials(0)
       ->mutable_from_plugin()
       ->mutable_typed_config()
-      ->set_value(Base64::decode("Egt4LXRva2VuLWJpbgo1CjMvdmFyL3J1bi9zZWNyZXRzL2t1YmVybmV0ZXMuaW8vc"
-                                 "2VydmljZWFjY291bnQvdG9rZW4="));
+      ->set_value(decoded);
+      // ->set_value(Base64::decode("Egt4LXRva2VuLWJpbgo1CjMvdmFyL3J1bi9zZWNyZXRzL2t1YmVybmV0ZXMuaW8vc"
+      //                            "2VydmljZWFjY291bnQvdG9rZW4="));
   auto secret_provider2 =
       secret_manager->findOrCreateTlsCertificateProvider(config_source, "abc.com", secret_context);
 

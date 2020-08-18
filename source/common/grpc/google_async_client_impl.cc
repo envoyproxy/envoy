@@ -12,6 +12,7 @@
 #include "common/grpc/google_grpc_utils.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "absl/strings/escaping.h"
 #include "grpcpp/support/proto_buffer_reader.h"
 
 namespace Envoy {
@@ -362,7 +363,8 @@ void GoogleAsyncStreamImpl::metadataTranslate(
   for (const auto& it : grpc_metadata) {
     auto key = Http::LowerCaseString(std::string(it.first.data(), it.first.size()));
     if (absl::EndsWith(key.get(), "-bin")) {
-      auto value = Base64::encode(it.second.data(), it.second.size());
+      // auto value = Base64::encode(it.second.data(), it.second.size());
+      auto value = absl::Base64Escape(std::string(it.second.data(), it.second.size()));
       header_map.addCopy(key, value);
       continue;
     }

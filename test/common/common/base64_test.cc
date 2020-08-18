@@ -5,6 +5,7 @@
 
 #include "test/test_common/printers.h"
 
+#include "absl/strings/escaping.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

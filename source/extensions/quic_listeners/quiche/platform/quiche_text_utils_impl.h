@@ -80,7 +80,8 @@ public:
   // NOLINTNEXTLINE(readability-identifier-naming)
   static void Base64Encode(const uint8_t* data, size_t data_len, std::string* output) {
     *output =
-        Envoy::Base64::encode(reinterpret_cast<const char*>(data), data_len, /*add_padding=*/false);
+        absl::WebSafeBase64Escape(std::string(reinterpret_cast<const char*>(data), data_len));
+        // Envoy::Base64::encode(reinterpret_cast<const char*>(data), data_len, /*add_padding=*/false);
   }
 
   // NOLINTNEXTLINE(readability-identifier-naming)

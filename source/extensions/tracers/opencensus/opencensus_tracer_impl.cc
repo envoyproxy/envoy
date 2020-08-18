@@ -7,6 +7,7 @@
 
 #include "common/common/base64.h"
 
+#include "absl/strings/escaping.h"
 #include "absl/strings/str_cat.h"
 #include "google/devtools/cloudtrace/v2/tracing.grpc.pb.h"
 #include "opencensus/exporters/trace/ocagent/ocagent_exporter.h"
@@ -211,7 +212,8 @@ void Span::injectContext(Http::RequestHeaderMap& request_headers) {
 
     case OpenCensusConfig::GRPC_TRACE_BIN: {
       std::string val = ::opencensus::trace::propagation::ToGrpcTraceBinHeader(ctx);
-      val = Base64::encode(val.data(), val.size(), /*add_padding=*/false);
+      val = absl::WebSafeBase64Escape(val);
+      // val = Base64::encode(val.data(), val.size(), /*add_padding=*/false);
       request_headers.setReferenceKey(Constants::get().GRPC_TRACE_BIN, val);
       break;
     }

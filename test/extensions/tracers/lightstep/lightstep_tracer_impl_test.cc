@@ -27,6 +27,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/escaping.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -640,7 +641,9 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
 
     // Context can be parsed fine.
     const opentracing::Tracer& tracer = driver_->tracer();
-    std::string context = Base64::decode(injected_ctx);
+    std::string context;
+    absl::Base64Unescape(injected_ctx, &context);
+    // std::string context = Base64::decode(injected_ctx);
     std::istringstream iss{context, std::ios::binary};
     EXPECT_TRUE(tracer.Extract(iss));
 
@@ -709,10 +712,14 @@ TEST_F(LightStepDriverTest, SpawnChild) {
   childViaHeaders->injectContext(base1);
   childViaSpawn->injectContext(base2);
 
-  std::string base1_context =
-      Base64::decode(std::string(base1.get_(Http::CustomHeaders::get().OtSpanContext)));
-  std::string base2_context =
-      Base64::decode(std::string(base2.get_(Http::CustomHeaders::get().OtSpanContext)));
+  std::string base1_context;
+  absl::Base64Unescape(std::string(base1.get_(Http::CustomHeaders::get().OtSpanContext)), &base1_context);
+  // std::string base1_context = 
+      // Base64::decode(std::string(base1.get_(Http::CustomHeaders::get().OtSpanContext)));
+  std::string base2_context;
+  absl::Base64Unescape(std::string(base2.get_(Http::CustomHeaders::get().OtSpanContext)), &base2_context);
+  // std::string base2_context = 
+      // Base64::decode(std::string(base2.get_(Http::CustomHeaders::get().OtSpanContext)));
 
   EXPECT_FALSE(base1_context.empty());
   EXPECT_FALSE(base2_context.empty());

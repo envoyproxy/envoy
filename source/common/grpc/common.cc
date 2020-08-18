@@ -21,6 +21,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/container/fixed_array.h"
+#include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 
 namespace Envoy {
@@ -109,7 +110,9 @@ Common::getGrpcStatusDetailsBin(const Http::HeaderMap& trailers) {
   }
 
   // Some implementations use non-padded base64 encoding for grpc-status-details-bin.
-  auto decoded_value = Base64::decodeWithoutPadding(details_header->value().getStringView());
+  std::string decoded_value;
+  absl::WebSafeBase64Unescape(details_header->value().getStringView(), &decoded_value);
+  // auto decoded_value = Base64::decodeWithoutPadding(details_header->value().getStringView());
   if (decoded_value.empty()) {
     return absl::nullopt;
   }

@@ -23,6 +23,7 @@
 
 #include "extensions/filters/http/well_known_names.h"
 
+#include "absl/strings/escaping.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
 
@@ -351,7 +352,10 @@ void Filter::dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::I
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   if (!json_resp.body().empty()) {
     if (json_resp.is_base64_encoded()) {
-      body.add(Base64::decode(json_resp.body()));
+      std::string decoded;
+      absl::Base64Unescape(json_resp.body(), &decoded);
+      body.add(decoded);
+      // body.add(Base64::decode(json_resp.body()));
     } else {
       body.add(json_resp.body());
     }
