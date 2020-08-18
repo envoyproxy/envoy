@@ -621,17 +621,14 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     }
   }
 
-  // TODO(alyssawilk) this is not true. Fix.
-  // A downstream disconnect can be identified for HTTP requests when the upstream returns with a 0
-  // response code and when no other response flags are set.
-  if (!filter_manager_.streamInfo().hasAnyResponseFlag() &&
-      !filter_manager_.streamInfo().responseCode()) {
-    filter_manager_.streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::DownstreamConnectionTermination);
-  }
   if (connection_manager_.remote_close_) {
     filter_manager_.streamInfo().setResponseCodeDetails(
         StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect);
+    if (!filter_manager_.streamInfo().hasAnyResponseFlag() &&
+        !filter_manager_.streamInfo().responseCode()) {
+      filter_manager_.streamInfo().setResponseFlag(
+          StreamInfo::ResponseFlag::DownstreamConnectionTermination);
+    }
   }
 
   if (connection_manager_.codec_->protocol() < Protocol::Http2) {
