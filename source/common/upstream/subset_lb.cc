@@ -136,7 +136,7 @@ void SubsetLoadBalancer::rebuildSingle() {
           if (!did_insert) {
             throw EnvoyException(fmt::format("Encountered duplicate metadata '{}' value in "
                                              "host '{}' with `single_host_per_subset`",
-                                             fields_it->second.DebugString(),
+                                             StringUtil::trim(fields_it->second.DebugString()),
                                              host->address()->asStringView()));
           }
         }
@@ -204,9 +204,6 @@ void SubsetLoadBalancer::initSubsetSelectorMap() {
       if (selector_keys.size() != 1 || selector_keys.begin()->empty()) {
         throw EnvoyException("subset_lb selector: single_host_per_subset cannot bet set when there "
                              "isn't exactly 1 key or if that key is empty.");
-      }
-      if (selector_keys.begin()->empty()) {
-        throw EnvoyException("subset_lb selector:");
       }
       single_key_ = *selector_keys.begin();
 

@@ -280,7 +280,8 @@ public:
   makeSelector(const std::set<std::string>& selector_keys,
                envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
                    LbSubsetSelectorFallbackPolicy fallback_policy,
-               const std::set<std::string>& fallback_keys_subset) {
+               const std::set<std::string>& fallback_keys_subset,
+               bool single_host_per_subset = false) {
 
     Protobuf::RepeatedPtrField<std::string> selector_keys_mapped;
     for (const auto& it : selector_keys) {
@@ -292,8 +293,8 @@ public:
       fallback_keys_subset_mapped.Add(std::string(it));
     }
 
-    return std::make_shared<SubsetSelectorImpl>(selector_keys_mapped, fallback_policy,
-                                                fallback_keys_subset_mapped, false);
+    return std::make_shared<SubsetSelectorImpl>(
+        selector_keys_mapped, fallback_policy, fallback_keys_subset_mapped, single_host_per_subset);
   }
 
   SubsetSelectorPtr makeSelector(
@@ -2326,6 +2327,135 @@ TEST_P(SubsetLoadBalancerTest, KeysSubsetFallbackToNotExistingSelector) {
 }
 
 INSTANTIATE_TEST_SUITE_P(UpdateOrderings, SubsetLoadBalancerTest,
+                         testing::ValuesIn({UpdateOrder::RemovesFirst, UpdateOrder::Simultaneous}));
+
+class SubsetLoadBalancerSingleHostPerSubsetTest : public SubsetLoadBalancerTest {
+public:
+  SubsetLoadBalancerSingleHostPerSubsetTest()
+      : default_subset_selectors_({
+            makeSelector({"key"}, true),
+        }) {
+    ON_CALL(subset_info_, subsetSelectors()).WillByDefault(ReturnRef(default_subset_selectors_));
+    ON_CALL(subset_info_, fallbackPolicy())
+        .WillByDefault(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+  }
+
+  using SubsetLoadBalancerTest::init;
+  void init() {
+    init({
+        {"tcp://127.0.0.1:80", {}},
+        {"tcp://127.0.0.1:81", {{"key", "a"}}},
+        {"tcp://127.0.0.1:82", {{"key", "b"}}},
+
+    });
+  }
+
+  using SubsetLoadBalancerTest::makeSelector;
+  SubsetSelectorPtr makeSelector(const std::set<std::string>& selector_keys,
+                                 bool single_host_per_subset) {
+    return makeSelector(
+        selector_keys,
+        envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED, {},
+        single_host_per_subset);
+  }
+
+  std::vector<SubsetSelectorPtr> default_subset_selectors_;
+};
+
+TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, RejectMultipleSelectors) {
+  std::vector<SubsetSelectorPtr> subset_selectors = {
+      makeSelector({"version"}, false),
+      makeSelector({"test"}, true),
+  };
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
+                            "subset_lb selector: single_host_per_subset cannot be set when there "
+                            "are multiple subset selectors.");
+}
+
+TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, RejectMultipleKeys) {
+  std::vector<SubsetSelectorPtr> subset_selectors = {
+      makeSelector({"version", "test"}, true),
+  };
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
+                            "subset_lb selector: single_host_per_subset cannot bet set when there "
+                            "isn't exactly 1 key or if that key is empty.");
+}
+
+TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, RejectEmptyKey) {
+  std::vector<SubsetSelectorPtr> subset_selectors = {
+      makeSelector({""}, true),
+  };
+  EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
+
+  EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
+                            "subset_lb selector: single_host_per_subset cannot bet set when there "
+                            "isn't exactly 1 key or if that key is empty.");
+}
+
+TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, RejectDuplicateMetadata) {
+  EXPECT_THROW_WITH_MESSAGE(init({
+                                {"tcp://127.0.0.1:80", {{"key", "a"}}},
+                                {"tcp://127.0.0.1:81", {{"key", "a"}}},
+                            }),
+                            EnvoyException,
+                            "Encountered duplicate metadata 'string_value: \"a\"' value in host "
+                            "'127.0.0.1:81' with `single_host_per_subset`");
+}
+
+TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, Match) {
+  init();
+
+  TestLoadBalancerContext host_1({{"key", "a"}});
+  TestLoadBalancerContext host_2({{"key", "b"}});
+
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_1));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_1));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_2));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_2));
+}
+
+TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, FallbackOnUnknownMetadata) {
+  init();
+
+  TestLoadBalancerContext context_unknown_key({{"unknown", "unknown"}});
+  TestLoadBalancerContext context_unknown_value({{"key", "unknown"}});
+
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_unknown_key));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_unknown_value));
+}
+
+TEST_P(SubsetLoadBalancerSingleHostPerSubsetTest, Update) {
+  init();
+
+  TestLoadBalancerContext host_a({{"key", "a"}});
+  TestLoadBalancerContext host_b({{"key", "b"}});
+  TestLoadBalancerContext host_c({{"key", "c"}});
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_a));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_a));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_b));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_b));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&host_c)); // fallback
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_c)); // fallback
+
+  HostSharedPtr added_host = makeHost("tcp://127.0.0.1:8000", {{"key", "c"}});
+
+  // Remove b, add c
+  modifyHosts({added_host}, {host_set_.hosts_.back()});
+
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_a));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_a));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_c));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_c));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_b)); // fallback
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&host_b)); // fallback
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_b)); // fallback
+}
+
+INSTANTIATE_TEST_SUITE_P(UpdateOrderings, SubsetLoadBalancerSingleHostPerSubsetTest,
                          testing::ValuesIn({UpdateOrder::RemovesFirst, UpdateOrder::Simultaneous}));
 
 } // namespace SubsetLoadBalancerTest
