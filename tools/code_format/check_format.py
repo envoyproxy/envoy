@@ -760,7 +760,7 @@ def checkSourceLine(line, file_path, reportError):
                     "Grpc::GoogleGrpcContext. See #8282")
 
   if denylistedForExceptions(file_path):
-    # skpping cases where throw is a substring of a symbol like in "foothrowBar"
+    # Skpping cases where 'throw' is a substring of a symbol like in "foothrowBar".
     if "throw" in line.split():
       comment_match = COMMENT_REGEX.search(line)
       if comment_match is None or comment_match.start(0) > line.find("throw"):
