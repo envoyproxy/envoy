@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atomic>
 #include <iomanip>
 #include <sstream>
 #include <vector>
@@ -220,7 +219,6 @@ private:
   const std::vector<uint8_t> raw_bytes_;
   const std::unique_ptr<OcspResponse> response_;
   TimeSource& time_source_;
-  std::atomic<bool> is_expired_{false};
 };
 
 using OcspResponseWrapperPtr = std::unique_ptr<OcspResponseWrapper>;

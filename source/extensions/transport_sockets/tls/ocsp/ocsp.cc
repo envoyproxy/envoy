@@ -127,15 +127,8 @@ bool OcspResponseWrapper::matchesCertificate(X509& cert) const {
 }
 
 bool OcspResponseWrapper::isExpired() {
-  if (is_expired_.load()) {
-    return true;
-  }
-
   auto& next_update = response_->response_->getNextUpdate();
-  bool expired = next_update == absl::nullopt || next_update < time_source_.systemTime();
-
-  is_expired_.store(expired);
-  return expired;
+  return next_update == absl::nullopt || next_update < time_source_.systemTime();
 }
 
 uint64_t OcspResponseWrapper::secondsUntilExpiration() const {

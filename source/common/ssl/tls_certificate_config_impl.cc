@@ -13,8 +13,8 @@ namespace Envoy {
 namespace Ssl {
 
 namespace {
-std::vector<uint8_t> readDerEncodedOcspStaple(const envoy::config::core::v3::DataSource& source,
-                                              Api::Api& api) {
+std::vector<uint8_t> readOcspStaple(const envoy::config::core::v3::DataSource& source,
+                                    Api::Api& api) {
   std::string staple = Config::DataSource::read(source, true, api);
   if (source.specifier_case() ==
       envoy::config::core::v3::DataSource::SpecifierCase::kInlineString) {
@@ -40,7 +40,7 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
       password_(Config::DataSource::read(config.password(), true, api)),
       password_path_(Config::DataSource::getPath(config.password())
                          .value_or(password_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      ocsp_staple_(readDerEncodedOcspStaple(config.ocsp_staple(), api)),
+      ocsp_staple_(readOcspStaple(config.ocsp_staple(), api)),
       ocsp_staple_path_(Config::DataSource::getPath(config.ocsp_staple())
                             .value_or(ocsp_staple_.empty() ? EMPTY_STRING : INLINE_STRING)),
       private_key_method_(
