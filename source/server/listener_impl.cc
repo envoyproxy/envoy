@@ -67,6 +67,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& facto
                                                  const std::string& listener_name, bool reuse_port)
     : factory_(factory), local_address_(address), socket_type_(socket_type), options_(options),
       bind_to_port_(bind_to_port), listener_name_(listener_name), reuse_port_(reuse_port) {
+  ENVOY_LOG(debug, "inside ::createListenSocketFactory");
 
   bool create_socket = false;
   if (local_address_->type() == Network::Address::Type::Ip) {
@@ -89,6 +90,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& facto
   }
 
   if (create_socket) {
+    ENVOY_LOG(debug, "create_socket");
     socket_ = createListenSocketAndApplyOptions();
   }
 
@@ -557,54 +559,63 @@ Event::Dispatcher& ListenerImpl::dispatcher() { return parent_.server_.dispatche
 void ListenerImpl::rebuildFilterChain(
     const envoy::config::listener::v3::FilterChain* const& filter_chain_message,
     const std::string& worker_name) {
+  ENVOY_LOG(debug, "receive rebuilding request from worker: {}", worker_name);
   if (filter_chain_message == nullptr) {
     ENVOY_LOG(debug, "filter chain message is empty");
   }
 
-  // Rebuilding only on the arrival of the first request.
-  bool on_first_request = false;
+  // Start only when there is no existing rebuilding.
+  bool should_start_rebuilding = false;
+  // Retry when the last rebuilding failed.
+  bool should_retry_rebuilding = false;
 
   // Find/create rebuilder for this filter chain message.
   if (filter_chain_rebuilder_map_.find(filter_chain_message) == filter_chain_rebuilder_map_.end()) {
     ENVOY_LOG(debug, "filter chain rebuilder not found, create a rebuilder and start rebuilding.");
     filter_chain_rebuilder_map_[filter_chain_message] =
         std::make_unique<PerFilterChainRebuilder>(*this, filter_chain_message);
-    on_first_request = true;
+    should_start_rebuilding = true;
   }
 
-  ENVOY_LOG(debug, "receive rebuilding request from worker: {}", worker_name);
+  // Two cases for duplicate requests:
+  // 1. Receive requests before rebuilding completed, worker name exists in the list. Do nothing.
+  // 2. Receive requests after rebuilding completed, will happen only when the previous rebuilding
+  // failed.
+  if (filter_chain_rebuilder_map_[filter_chain_message]->rebuildCompleted()) {
+    ENVOY_LOG(
+        debug,
+        "previous rebuilding for this filter chain has completed and failed. Retry rebuilding");
+    should_retry_rebuilding = true;
+    // rebuilder->callbackToWorkers(rebuilder->rebuildSuccess());
+    // return;
+  }
+
+  if (should_retry_rebuilding) {
+    // The previous rebuilding has completed and failed.
+    // Should create a new rebuilder and start rebuilding again, instead of just callback with
+    // failure signal.
+    filter_chain_rebuilder_map_.erase(filter_chain_message);
+    filter_chain_rebuilder_map_[filter_chain_message] =
+        std::make_unique<PerFilterChainRebuilder>(*this, filter_chain_message);
+    should_start_rebuilding = true;
+  }
+
   const auto& rebuilder = filter_chain_rebuilder_map_[filter_chain_message];
   rebuilder->storeWorkerInCallbackList(worker_name);
 
-  // Two cases for duplicate requests:
-  // 1. Receive requests before rebuild completed, worker name already exists in the list. Do
-  // nothing.
-  // 2. Receive requests after rebuild completed, this will happen only when the previous rebuild
-  // fails.
-  // TODO(ASOPVII): Retry rebuilding, instead of just callback with failure signal.
-  if (rebuilder->rebuildCompleted()) {
-    // Should start the rebuilding again, instead of callback with failure.
-    ENVOY_LOG(debug, "rebuilding for this filter chain has completed");
-    // Should callback again
-    rebuilder->callbackToWorkers(rebuilder->rebuildSuccess());
-    return;
-  }
-
-  // Request dependencies only on the first time.
-  if (on_first_request) {
+  if (should_start_rebuilding) {
     Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
         parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
         parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
         parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
         parent_.server_.threadLocal(), validation_visitor_, parent_.server_.api());
 
-    // Use init manager of rebuilder to request dependencies.
-    ENVOY_LOG(debug, "Pass init manager of rebuilder to transport factory context");
+    // Use init manager of the rebuilder to request dependencies.
     transport_factory_context.setInitManager(rebuilder->initManager());
     ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
     filter_chain_manager_.rebuildFilterChain(filter_chain_message, builder, filter_chain_manager_);
     // Start initializing after passing init manager to transport factory context.
-    ENVOY_LOG(debug, "Start rebuilding");
+    ENVOY_LOG(debug, "start rebuilding filter chain");
     rebuilder->startRebuilding();
   }
 }

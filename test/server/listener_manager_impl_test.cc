@@ -4190,11 +4190,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OnDemandFilterChainSingleRebuildi
         true
   )EOF",
                                                        Network::Address::IpVersion::v4);
-  const auto filter_chain_message = parseListenerFromV3Yaml(yaml).filter_chains().Get(0);
+  envoy::config::listener::v3::Listener listener_config = parseListenerFromV3Yaml(yaml);
+  const auto& filter_chain_message = listener_config.filter_chains().Get(0);
 
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
-  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  manager_->addOrUpdateListener(listener_config, "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // IPv4 client connects to unknown port - no match.

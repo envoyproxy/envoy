@@ -253,7 +253,6 @@ void FilterChainManagerImpl::rebuildFilterChain(
     }
   }
 
-  // Reuse created filter chain if possible.
   // FilterChainManager maintains the lifetime of FilterChainFactoryContext
   // ListenerImpl maintains the dependencies of FilterChainFactoryContext
   auto filter_chain_impl =
