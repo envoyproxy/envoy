@@ -27,7 +27,6 @@ envoy_extension_cc_test(
     name = "aws_lambda_filter_integration_test",
     srcs = ["aws_lambda_filter_integration_test.cc"],
     extension_name = "envoy.filters.http.aws_lambda",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/aws_lambda:aws_lambda_filter_lib",

@@ -45,7 +45,6 @@ envoy_extension_cc_test(
     name = "rbac_filter_integration_test",
     srcs = ["rbac_filter_integration_test.cc"],
     extension_name = "envoy.filters.http.rbac",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/http/rbac:config",
         "//test/config:utility_lib",

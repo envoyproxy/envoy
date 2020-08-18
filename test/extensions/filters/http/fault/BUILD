@@ -54,7 +54,6 @@ envoy_extension_cc_test(
     name = "fault_filter_integration_test",
     srcs = ["fault_filter_integration_test.cc"],
     extension_name = "envoy.filters.http.fault",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/http/fault:config",
         "//test/integration:http_protocol_integration_lib",

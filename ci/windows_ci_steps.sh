@@ -28,10 +28,19 @@ BAZEL_STARTUP_OPTIONS="--output_base=c:/_eb"
 BAZEL_BUILD_OPTIONS="-c opt --config=msvc-cl --show_task_finish --verbose_failures \
   --test_output=errors ${BAZEL_BUILD_EXTRA_OPTIONS} ${BAZEL_EXTRA_TEST_OPTIONS}"
 
-bazel ${BAZEL_STARTUP_OPTIONS} build ${BAZEL_BUILD_OPTIONS} //source/exe:envoy-static --build_tag_filters=-skip_on_windows
+# Test to validate updates of all dependency libraries in bazel/external and bazel/foreign_cc
+# bazel ${BAZEL_STARTUP_OPTIONS} build ${BAZEL_BUILD_OPTIONS} //bazel/... --build_tag_filters=-skip_on_windows
+
+# Complete envoy-static build (nothing needs to be skipped, build failure indicates broken dependencies)
+bazel ${BAZEL_STARTUP_OPTIONS} build ${BAZEL_BUILD_OPTIONS} //source/exe:envoy-static
 
 # Test invocations of known-working tests on Windows
-bazel ${BAZEL_STARTUP_OPTIONS} test ${BAZEL_BUILD_OPTIONS} //test/... --test_tag_filters=-skip_on_windows,-fails_on_windows --build_tests_only
+bazel ${BAZEL_STARTUP_OPTIONS} test ${BAZEL_BUILD_OPTIONS} //test/... --test_tag_filters=-skip_on_windows,-fails_on_windows,-flaky_on_windows --build_tests_only
 
-# Build tests that are failing to ensure no regressions
-bazel ${BAZEL_STARTUP_OPTIONS} build ${BAZEL_BUILD_OPTIONS} //test/... --test_tag_filters=-skip_on_windows,fails_on_windows --build_tests_only
+# Build tests that are known-flaky or known-failing to ensure no compilation regressions
+bazel ${BAZEL_STARTUP_OPTIONS} build ${BAZEL_BUILD_OPTIONS} //test/... --test_tag_filters=-skip_on_windows,fails_on_windows,flaky_on_windows --build_tests_only
+
+# Summarize tests bypasssed to monitor the progress of porting to Windows
+echo Tests bypassed as skip_on_windows: `bazel query 'kind(".*test rule", attr("tags", "skip_on_windows", //test/...))' 2>/dev/null | sort | wc -l` known unbuildable or inapplicable tests
+echo Tests bypassed as fails_on_windows: `bazel query 'kind(".*test rule", attr("tags", "fails_on_windows", //test/...))' 2>/dev/null | sort | wc -l` known incompatible tests
+echo Tests bypassed as flaky_on_windows: `bazel query 'kind(".*test rule", attr("tags", "flaky_on_windows", //test/...))' 2>/dev/null | sort | wc -l` known unstable tests
