@@ -169,7 +169,7 @@ message FilterChainMatch {
 // The configuration for on-demand filter chain. If this field is not empty in FilterChain message,
 // a filter chain will be built on-demand.
 // On-demand filter chains will be first built as placeholders when a listener is created in order to
-// speedup the warming up of the listener. The building and initialization of a on-demand filter chain
+// speedup the warming up of the listener. The building and initialization of an on-demand filter chain
 // will be postponed to the arrival of new connections that require this filter chain.
 // The building process of on-demand filter chains will be similar to the one of normal filter chains.
 // However, a unique rebuilder with a unique init manager will be assigned to build each on-demand filter chain.
@@ -178,8 +178,8 @@ message OnDemandConfiguration {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.listener.v3.OnDemandConfiguration";
 
-  // [#not-implemented-hide:] The timeout to wait for filter chain placeholder to complete rebuilding.
-  // If the timeout is reached, the filter chain rebuilding fails. Rebuilder send callbacks with failure signal//
+  // [#not-implemented-hide:] The timeout to wait for filter chain placeholders to complete rebuilding.
+  // If the timeout is reached, the filter chain rebuilding fails. Rebuilder send callbacks with failure signal
   // so that end users will close all stored connections related to this filter chain.
   // Specify 0 to disable the timeout. If not specified, a default timeout of 15s is used.
   google.protobuf.Duration rebuild_timeout = 1;
