@@ -104,11 +104,11 @@ Api::SysCallSizeResult FuzzedHeader::read(void* buffer, size_t length, int flags
   return Api::SysCallSizeResult{static_cast<ssize_t>(len), 0};
 }
 
-size_t FuzzedHeader::size() { return indices_[nreads_] - index_ + 1; }
+size_t FuzzedHeader::size() { return indices_[nread_] - index_ + 1; }
 
 bool FuzzedHeader::done() { return nread_ >= nreads_; }
 
-bool FuzzedHeader::empty() { return nreads_ == 0; }
+bool FuzzedHeader::empty() { return nreads_ == 0 | data_.size() == 0; }
 
 } // namespace ListenerFilters
 } // namespace Extensions
