@@ -147,7 +147,7 @@ private:
     }
 
     ClusterInfo& cluster_;
-    bool use_original_src_ip_;
+    const bool use_original_src_ip_;
     const Network::UdpRecvData::LocalPeerAddresses addresses_;
     const Upstream::HostConstSharedPtr host_;
     // TODO(mattklein123): Consider replacing an idle timer for each session with a last used

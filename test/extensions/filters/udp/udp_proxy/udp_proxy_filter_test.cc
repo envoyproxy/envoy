@@ -7,7 +7,6 @@
 #include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/mocks/api/mocks.h"
-#include "test/mocks/network/io_handle.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -27,48 +26,6 @@ namespace Extensions {
 namespace UdpFilters {
 namespace UdpProxy {
 namespace {
-
-class MockSocket : public Network::Socket {
-public:
-  MockSocket()
-      : io_handle_(std::make_unique<Network::MockIoHandle>()),
-        options_(std::make_shared<std::vector<OptionConstSharedPtr>>()){};
-  ~MockSocket() override = default;
-
-  Network::IoHandle& ioHandle() override { return *io_handle_; };
-
-  const Network::IoHandle& ioHandle() const override { return *io_handle_; };
-
-  Api::SysCallIntResult setSocketOption(int level, int optname, const void* optval,
-                                        socklen_t len) override {
-    return io_handle_->setOption(level, optname, optval, len);
-  }
-
-  void addOptions(const Network::Socket::OptionsSharedPtr& options) override {
-    Network::Socket::appendOptions(options_, options);
-  }
-
-  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
-  MOCK_METHOD(void, setLocalAddress, (const Network::Address::InstanceConstSharedPtr&), (override));
-  MOCK_METHOD(Network::Socket::Type, socketType, (), (const, override));
-  MOCK_METHOD(Network::Address::Type, addressType, (), (const, override));
-  MOCK_METHOD(absl::optional<Network::Address::IpVersion>, ipVersion, (), (const, override));
-  MOCK_METHOD(void, close, (), (override));
-  MOCK_METHOD(bool, isOpen, (), (const, override));
-  MOCK_METHOD(const OptionsSharedPtr&, options, (), (const, override));
-  MOCK_METHOD(Api::SysCallIntResult, bind, (const Network::Address::InstanceConstSharedPtr),
-              (override));
-  MOCK_METHOD(Api::SysCallIntResult, connect, (const Network::Address::InstanceConstSharedPtr),
-              (override));
-  MOCK_METHOD(Api::SysCallIntResult, listen, (int), (override));
-  MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*),
-              (const, override));
-  MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool), (override));
-  MOCK_METHOD(void, addOption, (const Network::Socket::OptionConstSharedPtr&), (override));
-
-  const std::unique_ptr<Network::MockIoHandle> io_handle_;
-  Network::Socket::OptionsSharedPtr options_;
-};
 
 class TestUdpProxyFilter : public UdpProxyFilter {
 public:
@@ -94,24 +51,17 @@ public:
     TestSession(UdpProxyFilterTest& parent,
                 const Network::Address::InstanceConstSharedPtr& upstream_address)
         : parent_(parent), upstream_address_(upstream_address),
-          socket_(new NiceMock<MockSocket>()) {
+          socket_(new NiceMock<Network::MockSocket>()) {
       ON_CALL(*socket_, ipVersion()).WillByDefault(Return(upstream_address_->ip()->version()));
     }
 
-    void expectUpstreamWriteOriginalSrcIp(bool no_support = false) {
+    void expectUpstreamWriteOriginalSrcIp() {
       EXPECT_CALL(*socket_->io_handle_, setOption(_, _, _, _))
-          .WillRepeatedly(Invoke([this, no_support](int level, int optname, const void* optval,
-                                                    socklen_t) -> Api::SysCallIntResult {
-            if (no_support) {
-              return Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP};
-            } else {
-              sock_opts_[level][optname] = *reinterpret_cast<const int*>(optval);
-              return Api::SysCallIntResult{0, 0};
-            }
+          .WillRepeatedly(Invoke([this](int level, int optname, const void* optval,
+                                        socklen_t) -> Api::SysCallIntResult {
+            sock_opts_[level][optname] = *reinterpret_cast<const int*>(optval);
+            return Api::SysCallIntResult{0, 0};
           }));
-      if (no_support) {
-        EXPECT_CALL(*socket_->io_handle_, fd()).Times(AtLeast(0));
-      }
     }
 
     void expectUpstreamWrite(const std::string& data, int sys_errno = 0,
@@ -205,7 +155,7 @@ public:
     UdpProxyFilterTest& parent_;
     const Network::Address::InstanceConstSharedPtr upstream_address_;
     Event::MockTimer* idle_timer_{};
-    NiceMock<MockSocket>* socket_;
+    NiceMock<Network::MockSocket>* socket_;
     std::map<int, std::map<int, int>> sock_opts_;
     Event::FileReadyCb file_event_cb_;
   };
@@ -762,35 +712,6 @@ cluster: fake_cluster
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
 }
 
-// Make sure socket option is not set correctly if the platform does not support the socket option.
-TEST_F(UdpProxyFilterTest, FallbackToNoOrgSrcIpForNoPlatformSupport) {
-  InSequence s;
-
-  EXPECT_CALL(os_sys_calls_, supportsIpTransparent());
-
-  setup(R"EOF(
-stat_prefix: foo
-cluster: fake_cluster
-use_original_src_ip: true
-)EOF");
-
-  expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWriteOriginalSrcIp(true);
-  test_sessions_[0].expectUpstreamWrite("hello", 0);
-  recvDataFromDownstream(peer_address_->asString(), "10.0.0.2:80", "hello");
-
-  if (ENVOY_SOCKET_IP_TRANSPARENT.hasValue() && ENVOY_SOCKET_IPV6_TRANSPARENT.hasValue()) {
-    checkSocketOptions(test_sessions_[0], ENVOY_SOCKET_IP_TRANSPARENT, 0,
-                       ENVOY_SOCKET_IPV6_TRANSPARENT, 0);
-  }
-  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
-  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
-  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
-
-  test_sessions_[0].recvDataFromUpstream("world");
-  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
-}
-
 // Make sure exit when use the use_original_src_ip but platform does not support ip transparent
 // option.
 TEST_F(UdpProxyFilterTest, ExitIpTransparentNoPlatformSupport) {
@@ -803,7 +724,10 @@ use_original_src_ip: true
 )EOF";
 
   EXPECT_CALL(os_sys_calls_, supportsIpTransparent()).WillOnce(Return(false));
-  EXPECT_THROW_WITH_REGEX(setup(config, true), EnvoyException, "The platform does not support .*");
+  EXPECT_THROW_WITH_REGEX(
+      setup(config, true), EnvoyException,
+      "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy is "
+      "not running with the CAP_NET_ADMIN capability.");
 }
 
 } // namespace

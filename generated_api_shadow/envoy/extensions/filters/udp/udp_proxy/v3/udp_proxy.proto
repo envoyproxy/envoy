@@ -36,19 +36,18 @@ message UdpProxyConfig {
   // the session. The default if not specified is 1 minute.
   google.protobuf.Duration idle_timeout = 3;
 
-  // Use the remote downstream ip address as sender ip address when send packets to upstreams.
-  // This option requires the Envoy to run with the *CAP_NET_ADMIN* capability.
+  // Use the remote downstream IP address as the sender IP address when sending packets to upstream hosts.
+  // This option requires Envoy to be run with the *CAP_NET_ADMIN* capability on Linux.
   // This option does not preserve the remote downstream port.
-  // If this option is enabled, the sender ip address will be changed to remote downstream ip address.
-  // It means that the Envoy cannot receive the packets that be sent by upstreams because the upstreams
-  // will send the packets with remote downstream ip address. So, basically, all packets will be routed
-  // to the remote downstream directly if there are route rules on the upstreams side.
-  // There are two options to return back to remote downstream.
-  // The one is that use the DSR(Direct Server Return).
-  // The another one is that configure the default gateway or add routing rules on the upstreams to forward
-  // all packets to the Envoy. And configure iptables rules and add some routing rules on the host of the Envoy side to
-  // forward all packets from upstreams to the Envoy process so that the Envoy can return back the packets to the downstream.
-  // If there are some errors during set this option to each sessions, it will fall back to no use_original_src_ip mode even if the this option is set.
-  // If the platform does not support this option, the Envoy will be stopped on initializing phase.
+  // If this option is enabled, the IP address of sent datagrams will be changed to the remote downstream IP address.
+  // This means that Envoy will not receive packets that are sent by upstream hosts because the upstream hosts
+  // will send the packets with the remote downstream IP address as the destination. All packets will be routed
+  // to the remote downstream directly if there are route rules on the upstream host side.
+  // There are two options to return the packets back to the remote downstream.
+  // The first one is to use DSR (Direct Server Return).
+  // The other one is to configure routing rules on the upstream hosts to forward
+  // all packets back to Envoy and configure iptables rules on the host running Envoy to
+  // forward all packets from upstream hosts to the Envoy process so that Envoy can forward the packets to the downstream.
+  // If the platform does not support this option, Envoy will raise a configuration error.
   bool use_original_src_ip = 4;
 }

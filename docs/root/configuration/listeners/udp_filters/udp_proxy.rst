@@ -20,9 +20,9 @@ Each session is index by the 4-tuple consisting of source IP/port and local IP/p
 datagram is received on. Sessions last until the :ref:`idle timeout
 <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.idle_timeout>` is reached.
 
-The UDP proxy listener filter also can operate as a *transparent* proxy if you set the
-use_original_src_ip. You can see the details from :ref:`use_original_src_ip
-<envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>`.
+The UDP proxy listener filter also can operate as a *transparent* proxy if the
+:ref:`use_original_src_ip <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>`
+field is set.
 
 Load balancing and unhealthy host handling
 ------------------------------------------
