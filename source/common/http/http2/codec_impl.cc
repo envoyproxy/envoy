@@ -381,10 +381,15 @@ ssize_t ConnectionImpl::StreamImpl::onDataSourceRead(uint64_t length, uint32_t* 
     if (local_end_stream_ && pending_send_data_.length() <= length) {
       *data_flags |= NGHTTP2_DATA_FLAG_EOF;
       if (pending_trailers_to_encode_) {
-        // We need to tell the library to not set end stream so that we can emit the trailers.
-        *data_flags |= NGHTTP2_DATA_FLAG_NO_END_STREAM;
-        submitTrailers(*pending_trailers_to_encode_);
-        pending_trailers_to_encode_.reset();
+        const bool skip_encoding_empty_trailers =
+            pending_trailers_to_encode_->empty() && parent_.skip_encoding_empty_trailers_;
+        // For empty trailers, we don't need to set the data flags and submit it again.
+        if (!skip_encoding_empty_trailers) {
+          // We need to tell the library to not set end stream so that we can emit the trailers.
+          *data_flags |= NGHTTP2_DATA_FLAG_NO_END_STREAM;
+          submitTrailers(*pending_trailers_to_encode_);
+          pending_trailers_to_encode_.reset();
+        }
       }
     }
 
