@@ -123,9 +123,18 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
 void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
   ASSERT(lookup_, "CacheFilter is trying to call getHeaders with no LookupContext");
 
+  // If the cache posts a callback to the dispatcher then the CacheFilter is destroyed for any
+  // reason (e.g client disconnected and HTTP stream terminated), then there is no guarantee that
+  // the posted callback will run before the filter is deleted. Hence, a weak_ptr to the CacheFilter
+  // is captured and used to make sure the CacheFilter is still alive before accessing it in the
+  // posted callback.
+  // TODO(yosrym93): Look into other options for handling this (also in getBody and getTrailers) as
+  // they arise, e.g. cancellable posts, guaranteed ordering of posted callbacks and deletions, etc.
+  CacheFilterWeakPtr self = shared_from_this();
+
   // The dispatcher needs to be captured because there's no guarantee that
   // decoder_callbacks_->dispatcher() is thread-safe.
-  lookup_->getHeaders([this, &request_headers,
+  lookup_->getHeaders([self, &request_headers,
                        &dispatcher = decoder_callbacks_->dispatcher()](LookupResult&& result) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
     // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
@@ -135,12 +144,14 @@ void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
     // lambda so that "result.headers_" can be captured as a raw pointer, then wrapped in a
     // unique_ptr when the result is re-instantiated.
     dispatcher.post(
-        [this, &request_headers, status = result.cache_entry_status_,
+        [self, &request_headers, status = result.cache_entry_status_,
          headers = result.headers_.release(), response_ranges = std::move(result.response_ranges_),
          content_length = result.content_length_, has_trailers = result.has_trailers_]() mutable {
-          onHeaders(LookupResult{status, absl::WrapUnique(headers), content_length, response_ranges,
-                                 has_trailers},
-                    request_headers);
+          if (auto cache_filter = self.lock()) {
+            cache_filter->onHeaders(LookupResult{status, absl::WrapUnique(headers), content_length,
+                                                 response_ranges, has_trailers},
+                                    request_headers);
+          }
         });
   });
 }
@@ -148,17 +159,27 @@ void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
 void CacheFilter::getBody() {
   ASSERT(lookup_, "CacheFilter is trying to call getBody with no LookupContext");
   ASSERT(!remaining_body_.empty(), "No reason to call getBody when there's no body to get.");
+  // If the cache posts a callback to the dispatcher then the CacheFilter is destroyed for any
+  // reason (e.g client disconnected and HTTP stream terminated), then there is no guarantee that
+  // the posted callback will run before the filter is deleted. Hence, a weak_ptr to the CacheFilter
+  // is captured and used to make sure the CacheFilter is still alive before accessing it in the
+  // posted callback.
+  CacheFilterWeakPtr self = shared_from_this();
 
   // The dispatcher needs to be captured because there's no guarantee that
   // decoder_callbacks_->dispatcher() is thread-safe.
-  lookup_->getBody(remaining_body_[0], [this, &dispatcher = decoder_callbacks_->dispatcher()](
+  lookup_->getBody(remaining_body_[0], [self, &dispatcher = decoder_callbacks_->dispatcher()](
                                            Buffer::InstancePtr&& body) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
     // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
     // initialize a std::function. Therefore, it cannot capture anything non-copyable.
     // "body" is a unique_ptr, which is non-copyable. Hence, it is captured as a raw pointer then
     // wrapped in a unique_ptr inside the lambda.
-    dispatcher.post([this, body = body.release()] { onBody(absl::WrapUnique(body)); });
+    dispatcher.post([self, body = body.release()] {
+      if (auto cache_filter = self.lock()) {
+        cache_filter->onBody(absl::WrapUnique(body));
+      }
+    });
   });
 }
 
@@ -166,17 +187,27 @@ void CacheFilter::getTrailers() {
   ASSERT(lookup_, "CacheFilter is trying to call getTrailers with no LookupContext");
   ASSERT(response_has_trailers_, "No reason to call getTrailers when there's no trailers to get.");
 
+  // If the cache posts a callback to the dispatcher then the CacheFilter is destroyed for any
+  // reason (e.g client disconnected and HTTP stream terminated), then there is no guarantee that
+  // the posted callback will run before the filter is deleted. Hence, a weak_ptr to the CacheFilter
+  // is captured and used to make sure the CacheFilter is still alive before accessing it in the
+  // posted callback.
+  CacheFilterWeakPtr self = shared_from_this();
+
   // The dispatcher needs to be captured because there's no guarantee that
   // decoder_callbacks_->dispatcher() is thread-safe.
-  lookup_->getTrailers([this, &dispatcher = decoder_callbacks_->dispatcher()](
+  lookup_->getTrailers([self, &dispatcher = decoder_callbacks_->dispatcher()](
                            Http::ResponseTrailerMapPtr&& trailers) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
     // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
     // initialize a std::function. Therefore, it cannot capture anything non-copyable.
     // "trailers" is a unique_ptr, which is non-copyable. Hence, it is captured as a raw
     // pointer then wrapped in a unique_ptr inside the lambda.
-    dispatcher.post(
-        [this, trailers = trailers.release()] { onTrailers(absl::WrapUnique(trailers)); });
+    dispatcher.post([self, trailers = trailers.release()] {
+      if (auto cache_filter = self.lock()) {
+        cache_filter->onTrailers(absl::WrapUnique(trailers));
+      }
+    });
   });
 }
 

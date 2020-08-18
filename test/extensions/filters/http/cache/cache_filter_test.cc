@@ -21,11 +21,13 @@ namespace {
 
 class CacheFilterTest : public ::testing::Test {
 protected:
-  CacheFilter makeFilter(HttpCache& cache) {
-    CacheFilter filter(config_, /*stats_prefix=*/"", context_.scope(), context_.timeSource(),
-                       cache);
-    filter.setDecoderFilterCallbacks(decoder_callbacks_);
-    filter.setEncoderFilterCallbacks(encoder_callbacks_);
+  // The filter has to be created as a shared_ptr to enable shared_from_this() which is used in the
+  // cache callbacks.
+  CacheFilterSharedPtr makeFilter(HttpCache& cache) {
+    auto filter = std::make_shared<CacheFilter>(config_, /*stats_prefix=*/"", context_.scope(),
+                                                context_.timeSource(), cache);
+    filter->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter->setEncoderFilterCallbacks(encoder_callbacks_);
     return filter;
   }
 
@@ -33,14 +35,14 @@ protected:
     ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(::testing::ReturnRef(*dispatcher_));
   }
 
-  void testDecodeRequestMiss(CacheFilter& filter) {
+  void testDecodeRequestMiss(CacheFilterSharedPtr filter) {
     // The filter should not encode any headers or data as no cached response exists.
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
     EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
 
     // The filter should stop decoding iteration when decodeHeaders is called as a cache lookup is
     // in progress.
-    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
               Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
     // The filter should continue decoding when the cache lookup result (miss) is ready.
@@ -53,7 +55,7 @@ protected:
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
   }
 
-  void testDecodeRequestHitNoBody(CacheFilter& filter) {
+  void testDecodeRequestHitNoBody(CacheFilterSharedPtr filter) {
     // The filter should encode cached headers.
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
@@ -65,7 +67,7 @@ protected:
 
     // The filter should stop decoding iteration when decodeHeaders is called as a cache lookup is
     // in progress.
-    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
               Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
     // The filter should not continue decoding when the cache lookup result is ready, as the
@@ -79,7 +81,7 @@ protected:
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
   }
 
-  void testDecodeRequestHitWithBody(CacheFilter& filter, std::string body) {
+  void testDecodeRequestHitWithBody(CacheFilterSharedPtr filter, std::string body) {
     // The filter should encode cached headers.
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
@@ -93,7 +95,7 @@ protected:
 
     // The filter should stop decoding iteration when decodeHeaders is called as a cache lookup is
     // in progress.
-    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
               Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
     // The filter should not continue decoding when the cache lookup result is ready, as the
@@ -102,6 +104,8 @@ protected:
 
     // The cache lookup callback should be posted to the dispatcher.
     // Run events on the dispatcher so that the callback is invoked.
+    // The posted lookup callback will cause another callback to be posted (when getBody() is
+    // called) which should also be invoked.
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
@@ -131,20 +135,20 @@ TEST_F(CacheFilterTest, UncacheableRequest) {
 
   for (int request = 1; request <= 2; request++) {
     // Create filter for the request
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Decode request headers
     // The filter should not encode any headers or data as no cached response exists.
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
     EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
 
-    // Uncacheable requests should bypass the cache filter. No cache lookups should be initiated.
-    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+    // Uncacheable requests should bypass the cache filter-> No cache lookups should be initiated.
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
 
     // Encode response header
-    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
-    filter.onDestroy();
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter->onDestroy();
   }
 }
 
@@ -156,13 +160,13 @@ TEST_F(CacheFilterTest, UncacheableResponse) {
 
   for (int request = 1; request <= 2; request++) {
     // Create filter for the request.
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     testDecodeRequestMiss(filter);
 
     // Encode response headers.
-    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
-    filter.onDestroy();
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter->onDestroy();
   }
 }
 
@@ -172,13 +176,13 @@ TEST_F(CacheFilterTest, CacheMiss) {
     request_headers_.setHost("CacheMiss" + std::to_string(request));
 
     // Create filter for request 1
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     testDecodeRequestMiss(filter);
 
     // Encode response header
-    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
-    filter.onDestroy();
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter->onDestroy();
   }
 }
 
@@ -187,21 +191,21 @@ TEST_F(CacheFilterTest, CacheHitNoBody) {
 
   {
     // Create filter for request 1.
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     testDecodeRequestMiss(filter);
 
     // Encode response headers.
-    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
-    filter.onDestroy();
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter->onDestroy();
   }
   {
     // Create filter for request 2.
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     testDecodeRequestHitNoBody(filter);
 
-    filter.onDestroy();
+    filter->onDestroy();
   }
 }
 
@@ -211,25 +215,25 @@ TEST_F(CacheFilterTest, CacheHitWithBody) {
 
   {
     // Create filter for request 1.
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     testDecodeRequestMiss(filter);
 
     // Encode response.
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
-    EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
-    EXPECT_EQ(filter.encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
 
-    filter.onDestroy();
+    filter->onDestroy();
   }
   {
     // Create filter for request 2
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     testDecodeRequestHitWithBody(filter, body);
 
-    filter.onDestroy();
+    filter->onDestroy();
   }
 }
 
@@ -239,7 +243,7 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
 
   {
     // Create filter for request 1
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     testDecodeRequestMiss(filter);
 
@@ -251,13 +255,13 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
 
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
-    EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
-    EXPECT_EQ(filter.encodeData(buffer, true), Http::FilterDataStatus::Continue);
-    filter.onDestroy();
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    filter->onDestroy();
   }
   {
     // Create filter for request 2
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Make request require validation
     request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
@@ -282,7 +286,7 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
     // The filter should stop encoding iteration when encodeHeaders is called as a cached response
     // is being fetched and added to the encoding stream. StopIteration does not stop encodeData of
     // the same filter from being called
-    EXPECT_EQ(filter.encodeHeaders(not_modified_response_headers, true),
+    EXPECT_EQ(filter->encodeHeaders(not_modified_response_headers, true),
               Http::FilterHeadersStatus::StopIteration);
 
     // Check for the cached response headers with updated date
@@ -296,7 +300,7 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
     // However, if a body is present by mistake, encodeData should stop iteration until
     // encoding the cached response is done
     Buffer::OwnedImpl not_modified_body;
-    EXPECT_EQ(filter.encodeData(not_modified_body, true),
+    EXPECT_EQ(filter->encodeData(not_modified_body, true),
               Http::FilterDataStatus::StopIterationAndBuffer);
 
     // The filter should add the cached response body to encoded data.
@@ -311,7 +315,7 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
 
     ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
 
-    filter.onDestroy();
+    filter->onDestroy();
   }
 }
 
@@ -321,7 +325,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
 
   {
     // Create filter for request 1
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     testDecodeRequestMiss(filter);
 
@@ -333,13 +337,13 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
 
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
-    EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
-    EXPECT_EQ(filter.encodeData(buffer, true), Http::FilterDataStatus::Continue);
-    filter.onDestroy();
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    filter->onDestroy();
   }
   {
     // Create filter for request 2
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Make request require validation
     request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
@@ -359,9 +363,9 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     response_headers_.setStatus(201);
 
     // The filter should not stop encoding iteration as this is a new response.
-    EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
     Buffer::OwnedImpl new_body;
-    EXPECT_EQ(filter.encodeData(new_body, true), Http::FilterDataStatus::Continue);
+    EXPECT_EQ(filter->encodeData(new_body, true), Http::FilterDataStatus::Continue);
 
     // The response headers should have the new status.
     EXPECT_THAT(response_headers_, HeaderHasValueRef(":status", "201"));
@@ -375,7 +379,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
 
     ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
 
-    filter.onDestroy();
+    filter->onDestroy();
   }
 }
 
@@ -387,15 +391,48 @@ TEST_F(CacheFilterTest, GetRequestWithBodyAndTrailers) {
   Http::TestRequestTrailerMapImpl request_trailers;
 
   for (int i = 0; i < 2; ++i) {
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
-    EXPECT_EQ(filter.decodeHeaders(request_headers_, false), Http::FilterHeadersStatus::Continue);
-    EXPECT_EQ(filter.decodeData(request_buffer, false), Http::FilterDataStatus::Continue);
-    EXPECT_EQ(filter.decodeTrailers(request_trailers), Http::FilterTrailersStatus::Continue);
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter->decodeData(request_buffer, false), Http::FilterDataStatus::Continue);
+    EXPECT_EQ(filter->decodeTrailers(request_trailers), Http::FilterTrailersStatus::Continue);
 
-    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
-    filter.onDestroy();
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter->onDestroy();
   }
+}
+
+// Checks the case where a cache lookup callback is posted to the dispatcher, then the CacheFilter
+// was deleted (e.g. connection dropped with the client) before the posted callback was executed. In
+// this case the CacheFilter should not be accessed after it was deleted, which is ensured by using
+// a weak_ptr to the CacheFilter in the posted callback.
+// This test may mistakenly pass (false positive) even if the the CacheFilter is accessed after
+// being deleted, as filter_state_ may be accessed and read as "FilterState::Destroyed" which will
+// result in a correct behavior. However, running the test with ASAN sanitizer enabled should
+// reliably fail if the CacheFilter is accessed after being deleted.
+TEST_F(CacheFilterTest, FilterDeletedBeforePostedCallbackExecuted) {
+  request_headers_.setHost("FilterDeletedBeforePostedCallbackExecuted");
+
+  // Create the filter
+  CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+
+  // Call decode headers to start the cache lookup, which should immediately post the callback to
+  // the dispatcher.
+  EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  // Destroy the filter
+  filter->onDestroy();
+  filter.reset();
+
+  // Make sure that onHeaders was not called by making sure no decoder callbacks were made.
+  EXPECT_CALL(decoder_callbacks_, continueDecoding).Times(0);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+
+  // Run events on the dispatcher so that the callback is invoked after the filter deletion.
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
 }
 
 // A new type alias for a different type of tests that use the exact same class
@@ -407,7 +444,7 @@ TEST_F(ValidationHeadersTest, EtagAndLastModified) {
 
   // Make request 1 to insert the response into cache
   {
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
     testDecodeRequestMiss(filter);
 
     // Add validation headers to the response
@@ -415,11 +452,11 @@ TEST_F(ValidationHeadersTest, EtagAndLastModified) {
     response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
                                       formatter_.now(time_source_));
 
-    filter.encodeHeaders(response_headers_, true);
+    filter->encodeHeaders(response_headers_, true);
   }
   // Make request 2 to test for added conditional headers
   {
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Make sure the request requires validation
     request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
@@ -438,17 +475,17 @@ TEST_F(ValidationHeadersTest, EtagOnly) {
 
   // Make request 1 to insert the response into cache
   {
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
     testDecodeRequestMiss(filter);
 
     // Add validation headers to the response
     response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag);
 
-    filter.encodeHeaders(response_headers_, true);
+    filter->encodeHeaders(response_headers_, true);
   }
   // Make request 2 to test for added conditional headers
   {
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Make sure the request requires validation
     request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
@@ -467,18 +504,18 @@ TEST_F(ValidationHeadersTest, LastModifiedOnly) {
 
   // Make request 1 to insert the response into cache
   {
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
     testDecodeRequestMiss(filter);
 
     // Add validation headers to the response
     response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
                                       formatter_.now(time_source_));
 
-    filter.encodeHeaders(response_headers_, true);
+    filter->encodeHeaders(response_headers_, true);
   }
   // Make request 2 to test for added conditional headers
   {
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Make sure the request requires validation
     request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
@@ -496,13 +533,13 @@ TEST_F(ValidationHeadersTest, NoEtagOrLastModified) {
 
   // Make request 1 to insert the response into cache
   {
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
     testDecodeRequestMiss(filter);
-    filter.encodeHeaders(response_headers_, true);
+    filter->encodeHeaders(response_headers_, true);
   }
   // Make request 2 to test for added conditional headers
   {
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Make sure the request requires validation
     request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
@@ -521,16 +558,16 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
 
   // Make request 1 to insert the response into cache
   {
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
     testDecodeRequestMiss(filter);
 
     // Add validation headers to the response
     response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified, "invalid-date");
-    filter.encodeHeaders(response_headers_, true);
+    filter->encodeHeaders(response_headers_, true);
   }
   // Make request 2 to test for added conditional headers
   {
-    CacheFilter filter = makeFilter(simple_cache_);
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Make sure the request requires validation
     request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");

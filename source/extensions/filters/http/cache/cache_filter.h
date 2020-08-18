@@ -22,7 +22,8 @@ namespace Cache {
  * A filter that caches responses and attempts to satisfy requests from cache.
  */
 class CacheFilter : public Http::PassThroughFilter,
-                    public Logger::Loggable<Logger::Id::cache_filter> {
+                    public Logger::Loggable<Logger::Id::cache_filter>,
+                    public std::enable_shared_from_this<CacheFilter> {
 public:
   CacheFilter(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config,
               const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source,
@@ -115,6 +116,9 @@ private:
 
   FilterState filter_state_ = FilterState::Initial;
 };
+
+using CacheFilterSharedPtr = std::shared_ptr<CacheFilter>;
+using CacheFilterWeakPtr = std::weak_ptr<CacheFilter>;
 
 } // namespace Cache
 } // namespace HttpFilters
