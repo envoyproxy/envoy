@@ -208,6 +208,9 @@ private:
                  std::function<void(LbSubsetEntryPtr, HostPredicate, const SubsetMetadata&)> cb);
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
+  HostConstSharedPtr
+  tryChooseHostFromMetadataMatchCriteriaSingle(const Router::MetadataMatchCriteria& match_criteria,
+                                               bool& host_chosen);
 
   absl::optional<SubsetSelectorFallbackParamsRef>
   tryFindSelectorFallbackParams(LoadBalancerContext* context);
@@ -257,7 +260,6 @@ private:
   // selectors configuration
   SubsetSelectorMapPtr selectors_;
 
-  bool single_{false};
   std::string single_key_;
   absl::flat_hash_map<HashedValue, HostConstSharedPtr> single_host_per_subset_map_;
 

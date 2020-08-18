@@ -113,27 +113,58 @@ SubsetLoadBalancer::~SubsetLoadBalancer() {
 }
 
 void SubsetLoadBalancer::rebuildSingle() {
-  if (single_) {
-    // Because PriorityUpdateCb doesn't give a modified list (only added and removed), it is
-    // faster to just rebuild this map than try to figure out if any hosts had their metadata
-    // changed, and then figure out the old and new value (to remove from the old key in this map
-    // and insert in the new key).
-    single_host_per_subset_map_.clear();
-    for (const auto& host_set : original_priority_set_.hostSetsPerPriority()) {
-      for (const auto& host : host_set->hosts()) {
-        MetadataConstSharedPtr metadata = host->metadata();
-        const auto& filter_metadata = metadata->filter_metadata();
-        auto filter_it = filter_metadata.find(Config::MetadataFilters::get().ENVOY_LB);
-        if (filter_it != filter_metadata.end()) {
-          const auto& fields = filter_it->second.fields();
-          auto fields_it = fields.find(single_key_);
-          if (fields_it != fields.end()) {
-            single_host_per_subset_map_[fields_it->second] = host;
+  if (single_key_.empty()) {
+    return;
+  }
+
+  // Because PriorityUpdateCb doesn't give a modified list (only added and removed), it is
+  // faster to just rebuild this map than try to figure out if any hosts had their metadata
+  // changed, and then figure out the old and new value (to remove from the old key in this map
+  // and insert in the new key).
+  single_host_per_subset_map_.clear();
+  for (const auto& host_set : original_priority_set_.hostSetsPerPriority()) {
+    for (const auto& host : host_set->hosts()) {
+      MetadataConstSharedPtr metadata = host->metadata();
+      const auto& filter_metadata = metadata->filter_metadata();
+      auto filter_it = filter_metadata.find(Config::MetadataFilters::get().ENVOY_LB);
+      if (filter_it != filter_metadata.end()) {
+        const auto& fields = filter_it->second.fields();
+        auto fields_it = fields.find(single_key_);
+        if (fields_it != fields.end()) {
+          auto [iterator, did_insert] =
+              single_host_per_subset_map_.try_emplace(fields_it->second, host);
+          if (!did_insert) {
+            throw EnvoyException(fmt::format("Encountered duplicate metadata '{}' value in "
+                                             "host '{}' with `single_host_per_subset`",
+                                             fields_it->second.DebugString(),
+                                             host->address()->asStringView()));
           }
         }
       }
     }
   }
+}
+
+// When in `single_host_per_subset` mode, select a host based on the provided match_criteria.
+// Set `host_chosen` to
+HostConstSharedPtr SubsetLoadBalancer::tryChooseHostFromMetadataMatchCriteriaSingle(
+    const Router::MetadataMatchCriteria& match_criteria, bool& host_chosen) {
+  ASSERT(!single_key_.empty());
+
+  for (const auto& entry : match_criteria.metadataMatchCriteria()) {
+    if (entry->name() == single_key_) {
+      auto it = single_host_per_subset_map_.find(entry->value());
+      if (it != single_host_per_subset_map_.end()) {
+        if (it->second->health() != Host::Health::Unhealthy) {
+          host_chosen = true;
+          stats_.lb_subsets_selected_.inc();
+          return it->second;
+        }
+      }
+      break;
+    }
+  }
+  return nullptr;
 }
 
 void SubsetLoadBalancer::refreshSubsets() {
@@ -170,11 +201,13 @@ void SubsetLoadBalancer::initSubsetSelectorMap() {
         throw EnvoyException("subset_lb selector: single_host_per_subset cannot be set when there "
                              "are multiple subset selectors.");
       }
-      if (selector_keys.size() > 1) {
+      if (selector_keys.size() != 1 || selector_keys.begin()->empty()) {
         throw EnvoyException("subset_lb selector: single_host_per_subset cannot bet set when there "
-                             "are multiple selector keys.");
+                             "isn't exactly 1 key or if that key is empty.");
       }
-      single_ = true;
+      if (selector_keys.begin()->empty()) {
+        throw EnvoyException("subset_lb selector:");
+      }
       single_key_ = *selector_keys.begin();
 
       subset_selectors_.clear();
@@ -333,20 +366,8 @@ HostConstSharedPtr SubsetLoadBalancer::tryChooseHostFromContext(LoadBalancerCont
     return nullptr;
   }
 
-  if (single_) {
-    for (const auto& entry : match_criteria->metadataMatchCriteria()) {
-      if (entry->name() == single_key_) {
-        auto it = single_host_per_subset_map_.find(entry->value());
-        if (it != single_host_per_subset_map_.end()) {
-          if (it->second->health() != Host::Health::Unhealthy) {
-            host_chosen = true;
-            return it->second;
-          }
-        }
-        break;
-      }
-    }
-    return nullptr;
+  if (!single_key_.empty()) {
+    return tryChooseHostFromMetadataMatchCriteriaSingle(*match_criteria, host_chosen);
   }
 
   // Route has metadata match criteria defined, see if we have a matching subset.
