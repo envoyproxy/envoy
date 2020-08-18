@@ -100,6 +100,8 @@ envoy_cc_test_library(
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:macros",
+        "//source/common/buffer:buffer_lib",
+        "//include/envoy/http:metadata_interface_with_external_headers",
     ],
 )
 
@@ -148,6 +150,16 @@ envoy_cc_test(
         "//source/common/runtime:runtime_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "http2_frame_test",
+    srcs = ["http2_frame_test.cc"],
+    deps = [
+        "//source/common/http/http2:metadata_encoder_lib",
+        "//test/common/http/http2:http2_frame",
+        "//include/envoy/http:metadata_interface",
     ],
 )
 
