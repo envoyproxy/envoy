@@ -361,8 +361,13 @@ def allowlistedForUnpackTo(file_path):
 
 
 def denylistedForExceptions(file_path):
-  return (file_path.endswith(".h") and not file_path.startswith("./test/")) or (file_path in EXCEPTION_DENYLIST \
-      or isInSubdir(file_path, 'tools/testdata')) and not file_path.endswith(DOCS_SUFFIX)
+  # returns True when it is a non test header file or
+  # the file_path is in DENYLIST or
+  # it is under toos/testdata subdirectory
+  if file_path.endswith(DOCS_SUFFIX):
+    return False:
+  return (file_path.endswith('.h') and not file_path.startswith("./test/")) or file_path in EXCEPTION_DENYLIST \
+      or isInSubdir(file_path, 'tools/testdata')
 
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
@@ -755,7 +760,7 @@ def checkSourceLine(line, file_path, reportError):
                     "Grpc::GoogleGrpcContext. See #8282")
 
   if denylistedForExceptions(file_path):
-    # changed to accommodate cases where throw is a substring of a token like in "foothrowBar"
+    # skpping cases where throw is a substring of a symbol like in "foothrowBar"
     if "throw" in line.split():
       comment_match = COMMENT_REGEX.search(line)
       if comment_match is None or comment_match.start(0) > line.find("throw"):
