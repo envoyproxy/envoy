@@ -62,6 +62,9 @@ IoResult BufferSourceSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
                    " bytes to write but no buffer to write to, closing. ");
     return {PostIoAction::Close, 0, false};
   }
+  if (isWritablePeerOverHighWatermark()) {
+    return {PostIoAction::KeepOpen, 0, false};
+  }
   uint64_t bytes_written = 0;
   if (buffer.length() > 0) {
     bytes_written = buffer.length();

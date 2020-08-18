@@ -81,6 +81,7 @@ protected:
         *dispatcher_, server_address_, client_address_, std::move(client_socket), nullptr);
     ENVOY_LOG_MISC(debug, "lambdai: client pipe C{} owns TS{} and B{}", client_conn->id(),
                    client_socket_raw->bsid(), client_socket_raw->read_buffer_.bid());
+    client_conn->addConnectionCallbacks(client_callbacks_);
 
     auto server_conn = std::make_unique<Network::ServerPipeImpl>(
         *dispatcher_, client_address_, server_address_, std::move(server_socket), nullptr);
@@ -223,6 +224,8 @@ TEST_P(PipeConnectionImplTest, UniqueId) {
   uint64_t client_id = client_connection_->id();
   uint64_t server_id = server_connection_->id();
   EXPECT_NE(server_id, client_id);
+
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
   client_connection_->close(ConnectionCloseType::NoFlush);
 }
 
@@ -230,8 +233,10 @@ TEST_P(PipeConnectionImplTest, ClientClose) {
   setupPipe();
   doConnect();
   Buffer::OwnedImpl buffer("hello world");
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected));
   client_connection_->write(buffer, false);
 
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
   client_connection_->close(ConnectionCloseType::NoFlush);
 }
@@ -317,6 +322,7 @@ TEST_P(PipeConnectionImplTest, ReadEnableDispatches) {
     client_connection_->readDisable(false);
   }
 
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
   client_connection_->close(ConnectionCloseType::NoFlush);
 }
@@ -361,6 +367,7 @@ TEST_P(PipeConnectionImplTest, KickUndone) {
     // Data no longer buffered - even if dispatch_buffered_data_ lingered it should have no effect.
   }
 
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
   client_connection_->close(ConnectionCloseType::NoFlush);
 }
@@ -385,6 +392,7 @@ TEST_P(PipeConnectionImplTest, ReadDisableAfterCloseHandledGracefully) {
   client_connection_->readDisable(true);
   client_connection_->readDisable(true);
 
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
   client_connection_->close(ConnectionCloseType::NoFlush);
 
@@ -484,55 +492,61 @@ TEST_P(PipeConnectionImplTest, ReadDisableAfterCloseHandledGracefully) {
 //   dispatcher_->run(Event::Dispatcher::RunType::Block);
 // }
 
-// // Test that as watermark levels are changed, the appropriate callbacks are triggered.
-// TEST_P(PipeConnectionImplTest, WriteWatermarks) {
-//   useMockBuffer();
+// Test that as watermark levels are changed, the appropriate callbacks are triggered.
+TEST_P(PipeConnectionImplTest, WriteWatermarks) {
+  useMockBuffer();
 
-//   setUpBasicConnection();
-//   EXPECT_FALSE(client_connection_->aboveHighWatermark());
+  setupPipe();
+  doConnect();
 
-//   // Stick 5 bytes in the connection buffer.
-//   std::unique_ptr<Buffer::OwnedImpl> buffer(new Buffer::OwnedImpl("hello"));
-//   int buffer_len = buffer->length();
-//   EXPECT_CALL(*client_write_buffer_, write(_))
-//       .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::failWrite));
-//   EXPECT_CALL(*client_write_buffer_, move(_));
-//   client_write_buffer_->move(*buffer);
+  //   auto client_read_filter = std::make_shared<NiceMock<MockReadFilter>>();
+  //   client_connection_->addReadFilter(client_read_filter);
+  EXPECT_FALSE(client_connection_->aboveHighWatermark());
 
-//   {
-//     // Go from watermarks being off to being above the high watermark.
-//     EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
-//     EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
-//     client_connection_->setBufferLimits(buffer_len - 3);
-//     EXPECT_TRUE(client_connection_->aboveHighWatermark());
-//   }
+  // Stick 5 bytes in the connection buffer.
+  std::unique_ptr<Buffer::OwnedImpl> buffer(new Buffer::OwnedImpl("hello"));
+  int buffer_len = buffer->length();
+  // EXPECT_CALL(*client_write_buffer_, write(_))
+  //     .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::failWrite));
+  EXPECT_CALL(*client_write_buffer_, move(_));
+  client_write_buffer_->move(*buffer);
 
-//   {
-//     // Go from above the high watermark to in between both.
-//     EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
-//     EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
-//     client_connection_->setBufferLimits(buffer_len + 1);
-//     EXPECT_TRUE(client_connection_->aboveHighWatermark());
-//   }
+  {
+    // Go from watermarks being off to being above the high watermark.
+    EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
+    EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
+    client_connection_->setBufferLimits(buffer_len - 3);
+    ASSERT_TRUE(client_connection_->aboveHighWatermark());
+  }
 
-//   {
-//     // Go from above the high watermark to below the low watermark.
-//     EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
-//     EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark());
-//     client_connection_->setBufferLimits(buffer_len * 3);
-//     EXPECT_FALSE(client_connection_->aboveHighWatermark());
-//   }
+  {
+    // Go from above the high watermark to in between both.
+    EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
+    EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
+    client_connection_->setBufferLimits(buffer_len + 1);
+    ASSERT_TRUE(client_connection_->aboveHighWatermark());
+  }
 
-//   {
-//     // Go back in between and verify neither callback is called.
-//     EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
-//     EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
-//     client_connection_->setBufferLimits(buffer_len * 2);
-//     EXPECT_FALSE(client_connection_->aboveHighWatermark());
-//   }
+  {
+    // Go from above the high watermark to below the low watermark.
+    EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
+    EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark());
+    client_connection_->setBufferLimits(buffer_len * 3);
+    ASSERT_FALSE(client_connection_->aboveHighWatermark());
+  }
 
-//   disconnect(false);
-// }
+  {
+    // Go back in between and verify neither callback is called.
+    EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
+    EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
+    client_connection_->setBufferLimits(buffer_len * 2);
+    ASSERT_FALSE(client_connection_->aboveHighWatermark());
+  }
+  EXPECT_CALL(*client_write_buffer_, drain(_));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  client_connection_->close(ConnectionCloseType::NoFlush);
+}
 
 // // Test that as watermark levels are changed, the appropriate callbacks are triggered.
 // TEST_P(PipeConnectionImplTest, ReadWatermarks) {

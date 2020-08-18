@@ -98,6 +98,7 @@ void WatermarkBuffer::checkLowWatermark() {
 }
 
 void WatermarkBuffer::checkHighAndOverflowWatermarks() {
+  ENVOY_LOG_MISC(debug, "lambdai: B{} {} above_high_watermark_called_={} high_watermark_={}, buflen={}", bid(), __FUNCTION__, above_high_watermark_called_, high_watermark_, OwnedImpl::length());
   if (high_watermark_ == 0 || OwnedImpl::length() <= high_watermark_) {
     return;
   }

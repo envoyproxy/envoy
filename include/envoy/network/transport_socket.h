@@ -269,6 +269,11 @@ public:
    * @return the buffer to be written.
    */
   virtual Buffer::Instance* getWriteBuffer() PURE;
+
+  /**
+   * @return false more data is acceptable.
+   */
+  virtual bool isOverHighWatermark() const PURE;
 };
 
 } // namespace Network
