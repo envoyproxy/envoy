@@ -406,7 +406,7 @@ be installed.
 
 ```
 bazel build -c dbg //test/common/http:async_client_impl_test
-bazel build //test/common/http:async_client_impl_test.dwp
+bazel build -c dbg //test/common/http:async_client_impl_test.dwp
 gdb bazel-bin/test/common/http/async_client_impl_test
 ```
 
