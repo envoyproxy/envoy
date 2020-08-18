@@ -60,7 +60,6 @@ def get_directives(translation_unit: Type[TranslationUnit]) -> str:
         #include "b.h"
 
         int foo(){
-
         }
     this function should return
     '#pragma once\n#include "a.h"\n#include "b.h"'
@@ -73,26 +72,18 @@ def get_directives(translation_unit: Type[TranslationUnit]) -> str:
         first non-directive statement.
     
     Notes:
-        This function actually find the first non-preprocessor directive statement and return 
-        all contents before it.
-
         clang lib provides API like tranlation_unit.get_includes() to get include directives.
-        But we can't use it as it requires presence of the included files to return the full list. 
-        To get this API work will need extra efforts than needed.
-
+        But we can't use it as it requires presence of the included files to return the full list.
         We choose to return the string insead of list of includes since we will simply copy-paste
         the include statements into generated headers. Return string seems more convenient
     """
-
   cursor = translation_unit.cursor
   for descendant in cursor.walk_preorder():
     if descendant.location.file is not None and descendant.location.file.name == cursor.displayname:
       filename = descendant.location.file.name
       with open(filename, 'r') as source_file:
         contents = source_file.read()
-      headers = contents[:descendant.extent.start.offset]
-      return headers
-
+      return contents[:descendant.extent.start.offset]
   return ""
 
 
@@ -105,7 +96,6 @@ def class_definitions(cursor: Cursor) -> List[Cursor]:
 
     Returns:
         a list of cursor, each pointing to a class definition.
-
     """
   class_cursors = []
   for descendant in cursor.walk_preorder():
@@ -117,19 +107,16 @@ def class_definitions(cursor: Cursor) -> List[Cursor]:
       continue
     if descendant.location.file.name != cursor.displayname:
       continue
-
     # check if descendant is pointing a class delaration block.
     if descendant.kind != CursorKind.CLASS_DECL:
       continue
     if not descendant.is_definition():
       continue
-
     # check if this class is directly enclosed by a namespace.
     # if it's not, then it's a nested class, our divided results
     # should not contain nested classes.
     if descendant.semantic_parent.kind != CursorKind.NAMESPACE:
       continue
-
     class_cursors.append(descendant)
   return class_cursors
 
@@ -143,7 +130,6 @@ def class_implementations(cursor: Cursor) -> List[Cursor]:
 
     Returns:
         a list of cursor, each pointing to a class implementation.
-
     """
   impl_cursors = []
   for descendant in cursor.walk_preorder():
@@ -241,7 +227,6 @@ def extract_implementations(impl_cursors: List[Cursor], source_code: str) -> Dic
 
     Returns:
         classname_to_impl: a dict maps class name to its member methods implementations
-
     """
   classname_to_impl = dict()
   for i, cursor in enumerate(impl_cursors):
@@ -299,7 +284,6 @@ def get_enclosing_namespace(defn: Cursor) -> Tuple[str, str]:
 
     Returns:
         namespace_prefix, namespace_suffix: a pair of string, representing the enclosing namespaces
-
     """
   namespace_prefix = ""
   namespace_suffix = ""
