@@ -491,7 +491,7 @@ void ClientPipeImpl::onReadReady() {
   const bool latched_dispatch_buffered_data = dispatch_buffered_data_;
   dispatch_buffered_data_ = false;
 
-  ASSERT(!connecting_);
+  //ASSERT(!connecting_);
 
   // We get here while read disabled in two ways.
   // 1) There was a call to setReadBufferReady(), for example if a raw buffer socket ceded due to

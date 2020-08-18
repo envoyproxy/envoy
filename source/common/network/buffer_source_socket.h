@@ -76,6 +76,7 @@ private:
   WritablePeer* writable_peer_{nullptr};
   // The flag whether the peer is valid. Any write attempt should check flag.
   bool peer_closed_{false};
+  bool over_high_watermark_{false};
 };
 
 class BufferSourceSocketFactory : public TransportSocketFactory {

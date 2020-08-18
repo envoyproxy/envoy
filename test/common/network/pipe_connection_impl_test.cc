@@ -286,87 +286,84 @@ TEST_P(PipeConnectionImplTest, ReadDisable) {
   connection->close(ConnectionCloseType::NoFlush);
 }
 
-// // The HTTP/1 codec handles pipelined connections by relying on readDisable(false) resulting in
-// the
-// // subsequent request being dispatched. Regression test this behavior.
-// TEST_P(PipeConnectionImplTest, ReadEnableDispatches) {
-//   setUpBasicConnection();
-//   connect();
+// The HTTP/1 codec handles pipelined connections by relying on readDisable(false) resulting in the
+// subsequent request being dispatched. Regression test this behavior.
+TEST_P(PipeConnectionImplTest, ReadEnableDispatches) {
+  setupPipe();
+  doConnect();
 
-//   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
-//   client_connection_->addReadFilter(client_read_filter);
+  auto client_read_filter = std::make_shared<NiceMock<MockReadFilter>>();
+  client_connection_->addReadFilter(client_read_filter);
 
-//   {
-//     Buffer::OwnedImpl buffer("data");
-//     server_connection_->write(buffer, false);
-//     EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("data"), false))
-//         .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
-//           dispatcher_->exit();
-//           return FilterStatus::StopIteration;
-//         }));
-//     dispatcher_->run(Event::Dispatcher::RunType::Block);
-//   }
+  {
+    Buffer::OwnedImpl buffer("data");
+    EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("data"), false))
+        .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+          dispatcher_->exit();
+          return FilterStatus::StopIteration;
+        }));
 
-//   {
-//     client_connection_->readDisable(true);
-//     EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("data"), false))
-//         .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
-//           buffer.drain(buffer.length());
-//           dispatcher_->exit();
-//           return FilterStatus::StopIteration;
-//         }));
-//     client_connection_->readDisable(false);
-//     dispatcher_->run(Event::Dispatcher::RunType::Block);
-//   }
+    server_connection_->write(buffer, false);
+  }
 
-//   disconnect(true);
-// }
+  {
+    client_connection_->readDisable(true);
+    EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("data"), false))
+        .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
+          buffer.drain(buffer.length());
+          dispatcher_->exit();
+          return FilterStatus::StopIteration;
+        }));
+    client_connection_->readDisable(false);
+  }
 
-// // Make sure if we readDisable(true) and schedule a 'kick' and then
-// // readDisable(false) the kick doesn't happen.
-// TEST_P(PipeConnectionImplTest, KickUndone) {
-//   setUpBasicConnection();
-//   connect();
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  client_connection_->close(ConnectionCloseType::NoFlush);
+}
 
-//   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
-//   client_connection_->addReadFilter(client_read_filter);
-//   Buffer::Instance* connection_buffer = nullptr;
+// Make sure if we readDisable(true) and schedule a 'kick' and then
+// readDisable(false) the kick doesn't happen.
+TEST_P(PipeConnectionImplTest, KickUndone) {
+  setupPipe();
+  doConnect();
 
-//   {
-//     Buffer::OwnedImpl buffer("data");
-//     server_connection_->write(buffer, false);
-//     EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("data"), false))
-//         .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
-//           dispatcher_->exit();
-//           connection_buffer = &buffer;
-//           return FilterStatus::StopIteration;
-//         }));
-//     dispatcher_->run(Event::Dispatcher::RunType::Block);
-//   }
+  auto client_read_filter = std::make_shared<NiceMock<MockReadFilter>>();
+  client_connection_->addReadFilter(client_read_filter);
+  Buffer::Instance* connection_buffer = nullptr;
 
-//   {
-//     // Like ReadEnableDispatches above, read disable and read enable to kick off
-//     // an extra read. But then readDisable again and make sure the kick doesn't
-//     // happen.
-//     client_connection_->readDisable(true);
-//     client_connection_->readDisable(false); // Sets dispatch_buffered_data_
-//     client_connection_->readDisable(true);
-//     EXPECT_CALL(*client_read_filter, onData(_, _)).Times(0);
-//     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-//   }
+  {
+    Buffer::OwnedImpl buffer("data");
+    server_connection_->write(buffer, false);
+    EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("data"), false))
+        .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
+          dispatcher_->exit();
+          connection_buffer = &buffer;
+          return FilterStatus::StopIteration;
+        }));
+  }
 
-//   // Now drain the connection's buffer and try to do a read which should _not_
-//   // pass up the stack (no data is read)
-//   {
-//     connection_buffer->drain(connection_buffer->length());
-//     client_connection_->readDisable(false);
-//     EXPECT_CALL(*client_read_filter, onData(_, _)).Times(0);
-//     // Data no longer buffered - even if dispatch_buffered_data_ lingered it should have no
-//     effect. dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-//   }
+  {
+    // Like ReadEnableDispatches above, read disable and read enable to kick off
+    // an extra read. But then readDisable again and make sure the kick doesn't
+    // happen.
+    client_connection_->readDisable(true);
+    client_connection_->readDisable(false); // Sets dispatch_buffered_data_
+    client_connection_->readDisable(true);
+    EXPECT_CALL(*client_read_filter, onData(_, _)).Times(0);
+  }
 
-//   disconnect(true);
-// }
+  // Now drain the connection's buffer and try to do a read which should _not_
+  // pass up the stack (no data is read)
+  {
+    connection_buffer->drain(connection_buffer->length());
+    client_connection_->readDisable(false);
+    EXPECT_CALL(*client_read_filter, onData(_, _)).Times(0);
+    // Data no longer buffered - even if dispatch_buffered_data_ lingered it should have no effect.
+  }
+
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  client_connection_->close(ConnectionCloseType::NoFlush);
+}
 
 // // Ensure that calls to readDisable on a closed connection are handled gracefully. Known past
 // issues

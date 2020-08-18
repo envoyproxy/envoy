@@ -13,7 +13,17 @@ namespace Network {
 uint64_t BufferSourceSocket::next_bsid_ = 0;
 
 BufferSourceSocket::BufferSourceSocket()
-    : bsid_(next_bsid_++), read_buffer_([]() -> void {}, []() -> void {}, []() -> void {}) {
+    : bsid_(next_bsid_++),
+      read_buffer_(
+          [this]() -> void {
+            ENVOY_LOG_MISC(debug, "lambdai: BufferSourceTS {} is below high watermark", bsid());
+            over_high_watermark_ = false;
+          },
+          [this]() -> void {
+            ENVOY_LOG_MISC(debug, "lambdai: BufferSourceTS {} is over high watermark", bsid());
+            over_high_watermark_ = true;
+          },
+          []() -> void {}) {
   ENVOY_LOG_MISC(debug, "lambdai: BufferSourceTS {} owns B{}", bsid(), read_buffer_.bid());
 }
 
