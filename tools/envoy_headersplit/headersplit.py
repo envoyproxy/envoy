@@ -65,7 +65,7 @@ def get_directives(translation_unit: Type[TranslationUnit]) -> str:
         This function actually find the first non-preprocessor directive statement and return 
         all contents before it.
 
-        clang lib provides API like tranlation_unit.get_inludes() to get include directives.
+        clang lib provides API like tranlation_unit.get_includes() to get include directives.
         But we can't use it as it requires presence of the included files to return the full list. 
         To get this API work will need extra efforts than needed.
 
