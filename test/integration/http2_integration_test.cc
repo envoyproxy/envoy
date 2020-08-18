@@ -1793,10 +1793,15 @@ TEST_P(Http2FloodMitigationTest, TooManyStreams) {
       });
   autonomous_upstream_ = true;
   beginSession();
+  // To prevent Envoy from closing client streams the upstream connection needs to push back on
+  // writing by the upstream server. In this case Envoy will not see upstream responses and will
+  // keep client streams open, eventually maxing them out and causing client connection to be
+  // closed.
+  writev_matcher_->setSourcePort(fake_upstreams_[0]->localAddress()->ip()->port());
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Exceed the number of streams allowed by the server. The server should stop reading from the
-  // client. Verify that the client was unable to stuff a lot of data into the server.
+  // client.
   floodServer("host", "/test/long/url", Http2Frame::ResponseStatus::Ok, "", 3);
 }
 
