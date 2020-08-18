@@ -179,6 +179,11 @@ public:
   virtual bool logFormatEscaped() const PURE;
 
   /**
+   * @return const bool logger mode: whether to use Fancy Logger.
+   */
+  virtual bool enableFineGrainLogging() const PURE;
+
+  /**
    * @return const std::string& the log file path.
    */
   virtual const std::string& logPath() const PURE;

@@ -35,6 +35,7 @@ public:
   Event::Dispatcher& dispatcher() override;
   const Address::InstanceConstSharedPtr& localAddress() const override;
   Api::IoCallUint64Result send(const UdpSendData& data) override;
+  Api::IoCallUint64Result flush() override;
 
   void processPacket(Address::InstanceConstSharedPtr local_address,
                      Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
@@ -54,6 +55,7 @@ protected:
 
 private:
   void onSocketEvent(short flags);
+  void disableEvent();
 
   TimeSource& time_source_;
   Event::FileEventPtr file_event_;
