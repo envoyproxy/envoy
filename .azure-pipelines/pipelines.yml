@@ -123,8 +123,7 @@ jobs:
 
   - job: docker
     displayName: "Linux multi-arch docker"
-    dependsOn: ["release","release_arm64"]
-    condition: and(succeeded(), eq(variables['PostSubmit'], 'true'), ne(variables['Build.Reason'], 'PullRequest'))
+    dependsOn: ["release", "release_arm64"]
     pool:
       vmImage: "ubuntu-18.04"
     steps:
@@ -153,6 +152,11 @@ jobs:
           AZP_SHA1: $(Build.SourceVersion)
           DOCKERHUB_USERNAME: $(DockerUsername)
           DOCKERHUB_PASSWORD: $(DockerPassword)
+      - task: PublishBuildArtifacts@1
+        inputs:
+          pathtoPublish: "$(Build.StagingDirectory)/build_images"
+          artifactName: docker
+        condition: always()
 
   - job: macOS
     dependsOn: ["format"]
