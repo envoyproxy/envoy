@@ -365,41 +365,45 @@ TEST_P(PipeConnectionImplTest, KickUndone) {
   client_connection_->close(ConnectionCloseType::NoFlush);
 }
 
-// // Ensure that calls to readDisable on a closed connection are handled gracefully. Known past
-// issues
-// // include a crash on https://github.com/envoyproxy/envoy/issues/3639, and ASSERT failure
-// followed
-// // by infinite loop in https://github.com/envoyproxy/envoy/issues/9508
-// TEST_P(PipeConnectionImplTest, ReadDisableAfterCloseHandledGracefully) {
-//   setUpBasicConnection();
+// Ensure that calls to readDisable on a closed connection are handled gracefully. Known past issues
+// include a crash on https://github.com/envoyproxy/envoy/issues/3639, and ASSERT failure followed
+// by infinite loop in https://github.com/envoyproxy/envoy/issues/9508
+TEST_P(PipeConnectionImplTest, ReadDisableAfterCloseHandledGracefully) {
+  setupPipe();
+  doConnect();
 
-//   client_connection_->readDisable(true);
-//   client_connection_->readDisable(false);
+  //   auto client_read_filter = std::make_shared<NiceMock<MockReadFilter>>();
+  //   client_connection_->addReadFilter(client_read_filter);
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(false);
 
-//   client_connection_->readDisable(true);
-//   client_connection_->readDisable(true);
-//   client_connection_->readDisable(false);
-//   client_connection_->readDisable(false);
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(false);
+  client_connection_->readDisable(false);
 
-//   client_connection_->readDisable(true);
-//   client_connection_->readDisable(true);
-//   disconnect(false);
-// #ifndef NDEBUG
-//   // When running in debug mode, verify that calls to readDisable and readEnabled on a closed
-//   socket
-//   // trigger ASSERT failures.
-//   EXPECT_DEBUG_DEATH(client_connection_->readEnabled(), "");
-//   EXPECT_DEBUG_DEATH(client_connection_->readDisable(true), "");
-//   EXPECT_DEBUG_DEATH(client_connection_->readDisable(false), "");
-// #else
-//   // When running in release mode, verify that calls to readDisable change the readEnabled
-//   state. client_connection_->readDisable(false); client_connection_->readDisable(true);
-//   client_connection_->readDisable(false);
-//   EXPECT_FALSE(client_connection_->readEnabled());
-//   client_connection_->readDisable(false);
-//   EXPECT_TRUE(client_connection_->readEnabled());
-// #endif
-// }
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(true);
+
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  client_connection_->close(ConnectionCloseType::NoFlush);
+
+#ifndef NDEBUG
+  // When running in debug mode, verify that calls to readDisable and readEnabled on a closed socket
+  // trigger ASSERT failures.
+  EXPECT_DEBUG_DEATH(client_connection_->readEnabled(), "");
+  EXPECT_DEBUG_DEATH(client_connection_->readDisable(true), "");
+  EXPECT_DEBUG_DEATH(client_connection_->readDisable(false), "");
+#else
+  // When running in release mode, verify that calls to readDisable change the readEnabled state.
+  client_connection_->readDisable(false);
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(false);
+  EXPECT_FALSE(client_connection_->readEnabled());
+  client_connection_->readDisable(false);
+  EXPECT_TRUE(client_connection_->readEnabled());
+#endif
+}
 
 // // On our current macOS build, the client connection does not get the early
 // // close notification and instead gets the close after reading the FIN.
