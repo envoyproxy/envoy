@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
-#include "envoy/http/header_map.h"
 
 #include "common/common/logger.h"
 

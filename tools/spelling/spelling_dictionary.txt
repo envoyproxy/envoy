@@ -26,6 +26,7 @@ CAS
 CB
 CDS
 CEL
+LTT
 ceil
 CHACHA
 CHLO
@@ -69,6 +70,7 @@ DRYs
 DS
 DST
 DW
+DWORD
 EADDRINUSE
 EADDRNOTAVAIL
 EAGAIN
@@ -350,6 +352,7 @@ WRONGPASS
 WRR
 WS
 WSA
+WSABUF
 WSS
 Welford's
 Wi
@@ -972,6 +975,7 @@ restarter
 resync
 retriable
 retriggers
+revalidated
 revalidation
 rmdir
 rocketmq
