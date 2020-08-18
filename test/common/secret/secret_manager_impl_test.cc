@@ -301,8 +301,6 @@ api_config_source:
       ->mutable_from_plugin()
       ->mutable_typed_config()
       ->set_value(decoded);
-  // ->set_value(Base64::decode("CjUKMy92YXIvcnVuL3NlY3JldHMva3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3Vud"
-  //                            "C90b2tlbhILeC10b2tlbi1iaW4="));
   auto secret_provider1 =
       secret_manager->findOrCreateTlsCertificateProvider(config_source, "abc.com", secret_context);
 
@@ -318,8 +316,6 @@ api_config_source:
       ->mutable_from_plugin()
       ->mutable_typed_config()
       ->set_value(decoded);
-  // ->set_value(Base64::decode("Egt4LXRva2VuLWJpbgo1CjMvdmFyL3J1bi9zZWNyZXRzL2t1YmVybmV0ZXMuaW8vc"
-  //                            "2VydmljZWFjY291bnQvdG9rZW4="));
   auto secret_provider2 =
       secret_manager->findOrCreateTlsCertificateProvider(config_source, "abc.com", secret_context);
 

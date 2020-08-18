@@ -149,13 +149,11 @@ TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   std::string a2_decoded;
   absl::Base64Unescape("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g=", &a2_decoded);
   a2.set_value(a2_decoded);
-  // a2.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
 
   ProtobufWkt::Any a3 = a1;
   std::string a3_decoded;
   absl::Base64Unescape("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo=", &a3_decoded);
   a3.set_value(a3_decoded);
-  // a3.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
 
   EXPECT_EQ(MessageUtil::hash(a1), MessageUtil::hash(a2));
   EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3));
