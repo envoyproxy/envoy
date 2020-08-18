@@ -284,7 +284,7 @@ private:
   std::string expected_valid_from_peer_cert_;
   std::string expected_expiration_peer_cert_;
   std::string expected_ocsp_response_;
-  bool ocsp_stapling_enabled_;
+  bool ocsp_stapling_enabled_{false};
   absl::flat_hash_map<std::string, absl::optional<std::string>> expected_x509_extensions_;
 };
 
