@@ -29,9 +29,6 @@ void ListenerFilterFuzzer::fuzz(
     ON_CALL(dispatcher_, createFileEvent_(_, _, _, _))
         .WillByDefault(testing::DoAll(testing::SaveArg<1>(&file_event_callback_),
                                       testing::ReturnNew<NiceMock<Event::MockFileEvent>>()));
-
-    ON_CALL(os_sys_calls_, ioctl(kFakeSocketFd, FIONREAD, _))
-        .WillByDefault(testing::Return(Api::SysCallIntResult{static_cast<int>(header.size()), 0}));
   }
 
   filter.onAccept(cb_);
@@ -42,6 +39,9 @@ void ListenerFilterFuzzer::fuzz(
   }
 
   if (!header.empty()) {
+    ON_CALL(os_sys_calls_, ioctl(kFakeSocketFd, FIONREAD, _))
+        .WillByDefault(testing::Return(Api::SysCallIntResult{static_cast<int>(header.size()), 0}));
+
     {
       testing::InSequence s;
 
@@ -93,7 +93,7 @@ void FuzzedHeader::next() {
 }
 
 Api::SysCallSizeResult FuzzedHeader::read(void* buffer, size_t length, int flags) {
-  size_t len = std::min(indices_[nread_], length); // Number of bytes to write
+  const size_t len = std::min(size(), length); // Number of bytes to write
   memcpy(buffer, data_.data() + index_, len);
 
   if (flags != MSG_PEEK) {
