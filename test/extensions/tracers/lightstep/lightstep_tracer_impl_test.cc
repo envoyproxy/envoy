@@ -713,13 +713,15 @@ TEST_F(LightStepDriverTest, SpawnChild) {
   childViaSpawn->injectContext(base2);
 
   std::string base1_context;
-  absl::Base64Unescape(std::string(base1.get_(Http::CustomHeaders::get().OtSpanContext)), &base1_context);
-  // std::string base1_context = 
-      // Base64::decode(std::string(base1.get_(Http::CustomHeaders::get().OtSpanContext)));
+  absl::Base64Unescape(std::string(base1.get_(Http::CustomHeaders::get().OtSpanContext)),
+                       &base1_context);
+  // std::string base1_context =
+  // Base64::decode(std::string(base1.get_(Http::CustomHeaders::get().OtSpanContext)));
   std::string base2_context;
-  absl::Base64Unescape(std::string(base2.get_(Http::CustomHeaders::get().OtSpanContext)), &base2_context);
-  // std::string base2_context = 
-      // Base64::decode(std::string(base2.get_(Http::CustomHeaders::get().OtSpanContext)));
+  absl::Base64Unescape(std::string(base2.get_(Http::CustomHeaders::get().OtSpanContext)),
+                       &base2_context);
+  // std::string base2_context =
+  // Base64::decode(std::string(base2.get_(Http::CustomHeaders::get().OtSpanContext)));
 
   EXPECT_FALSE(base1_context.empty());
   EXPECT_FALSE(base2_context.empty());

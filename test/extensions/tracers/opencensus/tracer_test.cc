@@ -16,7 +16,6 @@
 #include "test/mocks/tracing/mocks.h"
 
 #include "absl/strings/escaping.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "opencensus/trace/exporter/span_data.h"
