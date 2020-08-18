@@ -71,8 +71,11 @@ bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& heade
 
   // TODO(cbdm): only allowing responses to be cacheable if there's no vary header or it is empty;
   // need to implement the logic for using an allowlist.
-  const bool no_vary = (!headers.get(Http::Headers::get().Vary)) ||
-                       (headers.get(Http::Headers::get().Vary)->value().empty());
+  // TODO(cbdm): "vary: accept-encoding" could be treated in the cache; we can encode (decode) the
+  // content to the accepted format the user specified. This way we wouldn't need to store different
+  // versions for this header, and could simply convert to that format and serve.
+  const Envoy::Http::HeaderEntry* vary_header = headers.get(Http::Headers::get().Vary);
+  const bool no_vary = ((!vary_header) || (vary_header->value().empty()));
 
   return !response_cache_control.no_store_ &&
          cacheableStatusCodes().contains((headers.getStatusValue())) && has_validation_data &&
