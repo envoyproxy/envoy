@@ -14,9 +14,20 @@ import argparse
 from typing import Type, List, Tuple, Dict
 import clang.cindex
 from clang.cindex import TranslationUnit, Index, CursorKind, Cursor
+import os
+import subprocess
+import sys
 
-clang.cindex.Config.set_library_path("/opt/llvm/lib")
-
+if "LLVM_CONFIG" in os.environ:
+  llvm_config_path = os.environ["LLVM_CONFIG"]
+  exec_result = subprocess.run([llvm_config_path, "--libdir"],capture_output=True)
+  if exec_result.returncode != 0:
+    print(llvm_config_path + " --libdir returned %d" % exec_result.return_code)
+    sys.exit("llvm-config not found, please set the environment variable:\nexport LLVM_CONFIG=<path to clang installation>/bin/llvm-config")
+  clang_tools_lib_path = exec_result.stdout.rstrip()
+  clang.cindex.Config.set_library_path(clang_tools_lib_path.decode('utf-8'))
+else:
+  sys.exit("llvm-config not found, please set the environment variable:\nexport LLVM_CONFIG=<path to clang installation>/bin/llvm-config")
 
 def to_filename(classname: str) -> str:
   """
