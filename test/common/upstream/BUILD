@@ -392,6 +392,7 @@ envoy_cc_benchmark_binary(
         "//source/common/memory:stats_lib",
         "//source/common/upstream:maglev_lb_lib",
         "//source/common/upstream:ring_hash_lb_lib",
+        "//source/common/upstream:subset_lb_lib",
         "//source/common/upstream:upstream_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/upstream:upstream_mocks",
