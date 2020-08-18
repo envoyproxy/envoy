@@ -1425,12 +1425,12 @@ filter_chains:
   auto syscall_result = os_sys_calls_actual_.socket(AF_INET, SOCK_STREAM, 0);
   ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
   ON_CALL(os_sys_calls_, bind(_, _, _))
-      .WillByDefault(Invoke([&](os_fd_t sockfd, const sockaddr* addr,
-                                             socklen_t addrlen) -> Api::SysCallIntResult {
-        Api::SysCallIntResult result = os_sys_calls_actual_.bind(sockfd, addr, addrlen);
-        ASSERT(result.rc_ >= 0);
-        return result;
-      }));
+      .WillByDefault(Invoke(
+          [&](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) -> Api::SysCallIntResult {
+            Api::SysCallIntResult result = os_sys_calls_actual_.bind(sockfd, addr, addrlen);
+            ASSERT(result.rc_ >= 0);
+            return result;
+          }));
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {{true, false}}))
       .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
