@@ -64,7 +64,7 @@ MATCHER_P(AuthzResponseNoAttributes, response, "") {
   const bool equal_status = arg->status == response.status;
   const bool equal_metadata =
       TestUtility::protoEqual(arg->dynamic_metadata, response.dynamic_metadata);
-  if (!equalMetadata) {
+  if (!equal_metadata) {
     *result_listener << "\n"
                      << "==================Expected response dynamic metadata:==================\n"
                      << response.dynamic_metadata.DebugString()
