@@ -15,7 +15,7 @@ DEFINE_PROTO_FUZZER(
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {
     ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
-     return;
+    return;
   }
 
   Stats::IsolatedStoreImpl store;

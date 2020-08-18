@@ -26,8 +26,7 @@ void ListenerFilterFuzzer::fuzz(
     ON_CALL(os_sys_calls_, recv(kFakeSocketFd, _, _, _))
         .WillByDefault(testing::Return(Api::SysCallSizeResult{static_cast<ssize_t>(0), 0}));
 
-    ON_CALL(dispatcher_,
-            createFileEvent_(_, _, _, _))
+    ON_CALL(dispatcher_, createFileEvent_(_, _, _, _))
         .WillByDefault(testing::DoAll(testing::SaveArg<1>(&file_event_callback_),
                                       testing::ReturnNew<NiceMock<Event::MockFileEvent>>()));
 
@@ -105,9 +104,7 @@ Api::SysCallSizeResult FuzzedHeader::read(void* buffer, size_t length, int flags
   return Api::SysCallSizeResult{static_cast<ssize_t>(len), 0};
 }
 
-size_t FuzzedHeader::size() {
-  return indices_[nreads_] - index_ + 1;
-}
+size_t FuzzedHeader::size() { return indices_[nreads_] - index_ + 1; }
 
 bool FuzzedHeader::done() { return nread_ >= nreads_; }
 
