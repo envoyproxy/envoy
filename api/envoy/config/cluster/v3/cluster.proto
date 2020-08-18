@@ -246,6 +246,16 @@ message Cluster {
       // List of keys to match with the weighted cluster metadata.
       repeated string keys = 1;
 
+      // Selects a mode of operation in which each subset has only one host. This mode uses the same rules for
+      // choosing a host, but host updating hosts is faster, especially for large numbers of hosts.
+      //
+      // Currently, this mode is only supported if `subset_selectors` has only one entry, and `keys` contains
+      // only one entry.
+      //
+      // When this mode is enabled, configurations that contain more than one host with the same metadata value for the single key in `keys`
+      // will be rejected.
+      bool single_host_per_subset = 4;
+
       // The behavior used when no endpoint subset matches the selected route's
       // metadata.
       LbSubsetSelectorFallbackPolicy fallback_policy = 2
@@ -261,8 +271,6 @@ message Cluster {
       // :ref:`keys<envoy_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.keys>` are allowed, but
       // `fallback_keys_subset` cannot be equal to `keys`.
       repeated string fallback_keys_subset = 3;
-
-      bool single_host_per_subset = 4;
     }
 
     // The behavior used when no endpoint subset matches the selected route's
