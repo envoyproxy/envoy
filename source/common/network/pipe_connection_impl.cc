@@ -300,19 +300,24 @@ void ClientPipeImpl::readDisable(bool disable) {
       return;
     }
 
-    if (read_disable_count_ == 0) {
-      // We never ask for both early close and read at the same time. If we are reading, we want to
-      // consume all available data.
-      enableWriteRead();
-    }
-
+    // Drain the read buffer first. Won't read from peered buffer since dispatch_buffered_data_ is
+    // on.
     if (consumerWantsToRead() && read_buffer_.length() > 0) {
       // If the connection has data buffered there's no guarantee there's also data in the kernel
       // which will kick off the filter chain. Alternately if the read buffer has data the fd could
       // be read disabled. To handle these cases, fake an event to make sure the buffered data gets
       // processed regardless and ensure that we dispatch it via onRead.
       dispatch_buffered_data_ = true;
-      setReadBufferReady();
+      // setReadBufferReady();
+      onReadReady();
+    }
+
+    // Now read from peer buffer.
+    if (read_disable_count_ == 0) {
+      // We never ask for both early close and read at the same time. If we are reading, we want to
+      // consume all available data.
+      enableWriteRead();
+      onReadReady();
     }
   }
 }
@@ -851,19 +856,24 @@ void ServerPipeImpl::readDisable(bool disable) {
       return;
     }
 
-    if (read_disable_count_ == 0) {
-      // We never ask for both early close and read at the same time. If we are reading, we want to
-      // consume all available data.
-      enableWriteRead();
-    }
-
+    // Drain the read buffer first. Won't read from peered buffer since dispatch_buffered_data_ is
+    // on.
     if (consumerWantsToRead() && read_buffer_.length() > 0) {
       // If the connection has data buffered there's no guarantee there's also data in the kernel
       // which will kick off the filter chain. Alternately if the read buffer has data the fd could
       // be read disabled. To handle these cases, fake an event to make sure the buffered data gets
       // processed regardless and ensure that we dispatch it via onRead.
       dispatch_buffered_data_ = true;
-      setReadBufferReady();
+      // setReadBufferReady();
+      onReadReady();
+    }
+
+    // Now read from peer buffer.
+    if (read_disable_count_ == 0) {
+      // We never ask for both early close and read at the same time. If we are reading, we want to
+      // consume all available data.
+      enableWriteRead();
+      onReadReady();
     }
   }
 }
