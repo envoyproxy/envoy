@@ -86,35 +86,49 @@ def get_directives(translation_unit: Type[TranslationUnit]) -> str:
       return contents[:descendant.extent.start.offset]
   return ""
 
-
-def class_definitions(cursor: Cursor) -> List[Cursor]:
+def cursors_in_same_file(cursor: Cursor) -> List[Cursor]:
   """
-    extracts all class definitions in the file pointed by cursor. (typical mocks.h)
+    get all child cursors which are pointing to the same file as the input cursor
 
     Args:
-        cursor: cursor of parsing result of target souce code by libclang
+      cursor: cursor of parsing result of target source code by libclang
 
     Returns:
-        a list of cursor, each pointing to a class definition.
+      a list of cursor
     """
-  class_cursors = []
+  cursors = []
   for descendant in cursor.walk_preorder():
-    # We don't want Cursors from files other than the one belonging to
-    # translation_unit, otherwise we get definitions for every file included
+    # We don't want Cursors from files other than the input file,
+    # otherwise we get definitions for every file included
     # when clang parsed the input file (i.e. if we don't limit descendant loction,
     # it will check definitions from included headers and get class defns like std::string)
     if descendant.location.file is None:
       continue
     if descendant.location.file.name != cursor.displayname:
       continue
-    # check if descendant is pointing a class delaration block.
+    cursors.append(descendant)
+  return cursors
+
+
+def class_definitions(cursor: Cursor) -> List[Cursor]:
+  """
+    extracts all class definitions in the file pointed by cursor. (typical mocks.h)
+
+    Args:
+        cursor: cursor of parsing result of target source code by libclang
+
+    Returns:
+        a list of cursor, each pointing to a class definition.
+    """
+  cursors = cursors_in_same_file(cursor)
+  class_cursors = []
+  for descendant in cursors:
+    # check if descendant is pointing to a class delaration block.
     if descendant.kind != CursorKind.CLASS_DECL:
       continue
     if not descendant.is_definition():
       continue
     # check if this class is directly enclosed by a namespace.
-    # if it's not, then it's a nested class, our divided results
-    # should not contain nested classes.
     if descendant.semantic_parent.kind != CursorKind.NAMESPACE:
       continue
     class_cursors.append(descendant)
@@ -126,23 +140,17 @@ def class_implementations(cursor: Cursor) -> List[Cursor]:
     extracts all class implementation in the file pointed by cursor. (typical mocks.cc)
 
     Args:
-        cursor: cursor of parsing result of target souce code by libclang
+        cursor: cursor of parsing result of target source code by libclang
 
     Returns:
         a list of cursor, each pointing to a class implementation.
     """
+  cursors = cursors_in_same_file(cursor)
   impl_cursors = []
-  for descendant in cursor.walk_preorder():
-    # We don't want Cursors from files other than the one belonging to
-    # translation_unit, otherwise we get definitions for every file included
-    # when clang parsed the input file (i.e. if we don't limit descendant loction,
-    # it will check definitions from included headers and get class defns like std::string)
-    if descendant.location.file is None:
-      continue
-    if descendant.location.file.name != cursor.displayname:
-      continue
+  for descendant in cursors:
     if descendant.kind == CursorKind.NAMESPACE:
       continue
+    # check if descendant is pointing to a class method
     if descendant.semantic_parent is not None and descendant.semantic_parent.kind == CursorKind.CLASS_DECL:
       impl_cursors.append(descendant)
   return impl_cursors
