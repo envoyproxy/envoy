@@ -365,7 +365,8 @@ def denylistedForExceptions(file_path):
   # the file_path is in DENYLIST or
   # it is under toos/testdata subdirectory
   if file_path.endswith(DOCS_SUFFIX):
-    return False:
+    return False
+
   return (file_path.endswith('.h') and not file_path.startswith("./test/")) or file_path in EXCEPTION_DENYLIST \
       or isInSubdir(file_path, 'tools/testdata')
 
