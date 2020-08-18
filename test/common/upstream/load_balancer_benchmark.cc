@@ -8,6 +8,7 @@
 #include "common/memory/stats.h"
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/ring_hash_lb.h"
+#include "common/upstream/subset_lb.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
@@ -21,14 +22,28 @@ namespace {
 
 class BaseTester {
 public:
+  static constexpr absl::string_view metadata_key = "key";
   // We weight the first weighted_subset_percent of hosts with weight.
-  BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent = 0, uint32_t weight = 0) {
+  BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent = 0, uint32_t weight = 0,
+             bool attach_metadata = false) {
     HostVector hosts;
     ASSERT(num_hosts < 65536);
     for (uint64_t i = 0; i < num_hosts; i++) {
       const bool should_weight = i < num_hosts * (weighted_subset_percent / 100.0);
-      hosts.push_back(makeTestHost(info_, fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256),
-                                   should_weight ? weight : 1));
+      const std::string url = fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256);
+      const auto effective_weight = should_weight ? weight : 1;
+      if (attach_metadata) {
+        envoy::config::core::v3::Metadata metadata;
+        ProtobufWkt::Value value;
+        value.set_number_value(i);
+        ProtobufWkt::Struct& map =
+            (*metadata.mutable_filter_metadata())[Config::MetadataFilters::get().ENVOY_LB];
+        (*map.mutable_fields())[std::string(metadata_key)] = value;
+
+        hosts.push_back(makeTestHost(info_, url, metadata, effective_weight));
+      } else {
+        hosts.push_back(makeTestHost(info_, url, effective_weight));
+      }
     }
 
     HostVectorConstSharedPtr updated_hosts = std::make_shared<HostVector>(hosts);
@@ -483,6 +498,75 @@ BENCHMARK(BM_MaglevLoadBalancerWeighted)
     ->Args({500, 95, 127, 1, 10000})
     ->Args({500, 95, 25, 75, 1000})
     ->Args({500, 95, 75, 25, 10000})
+    ->Unit(benchmark::kMillisecond);
+
+class SubsetLbTester : public BaseTester {
+public:
+  SubsetLbTester(uint64_t num_hosts, bool single_host_per_subset)
+      : BaseTester(num_hosts, 0, 0, true /* attach metadata */) {
+    envoy::config::cluster::v3::Cluster::LbSubsetConfig subset_config;
+    subset_config.set_fallback_policy(
+        envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT);
+    auto* selector = subset_config.mutable_subset_selectors()->Add();
+    selector->set_single_host_per_subset(single_host_per_subset);
+    *selector->mutable_keys()->Add() = metadata_key;
+
+    subset_info_ = std::make_unique<LoadBalancerSubsetInfoImpl>(subset_config);
+    lb_ = std::make_unique<SubsetLoadBalancer>(
+        LoadBalancerType::Random, priority_set_, &local_priority_set_, stats_, stats_store_,
+        runtime_, random_, *subset_info_, absl::nullopt, absl::nullopt, common_config_);
+
+    const HostVector& hosts = priority_set_.getOrCreateHostSet(0).hosts();
+    ASSERT(hosts.size() == num_hosts);
+    orig_hosts_ = std::make_shared<HostVector>(hosts);
+    smaller_hosts_ = std::make_shared<HostVector>(hosts.begin() + 1, hosts.end());
+    ASSERT(smaller_hosts_->size() + 1 == orig_hosts_->size());
+    orig_locality_hosts_ = makeHostsPerLocality({*orig_hosts_});
+    smaller_locality_hosts_ = makeHostsPerLocality({*smaller_hosts_});
+  }
+
+  // Remove a host and add it back.
+  void update() {
+    priority_set_.updateHosts(0,
+                              HostSetImpl::partitionHosts(smaller_hosts_, smaller_locality_hosts_),
+                              nullptr, {}, host_moved_, absl::nullopt);
+    priority_set_.updateHosts(0, HostSetImpl::partitionHosts(orig_hosts_, orig_locality_hosts_),
+                              nullptr, host_moved_, {}, absl::nullopt);
+  }
+
+  std::unique_ptr<LoadBalancerSubsetInfoImpl> subset_info_;
+  std::unique_ptr<SubsetLoadBalancer> lb_;
+  HostVectorConstSharedPtr orig_hosts_;
+  HostVectorConstSharedPtr smaller_hosts_;
+  HostsPerLocalitySharedPtr orig_locality_hosts_;
+  HostsPerLocalitySharedPtr smaller_locality_hosts_;
+  HostVector host_moved_;
+};
+
+void BM_SubsetLoadBalancerCreate(benchmark::State& state) {
+  const bool single_host_per_subset = state.range(0);
+  const uint64_t num_hosts = state.range(1);
+  for (auto _ : state) {
+    SubsetLbTester tester(num_hosts, single_host_per_subset);
+  }
+}
+
+BENCHMARK(BM_SubsetLoadBalancerCreate)
+    ->Ranges({{false, true}, {50, 2500}})
+    ->Unit(benchmark::kMillisecond);
+
+void BM_SubsetLoadBalancerUpdate(benchmark::State& state) {
+  const bool single_host_per_subset = state.range(0);
+  const uint64_t num_hosts = state.range(1);
+  SubsetLbTester tester(num_hosts, single_host_per_subset);
+
+  for (auto _ : state) {
+    tester.update();
+  }
+}
+
+BENCHMARK(BM_SubsetLoadBalancerUpdate)
+    ->Ranges({{false, true}, {50, 2500}})
     ->Unit(benchmark::kMillisecond);
 
 } // namespace
