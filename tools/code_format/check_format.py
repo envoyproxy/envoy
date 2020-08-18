@@ -361,9 +361,8 @@ def allowlistedForUnpackTo(file_path):
 
 
 def denylistedForExceptions(file_path):
-  # returns True when it is a non test header file or
-  # the file_path is in DENYLIST or
-  # it is under toos/testdata subdirectory
+  # Returns true when it is a non test header file or the file_path is in DENYLIST or
+  # it is under toos/testdata subdirectory.
   if file_path.endswith(DOCS_SUFFIX):
     return False
 
