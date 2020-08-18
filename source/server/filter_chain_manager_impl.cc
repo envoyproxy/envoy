@@ -6,7 +6,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
-#include "common/network/socket_interface_impl.h"
+#include "common/network/socket_interface.h"
 #include "common/protobuf/utility.h"
 
 #include "server/configuration_impl.h"

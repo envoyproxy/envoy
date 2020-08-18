@@ -110,8 +110,16 @@ envoy_cc_library(
     deps = [
         ":address_interface",
         ":io_handle_interface",
-        "//include/envoy/config:typed_config_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "socket_interface_interface",
+    hdrs = ["socket_interface.h"],
+    deps = [
+        ":socket_interface",
+        "//include/envoy/config:typed_config_interface",
     ],
 )
 

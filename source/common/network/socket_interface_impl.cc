@@ -2,11 +2,9 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/extensions/network/socket_interface/v3/default_socket_interface.pb.h"
-#include "envoy/network/socket.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/utility.h"
-#include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 
 namespace Envoy {
