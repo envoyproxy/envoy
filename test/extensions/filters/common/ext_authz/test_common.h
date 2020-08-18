@@ -61,8 +61,8 @@ MATCHER_P(AuthzErrorResponse, status, "") {
 }
 
 MATCHER_P(AuthzResponseNoAttributes, response, "") {
-  const bool equalStatus = arg->status == response.status;
-  const bool equalMetadata =
+  const bool equal_status = arg->status == response.status;
+  const bool equal_metadata =
       TestUtility::protoEqual(arg->dynamic_metadata, response.dynamic_metadata);
   if (!equalMetadata) {
     *result_listener << "\n"
@@ -72,7 +72,7 @@ MATCHER_P(AuthzResponseNoAttributes, response, "") {
                      << arg->dynamic_metadata.DebugString()
                      << "=======================================================================\n";
   }
-  return equalStatus && equalMetadata;
+  return equal_status && equal_metadata;
 }
 
 MATCHER_P(AuthzDeniedResponse, response, "") {
