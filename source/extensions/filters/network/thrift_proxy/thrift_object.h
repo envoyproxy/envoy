@@ -6,6 +6,8 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 
+#include "common/common/utility.h"
+
 #include "extensions/filters/network/thrift_proxy/thrift.h"
 
 namespace Envoy {
@@ -36,9 +38,9 @@ public:
     // and throw if the value's type doesn't match.
     FieldType expected_field_type = Traits<T>::getFieldType();
     if (expected_field_type != type()) {
-      throw EnvoyException(fmt::format("expected field type {}, got {}",
-                                       static_cast<int>(expected_field_type),
-                                       static_cast<int>(type())));
+      ExceptionUtil::throwEnvoyException(fmt::format("expected field type {}, got {}",
+                                                     static_cast<int>(expected_field_type),
+                                                     static_cast<int>(type())));
     }
 
     return *static_cast<const T*>(getValue());

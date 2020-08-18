@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/network/address.h"
 #include "envoy/network/socket.h"
 
 #include "common/network/socket_interface.h"

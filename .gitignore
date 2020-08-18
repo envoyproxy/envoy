@@ -1,6 +1,7 @@
 /bazel-*
 BROWSE
 /build
+/build_*
 *.bzlc
 .cache
 .clangd

@@ -1,0 +1,25 @@
+config {
+  name: "envoy.filters.network.thrift_proxy"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.ThriftProxy"
+    value: "\xa\x4\x74\x65\x73\x74"
+  }
+}
+
+actions {
+  on_new_connection {
+  }
+}
+
+
+actions {
+  on_data {
+    data: "\x0\x0\x0\x1f\x80\x1\x0\x1\x0\x0\x0\x4\x6e\x61\x6d\x65\x0\x0\x0\x1\x8\xff\xff"
+  }
+}
+
+actions {
+  on_data {
+    data: ""
+  }
+}
