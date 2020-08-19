@@ -288,6 +288,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/07/21  12034    44811       46000   Add configurable histogram buckets.
   // 2020/07/31  12035    45002       46000   Init manager store unready targets in hash map.
   // 2020/08/10  12275    44949       46000   Re-organize tls histogram maps to improve continuity.
+  // 2020/08/11  12202    44949       46500   router: add new retry back-off strategy
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -308,7 +309,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
     // https://github.com/envoyproxy/envoy/issues/12209
     // EXPECT_MEMORY_EQ(m_per_cluster, 44949);
   }
-  EXPECT_MEMORY_LE(m_per_cluster, 46000); // Round up to allow platform variations.
+  EXPECT_MEMORY_LE(m_per_cluster, 46500); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
@@ -366,6 +367,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/07/21  12034    36923       38000   Add configurable histogram buckets.
   // 2020/07/31  12035    37114       38000   Init manager store unready targets in hash map.
   // 2020/08/10  12275    37061       38000   Re-organize tls histogram maps to improve continuity.
+  // 2020/08/11  12202    37061       38500   router: add new retry back-off strategy
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -386,7 +388,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
     // https://github.com/envoyproxy/envoy/issues/12209
     // EXPECT_MEMORY_EQ(m_per_cluster, 37061);
   }
-  EXPECT_MEMORY_LE(m_per_cluster, 38000); // Round up to allow platform variations.
+  EXPECT_MEMORY_LE(m_per_cluster, 38500); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
