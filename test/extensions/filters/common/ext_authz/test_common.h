@@ -9,6 +9,7 @@
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -60,10 +61,18 @@ MATCHER_P(AuthzErrorResponse, status, "") {
 }
 
 MATCHER_P(AuthzResponseNoAttributes, response, "") {
-  if (arg->status != response.status) {
-    return false;
+  const bool equal_status = arg->status == response.status;
+  const bool equal_metadata =
+      TestUtility::protoEqual(arg->dynamic_metadata, response.dynamic_metadata);
+  if (!equal_metadata) {
+    *result_listener << "\n"
+                     << "==================Expected response dynamic metadata:==================\n"
+                     << response.dynamic_metadata.DebugString()
+                     << "------------------is not equal to actual dynamic metadata:-------------\n"
+                     << arg->dynamic_metadata.DebugString()
+                     << "=======================================================================\n";
   }
-  return true;
+  return equal_status && equal_metadata;
 }
 
 MATCHER_P(AuthzDeniedResponse, response, "") {
