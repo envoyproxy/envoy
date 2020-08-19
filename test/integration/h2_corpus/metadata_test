@@ -1,0 +1,41 @@
+events {
+  downstream_send_event {
+    h2_frames {
+      metadata {
+        flags: END_METADATA
+        stream_index: 1
+        metadata: {
+            Connections: 15
+            TimeoutSeconds: 10
+        }
+      }
+    }
+  }
+}
+events {
+  upstream_send_event {
+    h2_frames {
+      settings {
+        flags: NONE
+      }
+    }
+    h2_frames {
+      settings {
+        flags: ACK
+      }
+    }
+    h2_frames {
+      headers {
+      	flags: NONE
+      	flags: END_STREAM
+	stream_index: 1
+      }
+    }
+    h2_frames {
+      data {
+        flags: NONE
+	stream_index: 1
+      }
+    }
+  }
+}

@@ -133,13 +133,15 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
     h2_frame = Http2Frame::makePostRequest(stream_idx, host, path);
     break;
   }
-  case test::integration::H2TestFrame::kMetadata {
+  case test::integration::H2TestFrame::kMetadata: {
     const Http2Frame::MetadataFlags metadata_flags =
         static_cast<Http2Frame::MetadataFlags>(proto_frame.data().flags());
     const uint32_t stream_idx = proto_frame.post_request().stream_index();
     Http::MetadataMap metadata_map;
     for (const auto& metadata : proto_frame.metadata().metadata()) {
-      metadata_map.insert(metadata);
+      for (const auto& metadataPair: metadata.metadata()) {
+        metadata_map.insert(metadataPair);
+      }
     }
     ENVOY_LOG_MISC(trace, "Sending metadata frame.");
     h2_frame = Http2Frame::makeMetadataFrameFromMetadataMap(stream_idx, metadata_map, metadata_flags);
