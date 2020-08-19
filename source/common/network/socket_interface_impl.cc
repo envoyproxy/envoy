@@ -10,6 +10,10 @@
 namespace Envoy {
 namespace Network {
 
+IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only) const {
+  return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only);
+}
+
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
                                         Address::IpVersion version, bool socket_v6only) const {
 #if defined(__APPLE__) || defined(WIN32)
@@ -40,7 +44,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
   const Api::SysCallSocketResult result = Api::OsSysCallsSingleton::get().socket(domain, flags, 0);
   RELEASE_ASSERT(SOCKET_VALID(result.rc_),
                  fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(result.rc_, socket_v6only);
+  IoHandlePtr io_handle = makeSocket(result.rc_, socket_v6only);
 
 #if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
