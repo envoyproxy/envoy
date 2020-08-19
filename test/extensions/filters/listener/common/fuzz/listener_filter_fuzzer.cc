@@ -89,7 +89,7 @@ FuzzedHeader::FuzzedHeader(const test::extensions::filters::listener::FilterFuzz
 
   for (int i = 0; i < nreads_; i++) {
     data_.insert(data_.end(), input.data(i).begin(), input.data(i).end());
-    indices_.push_back(data_.size());
+    indices_.push_back(data_.size() - 1);
   }
 }
 
