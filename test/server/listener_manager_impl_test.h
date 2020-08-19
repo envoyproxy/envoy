@@ -51,6 +51,14 @@ public:
   Configuration::FactoryContext* context_{};
 };
 
+class RebuilderHandle {
+public:
+  RebuilderHandle() {}
+
+  Init::ExpectableTargetImpl target_;
+  Configuration::FactoryContext* context_{};
+};
+
 class ListenerManagerImplTest : public testing::Test {
 protected:
   ListenerManagerImplTest() : api_(Api::createApiForTest()) {}
@@ -141,6 +149,24 @@ protected:
             }));
 
     return raw_listener;
+  }
+  RebuilderHandle* expectFilterChainRebuild(bool need_init) {
+    auto raw_rebuilder = new RebuilderHandle();
+    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+        .WillOnce(Invoke(
+            [raw_rebuilder, need_init](
+                const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
+                Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+                -> std::vector<Network::FilterFactoryCb> {
+              std::shared_ptr<RebuilderHandle> notifier(raw_rebuilder);
+              raw_rebuilder->context_ = &filter_chain_factory_context;
+              if (need_init) {
+                filter_chain_factory_context.initManager().add(notifier->target_);
+              }
+              return {[notifier](Network::FilterManager&) -> void {}};
+            }));
+
+    return raw_rebuilder;
   }
 
   ListenerHandle* expectListenerOverridden(bool need_init, ListenerHandle* origin = nullptr) {

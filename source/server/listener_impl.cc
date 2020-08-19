@@ -244,7 +244,6 @@ PerFilterChainRebuilder::PerFilterChainRebuilder(
           }),
       rebuild_timer_(listener_.dispatcher().createTimer([this]() -> void { onTimeout(); })),
       rebuild_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(*filter_chain, rebuild_timeout, 15000)) {}
-PerFilterChainRebuilder::~PerFilterChainRebuilder() = default;
 
 void PerFilterChainRebuilder::storeWorkerInCallbackList(const std::string& worker_name) {
   workers_to_callback_.insert(worker_name);
@@ -580,7 +579,7 @@ void ListenerImpl::rebuildFilterChain(
 
   // Find/create rebuilder for this filter chain message.
   if (filter_chain_rebuilder_map_.find(filter_chain_message) == filter_chain_rebuilder_map_.end()) {
-    ENVOY_LOG(debug, "filter chain rebuilder not found, create a rebuilder and start rebuilding.");
+    ENVOY_LOG(debug, "rebuilder for this filter chain is not found, create a new rebuilder.");
     filter_chain_rebuilder_map_[filter_chain_message] = std::make_unique<PerFilterChainRebuilder>(
         *this, filter_chain_message, listener_factory_context_->parentFactoryContext());
     should_start_rebuilding = true;
@@ -591,18 +590,16 @@ void ListenerImpl::rebuildFilterChain(
   // 2. Receive requests after rebuilding completed, will happen only when the previous rebuilding
   // failed.
   if (filter_chain_rebuilder_map_[filter_chain_message]->rebuildCompleted()) {
-    ENVOY_LOG(
-        debug,
-        "previous rebuilding for this filter chain has completed and failed. Retry rebuilding");
     should_retry_rebuilding = true;
     // rebuilder->callbackToWorkers(rebuilder->rebuildSuccess());
     // return;
   }
 
   if (should_retry_rebuilding) {
-    // The previous rebuilding has completed and failed.
-    // Should create a new rebuilder and start rebuilding again, instead of just callback with
-    // failure signal.
+    // The previous rebuilding has completed and failed. Should create a new rebuilder and start
+    // rebuilding again
+    ENVOY_LOG(debug, "previous rebuilding for this filter chain has failed. Should create a new "
+                     "rebuilder to retry rebuilding");
     filter_chain_rebuilder_map_.erase(filter_chain_message);
     filter_chain_rebuilder_map_[filter_chain_message] = std::make_unique<PerFilterChainRebuilder>(
         *this, filter_chain_message, listener_factory_context_->parentFactoryContext());

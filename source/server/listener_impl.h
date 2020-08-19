@@ -219,7 +219,6 @@ public:
   PerFilterChainRebuilder(ListenerImpl& listener,
                           const envoy::config::listener::v3::FilterChain* const& filter_chain,
                           Configuration::FactoryContext& factory_context);
-  ~PerFilterChainRebuilder();
 
   // FilterChainFactoryContextCreator
   Configuration::FilterChainFactoryContextPtr createFilterChainFactoryContext(
