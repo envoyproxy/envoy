@@ -148,7 +148,8 @@ void AuthenticatorImpl::startVerify() {
 
   ENVOY_LOG(debug, "{}: Verifying JWT token of issuer {}", name(), jwt_->iss_);
   // Check if token extracted from the location contains the issuer specified by config.
-  if (!curr_token_->isIssuerSpecified(jwt_->iss_)) {
+  // If issuer is not specified by "iss" in the jwt payload, not to verify it.
+  if (!jwt_->iss_.empty() && !curr_token_->isIssuerSpecified(jwt_->iss_)) {
     doneWithStatus(Status::JwtUnknownIssuer);
     return;
   }
