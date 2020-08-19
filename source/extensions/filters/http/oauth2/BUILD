@@ -65,6 +65,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "robust_to_untrusted_downstream",
+    status = "alpha",
     deps = [
         "//include/envoy/registry",
         "//source/extensions/filters/http:well_known_names",

@@ -49,8 +49,8 @@ class SDSSecretReader : public SecretReader {
 public:
   SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr client_secret_provider,
                   Secret::GenericSecretConfigProviderSharedPtr token_secret_provider, Api::Api& api)
-      : client_secret_provider_(std::move(client_secret_provider)),
-        token_secret_provider_(std::move(token_secret_provider)), api_(api) {
+      : api_(api), client_secret_provider_(std::move(client_secret_provider)),
+        token_secret_provider_(std::move(token_secret_provider)) {
     readAndWatchSecret(client_secret_, *client_secret_provider_);
     readAndWatchSecret(token_secret_, *token_secret_provider_);
   }
@@ -74,12 +74,12 @@ private:
       }
     });
   }
-  Secret::GenericSecretConfigProviderSharedPtr client_secret_provider_;
-  Secret::GenericSecretConfigProviderSharedPtr token_secret_provider_;
-
   std::string client_secret_;
   std::string token_secret_;
   Api::Api& api_;
+
+  Secret::GenericSecretConfigProviderSharedPtr client_secret_provider_;
+  Secret::GenericSecretConfigProviderSharedPtr token_secret_provider_;
 };
 
 /**
