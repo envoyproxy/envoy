@@ -233,7 +233,8 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # changes, this build type may need to be broken up.
   # TODO(mpwarres): remove quiche=enabled once QUICHE is built by default.
   # TODO(dio): We have conflicted zlib=ng vs. zlib=ng-with-optimizations. However, it should be safe
-  # to only build zlib=ng-with-optimizations for now.
+  # to only build zlib=ng-with-optimizations for now, since these two compile options use the same
+  # source and most likely to build with "ng-with-optimizations" is what people want.
   COMPILE_TIME_OPTIONS="\
     --define signal_trace=disabled \
     --define hot_restart=disabled \
