@@ -1,11 +1,8 @@
 #pragma once
 
-#include "envoy/server/listener_manager.h"
-
-#include "factory_context.h"
-#include "gmock/gmock.h"
 
 #include "envoy/server/configuration.h"
+#include "envoy/server/listener_manager.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
