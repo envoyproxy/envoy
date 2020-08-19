@@ -264,6 +264,11 @@ public:
    * Set the flag to indicate no further write.
    */
   virtual void setWriteEnd() PURE;
+  /**
+   * Read the flag to indicate no further write. Used by early close detection.
+   */
+  virtual bool isPeerShutDownWrite() const PURE;
+
 
   /**
    * @return the buffer to be written.

@@ -48,6 +48,9 @@ public:
     read_end_stream_ = true;
     ENVOY_LOG_MISC(debug, "lambdai: B{} set write end = true", bsid());
   }
+  bool isPeerShutDownWrite() const override {
+    return read_end_stream_;
+  }
 
   Buffer::Instance* getWriteBuffer() override { return &read_buffer_; }
 

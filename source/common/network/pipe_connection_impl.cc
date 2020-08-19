@@ -160,6 +160,8 @@ Connection::State ClientPipeImpl::state() const {
 void ClientPipeImpl::closeConnectionImmediately() { closeSocket(ConnectionEvent::LocalClose); }
 
 bool ClientPipeImpl::consumerWantsToRead() {
+  ENVOY_LOG_MISC(debug, "lambdai: {} read_disable_count_ = {}, highWatermarkTriggered={}", __FUNCTION__,read_disable_count_, read_buffer_.highWatermarkTriggered());
+
   return read_disable_count_ == 0 ||
          (read_disable_count_ == 1 && read_buffer_.highWatermarkTriggered());
 }
@@ -457,6 +459,8 @@ void ClientPipeImpl::onWriteBufferHighWatermark() {
 void ClientPipeImpl::onFileEvent() {
   auto events = events_;
   events_ = 0;
+  // TODO(lambdai): support deliver Closed event.
+  events &= ~Event::FileReadyType::Closed;
   onFileEvent(events);
 }
 void ClientPipeImpl::onFileEvent(uint32_t events) {
@@ -489,7 +493,7 @@ void ClientPipeImpl::onFileEvent(uint32_t events) {
 }
 
 void ClientPipeImpl::onReadReady() {
-  ENVOY_CONN_LOG(trace, "read ready. dispatch_buffered_data={}", *this, dispatch_buffered_data_);
+  ENVOY_CONN_LOG(trace, "read ready. dispatch_buffered_data={}, read_disable_count = {}", *this, dispatch_buffered_data_, read_disable_count_);
   const bool latched_dispatch_buffered_data = dispatch_buffered_data_;
   dispatch_buffered_data_ = false;
 
@@ -1014,8 +1018,11 @@ void ServerPipeImpl::onWriteBufferHighWatermark() {
 void ServerPipeImpl::onFileEvent() {
   auto events = events_;
   events_ = 0;
+  // TODO(lambdai): support deliver Closed event.
+  events &= ~Event::FileReadyType::Closed;
   onFileEvent(events);
 }
+
 void ServerPipeImpl::onFileEvent(uint32_t events) {
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
 

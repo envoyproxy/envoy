@@ -55,6 +55,9 @@ public:
 
   ~ClientPipeImpl() override;
 
+  void setConnected() {
+    onWriteReady();
+  }
   void enableWrite() { events_ = Event::FileReadyType::Write; DUMPEVENTS(__FUNCTION__, events_);}
   void enableWriteRead() { events_ = Event::FileReadyType::Write | Event::FileReadyType::Read; DUMPEVENTS(__FUNCTION__, events_);}
   void enableWriteClose() { events_ = (Event::FileReadyType::Write | Event::FileReadyType::Closed); DUMPEVENTS(__FUNCTION__, events_);}
@@ -225,7 +228,9 @@ public:
                  const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   ~ServerPipeImpl() override;
-
+  void setConnected() {
+    onWriteReady();
+  }
   void enableWrite() { events_ = Event::FileReadyType::Write; DUMPEVENTS(__FUNCTION__, events_); }
   void enableWriteRead() { events_ = Event::FileReadyType::Write | Event::FileReadyType::Read; DUMPEVENTS(__FUNCTION__, events_);}
   void enableWriteClose() { events_ = Event::FileReadyType::Write | Event::FileReadyType::Closed; DUMPEVENTS(__FUNCTION__, events_);}
