@@ -46,7 +46,6 @@ IMAGES_TO_SAVE=()
 build_images() {
   TYPE=$1
   BUILD_TAG=$2
-  BASE=$3
 
   use_builder "${TYPE}"
   ARGS="$(build_args ${TYPE})"
@@ -57,7 +56,11 @@ build_images() {
   PLATFORM="$(build_platforms ${TYPE} | tr ',' ' ')"
   # docker buildx load cannot have multiple platform, load individually
   for ARCH in ${PLATFORM}; do
-    IMAGE_TAG="${BUILD_TAG}-${ARCH/linux\//}"
+    if [[ "${ARCH}" == "linux/amd64" ]]; then
+      IMAGE_TAG="${BUILD_TAG}"
+    else
+      IMAGE_TAG="${BUILD_TAG}-${ARCH/linux\//}"
+    fi
     docker buildx build --platform "${ARCH}" -f ci/Dockerfile-envoy"${TYPE}" ${ARGS} -t "${IMAGE_TAG}" . --load
     IMAGES_TO_SAVE+=("${IMAGE_TAG}")
   done
@@ -66,12 +69,13 @@ build_images() {
 push_images() {
   TYPE=$1
   BUILD_TAG=$2
-  BASE=$3
 
   use_builder "${TYPE}"
   ARGS="$(build_args ${TYPE})"
   PLATFORM="$(build_platforms ${TYPE})"
-  docker buildx build --platform "${PLATFORM}" -f ci/Dockerfile-envoy"${TYPE}" ${ARGS} -t ${BUILD_TAG} . --push
+  # docker buildx doesn't do push with default builder
+  docker buildx build --platform "${PLATFORM}" -f ci/Dockerfile-envoy"${TYPE}" ${ARGS} -t ${BUILD_TAG} . --push || \
+    docker push "${BUILD_TAG}"
 }
 
 MASTER_BRANCH="refs/heads/master"
@@ -98,7 +102,7 @@ BUILD_TYPES=("" "-alpine" "-alpine-debug" "-google-vrp")
 config_env
 
 # VRP base image is only for amd64
-VRP_BASE_IMAGE="${DOCKER_IMAGE_PREFIX}${IMAGE_POSTFIX}:${IMAGE_NAME}-amd64"
+VRP_BASE_IMAGE="${DOCKER_IMAGE_PREFIX}${IMAGE_POSTFIX}:${IMAGE_NAME}"
 
 # Test the docker build in all cases, but use a local tag that we will overwrite before push in the
 # cases where we do push.
@@ -122,11 +126,11 @@ fi
 docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
 
 for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
-  push_images "${BUILD_TYPE}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}" "${BASE_IMAGE}"
+  push_images "${BUILD_TYPE}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
 
   # Only push latest on master builds.
   if [[ "${AZP_BRANCH}" == "${MASTER_BRANCH}" ]]; then
-    push_images "${BUILD_TYPE}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:latest" "${BASE_IMAGE}"
+    push_images "${BUILD_TYPE}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:latest"
   fi
 
   # Push vX.Y-latest to tag the latest image in a release line
