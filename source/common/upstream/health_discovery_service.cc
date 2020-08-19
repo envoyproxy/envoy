@@ -50,8 +50,8 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
       api_(api) {
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       local_info_.node());
-  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RetryInitialDelayMilliseconds,
-                                                                RetryMaxDelayMilliseconds, random_);
+  backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
+      RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds, random_);
   hds_retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   hds_stream_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
 
@@ -102,27 +102,50 @@ void HdsDelegate::handleFailure() {
 // TODO(lilika): Add support for the same endpoint in different clusters/ports
 envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelegate::sendResponse() {
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse response;
+
   for (const auto& cluster : hds_clusters_) {
+    // Add cluster health response and set name.
+    auto* cluster_health =
+        response.mutable_endpoint_health_response()->add_cluster_endpoints_health();
+    cluster_health->set_cluster_name(cluster->info()->name());
+
+    // Iterate through all hosts in our priority set.
     for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
-      for (const auto& host : hosts->hosts()) {
-        auto* endpoint = response.mutable_endpoint_health_response()->add_endpoints_health();
-        Network::Utility::addressToProtobufAddress(
-            *host->address(), *endpoint->mutable_endpoint()->mutable_address());
-        // TODO(lilika): Add support for more granular options of
-        // envoy::config::core::v3::HealthStatus
-        if (host->health() == Host::Health::Healthy) {
-          endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
-        } else {
-          if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::TIMEOUT) {
-            endpoint->set_health_status(envoy::config::core::v3::TIMEOUT);
-          } else if (host->getActiveHealthFailureType() ==
-                     Host::ActiveHealthFailureType::UNHEALTHY) {
-            endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
-          } else if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::UNKNOWN) {
-            endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
+      // Get a grouping of hosts by locality.
+      for (const auto& locality_hosts : hosts->hostsPerLocality().get()) {
+        // For this locality, add the response grouping.
+        envoy::service::health::v3::LocalityEndpointsHealth* locality_health =
+            cluster_health->add_locality_endpoints_health();
+        locality_health->mutable_locality()->MergeFrom(locality_hosts[0]->locality());
+
+        // Add all hosts to this locality.
+        for (const auto& host : locality_hosts) {
+          // Add this endpoint's health status to this locality grouping.
+          auto* endpoint = locality_health->add_endpoints_health();
+          Network::Utility::addressToProtobufAddress(
+              *host->address(), *endpoint->mutable_endpoint()->mutable_address());
+          // TODO(lilika): Add support for more granular options of
+          // envoy::config::core::v3::HealthStatus
+          if (host->health() == Host::Health::Healthy) {
+            endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
           } else {
-            NOT_REACHED_GCOVR_EXCL_LINE;
+            switch (host->getActiveHealthFailureType()) {
+            case Host::ActiveHealthFailureType::TIMEOUT:
+              endpoint->set_health_status(envoy::config::core::v3::TIMEOUT);
+              break;
+            case Host::ActiveHealthFailureType::UNHEALTHY:
+            case Host::ActiveHealthFailureType::UNKNOWN:
+              endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
+              break;
+            default:
+              NOT_REACHED_GCOVR_EXCL_LINE;
+              break;
+            }
           }
+
+          // TODO(drewsortega): remove this once we are on v4 and endpoint_health_response is
+          // removed. Copy this endpoint's health info to the legacy flat-list.
+          response.mutable_endpoint_health_response()->add_endpoints_health()->MergeFrom(*endpoint);
         }
       }
     }
@@ -158,8 +181,15 @@ void HdsDelegate::processMessage(
         ClusterConnectionBufferLimitBytes);
 
     // Add endpoints to cluster
-    auto* endpoints = cluster_config.mutable_load_assignment()->add_endpoints();
     for (const auto& locality_endpoints : cluster_health_check.locality_endpoints()) {
+      // add endpoint group by locality to config
+      auto* endpoints = cluster_config.mutable_load_assignment()->add_endpoints();
+      // if this group contains locality information, save it.
+      if (locality_endpoints.has_locality()) {
+        endpoints->mutable_locality()->MergeFrom(locality_endpoints.locality());
+      }
+
+      // add all endpoints for this locality group to the config
       for (const auto& endpoint : locality_endpoints.endpoints()) {
         endpoints->add_lb_endpoints()->mutable_endpoint()->mutable_address()->MergeFrom(
             endpoint.address());
@@ -252,13 +282,34 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
       {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
        local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
 
-  for (const auto& host : cluster_.load_assignment().endpoints(0).lb_endpoints()) {
-    initial_hosts_->emplace_back(
-        new HostImpl(info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()),
-                     nullptr, 1, envoy::config::core::v3::Locality().default_instance(),
-                     envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(),
-                     0, envoy::config::core::v3::UNKNOWN));
+  // Temporary structure to hold Host pointers grouped by locality, to build
+  // initial_hosts_per_locality_.
+  std::vector<HostVector> hosts_by_locality;
+  hosts_by_locality.reserve(cluster_.load_assignment().endpoints_size());
+
+  // Iterate over every endpoint in every cluster.
+  for (const auto& locality_endpoints : cluster_.load_assignment().endpoints()) {
+    // Add a locality grouping to the hosts sorted by locality.
+    hosts_by_locality.emplace_back();
+    hosts_by_locality.back().reserve(locality_endpoints.lb_endpoints_size());
+
+    for (const auto& host : locality_endpoints.lb_endpoints()) {
+      // Initialize an endpoint host object.
+      HostSharedPtr endpoint = std::make_shared<HostImpl>(
+          info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()), nullptr, 1,
+          locality_endpoints.locality(),
+          envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
+          envoy::config::core::v3::UNKNOWN);
+      // Add this host/endpoint pointer to our flat list of endpoints for health checking.
+      initial_hosts_->push_back(endpoint);
+      // Add this host/endpoint pointer to our structured list by locality so results can be
+      // requested by locality.
+      hosts_by_locality.back().push_back(endpoint);
+    }
   }
+  // Create the HostsPerLocality.
+  initial_hosts_per_locality_ =
+      std::make_shared<Envoy::Upstream::HostsPerLocalityImpl>(std::move(hosts_by_locality), false);
 }
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -300,9 +351,9 @@ void HdsCluster::initialize(std::function<void()> callback) {
   for (const auto& host : *initial_hosts_) {
     host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   }
-
+  // Use the ungrouped and grouped hosts lists to retain locality structure in the priority set.
   priority_set_.updateHosts(
-      0, HostSetImpl::partitionHosts(initial_hosts_, HostsPerLocalityImpl::empty()), {},
+      0, HostSetImpl::partitionHosts(initial_hosts_, initial_hosts_per_locality_), {},
       *initial_hosts_, {}, absl::nullopt);
 }
 

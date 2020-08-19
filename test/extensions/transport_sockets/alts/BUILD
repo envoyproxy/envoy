@@ -79,7 +79,6 @@ envoy_extension_cc_test(
         "grpc_alts_handshaker_proto",
         "grpc_alts_transport_security_common_proto",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/event:dispatcher_includes",
