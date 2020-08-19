@@ -1,8 +1,9 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 
-#include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 #include "common/common/hash.h"
+
+#include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/upstream/mocks.h"
@@ -521,13 +522,13 @@ hash_policy:
 
   auto generated_hash = HashUtil::xxHash64("10.0.0.1");
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
-  .WillOnce(
-              Invoke([host, generated_hash](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-                auto hash = context->computeHashKey();
-                EXPECT_TRUE(hash.has_value());
-                EXPECT_EQ(generated_hash, hash.value());
-                return host;
-              }));
+      .WillOnce(Invoke([host, generated_hash](
+                           Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+        auto hash = context->computeHashKey();
+        EXPECT_TRUE(hash.has_value());
+        EXPECT_EQ(generated_hash, hash.value());
+        return host;
+      }));
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectUpstreamWrite("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");

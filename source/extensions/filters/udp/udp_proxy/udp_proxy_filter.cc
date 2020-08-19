@@ -96,6 +96,7 @@ void UdpProxyFilter::ClusterInfo::onData(Network::UdpRecvData& data) {
     UdpLoadBalancerContext context(filter_.config_->hashPolicy(), data.addresses_);
     Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(&context);
     if (host == nullptr) {
+      ENVOY_LOG(debug, "cannot find any valid host. failed to create a session.");
       cluster_.info()->stats().upstream_cx_none_healthy_.inc();
       return;
     }
