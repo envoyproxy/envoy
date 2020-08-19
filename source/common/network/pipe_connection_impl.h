@@ -23,6 +23,14 @@ class TestPauseFilter;
 
 namespace Network {
 
+#define DUMPEVENTS(tag, events) \
+do { \
+  std::string s;  if (events & Event::FileReadyType::Write) { s+= "WRITE|";  } \
+  if (events & Event::FileReadyType::Read) { s+= "READ|";  }                   \
+  if (events & Event::FileReadyType::Closed) { s+= "CLOSED|";  }               \
+  ENVOY_LOG_MISC(debug, "lambdai: {} events {}", tag, s);                      \
+} while(0)     
+
 class PeeringPipe {
 public:
   virtual ~PeeringPipe() = default;
@@ -47,9 +55,9 @@ public:
 
   ~ClientPipeImpl() override;
 
-  void enableWrite() { events_ = Event::FileReadyType::Write; }
-  void enableWriteRead() { events_ = Event::FileReadyType::Write | Event::FileReadyType::Read; }
-  void enableWriteClose() { events_ = Event::FileReadyType::Write | Event::FileReadyType::Closed; }
+  void enableWrite() { events_ = Event::FileReadyType::Write; DUMPEVENTS(__FUNCTION__, events_);}
+  void enableWriteRead() { events_ = Event::FileReadyType::Write | Event::FileReadyType::Read; DUMPEVENTS(__FUNCTION__, events_);}
+  void enableWriteClose() { events_ = (Event::FileReadyType::Write | Event::FileReadyType::Closed); DUMPEVENTS(__FUNCTION__, events_);}
   bool isReadEnabled() {
     return events_ | (Event::FileReadyType::Closed | Event::FileReadyType::Read);
   }
@@ -113,7 +121,6 @@ public:
   // TODO(htuch): While this is the basis for also yielding to other connections to provide some
   // fair sharing of CPU resources, the underlying event loop does not make any fairness guarantees.
   // Reconsider how to make fairness happen.
-  // TODO(lambdai):
   void setReadBufferReady() override {
     events_ |= Event::FileReadyType::Read;
     io_timer_->enableTimer(std::chrono::milliseconds(0));
@@ -207,7 +214,6 @@ private:
   Event::TimerPtr io_timer_;
   uint32_t events_{0};
 };
-
 class ServerPipeImpl : public ConnectionImplBase,
                        public TransportSocketCallbacks,
                        public PeeringPipe {
@@ -220,9 +226,9 @@ public:
 
   ~ServerPipeImpl() override;
 
-  void enableWrite() { events_ = Event::FileReadyType::Write; }
-  void enableWriteRead() { events_ = Event::FileReadyType::Write | Event::FileReadyType::Read; }
-  void enableWriteClose() { events_ = Event::FileReadyType::Write | Event::FileReadyType::Closed; }
+  void enableWrite() { events_ = Event::FileReadyType::Write; DUMPEVENTS(__FUNCTION__, events_); }
+  void enableWriteRead() { events_ = Event::FileReadyType::Write | Event::FileReadyType::Read; DUMPEVENTS(__FUNCTION__, events_);}
+  void enableWriteClose() { events_ = Event::FileReadyType::Write | Event::FileReadyType::Closed; DUMPEVENTS(__FUNCTION__, events_);}
   bool isReadEnabled() {
     return events_ | (Event::FileReadyType::Closed | Event::FileReadyType::Read);
   }

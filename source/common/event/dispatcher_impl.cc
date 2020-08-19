@@ -51,8 +51,10 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactory
   SignalAction::registerFatalErrorHandler(*this);
 #endif
   updateApproximateMonotonicTimeInternal();
-  base_scheduler_.registerOnPrepareCallback(
-      std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
+  base_scheduler_.registerOnPrepareCallback([this]() {
+    ENVOY_LOG_MISC(debug, "lambdai: libevent loop................................................");
+    this->updateApproximateMonotonicTime();
+  });
 }
 
 DispatcherImpl::~DispatcherImpl() {

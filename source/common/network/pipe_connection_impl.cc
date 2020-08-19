@@ -299,25 +299,27 @@ void ClientPipeImpl::readDisable(bool disable) {
       // If readDisable is called on a closed connection, do not crash.
       return;
     }
-
-    // Drain the read buffer first. Won't read from peered buffer since dispatch_buffered_data_ is
-    // on.
-    if (consumerWantsToRead() && read_buffer_.length() > 0) {
-      // If the connection has data buffered there's no guarantee there's also data in the kernel
-      // which will kick off the filter chain. Alternately if the read buffer has data the fd could
-      // be read disabled. To handle these cases, fake an event to make sure the buffered data gets
-      // processed regardless and ensure that we dispatch it via onRead.
-      dispatch_buffered_data_ = true;
-      // setReadBufferReady();
-      onReadReady();
-    }
-
     // Now read from peer buffer.
     if (read_disable_count_ == 0) {
       // We never ask for both early close and read at the same time. If we are reading, we want to
       // consume all available data.
       enableWriteRead();
-      onReadReady();
+      // Pipe implementation is not signaled if buffersource socket has data. Meanwhile we must not
+      // trigger the inline read since the readDisable() might be in the context of buffer
+      // consuming. We need to manually trigger it.
+      ENVOY_LOG_MISC(debug, "lambdai: C{} will do transport socket read", id());
+      setReadBufferReady();
+    }
+    if (consumerWantsToRead() && read_buffer_.length() > 0) {
+      // Drain the read buffer first. Won't read from peered buffer since dispatch_buffered_data_ is
+      // on.
+      // If the connection has data buffered there's no guarantee there's also data in the kernel
+      // which will kick off the filter chain. Alternately if the read buffer has data the fd could
+      // be read disabled. To handle these cases, fake an event to make sure the buffered data gets
+      // processed regardless and ensure that we dispatch it via onRead.
+      ENVOY_LOG_MISC(debug, "lambdai: C{} will dispatch read buffer", id());
+      dispatch_buffered_data_ = true;
+      setReadBufferReady();
     }
   }
 }
@@ -469,7 +471,7 @@ void ClientPipeImpl::onFileEvent(uint32_t events) {
   if (events & Event::FileReadyType::Closed) {
     // We never ask for both early close and read at the same time. If we are reading, we want to
     // consume all available data.
-    ASSERT(!(events & Event::FileReadyType::Read));
+    // ASSERT(!(events & Event::FileReadyType::Read));
     ENVOY_CONN_LOG(debug, "remote early close", *this);
     closeSocket(ConnectionEvent::RemoteClose);
     return;
@@ -491,7 +493,7 @@ void ClientPipeImpl::onReadReady() {
   const bool latched_dispatch_buffered_data = dispatch_buffered_data_;
   dispatch_buffered_data_ = false;
 
-  //ASSERT(!connecting_);
+  // ASSERT(!connecting_);
 
   // We get here while read disabled in two ways.
   // 1) There was a call to setReadBufferReady(), for example if a raw buffer socket ceded due to
@@ -856,24 +858,26 @@ void ServerPipeImpl::readDisable(bool disable) {
       return;
     }
 
-    // Drain the read buffer first. Won't read from peered buffer since dispatch_buffered_data_ is
-    // on.
-    if (consumerWantsToRead() && read_buffer_.length() > 0) {
-      // If the connection has data buffered there's no guarantee there's also data in the kernel
-      // which will kick off the filter chain. Alternately if the read buffer has data the fd could
-      // be read disabled. To handle these cases, fake an event to make sure the buffered data gets
-      // processed regardless and ensure that we dispatch it via onRead.
-      dispatch_buffered_data_ = true;
-      // setReadBufferReady();
-      onReadReady();
-    }
-
     // Now read from peer buffer.
     if (read_disable_count_ == 0) {
       // We never ask for both early close and read at the same time. If we are reading, we want to
       // consume all available data.
       enableWriteRead();
-      onReadReady();
+      // Pipe implementation is not signaled if buffersource socket has data. Meanwhile we must not
+      // trigger the inline read since the readDisable() might be in the context of buffer
+      // consuming. We need to manually trigger it.
+      ENVOY_LOG_MISC(debug, "lambdai: C{} will do transport socket read", id());
+      setReadBufferReady();
+    }
+    if (consumerWantsToRead() && read_buffer_.length() > 0) {
+      // Drain the read buffer first. Won't read from peered buffer since dispatch_buffered_data_ is
+      // on. If the connection has data buffered there's no guarantee there's also data in the
+      // kernel which will kick off the filter chain. Alternately if the read buffer has data the fd
+      // could be read disabled. To handle these cases, fake an event to make sure the buffered data
+      // gets processed regardless and ensure that we dispatch it via onRead.
+      ENVOY_LOG_MISC(debug, "lambdai: C{} will dispatch read buffer", id());
+      dispatch_buffered_data_ = true;
+      setReadBufferReady();
     }
   }
 }
