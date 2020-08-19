@@ -110,11 +110,8 @@ MaglevLoadBalancer::MaglevLoadBalancer(
           common_config.has_consistent_hashing_lb_config()
               ? common_config.consistent_hashing_lb_config().use_hostname_for_hashing()
               : false),
-      hash_balance_factor_(
-          common_config.has_consistent_hashing_lb_config()
-              ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.consistent_hashing_lb_config(),
-                                                hash_balance_factor, 0)
-              : 0) {}
+      hash_balance_factor_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          common_config.consistent_hashing_lb_config(), hash_balance_factor, 0)) {}
 
 MaglevLoadBalancerStats MaglevLoadBalancer::generateStats(Stats::Scope& scope) {
   return {ALL_MAGLEV_LOAD_BALANCER_STATS(POOL_GAUGE(scope))};

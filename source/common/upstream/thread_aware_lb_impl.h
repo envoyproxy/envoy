@@ -10,7 +10,6 @@ namespace Envoy {
 namespace Upstream {
 
 using NormalizedHostWeightVector = std::vector<std::pair<HostConstSharedPtr, double>>;
-using NormalizedHostWeightVectorConstPtr = std::unique_ptr<const NormalizedHostWeightVector>;
 using NormalizedHostWeightMap = std::map<HostConstSharedPtr, double>;
 
 class ThreadAwareLoadBalancerBase : public LoadBalancerBase, public ThreadAwareLoadBalancer {
@@ -37,28 +36,39 @@ public:
      * It is common to both RingHash and Maglev load balancers, because the logic of selecting the
      * next host when one is overloaded is independent of the CH-LB type.
      */
-    BoundedLoadHashingLoadBalancer(HashingLoadBalancerSharedPtr hlb_ptr,
-                                   NormalizedHostWeightVectorConstPtr& normalized_host_weights_ptr,
+    BoundedLoadHashingLoadBalancer(HashingLoadBalancerSharedPtr hashing_lb_ptr,
+                                   const NormalizedHostWeightVector& normalized_host_weights,
                                    uint32_t hash_balance_factor)
-        : hlb_ptr_(hlb_ptr), normalized_host_weights_(std::move(normalized_host_weights_ptr)),
+        : normalized_host_weights_map_(init_normalized_host_weights_map(normalized_host_weights)),
+          hashing_lb_ptr_(hashing_lb_ptr),
+          normalized_host_weights_(std::move(normalized_host_weights)),
           hash_balance_factor_(hash_balance_factor) {
+      ASSERT(hashing_lb_ptr_ != nullptr);
       ASSERT(hash_balance_factor > 0);
-      ASSERT(normalized_host_weights_ != nullptr);
-      for (auto const& item : *normalized_host_weights_) {
-        normalized_host_weights_map_[item.first] = item.second;
-      }
     }
     ~BoundedLoadHashingLoadBalancer() override = default;
     HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
 
   protected:
-    virtual bool isHostOverloaded(HostConstSharedPtr host, double weight) const;
+    virtual bool isHostOverloaded(const Host& host, double weight) const;
+    virtual double hostWeight(HostConstSharedPtr host) const {
+      const double weight = normalized_host_weights_map_.at(host);
+      return weight / (host->stats().rq_active_.value() + 1);
+    }
+    const NormalizedHostWeightMap normalized_host_weights_map_;
 
   private:
-    HashingLoadBalancerSharedPtr hlb_ptr_;
-    NormalizedHostWeightVectorConstPtr normalized_host_weights_;
-    NormalizedHostWeightMap normalized_host_weights_map_;
-    uint32_t hash_balance_factor_;
+    const NormalizedHostWeightMap
+    init_normalized_host_weights_map(const NormalizedHostWeightVector& normalized_host_weights) {
+      NormalizedHostWeightMap normalized_host_weights_map;
+      for (auto const& item : normalized_host_weights) {
+        normalized_host_weights_map[item.first] = item.second;
+      }
+      return normalized_host_weights_map;
+    }
+    const HashingLoadBalancerSharedPtr hashing_lb_ptr_;
+    const NormalizedHostWeightVector normalized_host_weights_;
+    const uint32_t hash_balance_factor_;
   };
   // Upstream::ThreadAwareLoadBalancer
   LoadBalancerFactorySharedPtr factory() override { return factory_; }
@@ -115,7 +125,7 @@ private:
   };
 
   virtual HashingLoadBalancerSharedPtr
-  createLoadBalancer(NormalizedHostWeightVectorConstPtr normalized_host_weights,
+  createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
                      double min_normalized_weight, double max_normalized_weight) PURE;
   void refresh();
 

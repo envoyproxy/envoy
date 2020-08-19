@@ -80,17 +80,17 @@ public:
 private:
   // ThreadAwareLoadBalancerBase
   HashingLoadBalancerSharedPtr
-  createLoadBalancer(NormalizedHostWeightVectorConstPtr normalized_host_weights,
+  createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
                      double /* min_normalized_weight */, double max_normalized_weight) override {
-    HashingLoadBalancerSharedPtr hlb_ptr =
-        std::make_shared<MaglevTable>(*normalized_host_weights, max_normalized_weight, table_size_,
+    HashingLoadBalancerSharedPtr maglev_lb =
+        std::make_shared<MaglevTable>(normalized_host_weights, max_normalized_weight, table_size_,
                                       use_hostname_for_hashing_, stats_);
 
     if (hash_balance_factor_ == 0) {
-      return hlb_ptr;
+      return maglev_lb;
     }
 
-    return std::make_shared<BoundedLoadHashingLoadBalancer>(hlb_ptr, normalized_host_weights,
+    return std::make_shared<BoundedLoadHashingLoadBalancer>(maglev_lb, normalized_host_weights,
                                                             hash_balance_factor_);
   }
 
