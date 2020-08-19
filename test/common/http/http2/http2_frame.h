@@ -85,6 +85,12 @@ public:
 
   enum class ResponseStatus { Unknown, Ok, NotFound };
 
+  struct Header {
+    Header(absl::string_view key, absl::string_view value) : key_(key), value_(value) {}
+    std::string key_;
+    std::string value_;
+  };
+
   // Methods for creating HTTP2 frames
   static Http2Frame makePingFrame(absl::string_view data = {});
   static Http2Frame makeEmptySettingsFrame(SettingsFlags flags = SettingsFlags::None);
@@ -107,6 +113,8 @@ public:
                                                           absl::string_view path);
   static Http2Frame makeRequest(uint32_t stream_index, absl::string_view host,
                                 absl::string_view path);
+  static Http2Frame makeRequest(uint32_t stream_index, absl::string_view host,
+                                absl::string_view path, const std::vector<Header> extra_headers);
   static Http2Frame makePostRequest(uint32_t stream_index, absl::string_view host,
                                     absl::string_view path);
   /**
@@ -163,6 +171,7 @@ private:
   // Headers are directly encoded
   void appendStaticHeader(StaticHeaderIndex index);
   void appendHeaderWithoutIndexing(StaticHeaderIndex index, absl::string_view value);
+  void appendHeaderWithoutIndexing(const Header& header);
   void appendEmptyHeader();
 
   // This method updates payload length in the HTTP2 header based on the size of the data_
