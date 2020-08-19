@@ -261,9 +261,9 @@ TEST_P(ListenerIntegrationTest, BasicSuccess) {
 TEST_P(ListenerIntegrationTest, BasicSuccessWithOnDemandFilterChain) {
   on_server_init_function_ = [&]() {
     createLdsStream();
-    // Make all filter chains of this listener to be build_on_demand.
+    // Make all filter chains of this listener to be built on-demand.
     for (auto filter_chain : listener_config_.filter_chains()) {
-      filter_chain.set_build_on_demand(true);
+      filter_chain.mutable_on_demand_configuration();
     }
     sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
     createRdsStream(route_table_name_);

@@ -4247,8 +4247,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OnDemandFilterChainSingleRebuildi
             tls_certificates:
               - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
-      build_on_demand:
-        true
+      on_demand_configuration: {}
   )EOF",
                                                        Network::Address::IpVersion::v4);
   envoy::config::listener::v3::Listener listener_config = parseListenerFromV3Yaml(yaml);
@@ -4298,8 +4297,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
             tls_certificates:
               - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
-      build_on_demand:
-        true
+      on_demand_configuration: {}
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -4350,14 +4348,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
             tls_certificates:
               - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
-      build_on_demand:
-        true
+      on_demand_configuration: {}
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
   envoy::config::listener::v3::Listener listener_config = parseListenerFromV3Yaml(yaml);
   const auto& filter_chain_message = listener_config.filter_chains().Get(0);
-
+  EXPECT_TRUE(filter_chain_message.has_on_demand_configuration());
+  
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   manager_->addOrUpdateListener(listener_config, "", true);
@@ -4374,14 +4372,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
 
   // Several rebuilding requests for the same filter chain from the same listener.
   auto& listener = manager_->listeners().back().get();
-  listener.rebuildFilterChain(&filter_chain_message, "test_worker");
+  listener.rebuildFilterChain(&filter_chain_message, "test_worker1");
   // On the first request, a rebuilder will be created to start rebuilding.
   // If multiple requests arrive for the same filter chain before the first rebuilding has
   // completed, the later requests will not trigger rebuilder creation, only the worker name will be
   // stored into the callback list.
-  listener.rebuildFilterChain(&filter_chain_message, "test_worker");
-  listener.rebuildFilterChain(&filter_chain_message, "test_worker");
-  listener.rebuildFilterChain(&filter_chain_message, "test_worker");
+  listener.rebuildFilterChain(&filter_chain_message, "test_worker2");
+  listener.rebuildFilterChain(&filter_chain_message, "test_worker3");
+  listener.rebuildFilterChain(&filter_chain_message, "test_worker4");
 
   rebuilder_foo->target_.ready();
 

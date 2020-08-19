@@ -66,7 +66,7 @@ public:
         TestEnvironment::substitute(filter_chain_yaml, Network::Address::IpVersion::v4),
         filter_chain_template_);
     on_demand_filter_chain_template_ = filter_chain_template_;
-    on_demand_filter_chain_template_.set_build_on_demand(true);
+    on_demand_filter_chain_template_.mutable_on_demand_configuration();
   }
 
   const Network::FilterChain*
@@ -161,7 +161,7 @@ TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
 }
 
 TEST_F(FilterChainManagerImplTest, AddOnDemandFilterChain) {
-  // Given filter chain config with build_on_demand=true.
+  // Given filter chain config with OnDemandConfiguration.
   addSingleFilterChainHelper(on_demand_filter_chain_template_);
   auto* on_demand_filter_chain =
       findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);

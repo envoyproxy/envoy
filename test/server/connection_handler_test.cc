@@ -239,8 +239,7 @@ public:
         destination_port: 10000
       transport_socket:
         name: tls
-      build_on_demand:
-        true
+      on_demand_configuration: {}
   )EOF";
   envoy::config::listener::v3::FilterChain on_demand_filter_chain_template_;
   Stats::TestUtil::TestStore stats_store_;
