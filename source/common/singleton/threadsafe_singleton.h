@@ -74,13 +74,33 @@ template <class T> T* InjectableSingleton<T>::loader_ = nullptr;
 
 template <class T> class ScopedInjectableLoader {
 public:
-  ScopedInjectableLoader(std::unique_ptr<T>&& instance) {
-    instance_ = std::move(instance);
+  enum class PreviousSingletonBehavior { ExpectEmpty, OverrideAndRestore };
+
+  explicit ScopedInjectableLoader(std::unique_ptr<T>&& instance)
+      : ScopedInjectableLoader(PreviousSingletonBehavior::ExpectEmpty, std::move(instance)) {}
+
+  ScopedInjectableLoader(PreviousSingletonBehavior previous_singleton_behavior,
+                         std::unique_ptr<T>&& instance)
+      : previous_instance_(previous_singleton_behavior ==
+                                   PreviousSingletonBehavior::OverrideAndRestore
+                               ? InjectableSingleton<T>::getExisting()
+                               : nullptr),
+        instance_(std::move(instance)) {
+    if (previous_singleton_behavior == PreviousSingletonBehavior::OverrideAndRestore) {
+      InjectableSingleton<T>::clear();
+    }
     InjectableSingleton<T>::initialize(instance_.get());
   }
-  ~ScopedInjectableLoader() { InjectableSingleton<T>::clear(); }
+
+  ~ScopedInjectableLoader() {
+    InjectableSingleton<T>::clear();
+    if (previous_instance_) {
+      InjectableSingleton<T>::initialize(previous_instance_);
+    }
+  }
 
 private:
+  T* const previous_instance_{nullptr};
   std::unique_ptr<T> instance_;
 };
 

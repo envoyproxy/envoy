@@ -88,7 +88,6 @@ protected:
 class Http2FloodMitigationTest : public Http2FrameIntegrationTest {
 public:
   Http2FloodMitigationTest();
-  ~Http2FloodMitigationTest() override;
 
 protected:
   // Object of this class hold the state determining the IoHandle which
@@ -123,9 +122,7 @@ protected:
   void setNetworkConnectionBufferSize();
   void beginSession() override;
 
-  Envoy::Network::SocketInterface* const previous_socket_interface_{
-      Envoy::Network::SocketInterfaceSingleton::getExisting()};
   std::shared_ptr<IoHandleMatcher> writev_matcher_{std::make_shared<IoHandleMatcher>()};
-  std::unique_ptr<Envoy::Network::SocketInterfaceLoader> test_socket_interface_loader_;
+  Envoy::Network::SocketInterfaceLoader test_socket_interface_loader_;
 };
 } // namespace Envoy
