@@ -18,7 +18,6 @@ void HeaderToInt(const char header_name[], int32_t& return_int,
 } // namespace
 
 const char AutonomousStream::RESPONSE_SIZE_BYTES[] = "response_size_bytes";
-const char AutonomousStream::RESPONSE_DATA_BLOCKS[] = "response_data_blocks";
 const char AutonomousStream::EXPECT_REQUEST_SIZE_BYTES[] = "expect_request_size_bytes";
 const char AutonomousStream::RESET_AFTER_REQUEST[] = "reset_after_request";
 
@@ -60,13 +59,8 @@ void AutonomousStream::sendResponse() {
   int32_t response_body_length = 10;
   HeaderToInt(RESPONSE_SIZE_BYTES, response_body_length, headers);
 
-  int32_t response_data_blocks = 1;
-  HeaderToInt(RESPONSE_DATA_BLOCKS, response_data_blocks, headers);
-
   encodeHeaders(upstream_.responseHeaders(), false);
-  for (int32_t i = 0; i < response_data_blocks; ++i) {
-    encodeData(response_body_length, false);
-  }
+  encodeData(response_body_length, false);
   encodeTrailers(upstream_.responseTrailers());
 }
 

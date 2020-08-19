@@ -25,9 +25,6 @@ public:
   std::string name() const override {
     return "envoy.extensions.network.socket_interface.default_socket_interface";
   };
-
-protected:
-  virtual IoHandlePtr makeSocket(int socket_fd, bool socket_v6only) const;
 };
 
 DECLARE_FACTORY(SocketInterfaceImpl);

@@ -111,14 +111,6 @@ void Http2Frame::appendHeaderWithoutIndexing(StaticHeaderIndex index, absl::stri
   appendData(value);
 }
 
-void Http2Frame::appendHeaderWithoutIndexing(const Header& header) {
-  data_.push_back(0);
-  appendHpackInt(header.key_.size(), 0x7f);
-  appendData(header.key_);
-  appendHpackInt(header.value_.size(), 0x7f);
-  appendData(header.value_);
-}
-
 void Http2Frame::appendEmptyHeader() {
   data_.push_back(0x40);
   data_.push_back(0x00);
@@ -254,17 +246,6 @@ Http2Frame Http2Frame::makeRequest(uint32_t stream_index, absl::string_view host
   frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
   frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
   frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Host, host);
-  frame.adjustPayloadSize();
-  return frame;
-}
-
-Http2Frame Http2Frame::makeRequest(uint32_t stream_index, absl::string_view host,
-                                   absl::string_view path,
-                                   const std::vector<Header> extra_headers) {
-  auto frame = makeRequest(stream_index, host, path);
-  for (const auto& header : extra_headers) {
-    frame.appendHeaderWithoutIndexing(header);
-  }
   frame.adjustPayloadSize();
   return frame;
 }

@@ -59,7 +59,7 @@ public:
   Address::InstanceConstSharedPtr localAddress() override;
   Address::InstanceConstSharedPtr peerAddress() override;
 
-protected:
+private:
   // Converts a SysCallSizeResult to IoCallUint64Result.
   template <typename T>
   Api::IoCallUint64Result sysCallResultToIoCallResult(const Api::SysCallResult<T>& result) {
