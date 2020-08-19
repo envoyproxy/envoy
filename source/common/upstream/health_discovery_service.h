@@ -85,6 +85,7 @@ private:
   bool added_via_api_;
 
   HostVectorSharedPtr initial_hosts_;
+  HostsPerLocalitySharedPtr initial_hosts_per_locality_;
   ClusterInfoConstSharedPtr info_;
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
