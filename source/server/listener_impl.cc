@@ -229,7 +229,8 @@ Init::Manager& ListenerFactoryContextBaseImpl::initManager() { NOT_IMPLEMENTED_G
 // Since we use non-virtual function of listenerImpl, we can not make the rebuilder a virtual class.
 PerFilterChainRebuilder::PerFilterChainRebuilder(
     ListenerImpl& listener, const envoy::config::listener::v3::FilterChain* const& filter_chain,
-    Configuration::FactoryContext& factory_context) : listener_(listener), filter_chain_(filter_chain), parent_context_(factory_context),
+    Configuration::FactoryContext& factory_context)
+    : listener_(listener), filter_chain_(filter_chain), parent_context_(factory_context),
       rebuild_init_manager_(std::make_unique<Init::ManagerImpl>("rebuild_init_manager")),
       rebuild_watcher_(
           "rebuild_watcher",
@@ -249,7 +250,8 @@ void PerFilterChainRebuilder::storeWorkerInCallbackList(const std::string& worke
   workers_to_callback_.insert(worker_name);
 }
 
-Configuration::FilterChainFactoryContextPtr PerFilterChainRebuilder::createFilterChainFactoryContext(
+Configuration::FilterChainFactoryContextPtr
+PerFilterChainRebuilder::createFilterChainFactoryContext(
     const ::envoy::config::listener::v3::FilterChain* const filter_chain) {
   // TODO(lambdai): add stats
   UNREFERENCED_PARAMETER(filter_chain);
@@ -579,8 +581,8 @@ void ListenerImpl::rebuildFilterChain(
   // Find/create rebuilder for this filter chain message.
   if (filter_chain_rebuilder_map_.find(filter_chain_message) == filter_chain_rebuilder_map_.end()) {
     ENVOY_LOG(debug, "filter chain rebuilder not found, create a rebuilder and start rebuilding.");
-    filter_chain_rebuilder_map_[filter_chain_message] =
-        std::make_unique<PerFilterChainRebuilder>(*this, filter_chain_message, listener_factory_context_->parentFactoryContext());
+    filter_chain_rebuilder_map_[filter_chain_message] = std::make_unique<PerFilterChainRebuilder>(
+        *this, filter_chain_message, listener_factory_context_->parentFactoryContext());
     should_start_rebuilding = true;
   }
 
@@ -602,8 +604,8 @@ void ListenerImpl::rebuildFilterChain(
     // Should create a new rebuilder and start rebuilding again, instead of just callback with
     // failure signal.
     filter_chain_rebuilder_map_.erase(filter_chain_message);
-    filter_chain_rebuilder_map_[filter_chain_message] =
-        std::make_unique<PerFilterChainRebuilder>(*this, filter_chain_message, listener_factory_context_->parentFactoryContext());
+    filter_chain_rebuilder_map_[filter_chain_message] = std::make_unique<PerFilterChainRebuilder>(
+        *this, filter_chain_message, listener_factory_context_->parentFactoryContext());
     should_start_rebuilding = true;
   }
 

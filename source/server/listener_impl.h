@@ -213,16 +213,18 @@ private:
  * PerFilterChainRebuilder is used to rebuild filter chain placeholder. It assigns an init manager
  * to dependencies and send callback to workers when the rebuilding is completed or reaches timeout.
  */
-class PerFilterChainRebuilder : public FilterChainFactoryContextCreator, Logger::Loggable<Logger::Id::config> {
+class PerFilterChainRebuilder : public FilterChainFactoryContextCreator,
+                                Logger::Loggable<Logger::Id::config> {
 public:
   PerFilterChainRebuilder(ListenerImpl& listener,
-                          const envoy::config::listener::v3::FilterChain* const& filter_chain, Configuration::FactoryContext& factory_context);
+                          const envoy::config::listener::v3::FilterChain* const& filter_chain,
+                          Configuration::FactoryContext& factory_context);
   ~PerFilterChainRebuilder();
 
   // FilterChainFactoryContextCreator
   Configuration::FilterChainFactoryContextPtr createFilterChainFactoryContext(
       const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
-  
+
   void storeWorkerInCallbackList(const std::string& worker_name);
   void callbackToWorkers(bool success);
   bool rebuildCompleted() { return rebuild_complete_; }
@@ -379,7 +381,8 @@ public:
     return config().traffic_direction();
   }
 
-  // Stop rebuilding filter chain on timeout of rebuilder, make the filter chain back to a placeholder. Will be called by the rebuilder.
+  // Stop rebuilding filter chain on timeout of rebuilder, make the filter chain back to a
+  // placeholder. Will be called by the rebuilder.
   void
   stopRebuildingFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain);
 
