@@ -43,4 +43,5 @@ HTTP filters
   :hidden:
 
   ../../../api-v3/extensions/filters/http/admission_control/v3alpha/admission_control.proto
+  ../../../api-v3/extensions/filters/http/oauth2/v3alpha/oauth.proto
   ../../../api-v3/extensions/filters/http/cache/v3alpha/cache.proto
