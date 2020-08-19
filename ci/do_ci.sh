@@ -240,12 +240,12 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define hot_restart=disabled \
     --define google_grpc=disabled \
     --define boringssl=fips \
-    --define zlib=ng-with-optimizations \
     --define log_debug_assert_in_release=enabled \
     --define quiche=enabled \
     --define path_normalization_by_default=true \
     --define deprecated_features=disabled \
     --define use_new_codecs_in_integration_tests=true \
+    --define zlib=ng-with-optimizations \
   "
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
   setup_clang_toolchain
