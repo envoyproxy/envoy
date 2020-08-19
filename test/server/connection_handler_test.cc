@@ -627,10 +627,12 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainMultipleRebuildingRequests) {
   Network::MockConnection* connection2 = new NiceMock<Network::MockConnection>();
   Network::MockConnection* connection3 = new NiceMock<Network::MockConnection>();
 
-  EXPECT_CALL(manager_,findFilterChain(_)).WillRepeatedly(Return(on_demand_filter_chain_.get()));
+  EXPECT_CALL(manager_, findFilterChain(_)).WillRepeatedly(Return(on_demand_filter_chain_.get()));
 
-  // Will call newConnection twice. After calling onAccept, newConnection will find filter chain is  placeholder. Rebuilding request will be post to master thread and the currently no createServerConnection will be called. 
-  EXPECT_CALL(dispatcher_, createServerConnection_()).Times(0); 
+  // Will call newConnection twice. After calling onAccept, newConnection will find filter chain is
+  // placeholder. Rebuilding request will be post to master thread and the currently no
+  // createServerConnection will be called.
+  EXPECT_CALL(dispatcher_, createServerConnection_()).Times(0);
   EXPECT_CALL(master_dispatcher_, post(_)).Times(3);
 
   Network::MockConnectionSocket* socket1 = new NiceMock<Network::MockConnectionSocket>();
@@ -642,8 +644,12 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainMultipleRebuildingRequests) {
   // Rebuilding request has been sent 3 times. But only the first one will start rebuilding.
 
   // Expect call after rebuilding succeeded.
-  EXPECT_CALL(dispatcher_, createServerConnection_()).Times(3).WillOnce(Return(connection1)).WillOnce(Return(connection2)).WillOnce(Return(connection3)); 
-  EXPECT_CALL(factory_, createNetworkFilterChain(_,_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(dispatcher_, createServerConnection_())
+      .Times(3)
+      .WillOnce(Return(connection1))
+      .WillOnce(Return(connection2))
+      .WillOnce(Return(connection3));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillRepeatedly(Return(true));
   EXPECT_CALL(*connection1, addConnectionCallbacks(_)).Times(1);
   EXPECT_CALL(*connection2, addConnectionCallbacks(_)).Times(1);
   EXPECT_CALL(*connection3, addConnectionCallbacks(_)).Times(1);
@@ -651,7 +657,8 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainMultipleRebuildingRequests) {
   // After start rebuilding, rebuilt filter chain will be stored inside placeholder.
   on_demand_filter_chain_->storeRebuiltFilterChain(filter_chain_);
   // Master thread sends callback to worker to call retryAllConnections. Then newConnection will be
-  // called again. At this time, the same filter chain is found not to be a placeholder. Will call createServerConnection.
+  // called again. At this time, the same filter chain is found not to be a placeholder. Will call
+  // createServerConnection.
   handler_->retryAllConnections(true, &on_demand_filter_chain_template_);
   EXPECT_EQ(3UL, handler_->numConnections());
 

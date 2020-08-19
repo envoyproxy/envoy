@@ -4355,7 +4355,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
   envoy::config::listener::v3::Listener listener_config = parseListenerFromV3Yaml(yaml);
   const auto& filter_chain_message = listener_config.filter_chains().Get(0);
   EXPECT_TRUE(filter_chain_message.has_on_demand_configuration());
-  
+
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   manager_->addOrUpdateListener(listener_config, "", true);

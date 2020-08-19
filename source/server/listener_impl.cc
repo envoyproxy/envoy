@@ -243,7 +243,8 @@ PerFilterChainRebuilder::PerFilterChainRebuilder(
             }
           }),
       rebuild_timer_(listener_.dispatcher().createTimer([this]() -> void { onTimeout(); })),
-      rebuild_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(filter_chain->on_demand_configuration(), rebuild_timeout, 15000)) {}
+      rebuild_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(filter_chain->on_demand_configuration(),
+                                                  rebuild_timeout, 15000)) {}
 
 void PerFilterChainRebuilder::storeWorkerInCallbackList(const std::string& worker_name) {
   workers_to_callback_.insert(worker_name);
