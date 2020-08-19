@@ -108,6 +108,9 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::SwitchArg log_format_escaped("", "log-format-escaped",
                                       "Escape c-style escape sequences in the application logs",
                                       cmd, false);
+  TCLAP::SwitchArg enable_fine_grain_logging(
+      "", "enable-fine-grain-logging",
+      "Logger mode: enable file level log control(Fancy Logger)or not", cmd, false);
   TCLAP::ValueArg<bool> log_format_prefix_with_location(
       "", "log-format-prefix-with-location",
       "Prefix all occurrences of '%v' in log format with with '[%g:%#] ' ('[path/to/file.cc:99] "
@@ -191,6 +194,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
     log_format_ = absl::StrReplaceAll(log_format_, {{"%%", "%%"}, {"%v", "[%g:%#] %v"}});
   }
   log_format_escaped_ = log_format_escaped.getValue();
+  enable_fine_grain_logging_ = enable_fine_grain_logging.getValue();
 
   parseComponentLogLevels(component_log_level.getValue());
 
@@ -354,6 +358,7 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
                                       spdlog::level::to_string_view(logLevel()).size());
   command_line_options->set_log_format(logFormat());
   command_line_options->set_log_format_escaped(logFormatEscaped());
+  command_line_options->set_enable_fine_grain_logging(enableFineGrainLogging());
   command_line_options->set_log_path(logPath());
   command_line_options->set_service_cluster(serviceClusterName());
   command_line_options->set_service_node(serviceNodeName());
