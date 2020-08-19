@@ -94,7 +94,7 @@ FancyContext& getFancyContext();
     static std::atomic<spdlog::logger*> flogger{0};                                                \
     spdlog::logger* local_flogger = flogger.load(std::memory_order_relaxed);                       \
     if (!local_flogger) {                                                                          \
-      ::Envoy::getFancyContext().initFancyLogger(FANCY_KEY, flogger);	                           \
+      ::Envoy::getFancyContext().initFancyLogger(FANCY_KEY, flogger);                              \
       local_flogger = flogger.load(std::memory_order_relaxed);                                     \
     }                                                                                              \
     local_flogger->log(spdlog::source_loc{__FILE__, __LINE__, __func__},                           \
