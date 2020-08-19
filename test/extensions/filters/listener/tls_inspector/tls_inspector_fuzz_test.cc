@@ -28,7 +28,7 @@ DEFINE_PROTO_FUZZER(
     cfg = std::make_shared<Config>(store, input.max_size());
   }
 
-  auto filter = std::make_unique<Filter>(cfg);
+  auto filter = std::make_unique<Filter>(std::move(cfg));
 
   ListenerFilterFuzzer fuzzer;
   fuzzer.fuzz(*filter, input.fuzzed());

@@ -17,6 +17,8 @@ public:
   ListenerFilterFuzzer() {
     ON_CALL(cb_, socket()).WillByDefault(testing::ReturnRef(socket_));
     ON_CALL(cb_, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher_));
+    ON_CALL(cb_, dynamicMetadata()).WillByDefault(testing::ReturnRef(metadata_));
+    ON_CALL(Const(cb_), dynamicMetadata()).WillByDefault(testing::ReturnRef(metadata_));
   }
 
   void fuzz(Network::ListenerFilter& filter,
@@ -29,6 +31,7 @@ private:
   FakeConnectionSocket socket_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::FileReadyCb file_event_callback_;
+  envoy::config::core::v3::Metadata metadata_;
 };
 
 class FuzzedHeader {

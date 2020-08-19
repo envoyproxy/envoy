@@ -40,8 +40,12 @@ void ListenerFilterFuzzer::fuzz(
 
   if (!header.empty()) {
     ON_CALL(os_sys_calls_, ioctl(kFakeSocketFd, FIONREAD, _))
-        .WillByDefault(testing::Return(Api::SysCallIntResult{static_cast<int>(header.size()), 0}));
-
+        .WillByDefault(Invoke(
+            [&header](os_fd_t, unsigned long int, void* argp) -> Api::SysCallIntResult {
+              int bytes_avail = static_cast<int>(header.size());
+              memcpy(argp, &bytes_avail, sizeof(int));
+              return Api::SysCallIntResult{bytes_avail, 0};
+            }));
     {
       testing::InSequence s;
 
