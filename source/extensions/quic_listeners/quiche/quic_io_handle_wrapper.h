@@ -62,6 +62,14 @@ public:
     }
     return io_handle_.recvmmsg(slices, self_port, output);
   }
+  Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override {
+    if (closed_) {
+      ASSERT(false, "recv called after close.");
+      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
+                                                        Network::IoSocketError::deleteIoError));
+    }
+    return io_handle_.recv(buffer, length, flags);
+  }
   bool supportsMmsg() const override { return io_handle_.supportsMmsg(); }
   bool supportsUdpGro() const override { return io_handle_.supportsUdpGro(); }
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override {
