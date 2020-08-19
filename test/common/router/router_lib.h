@@ -71,7 +71,7 @@ public:
   RetryStatePtr createRetryState(const RetryPolicy&, Http::RequestHeaderMap&,
                                  const Upstream::ClusterInfo&, const VirtualCluster*,
                                  Runtime::Loader&, Random::RandomGenerator&, Event::Dispatcher&,
-                                 Upstream::ResourcePriority) override {
+                                 TimeSource&, Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);
     retry_state_ = new NiceMock<MockRetryState>();
     if (reject_all_hosts_) {
@@ -93,7 +93,7 @@ public:
 class RouterTestLib {
 public:
   RouterTestLib(bool start_child_span, bool suppress_envoy_headers,
-                 Protobuf::RepeatedPtrField<std::string> strict_headers_to_check);
+                Protobuf::RepeatedPtrField<std::string> strict_headers_to_check);
 
   void expectResponseTimerCreate();
   void expectPerTryTimerCreate();

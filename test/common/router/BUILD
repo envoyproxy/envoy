@@ -391,7 +391,7 @@ envoy_cc_test(
 envoy_proto_library(
     name = "router_fuzz_proto",
     srcs = ["router_fuzz.proto"],
-    deps = ["//test/fuzz:common_proto"]
+    deps = ["//test/fuzz:common_proto"],
 )
 
 envoy_cc_fuzz_test(
@@ -400,7 +400,7 @@ envoy_cc_fuzz_test(
     corpus = "router_corpus",
     deps = [
         ":router_fuzz_proto_cc_proto",
-        "//test/fuzz:utility_lib",
         ":router_lib",
+        "//test/fuzz:utility_lib",
     ],
 )

@@ -5,7 +5,9 @@ namespace Router {
 
 class RouterTestBase : public RouterTestLib, public testing::Test {
 public:
-  RouterTestBase(bool start_child_span, bool suppress_envoy_headers, Protobuf::RepeatedPtrField<std::string> strict_headers_to_check) : RouterTestLib(start_child_span, suppress_envoy_headers, strict_headers_to_check) {}
+  RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
+                 Protobuf::RepeatedPtrField<std::string> strict_headers_to_check)
+      : RouterTestLib(start_child_span, suppress_envoy_headers, strict_headers_to_check) {}
 
   void testAppendCluster(absl::optional<Http::LowerCaseString> cluster_header_name);
   void testAppendUpstreamHost(absl::optional<Http::LowerCaseString> hostname_header_name,

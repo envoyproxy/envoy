@@ -28,11 +28,10 @@ message Action {
   oneof action_selector {
     StreamAction stream_action = 1;
     google.protobuf.Empty advance_time = 2;
-    google.protobuf.Empty upstream_bad = 3;
+    google.protobuf.Empty force_retry = 3;
   }
 }
 
 message RouterTestCase {
   repeated Action actions = 1;
 }
-

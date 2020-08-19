@@ -4,7 +4,7 @@ namespace Envoy {
 namespace Router {
 
 RouterTestLib::RouterTestLib(bool start_child_span, bool suppress_envoy_headers,
-               Protobuf::RepeatedPtrField<std::string> strict_headers_to_check)
+                             Protobuf::RepeatedPtrField<std::string> strict_headers_to_check)
     : http_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
       config_("test.", local_info_, stats_store_, cm_, runtime_, random_,
               ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
@@ -52,8 +52,7 @@ AssertionResult RouterTestLib::verifyHostUpstreamStats(uint64_t success, uint64_
   }
   if (error != cm_.conn_pool_.host_->stats_.rq_error_.value()) {
     return AssertionFailure() << fmt::format("rq_error {} does not match expected {}",
-                                             cm_.conn_pool_.host_->stats_.rq_error_.value(),
-                                             error);
+                                             cm_.conn_pool_.host_->stats_.rq_error_.value(), error);
   }
   return AssertionSuccess();
 }
@@ -87,9 +86,9 @@ void RouterTestLib::verifyMetadataMatchCriteriaFromRequest(bool route_entry_has_
   }
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
-      .WillOnce(Invoke(
-          [&](const std::string&, Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-              Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+      .WillOnce(
+          Invoke([&](const std::string&, Upstream::ResourcePriority, absl::optional<Http::Protocol>,
+                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
             auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
             EXPECT_EQ(match.size(), 2);
             auto it = match.begin();
@@ -125,7 +124,8 @@ void RouterTestLib::verifyMetadataMatchCriteriaFromRequest(bool route_entry_has_
 }
 
 void RouterTestLib::verifyAttemptCountInRequestBasic(bool set_include_attempt_count_in_request,
-                                      absl::optional<int> preset_count, int expected_count) {
+                                                     absl::optional<int> preset_count,
+                                                     int expected_count) {
   setIncludeAttemptCountInRequest(set_include_attempt_count_in_request);
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
@@ -151,7 +151,8 @@ void RouterTestLib::verifyAttemptCountInRequestBasic(bool set_include_attempt_co
 }
 
 void RouterTestLib::verifyAttemptCountInResponseBasic(bool set_include_attempt_count_in_response,
-                                       absl::optional<int> preset_count, int expected_count) {
+                                                      absl::optional<int> preset_count,
+                                                      int expected_count) {
   setIncludeAttemptCountInResponse(set_include_attempt_count_in_response);
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -212,8 +213,7 @@ void RouterTestLib::enableRedirects(uint32_t max_internal_redirects) {
       .WillByDefault(Return(true));
   ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, maxInternalRedirects())
       .WillByDefault(Return(max_internal_redirects));
-  ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
-          isCrossSchemeRedirectAllowed())
+  ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, isCrossSchemeRedirectAllowed())
       .WillByDefault(Return(false));
   ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_));
 }
