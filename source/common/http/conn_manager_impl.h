@@ -509,8 +509,8 @@ private:
      */
     virtual Tracing::Span& activeSpan() PURE;
 
-    // TODO(snowp): It might make more sense to pass (optional?) counters to the FM instead of calling back
-    // out to the AS to record them.
+    // TODO(snowp): It might make more sense to pass (optional?) counters to the FM instead of
+    // calling back out to the AS to record them.
     /**
      * Called when a stream fails due to the response data being too large.
      */
@@ -574,7 +574,8 @@ private:
     void dumpState(std::ostream& os, int indent_level = 0) const override {
       const char* spaces = spacesForLevel(indent_level);
       os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_continue_headers_)
-         << DUMP_MEMBER(state_.decoding_headers_only_) << DUMP_MEMBER(state_.encoding_headers_only_) << "\n";
+         << DUMP_MEMBER(state_.decoding_headers_only_) << DUMP_MEMBER(state_.encoding_headers_only_)
+         << "\n";
 
       DUMP_DETAILS(request_headers_);
       DUMP_DETAILS(request_trailers_);
@@ -1084,8 +1085,8 @@ private:
     }
 
     ConnectionManagerImpl& connection_manager_;
-    // TODO(snowp): It might make sense to move this to the FilterManager to avoid storing it in both locations,
-    // then refer to the FM when doing stream logs.
+    // TODO(snowp): It might make sense to move this to the FilterManager to avoid storing it in
+    // both locations, then refer to the FM when doing stream logs.
     const uint64_t stream_id_;
     FilterManager filter_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
