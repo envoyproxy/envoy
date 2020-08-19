@@ -28,6 +28,7 @@ void ListenerFilterFuzzer::fuzz(
 
     ON_CALL(dispatcher_, createFileEvent_(_, _, _, _))
         .WillByDefault(testing::DoAll(testing::SaveArg<1>(&file_event_callback_),
+                                      testing::SaveArg<3>(&events_),
                                       testing::ReturnNew<NiceMock<Event::MockFileEvent>>()));
   }
 
@@ -53,7 +54,7 @@ void ListenerFilterFuzzer::fuzz(
           .Times(testing::AnyNumber())
           .WillRepeatedly(Invoke(
               [&header](os_fd_t, void* buffer, size_t length, int flags) -> Api::SysCallSizeResult {
-                return header.read(buffer, length, flags);
+                return header.read(buffer, length, flags == MSG_PEEK);
               }));
     }
 
@@ -64,7 +65,9 @@ void ListenerFilterFuzzer::fuzz(
 
     while (!got_continue) {
       if (header.done()) { // End of stream reached but not done
-        // file_event_callback_(Event::FileReadyType::Closed);
+        if (events_ & Event::FileReadyType::Closed) {
+          file_event_callback_(Event::FileReadyType::Closed);
+        }
         return;
       } else {
         file_event_callback_(Event::FileReadyType::Read);
@@ -96,11 +99,11 @@ void FuzzedHeader::next() {
   }
 }
 
-Api::SysCallSizeResult FuzzedHeader::read(void* buffer, size_t length, int flags) {
+Api::SysCallSizeResult FuzzedHeader::read(void* buffer, size_t length, bool peek) {
   const size_t len = std::min(size(), length); // Number of bytes to write
   memcpy(buffer, data_.data() + index_, len);
 
-  if (flags != MSG_PEEK) {
+  if (!peek) {
     // If not peeking, written bytes will be marked as read
     index_ += len;
   }

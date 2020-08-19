@@ -31,6 +31,7 @@ private:
   FakeConnectionSocket socket_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::FileReadyCb file_event_callback_;
+  uint32_t events_;
   envoy::config::core::v3::Metadata metadata_;
 };
 
@@ -42,7 +43,7 @@ public:
   void next();
 
   // Copies data into buffer and returns the number of bytes written
-  Api::SysCallSizeResult read(void* buffer, size_t length, int flags);
+  Api::SysCallSizeResult read(void* buffer, size_t length, bool peek);
 
   size_t size();
 
