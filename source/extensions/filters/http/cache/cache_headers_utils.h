@@ -82,9 +82,6 @@ struct ResponseCacheControl {
   OptionalDuration max_age_;
 };
 
-std::ostream& operator<<(std::ostream& os, const OptionalDuration& duration);
-std::ostream& operator<<(std::ostream& os, const RequestCacheControl& request_cache_control);
-std::ostream& operator<<(std::ostream& os, const ResponseCacheControl& response_cache_control);
 bool operator==(const RequestCacheControl& lhs, const RequestCacheControl& rhs);
 bool operator==(const ResponseCacheControl& lhs, const ResponseCacheControl& rhs);
 
@@ -93,6 +90,13 @@ public:
   // Parses header_entry as an HTTP time. Returns SystemTime() if
   // header_entry is null or malformed.
   static SystemTime httpTime(const Http::HeaderEntry* header_entry);
+
+  /**
+   * Read a leading positive decimal integer value and advance "*str" past the
+   * digits read. If overflow occurs, or no digits exist, return
+   * absl::nullopt without advancing "*str".
+   */
+  static absl::optional<uint64_t> readAndRemoveLeadingDigits(absl::string_view& str);
 };
 } // namespace Cache
 } // namespace HttpFilters

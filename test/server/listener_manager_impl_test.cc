@@ -1255,6 +1255,67 @@ filter_chains:
   EXPECT_CALL(*listener_baz_update1, onDestroy());
 }
 
+TEST_F(ListenerManagerImplTest, UpdateActiveToWarmAndBack) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add and initialize foo listener.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
+  checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  // Update foo into warming.
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+per_connection_buffer_limit_bytes: 999
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml), "", true));
+
+  // Should be both active and warming now.
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  // Update foo back to original active, should cause the warming listener to be removed.
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
+
+  checkStats(__LINE__, 1, 2, 0, 0, 1, 0, 0);
+  EXPECT_EQ(0UL, manager_->listeners(ListenerManager::WARMING).size());
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
 TEST_F(ListenerManagerImplTest, AddReusableDrainingListener) {
   InSequence s;
 
@@ -3117,17 +3178,19 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch
     - name: "envoy.filters.listener.tls_inspector"
       typed_config: {}
     filter_chains:
-    - filter_chain_match:
+    - name : foo
+      filter_chain_match:
         transport_protocol: "tls"
-    - filter_chain_match:
+    - name: bar
+      filter_chain_match:
         transport_protocol: "tls"
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
                             EnvoyException,
-                            "error adding listener '127.0.0.1:1234': multiple filter chains with "
-                            "the same matching rules are defined");
+                            "error adding listener '127.0.0.1:1234': filter chain 'bar' has "
+                            "the same matching rules defined as 'foo'");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest,
@@ -3139,18 +3202,19 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
     - name: "envoy.filters.listener.tls_inspector"
       typed_config: {}
     filter_chains:
-    - filter_chain_match:
+    - name: foo
+      filter_chain_match:
         transport_protocol: "tls"
-    - filter_chain_match:
+    - name: bar
+      filter_chain_match:
         transport_protocol: "tls"
         address_suffix: 127.0.0.0
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
-                            EnvoyException,
-                            "error adding listener '127.0.0.1:1234': contains filter chains with "
-                            "unimplemented fields");
+  EXPECT_THROW_WITH_MESSAGE(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), EnvoyException,
+      "error adding listener '127.0.0.1:1234': filter chain 'bar' contains unimplemented fields");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithOverlappingRules) {
@@ -4694,6 +4758,45 @@ filter_chains:
   EXPECT_CALL(*listener_foo_update2, onDestroy());
   worker_->callRemovalCompletion();
   EXPECT_EQ(0UL, manager_->listeners().size());
+}
+
+// This test verifies that on default initialization the UDP Packet Writer
+// is initialized in passthrough mode. (i.e. by using UdpDefaultWriter).
+TEST_F(ListenerManagerImplTest, UdpDefaultWriterConfig) {
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    protocol: UDP
+    port_value: 1234
+filter_chains:
+  filters: []
+    )EOF");
+  manager_->addOrUpdateListener(listener, "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+  Network::SocketSharedPtr listen_socket =
+      manager_->listeners().front().get().listenSocketFactory().getListenSocket();
+  Network::UdpPacketWriterPtr udp_packet_writer =
+      manager_->listeners().front().get().udpPacketWriterFactory()->get().createUdpPacketWriter(
+          listen_socket->ioHandle(), manager_->listeners()[0].get().listenerScope());
+  EXPECT_FALSE(udp_packet_writer->isBatchMode());
+}
+
+TEST_F(ListenerManagerImplTest, TcpBacklogCustomConfig) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: TcpBacklogConfigListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    tcp_backlog_size: 100
+    filter_chains:
+    - filters:
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _));
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+  EXPECT_EQ(100U, manager_->listeners().back().get().tcpBacklogSize());
 }
 
 } // namespace

@@ -80,6 +80,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/common/expr @kyessenov @yangminzhu @lizan
 # webassembly common extension
 /*/extensions/common/wasm @jplevyak @PiotrSikora @lizan
+# common matcher
+/*/extensions/common/matcher @mattklein123 @yangminzhu
 # common crypto extension
 /*/extensions/common/crypto @lizan @PiotrSikora @bdecoste
 /*/extensions/common/proxy_protocol @alyssawilk @wez470

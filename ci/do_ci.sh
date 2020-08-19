@@ -16,7 +16,17 @@ SRCDIR="${PWD}"
 . "$(dirname "$0")"/build_setup.sh $build_setup_args
 cd "${SRCDIR}"
 
+if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+  BUILD_ARCH_DIR="/linux/amd64"
+elif [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]]; then
+  BUILD_ARCH_DIR="/linux/arm64"
+else
+  # Fall back to use the ENVOY_BUILD_ARCH itself.
+  BUILD_ARCH_DIR="/linux/${ENVOY_BUILD_ARCH}"
+fi
+
 echo "building using ${NUM_CPUS} CPUs"
+echo "building for ${ENVOY_BUILD_ARCH}"
 
 function collect_build_profile() {
   declare -g build_profile_count=${build_profile_count:-1}
@@ -52,18 +62,19 @@ function cp_binary_for_outside_access() {
 
 function cp_binary_for_image_build() {
   # TODO(mattklein123): Replace this with caching and a different job which creates images.
+  local BASE_TARGET_DIR="${ENVOY_SRCDIR}${BUILD_ARCH_DIR}"
   echo "Copying binary for image build..."
-  mkdir -p "${ENVOY_SRCDIR}"/build_"$1"
-  cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_"$1"
-  mkdir -p "${ENVOY_SRCDIR}"/build_"$1"_stripped
-  strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_"$1"_stripped/envoy
+  mkdir -p "${BASE_TARGET_DIR}"/build_"$1"
+  cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${BASE_TARGET_DIR}"/build_"$1"
+  mkdir -p "${BASE_TARGET_DIR}"/build_"$1"_stripped
+  strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/build_"$1"_stripped/envoy
 
   # Copy for azp which doesn't preserve permissions, creating a tar archive
-  tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${ENVOY_SRCDIR}" build_"$1" build_"$1"_stripped
+  tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${BASE_TARGET_DIR}" build_"$1" build_"$1"_stripped
 
   # Remove binaries to save space, only if BUILD_REASON exists (running in AZP)
   [[ -z "${BUILD_REASON}" ]] || \
-    rm -rf "${ENVOY_SRCDIR}"/build_"$1" "${ENVOY_SRCDIR}"/build_"$1"_stripped "${ENVOY_DELIVERY_DIR}"/envoy \
+    rm -rf "${BASE_TARGET_DIR}"/build_"$1" "${BASE_TARGET_DIR}"/build_"$1"_stripped "${ENVOY_DELIVERY_DIR}"/envoy \
       bazel-bin/"${ENVOY_BIN}"
 }
 
@@ -99,9 +110,9 @@ function bazel_binary_build() {
 }
 
 CI_TARGET=$1
+shift
 
-if [[ $# -gt 1 ]]; then
-  shift
+if [[ $# -ge 1 ]]; then
   COVERAGE_TEST_TARGETS=$*
   TEST_TARGETS="$COVERAGE_TEST_TARGETS"
 else
@@ -117,7 +128,7 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   # toolchain is kept consistent. This ifdef is checked in
   # test/common/stats/stat_test_utility.cc when computing
   # Stats::TestUtil::MemoryTest::mode().
-  [[ "$(uname -m)" == "x86_64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_MEMORY_TEST_EXACT=true"
+  [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_MEMORY_TEST_EXACT=true"
 
   setup_clang_toolchain
   echo "Testing ${TEST_TARGETS}"
@@ -230,7 +241,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define quiche=enabled \
     --define path_normalization_by_default=true \
     --define deprecated_features=disabled \
-    --define use_legacy_codecs_in_integration_tests=true \
+    --define use_new_codecs_in_integration_tests=true \
   "
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
   setup_clang_toolchain
@@ -283,8 +294,10 @@ elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage
   collect_build_profile coverage
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
+  # clang-tidy will warn on standard library issues with libc++
+  ENVOY_STDLIB="libstdc++"
   setup_clang_toolchain
-  NUM_CPUS=$NUM_CPUS ci/run_clang_tidy.sh
+  NUM_CPUS=$NUM_CPUS ci/run_clang_tidy.sh "$@"
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   # Coverity Scan version 2017.07 fails to analyze the entirely of the Envoy

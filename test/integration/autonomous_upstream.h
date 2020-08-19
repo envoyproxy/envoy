@@ -13,6 +13,8 @@ class AutonomousStream : public FakeStream {
 public:
   // The number of response bytes to send. Payload is randomized.
   static const char RESPONSE_SIZE_BYTES[];
+  // The number of data blocks send.
+  static const char RESPONSE_DATA_BLOCKS[];
   // If set to an integer, the AutonomousStream will expect the response body to
   // be this large.
   static const char EXPECT_REQUEST_SIZE_BYTES[];
@@ -24,11 +26,11 @@ public:
                    AutonomousUpstream& upstream, bool allow_incomplete_streams);
   ~AutonomousStream() override;
 
-  void setEndStream(bool set) override;
+  void setEndStream(bool set) EXCLUSIVE_LOCKS_REQUIRED(lock_) override;
 
 private:
   AutonomousUpstream& upstream_;
-  void sendResponse();
+  void sendResponse() EXCLUSIVE_LOCKS_REQUIRED(lock_);
   const bool allow_incomplete_streams_{false};
 };
 
