@@ -1010,8 +1010,8 @@ private:
   void resetAllStreams(absl::optional<StreamInfo::ResponseFlag> response_flag);
   void onIdleTimeout();
   void onConnectionDurationTimeout();
-  void drainConnection();
-  void startDrainSequence(bool wait_for_timeout = true);
+  void onDrainTimeout();
+  void startDrainSequence();
   Tracing::HttpTracer& tracer() { return *config_.tracer(); }
   void handleCodecError(absl::string_view error);
   void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
