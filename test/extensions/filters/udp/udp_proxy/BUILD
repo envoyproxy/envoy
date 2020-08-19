@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/udp/udp_proxy:udp_proxy_filter_lib",
         "//test/mocks/api:api_mocks",
-        "//test/mocks/network:network_mocks",
+        "//test/mocks/network:socket_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",

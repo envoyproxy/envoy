@@ -7,6 +7,7 @@
 #include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/network/socket.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 

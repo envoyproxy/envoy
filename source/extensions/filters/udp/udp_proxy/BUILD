@@ -22,7 +22,6 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/network:socket_lib",
         "//source/common/network:socket_option_factory_lib",
-        "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
     ],

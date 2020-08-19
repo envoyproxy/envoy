@@ -9,7 +9,6 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/network/socket_impl.h"
 #include "common/network/socket_interface.h"
-#include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
 
 #include "absl/container/flat_hash_set.h"
