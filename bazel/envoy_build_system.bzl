@@ -34,14 +34,14 @@ load(
 )
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
-    "EXTENSION_EXTENSION_PACKAGE_VISIBILITY",
+    "EXTENSION_PACKAGE_VISIBILITY",
 )
 
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
 
 def envoy_extension_package():
-    native.package(default_visibility = EXTENSION_EXTENSION_PACKAGE_VISIBILITY)
+    native.package(default_visibility = EXTENSION_PACKAGE_VISIBILITY)
 
 # A genrule variant that can output a directory. This is useful when doing things like
 # generating a fuzz corpus mechanically.

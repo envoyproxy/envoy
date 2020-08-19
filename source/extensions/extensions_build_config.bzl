@@ -203,4 +203,4 @@ EXTENSIONS = {
 # These can be changed to ["//visibility:public"], for  downstream builds which
 # need to directly reference Envoy extensions.
 EXTENSION_CONFIG_VISIBILITY = ["//:extension_config"]
-EXTENSION_EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library"]
+EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library"]
