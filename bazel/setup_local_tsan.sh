@@ -12,8 +12,8 @@ fi
 
 echo "# Generated file, do not edit. Delete this file if you no longer use local tsan-instrumented libc++
 build:local-tsan --config=libc++
+build:local-tsan --config=clang-tsan
 build:local-tsan --linkopt=-L${LIBCXX_PREFIX}/lib
 build:local-tsan --linkopt=-Wl,-rpath,${LIBCXX_PREFIX}/lib
-build:local-tsan --config=clang-tsan
 " > ${BAZELRC_FILE}
 
