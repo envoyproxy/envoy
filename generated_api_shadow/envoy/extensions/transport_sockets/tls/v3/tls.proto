@@ -60,23 +60,23 @@ message DownstreamTlsContext {
       "envoy.api.v2.auth.DownstreamTlsContext";
 
   enum OcspStaplePolicy {
-    // OCSP responses are optional. Invalid or expired OCSP
-    // responses are rejected at config time. If an OCSP
-    // response expires before a config update, it is no
-    // longer stapled.
-    SKIP_STAPLING_IF_EXPIRED = 0;
+    // OCSP responses are optional. If an OCSP response is absent
+    // or expires, the associated certificate will be used for
+    // subsequent connections without an OCSP staple.
+    LENIENT_STAPLING = 0;
 
-    // OCSP responses are required on all certificates for a
-    // configuration to be deemed valid. If an OCSP response
-    // expires before a config update, subsequent TLS
-    // handshakes for that certificate are aborted.
-    STAPLING_REQUIRED = 1;
+    // OCSP responses are optional. If an OCSP response is absent,
+    // the associated certificate will be used without an
+    // OCSP staple. If a response is provided but expires,
+    // the associated certificate will not be used for
+    // subsequent connections.
+    STRICT_STAPLING = 1;
 
-    // OCSP responses are optional. Invalid or expired OCSP
-    // responses are rejected at config time. If an OCSP
-    // response expires before a config update, subsequent
-    // TLS handshakes for that certificate are aborted.
-    REJECT_CONNECTION_ON_EXPIRED = 2;
+    // OCSP responses are required. Configuration will fail if
+    // a certificate is provided without an OCSP response. If a
+    // response expires, the associated certificate will not be
+    // used for subsequent connections.
+    MUST_STAPLE = 2;
   }
 
   // Common TLS context settings.

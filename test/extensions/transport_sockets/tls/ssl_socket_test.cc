@@ -5253,7 +5253,7 @@ TEST_P(SslSocketTest, TestStaplesOcspResponseSuccess) {
         filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
       ocsp_staple:
         filename: "{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp.der"
-  ocsp_staple_policy: skip_stapling_if_expired
+  ocsp_staple_policy: lenient_stapling
   )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
@@ -5283,7 +5283,7 @@ TEST_P(SslSocketTest, TestNoOcspStapleWhenNotEnabledOnClient) {
         filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
       ocsp_staple:
         filename: "{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp.der"
-  ocsp_staple_policy: stapling_required
+  ocsp_staple_policy: must_staple
   )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
@@ -5306,7 +5306,7 @@ TEST_P(SslSocketTest, TestOcspStapleOmittedOnSkipStaplingAndResponseExpired) {
         filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
       ocsp_staple:
         filename: "{{ test_tmpdir }}/ocsp_test_data/unknown_ocsp_resp.der"
-  ocsp_staple_policy: skip_stapling_if_expired
+  ocsp_staple_policy: lenient_stapling
   )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
@@ -5315,9 +5315,6 @@ TEST_P(SslSocketTest, TestOcspStapleOmittedOnSkipStaplingAndResponseExpired) {
       cipher_suites:
       - TLS_RSA_WITH_AES_128_GCM_SHA256
 )EOF";
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.validate_ocsp_expiration_at_config_time", "false"}});
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setExpectedServerStats("ssl.ocsp_staple_omitted").enableOcspStapling());
 }
@@ -5332,7 +5329,7 @@ TEST_P(SslSocketTest, TestConnectionFailsOnStapleRequiredAndOcspExpired) {
         filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
       ocsp_staple:
         filename: "{{ test_tmpdir }}/ocsp_test_data/unknown_ocsp_resp.der"
-  ocsp_staple_policy: stapling_required
+  ocsp_staple_policy: must_staple
   )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
@@ -5341,9 +5338,6 @@ TEST_P(SslSocketTest, TestConnectionFailsOnStapleRequiredAndOcspExpired) {
       cipher_suites:
       - TLS_RSA_WITH_AES_128_GCM_SHA256
 )EOF";
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.validate_ocsp_expiration_at_config_time", "false"}});
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
   testUtil(test_options.setExpectedServerStats("ssl.ocsp_staple_failed").enableOcspStapling());
 }
@@ -5356,7 +5350,7 @@ TEST_P(SslSocketTest, TestConnectionSucceedsWhenRejectOnExpiredNoOcspResponse) {
         filename: "{{ test_tmpdir }}/ocsp_test_data/good_cert.pem"
       private_key:
         filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
-  ocsp_staple_policy: reject_connection_on_expired
+  ocsp_staple_policy: strict_stapling
   )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
@@ -5379,7 +5373,7 @@ TEST_P(SslSocketTest, TestConnectionFailsWhenRejectOnExpiredAndResponseExpired) 
         filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
       ocsp_staple:
         filename: "{{ test_tmpdir }}/ocsp_test_data/unknown_ocsp_resp.der"
-  ocsp_staple_policy: reject_connection_on_expired
+  ocsp_staple_policy: strict_stapling
   )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
@@ -5389,9 +5383,6 @@ TEST_P(SslSocketTest, TestConnectionFailsWhenRejectOnExpiredAndResponseExpired) 
       - TLS_RSA_WITH_AES_128_GCM_SHA256
 )EOF";
 
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.validate_ocsp_expiration_at_config_time", "false"}});
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
   testUtil(test_options.setExpectedServerStats("ssl.ocsp_staple_failed").enableOcspStapling());
 }
@@ -5406,7 +5397,7 @@ TEST_P(SslSocketTest, TestConnectionFailsWhenCertIsMustStapleAndResponseExpired)
         filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_key.pem"
       ocsp_staple:
         filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_ocsp_resp.der"
-  ocsp_staple_policy: skip_stapling_if_expired
+  ocsp_staple_policy: lenient_stapling
   )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
@@ -5416,9 +5407,6 @@ TEST_P(SslSocketTest, TestConnectionFailsWhenCertIsMustStapleAndResponseExpired)
       - TLS_RSA_WITH_AES_128_GCM_SHA256
 )EOF";
 
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.validate_ocsp_expiration_at_config_time", "false"}});
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
   testUtil(test_options.setExpectedServerStats("ssl.ocsp_staple_failed"));
 }
@@ -5433,7 +5421,7 @@ TEST_P(SslSocketTest, TestConnectionSucceedsForMustStapleCertExpirationValidatio
         filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_key.pem"
       ocsp_staple:
         filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_ocsp_resp.der"
-  ocsp_staple_policy: stapling_required
+  ocsp_staple_policy: must_staple
   )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
@@ -5445,8 +5433,7 @@ TEST_P(SslSocketTest, TestConnectionSucceedsForMustStapleCertExpirationValidatio
 
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.validate_ocsp_expiration_at_config_time", "false"},
-       {"envoy.reloadable_features.validate_ocsp_expiration_on_connection", "false"}});
+      {{"envoy.reloadable_features.validate_ocsp_expiration_on_connection", "false"}});
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   std::string ocsp_response_path = "{{ test_tmpdir }}/ocsp_test_data/revoked_ocsp_resp.der";
@@ -5465,7 +5452,7 @@ TEST_P(SslSocketTest, TestConnectionSucceedsForMustStapleCertNoValidationNoRespo
         filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_cert.pem"
       private_key:
         filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_key.pem"
-  ocsp_staple_policy: skip_stapling_if_expired
+  ocsp_staple_policy: lenient_stapling
   )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
@@ -5478,7 +5465,6 @@ TEST_P(SslSocketTest, TestConnectionSucceedsForMustStapleCertNoValidationNoRespo
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.require_ocsp_response_for_must_staple_certs", "false"},
-       {"envoy.reloadable_features.validate_ocsp_expiration_at_config_time", "false"},
        {"envoy.reloadable_features.validate_ocsp_expiration_on_connection", "false"}});
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setExpectedServerStats("ssl.ocsp_staple_omitted")
@@ -5502,7 +5488,7 @@ TEST_P(SslSocketTest, TestFilterMultipleCertsFilterByOcspPolicyFallbackOnFirst) 
         filename: "{{ test_tmpdir }}/ocsp_test_data/ecdsa_key.pem"
       ocsp_staple:
         filename: "{{ test_tmpdir }}/ocsp_test_data/ecdsa_ocsp_resp.der"
-  ocsp_staple_policy: stapling_required
+  ocsp_staple_policy: must_staple
   )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
@@ -5513,9 +5499,6 @@ TEST_P(SslSocketTest, TestFilterMultipleCertsFilterByOcspPolicyFallbackOnFirst) 
       - TLS_RSA_WITH_AES_128_GCM_SHA256
 )EOF";
 
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.validate_ocsp_expiration_at_config_time", "false"}});
   std::string ocsp_response_path = "{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp.der";
   std::string expected_response =
       TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ocsp_response_path));
@@ -5541,7 +5524,7 @@ TEST_P(SslSocketTest, TestConnectionFailsOnMultipleCertificatesNonePassOcspPolic
         filename: "{{ test_tmpdir }}/ocsp_test_data/ecdsa_key.pem"
       ocsp_staple:
         filename: "{{ test_tmpdir }}/ocsp_test_data/ecdsa_ocsp_resp.der"
-  ocsp_staple_policy: stapling_required
+  ocsp_staple_policy: must_staple
   )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
@@ -5552,9 +5535,6 @@ TEST_P(SslSocketTest, TestConnectionFailsOnMultipleCertificatesNonePassOcspPolic
       - TLS_RSA_WITH_AES_128_GCM_SHA256
 )EOF";
 
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.validate_ocsp_expiration_at_config_time", "false"}});
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
   testUtil(test_options.setExpectedServerStats("ssl.ocsp_staple_failed").enableOcspStapling());
 }

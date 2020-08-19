@@ -484,14 +484,12 @@ Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePo
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::OcspStaplePolicy&
         policy) {
   switch (policy) {
-  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
-      SKIP_STAPLING_IF_EXPIRED:
-    return Ssl::ServerContextConfig::OcspStaplePolicy::SkipStaplingIfExpired;
-  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::STAPLING_REQUIRED:
-    return Ssl::ServerContextConfig::OcspStaplePolicy::StaplingRequired;
-  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
-      REJECT_CONNECTION_ON_EXPIRED:
-    return Ssl::ServerContextConfig::OcspStaplePolicy::RejectConnectionOnExpired;
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::LENIENT_STAPLING:
+    return Ssl::ServerContextConfig::OcspStaplePolicy::LenientStapling;
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::STRICT_STAPLING:
+    return Ssl::ServerContextConfig::OcspStaplePolicy::StrictStapling;
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::MUST_STAPLE:
+    return Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

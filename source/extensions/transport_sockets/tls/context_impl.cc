@@ -796,8 +796,8 @@ absl::optional<uint64_t> ContextImpl::secondsUntilFirstOcspResponseExpires() con
   for (auto& ctx : tls_contexts_) {
     if (ctx.ocsp_response_) {
       uint64_t next_expiration = ctx.ocsp_response_->secondsUntilExpiration();
-      secs_until_expiration = std::min<uint64_t>(next_expiration,
-          secs_until_expiration.value_or(std::numeric_limits<uint64_t>::max()));
+      secs_until_expiration = std::min<uint64_t>(
+          next_expiration, secs_until_expiration.value_or(std::numeric_limits<uint64_t>::max()));
     }
   }
 
@@ -1102,18 +1102,13 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
           ctx.is_must_staple_) {
         throw EnvoyException("OCSP response is required for must-staple certificate");
       }
-      if (ocsp_staple_policy_ == Ssl::ServerContextConfig::OcspStaplePolicy::StaplingRequired) {
+      if (ocsp_staple_policy_ == Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple) {
         throw EnvoyException("Required OCSP response is missing from TLS context");
       }
     } else {
       auto response = std::make_unique<Ocsp::OcspResponseWrapper>(ocsp_resp_bytes, time_source_);
       if (!response->matchesCertificate(*ctx.cert_chain_)) {
         throw EnvoyException("OCSP response does not match its TLS certificate");
-      }
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.validate_ocsp_expiration_at_config_time") &&
-          response->isExpired()) {
-        throw EnvoyException("OCSP response has expired as of config time");
       }
       ctx.ocsp_response_ = std::move(response);
     }
@@ -1401,12 +1396,12 @@ OcspStapleAction ServerContextImpl::passesOcspPolicy(const ContextImpl::TlsConte
 
   // `response` is either not present or expired, and the action depends on the policy.
   switch (ocsp_staple_policy_) {
-  case Ssl::ServerContextConfig::OcspStaplePolicy::SkipStaplingIfExpired:
+  case Ssl::ServerContextConfig::OcspStaplePolicy::LenientStapling:
     return OcspStapleAction::NoStaple;
-  case Ssl::ServerContextConfig::OcspStaplePolicy::StaplingRequired:
-    return OcspStapleAction::Fail;
-  case Ssl::ServerContextConfig::OcspStaplePolicy::RejectConnectionOnExpired:
+  case Ssl::ServerContextConfig::OcspStaplePolicy::StrictStapling:
     return response ? OcspStapleAction::Fail : OcspStapleAction::NoStaple;
+  case Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple:
+    return OcspStapleAction::Fail;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

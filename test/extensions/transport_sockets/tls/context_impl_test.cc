@@ -596,7 +596,7 @@ TEST_F(SslServerContextImplOcspTest, TestFilenameOcspStapleConfigLoads) {
         filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
       ocsp_staple:
         filename: "{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp.der"
-  ocsp_staple_policy: stapling_required
+  ocsp_staple_policy: must_staple
   )EOF";
   loadConfigYaml(tls_context_yaml);
 }
@@ -614,7 +614,7 @@ TEST_F(SslServerContextImplOcspTest, TestInlineBytesOcspStapleConfigLoads) {
         filename: "{{{{ test_tmpdir }}}}/ocsp_test_data/good_key.pem"
       ocsp_staple:
        inline_bytes: "{}"
-  ocsp_staple_policy: stapling_required
+  ocsp_staple_policy: must_staple
   )EOF",
                                                    base64_response);
 
@@ -634,7 +634,7 @@ TEST_F(SslServerContextImplOcspTest, TestInlineStringOcspStapleConfigLoads) {
         filename: "{{{{ test_tmpdir }}}}/ocsp_test_data/good_key.pem"
       ocsp_staple:
        inline_string: "{}"
-  ocsp_staple_policy: stapling_required
+  ocsp_staple_policy: must_staple
   )EOF",
                                                    base64_response);
 
@@ -651,28 +651,11 @@ TEST_F(SslServerContextImplOcspTest, TestMismatchedOcspStapleConfigFails) {
         filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_key.pem"
       ocsp_staple:
         filename: "{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp.der"
-  ocsp_staple_policy: stapling_required
+  ocsp_staple_policy: must_staple
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(tls_context_yaml), EnvoyException,
                             "OCSP response does not match its TLS certificate");
-}
-
-TEST_F(SslServerContextImplOcspTest, TestExpiredOcspStapleConfigFails) {
-  const std::string tls_context_yaml = R"EOF(
-  common_tls_context:
-    tls_certificates:
-    - certificate_chain:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_cert.pem"
-      private_key:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_key.pem"
-      ocsp_staple:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_ocsp_resp.der"
-  ocsp_staple_policy: skip_stapling_if_expired
-  )EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(tls_context_yaml), EnvoyException,
-                            "OCSP response has expired as of config time");
 }
 
 TEST_F(SslServerContextImplOcspTest, TestStaplingRequiredWithoutStapleConfigFails) {
@@ -683,7 +666,7 @@ TEST_F(SslServerContextImplOcspTest, TestStaplingRequiredWithoutStapleConfigFail
         filename: "{{ test_tmpdir }}/ocsp_test_data/good_cert.pem"
       private_key:
         filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
-  ocsp_staple_policy: stapling_required
+  ocsp_staple_policy: must_staple
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(tls_context_yaml), EnvoyException,
@@ -709,7 +692,7 @@ TEST_F(SslServerContextImplOcspTest, TestUnsuccessfulOcspResponseConfigFails) {
         filename: "{{{{ test_tmpdir }}}}/ocsp_test_data/good_key.pem"
       ocsp_staple:
        inline_bytes: "{}"
-  ocsp_staple_policy: stapling_required
+  ocsp_staple_policy: must_staple
   )EOF",
                                                    base64_response);
 
@@ -725,7 +708,7 @@ TEST_F(SslServerContextImplOcspTest, TestMustStapleCertWithoutStapleConfigFails)
         filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_cert.pem"
       private_key:
         filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_key.pem"
-  ocsp_staple_policy: skip_stapling_if_expired
+  ocsp_staple_policy: lenient_stapling
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(tls_context_yaml), EnvoyException,
@@ -740,7 +723,7 @@ TEST_F(SslServerContextImplOcspTest, TestMustStapleCertWithoutStapleFeatureFlagO
         filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_cert.pem"
       private_key:
         filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_key.pem"
-  ocsp_staple_policy: skip_stapling_if_expired
+  ocsp_staple_policy: lenient_stapling
   )EOF";
 
   TestScopedRuntime scoped_runtime;
