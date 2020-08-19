@@ -56,6 +56,8 @@ private:
   void removeListener(const std::string& listener_name);
   void addRoute(const std::string& route_name);
 
+  void logState();
+
   void verifyState();
   void verifyListeners();
   void verifyRoutes();
