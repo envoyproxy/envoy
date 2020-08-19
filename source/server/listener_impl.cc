@@ -228,8 +228,8 @@ Init::Manager& ListenerFactoryContextBaseImpl::initManager() { NOT_IMPLEMENTED_G
 
 // Since we use non-virtual function of listenerImpl, we can not make the rebuilder a virtual class.
 PerFilterChainRebuilder::PerFilterChainRebuilder(
-    ListenerImpl& listener, const envoy::config::listener::v3::FilterChain* const& filter_chain)
-    : listener_(listener), filter_chain_(filter_chain),
+    ListenerImpl& listener, const envoy::config::listener::v3::FilterChain* const& filter_chain,
+    Configuration::FactoryContext& factory_context) : listener_(listener), filter_chain_(filter_chain), parent_context_(factory_context),
       rebuild_init_manager_(std::make_unique<Init::ManagerImpl>("rebuild_init_manager")),
       rebuild_watcher_(
           "rebuild_watcher",
@@ -247,6 +247,13 @@ PerFilterChainRebuilder::~PerFilterChainRebuilder() = default;
 
 void PerFilterChainRebuilder::storeWorkerInCallbackList(const std::string& worker_name) {
   workers_to_callback_.insert(worker_name);
+}
+
+Configuration::FilterChainFactoryContextPtr PerFilterChainRebuilder::createFilterChainFactoryContext(
+    const ::envoy::config::listener::v3::FilterChain* const filter_chain) {
+  // TODO(lambdai): add stats
+  UNREFERENCED_PARAMETER(filter_chain);
+  return std::make_unique<PerFilterChainFactoryContextImpl>(parent_context_, initManager());
 }
 
 void PerFilterChainRebuilder::callbackToWorkers(bool success) {
@@ -573,7 +580,7 @@ void ListenerImpl::rebuildFilterChain(
   if (filter_chain_rebuilder_map_.find(filter_chain_message) == filter_chain_rebuilder_map_.end()) {
     ENVOY_LOG(debug, "filter chain rebuilder not found, create a rebuilder and start rebuilding.");
     filter_chain_rebuilder_map_[filter_chain_message] =
-        std::make_unique<PerFilterChainRebuilder>(*this, filter_chain_message);
+        std::make_unique<PerFilterChainRebuilder>(*this, filter_chain_message, listener_factory_context_->parentFactoryContext());
     should_start_rebuilding = true;
   }
 
@@ -596,7 +603,7 @@ void ListenerImpl::rebuildFilterChain(
     // failure signal.
     filter_chain_rebuilder_map_.erase(filter_chain_message);
     filter_chain_rebuilder_map_[filter_chain_message] =
-        std::make_unique<PerFilterChainRebuilder>(*this, filter_chain_message);
+        std::make_unique<PerFilterChainRebuilder>(*this, filter_chain_message, listener_factory_context_->parentFactoryContext());
     should_start_rebuilding = true;
   }
 
@@ -613,7 +620,7 @@ void ListenerImpl::rebuildFilterChain(
     // Use init manager of the rebuilder to request dependencies.
     transport_factory_context.setInitManager(rebuilder->initManager());
     ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
-    filter_chain_manager_.rebuildFilterChain(filter_chain_message, builder, filter_chain_manager_);
+    filter_chain_manager_.rebuildFilterChain(filter_chain_message, builder, *rebuilder);
     // Start initializing after passing init manager to transport factory context.
     ENVOY_LOG(debug, "start rebuilding filter chain");
     rebuilder->startRebuilding();

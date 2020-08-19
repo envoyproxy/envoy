@@ -269,9 +269,9 @@ void FilterChainManagerImpl::rebuildFilterChain(
 
 void FilterChainManagerImpl::stopRebuildingFilterChain(
     const envoy::config::listener::v3::FilterChain* const& filter_chain) {
-  auto placeholder = fc_contexts_[*filter_chain];
-  if (placeholder != nullptr) {
-    placeholder->backToPlaceholder();
+  auto rebuilt_placeholder = fc_contexts_[*filter_chain];
+  if (rebuilt_placeholder != nullptr) {
+    rebuilt_placeholder->backToPlaceholder();
   } else {
     ENVOY_LOG(debug, "filter chain placeholder is not found.");
   }
