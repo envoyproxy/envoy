@@ -23,7 +23,6 @@
 #include "common/http/utility.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
-#include "extensions/filters/http/oauth2/filter.h"
 #include "extensions/filters/http/oauth2/oauth.h"
 #include "extensions/filters/http/oauth2/oauth_client.h"
 
