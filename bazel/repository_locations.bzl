@@ -345,10 +345,13 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         cpe = "cpe:2.3:a:gnu:zlib:*",
     ),
     com_github_zlib_ng_zlib_ng = dict(
-        sha256 = "eb1b3a33855e8994ee89901e74ca4317f3bff93d2e0f3fc5a11e655a78a73092",
-        strip_prefix = "zlib-ng-8832d7db7241194fa68509c96c092f3cf527ccce",
-        # 2020-08-03 develop branch.
-        urls = ["https://github.com/zlib-ng/zlib-ng/archive/8832d7db7241194fa68509c96c092f3cf527ccce.tar.gz"],
+        project_name = "zlib-ng",
+        project_url = "https://github.com/zlib-ng/zlib-ng",
+        version = "193d8fd7dfb7927facab7a3034daa27ad5b9df1c",
+        sha256 = "5fe543e8d007b9e7b729f3d6b3a5ee1f9b68d0eef5f6af1393745a4dcd472a98",
+        strip_prefix = "zlib-ng-193d8fd7dfb7927facab7a3034daa27ad5b9df1c",
+        # 2020-08-16 develop branch.
+        urls = ["https://github.com/zlib-ng/zlib-ng/archive/193d8fd7dfb7927facab7a3034daa27ad5b9df1c.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
