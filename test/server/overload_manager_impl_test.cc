@@ -54,6 +54,7 @@ public:
     if (update_async_) {
       ASSERT(callbacks_.has_value());
       publishUpdate(*callbacks_);
+      callbacks_.reset();
     }
   }
 
@@ -103,8 +104,8 @@ protected:
   OverloadManagerImplTest()
       : factory1_("envoy.resource_monitors.fake_resource1"),
         factory2_("envoy.resource_monitors.fake_resource2"),
-        factory3_("envoy.resource_monitors.fake_resource3"), register_factory1_(factory1_),
-        register_factory2_(factory2_), register_factory3_(factory3_),
+        factory3_("envoy.resource_monitors.fake_resource3"), factory4_("envoy.resource_monitors.fake_resource4"), register_factory1_(factory1_),
+        register_factory2_(factory2_), register_factory3_(factory3_),register_factory4_(factory4_),
         api_(Api::createApiForTest(stats_)) {}
 
   void setDispatcherExpectation() {
@@ -136,6 +137,9 @@ protected:
       resource_monitors {
         name: "envoy.resource_monitors.fake_resource3"
       }
+      resource_monitors {
+        name: "envoy.resource_monitors.fake_resource4"
+      }
       actions {
         name: "envoy.overload_actions.dummy_action"
         triggers {
@@ -157,6 +161,13 @@ protected:
             saturation_threshold: 0.8
           }
         }
+        triggers {
+          name: "envoy.resource_monitors.fake_resource4"
+          scaled {
+            scaling_threshold: 0.5
+            saturation_threshold: 0.8
+          }
+        }
       }
     )EOF";
   }
@@ -169,9 +180,11 @@ protected:
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Struct> factory1_;
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory2_;
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory3_;
+  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory4_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory1_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory2_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory3_;
+  Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory4_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Event::MockTimer>* timer_; // not owned
   Stats::TestUtil::TestStore stats_;
@@ -370,6 +383,30 @@ TEST_F(OverloadManagerImplTest, AggregatesMultipleResourceUpdates) {
   // Once the last monitor publishes, the change to the action takes effect.
   factory1_.monitor_->publishUpdate();
   EXPECT_TRUE(action_state.isSaturated());
+}
+
+TEST_F(OverloadManagerImplTest, DelayedUpdatesAreCoalesced) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(getConfig()));
+  manager->start();
+
+  const OverloadActionState& action_state =
+      manager->getThreadLocalOverloadState().getState("envoy.overload_actions.dummy_action");
+
+  factory3_.monitor_->setUpdateAsync(true);
+  factory4_.monitor_->setUpdateAsync(true);
+
+  timer_cb_();
+  // When monitor 3 publishes its update, the action won't be visible to the thread-local state
+  factory3_.monitor_->setPressure(0.6);
+  factory3_.monitor_->publishUpdate();
+  EXPECT_EQ(action_state.value(), 0.0);
+
+  // Now when monitor 4 publishes a larger value, the update from monitor 3 is skipped.
+  EXPECT_FALSE(action_state.isSaturated());
+  factory4_.monitor_->setPressure(0.65);
+  factory4_.monitor_->publishUpdate();
+  EXPECT_EQ(action_state.value(), 0.5 /* = (0.65 - 0.5) / (0.8 - 0.5) */);
 }
 
 TEST_F(OverloadManagerImplTest, FlushesUpdatesEvenWithOneUnresponsive) {
