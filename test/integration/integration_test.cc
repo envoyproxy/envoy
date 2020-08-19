@@ -1432,7 +1432,7 @@ TEST_P(IntegrationTest, Response204WithBody) {
   // should still see a response.
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "204"}}, false);
   upstream_request_->encodeData(512, true);
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
   response->waitForEndStream();
 

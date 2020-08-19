@@ -477,8 +477,6 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
     : connection_(connection), stats_(stats),
       header_key_formatter_(std::move(header_key_formatter)), processing_trailers_(false),
       handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
-      connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.connection_header_sanitization")),
       enable_trailers_(enable_trailers),
       strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
@@ -911,7 +909,7 @@ Envoy::StatusOr<int> ServerConnectionImpl::onHeadersComplete() {
     ENVOY_CONN_LOG(trace, "Server: onHeadersComplete size={}", connection_, headers->size());
     const char* method_string = http_method_str(static_cast<http_method>(parser_.method));
 
-    if (!handling_upgrade_ && connection_header_sanitization_ && headers->Connection()) {
+    if (!handling_upgrade_ && headers->Connection()) {
       // If we fail to sanitize the request, return a 400 to the client
       if (!Utility::sanitizeConnectionHeader(*headers)) {
         absl::string_view header_value = headers->getConnectionValue();

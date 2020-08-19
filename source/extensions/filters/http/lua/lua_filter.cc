@@ -12,6 +12,8 @@
 #include "common/crypto/utility.h"
 #include "common/http/message_impl.h"
 
+#include "absl/strings/escaping.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -555,25 +557,30 @@ int StreamHandleWrapper::luaLogCritical(lua_State* state) {
 }
 
 int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
-  // Step 1: get hash function
+  // Step 1: Get hash function.
   absl::string_view hash = luaL_checkstring(state, 2);
 
-  // Step 2: get key pointer
-  auto ptr = lua_touserdata(state, 3);
+  // Step 2: Get the key pointer.
+  auto key = luaL_checkstring(state, 3);
+  auto ptr = public_key_storage_.find(key);
+  if (ptr == public_key_storage_.end()) {
+    luaL_error(state, "invalid public key");
+    return 0;
+  }
 
-  // Step 3: get signature
+  // Step 3: Get signature from args.
   const char* signature = luaL_checkstring(state, 4);
   int sig_len = luaL_checknumber(state, 5);
   const std::vector<uint8_t> sig_vec(signature, signature + sig_len);
 
-  // Step 4: get clear text
+  // Step 4: Get clear text from args.
   const char* clear_text = luaL_checkstring(state, 6);
   int text_len = luaL_checknumber(state, 7);
   const std::vector<uint8_t> text_vec(clear_text, clear_text + text_len);
-  // Step 5: verify signature
-  auto crypto = reinterpret_cast<Envoy::Common::Crypto::CryptoObject*>(ptr);
+
+  // Step 5: Verify signature.
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  auto output = crypto_util.verifySignature(hash, *crypto, sig_vec, text_vec);
+  auto output = crypto_util.verifySignature(hash, *ptr->second, sig_vec, text_vec);
   lua_pushboolean(state, output.result_);
   if (output.result_) {
     lua_pushnil(state);
@@ -593,8 +600,28 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
   } else {
     auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
     Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr = crypto_util.importPublicKey(key);
-    public_key_wrapper_.reset(PublicKeyWrapper::create(state, std::move(crypto_ptr)), true);
+    auto wrapper = Envoy::Common::Crypto::Access::getTyped<Envoy::Common::Crypto::PublicKeyObject>(
+        *crypto_ptr);
+    EVP_PKEY* pkey = wrapper->getEVP_PKEY();
+    if (pkey == nullptr) {
+      // TODO(dio): Call luaL_error here instead of failing silently. However, the current behavior
+      // is to return nil (when calling get() to the wrapped object, hence we create a wrapper
+      // initialized by an empty string here) when importing a public key is failed.
+      public_key_wrapper_.reset(PublicKeyWrapper::create(state, EMPTY_STRING), true);
+    }
+
+    public_key_storage_.insert({std::string(str).substr(0, n), std::move(crypto_ptr)});
+    public_key_wrapper_.reset(PublicKeyWrapper::create(state, str), true);
   }
+
+  return 1;
+}
+
+int StreamHandleWrapper::luaBase64Escape(lua_State* state) {
+  // Get input string.
+  absl::string_view input = luaL_checkstring(state, 2);
+  auto output = absl::Base64Escape(input);
+  lua_pushlstring(state, output.data(), output.length());
 
   return 1;
 }
