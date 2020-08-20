@@ -192,6 +192,17 @@ following are the command line options that Envoy supports.
   more. The administration interface usage is similar. Please see `Administration interface 
   <https://www.envoyproxy.io/docs/envoy/latest/operations/admin>`_ for more detail.
 
+.. option:: --socket-path <path string>
+
+  *(optional)* The output file path where the socket address will be created for
+  :ref:`hot restart <arch_overview_hot_restart>`.
+
+.. option:: --socket-mode <integer>
+
+  *(optional)* The socket file permission for :ref:`hot restart <arch_overview_hot_restart>`.
+  The range of value is from 000 to 777(Octal number).
+  This flag may not used when :option:`--socket-path` is "abstract namespace" or not set.
+
 .. option:: --hot-restart-version
 
   *(optional)* Outputs an opaque hot restart compatibility version for the binary. This can be

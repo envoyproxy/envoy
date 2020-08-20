@@ -270,7 +270,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   socket_path_ = socket_path.getValue();
-  socket_mode_ = socket_mode.getValue();
+  socket_mode_ = StringUtil::octalToDecimal(socket_mode.getValue());
 
   if (drain_strategy.getValue() == "immediate") {
     drain_strategy_ = Server::DrainStrategy::Immediate;

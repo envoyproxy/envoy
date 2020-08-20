@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sys/stat.h>
+
 #include <chrono>
 #include <cstdint>
 #include <string>
