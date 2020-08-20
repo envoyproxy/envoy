@@ -117,6 +117,7 @@ SplitRequestPtr SimpleRequest::create(Router& router,
   }
 
   if (!request_ptr->handle_) {
+    command_stats.error_.inc();
     callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
     return nullptr;
   }
@@ -203,6 +204,7 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
     }
 
     if (!pending_request.handle_) {
+      command_stats.error_.inc();
       pending_request.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
     }
   }
@@ -281,6 +283,7 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
     }
 
     if (!pending_request.handle_) {
+      command_stats.error_.inc();
       pending_request.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
     }
   }
@@ -352,6 +355,7 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
     }
 
     if (!pending_request.handle_) {
+      command_stats.error_.inc();
       pending_request.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
     }
   }
