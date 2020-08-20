@@ -73,7 +73,7 @@ bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& heade
   // need to implement the logic for using an allowlist.
   // TODO(cbdm): "vary: accept-encoding" could be treated in the cache; we can encode (decode) the
   // content to the accepted format the user specified. This way we wouldn't need to store different
-  // versions for this header, and could simply convert to that format and serve.
+  // versions for this payload, and could simply convert to that format and serve.
   const Envoy::Http::HeaderEntry* vary_header = headers.get(Http::Headers::get().Vary);
   const bool no_vary = ((!vary_header) || (vary_header->value().empty()));
 
