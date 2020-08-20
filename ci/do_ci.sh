@@ -60,12 +60,24 @@ function cp_binary_for_outside_access() {
     "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}"
 }
 
+function cp_debug_info_for_outside_access() {
+  DELIVERY_LOCATION="$1"
+  cp -f \
+    bazel-bin/"${ENVOY_BIN}".dwp \
+    "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}".dwp
+}
+
+
 function cp_binary_for_image_build() {
   # TODO(mattklein123): Replace this with caching and a different job which creates images.
   local BASE_TARGET_DIR="${ENVOY_SRCDIR}${BUILD_ARCH_DIR}"
   echo "Copying binary for image build..."
+  COMPILE_TYPE="$2"
   mkdir -p "${BASE_TARGET_DIR}"/build_"$1"
   cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${BASE_TARGET_DIR}"/build_"$1"
+  if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
+    cp -f "${ENVOY_DELIVERY_DIR}"/envoy.dwp "${BASE_TARGET_DIR}"/build_"$1"
+  fi
   mkdir -p "${BASE_TARGET_DIR}"/build_"$1"_stripped
   strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/build_"$1"_stripped/envoy
 
@@ -106,7 +118,16 @@ function bazel_binary_build() {
   # container.
   cp_binary_for_outside_access envoy
 
-  cp_binary_for_image_build "${BINARY_TYPE}"
+  if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
+    # Generate dwp file for debugging since we used split DWARF to reduce binary
+    # size
+    bazel build ${BAZEL_BUILD_OPTIONS} -c "${COMPILE_TYPE}" "${ENVOY_BUILD_DEBUG_INFORMATION}" ${CONFIG_ARGS}
+    # Copy the debug information
+    cp_debug_info_for_outside_access envoy
+  fi
+
+  cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}"
+
 }
 
 CI_TARGET=$1

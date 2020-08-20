@@ -32,7 +32,6 @@ envoy_extension_cc_test(
         "compressor_filter_integration_test.cc",
     ],
     extension_name = "envoy.filters.http.compressor",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/compression/gzip/compressor:config",
         "//source/extensions/compression/gzip/decompressor:config",

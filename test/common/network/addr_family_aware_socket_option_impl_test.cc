@@ -3,7 +3,7 @@
 
 #include "common/network/addr_family_aware_socket_option_impl.h"
 #include "common/network/io_socket_handle_impl.h"
-#include "common/network/socket_interface_impl.h"
+#include "common/network/socket_interface.h"
 #include "common/network/utility.h"
 
 #include "test/common/network/socket_option_test.h"
