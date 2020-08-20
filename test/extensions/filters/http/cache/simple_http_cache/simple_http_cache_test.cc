@@ -216,6 +216,35 @@ TEST(Registration, GetFactory) {
   EXPECT_EQ(factory->getCache(config).cacheInfo().name_, "envoy.extensions.http.cache.simple");
 }
 
+TEST_F(SimpleHttpCacheTest, VaryResponses) {
+  // Responses will vary on accept-encoding.
+  const std::string RequestPath("some-resource");
+  Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
+                                                   {"cache-control", "public,max-age=3600"},
+                                                   {"vary", "accept-encoding"}};
+
+  // First request with no value for the varied header.
+  LookupContextPtr no_value_vary = lookup(RequestPath);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+  const std::string Body1("accept-encoding is empty");
+  insert(move(no_value_vary), response_headers, Body1);
+  no_value_vary = lookup(RequestPath);
+  EXPECT_TRUE(expectLookupSuccessWithBody(no_value_vary.get(), Body1));
+
+  // Second request with a different value for the varied header.
+  request_headers_.setCopy(Http::LowerCaseString("accept-encoding"), "gzip");
+  LookupContextPtr some_value_vary = lookup(RequestPath);
+  // Should miss because we don't have this version of the response saved yet.
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+  // Add second version and make sure we receive the correct one..
+  const std::string Body2("accept-encoding is gzip");
+  insert(move(some_value_vary), response_headers, Body2);
+  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(RequestPath).get(), Body2));
+
+  // Looks up first version again to be sure it wasn't replaced with the second one.
+  EXPECT_TRUE(expectLookupSuccessWithBody(no_value_vary.get(), Body1));
+}
+
 } // namespace
 } // namespace Cache
 } // namespace HttpFilters
