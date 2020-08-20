@@ -513,7 +513,6 @@ transport_socket:
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection));
 
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(1);
-  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
   // Carry over cluster name on a call to createClusterInfo,
   // in the same way that the prod factory does.
   bool valid = false;
