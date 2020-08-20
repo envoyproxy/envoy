@@ -445,8 +445,11 @@ TEST_P(SimulatedTimeSystemTest, DuplicateTimer) {
   zero_timer->enableTimer(delay);
   advanceMsAndLoop(1);
   EXPECT_EQ("2", output_);
+}
 
-  // Now set an alarm which requires 10ms of progress and make sure waitFor works.
+// Regression test for issues documented in https://github.com/envoyproxy/envoy/pull/6956
+TEST_P(SimulatedTimeSystemTest, DuplicateTimer2) {
+  // Now set an alarm which requires 10s of progress and make sure advanceTimeWait and waitFor works.
   absl::Mutex mutex;
   bool done(false);
   auto thread = Thread::threadFactoryForTest().createThread([this, &mutex, &done]() {

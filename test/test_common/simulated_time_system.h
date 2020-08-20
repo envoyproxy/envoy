@@ -63,12 +63,12 @@ private:
   class SimulatedScheduler;
   class Alarm;
 
-  void addScheduler(SimulatedScheduler* scheduler) {
+  void registerScheduler(SimulatedScheduler* scheduler) {
     absl::MutexLock lock(&mutex_);
     schedulers_.insert(scheduler);
   }
 
-  void removeScheduler(SimulatedScheduler* scheduler) {
+  void unregisterScheduler(SimulatedScheduler* scheduler) {
     absl::MutexLock lock(&mutex_);
     schedulers_.erase(scheduler);
   }
@@ -84,15 +84,15 @@ private:
   void setMonotonicTimeLockHeld(const MonotonicTime& monotonic_time)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  // Keeps track of how many alarms have been activated but not yet called,
-  // which helps waitFor() determine when to give up and declare a timeout.
+  // Keeps track of the number of simulated schedulers that have pending monotonic time updates.
+  // Used by advanceTimeWait() to determine when the time updates have finished propagating.
   void incPending() {
     absl::MutexLock lock(&mutex_);
-    ++pending_alarms_;
+    ++pending_updates_;
   }
   void decPending() {
     absl::MutexLock lock(&mutex_);
-    --pending_alarms_;
+    --pending_updates_;
   }
   void waitForNoPendingLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
@@ -102,7 +102,7 @@ private:
   TestRandomGenerator random_source_ ABSL_GUARDED_BY(mutex_);
   std::set<SimulatedScheduler*> schedulers_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
-  uint32_t pending_alarms_ ABSL_GUARDED_BY(mutex_);
+  uint32_t pending_updates_ ABSL_GUARDED_BY(mutex_);
 };
 
 // Represents a simulated time system, where time is advanced by calling
