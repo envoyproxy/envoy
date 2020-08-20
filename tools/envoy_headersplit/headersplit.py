@@ -83,8 +83,7 @@ def get_directives(translation_unit: Type[TranslationUnit]) -> str:
   for descendant in cursor.walk_preorder():
     if descendant.location.file is not None and descendant.location.file.name == cursor.displayname:
       filename = descendant.location.file.name
-      with open(filename, "r") as source_file:
-        contents = source_file.read()
+      contents = read_file_contents(filename)
       return contents[:descendant.extent.start.offset]
   return ""
 
@@ -178,8 +177,7 @@ def extract_definition(cursor: Cursor, classnames: List[str]) -> Tuple[str, str,
         manually.
     """
   filename = cursor.location.file.name
-  with open(filename, "r") as source_file:
-    contents = source_file.read()
+  contents = read_file_contents(filename)
   class_name = cursor.spelling
   class_defn = contents[cursor.extent.start.offset:cursor.extent.end.offset] + ";"
   # need to know enclosing semantic parents (namespaces)
@@ -196,7 +194,6 @@ def extract_definition(cursor: Cursor, classnames: List[str]) -> Tuple[str, str,
   for classname in classnames:
     if classname in class_defn and classname != class_name:
       deps.add(classname)
-
   return class_name, class_defn, deps
 
 
@@ -242,7 +239,6 @@ def extract_implementations(impl_cursors: List[Cursor], source_code: str) -> Dic
     classname = cursor.semantic_parent.spelling
     # get first line of function body
     implline = get_implline(cursor)
-
     # get last line of function body
     if i + 1 < len(impl_cursors):
       # i is not the last method, get the start line for the next method
@@ -306,14 +302,15 @@ def get_enclosing_namespace(defn: Cursor) -> Tuple[str, str]:
   namespace_suffix += "\n"
   return namespace_prefix, namespace_suffix
 
+def read_file_contents(path):
+    with open(path, "r") as input_file:
+      return input_file.read()
 
 def write_file_contents(class_name, class_defn, class_impl):
   with open("{}.h".format(to_filename(class_name)), "w") as decl_file:
     decl_file.write(class_defn)
-
   with open("{}.cc".format(to_filename(class_name)), "w") as impl_file:
     impl_file.write(class_impl)
-
   # generating bazel build file, need to fill dependency manually
   bazel_text = """
 envoy_cc_mock(
@@ -335,36 +332,24 @@ def main(args):
     """
   decl_filename = args["decl"]
   impl_filename = args["impl"]
-
   idx = Index.create()
-
   impl_translation_unit = TranslationUnit.from_source(
       impl_filename, options=TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
-
   impl_includes = get_directives(impl_translation_unit)
-
   decl_translation_unit = idx.parse(decl_filename, ["-x", "c++"])
   defns = class_definitions(decl_translation_unit.cursor)
   decl_includes = get_directives(decl_translation_unit)
-
   impl_cursors = class_implementations(impl_translation_unit.cursor)
-
-  with open(impl_filename, "r") as source_file:
-    contents = source_file.readlines()
+  contents = read_file_contents(impl_filename)
   classname_to_impl = extract_implementations(impl_cursors, contents)
-
   classnames = [cursor.spelling for cursor in defns]
-
   for defn in defns:
     # writing {class}.h and {classname}.cc
     class_name, class_defn, deps = extract_definition(defn, classnames)
-
     includes = ""
     for name in deps:
       includes += '#include "{}.h"\n'.format(to_filename(name))
-
     class_defn = decl_includes + includes + class_defn
-
     class_impl = ""
     if class_name not in classname_to_impl:
       print("Warning: empty class {}".format(class_name))
@@ -374,7 +359,6 @@ def main(args):
       namespace_prefix, namespace_suffix = get_enclosing_namespace(defn)
       class_impl = impl_include + namespace_prefix + \
           classname_to_impl[class_name] + namespace_suffix
-
     write_file_contents(class_name, class_defn, class_impl)
 
 
