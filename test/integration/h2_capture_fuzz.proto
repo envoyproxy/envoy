@@ -165,9 +165,9 @@ message UpstreamSendEvent {
 
 message Event {
   oneof event_selector {
-    // Downstream sent given frames.
+    // Frames sent from downstream.
     DownstreamSendEvent downstream_send_event = 1;
-    // Upstream sent given frames.
+    // Frames sent from upstream.
     UpstreamSendEvent upstream_send_event = 2;
   }
 }

@@ -4,9 +4,13 @@ events {
       metadata {
         flags: END_METADATA
         stream_index: 1
-        metadata: {
-            Connections: 15
-            TimeoutSeconds: 10
+        metadata {
+            key: "connections"
+            value: "15"
+        }
+        metadata {
+            key: "Timeout Seconds"
+            value: "10"
         }
       }
     }
@@ -14,23 +18,6 @@ events {
 }
 events {
   upstream_send_event {
-    h2_frames {
-      settings {
-        flags: NONE
-      }
-    }
-    h2_frames {
-      settings {
-        flags: ACK
-      }
-    }
-    h2_frames {
-      headers {
-      	flags: NONE
-      	flags: END_STREAM
-	stream_index: 1
-      }
-    }
     h2_frames {
       data {
         flags: NONE
