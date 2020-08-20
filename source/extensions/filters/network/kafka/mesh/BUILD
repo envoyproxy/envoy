@@ -71,6 +71,7 @@ envoy_cc_library(
     deps = [
         ":abstract_command_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/extensions/filters/network/kafka:kafka_request_codec_lib",
         "//source/extensions/filters/network/kafka:kafka_request_parser_lib",
         "//source/extensions/filters/network/kafka/mesh/command_handlers:api_versions_lib",
         "//source/extensions/filters/network/kafka/mesh/command_handlers:metadata_lib",

@@ -4,6 +4,7 @@
 
 #include "extensions/filters/network/kafka/external/requests.h"
 #include "extensions/filters/network/kafka/mesh/abstract_command.h"
+#include "extensions/filters/network/kafka/request_codec.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,21 +12,20 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-class RequestInFlightFactory : private Logger::Loggable<Logger::Id::kafka> {
+class RequestProcessor : public RequestCallback, private Logger::Loggable<Logger::Id::kafka> {
 public:
-  RequestInFlightFactory(AbstractRequestListener& origin,
-                         const ClusteringConfiguration& clustering_configuration);
+  RequestProcessor(AbstractRequestListener& origin,
+                   const ClusteringConfiguration& clustering_configuration);
 
-  AbstractInFlightRequestSharedPtr
-  create(const std::shared_ptr<Request<ProduceRequest>> request) const;
-
-  AbstractInFlightRequestSharedPtr
-  create(const std::shared_ptr<Request<MetadataRequest>> request) const;
-
-  AbstractInFlightRequestSharedPtr
-  create(const std::shared_ptr<Request<ApiVersionsRequest>> request) const;
+  // RequestCallback
+  void onMessage(AbstractRequestSharedPtr arg) override;
+  void onFailedParse(RequestParseFailureSharedPtr) override;
 
 private:
+  void process(const std::shared_ptr<Request<ProduceRequest>> request) const;
+  void process(const std::shared_ptr<Request<MetadataRequest>> request) const;
+  void process(const std::shared_ptr<Request<ApiVersionsRequest>> request) const;
+
   AbstractRequestListener& origin_;
   const ClusteringConfiguration& clustering_configuration_;
 };

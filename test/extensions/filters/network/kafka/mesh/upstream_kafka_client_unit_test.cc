@@ -55,7 +55,7 @@ TEST(UpstreamKafkaClientTest, shouldThrowIfBadBootstrapServers) {
   KafkaProducerWrapper testee = {dispatcher, thread_factory, config, utils};
 
   // then
-  // FIXME put something nice here
+  // put something nice here
   ASSERT_NE(&producer, nullptr);
 }
 

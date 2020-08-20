@@ -17,6 +17,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
+namespace {
 
 class MockClusteringConfiguration : public ClusteringConfiguration {
 public:
@@ -89,6 +90,7 @@ TEST(UpstreamKafkaFacadeTest, shouldRethrowCreationException) {
   // TODO
 }
 
+} // namespace
 } // namespace Mesh
 } // namespace Kafka
 } // namespace NetworkFilters

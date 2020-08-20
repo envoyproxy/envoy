@@ -270,7 +270,7 @@ public:
         offset_ += 7;
         // Valid input can have at most 5 bytes.
         if (offset_ >= 9 * 7) {
-          throw EnvoyException("VarInt64 is too long (9th byte has highest bit set)");
+          ExceptionUtil::throwEnvoyException("VarInt64 is too long (9th byte has highest bit set)");
         }
       }
     }

@@ -16,54 +16,11 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-class RequestHandler : public RequestCallback, private Logger::Loggable<Logger::Id::kafka> {
-public:
-  RequestHandler(KafkaMeshFilter& filter) : filter_{filter} {}
-
-  void onMessage(AbstractRequestSharedPtr arg) override {
-    switch (arg->request_header_.api_key_) {
-    case /* Produce */ 0: {
-      const std::shared_ptr<Request<ProduceRequest>> cast =
-          std::dynamic_pointer_cast<Request<ProduceRequest>>(arg);
-      filter_.respondToProduce(cast);
-      break;
-    }
-    case /* Metadata */ 3: {
-      const std::shared_ptr<Request<MetadataRequest>> cast =
-          std::dynamic_pointer_cast<Request<MetadataRequest>>(arg);
-      filter_.respondToMetadata(cast);
-      break;
-    }
-    case /* ApiVersions */ 18: {
-      const std::shared_ptr<Request<ApiVersionsRequest>> cast =
-          std::dynamic_pointer_cast<Request<ApiVersionsRequest>>(arg);
-      filter_.respondToApiVersions(cast);
-      break;
-    }
-    default: {
-      ENVOY_LOG(warn, "unknown request: {}/{}", arg->request_header_.api_key_,
-                arg->request_header_.api_version_);
-      break;
-    }
-    }
-  }
-
-  void onFailedParse(RequestParseFailureSharedPtr) override {
-    ENVOY_LOG(warn, "got parse failure");
-    // kill connection.
-  }
-
-private:
-  KafkaMeshFilter& filter_;
-};
-
-// === KAFKA MESH FILTER ===========================================================================
-
 KafkaMeshFilter::KafkaMeshFilter(const ClusteringConfiguration& clustering_configuration,
                                  UpstreamKafkaFacade& upstream_kafka_facade)
-    : request_decoder_{new RequestDecoder({std::make_shared<RequestHandler>(*this)})},
-      request_in_flight_factory_{*this, clustering_configuration}, upstream_kafka_facade_{
-                                                                       upstream_kafka_facade} {}
+    : request_decoder_{new RequestDecoder(
+          {std::make_shared<RequestProcessor>(*this, clustering_configuration)})},
+      upstream_kafka_facade_{upstream_kafka_facade} {}
 
 KafkaMeshFilter::~KafkaMeshFilter() {
   ENVOY_LOG(trace, "KafkaMeshFilter - dtor");
@@ -113,23 +70,12 @@ void KafkaMeshFilter::onAboveWriteBufferHighWatermark() {}
 
 void KafkaMeshFilter::onBelowWriteBufferLowWatermark() {}
 
-void KafkaMeshFilter::respondToProduce(const std::shared_ptr<Request<ProduceRequest>> request) {
-  AbstractInFlightRequestSharedPtr split_request = request_in_flight_factory_.create(request);
-  requests_in_flight_.push_back(split_request);
-  split_request->invoke(upstream_kafka_facade_);
-}
-
-void KafkaMeshFilter::respondToApiVersions(
-    const std::shared_ptr<Request<ApiVersionsRequest>> request) {
-  AbstractInFlightRequestSharedPtr split_request = request_in_flight_factory_.create(request);
-  requests_in_flight_.push_back(split_request);
-  split_request->invoke(upstream_kafka_facade_);
-}
-
-void KafkaMeshFilter::respondToMetadata(const std::shared_ptr<Request<MetadataRequest>> request) {
-  AbstractInFlightRequestSharedPtr split_request = request_in_flight_factory_.create(request);
-  requests_in_flight_.push_back(split_request);
-  split_request->invoke(upstream_kafka_facade_);
+/**
+ * We have received a request we can actually process.
+ */
+void KafkaMeshFilter::onRequest(AbstractInFlightRequestSharedPtr request) {
+  requests_in_flight_.push_back(request);
+  request->invoke(upstream_kafka_facade_);
 }
 
 /**

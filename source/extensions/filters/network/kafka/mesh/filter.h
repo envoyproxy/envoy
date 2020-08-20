@@ -38,21 +38,12 @@ public:
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
 
-  // 0.
-  void respondToProduce(const std::shared_ptr<Request<ProduceRequest>> request);
-
-  // 3.
-  void respondToApiVersions(const std::shared_ptr<Request<ApiVersionsRequest>> request);
-
-  // 18.
-  void respondToMetadata(const std::shared_ptr<Request<MetadataRequest>> request);
-
   // AbstractRequestListener
+  void onRequest(AbstractInFlightRequestSharedPtr request) override;
   void onRequestReadyForAnswer() override;
 
 private:
   const RequestDecoderSharedPtr request_decoder_;
-  const RequestInFlightFactory request_in_flight_factory_; // For test injection.
   UpstreamKafkaFacade& upstream_kafka_facade_;
 
   Network::ReadFilterCallbacks* read_filter_callbacks_;
