@@ -87,6 +87,7 @@ public:
   HostOverloadedPredicate host_overloaded_predicate_;
 };
 
+#if !defined(NDEBUG)
 // Works correctly when hash balance factor is 0, when bounding load is not required.
 TEST_F(BoundedLoadHashingLoadBalancerTest, HashBalanceDisabled) {
   ThreadAwareLoadBalancerBase::HashingLoadBalancerSharedPtr hlb =
@@ -96,6 +97,15 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, HashBalanceDisabled) {
                "");
 };
 
+// Works correctly without any hashing load balancer.
+TEST_F(BoundedLoadHashingLoadBalancerTest, NoHashingLoadBalancer) {
+  NormalizedHostWeightVector normalized_host_weights;
+  EXPECT_DEATH(std::make_unique<TestBoundedLoadHashingLoadBalancer>(
+                   nullptr, normalized_host_weights, 1, nullptr),
+               "");
+};
+#endif // !defined(NDEBUG)
+
 // Works correctly without any hosts.
 TEST_F(BoundedLoadHashingLoadBalancerTest, NoHosts) {
   hlb_ = std::make_shared<TestHashingLoadBalancer>();
@@ -103,14 +113,6 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, NoHosts) {
   lb_ = std::make_unique<TestBoundedLoadHashingLoadBalancer>(hlb_, normalized_host_weights, 1,
                                                              nullptr);
   EXPECT_EQ(lb_->chooseHost(1, 1), nullptr);
-};
-
-// Works correctly without any hashing load balancer.
-TEST_F(BoundedLoadHashingLoadBalancerTest, NoHashingLoadBalancer) {
-  NormalizedHostWeightVector normalized_host_weights;
-  EXPECT_DEATH(std::make_unique<TestBoundedLoadHashingLoadBalancer>(
-                   nullptr, normalized_host_weights, 1, nullptr),
-               "");
 };
 
 // Works correctly for the case when no host is ever overloaded.
@@ -138,7 +140,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, NoHostEverOverloaded) {
 // Works correctly for the case one host is overloaded.
 TEST_F(BoundedLoadHashingLoadBalancerTest, OneHostOverloaded) {
   // In this test host 2 is overloaded. The random shuffle sequence of 5
-  // elements with seed 2 is 2 0 3 1 4. When the host picked up for
+  // elements with seed 2 is 2 1 0 4 3. When the host picked up for
   // hash 2 (which is 127.0.0.12) is overloaded, host 0 (127.0.0.10)
   // is picked up.
 
@@ -158,13 +160,13 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, OneHostOverloaded) {
 
   HostConstSharedPtr host = lb_->chooseHost(2, 1);
   EXPECT_NE(host, nullptr);
-  EXPECT_EQ(host->address()->asString(), "127.0.0.10:90");
+  EXPECT_EQ(host->address()->asString(), "127.0.0.11:90");
 };
 
 // Works correctly for the case a few hosts are overloaded.
 TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHostOverloaded) {
   // In this test hosts 0, 1 & 2 are overloaded. The random shuffle
-  // sequence of 5 elements with seed 2 is 2 0 3 1 4. When the host
+  // sequence of 5 elements with seed 2 is 2 1 0 4 3. When the host
   // picked up for hash 2 (which is 127.0.0.12) is overloaded, the
   // method passes over host 0 and picks host 3 (127.0.0.13) up.
 
@@ -186,7 +188,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHostOverloaded) {
 
   HostConstSharedPtr host = lb_->chooseHost(2, 1);
   EXPECT_NE(host, nullptr);
-  EXPECT_EQ(host->address()->asString(), "127.0.0.13:90");
+  EXPECT_EQ(host->address()->asString(), "127.0.0.14:90");
 };
 
 // Works correctly for the case when requests with different hash map to the same
@@ -195,7 +197,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHashSameHostOverloaded) {
   // In this case host 3 is overloaded and the CH ring has same host repeated on
   // consecutive indices (0 0 1 1 2 2 3 3 4 4). The hashes 6 and 7 map to same host
   // 3 which is overloaded. The random shuffle sequence of 5 elements with seed 6 is
-  // 4 0 1 2 3 and with 7 it is 0 1 2 3 4. Hence hosts 4 and 0 are picked up for these
+  // 4 0 2 3 1 and with 7 it is 0 1 4 3 2. Hence hosts 4 and 0 are picked up for these
   // hashes.
 
   // setup: 5 hosts, one of them is overloaded.
@@ -218,9 +220,9 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHashSameHostOverloaded) {
 
   EXPECT_NE(host1->address()->asString(), host2->address()->asString());
 
-  // sequence for 4 is 40123, 4 is the first host not overloaded
+  // sequence for 4 is 40231, 4 is the first host not overloaded
   EXPECT_EQ(host1->address()->asString(), "127.0.0.14:90");
-  // sequence for 5 is 01234, 0 is the first host not overloaded
+  // sequence for 5 is 01432, 0 is the first host not overloaded
   EXPECT_EQ(host2->address()->asString(), "127.0.0.10:90");
 };
 

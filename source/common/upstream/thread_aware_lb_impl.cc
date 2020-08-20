@@ -187,10 +187,6 @@ LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
 
 bool ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::isHostOverloaded(
     const Host& host, double weight) const {
-  /*
-  Consistent Hashing with Bounded Load
-  Ref: https://arxiv.org/abs/1608.01350
-  */
   const uint32_t overall_active = host.cluster().stats().upstream_rq_active_.value();
   const uint32_t host_active = host.stats().rq_active_.value();
 
@@ -213,6 +209,20 @@ HostConstSharedPtr
 ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t hash,
                                                                         uint32_t attempt) const {
 
+  // This is implemented based on the method described in the paper
+  // https://arxiv.org/abs/1608.01350. For the specified `hash_balance_factor`, requests to any
+  // upstream host are capped at `hash_balance_factor/100` times the average number of requests
+  // across the cluster. When a request arrives for an upstream host that is currently serving at
+  // its max capacity, linear probing is used to identify an eligible host. Further, the linear
+  // probe is implemented using a random jump on hosts ring to identify the eligible host (this
+  // technique is as described in the paper https://arxiv.org/abs/1908.08762 - the random jump
+  // avoids the cascading overflow effect when choosing the next host on the ring).
+  //
+  // If weights are specified on the hosts, they are respected.
+  //
+  // This is an O(N) algorithm, unlike other load balancers. Using a lower `hash_balance_factor`
+  // results in more hosts being probed, so use a higher value if you require better performance.
+
   if (normalized_host_weights_.empty()) {
     return nullptr;
   }
@@ -229,9 +239,6 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
                    host->address()->asString());
     return host;
   }
-
-  // Revisiting Consistent Hashing with Bounded Loads
-  // https://arxiv.org/abs/1908.08762
 
   // When a host is overloaded, we choose the next host in a random manner rather than picking the
   // next one in the ring. The random sequence is seeded by the hash, so the same input gets the
@@ -250,8 +257,7 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
   std::mt19937 random(seed);
 
   // generates a random number in the range [0,k) uniformly.
-  auto uniform_int = [](std::mt19937 random, uint32_t k) -> uint32_t {
-    // Note: 1+random()%k is biased
+  auto uniform_int = [](std::mt19937& random, uint32_t k) -> uint32_t {
     uint32_t x = k;
     while (x >= k) {
       x = random() / ((static_cast<uint64_t>(random.max()) + 1u) / k);

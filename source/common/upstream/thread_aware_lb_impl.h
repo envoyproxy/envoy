@@ -39,7 +39,7 @@ public:
     BoundedLoadHashingLoadBalancer(HashingLoadBalancerSharedPtr hashing_lb_ptr,
                                    const NormalizedHostWeightVector& normalized_host_weights,
                                    uint32_t hash_balance_factor)
-        : normalized_host_weights_map_(init_normalized_host_weights_map(normalized_host_weights)),
+        : normalized_host_weights_map_(initNormalizedHostWeightMap(normalized_host_weights)),
           hashing_lb_ptr_(hashing_lb_ptr),
           normalized_host_weights_(std::move(normalized_host_weights)),
           hash_balance_factor_(hash_balance_factor) {
@@ -59,7 +59,7 @@ public:
 
   private:
     const NormalizedHostWeightMap
-    init_normalized_host_weights_map(const NormalizedHostWeightVector& normalized_host_weights) {
+    initNormalizedHostWeightMap(const NormalizedHostWeightVector& normalized_host_weights) {
       NormalizedHostWeightMap normalized_host_weights_map;
       for (auto const& item : normalized_host_weights) {
         normalized_host_weights_map[item.first] = item.second;
