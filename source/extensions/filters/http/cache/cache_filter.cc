@@ -143,18 +143,19 @@ void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
     // non-copyable. Hence, "result" is decomposed when captured, and re-instantiated inside the
     // lambda so that "result.headers_" can be captured as a raw pointer, then wrapped in a
     // unique_ptr when the result is re-instantiated.
-    dispatcher.post(
-        [self, &request_headers, status = result.cache_entry_status_,
-         headers_raw_ptr = result.headers_.release(), response_ranges = std::move(result.response_ranges_),
-         content_length = result.content_length_, has_trailers = result.has_trailers_]() mutable {
-           // Wrap the raw pointer in a unique_ptr before checking to avoid memory leaks.
-          Http::ResponseHeaderMapPtr headers = absl::WrapUnique(headers_raw_ptr);
-          if (CacheFilterSharedPtr cache_filter = self.lock()) {
-            cache_filter->onHeaders(LookupResult{status, std::move(headers), content_length,
-                                                 response_ranges, has_trailers},
-                                    request_headers);
-          }
-        });
+    dispatcher.post([self, &request_headers, status = result.cache_entry_status_,
+                     headers_raw_ptr = result.headers_.release(),
+                     response_ranges = std::move(result.response_ranges_),
+                     content_length = result.content_length_,
+                     has_trailers = result.has_trailers_]() mutable {
+      // Wrap the raw pointer in a unique_ptr before checking to avoid memory leaks.
+      Http::ResponseHeaderMapPtr headers = absl::WrapUnique(headers_raw_ptr);
+      if (CacheFilterSharedPtr cache_filter = self.lock()) {
+        cache_filter->onHeaders(
+            LookupResult{status, std::move(headers), content_length, response_ranges, has_trailers},
+            request_headers);
+      }
+    });
   });
 }
 
