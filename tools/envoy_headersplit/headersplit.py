@@ -17,12 +17,13 @@ from typing import Type, List, Tuple, Dict
 import clang.cindex
 from clang.cindex import TranslationUnit, Index, CursorKind, Cursor
 
+# Loading libclang
 if "LLVM_CONFIG" in os.environ:
   llvm_config_path = os.environ["LLVM_CONFIG"]
   exec_result = subprocess.run([llvm_config_path, "--libdir"],capture_output=True)
   if exec_result.returncode != 0:
     print(llvm_config_path + " --libdir returned %d" % exec_result.return_code)
-    sys.exit("llvm-config not found, please set the environment variable:\nexport LLVM_CONFIG=<path to clang installation>/bin/llvm-config")
+    sys.exit("llvm-config returned abnormally")
   clang_tools_lib_path = exec_result.stdout.rstrip()
   clang.cindex.Config.set_library_path(clang_tools_lib_path.decode("utf-8"))
 else:
@@ -166,8 +167,8 @@ def extract_definition(cursor: Cursor, classnames: List[str]) -> Tuple[str, str,
             divided, used to parse class dependencies.
     Returns:
         class_name: a string representing the mock class name.
-        class_defn: a string contatins the whole class definition body.
-        deps: a set of string contatins all dependent classes for the return class.
+        class_defn: a string contains the whole class definition body.
+        deps: a set of string contains all dependent classes for the return class.
 
     Note:
         It can not detect and resolve forward declaration and cyclic dependency. Need to address
@@ -186,10 +187,8 @@ def extract_definition(cursor: Cursor, classnames: List[str]) -> Tuple[str, str,
       break
     class_defn = "namespace {} {{\n".format(parent_cursor.spelling) + class_defn + "\n}\n"
     parent_cursor = parent_cursor.semantic_parent
-
   # resolve dependency
   # by simple naming look up
-
   deps = set()
   for classname in classnames:
     if classname in class_defn and classname != class_name:
