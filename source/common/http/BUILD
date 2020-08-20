@@ -158,6 +158,25 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "filter_manager_lib",
+    srcs = [
+        "filter_manager.cc",
+    ],
+    hdrs = [
+        "filter_manager.h",
+    ],
+    deps = [
+        ":headers_lib",
+        "//include/envoy/http:filter_interface",
+        "//source/common/buffer:watermark_buffer_lib",
+        "//source/common/common:linked_object",
+        "//source/common/common:scope_tracker",
+        "//source/common/grpc:common_lib",
+        "//source/common/local_reply:local_reply_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_manager_lib",
     srcs = [
         "conn_manager_impl.cc",
@@ -171,6 +190,7 @@ envoy_cc_library(
         ":codes_lib",
         ":conn_manager_config_interface",
         ":exception_lib",
+        ":filter_manager_lib",
         ":header_map_lib",
         ":header_utility_lib",
         ":headers_lib",
