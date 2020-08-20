@@ -75,6 +75,11 @@ void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& stat
   TimestampUtil::systemClockToTimestamp(listener.last_updated_, *(state.mutable_last_updated()));
 }
 
+std::string jsonStringFromMessageOrError(const Protobuf::Message& message) {
+  auto json_or_status = MessageUtil::getJsonStringFromMessage(message);
+  return json_or_status.ok() ? std::move(json_or_status).value()
+                             : json_or_status.status().ToString();
+}
 } // namespace
 
 bool ListenSocketCreationParams::operator==(const ListenSocketCreationParams& rhs) const {
@@ -95,12 +100,11 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessageOrDie(
+              jsonStringFromMessageOrError(
                   proto_config.has_typed_config()
                       ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
                       : static_cast<const Protobuf::Message&>(
-                            proto_config.hidden_envoy_deprecated_config()),
-                  true));
+                            proto_config.hidden_envoy_deprecated_config())));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -129,12 +133,11 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessageOrDie(
+              jsonStringFromMessageOrError(
                   proto_config.has_typed_config()
                       ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
                       : static_cast<const Protobuf::Message&>(
-                            proto_config.hidden_envoy_deprecated_config()),
-                  true));
+                            proto_config.hidden_envoy_deprecated_config())));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -158,12 +161,11 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessageOrDie(
+              jsonStringFromMessageOrError(
                   proto_config.has_typed_config()
                       ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
                       : static_cast<const Protobuf::Message&>(
-                            proto_config.hidden_envoy_deprecated_config()),
-                  true));
+                            proto_config.hidden_envoy_deprecated_config())));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =

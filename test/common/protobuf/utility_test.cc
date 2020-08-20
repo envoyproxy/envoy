@@ -37,6 +37,9 @@ using namespace std::chrono_literals;
 
 namespace Envoy {
 
+using testing::AllOf;
+using testing::Property;
+
 class RuntimeStatsHelper : public TestScopedRuntime {
 public:
   RuntimeStatsHelper(bool allow_deprecated_v2_api = false)
@@ -248,6 +251,15 @@ TEST_F(ProtobufUtilityTest, DowncastAndValidateUnknownFieldsNested) {
   EXPECT_THROW_WITH_MESSAGE(TestUtility::validate(bootstrap), EnvoyException,
                             "Protobuf message (type envoy.config.cluster.v3.Cluster with "
                             "unknown field set {1}) has unknown fields");
+}
+
+TEST_F(ProtobufUtilityTest, JsonConvertAnyUnknownMessageType) {
+  ProtobufWkt::Any source_any;
+  source_any.set_type_url("type.googleapis.com/bad.type.url");
+  source_any.set_value("asdf");
+  EXPECT_THAT(MessageUtil::getJsonStringFromMessage(source_any, true).status(),
+              AllOf(Property(&ProtobufUtil::Status::ok, false),
+                    Property(&ProtobufUtil::Status::ToString, testing::HasSubstr("bad.type.url"))));
 }
 
 TEST_F(ProtobufUtilityTest, LoadBinaryProtoFromFile) {
