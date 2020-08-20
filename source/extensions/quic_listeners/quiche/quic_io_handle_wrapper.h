@@ -92,6 +92,10 @@ public:
   Network::Address::InstanceConstSharedPtr peerAddress() override {
     return io_handle_.peerAddress();
   }
+  Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                      Event::FileTriggerType trigger, uint32_t events) override {
+    return io_handle_.createFileEvent(dispatcher, cb, trigger, events);
+  }
 
 private:
   Network::IoHandle& io_handle_;

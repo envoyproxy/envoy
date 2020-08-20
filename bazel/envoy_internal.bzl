@@ -42,9 +42,9 @@ def envoy_copts(repository, test = False):
                "//conditions:default": posix_options,
            }) + select({
                # Bazel adds an implicit -DNDEBUG for opt.
-               repository + "//bazel:opt_build": [] if test else ["-ggdb3"],
+               repository + "//bazel:opt_build": [] if test else ["-ggdb3", "-gsplit-dwarf"],
                repository + "//bazel:fastbuild_build": [],
-               repository + "//bazel:dbg_build": ["-ggdb3"],
+               repository + "//bazel:dbg_build": ["-ggdb3", "-gsplit-dwarf"],
                repository + "//bazel:windows_opt_build": [],
                repository + "//bazel:windows_fastbuild_build": [],
                repository + "//bazel:windows_dbg_build": [],
