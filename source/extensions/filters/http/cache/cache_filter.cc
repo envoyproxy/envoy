@@ -130,7 +130,7 @@ void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
   // posted callback.
   // TODO(yosrym93): Look into other options for handling this (also in getBody and getTrailers) as
   // they arise, e.g. cancellable posts, guaranteed ordering of posted callbacks and deletions, etc.
-  CacheFilterWeakPtr self = shared_from_this();
+  CacheFilterWeakPtr self = weak_from_this();
 
   // The dispatcher needs to be captured because there's no guarantee that
   // decoder_callbacks_->dispatcher() is thread-safe.
@@ -145,10 +145,12 @@ void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
     // unique_ptr when the result is re-instantiated.
     dispatcher.post(
         [self, &request_headers, status = result.cache_entry_status_,
-         headers = result.headers_.release(), response_ranges = std::move(result.response_ranges_),
+         headers_raw_ptr = result.headers_.release(), response_ranges = std::move(result.response_ranges_),
          content_length = result.content_length_, has_trailers = result.has_trailers_]() mutable {
-          if (auto cache_filter = self.lock()) {
-            cache_filter->onHeaders(LookupResult{status, absl::WrapUnique(headers), content_length,
+           // Wrap the raw pointer in a unique_ptr before checking to avoid memory leaks.
+          Http::ResponseHeaderMapPtr headers = absl::WrapUnique(headers_raw_ptr);
+          if (CacheFilterSharedPtr cache_filter = self.lock()) {
+            cache_filter->onHeaders(LookupResult{status, std::move(headers), content_length,
                                                  response_ranges, has_trailers},
                                     request_headers);
           }
@@ -164,7 +166,7 @@ void CacheFilter::getBody() {
   // the posted callback will run before the filter is deleted. Hence, a weak_ptr to the CacheFilter
   // is captured and used to make sure the CacheFilter is still alive before accessing it in the
   // posted callback.
-  CacheFilterWeakPtr self = shared_from_this();
+  CacheFilterWeakPtr self = weak_from_this();
 
   // The dispatcher needs to be captured because there's no guarantee that
   // decoder_callbacks_->dispatcher() is thread-safe.
@@ -175,9 +177,11 @@ void CacheFilter::getBody() {
     // initialize a std::function. Therefore, it cannot capture anything non-copyable.
     // "body" is a unique_ptr, which is non-copyable. Hence, it is captured as a raw pointer then
     // wrapped in a unique_ptr inside the lambda.
-    dispatcher.post([self, body = body.release()] {
-      if (auto cache_filter = self.lock()) {
-        cache_filter->onBody(absl::WrapUnique(body));
+    dispatcher.post([self, body_raw_ptr = body.release()] {
+      // Wrap the raw pointer in a unique_ptr before checking to avoid memory leaks.
+      Buffer::InstancePtr body = absl::WrapUnique(body_raw_ptr);
+      if (CacheFilterSharedPtr cache_filter = self.lock()) {
+        cache_filter->onBody(std::move(body));
       }
     });
   });
@@ -192,7 +196,7 @@ void CacheFilter::getTrailers() {
   // the posted callback will run before the filter is deleted. Hence, a weak_ptr to the CacheFilter
   // is captured and used to make sure the CacheFilter is still alive before accessing it in the
   // posted callback.
-  CacheFilterWeakPtr self = shared_from_this();
+  CacheFilterWeakPtr self = weak_from_this();
 
   // The dispatcher needs to be captured because there's no guarantee that
   // decoder_callbacks_->dispatcher() is thread-safe.
@@ -203,9 +207,11 @@ void CacheFilter::getTrailers() {
     // initialize a std::function. Therefore, it cannot capture anything non-copyable.
     // "trailers" is a unique_ptr, which is non-copyable. Hence, it is captured as a raw
     // pointer then wrapped in a unique_ptr inside the lambda.
-    dispatcher.post([self, trailers = trailers.release()] {
-      if (auto cache_filter = self.lock()) {
-        cache_filter->onTrailers(absl::WrapUnique(trailers));
+    dispatcher.post([self, trailers_raw_ptr = trailers.release()] {
+      // Wrap the raw pointer in a unique_ptr before checking to avoid memory leaks.
+      Http::ResponseTrailerMapPtr trailers = absl::WrapUnique(trailers_raw_ptr);
+      if (CacheFilterSharedPtr cache_filter = self.lock()) {
+        cache_filter->onTrailers(std::move(trailers));
       }
     });
   });
