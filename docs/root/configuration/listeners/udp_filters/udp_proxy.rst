@@ -22,7 +22,7 @@ datagram is received on. Sessions last until the :ref:`idle timeout
 
 The UDP proxy listener filter also can operate as a *transparent* proxy if the
 :ref:`use_original_src_ip <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>`
-field is set.
+field is set. But please keep in mind that it does not forward the port to upstreams. It forwards only the IP address to upstreams.
 
 Load balancing and unhealthy host handling
 ------------------------------------------

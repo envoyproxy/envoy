@@ -56,7 +56,7 @@ public:
       ON_CALL(*socket_, ipVersion()).WillByDefault(Return(upstream_address_->ip()->version()));
     }
 
-    void expectUpstreamWriteOriginalSrcIp() {
+    void expectSetIpTransparentSocketOption() {
       EXPECT_CALL(*socket_->io_handle_, setOption(_, _, _, _))
           .WillRepeatedly(Invoke([this](int level, int optname, const void* optval,
                                         socklen_t) -> Api::SysCallIntResult {
@@ -162,11 +162,11 @@ public:
   };
 
   UdpProxyFilterTest()
-      : UdpProxyFilterTest(Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000")) {}
+      : UdpProxyFilterTest(Network::Utility::parseInternetAddressAndPort(peer_ip_address_)) {}
 
   explicit UdpProxyFilterTest(Network::Address::InstanceConstSharedPtr&& peer_address)
       : os_calls_(&os_sys_calls_),
-        upstream_address_(Network::Utility::parseInternetAddressAndPort("20.0.0.1:443")),
+        upstream_address_(Network::Utility::parseInternetAddressAndPort(upstream_ip_address_)),
         peer_address_(std::move(peer_address)) {
     // Disable strict mock warnings.
     ON_CALL(os_sys_calls_, supportsIpTransparent()).WillByDefault(Return(true));
@@ -248,18 +248,14 @@ public:
     EXPECT_EQ(ipv6_expect == 1, ipv6_option_details.has_value());
   }
 
-  bool isSocketOptionsSupported(const std::vector<Network::SocketOptionName>& option_names) {
-    for (const auto& option_name : option_names) {
+  bool isTransparentSocketOptionsSupported() {
+    for (const auto& option_name : transparent_options) {
       if (!option_name.hasValue()) {
         return false;
       }
     }
 
     return true;
-  }
-
-  bool isTransparentSocketOptionsSupported() {
-    return isSocketOptionsSupported(transparent_options);
   }
 
   Api::MockOsSysCalls os_sys_calls_;
@@ -276,30 +272,33 @@ public:
   const Network::Address::InstanceConstSharedPtr peer_address_;
   const std::vector<Network::SocketOptionName> transparent_options{ENVOY_SOCKET_IP_TRANSPARENT,
                                                                    ENVOY_SOCKET_IPV6_TRANSPARENT};
+  inline static const std::string upstream_ip_address_ = "20.0.0.1:443";
+  inline static const std::string peer_ip_address_ = "10.0.0.1:1000";
 };
 
 class UdpProxyFilterTestIpv6 : public UdpProxyFilterTest {
 public:
   UdpProxyFilterTestIpv6()
       : UdpProxyFilterTestIpv6(
-            Network::Utility::parseInternetAddressAndPort("[2001:db8:85a3::8a2e:370:7334]:443")) {}
+            Network::Utility::parseInternetAddressAndPort(upstream_ipv6_address_)) {}
 
-  explicit UdpProxyFilterTestIpv6(Network::Address::InstanceConstSharedPtr&& address)
-      : UdpProxyFilterTest(
-            Network::Utility::parseInternetAddressAndPort("[2001:db8:85a3::9a2e:370:7334]:1000")),
-        upstream_address_v6_(std::move(address)) {
+  explicit UdpProxyFilterTestIpv6(Network::Address::InstanceConstSharedPtr&& upstream_address_v6)
+      : UdpProxyFilterTest(Network::Utility::parseInternetAddressAndPort(peer_ipv6_address_)),
+        upstream_address_v6_(std::move(upstream_address_v6)) {
     EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, address())
         .WillRepeatedly(Return(upstream_address_v6_));
   }
 
   const Network::Address::InstanceConstSharedPtr upstream_address_v6_;
+  inline static const std::string upstream_ipv6_address_ = "[2001:db8:85a3::8a2e:370:7334]:443";
+  inline static const std::string peer_ipv6_address_ = "[2001:db8:85a3::9a2e:370:7334]:1000";
 };
 
 class UdpProxyFilterTestIpv4Ipv6 : public UdpProxyFilterTestIpv6 {
 public:
   UdpProxyFilterTestIpv4Ipv6()
       : UdpProxyFilterTestIpv6(Network::Utility::parseInternetAddressAndPort(
-            "[2001:db8:85a3::8a2e:370:7334]:443", false)) {}
+            UdpProxyFilterTestIpv6::upstream_ipv6_address_, false)) {}
 };
 
 // Basic UDP proxy flow with a single session.
@@ -608,7 +607,7 @@ use_original_src_ip: true
 )EOF");
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWriteOriginalSrcIp();
+  test_sessions_[0].expectSetIpTransparentSocketOption();
   test_sessions_[0].expectUpstreamWrite("hello", 0, peer_address_->ip());
   recvDataFromDownstream(peer_address_->asString(), "10.0.0.2:80", "hello");
 
@@ -640,7 +639,7 @@ use_original_src_ip: true
 )EOF");
 
   expectSessionCreate(upstream_address_v6_);
-  test_sessions_[0].expectUpstreamWriteOriginalSrcIp();
+  test_sessions_[0].expectSetIpTransparentSocketOption();
   test_sessions_[0].expectUpstreamWrite("hello", 0, peer_address_->ip());
   recvDataFromDownstream(peer_address_->asString(), "[2001:db8:85a3::9a2e:370:7335]:80", "hello");
 
@@ -654,8 +653,8 @@ use_original_src_ip: true
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
 }
 
-// Make sure socket option is not set correctly if use_original_src_ip is not set.
-TEST_F(UdpProxyFilterTestIpv4Ipv6, NoSocketOptionForDontUseOriginalSrcIp) {
+// Make sure socket options should not be set if use_original_src_ip is not set.
+TEST_F(UdpProxyFilterTestIpv4Ipv6, NoSocketOptionIfUseOriginalSrcIpIsNotSet) {
   if (!isTransparentSocketOptionsSupported()) {
     // The option is not supported on this platform. Just skip the test.
     GTEST_SKIP();
@@ -684,8 +683,8 @@ use_original_src_ip: false
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
 }
 
-// Make sure socket option is not set correctly if use_original_src_ip is not mentioned.
-TEST_F(UdpProxyFilterTestIpv4Ipv6, NoSocketOptionForNoUseOriginalSrcIp) {
+// Make sure socket options should not be set if use_original_src_ip is not mentioned.
+TEST_F(UdpProxyFilterTestIpv4Ipv6, NoSocketOptionIfUseOriginalSrcIpIsNotMentioned) {
   if (!isTransparentSocketOptionsSupported()) {
     // The option is not supported on this platform. Just skip the test.
     GTEST_SKIP();

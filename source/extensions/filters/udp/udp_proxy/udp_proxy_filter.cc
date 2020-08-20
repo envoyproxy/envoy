@@ -180,10 +180,10 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
     const bool ok = Network::Socket::applyOptions(
         socket_options, *socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND);
 
+    RELEASE_ASSERT(ok, "Should not be never occurred!!");
     ENVOY_LOG(debug, "The original src is enabled for address {}.",
               addresses_.peer_->asStringView());
     socket_->addOptions(socket_options);
-    RELEASE_ASSERT(ok, "Should not be never occurred!!");
   }
 
   // TODO(mattklein123): Enable dropped packets socket option. In general the Socket abstraction
@@ -241,7 +241,8 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
   // NOTE: On the first write, a local ephemeral port is bound, and thus this write can fail due to
   //       port exhaustion.
   // NOTE: We do not specify the local IP to use for the sendmsg call if use_original_src_ip_ is not
-  //       set. We allow the OS to select the right IP based on outbound routing rules.
+  //       set. We allow the OS to select the right IP based on outbound routing rules if
+  //       use_original_src_ip_ is not set, else use downstream peer IP as local IP.
   const Network::Address::Ip* local_ip = use_original_src_ip_ ? addresses_.peer_->ip() : nullptr;
   Api::IoCallUint64Result rc =
       Network::Utility::writeToSocket(socket_->ioHandle(), buffer, local_ip, *host_->address());
