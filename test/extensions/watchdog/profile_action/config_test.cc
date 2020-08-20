@@ -46,6 +46,7 @@ TEST(ProfileActionFactoryTest, CanCreateAction) {
   Api::ApiPtr api = Api::createApiForTest();
   Server::Configuration::GuardDogActionFactoryContext context{*api, dispatcher};
 
+  EXPECT_CALL(dispatcher, createTimer_(_));
   EXPECT_NE(factory->createGuardDogActionFromProto(config, context), nullptr);
 }
 
