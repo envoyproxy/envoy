@@ -285,9 +285,9 @@ virtual_domains:
           protocol: { number: 6 }
           ttl: 86400s
           targets: [
-            { name: { host_name: "primary.voip.subzero.com" }, weight: 30, priority: 10, port: 5060 },
-            { name: { host_name: "secondary.voip.subzero.com" }, weight: 20, priority: 10, port: 5061 },
-            { name: { host_name: "backup.voip.subzero.com" }, weight: 10, priority: 10, port: 5062 }
+            { host_name: "primary.voip.subzero.com" , weight: 30, priority: 10, port: 5060 },
+            { host_name: "secondary.voip.subzero.com", weight: 20, priority: 10, port: 5061 },
+            { host_name: "backup.voip.subzero.com", weight: 10, priority: 10, port: 5062 }
           ]
   - name: "web.subzero.com"
     endpoint:

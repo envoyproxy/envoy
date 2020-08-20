@@ -58,10 +58,13 @@ message DnsTable {
     }
   }
 
-  message DnsServiceEndpointName {
+  // Specify the target for a given DNS service
+  // [#next-free-field: 6]
+  message DnsServiceTarget {
     option (udpa.annotations.versioning).previous_message_type =
-        "envoy.data.dns.v3.DnsTable.DnsServiceEndpointName";
+        "envoy.data.dns.v3.DnsTable.DnsServiceTarget";
 
+    // Specify the name of the endpoint for the Service. The name is a hostname or a cluster
     oneof endpoint_type {
       option (validate.required) = true;
 
@@ -73,26 +76,17 @@ message DnsTable {
       string cluster_name = 2
           [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
     }
-  }
-
-  // Specify the target for a given DNS service
-  message DnsServiceTarget {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.data.dns.v3.DnsTable.DnsServiceTarget";
-
-    // Specify the name of the endpoint for the Service. The name is a hostname or a cluster
-    DnsServiceEndpointName name = 1;
 
     // The priority of the service record target
-    uint32 priority = 2 [(validate.rules).uint32 = {lt: 65536}];
+    uint32 priority = 3 [(validate.rules).uint32 = {lt: 65536}];
 
     // The weight of the service record target
-    uint32 weight = 3 [(validate.rules).uint32 = {lt: 65536}];
+    uint32 weight = 4 [(validate.rules).uint32 = {lt: 65536}];
 
     // The port to which the service is bound. This value is optional if the target is a
     // cluster. Setting port to zero in this case makes the filter use the port value
     // from the cluster host
-    uint32 port = 4 [(validate.rules).uint32 = {lt: 65536}];
+    uint32 port = 5 [(validate.rules).uint32 = {lt: 65536}];
   }
 
   // This message defines a service selection record returned for a service query in a domain

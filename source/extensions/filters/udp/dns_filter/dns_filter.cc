@@ -105,9 +105,9 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
           attributes.weight = target.weight();
           attributes.port = target.port();
 
-          absl::string_view target_name = target.name().host_name();
+          absl::string_view target_name = target.host_name();
           if (target_name.empty()) {
-            target_name = target.name().cluster_name();
+            target_name = target.cluster_name();
             attributes.is_cluster = true;
           }
 
