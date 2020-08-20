@@ -19,14 +19,16 @@ from clang.cindex import TranslationUnit, Index, CursorKind, Cursor
 # Loading libclang
 if "LLVM_CONFIG" in os.environ:
   llvm_config_path = os.environ["LLVM_CONFIG"]
-  exec_result = subprocess.run([llvm_config_path, "--libdir"],capture_output=True)
+  exec_result = subprocess.run(
+      [llvm_config_path, "--libdir"], capture_output=True, check=False)
   if exec_result.returncode != 0:
-    print(llvm_config_path + " --libdir returned %d" % exec_result.return_code)
+    print(llvm_config_path + " --libdir returned %d" % exec_result.returncode)
     sys.exit("llvm-config returned abnormally")
   clang_tools_lib_path = exec_result.stdout.rstrip()
   clang.cindex.Config.set_library_path(clang_tools_lib_path.decode("utf-8"))
 else:
   sys.exit("llvm-config not found, please set the environment variable:\nexport LLVM_CONFIG=<path to clang installation>/bin/llvm-config")
+
 
 def to_filename(classname: str) -> str:
   """
@@ -84,6 +86,7 @@ def get_directives(translation_unit: Type[TranslationUnit]) -> str:
         contents = source_file.read()
       return contents[:descendant.extent.start.offset]
   return ""
+
 
 def cursors_in_same_file(cursor: Cursor) -> List[Cursor]:
   """
@@ -184,7 +187,8 @@ def extract_definition(cursor: Cursor, classnames: List[str]) -> Tuple[str, str,
   while parent_cursor.kind == CursorKind.NAMESPACE:
     if parent_cursor.spelling == "":
       break
-    class_defn = "namespace {} {{\n".format(parent_cursor.spelling) + class_defn + "\n}\n"
+    class_defn = "namespace {} {{\n".format(
+        parent_cursor.spelling) + class_defn + "\n}\n"
     parent_cursor = parent_cursor.semantic_parent
   # resolve dependency
   # by simple naming look up
@@ -296,7 +300,8 @@ def get_enclosing_namespace(defn: Cursor) -> Tuple[str, str]:
   while parent_cursor.kind == CursorKind.NAMESPACE:
     if parent_cursor.spelling == "":
       break
-    namespace_prefix = "namespace {} {{\n".format(parent_cursor.spelling) + namespace_prefix
+    namespace_prefix = "namespace {} {{\n".format(
+        parent_cursor.spelling) + namespace_prefix
     namespace_suffix += "\n}"
     parent_cursor = parent_cursor.semantic_parent
   namespace_suffix += "\n"
@@ -365,7 +370,8 @@ def main(args):
     if class_name not in classname_to_impl:
       print("Warning: empty class {}".format(class_name))
     else:
-      impl_include = impl_includes.replace(decl_filename, "{}.h".format(to_filename(class_name)))
+      impl_include = impl_includes.replace(
+          decl_filename, "{}.h".format(to_filename(class_name)))
       # we need to enclose methods with namespaces
       namespace_prefix, namespace_suffix = get_enclosing_namespace(defn)
       class_impl = impl_include + namespace_prefix + \
