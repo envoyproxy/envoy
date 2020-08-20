@@ -37,6 +37,8 @@ public:
 
   /**
    * Increment a counter with a given string of elements and by the given count.
+   * @param elements, joined elements of the timeseries.
+   * @param count, amount to add to the counter.
    */
   void recordCounter(const std::string& elements, uint64_t count);
 
