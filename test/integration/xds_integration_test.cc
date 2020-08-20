@@ -266,6 +266,10 @@ public:
     config_helper_.addListenerFilter(tls_inspector_config);
     config_helper_.addSslConfig();
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      bootstrap.mutable_static_resources()
+          ->mutable_listeners(0)
+          ->mutable_connection_balance_config()
+          ->mutable_exact_balance();
       auto* filter_chain_0 =
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
       *filter_chain_0->mutable_filter_chain_match()->mutable_application_protocols()->Add() =

@@ -393,7 +393,7 @@ private:
   const bool continue_on_listener_filters_timeout_;
   Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
   Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
-  Network::ConnectionBalancerPtr connection_balancer_;
+  Network::ConnectionBalancerSharedPtr connection_balancer_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;
 
