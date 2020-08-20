@@ -157,9 +157,9 @@ public:
       }
       case test::common::router::Action::kAdvanceTime: {
         ENVOY_LOG_MISC(info, "Advance time");
-  Http::ResponseHeaderMapPtr response_headers(
-      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-  response_decoder->decodeHeaders(std::move(response_headers), false);
+        Http::ResponseHeaderMapPtr response_headers(
+            new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+        response_decoder->decodeHeaders(std::move(response_headers), false);
 
         // The upstream timeout is 200ms.
         test_time_.timeSystem().advanceTimeWait(std::chrono::milliseconds(201));
@@ -188,7 +188,8 @@ public:
         // Reset the expectation and send a normal response. It is necessary to send the normal
         // response before continuing iteration because the RouterTestFilter fails an assertion if
         // it does not get a response to all upstream requests before its destruction.
-        EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
+        EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _))
+            .WillOnce(Return(RetryStatus::No));
         Http::ResponseHeaderMapPtr response_headers2(
             new Http::TestResponseHeaderMapImpl{{":status", "200"}});
         EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
