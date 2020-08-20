@@ -780,26 +780,29 @@ def checkBuildLine(line, file_path, reportError, command_line_args):
   if not allowlistedForProtobufDeps(file_path) and '"protobuf"' in line:
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
-  if (command_line_args.envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
-      not isExternalBuildFile(file_path) and "@envoy//" in line):
+  if (command_line_args.envoy_build_rule_check and not isSkylarkFile(file_path) and
+      not isWorkspaceFile(file_path) and not isExternalBuildFile(file_path) and "@envoy//" in line):
     reportError("Superfluous '@envoy//' prefix")
 
 
 def fixBuildLine(file_path, line, line_number, command_line_args):
-  if (command_line_args.envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
-      not isExternalBuildFile(file_path)):
+  if (command_line_args.envoy_build_rule_check and not isSkylarkFile(file_path) and
+      not isWorkspaceFile(file_path) and not isExternalBuildFile(file_path)):
     line = line.replace("@envoy//", "//")
   return line
 
 
 def fixBuildPath(file_path, command_line_args):
-  evaluateLines(file_path, functools.partial(fixBuildLine, file_path, command_line_args=command_line_args))
+  evaluateLines(file_path,
+                functools.partial(fixBuildLine, file_path, command_line_args=command_line_args))
 
   error_messages = []
 
   # TODO(htuch): Add API specific BUILD fixer script.
-  if not isBuildFixerExcludedFile(file_path, command_line_args.build_fixer_check_excluded_paths) and not isApiFile(file_path, command_line_args.api_prefix, command_line_args.api_shadow_prefix) and not isSkylarkFile(
-      file_path) and not isWorkspaceFile(file_path):
+  if not isBuildFixerExcludedFile(
+      file_path, command_line_args.build_fixer_check_excluded_paths) and not isApiFile(
+          file_path, command_line_args.api_prefix, command_line_args.api_shadow_prefix
+      ) and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
     if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
 
@@ -811,13 +814,16 @@ def fixBuildPath(file_path, command_line_args):
 def checkBuildPath(file_path, command_line_args):
   error_messages = []
 
-  if not isBuildFixerExcludedFile(file_path, command_line_args.build_fixer_check_excluded_paths) and not isApiFile(file_path, command_line_args.api_prefix, command_line_args.api_shadow_prefix) and not isSkylarkFile(
-      file_path) and not isWorkspaceFile(file_path):
+  if not isBuildFixerExcludedFile(
+      file_path, command_line_args.build_fixer_check_excluded_paths) and not isApiFile(
+          file_path, command_line_args.api_prefix, command_line_args.api_shadow_prefix
+      ) and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
     command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
     error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
 
   if isBuildFile(file_path) and (file_path.startswith(command_line_args.api_prefix + "envoy") or
-                                 file_path.startswith(command_line_args.api_shadow_prefix + "envoy")):
+                                 file_path.startswith(command_line_args.api_shadow_prefix +
+                                                      "envoy")):
     found = False
     for line in readLines(file_path):
       if "api_proto_package(" in line:
@@ -841,7 +847,8 @@ def fixSourcePath(file_path, command_line_args):
     if not file_path.endswith(PROTO_SUFFIX):
       error_messages += fixHeaderOrder(file_path, command_line_args.include_dir_order)
     error_messages += clangFormat(file_path)
-  if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path, command_line_args.api_prefix, command_line_args.api_shadow_prefix):
+  if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path, command_line_args.api_prefix,
+                                                    command_line_args.api_shadow_prefix):
     package_name, error_message = packageNameForProto(file_path)
     if package_name is None:
       error_messages += error_message
@@ -853,14 +860,16 @@ def checkSourcePath(file_path, command_line_args):
 
   if not file_path.endswith(DOCS_SUFFIX):
     if not file_path.endswith(PROTO_SUFFIX):
-      error_messages += checkNamespace(file_path, command_line_args.namespace_check, command_line_args.namespace_check_excluded_paths)
+      error_messages += checkNamespace(file_path, command_line_args.namespace_check,
+                                       command_line_args.namespace_check_excluded_paths)
       command = ("%s --include_dir_order %s --path %s | diff %s -" %
                  (HEADER_ORDER_PATH, command_line_args.include_dir_order, file_path, file_path))
       error_messages += executeCommand(command, "header_order.py check failed", file_path)
     command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
     error_messages += executeCommand(command, "clang-format check failed", file_path)
 
-  if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path, command_line_args.api_prefix, command_line_args.api_shadow_prefix):
+  if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path, command_line_args.api_prefix,
+                                                    command_line_args.api_shadow_prefix):
     package_name, error_message = packageNameForProto(file_path)
     if package_name is None:
       error_messages += error_message
@@ -1001,9 +1010,11 @@ def checkFormatVisitor(arg, dir_name, names):
   for file_name in names:
     if dir_name.startswith("./api") and isSkylarkFile(file_name):
       result = pool.apply_async(checkApiShadowStarlarkFiles,
-                                args=(dir_name + "/" + file_name, error_messages, command_line_args))
+                                args=(dir_name + "/" + file_name, error_messages,
+                                      command_line_args))
       result_list.append(result)
-    result = pool.apply_async(checkFormatReturnTraceOnError, args=(dir_name + "/" + file_name, command_line_args))
+    result = pool.apply_async(checkFormatReturnTraceOnError,
+                              args=(dir_name + "/" + file_name, command_line_args))
     result_list.append(result)
 
 
@@ -1071,13 +1082,13 @@ if __name__ == "__main__":
   args.namespace_check_excluded_paths = args.namespace_check_excluded_paths + [
       "./tools/api_boost/testdata/",
       "./tools/clang_tools/",
-  ] 
+  ]
   args.build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths + [
       "./bazel/external/",
       "./bazel/toolchains/",
       "./bazel/BUILD",
       "./tools/clang_tools",
-  ]  
+  ]
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
 
@@ -1130,8 +1141,8 @@ if __name__ == "__main__":
       # For each file in target_path, start a new task in the pool and collect the
       # results (results is passed by reference, and is used as an output).
       for root, _, files in os.walk(args.target_path):
-        checkFormatVisitor((pool, results, owned_directories, error_messages, args),
-                           root, [f for f in files if path_predicate(f)])
+        checkFormatVisitor((pool, results, owned_directories, error_messages, args), root,
+                           [f for f in files if path_predicate(f)])
 
       # Close the pool to new tasks, wait for all of the running tasks to finish,
       # then collect the error messages.
