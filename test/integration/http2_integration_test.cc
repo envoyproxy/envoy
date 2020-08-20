@@ -1245,6 +1245,27 @@ TEST_P(Http2IntegrationTest, PauseAndResumeHeadersOnly) {
   ASSERT_TRUE(response->complete());
 }
 
+// Verify the case when we have large pending data with empty trailers. It should not introduce
+// stack-overflow. This is a regression test for
+// https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=24714.
+TEST_P(Http2IntegrationTest, EmptyTrailers) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 100000, false);
+  Http::TestRequestTrailerMapImpl request_trailers;
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+}
+
 Http2RingHashIntegrationTest::Http2RingHashIntegrationTest() {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
