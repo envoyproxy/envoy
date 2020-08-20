@@ -104,8 +104,9 @@ protected:
   OverloadManagerImplTest()
       : factory1_("envoy.resource_monitors.fake_resource1"),
         factory2_("envoy.resource_monitors.fake_resource2"),
-        factory3_("envoy.resource_monitors.fake_resource3"), factory4_("envoy.resource_monitors.fake_resource4"), register_factory1_(factory1_),
-        register_factory2_(factory2_), register_factory3_(factory3_),register_factory4_(factory4_),
+        factory3_("envoy.resource_monitors.fake_resource3"),
+        factory4_("envoy.resource_monitors.fake_resource4"), register_factory1_(factory1_),
+        register_factory2_(factory2_), register_factory3_(factory3_), register_factory4_(factory4_),
         api_(Api::createApiForTest(stats_)) {}
 
   void setDispatcherExpectation() {
