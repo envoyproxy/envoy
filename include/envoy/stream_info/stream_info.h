@@ -162,7 +162,7 @@ struct ResponseCodeDetailValues {
   const std::string FilterChainNotFound = "filter_chain_not_found";
   // The client disconnected unexpectedly.
   const std::string DownstreamRemoteDisconnect = "downstream_remote_disconnect";
-  // The client connection was locally closed for an unexpecfied reason.
+  // The client connection was locally closed for an unspecified reason.
   const std::string DownstreamLocalDisconnect = "downstream_local_disconnect";
   // The max connection duration was exceeded.
   const std::string DurationTimeout = "duration_timeout";
