@@ -193,7 +193,6 @@ The following runtime flags are provided to adjust the requirements of OCSP resp
 the OCSP policy. These flags default to ``true``.
 
 * ``envoy.reloadable_features.require_ocsp_response_for_must_staple_certs``: Disabling this allows the operator to omit an OCSP response for must-staple certs in the config.
-* ``envoy.reloadable_features.validate_ocsp_expiration_at_config_time``: Disabling this allows OCSP responses to be expired at configuration time.
 * ``envoy.reloadable_features.validate_ocsp_expiration_on_connection``: Disabling this will staple OCSP responses on new connections even if they are expired.
 
 OCSP responses are ignored for :ref:`UpstreamTlsContexts
