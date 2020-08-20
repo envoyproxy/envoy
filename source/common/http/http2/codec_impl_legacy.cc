@@ -377,8 +377,8 @@ ssize_t ConnectionImpl::StreamImpl::onDataSourceRead(uint64_t length, uint32_t* 
           // We need to tell the library to not set end stream so that we can emit the trailers.
           *data_flags |= NGHTTP2_DATA_FLAG_NO_END_STREAM;
           submitTrailers(*pending_trailers_to_encode_);
-          pending_trailers_to_encode_.reset();
         }
+        pending_trailers_to_encode_.reset();
       }
     }
 
