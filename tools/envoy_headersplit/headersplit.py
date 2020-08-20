@@ -3,20 +3,19 @@
 """
 This python script can dividing monolithic mock headers
 into different mock classes. We need to remove the
-over-included head files in generated class codes and
+over-included header files in generated class codes and
 resolve dependencies in the corresponding Bazel files
 manually.
 """
-
-from __future__ import print_function
-
 import argparse
-from typing import Type, List, Tuple, Dict
-import clang.cindex
-from clang.cindex import TranslationUnit, Index, CursorKind, Cursor
 import os
 import subprocess
 import sys
+from typing import Type, List, Tuple, Dict
+
+#libclang imports
+import clang.cindex
+from clang.cindex import TranslationUnit, Index, CursorKind, Cursor
 
 if "LLVM_CONFIG" in os.environ:
   llvm_config_path = os.environ["LLVM_CONFIG"]
@@ -25,7 +24,7 @@ if "LLVM_CONFIG" in os.environ:
     print(llvm_config_path + " --libdir returned %d" % exec_result.return_code)
     sys.exit("llvm-config not found, please set the environment variable:\nexport LLVM_CONFIG=<path to clang installation>/bin/llvm-config")
   clang_tools_lib_path = exec_result.stdout.rstrip()
-  clang.cindex.Config.set_library_path(clang_tools_lib_path.decode('utf-8'))
+  clang.cindex.Config.set_library_path(clang_tools_lib_path.decode("utf-8"))
 else:
   sys.exit("llvm-config not found, please set the environment variable:\nexport LLVM_CONFIG=<path to clang installation>/bin/llvm-config")
 
@@ -40,18 +39,18 @@ def to_filename(classname: str) -> str:
     Returns:
         corresponding file name
     """
-  filename = classname.replace('Mock', '', 1)  # Remove only first "Mock"
+  filename = classname.replace("Mock", "", 1)  # Remove only first "Mock"
   ret = ""
   for index, val in enumerate(filename):
     if val.isupper() and index > 0:
-      ret += '_'
+      ret += "_"
     ret += val
   return ret.lower()
 
 
 def get_directives(translation_unit: Type[TranslationUnit]) -> str:
   """
-    "extracts" all head includes statements and other directives from the target code file (translation_unit)
+    "extracts" all header includes statements and other directives from the target code file (translation_unit)
 
     for instance:
         foo.h:
@@ -70,7 +69,7 @@ def get_directives(translation_unit: Type[TranslationUnit]) -> str:
     Returns:
         A string, contains all includes statements and other preprocessor directives before the
         first non-directive statement.
-    
+
     Notes:
         clang lib provides API like tranlation_unit.get_includes() to get include directives.
         But we can't use it as it requires presence of the included files to return the full list.
@@ -81,7 +80,7 @@ def get_directives(translation_unit: Type[TranslationUnit]) -> str:
   for descendant in cursor.walk_preorder():
     if descendant.location.file is not None and descendant.location.file.name == cursor.displayname:
       filename = descendant.location.file.name
-      with open(filename, 'r') as source_file:
+      with open(filename, "r") as source_file:
         contents = source_file.read()
       return contents[:descendant.extent.start.offset]
   return ""
@@ -175,7 +174,7 @@ def extract_definition(cursor: Cursor, classnames: List[str]) -> Tuple[str, str,
         manually.
     """
   filename = cursor.location.file.name
-  with open(filename, 'r') as source_file:
+  with open(filename, "r") as source_file:
     contents = source_file.read()
   class_name = cursor.spelling
   class_defn = contents[cursor.extent.start.offset:cursor.extent.end.offset] + ";"
@@ -247,16 +246,16 @@ def extract_implementations(impl_cursors: List[Cursor], source_code: str) -> Dic
       # i is not the last method, get the start line for the next method
       # as the last line of i
       _, impl_end = get_implline(impl_cursors[i + 1])
-      impl = ''.join(source_code[implline:impl_end])
+      impl = "".join(source_code[implline:impl_end])
     else:
       # i is the last method, after removing the lines containing close brackets
       # for namespaces, the rest should be the function body
       offset = 0
       while implline + offset < len(source_code):
-        if '// namespace' in source_code[implline + offset]:
+        if "// namespace" in source_code[implline + offset]:
           break
         offset += 1
-      impl = ''.join(source_code[implline:implline + offset])
+      impl = "".join(source_code[implline:implline + offset])
     if classname in classname_to_impl:
       classname_to_impl[classname] += impl + "\n"
     else:
@@ -302,7 +301,7 @@ def get_enclosing_namespace(defn: Cursor) -> Tuple[str, str]:
     namespace_prefix = "namespace {} {{\n".format(parent_cursor.spelling) + namespace_prefix
     namespace_suffix += "\n}"
     parent_cursor = parent_cursor.semantic_parent
-  namespace_suffix += '\n'
+  namespace_suffix += "\n"
   return namespace_prefix, namespace_suffix
 
 
@@ -342,13 +341,13 @@ def main(args):
 
   impl_includes = get_directives(impl_translation_unit)
 
-  decl_translation_unit = idx.parse(decl_filename, ['-x', 'c++'])
+  decl_translation_unit = idx.parse(decl_filename, ["-x", "c++"])
   defns = class_definitions(decl_translation_unit.cursor)
   decl_includes = get_directives(decl_translation_unit)
 
   impl_cursors = class_implementations(impl_translation_unit.cursor)
 
-  with open(impl_filename, 'r') as source_file:
+  with open(impl_filename, "r") as source_file:
     contents = source_file.readlines()
   classname_to_impl = extract_implementations(impl_cursors, contents)
 
@@ -360,7 +359,7 @@ def main(args):
 
     includes = ""
     for name in deps:
-      includes += '#include "{}.h"\n'.format(to_filename(name))
+      includes += "#include "{}.h"\n".format(to_filename(name))
 
     class_defn = decl_includes + includes + class_defn
 
@@ -368,7 +367,7 @@ def main(args):
     if class_name not in classname_to_impl:
       print("Warning: empty class {}".format(class_name))
     else:
-      impl_include = impl_includes.replace(decl_filename, '{}.h'.format(to_filename(class_name)))
+      impl_include = impl_includes.replace(decl_filename, "{}.h".format(to_filename(class_name)))
       # we need to enclose methods with namespaces
       namespace_prefix, namespace_suffix = get_enclosing_namespace(defn)
       class_impl = impl_include + namespace_prefix + \
@@ -377,18 +376,18 @@ def main(args):
     write_file(class_name, class_defn, class_impl)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   PARSER = argparse.ArgumentParser()
   PARSER.add_argument(
-      '-d',
-      '--decl',
-      default='mocks.h',
+      "-d",
+      "--decl",
+      default="mocks.h",
       help="Path to the monolithic header .h file that needs to be splitted",
   )
   PARSER.add_argument(
-      '-i',
-      '--impl',
-      default='mocks.cc',
+      "-i",
+      "--impl",
+      default="mocks.cc",
       help="Path to the implementation code .cc file that needs to be splitted",
   )
   main(vars(PARSER.parse_args()))
