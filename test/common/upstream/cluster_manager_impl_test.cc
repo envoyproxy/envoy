@@ -5,22 +5,21 @@
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
-#include "test/mocks/upstream/health_checker.h"
-#include "test/mocks/upstream/thread_aware_load_balancer.h"
-
-using testing::_;
-using testing::Eq;
-using testing::InSequence;
-using testing::Invoke;
-using testing::Mock;
-using testing::NiceMock;
-using testing::Return;
-using testing::ReturnNew;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Upstream {
 namespace {
+
+using ::testing::_;
+using ::testing::DoAll;
+using ::testing::Eq;
+using ::testing::InSequence;
+using ::testing::Invoke;
+using ::testing::Mock;
+using ::testing::NiceMock;
+using ::testing::Return;
+using ::testing::ReturnNew;
+using ::testing::SaveArg;
 
 envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml,
                                                                  bool avoid_boosting = true) {

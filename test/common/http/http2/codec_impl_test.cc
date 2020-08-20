@@ -671,6 +671,65 @@ TEST_P(Http2CodecImplTest, TrailingHeaders) {
   response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{{"trailing", "header"}});
 }
 
+// When having empty trailers, codec submits empty buffer and end_stream instead.
+TEST_P(Http2CodecImplTest, IgnoreTrailingEmptyHeaders) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http2_skip_encoding_empty_trailers", "true"}});
+
+  initialize();
+
+  Buffer::OwnedImpl empty_buffer;
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  Buffer::OwnedImpl hello("hello");
+  request_encoder_->encodeData(hello, false);
+  EXPECT_CALL(request_decoder_, decodeData(BufferEqual(&empty_buffer), true));
+  request_encoder_->encodeTrailers(TestRequestTrailerMapImpl{});
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder_->encodeHeaders(response_headers, false);
+  EXPECT_CALL(response_decoder_, decodeData(_, false));
+  Buffer::OwnedImpl world("world");
+  response_encoder_->encodeData(world, false);
+  EXPECT_CALL(response_decoder_, decodeData(BufferEqual(&empty_buffer), true));
+  response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{});
+}
+
+// When having empty trailers and "envoy.reloadable_features.http2_skip_encoding_empty_trailers" is
+// turned off, codec submits empty trailers.
+TEST_P(Http2CodecImplTest, SubmitTrailingEmptyHeaders) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http2_skip_encoding_empty_trailers", "false"}});
+
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  Buffer::OwnedImpl hello("hello");
+  request_encoder_->encodeData(hello, false);
+  EXPECT_CALL(request_decoder_, decodeTrailers_(_));
+  request_encoder_->encodeTrailers(TestRequestTrailerMapImpl{});
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder_->encodeHeaders(response_headers, false);
+  EXPECT_CALL(response_decoder_, decodeData(_, false));
+  Buffer::OwnedImpl world("world");
+  response_encoder_->encodeData(world, false);
+  EXPECT_CALL(response_decoder_, decodeTrailers_(_));
+  response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{});
+}
+
 TEST_P(Http2CodecImplTest, TrailingHeadersLargeClientBody) {
   initialize();
 
@@ -1801,7 +1860,12 @@ TEST_P(Http2CodecImplTest, PingFlood) {
         buffer.move(frame);
       }));
 
-  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
+  // Legacy codec does not propagate error details and uses generic error message
+  EXPECT_THROW_WITH_MESSAGE(
+      client_->sendPendingFrames().IgnoreError(), ServerCodecError,
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")
+          ? "Too many control frames in the outbound queue."
+          : "Too many frames in the outbound queue.");
   EXPECT_EQ(ack_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES);
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_control_flood").value());
 }
@@ -1824,7 +1888,7 @@ TEST_P(Http2CodecImplTest, PingFloodMitigationDisabled) {
 
   EXPECT_CALL(server_connection_, write(_, _))
       .Times(CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES + 1);
-  EXPECT_NO_THROW(client_->sendPendingFrames());
+  EXPECT_NO_THROW(client_->sendPendingFrames().IgnoreError());
 }
 
 // Verify that outbound control frame counter decreases when send buffer is drained
@@ -1854,7 +1918,7 @@ TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
       }));
 
   // We should be 1 frame under the control frame flood mitigation threshold.
-  EXPECT_NO_THROW(client_->sendPendingFrames());
+  EXPECT_NO_THROW(client_->sendPendingFrames().IgnoreError());
   EXPECT_EQ(ack_count, kMaxOutboundControlFrames);
 
   // Drain floor(kMaxOutboundFrames / 2) slices from the send buffer
@@ -1866,12 +1930,17 @@ TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
   }
   // The number of outbound frames should be half of max so the connection should not be
   // terminated.
-  EXPECT_NO_THROW(client_->sendPendingFrames());
+  EXPECT_NO_THROW(client_->sendPendingFrames().IgnoreError());
   EXPECT_EQ(ack_count, kMaxOutboundControlFrames + kMaxOutboundControlFrames / 2);
 
   // 1 more ping frame should overflow the outbound frame limit.
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
+  // Legacy codec does not propagate error details and uses generic error message
+  EXPECT_THROW_WITH_MESSAGE(
+      client_->sendPendingFrames().IgnoreError(), ServerCodecError,
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")
+          ? "Too many control frames in the outbound queue."
+          : "Too many frames in the outbound queue.");
 }
 
 // Verify that codec detects flood of outbound HEADER frames
@@ -1898,7 +1967,8 @@ TEST_P(Http2CodecImplTest, ResponseHeadersFlood) {
   // Presently flood mitigation is done only when processing downstream data
   // So we need to send stream from downstream client to trigger mitigation
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
+  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
+                            "Too many frames in the outbound queue.");
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
@@ -1931,7 +2001,8 @@ TEST_P(Http2CodecImplTest, ResponseDataFlood) {
   // Presently flood mitigation is done only when processing downstream data
   // So we need to send stream from downstream client to trigger mitigation
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
+  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
+                            "Too many frames in the outbound queue.");
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
@@ -1963,7 +2034,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFloodMitigationDisabled) {
   // Presently flood mitigation is done only when processing downstream data
   // So we need to send stream from downstream client to trigger mitigation
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_NO_THROW(client_->sendPendingFrames());
+  EXPECT_NO_THROW(client_->sendPendingFrames().IgnoreError());
 }
 
 // Verify that outbound frame counter decreases when send buffer is drained
@@ -2005,7 +2076,8 @@ TEST_P(Http2CodecImplTest, ResponseDataFloodCounterReset) {
   // Presently flood mitigation is done only when processing downstream data
   // So we need to send a frame from downstream client to trigger mitigation
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
+  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
+                            "Too many frames in the outbound queue.");
 }
 
 // Verify that control frames are added to the counter of outbound frames of all types.
@@ -2034,7 +2106,8 @@ TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
   }
   // Send one PING frame above the outbound queue size limit
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
+  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
+                            "Too many frames in the outbound queue.");
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES);
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
@@ -2042,25 +2115,35 @@ TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
 
 TEST_P(Http2CodecImplTest, PriorityFlood) {
   priorityFlood();
-  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
+  // Legacy codec does not propagate error details and uses generic error message
+  EXPECT_THROW_WITH_MESSAGE(
+      client_->sendPendingFrames().IgnoreError(), ServerCodecError,
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")
+          ? "Too many PRIORITY frames"
+          : "Flooding was detected in this HTTP/2 session, and it must be closed");
 }
 
 TEST_P(Http2CodecImplTest, PriorityFloodOverride) {
   max_inbound_priority_frames_per_stream_ = 2147483647;
 
   priorityFlood();
-  EXPECT_NO_THROW(client_->sendPendingFrames());
+  EXPECT_NO_THROW(client_->sendPendingFrames().IgnoreError());
 }
 
 TEST_P(Http2CodecImplTest, WindowUpdateFlood) {
   windowUpdateFlood();
-  EXPECT_THROW(client_->sendPendingFrames(), ServerCodecError);
+  // Legacy codec does not propagate error details and uses generic error message
+  EXPECT_THROW_WITH_MESSAGE(
+      client_->sendPendingFrames().IgnoreError(), ServerCodecError,
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")
+          ? "Too many WINDOW_UPDATE frames"
+          : "Flooding was detected in this HTTP/2 session, and it must be closed");
 }
 
 TEST_P(Http2CodecImplTest, WindowUpdateFloodOverride) {
   max_inbound_window_update_frames_per_data_frame_sent_ = 2147483647;
   windowUpdateFlood();
-  EXPECT_NO_THROW(client_->sendPendingFrames());
+  EXPECT_NO_THROW(client_->sendPendingFrames().IgnoreError());
 }
 
 TEST_P(Http2CodecImplTest, EmptyDataFlood) {
@@ -2070,6 +2153,11 @@ TEST_P(Http2CodecImplTest, EmptyDataFlood) {
   auto status = server_wrapper_.dispatch(data, *server_);
   EXPECT_FALSE(status.ok());
   EXPECT_TRUE(isBufferFloodError(status));
+  // Legacy codec does not propagate error details and uses generic error message
+  EXPECT_EQ(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")
+                ? "Too many consecutive frames with an empty payload"
+                : "Flooding was detected in this HTTP/2 session, and it must be closed",
+            status.message());
 }
 
 TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
@@ -2162,34 +2250,7 @@ public:
 
   nghttp2_session* create(const nghttp2_session_callbacks*,
                           typename Nghttp2SessionFactoryType::ConnectionImplType* connection,
-                          const nghttp2_option*) override {
-    // Only need to provide callbacks required to send METADATA frames.
-    nghttp2_session_callbacks_new(&callbacks_);
-    nghttp2_session_callbacks_set_pack_extension_callback(
-        callbacks_,
-        [](nghttp2_session*, uint8_t* data, size_t length, const nghttp2_frame*,
-           void* user_data) -> ssize_t {
-          // Double cast required due to multiple inheritance.
-          return static_cast<MetadataTestClientConnectionImpl<TestClientConnectionImplType>*>(
-                     static_cast<typename Nghttp2SessionFactoryType::ConnectionImplType*>(
-                         user_data))
-              ->encoder_.packNextFramePayload(data, length);
-        });
-    nghttp2_session_callbacks_set_send_callback(
-        callbacks_,
-        [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
-          // Cast down to MetadataTestClientConnectionImpl to leverage friendship.
-          return static_cast<MetadataTestClientConnectionImpl<TestClientConnectionImplType>*>(
-                     static_cast<typename Nghttp2SessionFactoryType::ConnectionImplType*>(
-                         user_data))
-              ->onSend(data, length);
-        });
-    nghttp2_option_new(&options_);
-    nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
-    nghttp2_session* session;
-    nghttp2_session_client_new2(&session, callbacks_, connection, options_);
-    return session;
-  }
+                          const nghttp2_option*) override;
 
   void init(nghttp2_session*, typename Nghttp2SessionFactoryType::ConnectionImplType*,
             const envoy::config::core::v3::Http2ProtocolOptions&) override {}
@@ -2198,6 +2259,77 @@ private:
   nghttp2_session_callbacks* callbacks_;
   nghttp2_option* options_;
 };
+
+template <typename Nghttp2SessionFactoryType, typename TestClientConnectionImplType>
+nghttp2_session*
+TestNghttp2SessionFactory<Nghttp2SessionFactoryType, TestClientConnectionImplType>::create(
+    const nghttp2_session_callbacks*,
+    typename Nghttp2SessionFactoryType::ConnectionImplType* connection, const nghttp2_option*) {
+  // Only need to provide callbacks required to send METADATA frames.
+  nghttp2_session_callbacks_new(&callbacks_);
+  nghttp2_session_callbacks_set_pack_extension_callback(
+      callbacks_,
+      [](nghttp2_session*, uint8_t* data, size_t length, const nghttp2_frame*,
+         void* user_data) -> ssize_t {
+        // Double cast required due to multiple inheritance.
+        return static_cast<MetadataTestClientConnectionImpl<TestClientConnectionImplType>*>(
+                   static_cast<typename Nghttp2SessionFactoryType::ConnectionImplType*>(user_data))
+            ->encoder_.packNextFramePayload(data, length);
+      });
+  nghttp2_session_callbacks_set_send_callback(
+      callbacks_,
+      [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
+        // Cast down to MetadataTestClientConnectionImpl to leverage friendship.
+        auto status_or_len =
+            static_cast<MetadataTestClientConnectionImpl<TestClientConnectionImplType>*>(
+                static_cast<typename Nghttp2SessionFactoryType::ConnectionImplType*>(user_data))
+                ->onSend(data, length);
+        if (status_or_len.ok()) {
+          return status_or_len.value();
+        }
+        return NGHTTP2_ERR_CALLBACK_FAILURE;
+      });
+  nghttp2_option_new(&options_);
+  nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
+  nghttp2_session* session;
+  nghttp2_session_client_new2(&session, callbacks_, connection, options_);
+  return session;
+}
+
+template <>
+nghttp2_session* TestNghttp2SessionFactory<Envoy::Http::Legacy::Http2::ProdNghttp2SessionFactory,
+                                           TestClientConnectionImplLegacy>::
+    create(const nghttp2_session_callbacks*,
+           Envoy::Http::Legacy::Http2::ProdNghttp2SessionFactory::ConnectionImplType* connection,
+           const nghttp2_option*) {
+  // Only need to provide callbacks required to send METADATA frames.
+  nghttp2_session_callbacks_new(&callbacks_);
+  nghttp2_session_callbacks_set_pack_extension_callback(
+      callbacks_,
+      [](nghttp2_session*, uint8_t* data, size_t length, const nghttp2_frame*,
+         void* user_data) -> ssize_t {
+        // Double cast required due to multiple inheritance.
+        return static_cast<MetadataTestClientConnectionImpl<TestClientConnectionImplLegacy>*>(
+                   static_cast<
+                       Envoy::Http::Legacy::Http2::ProdNghttp2SessionFactory::ConnectionImplType*>(
+                       user_data))
+            ->encoder_.packNextFramePayload(data, length);
+      });
+  nghttp2_session_callbacks_set_send_callback(
+      callbacks_,
+      [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
+        // Cast down to MetadataTestClientConnectionImpl to leverage friendship.
+        return static_cast<MetadataTestClientConnectionImpl<TestClientConnectionImplLegacy>*>(
+                   static_cast<typename Envoy::Http::Legacy::Http2::ProdNghttp2SessionFactory::
+                                   ConnectionImplType*>(user_data))
+            ->onSend(data, length);
+      });
+  nghttp2_option_new(&options_);
+  nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
+  nghttp2_session* session;
+  nghttp2_session_client_new2(&session, callbacks_, connection, options_);
+  return session;
+}
 
 using TestNghttp2SessionFactoryNew =
     TestNghttp2SessionFactory<ProdNghttp2SessionFactory, TestClientConnectionImplNew>;
