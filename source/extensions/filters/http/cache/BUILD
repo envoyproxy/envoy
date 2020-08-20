@@ -77,6 +77,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/http:header_map_interface",
+        "//source/common/http:headers_lib",
     ],
 )
 

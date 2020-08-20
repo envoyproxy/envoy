@@ -349,6 +349,223 @@ TEST(ReadAndRemoveLeadingDigits, ComprehensiveTest) {
   testReadAndRemoveLeadingDigits("184467440737095516159yz", -1, "184467440737095516159yz");
 }
 
+TEST(NoVary, Null) {
+  Http::TestResponseHeaderMapImpl headers;
+  ASSERT_TRUE(VaryHeader::noVary(headers));
+}
+
+TEST(NoVary, Empty) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", ""}};
+  ASSERT_TRUE(VaryHeader::noVary(headers));
+}
+
+TEST(NoVary, NotEmpty) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding"}};
+  ASSERT_FALSE(VaryHeader::noVary(headers));
+}
+
+TEST(ParseHeaderValue, Null) {
+  Http::TestResponseHeaderMapImpl headers;
+  std::vector<std::string> result =
+      VaryHeader::parseHeaderValue(headers.get(Http::Headers::get().Vary));
+
+  EXPECT_EQ(result.size(), 0);
+}
+
+TEST(ParseHeaderValue, Empty) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", ""}};
+  std::vector<std::string> result =
+      VaryHeader::parseHeaderValue(headers.get(Http::Headers::get().Vary));
+
+  EXPECT_EQ(result.size(), 0);
+}
+
+TEST(ParseHeaderValue, SingleValue) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding"}};
+  std::vector<std::string> result =
+      VaryHeader::parseHeaderValue(headers.get(Http::Headers::get().Vary));
+
+  EXPECT_EQ(result.size(), 1);
+  EXPECT_EQ(result[0], "accept-encoding");
+}
+
+class ParseHeaderValueMultipleTest : public testing::Test,
+                                     public testing::WithParamInterface<std::string> {
+protected:
+  Http::TestResponseHeaderMapImpl headers{{"vary", GetParam()}};
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    MultipleValuesMixedSpaces, ParseHeaderValueMultipleTest,
+    testing::Values("accept-encoding,accept-language", " accept-encoding,accept-language",
+                    "accept-encoding ,accept-language", "accept-encoding, accept-language",
+                    "accept-encoding,accept-language ", " accept-encoding, accept-language ",
+                    "  accept-encoding  ,  accept-language  "));
+
+TEST_P(ParseHeaderValueMultipleTest, MultipleValuesMixedSpaces) {
+  std::vector<std::string> result =
+      VaryHeader::parseHeaderValue(headers.get(Http::Headers::get().Vary));
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0], "accept-encoding");
+  EXPECT_EQ(result[1], "accept-language");
+}
+
+class ParseHeaderValueInvalid : public testing::Test,
+                                public testing::WithParamInterface<std::string> {
+protected:
+  Http::TestResponseHeaderMapImpl headers{{"vary", GetParam()}};
+};
+
+INSTANTIATE_TEST_SUITE_P(InvalidValues, ParseHeaderValueInvalid,
+                         testing::Values("*", "accept encoding", "accept,,encoding",
+                                         ",accept-encoding", "accept-encoding,"));
+
+TEST_P(ParseHeaderValueInvalid, InvalidValues) {
+  std::vector<std::string> result =
+      VaryHeader::parseHeaderValue(headers.get(Http::Headers::get().Vary));
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(VaryIsAllowed, Null) {
+  Http::TestResponseHeaderMapImpl headers;
+  ASSERT_TRUE(VaryHeader::isAllowed(headers));
+}
+
+TEST(VaryIsAllowed, Empty) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", ""}};
+  ASSERT_TRUE(VaryHeader::isAllowed(headers));
+}
+
+TEST(VaryIsAllowed, SingleAllowed) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding"}};
+  ASSERT_TRUE(VaryHeader::isAllowed(headers));
+}
+
+TEST(VaryIsAllowed, MultipleAllowed) {
+  Http::TestResponseHeaderMapImpl headers{
+      {"vary", "accept-encoding, accept-encoding, accept-encoding"}};
+  ASSERT_TRUE(VaryHeader::isAllowed(headers));
+}
+
+TEST(VaryIsAllowed, StarNotAllowed) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", "*"}};
+  ASSERT_FALSE(VaryHeader::isAllowed(headers));
+}
+
+TEST(VaryIsAllowed, SingleNotAllowed) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", "wrong-header"}};
+  ASSERT_FALSE(VaryHeader::isAllowed(headers));
+}
+
+TEST(VaryIsAllowed, MultipleNotAllowed) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding, wrong-header"}};
+  ASSERT_FALSE(VaryHeader::isAllowed(headers));
+}
+
+std::vector<const Http::HeaderEntry*>
+createHeaderVector(const Http::TestRequestHeaderMapImpl& request_headers) {
+  std::vector<const Http::HeaderEntry*> header_vector;
+  static const absl::flat_hash_set<std::string> allowed_headers = {"accept-encoding",
+                                                                   "accept-language", "width"};
+
+  for (const std::string& header : allowed_headers) {
+    const Http::HeaderEntry* cur_header = request_headers.get(Http::LowerCaseString(header));
+    if (cur_header) {
+      header_vector.emplace_back(cur_header);
+    }
+  }
+
+  return header_vector;
+}
+
+TEST(CreateVaryKey, EmptyVaryEntry) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", ""}};
+  Http::TestRequestHeaderMapImpl request_headers{{"accept-encoding", "gzip"}};
+
+  ASSERT_EQ(VaryHeader::createVaryKey(headers.get(Http::Headers::get().Vary),
+                                      createHeaderVector(request_headers)),
+            "vary-key:\n");
+}
+
+TEST(CreateVaryKey, SingleHeaderExists) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding"}};
+  Http::TestRequestHeaderMapImpl request_headers{{"accept-encoding", "gzip"}};
+
+  ASSERT_EQ(VaryHeader::createVaryKey(headers.get(Http::Headers::get().Vary),
+                                      createHeaderVector(request_headers)),
+            "vary-key:accept-encoding;\ngzip\n");
+}
+
+TEST(CreateVaryKey, SingleHeaderMissing) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding"}};
+  Http::TestRequestHeaderMapImpl request_headers;
+
+  ASSERT_EQ(VaryHeader::createVaryKey(headers.get(Http::Headers::get().Vary),
+                                      createHeaderVector(request_headers)),
+            "vary-key:accept-encoding;\n\n");
+}
+
+TEST(CreateVaryKey, MultipleHeadersAllExist) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding, accept-language, width"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"accept-encoding", "gzip"}, {"accept-language", "en-us"}, {"width", "640"}};
+
+  ASSERT_EQ(VaryHeader::createVaryKey(headers.get(Http::Headers::get().Vary),
+                                      createHeaderVector(request_headers)),
+            "vary-key:accept-encoding;accept-language;width;\ngzip\nen-us\n640\n");
+}
+
+TEST(CreateVaryKey, MultipleHeadersSomeExist) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding, accept-language, width"}};
+  Http::TestRequestHeaderMapImpl request_headers{{"accept-encoding", "gzip"}, {"width", "640"}};
+
+  ASSERT_EQ(VaryHeader::createVaryKey(headers.get(Http::Headers::get().Vary),
+                                      createHeaderVector(request_headers)),
+            "vary-key:accept-encoding;accept-language;width;\ngzip\n\n640\n");
+}
+
+TEST(CreateVaryKey, ExtraRequestHeaders) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding, width"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"accept-encoding", "gzip"}, {"accept-language", "en-us"}, {"width", "640"}};
+
+  ASSERT_EQ(VaryHeader::createVaryKey(headers.get(Http::Headers::get().Vary),
+                                      createHeaderVector(request_headers)),
+            "vary-key:accept-encoding;width;\ngzip\n640\n");
+}
+
+TEST(CreateVaryKey, MultipleHeadersNoneExist) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding, accept-language, width"}};
+  Http::TestRequestHeaderMapImpl request_headers;
+
+  ASSERT_EQ(VaryHeader::createVaryKey(headers.get(Http::Headers::get().Vary),
+                                      createHeaderVector(request_headers)),
+            "vary-key:accept-encoding;accept-language;width;\n\n\n\n");
+}
+
+TEST(PossibleVariedHeaders, Empty) {
+  Http::TestRequestHeaderMapImpl request_headers;
+  std::vector<const Http::HeaderEntry*> result = VaryHeader::possibleVariedHeaders(request_headers);
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(PossibleVariedHeaders, NoOverlap) {
+  Http::TestRequestHeaderMapImpl request_headers{{"abc", "123"}};
+  std::vector<const Http::HeaderEntry*> result = VaryHeader::possibleVariedHeaders(request_headers);
+
+  EXPECT_TRUE(result.empty());
+}
+
+TEST(PossibleVariedHeaders, Overlap) {
+  Http::TestRequestHeaderMapImpl request_headers{{"accept-encoding", "gzip"}, {"abc", "123"}};
+  std::vector<const Http::HeaderEntry*> result = VaryHeader::possibleVariedHeaders(request_headers);
+
+  ASSERT_EQ(result.size(), 1);
+  EXPECT_EQ(result[0]->key(), "accept-encoding");
+  EXPECT_EQ(result[0]->value(), "gzip");
+}
+
 } // namespace
 } // namespace Cache
 } // namespace HttpFilters

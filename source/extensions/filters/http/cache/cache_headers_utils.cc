@@ -168,6 +168,135 @@ absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::str
   return absl::nullopt;
 }
 
+absl::flat_hash_set<std::string> VaryHeader::parseAllowlist() {
+  // TODO(cbdm): Populate the hash_set from
+  // envoy::extensions::filters::http::cache::v3alpha::CacheConfig::allowed_vary_headers.
+  return {"accept-encoding"};
+}
+
+bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) {
+  if (noVary(headers)) {
+    return true;
+  }
+
+  std::vector<std::string> varied_headers =
+      parseHeaderValue(headers.get(Http::Headers::get().Vary));
+  if (varied_headers.empty()) {
+    // Value was malformed.
+    return false;
+  }
+
+  for (const std::string& header : varied_headers) {
+    if (!allowed_headers_.contains(header)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool VaryHeader::noVary(const Http::ResponseHeaderMap& headers) {
+  const Http::HeaderEntry* vary_header = headers.get(Http::Headers::get().Vary);
+  return ((!vary_header) || (vary_header->value().empty()));
+}
+
+bool VaryHeader::noVary(const Http::ResponseHeaderMapPtr& headers) {
+  return ((!headers) || (noVary(*headers)));
+}
+
+std::string VaryHeader::createVaryKey(const Http::HeaderEntry* vary_header,
+                                      const std::vector<const Http::HeaderEntry*>& entry_headers) {
+  if (!vary_header) {
+    return "";
+  }
+
+  ASSERT(vary_header->key() == "vary");
+
+  std::string vary_key = "vary-key:";
+  std::string vary_key_values;
+
+  for (const std::string& header : parseHeaderValue(vary_header)) {
+    absl::StrAppend(&vary_key, header, ";");
+
+    for (const Http::HeaderEntry* cur_entry : entry_headers) {
+      if (cur_entry->key() == header) {
+        // TODO(cbdm): Can add some bucketing logic here based on header.
+        absl::StrAppend(&vary_key_values, cur_entry->value().getStringView());
+        break;
+      }
+    }
+
+    absl::StrAppend(&vary_key_values, "\n");
+  }
+
+  absl::StrAppend(&vary_key, "\n", vary_key_values);
+
+  return vary_key;
+}
+
+std::vector<std::string> VaryHeader::parseHeaderValue(const Http::HeaderEntry* vary_header) {
+  if (!vary_header) {
+    return {};
+  }
+
+  ASSERT(vary_header->key() == "vary");
+
+  // Vary header value should follow rules set per:
+  // https://tools.ietf.org/html/rfc7231#section-7.1.4
+
+  std::vector<std::string> header_values =
+      absl::StrSplit(vary_header->value().getStringView(), ',');
+  for (std::string& value : header_values) {
+    absl::StripAsciiWhitespace(&value);
+    absl::AsciiStrToLower(&value);
+
+    // "Vary: *" should always be ignored per:
+    // https://tools.ietf.org/html/rfc7234#section-4.1
+    if (!isValidHeaderName(value) || value == "*") {
+      return {};
+    }
+  }
+
+  return header_values;
+}
+
+bool VaryHeader::isValidHeaderName(const std::string value) {
+  // Header name rules per:
+  // https://tools.ietf.org/html/rfc7230#section-3.2
+
+  if (value.empty()) {
+    return false;
+  }
+
+  static const absl::flat_hash_set<char> separators = {'(', ')',  '<',  '>', '@', ',', ';',
+                                                       ':', '\\', '\"', '/', '[', ']', '?',
+                                                       '=', '{',  '}',  ' ', '\t'};
+
+  for (const char& c : value) {
+    if (31 > c || c > 126 || separators.contains(c)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+std::vector<const Http::HeaderEntry*>
+VaryHeader::possibleVariedHeaders(const Http::RequestHeaderMap& request_headers) {
+  // TODO(cbdm): Could use a map for faster lookup when combining these values with the response
+  // headers in createVaryKey.
+  std::vector<const Http::HeaderEntry*> possible_headers;
+
+  for (const std::string& header : allowed_headers_) {
+    const Http::HeaderEntry* cur_header = request_headers.get(Http::LowerCaseString(header));
+
+    if (cur_header) {
+      possible_headers.emplace_back(cur_header);
+    }
+  }
+
+  return possible_headers;
+}
+
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions
