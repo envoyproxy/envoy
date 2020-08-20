@@ -73,6 +73,13 @@ public:
    *         for at least MultiKillTimeout before we kill the process.
    */
   virtual double wdMultiKillThreshold() const PURE;
+
+  /**
+   * @return Protobuf::RepeatedPtrField<envoy::config::bootstrap::v3::Watchdog::WatchdogAction>
+   *         the WatchDog Actions that trigger on WatchDog Events.
+   */
+  virtual Protobuf::RepeatedPtrField<envoy::config::bootstrap::v3::Watchdog::WatchdogAction>
+  wdActions() const PURE;
 };
 
 /**

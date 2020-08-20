@@ -20,6 +20,7 @@
 #include "common/http/headers.h"
 #include "common/http/http2/codec_stats.h"
 #include "common/http/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -333,6 +334,18 @@ void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& 
 }
 
 void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
+  ASSERT(local_end_stream_);
+  const bool skip_encoding_empty_trailers =
+      trailers.empty() && parent_.skip_encoding_empty_trailers_;
+  if (skip_encoding_empty_trailers) {
+    ENVOY_CONN_LOG(debug, "skipping submitting trailers", parent_.connection_);
+
+    // Instead of submitting empty trailers, we send empty data instead.
+    Buffer::OwnedImpl empty_buffer;
+    encodeDataHelper(empty_buffer, /*end_stream=*/true, skip_encoding_empty_trailers);
+    return;
+  }
+
   std::vector<nghttp2_nv> final_headers;
   buildHeaders(final_headers, trailers);
   int rc = nghttp2_submit_trailer(parent_.session_, stream_id_, final_headers.data(),
@@ -428,6 +441,15 @@ void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
 
 void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!local_end_stream_);
+  encodeDataHelper(data, end_stream, /*skip_encoding_empty_trailers=*/false);
+}
+
+void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool end_stream,
+                                                  bool skip_encoding_empty_trailers) {
+  if (skip_encoding_empty_trailers) {
+    ASSERT(data.length() == 0 && end_stream);
+  }
+
   local_end_stream_ = end_stream;
   parent_.stats_.pending_send_bytes_.add(data.length());
   pending_send_data_.move(data);
@@ -512,6 +534,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           http2_options.max_inbound_priority_frames_per_stream().value()),
       max_inbound_window_update_frames_per_data_frame_sent_(
           http2_options.max_inbound_window_update_frames_per_data_frame_sent().value()),
+      skip_encoding_empty_trailers_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_skip_encoding_empty_trailers")),
       dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {}
 
 ConnectionImpl::~ConnectionImpl() {
@@ -1251,7 +1275,7 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& decoder) {
     stream->runHighWatermarkCallbacks();
   }
   ClientStreamImpl& stream_ref = *stream;
-  stream->moveIntoList(std::move(stream), active_streams_);
+  LinkedList::moveIntoList(std::move(stream), active_streams_);
   return stream_ref;
 }
 
@@ -1317,7 +1341,7 @@ int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   }
   stream->request_decoder_ = &callbacks_.newStream(*stream);
   stream->stream_id_ = frame->hd.stream_id;
-  stream->moveIntoList(std::move(stream), active_streams_);
+  LinkedList::moveIntoList(std::move(stream), active_streams_);
   nghttp2_session_set_stream_user_data(session_, frame->hd.stream_id,
                                        active_streams_.front().get());
   return 0;

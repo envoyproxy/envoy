@@ -71,7 +71,7 @@ HttpConnPoolImplBase::newPendingRequest(Envoy::ConnectionPool::AttachContext& co
   ENVOY_LOG(debug, "queueing stream due to no available connections");
   Envoy::ConnectionPool::PendingRequestPtr pending_stream(
       new HttpPendingRequest(*this, decoder, callbacks));
-  pending_stream->moveIntoList(std::move(pending_stream), pending_streams_);
+  LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
   return pending_streams_.front().get();
 }
 

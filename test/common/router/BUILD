@@ -63,6 +63,18 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_test(
+    name = "reset_header_parser_test",
+    srcs = ["reset_header_parser_test.cc"],
+    deps = [
+        "//source/common/http:header_utility_lib",
+        "//source/common/router:reset_header_parser_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "rds_impl_test",
     srcs = ["rds_impl_test.cc"],
     deps = [
@@ -154,12 +166,14 @@ envoy_cc_test(
     srcs = ["retry_state_impl_test.cc"],
     deps = [
         "//source/common/http:header_map_lib",
+        "//source/common/router:reset_header_parser_lib",
         "//source/common/router:retry_state_lib",
         "//source/common/upstream:resource_manager_lib",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:test_runtime_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
@@ -289,7 +303,6 @@ envoy_cc_test(
     name = "router_upstream_log_test",
     srcs = ["router_upstream_log_test.cc"],
     external_deps = ["abseil_optional"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/network:utility_lib",

@@ -109,7 +109,6 @@ public:
   void clearCallbacks();
 
   ConnPoolImpl& parent_;
-  Upstream::HostDescriptionConstSharedPtr real_host_description_;
   ConnectionPool::UpstreamCallbacks* callbacks_{};
   Network::ClientConnectionPtr connection_;
   ConnectionPool::ConnectionStatePtr connection_state_;
@@ -164,7 +163,7 @@ public:
   newPendingRequest(Envoy::ConnectionPool::AttachContext& context) override {
     Envoy::ConnectionPool::PendingRequestPtr pending_stream =
         std::make_unique<TcpPendingRequest>(*this, typedContext<TcpAttachContext>(context));
-    pending_stream->moveIntoList(std::move(pending_stream), pending_streams_);
+    LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
     return pending_streams_.front().get();
   }
 

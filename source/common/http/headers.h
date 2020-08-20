@@ -64,8 +64,15 @@ public:
   const LowerCaseString ContentEncoding{"content-encoding"};
   const LowerCaseString Etag{"etag"};
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
+  const LowerCaseString IfMatch{"if-match"};
+  const LowerCaseString IfNoneMatch{"if-none-match"};
+  const LowerCaseString IfModifiedSince{"if-modified-since"};
+  const LowerCaseString IfUnmodifiedSince{"if-unmodified-since"};
+  const LowerCaseString IfRange{"if-range"};
+  const LowerCaseString LastModified{"last-modified"};
   const LowerCaseString Origin{"origin"};
   const LowerCaseString OtSpanContext{"x-ot-span-context"};
+  const LowerCaseString Pragma{"pragma"};
   const LowerCaseString Referer{"referer"};
   const LowerCaseString Vary{"vary"};
 
@@ -112,7 +119,7 @@ using CustomHeaders = ConstSingleton<CustomHeaderValues>;
  */
 class HeaderValues {
 public:
-  const char* prefix() { return ThreadSafeSingleton<PrefixValue>::get().prefix(); }
+  const char* prefix() const { return ThreadSafeSingleton<PrefixValue>::get().prefix(); }
 
   const LowerCaseString Age{"age"};
   const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};
@@ -120,6 +127,7 @@ public:
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
   const LowerCaseString ContentLength{"content-length"};
+  const LowerCaseString ContentRange{"content-range"};
   const LowerCaseString ContentType{"content-type"};
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
@@ -191,6 +199,7 @@ public:
   const LowerCaseString Path{":path"};
   const LowerCaseString Protocol{":protocol"};
   const LowerCaseString ProxyConnection{"proxy-connection"};
+  const LowerCaseString Range{"range"};
   const LowerCaseString RequestId{"x-request-id"};
   const LowerCaseString Scheme{":scheme"};
   const LowerCaseString Server{"server"};

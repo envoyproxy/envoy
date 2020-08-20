@@ -61,8 +61,8 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   case ParseState::Continue:
     // do nothing but create the event
     ASSERT(file_event_ == nullptr);
-    file_event_ = cb.dispatcher().createFileEvent(
-        socket.ioHandle().fd(),
+    file_event_ = cb.socket().ioHandle().createFileEvent(
+        cb.dispatcher(),
         [this](uint32_t events) {
           ENVOY_LOG(trace, "http inspector event: {}", events);
           // inspector is always peeking and can never determine EOF.
@@ -93,7 +93,8 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
             break;
           }
         },
-        Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Closed);
+        Event::PlatformDefaultTriggerType,
+        Event::FileReadyType::Read | Event::FileReadyType::Closed);
     return Network::FilterStatus::StopIteration;
   }
   NOT_REACHED_GCOVR_EXCL_LINE;

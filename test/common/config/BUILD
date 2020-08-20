@@ -82,7 +82,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filesystem_subscription_impl_test",
     srcs = ["filesystem_subscription_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         ":filesystem_subscription_test_harness",
         "//test/mocks/event:event_mocks",
@@ -101,6 +100,8 @@ envoy_cc_test_library(
         "//source/common/config:utility_lib",
         "//source/common/event:dispatcher_lib",
         "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:test_time_lib",
@@ -293,7 +294,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "subscription_impl_test",
     srcs = ["subscription_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         ":delta_subscription_test_harness",
         ":filesystem_subscription_test_harness",

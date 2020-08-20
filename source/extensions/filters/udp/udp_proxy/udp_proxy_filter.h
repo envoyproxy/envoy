@@ -6,7 +6,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/network/socket_interface_impl.h"
+#include "common/network/socket_interface.h"
 #include "common/network/utility.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -222,12 +222,11 @@ private:
 
   virtual Network::IoHandlePtr createIoHandle(const Upstream::HostConstSharedPtr& host) {
     // Virtual so this can be overridden in unit tests.
-    return Network::SocketInterfaceSingleton::get().socket(Network::Socket::Type::Datagram,
-                                                           host->address());
+    return Network::ioHandleForAddr(Network::Socket::Type::Datagram, host->address());
   }
 
   // Upstream::ClusterUpdateCallbacks
-  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override;
+  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) final;
   void onClusterRemoval(const std::string& cluster_name) override;
 
   const UdpProxyFilterConfigSharedPtr config_;

@@ -122,9 +122,8 @@ jobs:
         condition: always()
 
   - job: docker
-    displayName: "Linux-x64 docker"
-    dependsOn: ["release"]
-    condition: and(succeeded(), eq(variables['PostSubmit'], 'true'), ne(variables['Build.Reason'], 'PullRequest'))
+    displayName: "Linux multi-arch docker"
+    dependsOn: ["release", "release_arm64"]
     pool:
       vmImage: "ubuntu-18.04"
     steps:
@@ -135,10 +134,17 @@ jobs:
           itemPattern: "bazel.release/envoy_binary.tar.gz"
           downloadType: single
           targetPath: $(Build.StagingDirectory)
-
+      - task: DownloadBuildArtifacts@0
+        inputs:
+          buildType: current
+          artifactName: "bazel.release.arm64"
+          itemPattern: "bazel.release.arm64/envoy_binary.tar.gz"
+          downloadType: single
+          targetPath: $(Build.StagingDirectory)
       - bash: |
           set -e
-          tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz
+          mkdir -p linux/amd64 && tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz -C ./linux/amd64
+          mkdir -p linux/arm64 && tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz -C ./linux/arm64
           ci/docker_ci.sh
         workingDirectory: $(Build.SourcesDirectory)
         env:
@@ -146,6 +152,11 @@ jobs:
           AZP_SHA1: $(Build.SourceVersion)
           DOCKERHUB_USERNAME: $(DockerUsername)
           DOCKERHUB_PASSWORD: $(DockerPassword)
+      - task: PublishBuildArtifacts@1
+        inputs:
+          pathtoPublish: "$(Build.StagingDirectory)/build_images"
+          artifactName: docker
+        condition: always()
 
   - job: macOS
     dependsOn: ["format"]

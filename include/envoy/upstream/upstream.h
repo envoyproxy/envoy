@@ -577,6 +577,8 @@ public:
   COUNTER(upstream_rq_pending_total)                                                               \
   COUNTER(upstream_rq_per_try_timeout)                                                             \
   COUNTER(upstream_rq_retry)                                                                       \
+  COUNTER(upstream_rq_retry_backoff_exponential)                                                   \
+  COUNTER(upstream_rq_retry_backoff_ratelimited)                                                   \
   COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
   COUNTER(upstream_rq_retry_overflow)                                                              \
   COUNTER(upstream_rq_retry_success)                                                               \
@@ -777,8 +779,8 @@ public:
   }
 
   /**
-   * @return const envoy::api::v2::Cluster::CommonLbConfig& the common configuration for all
-   *         load balancers for this cluster.
+   * @return const envoy::config::cluster::v3::Cluster::CommonLbConfig& the common configuration for
+   * all load balancers for this cluster.
    */
   virtual const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const PURE;
 
@@ -811,8 +813,8 @@ public:
   lbRingHashConfig() const PURE;
 
   /**
-   * @return const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>& the configuration
-   *         for the Original Destination load balancing policy, only used if type is set to
+   * @return const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>& the
+   * configuration for the Original Destination load balancing policy, only used if type is set to
    *         ORIGINAL_DST_LB.
    */
   virtual const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&
@@ -904,7 +906,7 @@ public:
   virtual const LoadBalancerSubsetInfo& lbSubsetInfo() const PURE;
 
   /**
-   * @return const envoy::api::v2::core::Metadata& the configuration metadata for this cluster.
+   * @return const envoy::config::core::v3::Metadata& the configuration metadata for this cluster.
    */
   virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
 

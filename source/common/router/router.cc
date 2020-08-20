@@ -569,9 +569,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
 
-  retry_state_ = createRetryState(route_entry_->retryPolicy(), headers, *cluster_,
-                                  request_vcluster_, config_.runtime_, config_.random_,
-                                  callbacks_->dispatcher(), route_entry_->priority());
+  retry_state_ = createRetryState(
+      route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, config_.runtime_,
+      config_.random_, callbacks_->dispatcher(), config_.timeSource(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
   // runtime keys.
@@ -589,7 +589,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   UpstreamRequestPtr upstream_request =
       std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
-  upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
+  LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
     onRequestComplete();
@@ -1169,7 +1169,7 @@ void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
 
   ASSERT(final_upstream_request);
   // Now put the final request back on this list.
-  final_upstream_request->moveIntoList(std::move(final_upstream_request), upstream_requests_);
+  LinkedList::moveIntoList(std::move(final_upstream_request), upstream_requests_);
 }
 
 void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
@@ -1551,7 +1551,7 @@ void Filter::doRetry() {
   }
 
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
-  upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
+  LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(!callbacks_->decodingBuffer() &&
                                             !downstream_trailers_ && downstream_end_stream_);
   // It's possible we got immediately reset which means the upstream request we just
@@ -1575,13 +1575,15 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
                        [](const auto& req) -> bool { return req->awaitingHeaders(); });
 }
 
-RetryStatePtr
-ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
-                             const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                             Runtime::Loader& runtime, Random::RandomGenerator& random,
-                             Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) {
+RetryStatePtr ProdFilter::createRetryState(const RetryPolicy& policy,
+                                           Http::RequestHeaderMap& request_headers,
+                                           const Upstream::ClusterInfo& cluster,
+                                           const VirtualCluster* vcluster, Runtime::Loader& runtime,
+                                           Random::RandomGenerator& random,
+                                           Event::Dispatcher& dispatcher, TimeSource& time_source,
+                                           Upstream::ResourcePriority priority) {
   return RetryStateImpl::create(policy, request_headers, cluster, vcluster, runtime, random,
-                                dispatcher, priority);
+                                dispatcher, time_source, priority);
 }
 
 } // namespace Router

@@ -2,18 +2,20 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/extensions/network/socket_interface/v3/default_socket_interface.pb.h"
-#include "envoy/network/socket.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/utility.h"
-#include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 
 namespace Envoy {
 namespace Network {
 
+IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only) const {
+  return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only);
+}
+
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
-                                        Address::IpVersion version, bool socket_v6only) {
+                                        Address::IpVersion version, bool socket_v6only) const {
 #if defined(__APPLE__) || defined(WIN32)
   int flags = 0;
 #else
@@ -42,7 +44,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
   const Api::SysCallSocketResult result = Api::OsSysCallsSingleton::get().socket(domain, flags, 0);
   RELEASE_ASSERT(SOCKET_VALID(result.rc_),
                  fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(result.rc_, socket_v6only);
+  IoHandlePtr io_handle = makeSocket(result.rc_, socket_v6only);
 
 #if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
@@ -54,7 +56,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 }
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
-                                        const Address::InstanceConstSharedPtr addr) {
+                                        const Address::InstanceConstSharedPtr addr) const {
   Address::IpVersion ip_version = addr->ip() ? addr->ip()->version() : Address::IpVersion::v4;
   int v6only = 0;
   if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6) {

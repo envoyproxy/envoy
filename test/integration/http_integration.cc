@@ -364,8 +364,7 @@ HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& ups
   if (!fake_upstream_connection_) {
     AssertionResult result = AssertionFailure();
     int upstream_index = 0;
-    Event::TestTimeSystem& time_system = timeSystem();
-    auto end_time = time_system.monotonicTime() + connection_wait_timeout;
+    Event::TestTimeSystem::RealTimeBound bound(connection_wait_timeout);
     // Loop over the upstreams until the call times out or an upstream request is received.
     while (!result) {
       upstream_index = upstream_index % upstream_indices.size();
@@ -375,7 +374,7 @@ HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& ups
       if (result) {
         upstream_with_request = upstream_index;
         break;
-      } else if (time_system.monotonicTime() >= end_time) {
+      } else if (!bound.withinBound()) {
         result = (AssertionFailure() << "Timed out waiting for new connection.");
         break;
       }

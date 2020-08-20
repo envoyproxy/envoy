@@ -10,7 +10,7 @@ load("@protodoc_pip3//:requirements.bzl", protodoc_pip_install = "pip_install")
 load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 
 # go version for rules_go
-GO_VERSION = "1.14.4"
+GO_VERSION = "1.14.7"
 
 def envoy_dependency_imports(go_version = GO_VERSION):
     rules_foreign_cc_dependencies()

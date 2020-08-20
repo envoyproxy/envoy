@@ -428,15 +428,14 @@ void SplitKeysSumResultRequest::onChildResponse(Common::Redis::RespValuePtr&& va
   }
 }
 
-InstanceImpl::InstanceImpl(Router& router, Stats::Scope& scope, const std::string& stat_prefix,
+InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
                            TimeSource& time_source, bool latency_in_micros,
-                           Common::Redis::FaultManager& fault_manager,
-                           Event::Dispatcher& dispatcher)
-    : simple_command_handler_(router), eval_command_handler_(router), mget_handler_(router),
-      mset_handler_(router),
-      split_keys_sum_result_handler_(router), stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(
-                                                  scope, stat_prefix + "splitter."))},
-      time_source_(time_source), fault_manager_(fault_manager), dispatcher_(dispatcher) {
+                           Common::Redis::FaultManagerPtr&& fault_manager)
+    : router_(std::move(router)), simple_command_handler_(*router_),
+      eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
+      split_keys_sum_result_handler_(*router_),
+      stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
+      time_source_(time_source), fault_manager_(std::move(fault_manager)) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
   }
@@ -458,7 +457,8 @@ InstanceImpl::InstanceImpl(Router& router, Stats::Scope& scope, const std::strin
 }
 
 SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
-                                          SplitCallbacks& callbacks) {
+                                          SplitCallbacks& callbacks,
+                                          Event::Dispatcher& dispatcher) {
   if ((request->type() != Common::Redis::RespType::Array) || request->asArray().empty()) {
     onInvalidRequest(callbacks);
     return nullptr;
@@ -517,7 +517,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   }
 
   // Fault Injection Check
-  const Common::Redis::Fault* fault_ptr = fault_manager_.getFaultForCommand(to_lower_string);
+  const Common::Redis::Fault* fault_ptr = fault_manager_->getFaultForCommand(to_lower_string);
 
   // Check if delay, which determines which callbacks to use. If a delay fault is enabled,
   // the delay fault itself wraps the request (or other fault) and the delay fault itself
@@ -528,7 +528,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   std::unique_ptr<DelayFaultRequest> delay_fault_ptr;
   if (has_delay_fault) {
     delay_fault_ptr = DelayFaultRequest::create(callbacks, handler->command_stats_, time_source_,
-                                                dispatcher_, fault_ptr->delayMs());
+                                                dispatcher, fault_ptr->delayMs());
   }
 
   // Note that the command_stats_ object of the original request is used for faults, so that our
@@ -578,12 +578,6 @@ void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefi
                                                            ? Stats::Histogram::Unit::Microseconds
                                                            : Stats::Histogram::Unit::Milliseconds)},
           handler}));
-}
-
-CommandSplitterPtr CommandSplitterFactoryImpl::create(Event::Dispatcher& dispatcher) {
-  return std::make_unique<CommandSplitter::InstanceImpl>(*router_, scope_, stat_prefix_,
-                                                         time_source_, latency_in_micros_,
-                                                         *fault_manager_, dispatcher);
 }
 
 } // namespace CommandSplitter

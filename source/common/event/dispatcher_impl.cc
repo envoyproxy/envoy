@@ -45,19 +45,13 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactory
       post_cb_(base_scheduler_.createSchedulableCallback([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
   ASSERT(!name_.empty());
-#ifdef ENVOY_HANDLE_SIGNALS
-  SignalAction::registerFatalErrorHandler(*this);
-#endif
+  FatalErrorHandler::registerFatalErrorHandler(*this);
   updateApproximateMonotonicTimeInternal();
   base_scheduler_.registerOnPrepareCallback(
       std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
 }
 
-DispatcherImpl::~DispatcherImpl() {
-#ifdef ENVOY_HANDLE_SIGNALS
-  SignalAction::removeFatalErrorHandler(*this);
-#endif
-}
+DispatcherImpl::~DispatcherImpl() { FatalErrorHandler::removeFatalErrorHandler(*this); }
 
 void DispatcherImpl::initializeStats(Stats::Scope& scope,
                                      const absl::optional<std::string>& prefix) {
@@ -144,9 +138,10 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
 
 Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,
                                                     Network::ListenerCallbacks& cb,
-                                                    bool bind_to_port) {
+                                                    bool bind_to_port, uint32_t backlog_size) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::ListenerImpl>(*this, std::move(socket), cb, bind_to_port);
+  return std::make_unique<Network::ListenerImpl>(*this, std::move(socket), cb, bind_to_port,
+                                                 backlog_size);
 }
 
 Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr&& socket,

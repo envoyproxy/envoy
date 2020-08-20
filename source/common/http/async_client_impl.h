@@ -76,7 +76,7 @@ class AsyncStreamImpl : public AsyncClient::Stream,
                         public StreamDecoderFilterCallbacks,
                         public Event::DeferredDeletable,
                         Logger::Loggable<Logger::Id::http>,
-                        LinkedObject<AsyncStreamImpl>,
+                        public LinkedObject<AsyncStreamImpl>,
                         public ScopeTrackedObject {
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
@@ -152,10 +152,17 @@ private:
       return absl::nullopt;
     }
     absl::optional<std::chrono::milliseconds> maxInterval() const override { return absl::nullopt; }
+    const std::vector<Router::ResetHeaderParserSharedPtr>& resetHeaders() const override {
+      return reset_headers_;
+    }
+    std::chrono::milliseconds resetMaxInterval() const override {
+      return std::chrono::milliseconds(300000);
+    }
 
     const std::vector<uint32_t> retriable_status_codes_{};
     const std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_{};
     const std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_{};
+    const std::vector<Router::ResetHeaderParserSharedPtr> reset_headers_{};
   };
 
   struct NullConfig : public Router::Config {

@@ -309,6 +309,7 @@ most_specific_header_mutations_wins: {0}
   Stats::TestSymbolTable symbol_table_;
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  Event::SimulatedTimeSystem test_time_;
 };
 
 class RouteMatcherTest : public testing::Test, public ConfigImplTestBase {};
@@ -708,12 +709,12 @@ virtual_hosts:
       prefix: "/host/rewrite/me"
     route:
       cluster: ats
-      host_rewrite: new_host
+      host_rewrite_literal: new_host
   - match:
       prefix: "/oldhost/rewrite/me"
     route:
       cluster: ats
-      host_rewrite: new_oldhost
+      host_rewrite_literal: new_oldhost
   - match:
       path: "/foo"
       case_sensitive: true
@@ -731,7 +732,7 @@ virtual_hosts:
       case_sensitive: false
     route:
       cluster: ats
-      host_rewrite: new_host
+      host_rewrite_literal: new_host
   - match:
       path: "/FOOD"
       case_sensitive: false
@@ -752,12 +753,21 @@ virtual_hosts:
         value: rewrote
     route:
       cluster: ats
-      auto_host_rewrite_header: x-rewrite-host
+      host_rewrite_header: x-rewrite-host
   - match:
       path: "/do-not-rewrite-host-with-header-value"
     route:
       cluster: ats
-      auto_host_rewrite_header: x-rewrite-host
+      host_rewrite_header: x-rewrite-host
+  - match:
+      path: "/rewrite-host-with-path-regex/envoyproxy.io"
+    route:
+      cluster: ats
+      host_rewrite_path_regex:
+        pattern:
+          google_re2: {}
+          regex: "^/.+/(.+)$"
+        substitution: \1
   - match:
       prefix: "/"
     route:
@@ -1023,6 +1033,24 @@ virtual_hosts:
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("api.lyft.com", headers.get_(Http::Headers::get().Host));
+  }
+
+  // Rewrites host using path.
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("api.lyft.com", "/rewrite-host-with-path-regex/envoyproxy.io", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("envoyproxy.io", headers.get_(Http::Headers::get().Host));
+  }
+
+  // Rewrites host using path, removes query parameters
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders(
+        "api.lyft.com", "/rewrite-host-with-path-regex/envoyproxy.io?query=query", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("envoyproxy.io", headers.get_(Http::Headers::get().Host));
   }
 
   // Case sensitive rewrite matching test.
@@ -3556,6 +3584,86 @@ virtual_hosts:
       "retry_policy.max_interval must greater than or equal to the base_interval");
 }
 
+TEST_F(RouteMatcherTest, RateLimitedRetryBackOff) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/no-backoff"
+    route:
+      cluster: www
+  - match:
+      prefix: "/sub-ms-interval"
+    route:
+      cluster: www
+      retry_policy:
+        rate_limited_retry_back_off:
+          reset_headers:
+          - name: Retry-After
+            format: SECONDS
+          max_interval: 0.0001s # < 1 ms
+  - match:
+      prefix: "/typical-backoff"
+    route:
+      cluster: www
+      retry_policy:
+        rate_limited_retry_back_off:
+          reset_headers:
+          - name: Retry-After
+            format: SECONDS
+          - name: RateLimit-Reset
+            format: UNIX_TIMESTAMP
+          max_interval: 0.050s
+  )EOF";
+
+  const time_t known_date_time = 1000000000;
+  test_time_.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  // has no ratelimit retry back off
+  EXPECT_EQ(true, config.route(genHeaders("www.lyft.com", "/no-backoff", "GET"), 0)
+                      ->routeEntry()
+                      ->retryPolicy()
+                      .resetHeaders()
+                      .empty());
+  EXPECT_EQ(std::chrono::milliseconds(300000),
+            config.route(genHeaders("www.lyft.com", "/no-backoff", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .resetMaxInterval());
+
+  // has sub millisecond interval
+  EXPECT_EQ(1, config.route(genHeaders("www.lyft.com", "/sub-ms-interval", "GET"), 0)
+                   ->routeEntry()
+                   ->retryPolicy()
+                   .resetHeaders()
+                   .size());
+  EXPECT_EQ(std::chrono::milliseconds(1),
+            config.route(genHeaders("www.lyft.com", "/sub-ms-interval", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .resetMaxInterval());
+
+  // a typical configuration
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/typical-backoff", "GET");
+  const auto& retry_policy = config.route(headers, 0)->routeEntry()->retryPolicy();
+  EXPECT_EQ(2, retry_policy.resetHeaders().size());
+
+  Http::TestResponseHeaderMapImpl expected_0{{"Retry-After", "2"}};
+  Http::TestResponseHeaderMapImpl expected_1{{"RateLimit-Reset", "1000000005"}};
+
+  EXPECT_EQ(std::chrono::milliseconds(2000),
+            retry_policy.resetHeaders()[0]->parseInterval(test_time_.timeSystem(), expected_0));
+  EXPECT_EQ(std::chrono::milliseconds(5000),
+            retry_policy.resetHeaders()[1]->parseInterval(test_time_.timeSystem(), expected_1));
+
+  EXPECT_EQ(std::chrono::milliseconds(50), retry_policy.resetMaxInterval());
+}
+
 TEST_F(RouteMatcherTest, HedgeRouteLevel) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -3754,6 +3862,7 @@ virtual_hosts:
 // Test to detect if hostname matches are case-insensitive
 TEST_F(RouteMatcherTest, TestCaseSensitiveDomainConfig) {
   std::string yaml = R"EOF(
+name: foo
 virtual_hosts:
   - name: www2
     domains: [www.lyft.com]
@@ -3769,11 +3878,13 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Only unique values for domains are permitted. Duplicate entry of domain www.lyft.com");
+      "Only unique values for domains are permitted. Duplicate entry of domain www.lyft.com in "
+      "route foo");
 }
 
 TEST_F(RouteMatcherTest, TestDuplicateWildcardDomainConfig) {
   const std::string yaml = R"EOF(
+name: foo
 virtual_hosts:
 - name: www2
   domains: ["*"]
@@ -3789,11 +3900,12 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Only a single wildcard domain is permitted");
+      "Only a single wildcard domain is permitted in route foo");
 }
 
 TEST_F(RouteMatcherTest, TestDuplicateSuffixWildcardDomainConfig) {
   const std::string yaml = R"EOF(
+name: foo
 virtual_hosts:
 - name: www2
   domains: ["*.lyft.com"]
@@ -3809,11 +3921,13 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Only unique values for domains are permitted. Duplicate entry of domain *.lyft.com");
+      "Only unique values for domains are permitted. Duplicate entry of domain *.lyft.com in route "
+      "foo");
 }
 
 TEST_F(RouteMatcherTest, TestDuplicatePrefixWildcardDomainConfig) {
   const std::string yaml = R"EOF(
+name: foo
 virtual_hosts:
 - name: www2
   domains: ["bar.*"]
@@ -3829,7 +3943,7 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Only unique values for domains are permitted. Duplicate entry of domain bar.*");
+      "Only unique values for domains are permitted. Duplicate entry of domain bar.* in route foo");
 }
 
 TEST_F(RouteMatcherTest, TestInvalidCharactersInPrefixRewrites) {

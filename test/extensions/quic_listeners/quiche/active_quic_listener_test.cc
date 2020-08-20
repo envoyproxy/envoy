@@ -43,6 +43,7 @@
 #include "extensions/quic_listeners/quiche/active_quic_listener_config.h"
 #include "extensions/quic_listeners/quiche/platform/envoy_quic_clock.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "extensions/quic_listeners/quiche/udp_gso_batch_writer.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -85,7 +86,7 @@ protected:
             return quic::CurrentSupportedVersionsWithQuicCrypto();
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
-          SetQuicReloadableFlag(quic_enable_version_draft_29, use_http3);
+          SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
           SetQuicReloadableFlag(quic_disable_version_draft_27, !use_http3);
           SetQuicReloadableFlag(quic_disable_version_draft_25, !use_http3);
           return quic::CurrentSupportedVersions();
@@ -110,6 +111,18 @@ protected:
 
     ON_CALL(listener_config_, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
     ON_CALL(socket_factory_, getListenSocket()).WillByDefault(Return(listen_socket_));
+
+    // Use UdpGsoBatchWriter to perform non-batched writes for the purpose of this test
+    ON_CALL(listener_config_, udpPacketWriterFactory())
+        .WillByDefault(Return(
+            std::reference_wrapper<Network::UdpPacketWriterFactory>(udp_packet_writer_factory_)));
+    ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _))
+        .WillByDefault(Invoke(
+            [&](Network::IoHandle& io_handle, Stats::Scope& scope) -> Network::UdpPacketWriterPtr {
+              Network::UdpPacketWriterPtr udp_packet_writer =
+                  std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
+              return udp_packet_writer;
+            }));
 
     listener_factory_ = createQuicListenerFactory(yamlForQuicConfig());
     EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager_));
@@ -179,8 +192,8 @@ protected:
     client_sockets_.push_back(std::make_unique<Socket>(local_address_, nullptr, /*bind*/ false));
     Buffer::OwnedImpl payload = generateChloPacketToSend(
         quic_version_, quic_config_, ActiveQuicListenerPeer::cryptoConfig(*quic_listener_),
-        connection_id, clock_, envoyAddressInstanceToQuicSocketAddress(local_address_),
-        envoyAddressInstanceToQuicSocketAddress(local_address_), "test.example.org");
+        connection_id, clock_, envoyIpAddressToQuicSocketAddress(local_address_->ip()),
+        envoyIpAddressToQuicSocketAddress(local_address_->ip()), "test.example.org");
     Buffer::RawSliceVector slice = payload.getRawSlices();
     ASSERT_EQ(1u, slice.size());
     // Send a full CHLO to finish 0-RTT handshake.
@@ -243,6 +256,7 @@ protected:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   Network::MockConnectionCallbacks network_connection_callbacks_;
   NiceMock<Network::MockListenerConfig> listener_config_;
+  NiceMock<Network::MockUdpPacketWriterFactory> udp_packet_writer_factory_;
   quic::QuicConfig quic_config_;
   Server::ConnectionHandlerImpl connection_handler_;
   std::unique_ptr<ActiveQuicListener> quic_listener_;

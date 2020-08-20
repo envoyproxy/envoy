@@ -68,6 +68,9 @@ public:
     return io_handle_.bind(address);
   }
   Api::SysCallIntResult listen(int backlog) override { return io_handle_.listen(backlog); }
+  Network::IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override {
+    return io_handle_.accept(addr, addrlen);
+  }
   Api::SysCallIntResult connect(Network::Address::InstanceConstSharedPtr address) override {
     return io_handle_.connect(address);
   }
@@ -88,6 +91,10 @@ public:
   }
   Network::Address::InstanceConstSharedPtr peerAddress() override {
     return io_handle_.peerAddress();
+  }
+  Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                      Event::FileTriggerType trigger, uint32_t events) override {
+    return io_handle_.createFileEvent(dispatcher, cb, trigger, events);
   }
 
 private:
