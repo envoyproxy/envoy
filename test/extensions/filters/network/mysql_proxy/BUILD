@@ -40,7 +40,6 @@ envoy_extension_cc_test(
         "mysql_filter_test.cc",
     ],
     extension_name = "envoy.filters.network.mysql_proxy",
-    tags = ["fails_on_windows"],
     deps = [
         ":mysql_test_utils_lib",
         "//source/extensions/filters/network/mysql_proxy:config",
@@ -57,7 +56,6 @@ envoy_extension_cc_test(
         "mysql_test_config.yaml",
     ],
     extension_name = "envoy.filters.network.mysql_proxy",
-    tags = ["fails_on_windows"],
     deps = [
         ":mysql_test_utils_lib",
         "//source/common/tcp_proxy",

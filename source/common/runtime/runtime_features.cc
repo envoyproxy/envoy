@@ -55,7 +55,6 @@ constexpr const char* runtime_features[] = {
     // Enabled
     "envoy.reloadable_features.http1_flood_protection",
     "envoy.reloadable_features.test_feature_true",
-    "envoy.reloadable_features.connection_header_sanitization",
     // Begin alphabetically sorted section.
     "envoy.reloadable_features.activate_fds_next_event_loop",
     "envoy.reloadable_features.activate_timers_next_event_loop",
