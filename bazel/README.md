@@ -406,11 +406,15 @@ be installed.
 
 ```
 bazel build -c dbg //test/common/http:async_client_impl_test
+bazel build -c dbg //test/common/http:async_client_impl_test.dwp
 gdb bazel-bin/test/common/http/async_client_impl_test
 ```
 
-Without the `-c dbg` Bazel option at the end of the command line the test
-binaries will not include debugging symbols and GDB will not be very useful.
+We need to use `-c dbg` Bazel option to generate debugging symbols and without
+that GDB will not be very useful. The debugging symbols are stored as separate
+debugging information files (`.dwo` files) and we can build a DWARF package file
+with `.dwp ` target. The `.dwp` file need to be presented in the same folder with the
+binary for a full debugging experience.
 
 # Running Bazel tests requiring privileges
 
@@ -463,8 +467,8 @@ modes](https://docs.bazel.build/versions/master/user-manual.html#flag--compilati
 that Bazel supports:
 
 * `fastbuild`: `-O0`, aimed at developer speed (default).
-* `opt`: `-O2 -DNDEBUG -ggdb3`, for production builds and performance benchmarking.
-* `dbg`: `-O0 -ggdb3`, no optimization and debug symbols.
+* `opt`: `-O2 -DNDEBUG -ggdb3 -gsplit-dwarf`, for production builds and performance benchmarking.
+* `dbg`: `-O0 -ggdb3 -gsplit-dwarf`, no optimization and debug symbols.
 
 You can use the `-c <compilation_mode>` flag to control this, e.g.
 

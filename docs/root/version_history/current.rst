@@ -11,6 +11,7 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* build: the debug information will be generated separately to reduce target size and reduce compilation time when build in compilation mode `dbg` and `opt`. Users will need to build dwp file to debug with gdb.
 * compressor: always insert `Vary` headers for compressible resources even if it's decided not to compress a response due to incompatible `Accept-Encoding` value. The `Vary` header needs to be inserted to let a caching proxy in front of Envoy know that the requested resource still can be served with compression applied.
 * decompressor: headers-only requests were incorrectly not advertising accept-encoding when configured to do so. This is now fixed.
 * http: added :ref:`headers_to_add <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.headers_to_add>` to :ref:`local reply mapper <config_http_conn_man_local_reply>` to allow its users to add/append/override response HTTP headers to local replies.
@@ -36,7 +37,9 @@ Bug Fixes
 * csrf: fixed issues with regards to origin and host header parsing.
 * dynamic_forward_proxy: only perform DNS lookups for routes to Dynamic Forward Proxy clusters since other cluster types handle DNS lookup themselves.
 * fault: fixed an issue with `active_faults` gauge not being decremented for when abort faults were injected.
+* fault: made the HeaderNameValues::prefix() method const.
 * grpc-web: fixed an issue with failing HTTP/2 requests on some browsers. Notably, WebKit-based browsers (https://bugs.webkit.org/show_bug.cgi?id=210108), Internet Explorer 11, and Edge (pre-Chromium).
+* http: made the HeaderValues::prefix() method const.
 * rocketmq_proxy network-level filter: fixed an issue involving incorrect header lengths. In debug mode it causes crash and in release mode it causes underflow.
 
 Removed Config or Runtime
