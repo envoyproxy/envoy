@@ -8,6 +8,7 @@
 #include "envoy/server/guarddog_config.h"
 #include "envoy/thread/thread.h"
 
+#include "common/common/assert.h"
 #include "common/filesystem/directory.h"
 #include "common/profiler/profiler.h"
 
@@ -78,16 +79,14 @@ protected:
   }
 
   static std::unique_ptr<Event::TestTimeSystem> makeTimeSystem() {
-    if (GetParam() == TimeSystemType::Real) {
+    switch (GetParam()) {
+    case TimeSystemType::Real:
       return std::make_unique<Event::GlobalTimeSystem>();
+    case TimeSystemType::Simulated:
+      return std::make_unique<Event::SimulatedTimeSystem>();
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
-    ASSERT(GetParam() == TimeSystemType::Simulated);
-    return std::make_unique<Event::SimulatedTimeSystem>();
-  }
-
-  void
-  setupAction(envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig& config) {
-    action_ = std::make_unique<ProfileAction>(config, context_);
   }
 
   void waitForOutstandingNotify() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
@@ -118,7 +117,7 @@ TEST_P(ProfileActionTest, CanDoSingleProfile) {
   envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
   config.set_profile_path(test_path_);
   config.mutable_profile_duration()->set_seconds(1);
-  setupAction(config);
+  action_ = std::make_unique<ProfileAction>(config, context_);
 
   // Create vector of relevant threads
   const auto now = api_->timeSource().monotonicTime();
@@ -152,7 +151,7 @@ TEST_P(ProfileActionTest, CanDoMultipleProfiles) {
   envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
   config.set_profile_path(test_path_);
   config.mutable_profile_duration()->set_seconds(1);
-  setupAction(config);
+  action_ = std::make_unique<ProfileAction>(config, context_);
 
   // Create vector of relevant threads
   const auto now = api_->timeSource().monotonicTime();
@@ -203,7 +202,7 @@ TEST_P(ProfileActionTest, CannotTriggerConcurrentProfiles) {
   envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
   TestUtility::loadFromJson(absl::Substitute(R"EOF({ "profile_path": "$0", })EOF", test_path_),
                             config);
-  setupAction(config);
+  action_ = std::make_unique<ProfileAction>(config, context_);
 
   // Create vector of relevant threads
   const auto now = api_->timeSource().monotonicTime();
@@ -240,7 +239,7 @@ TEST_P(ProfileActionTest, ShouldNotProfileIfDirectoryDoesNotExist) {
   const std::string nonexistant_path = test_path_ + "/nonexistant_dir/";
   TestUtility::loadFromJson(
       absl::Substitute(R"EOF({ "profile_path": "$0", })EOF", nonexistant_path), config);
-  setupAction(config);
+  action_ = std::make_unique<ProfileAction>(config, context_);
 
   // Create vector of relevant threads
   const auto now = api_->timeSource().monotonicTime();
@@ -269,7 +268,7 @@ TEST_P(ProfileActionTest, ShouldNotProfileIfNoTids) {
   envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
   TestUtility::loadFromJson(absl::Substitute(R"EOF({ "profile_path": "$0"})EOF", test_path_),
                             config);
-  setupAction(config);
+  action_ = std::make_unique<ProfileAction>(config, context_);
 
   // Test that no profiles are created given empty vector of valid TIDs
   dispatcher_->post([this]() -> void {
@@ -302,7 +301,7 @@ TEST_P(ProfileActionTest, ShouldSaturateTids) {
       )EOF",
                                              test_path_),
                             config);
-  setupAction(config);
+  action_ = std::make_unique<ProfileAction>(config, context_);
 
   // Create vector of relevant threads
   const auto now = api_->timeSource().monotonicTime();

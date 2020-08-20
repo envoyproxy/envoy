@@ -34,7 +34,19 @@ ProfileAction::ProfileAction(
                                 : config.max_profiles_per_thread()),
       profiles_started_(0), duration_(std::chrono::milliseconds(
                                 PROTOBUF_GET_MS_OR_DEFAULT(config, profile_duration, 5000))),
-      context_(context), timer_cb_(nullptr) {}
+      context_(context), timer_cb_(context_.dispatcher_.createTimer([this] {
+        if (Profiler::Cpu::profilerEnabled()) {
+          Profiler::Cpu::stopProfiler();
+          running_profile_ = false;
+        } else {
+          ENVOY_LOG_MISC(error,
+                         "Profile Action's stop() was scheduled, but profiler isn't running!");
+        }
+
+        if (!context_.api_.fileSystem().fileExists(profile_filename_)) {
+          ENVOY_LOG_MISC(error, "Profile file {} wasn't created!", profile_filename_);
+        }
+      })) {}
 
 void ProfileAction::run(
     envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent /*event*/,
@@ -68,23 +80,6 @@ void ProfileAction::run(
       tid_to_profile_count_[*trigger_tid] += 1;
 
       // Schedule callback to stop
-      if (timer_cb_ == nullptr) {
-        // Create the timer once.
-        timer_cb_ = context_.dispatcher_.createTimer([this] {
-          if (Profiler::Cpu::profilerEnabled()) {
-            Profiler::Cpu::stopProfiler();
-            running_profile_ = false;
-          } else {
-            ENVOY_LOG_MISC(error,
-                           "Profile Action's stop() was scheduled, but profiler isn't running!");
-          }
-
-          if (!context_.api_.fileSystem().fileExists(profile_filename_)) {
-            ENVOY_LOG_MISC(error, "Profile file {} wasn't created!", profile_filename_);
-          }
-        });
-      }
-
       timer_cb_->enableTimer(duration_);
     } else {
       ENVOY_LOG_MISC(error, "Profile Action failed to start the profiler.");
