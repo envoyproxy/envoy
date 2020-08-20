@@ -53,8 +53,6 @@ public:
 
 class RebuilderHandle {
 public:
-  RebuilderHandle() {}
-
   Init::ExpectableTargetImpl target_;
   Configuration::FactoryContext* context_{};
 };
