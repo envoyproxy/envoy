@@ -10,6 +10,7 @@
 #include "instance.h"
 #include "overload_manager.h"
 #include "server_lifecycle_notifier.h"
+#include "transport_socket_factory_context.h"
 
 namespace Envoy {
 namespace Server {
@@ -51,6 +52,7 @@ public:
   testing::NiceMock<MockServerFactoryContext> server_factory_context_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  testing::NiceMock<MockTransportSocketFactoryContext> transport_socket_factory_context_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
   testing::NiceMock<Init::MockManager> init_manager_;
