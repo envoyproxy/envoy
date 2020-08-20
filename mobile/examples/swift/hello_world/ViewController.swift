@@ -5,6 +5,7 @@ private let kCellID = "cell-id"
 private let kRequestAuthority = "api.lyft.com"
 private let kRequestPath = "/ping"
 private let kRequestScheme = "https"
+private let kFilteredHeaders = ["server", "filter-demo", "x-envoy-upstream-service-time"]
 
 final class ViewController: UITableViewController {
   private var results = [Result<Response, RequestError>]()
@@ -59,14 +60,20 @@ final class ViewController: UITableViewController {
       .newStreamPrototype()
       .setOnResponseHeaders { [weak self] headers, _ in
         let statusCode = headers.httpStatus ?? -1
-        var message = "received headers with status \(statusCode)"
+        let message = "received headers with status \(statusCode)"
+
+        let headerMessage = headers.allHeaders()
+          .filter { kFilteredHeaders.contains($0.key) }
+          .map { "\($0.key): \($0.value.joined(separator: ", "))" }
+          .joined(separator: "\n")
+
+        NSLog(message)
         if let filterDemoValue = headers.value(forName: "filter-demo")?.first {
-          message += " and filter-demo set to \(filterDemoValue)"
+          NSLog("filter-demo: \(filterDemoValue)")
         }
 
         let response = Response(message: message,
-                                serverHeader: headers.value(forName: "server")?.first ?? "")
-        NSLog(message)
+                                headerMessage: headerMessage)
         self?.add(result: .success(response))
       }
       .setOnError { [weak self] error in
@@ -109,12 +116,13 @@ final class ViewController: UITableViewController {
     switch result {
     case .success(let response):
       cell.textLabel?.text = response.message
-      cell.detailTextLabel?.text = "'server' header: \(response.serverHeader)"
+      cell.detailTextLabel?.text = response.headerMessage
 
       cell.textLabel?.textColor = .black
+      cell.detailTextLabel?.lineBreakMode = .byWordWrapping
+      cell.detailTextLabel?.numberOfLines = 0
       cell.detailTextLabel?.textColor = .black
       cell.contentView.backgroundColor = .white
-
     case .failure(let error):
       cell.textLabel?.text = error.message
       cell.detailTextLabel?.text = nil
