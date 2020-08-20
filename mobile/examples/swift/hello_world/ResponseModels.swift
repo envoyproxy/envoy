@@ -1,7 +1,7 @@
 /// Represents a response from the server.
 struct Response {
   let message: String
-  let serverHeader: String
+  let headerMessage: String
 }
 
 /// Error that was encountered when executing a request.

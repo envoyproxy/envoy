@@ -14,6 +14,7 @@ NSString *_REQUEST_SCHEME = @"https";
 
 @interface ViewController ()
 @property (nonatomic, strong) id<StreamClient> client;
+@property (nonatomic, strong) NSArray<NSString *> *filteredHeaders;
 @property (nonatomic, strong) NSMutableArray<Result *> *results;
 @property (nonatomic, weak) NSTimer *requestTimer;
 @end
@@ -25,6 +26,7 @@ NSString *_REQUEST_SCHEME = @"https";
 - (instancetype)init {
   self = [super init];
   if (self) {
+    self.filteredHeaders = @[ @"server", @"filter-demo", @"x-envoy-upstream-service-time" ];
     self.results = [NSMutableArray new];
     self.tableView.allowsSelection = NO;
     [self startEnvoy];
@@ -79,17 +81,27 @@ NSString *_REQUEST_SCHEME = @"https";
   [prototype setOnResponseHeadersWithClosure:^(ResponseHeaders *headers, BOOL endStream) {
     int statusCode = [[[headers valueForName:@":status"] firstObject] intValue];
     NSString *message = [NSString stringWithFormat:@"received headers with status %i", statusCode];
+
+    NSMutableString *headerMessage = [NSMutableString new];
+    for (NSString *name in headers.allHeaders) {
+      if ([self.filteredHeaders containsObject:name]) {
+        NSArray<NSString *> *values = headers.allHeaders[name];
+        NSString *joined = [values componentsJoinedByString:@", "];
+        NSString *pair = [NSString stringWithFormat:@"%@: %@\n", name, joined];
+        [headerMessage appendString:pair];
+      }
+    }
+
     NSLog(@"%@", message);
-    [weakSelf addResponseMessage:message
-                    serverHeader:[[headers valueForName:@"server"] firstObject]
-                           error:nil];
+
+    [weakSelf addResponseMessage:message headerMessage:headerMessage error:nil];
   }];
   [prototype setOnErrorWithClosure:^(EnvoyError *error) {
     // TODO: expose attemptCount. https://github.com/lyft/envoy-mobile/issues/823
     NSString *message =
         [NSString stringWithFormat:@"failed within Envoy library %@", error.message];
     NSLog(@"%@", message);
-    [weakSelf addResponseMessage:message serverHeader:nil error:message];
+    [weakSelf addResponseMessage:message headerMessage:nil error:message];
   }];
 
   Stream *stream = [prototype startWithQueue:dispatch_get_main_queue()];
@@ -97,11 +109,11 @@ NSString *_REQUEST_SCHEME = @"https";
 }
 
 - (void)addResponseMessage:(NSString *)message
-              serverHeader:(NSString *)serverHeader
+             headerMessage:(NSString *)headerMessage
                      error:(NSString *)error {
   Result *result = [Result new];
   result.message = message;
-  result.serverHeader = serverHeader;
+  result.headerMessage = headerMessage;
   result.error = error;
 
   [self.results insertObject:result atIndex:0];
@@ -129,10 +141,11 @@ NSString *_REQUEST_SCHEME = @"https";
   Result *result = self.results[indexPath.row];
   if (result.error == nil) {
     cell.textLabel.text = result.message;
-    cell.detailTextLabel.text =
-        [NSString stringWithFormat:@"'server' header: %@", result.serverHeader];
+    cell.detailTextLabel.text = result.headerMessage;
 
     cell.textLabel.textColor = [UIColor blackColor];
+    cell.detailTextLabel.lineBreakMode = NSLineBreakByWordWrapping;
+    cell.detailTextLabel.numberOfLines = 0;
     cell.detailTextLabel.textColor = [UIColor blackColor];
     cell.contentView.backgroundColor = [UIColor whiteColor];
   } else {
