@@ -19,11 +19,8 @@ from clang.cindex import TranslationUnit, Index, CursorKind, Cursor
 # Loading libclang
 if "LLVM_CONFIG" in os.environ:
   llvm_config_path = os.environ["LLVM_CONFIG"]
-  exec_result = subprocess.run([llvm_config_path, "--libdir"], capture_output=True, check=False)
-  if exec_result.returncode != 0:
-    print(llvm_config_path + " --libdir returned %d" % exec_result.returncode)
-    sys.exit("llvm-config returned abnormally")
-  clang_tools_lib_path = exec_result.stdout.rstrip()
+  exec_result = subprocess.check_output([llvm_config_path, "--libdir"])
+  clang_tools_lib_path = exec_result.rstrip()
   clang.cindex.Config.set_library_path(clang_tools_lib_path.decode("utf-8"))
 else:
   sys.exit(

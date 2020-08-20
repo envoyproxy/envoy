@@ -1,23 +1,36 @@
 # Lint as: python3
 """Tests for headersplit."""
 
-import unittest
 import headersplit
 import io
+import os
+import subprocess
+import unittest
+# libclang imports
 import clang.cindex
 from clang.cindex import TranslationUnit, Index, CursorKind
-clang.cindex.Config.set_library_path("/opt/llvm/lib")
+
+# Loading libclang
+if "LLVM_CONFIG" in os.environ:
+  llvm_config_path = os.environ["LLVM_CONFIG"]
+  exec_result = subprocess.check_output([llvm_config_path, "--libdir"])
+  clang_tools_lib_path = exec_result.rstrip()
+  clang.cindex.Config.set_library_path(clang_tools_lib_path.decode("utf-8"))
+else:
+  sys.exit(
+      "llvm-config not found, please set the environment variable:\nexport LLVM_CONFIG=<path to clang installation>/bin/llvm-config"
+  )
 
 class HeadersplitTest(unittest.TestCase):
   # A header contains a simple class print hello world
-  source_code_hello_world = open("code_corpus/hello.h", "r").read()
+  source_code_hello_world = open("tools/envoy_headersplit/code_corpus/hello.h", "r").read()
   # A C++ source code contains definition for several classes
-  source_class_defn = open("code_corpus/class_defn.h", "r").read()
+  source_class_defn = open("tools/envoy_headersplit/code_corpus/class_defn.h", "r").read()
   # almost the same as above, but classes are not enclosed by namespace
-  source_class_defn_without_namespace = open("code_corpus/class_defn_without_namespace.h",
+  source_class_defn_without_namespace = open("tools/envoy_headersplit/code_corpus/class_defn_without_namespace.h",
                                              "r").read()
   # A C++ source code contains method implementaions for class_defn.h
-  source_class_impl = open("code_corpus/class_impl.cc", "r").read()
+  source_class_impl = open("tools/envoy_headersplit/code_corpus/class_impl.cc", "r").read()
 
   def test_to_filename(self):
     # Test class name with one "mock"
@@ -42,17 +55,17 @@ class HeadersplitTest(unittest.TestCase):
 
 """
     translation_unit_hello_world = TranslationUnit.from_source(
-        "code_corpus/hello.h", options=TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
+        "tools/envoy_headersplit/code_corpus/hello.h", options=TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
     self.assertEqual(headersplit.get_directives(translation_unit_hello_world), includes)
 
   def test_class_definitions(self):
     idx = Index.create()
-    translation_unit_class_defn = idx.parse("code_corpus/class_defn.h", ["-x", "c++"])
+    translation_unit_class_defn = idx.parse("tools/envoy_headersplit/code_corpus/class_defn.h", ["-x", "c++"])
     defns_cursors = headersplit.class_definitions(translation_unit_class_defn.cursor)
     defns_names = [cursor.spelling for cursor in defns_cursors]
     self.assertEqual(defns_names, ["Foo", "Bar", "FooBar", "DeadBeaf"])
     idx = Index.create()
-    translation_unit_class_defn = idx.parse("code_corpus/class_defn_without_namespace.h",
+    translation_unit_class_defn = idx.parse("tools/envoy_headersplit/code_corpus/class_defn_without_namespace.h",
                                             ["-x", "c++"])
     defns_cursors = headersplit.class_definitions(translation_unit_class_defn.cursor)
     defns_names = [cursor.spelling for cursor in defns_cursors]
@@ -60,7 +73,7 @@ class HeadersplitTest(unittest.TestCase):
 
   def test_class_implementations(self):
     translation_unit_class_impl = TranslationUnit.from_source(
-        "code_corpus/class_impl.cc", options=TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
+        "tools/envoy_headersplit/code_corpus/class_impl.cc", options=TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
     impls_cursors = headersplit.class_implementations(translation_unit_class_impl.cursor)
     impls_names = [cursor.spelling for cursor in impls_cursors]
     self.assertEqual(impls_names, ["getFoo", "val", "DeadBeaf"])
@@ -68,7 +81,7 @@ class HeadersplitTest(unittest.TestCase):
   def test_class_implementations_error(self):
     # LibClang will fail in parse this source file (it's modified from the original test/server/mocks.cc from Envoy repository)
     # if we don't add flag PARSE_SKIP_FUNCTION_BODIES to ignore function bodies.
-    impl_translation_unit = TranslationUnit.from_source("code_corpus/fail_mocks.cc")
+    impl_translation_unit = TranslationUnit.from_source("tools/envoy_headersplit/code_corpus/fail_mocks.cc")
     impls_cursors = headersplit.class_implementations(impl_translation_unit.cursor)
     # impls_name is not complete in this case
     impls_names = [cursor.spelling for cursor in impls_cursors]
@@ -81,7 +94,7 @@ class HeadersplitTest(unittest.TestCase):
 
     # get correct list of member methods
     impl_translation_unit_correct = TranslationUnit.from_source(
-        "code_corpus/fail_mocks.cc", options=TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
+        "tools/envoy_headersplit/code_corpus/fail_mocks.cc", options=TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
     impls_cursors_correct = headersplit.class_implementations(impl_translation_unit_correct.cursor)
     impls_names_correct = [cursor.spelling for cursor in impls_cursors_correct]
     self.assertNotEqual(impls_names, impls_names_correct)
