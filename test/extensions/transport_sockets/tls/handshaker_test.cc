@@ -28,7 +28,7 @@ using ::testing::StrictMock;
 
 // A callback shaped like pem_password_cb.
 // See https://www.openssl.org/docs/man1.1.0/man3/pem_password_cb.html.
-int PemPasswordCallback(char* buf, int buf_size, int, void* u) {
+int pemPasswordCallback(char* buf, int buf_size, int, void* u) {
   if (u == nullptr) {
     return 0;
   }
@@ -53,8 +53,8 @@ protected:
         client_ctx_(SSL_CTX_new(TLS_method())), server_ctx_(SSL_CTX_new(TLS_method())) {
     // Set up key and cert, initialize two SSL objects and a pair of BIOs for
     // handshaking.
-    auto key = MakeKey();
-    auto cert = MakeCert();
+    auto key = makeKey();
+    auto cert = makeCert();
     auto chain = std::vector<CRYPTO_BUFFER*>{cert.get()};
 
     server_ssl_ = bssl::UniquePtr<SSL>(SSL_new(server_ctx_.get()));
@@ -76,7 +76,7 @@ protected:
   }
 
   // Read in key.pem and return a new private key.
-  bssl::UniquePtr<EVP_PKEY> MakeKey() {
+  bssl::UniquePtr<EVP_PKEY> makeKey() {
     std::string file = TestEnvironment::readFileToStringForTest(
         TestEnvironment::substitute("{{ test_tmpdir }}/unittestkey.pem"));
     std::string passphrase = "";
@@ -84,13 +84,13 @@ protected:
 
     bssl::UniquePtr<EVP_PKEY> key(EVP_PKEY_new());
 
-    RSA* rsa = PEM_read_bio_RSAPrivateKey(bio.get(), nullptr, &PemPasswordCallback, &passphrase);
+    RSA* rsa = PEM_read_bio_RSAPrivateKey(bio.get(), nullptr, &pemPasswordCallback, &passphrase);
     ASSERT(rsa && EVP_PKEY_assign_RSA(key.get(), rsa));
     return key;
   }
 
   // Read in cert.pem and return a certificate.
-  bssl::UniquePtr<CRYPTO_BUFFER> MakeCert() {
+  bssl::UniquePtr<CRYPTO_BUFFER> makeCert() {
     std::string file = TestEnvironment::readFileToStringForTest(
         TestEnvironment::substitute("{{ test_tmpdir }}/unittestcert.pem"));
     bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(file.data(), file.size()));
