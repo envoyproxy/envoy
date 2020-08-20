@@ -175,7 +175,7 @@ size_t stableHashKey(const Key& key);
 // to determine what ranges are needed.
 class LookupRequest {
 public:
-  using HeaderVector = std::vector<Http::HeaderEntry>;
+  using HeaderVector = std::vector<const Http::HeaderEntry*>;
 
   // Prereq: request_headers's Path(), Scheme(), and Host() are non-null.
   LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp);
@@ -197,6 +197,8 @@ public:
   // there).
   LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
                                 uint64_t content_length) const;
+
+  HeaderVector getVaryHeaders() const { return vary_headers_; }
 
 private:
   void initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers);

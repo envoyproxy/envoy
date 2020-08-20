@@ -51,6 +51,8 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   key_.set_host(std::string(request_headers.getHostValue()));
   key_.set_path(std::string(request_headers.getPathValue()));
   key_.set_clear_http(forwarded_proto == scheme_values.Http);
+
+  vary_headers_ = VaryHeader::possibleVariedHeaders(request_headers);
 }
 
 // Unless this API is still alpha, calls to stableHashKey() must always return

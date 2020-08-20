@@ -595,6 +595,16 @@ TEST_P(ParseInvalidRangeHeaderTest, InvalidRangeReturnsEmpty) {
   ASSERT_EQ(0, result_vector.size());
 }
 
+TEST_F(LookupRequestTest, VariedHeaders) {
+  request_headers_.addCopy("accept-encoding", "gzip");
+  const LookupRequest lookup_request(request_headers_, currentTime() + std::chrono::seconds(5));
+  std::vector<const Http::HeaderEntry*> result = lookup_request.getVaryHeaders();
+
+  ASSERT_EQ(result.size(), 1);
+  EXPECT_EQ(result[0]->key(), "accept-encoding");
+  EXPECT_EQ(result[0]->value(), "gzip");
+}
+
 } // namespace
 } // namespace Cache
 } // namespace HttpFilters
