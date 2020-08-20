@@ -184,6 +184,8 @@ protected:
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
+/*
+
 // Tests that a LDS deletion before Server initManager been initialized will not block the Server
 // from starting.
 TEST_P(ListenerIntegrationTest, RemoveLastUninitializedListener) {
@@ -208,6 +210,8 @@ TEST_P(ListenerIntegrationTest, RemoveLastUninitializedListener) {
   // initialized.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 }
+
+*/
 
 // Tests that a LDS adding listener works as expected.
 TEST_P(ListenerIntegrationTest, BasicSuccess) {
@@ -262,9 +266,16 @@ TEST_P(ListenerIntegrationTest, BasicSuccessWithOnDemandFilterChain) {
   on_server_init_function_ = [&]() {
     createLdsStream();
     // Make all filter chains of this listener to be built on-demand.
-    for (auto filter_chain : listener_config_.filter_chains()) {
-      filter_chain.mutable_on_demand_configuration();
-    }
+    // for (auto i = 0; i < listener_config_.filter_chains().size(); i++) {
+    //   auto* filter_chain = listener_config_.mutable_filter_chains(i);
+    //   // filter_chain->mutable_on_demand_configuration();
+    //   filter_chain->mutable_name();
+    //   auto* on_demand_config = filter_chain->mutable_on_demand_configuration();
+    //   on_demand_config->mutable_rebuild_timeout()->CopyFrom(
+    //   Protobuf::util::TimeUtil::MillisecondsToDuration(15000));
+    //   // auto* duration = 
+    //   // duration->set
+    // }
     sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
     createRdsStream(route_table_name_);
   };
