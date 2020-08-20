@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "envoy/server/configuration.h"
 #include "envoy/server/listener_manager.h"
 
