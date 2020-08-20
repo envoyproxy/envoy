@@ -37,18 +37,6 @@ jobs:
           artifactName: format
         condition: failed()
 
-  - job: examples
-    dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
-    pool:
-      vmImage: "ubuntu-18.04"
-    steps:
-      - bash: |
-          sudo apt-get update -y
-          sudo apt-get install -y -qq --no-install-recommends redis-tools
-          ci/verify_examples.sh
-        workingDirectory: $(Build.SourcesDirectory)
-        displayName: "Verify examples run as documented"
-
   - job: release
     displayName: "Linux-x64 release"
     dependsOn: ["format"]
@@ -169,6 +157,26 @@ jobs:
           pathtoPublish: "$(Build.StagingDirectory)/build_images"
           artifactName: docker
         condition: always()
+
+  - job: examples
+    dependsOn: ["docker"]
+    displayName: "Verify examples run as documented"
+    pool:
+      vmImage: "ubuntu-18.04"
+    steps:
+      - task: DownloadBuildArtifacts@0
+        inputs:
+          buildType: current
+          artifactName: "docker"
+          itemPattern: "docker/envoy-docker-images.tar.xz"
+          downloadType: single
+          targetPath: $(Build.StagingDirectory)
+      - bash: |
+          docker load < $(Build.StagingDirectory)/docker/envoy-docker-images.tar.xz
+          sudo apt-get update -y
+          sudo apt-get install -y -qq --no-install-recommends redis-tools
+          ci/verify_examples.sh
+        workingDirectory: $(Build.SourcesDirectory)
 
   - job: macOS
     dependsOn: ["format"]
