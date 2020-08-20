@@ -65,7 +65,7 @@ public:
   // Ssl::PrivateKeyConnectionCallbacks
   void onPrivateKeyMethodComplete() override;
   // Ssl::HandshakeCallbacks
-  Network::Connection::State connectionState() const override;
+  Network::Connection& connection() const override;
   void onSuccess(SSL* ssl) override;
   void onFailure() override;
 

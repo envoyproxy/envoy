@@ -6,6 +6,7 @@
 #include "extensions/transport_sockets/tls/ssl_handshaker.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_certs_test.h"
+#include "test/mocks/network/connection.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -21,6 +22,7 @@ namespace {
 
 using ::testing::AtLeast;
 using ::testing::Invoke;
+using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::StrictMock;
 
@@ -39,7 +41,7 @@ int PemPasswordCallback(char* buf, int buf_size, int, void* u) {
 class MockHandshakeCallbacks : public Ssl::HandshakeCallbacks {
 public:
   ~MockHandshakeCallbacks() override{};
-  MOCK_METHOD(Network::Connection::State, connectionState, (), (const, override));
+  MOCK_METHOD(Network::Connection&, connection, (), (const, override));
   MOCK_METHOD(void, onSuccess, (SSL*), (override));
   MOCK_METHOD(void, onFailure, (), (override));
 };
@@ -111,10 +113,12 @@ protected:
 };
 
 TEST_F(HandshakerTest, NormalOperation) {
-  StrictMock<MockHandshakeCallbacks> handshake_callbacks;
+  NiceMock<Network::MockConnection> mock_connection;
+  ON_CALL(mock_connection, state).WillByDefault(Return(Network::Connection::State::Closed));
+
+  NiceMock<MockHandshakeCallbacks> handshake_callbacks;
   EXPECT_CALL(handshake_callbacks, onSuccess).Times(1);
-  EXPECT_CALL(handshake_callbacks, connectionState())
-      .WillOnce(Return(Network::Connection::State::Closed));
+  ON_CALL(handshake_callbacks, connection()).WillByDefault(ReturnRef(mock_connection));
 
   SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);
 

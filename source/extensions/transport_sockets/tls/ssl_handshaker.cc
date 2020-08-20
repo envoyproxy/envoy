@@ -237,7 +237,7 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
     handshake_callbacks_->onSuccess(ssl());
 
     // It's possible that we closed during the handshake callback.
-    return handshake_callbacks_->connectionState() == Network::Connection::State::Open
+    return handshake_callbacks_->connection().state() == Network::Connection::State::Open
                ? PostIoAction::KeepOpen
                : PostIoAction::Close;
   } else {

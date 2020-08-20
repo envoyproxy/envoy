@@ -16,9 +16,9 @@ public:
   virtual ~HandshakeCallbacks() = default;
 
   /**
-   * @return the connection state.
+   * @return the connection.
    */
-  virtual Network::Connection::State connectionState() const PURE;
+  virtual Network::Connection& connection() const PURE;
 
   /**
    * A callback which will be executed at most once upon successful completion

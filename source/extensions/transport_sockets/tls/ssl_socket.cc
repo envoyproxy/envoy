@@ -171,9 +171,7 @@ void SslSocket::onPrivateKeyMethodComplete() {
   }
 }
 
-Network::Connection::State SslSocket::connectionState() const {
-  return callbacks_->connection().state();
-}
+Network::Connection& SslSocket::connection() const { return callbacks_->connection(); }
 
 void SslSocket::onSuccess(SSL* ssl) {
   ctx_->logHandshake(ssl);
