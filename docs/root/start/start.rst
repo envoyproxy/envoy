@@ -151,7 +151,7 @@ by using a volume.
 By default the Docker image will run as the ``envoy`` user created at build time.
 
 The ``uid`` and ``gid`` of this user can be set at runtime using the ``ENVOY_UID`` and ``ENVOY_GID``
-environment variables. This can be done, for example, on the Docker command line:
+environment variables. This can be done, for example, on the Docker command line::
 
   $ docker run -d --name envoy -e ENVOY_UID=777 -e ENVOY_GID=777 -p 9901:9901 -p 10000:10000 envoy:v1
 
