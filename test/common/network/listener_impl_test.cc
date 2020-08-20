@@ -66,7 +66,7 @@ class TestListenerImpl : public ListenerImpl {
 public:
   TestListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket, ListenerCallbacks& cb,
                    bool bind_to_port)
-      : ListenerImpl(dispatcher, std::move(socket), cb, bind_to_port) {}
+      : ListenerImpl(dispatcher, std::move(socket), cb, bind_to_port, "") {}
 
   MOCK_METHOD(Address::InstanceConstSharedPtr, getLocalAddress, (os_fd_t fd));
 };

@@ -23,13 +23,20 @@ class TestPauseFilter;
 
 namespace Network {
 
-#define DUMPEVENTS(tag, events) \
-do { \
-  std::string s;  if (events & Event::FileReadyType::Write) { s+= "WRITE|";  } \
-  if (events & Event::FileReadyType::Read) { s+= "READ|";  }                   \
-  if (events & Event::FileReadyType::Closed) { s+= "CLOSED|";  }               \
-  ENVOY_LOG_MISC(debug, "lambdai: {} events {}", tag, s);                      \
-} while(0)     
+#define DUMPEVENTS(tag, events)                                                                    \
+  do {                                                                                             \
+    std::string s;                                                                                 \
+    if (events & Event::FileReadyType::Write) {                                                    \
+      s += "WRITE|";                                                                               \
+    }                                                                                              \
+    if (events & Event::FileReadyType::Read) {                                                     \
+      s += "READ|";                                                                                \
+    }                                                                                              \
+    if (events & Event::FileReadyType::Closed) {                                                   \
+      s += "CLOSED|";                                                                              \
+    }                                                                                              \
+    ENVOY_LOG_MISC(debug, "lambdai: {} events {}", tag, s);                                        \
+  } while (0)
 
 class PeeringPipe {
 public:
@@ -55,12 +62,19 @@ public:
 
   ~ClientPipeImpl() override;
 
-  void setConnected() {
-    onWriteReady();
+  void setConnected() { onWriteReady(); }
+  void enableWrite() {
+    events_ = Event::FileReadyType::Write;
+    DUMPEVENTS(__FUNCTION__, events_);
   }
-  void enableWrite() { events_ = Event::FileReadyType::Write; DUMPEVENTS(__FUNCTION__, events_);}
-  void enableWriteRead() { events_ = Event::FileReadyType::Write | Event::FileReadyType::Read; DUMPEVENTS(__FUNCTION__, events_);}
-  void enableWriteClose() { events_ = (Event::FileReadyType::Write | Event::FileReadyType::Closed); DUMPEVENTS(__FUNCTION__, events_);}
+  void enableWriteRead() {
+    events_ = Event::FileReadyType::Write | Event::FileReadyType::Read;
+    DUMPEVENTS(__FUNCTION__, events_);
+  }
+  void enableWriteClose() {
+    events_ = (Event::FileReadyType::Write | Event::FileReadyType::Closed);
+    DUMPEVENTS(__FUNCTION__, events_);
+  }
   bool isReadEnabled() {
     return events_ | (Event::FileReadyType::Closed | Event::FileReadyType::Read);
   }
@@ -228,12 +242,19 @@ public:
                  const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   ~ServerPipeImpl() override;
-  void setConnected() {
-    onWriteReady();
+  void setConnected() { onWriteReady(); }
+  void enableWrite() {
+    events_ = Event::FileReadyType::Write;
+    DUMPEVENTS(__FUNCTION__, events_);
   }
-  void enableWrite() { events_ = Event::FileReadyType::Write; DUMPEVENTS(__FUNCTION__, events_); }
-  void enableWriteRead() { events_ = Event::FileReadyType::Write | Event::FileReadyType::Read; DUMPEVENTS(__FUNCTION__, events_);}
-  void enableWriteClose() { events_ = Event::FileReadyType::Write | Event::FileReadyType::Closed; DUMPEVENTS(__FUNCTION__, events_);}
+  void enableWriteRead() {
+    events_ = Event::FileReadyType::Write | Event::FileReadyType::Read;
+    DUMPEVENTS(__FUNCTION__, events_);
+  }
+  void enableWriteClose() {
+    events_ = Event::FileReadyType::Write | Event::FileReadyType::Closed;
+    DUMPEVENTS(__FUNCTION__, events_);
+  }
   bool isReadEnabled() {
     return events_ | (Event::FileReadyType::Closed | Event::FileReadyType::Read);
   }

@@ -77,7 +77,7 @@ public:
   Instance() : buffer_id_(BufferIdGenerator::nextId()) {}
   Instance(int) : buffer_id_(TestBufferIdGenerator::nextId()) {}
 
-  const int buffer_id_;
+  int buffer_id_;
   int bid() const { return buffer_id_; }
   virtual ~Instance() = default;
 

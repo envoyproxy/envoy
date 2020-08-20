@@ -154,7 +154,7 @@ public:
       EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
           .WillOnce(Invoke([listener, listener_callbacks](Network::SocketSharedPtr&&,
                                                           Network::ListenerCallbacks& cb,
-                                                          bool) -> Network::Listener* {
+                                                          bool, const std::string&) -> Network::Listener* {
             if (listener_callbacks != nullptr) {
               *listener_callbacks = &cb;
             }

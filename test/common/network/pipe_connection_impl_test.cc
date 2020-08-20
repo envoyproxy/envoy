@@ -2,11 +2,11 @@
 #include <memory>
 #include <string>
 
-#include "common/buffer/watermark_buffer.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/buffer/watermark_buffer.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/event/dispatcher_impl.h"
@@ -99,6 +99,8 @@ protected:
     server_socket_raw->setWritablePeer(client_socket_raw);
     server_connection_ = std::move(server_conn);
     client_connection_ = std::move(client_conn);
+    server_socket_ = server_socket_raw;
+    client_socket_ = client_socket_raw;
   }
 
   void doConnect() {
@@ -218,6 +220,9 @@ protected:
       std::make_shared<Network::Address::EnvoyInternalInstance>("client_address")};
   Address::InstanceConstSharedPtr server_address_{
       std::make_shared<Network::Address::EnvoyInternalInstance>("server_address")};
+  // The below sockets are owned by connection. Don't manually destroy.
+  Network::BufferSourceSocket* client_socket_;
+  Network::BufferSourceSocket* server_socket_;
 };
 
 TEST_P(PipeConnectionImplTest, UniqueId) {
@@ -759,93 +764,117 @@ TEST_P(PipeConnectionImplTest, ReadWatermarksConnectionUnconsumedBufferWhenConsu
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
   client_connection_->close(ConnectionCloseType::NoFlush);
 }
-// // Write some data to the connection. It will automatically attempt to flush
-// // it to the upstream file descriptor via a write() call to buffer_, which is
-// // configured to succeed and accept all bytes read.
-// TEST_P(PipeConnectionImplTest, BasicWrite) {
-//   useMockBuffer();
 
-//   setUpBasicConnection();
+// Write some data to the connection. It will automatically attempt to flush
+// it to the upstream file descriptor via a write() call to buffer_, which is
+// configured to succeed and accept all bytes read.
+TEST_P(PipeConnectionImplTest, BasicWrite) {
+  useMockBuffer();
+  setupPipe();
+  doConnect();
 
-//   connect();
+  EXPECT_FALSE(client_connection_->aboveHighWatermark());
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected));
 
-//   // Send the data to the connection and verify it is sent upstream.
-//   std::string data_to_write = "hello world";
-//   Buffer::OwnedImpl buffer_to_write(data_to_write);
-//   std::string data_written;
-//   EXPECT_CALL(*client_write_buffer_, move(_))
-//       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
-//                             Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
-//   EXPECT_CALL(*client_write_buffer_, write(_))
-//       .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackWrites));
-//   EXPECT_CALL(*client_write_buffer_, drain(_))
-//       .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
-//   client_connection_->write(buffer_to_write, false);
-//   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-//   EXPECT_EQ(data_to_write, data_written);
+  // Send the data to the connection and verify it is sent upstream.
+  std::string data_to_write = "hello world";
+  Buffer::OwnedImpl buffer_to_write(data_to_write);
+  std::string data_written;
+  EXPECT_CALL(*client_write_buffer_, move(_))
+      .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
+                            Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
+  // Buffer source socket does not write to io handle.
+  EXPECT_CALL(*client_write_buffer_, write(_)).Times(0);
+  EXPECT_CALL(*client_write_buffer_, drain(_))
+      .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
+  client_connection_->write(buffer_to_write, false);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(data_to_write, data_written);
 
-//   disconnect(true);
-// }
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  client_connection_->close(ConnectionCloseType::NoFlush);
+}
 
-// // Similar to BasicWrite, only with watermarks set.
-// TEST_P(PipeConnectionImplTest, WriteWithWatermarks) {
-//   useMockBuffer();
+// Similar to BasicWrite, only with watermarks set.
+TEST_P(PipeConnectionImplTest, WriteAllAndClearHighwatermark) {
+  useMockBuffer();
+  setupPipe();
+  doConnect();
+  client_connection_->setBufferLimits(2);
+  EXPECT_FALSE(client_connection_->aboveHighWatermark());
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected));
 
-//   setUpBasicConnection();
+  std::string data_to_write = "hello world";
+  Buffer::OwnedImpl first_buffer_to_write(data_to_write);
+  std::string data_written;
+  EXPECT_CALL(*client_write_buffer_, move(_))
+      .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
+                            Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
+  // Buffer source socket does not write to io handle.
+  EXPECT_CALL(*client_write_buffer_, write(_)).Times(0);
+  EXPECT_CALL(*client_write_buffer_, drain(_))
+      .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
+  // The write() call on the connection will buffer enough data to bring the connection above the
+  // high watermark but the subsequent drain immediately brings it back below.
+  // A nice future performance optimization would be to latch if the socket is writable in the
+  // connection_impl, and try an immediate drain inside of write() to avoid thrashing here.
+  EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark());
+  client_connection_->write(first_buffer_to_write, false);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(data_to_write, data_written);
 
-//   connect();
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  client_connection_->close(ConnectionCloseType::NoFlush);
+}
 
-//   client_connection_->setBufferLimits(2);
+TEST_P(PipeConnectionImplTest, DISABLED_WritePartialAndHighwatermarkRemains) {
+  useMockBuffer();
+  setupPipe();
+  doConnect();
+  client_connection_->setBufferLimits(2);
 
-//   std::string data_to_write = "hello world";
-//   Buffer::OwnedImpl first_buffer_to_write(data_to_write);
-//   std::string data_written;
-//   EXPECT_CALL(*client_write_buffer_, move(_))
-//       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
-//                             Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
-//   EXPECT_CALL(*client_write_buffer_, write(_))
-//       .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackWrites));
-//   EXPECT_CALL(*client_write_buffer_, drain(_))
-//       .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
-//   // The write() call on the connection will buffer enough data to bring the connection above
-//   the
-//   // high watermark but the subsequent drain immediately brings it back below.
-//   // A nice future performance optimization would be to latch if the socket is writable in the
-//   // connection_impl, and try an immediate drain inside of write() to avoid thrashing here.
-//   EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
-//   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark());
-//   client_connection_->write(first_buffer_to_write, false);
-//   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-//   EXPECT_EQ(data_to_write, data_written);
+  server_socket_->read_buffer_.setWatermarks(2);
+  ASSERT_FALSE(server_socket_->isOverHighWatermark());
+  server_socket_->read_buffer_.add("buffered_data");
+  ASSERT_TRUE(server_socket_->isOverHighWatermark());
+  ASSERT_EQ(server_socket_->read_buffer_.length(), 13);
 
-//   // Now do the write again, but this time configure buffer_ to reject the write
-//   // with errno set to EAGAIN via failWrite(). This should result in going above the high
-//   // watermark and not returning.
-//   Buffer::OwnedImpl second_buffer_to_write(data_to_write);
-//   EXPECT_CALL(*client_write_buffer_, move(_))
-//       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
-//                             Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
-//   EXPECT_CALL(*client_write_buffer_, write(_))
-//       .WillOnce(Invoke([&](IoHandle& io_handle) -> Api::IoCallUint64Result {
-//         dispatcher_->exit();
-//         return client_write_buffer_->failWrite(io_handle);
-//       }));
-//   // The write() call on the connection will buffer enough data to bring the connection above
-//   the
-//   // high watermark and as the data will not flush it should not return below the watermark.
-//   EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
-//   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
-//   client_connection_->write(second_buffer_to_write, false);
-//   dispatcher_->run(Event::Dispatcher::RunType::Block);
+  ASSERT_FALSE(client_connection_->aboveHighWatermark());
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected));
 
-//   // Clean up the connection. The close() (called via disconnect) will attempt to flush. The
-//   // call to write() will succeed, bringing the connection back under the low watermark.
-//   EXPECT_CALL(*client_write_buffer_, write(_))
-//       .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackWrites));
-//   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
+  // Now do the write again, but this time the d
+  const std::string data_to_write = "hello world";
+  std::string data_written;
+  Buffer::OwnedImpl second_buffer_to_write(data_to_write);
+  EXPECT_CALL(*client_write_buffer_, move(_))
+      .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
+                            Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
+  EXPECT_CALL(*client_write_buffer_, write(_)).Times(0);
+  // The write() call on the connection will buffer enough data to bring the connection abovethe
+  // high watermark and as the data will not flush it should not return below the watermark.
+  EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
+  client_connection_->write(second_buffer_to_write, false);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-//   disconnect(true);
-// }
+  // No data is written to server side buffer.
+  ASSERT_EQ(server_socket_->read_buffer_.length(), 13);
+
+  // Now we drain the server side buffer and it will accept bytes from client.
+  EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
+  server_socket_->read_buffer_.drain(13);
+
+  // Clean up the connection. The close() (called via disconnect) will attempt to flush. The
+  // call to write() will succeed, bringing the connection back under the low watermark.
+  EXPECT_CALL(*client_write_buffer_, write(_)).Times(0);
+
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
+  client_connection_->close(ConnectionCloseType::FlushWrite);
+}
 
 // // Read and write random bytes and ensure we don't encounter issues.
 // TEST_P(PipeConnectionImplTest, WatermarkFuzzing) {

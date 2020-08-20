@@ -269,16 +269,16 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
                            "body\r\n0\r\n");
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
-  buffer = Buffer::OwnedImpl(trailer_string);
+  Buffer::OwnedImpl buffer1{Buffer::OwnedImpl(trailer_string)};
   if (enable_trailers) {
     EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
-    status = codec_->dispatch(buffer);
+    status = codec_->dispatch(buffer1);
     EXPECT_TRUE(isCodecProtocolError(status));
     EXPECT_EQ(status.message(), "trailers size exceeds limit");
   } else {
     // If trailers are not enabled, we expect Envoy to simply skip over the large
     // trailers as if nothing has happened!
-    status = codec_->dispatch(buffer);
+    status = codec_->dispatch(buffer1);
     EXPECT_TRUE(status.ok());
   }
 }
@@ -298,9 +298,9 @@ void Http1ServerConnectionImplTest::testRequestHeadersExceedLimit(std::string he
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
-  buffer = Buffer::OwnedImpl(header_string + "\r\n");
+  Buffer::OwnedImpl buffer1(header_string + "\r\n");
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
-  status = codec_->dispatch(buffer);
+  status = codec_->dispatch(buffer1);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "headers size exceeds limit");
   if (!details.empty()) {
@@ -321,8 +321,8 @@ void Http1ServerConnectionImplTest::testRequestHeadersAccepted(std::string heade
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
   auto status = codec_->dispatch(buffer);
-  buffer = Buffer::OwnedImpl(header_string + "\r\n");
-  status = codec_->dispatch(buffer);
+  Buffer::OwnedImpl next_buffer(header_string + "\r\n");
+  status = codec_->dispatch(next_buffer);
   EXPECT_TRUE(status.ok());
 }
 
@@ -2622,13 +2622,13 @@ TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersSplitRejected) {
 
   std::string long_string = std::string(1024, 'q');
   for (int i = 0; i < 59; i++) {
-    buffer = Buffer::OwnedImpl(fmt::format("big: {}\r\n", long_string));
-    status = codec_->dispatch(buffer);
+    Buffer::OwnedImpl next(fmt::format("big: {}\r\n", long_string));
+    status = codec_->dispatch(next);
   }
   // the 60th 1kb header should induce overflow
-  buffer = Buffer::OwnedImpl(fmt::format("big: {}\r\n", long_string));
+  Buffer::OwnedImpl next(fmt::format("big: {}\r\n", long_string));
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
-  status = codec_->dispatch(buffer);
+  status = codec_->dispatch(next);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "headers size exceeds limit");
   EXPECT_EQ("http1.headers_too_large", response_encoder->getStream().responseDetails());
@@ -2652,13 +2652,13 @@ TEST_P(Http1ServerConnectionImplTest, ManyRequestHeadersSplitRejected) {
   auto status = codec_->dispatch(buffer);
 
   // Dispatch 100 headers.
-  buffer = Buffer::OwnedImpl(createHeaderFragment(100));
-  status = codec_->dispatch(buffer);
+  Buffer::OwnedImpl buffer1(createHeaderFragment(100));
+  status = codec_->dispatch(buffer1);
 
   // The final 101th header should induce overflow.
-  buffer = Buffer::OwnedImpl("header101:\r\n\r\n");
+  Buffer::OwnedImpl buffer2("header101:\r\n\r\n");
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
-  status = codec_->dispatch(buffer);
+  status = codec_->dispatch(buffer2);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "headers size exceeds limit");
 }
@@ -2695,8 +2695,8 @@ TEST_P(Http1ClientConnectionImplTest, ResponseHeadersWithLargeValueRejected) {
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
   std::string long_header = "big: " + std::string(80 * 1024, 'q');
-  buffer = Buffer::OwnedImpl(long_header);
-  status = codec_->dispatch(buffer);
+  Buffer::OwnedImpl next_buffer(long_header);
+  status = codec_->dispatch(next_buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "headers size exceeds limit");
 }
@@ -2715,8 +2715,8 @@ TEST_P(Http1ClientConnectionImplTest, ResponseHeadersWithLargeFieldRejected) {
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
   std::string long_header = "big: " + std::string(80 * 1024, 'q');
-  buffer = Buffer::OwnedImpl(long_header);
-  status = codec_->dispatch(buffer);
+  Buffer::OwnedImpl next_buffer(long_header);
+  status = codec_->dispatch(next_buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "headers size exceeds limit");
 }
@@ -2734,8 +2734,8 @@ TEST_P(Http1ClientConnectionImplTest, LargeResponseHeadersAccepted) {
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
   std::string long_header = "big: " + std::string(79 * 1024, 'q') + "\r\n";
-  buffer = Buffer::OwnedImpl(long_header);
-  status = codec_->dispatch(buffer);
+  Buffer::OwnedImpl next_buffer(long_header);
+  status = codec_->dispatch(next_buffer);
 }
 
 // Regression test for CVE-2019-18801. Large method headers should not trigger
@@ -2801,9 +2801,8 @@ TEST_P(Http1ClientConnectionImplTest, ManyResponseHeadersRejected) {
 
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
   auto status = codec_->dispatch(buffer);
-  buffer = Buffer::OwnedImpl(createHeaderFragment(101) + "\r\n");
-
-  status = codec_->dispatch(buffer);
+  Buffer::OwnedImpl next_buffer(createHeaderFragment(101) + "\r\n");
+  status = codec_->dispatch(next_buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "headers size exceeds limit");
 }
@@ -2822,8 +2821,8 @@ TEST_P(Http1ClientConnectionImplTest, ManyResponseHeadersAccepted) {
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
   auto status = codec_->dispatch(buffer);
   // Response already contains one header.
-  buffer = Buffer::OwnedImpl(createHeaderFragment(150) + "\r\n");
-  status = codec_->dispatch(buffer);
+  Buffer::OwnedImpl next_buffer(createHeaderFragment(150) + "\r\n");
+  status = codec_->dispatch(next_buffer);
 }
 
 } // namespace Http

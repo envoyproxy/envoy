@@ -48,15 +48,11 @@ public:
     read_end_stream_ = true;
     ENVOY_LOG_MISC(debug, "lambdai: B{} set write end = true", bsid());
   }
-  bool isPeerShutDownWrite() const override {
-    return read_end_stream_;
-  }
+  bool isPeerShutDownWrite() const override { return read_end_stream_; }
 
   Buffer::Instance* getWriteBuffer() override { return &read_buffer_; }
 
-  bool isOverHighWatermark() const override {
-    return over_high_watermark_;
-  }
+  bool isOverHighWatermark() const override { return over_high_watermark_; }
 
   void setWritablePeer(WritablePeer* writable_peer) {
     // Swapping writable peer is undefined behavior.
@@ -74,9 +70,7 @@ public:
     peer_closed_ = true;
   }
   bool isWritablePeerValid() const { return !peer_closed_; }
-  bool isWritablePeerOverHighWatermark() const {
-    return writable_peer_->isOverHighWatermark();
-  }
+  bool isWritablePeerOverHighWatermark() const { return writable_peer_->isOverHighWatermark(); }
 
 private:
   static uint64_t next_bsid_;

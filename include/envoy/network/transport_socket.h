@@ -269,7 +269,6 @@ public:
    */
   virtual bool isPeerShutDownWrite() const PURE;
 
-
   /**
    * @return the buffer to be written.
    */
