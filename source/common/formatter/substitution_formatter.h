@@ -117,10 +117,10 @@ private:
   using JsonFormatMapValue =
       absl::variant<const std::vector<FormatterProviderPtr>, const JsonFormatMapWrapper>;
   // Although not required for JSON, it is nice to have the order of properties
-  // preserved between the format and the log entry, thus std::map
+  // preserved between the format and the log entry, thus std::map.
   using JsonFormatMap = std::map<std::string, JsonFormatMapValue>;
   using JsonFormatMapPtr = std::unique_ptr<JsonFormatMap>;
-  struct JsonFormatMapWrapper{
+  struct JsonFormatMapWrapper {
     JsonFormatMapPtr value_;
   };
 
