@@ -248,6 +248,11 @@ public:
    */
   virtual Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                                               Event::FileTriggerType trigger, uint32_t events) PURE;
+
+  /**
+   * Shut down part of a full-duplex connection (see man 2 shutdown)
+   */
+  virtual Api::SysCallIntResult shutdown(int how) PURE;
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;

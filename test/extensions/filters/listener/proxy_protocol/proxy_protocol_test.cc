@@ -360,7 +360,10 @@ TEST_P(ProxyProtocolTest, ErrorFIONREAD_1) {
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+  // ioctl replaced with recv so have recv return an error
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(Api::SysCallSizeResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -575,12 +578,13 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsIoctlError) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
-  EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _))
+  // ioctl replaced with recv so have recv return an error
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, unsigned long int request, void* argp) {
-        const Api::SysCallIntResult x = os_sys_calls_actual_.ioctl(fd, request, argp);
-        if (x.rc_ == 0 && *static_cast<int*>(argp) == sizeof(tlv)) {
-          return Api::SysCallIntResult{-1, x.errno_};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t n, int flags) {
+        const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
+        if (x.rc_ == sizeof(tlv)) {
+          return Api::SysCallSizeResult{-1, 0};
         } else {
           return x;
         }
@@ -589,11 +593,6 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsIoctlError) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
         return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
-      }));
-  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
-        return os_sys_calls_actual_.recv(fd, buf, len, flags);
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
