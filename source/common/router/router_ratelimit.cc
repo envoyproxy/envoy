@@ -97,8 +97,7 @@ bool GenericKeyAction::populateDescriptor(const Router::RouteEntry&,
                                           RateLimit::Descriptor& descriptor, const std::string&,
                                           const Http::HeaderMap&, const Network::Address::Instance&,
                                           const envoy::config::core::v3::Metadata*) const {
-  const std::string key = !descriptor_key_.empty() ? descriptor_key_ : "generic_key";
-  descriptor.entries_.push_back({key, descriptor_value_});
+  descriptor.entries_.push_back({descriptor_key_, descriptor_value_});
   return true;
 }
 
