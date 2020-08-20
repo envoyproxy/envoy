@@ -15,7 +15,7 @@ envoy_package()
 envoy_cc_test(
     name = "injected_resource_monitor_test",
     srcs = ["injected_resource_monitor_test.cc"],
-    tags = ["fails_on_windows"],
+    args = ["-l trace --gtest_filter=*InjectedResourceMonitorTest.ReportsErrorOnFileRead*"],
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/stats:isolated_store_lib",
