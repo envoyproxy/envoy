@@ -119,7 +119,7 @@ message DownstreamTlsContext {
 
   // Config for whether to use certificates if they do not have
   // an accompanying OCSP response or if the response expires at runtime.
-  // Defaults to SKIP_STAPLING_IF_EXPIRED
+  // Defaults to LENIENT_STAPLING
   OcspStaplePolicy ocsp_staple_policy = 8 [(validate.rules).enum = {defined_only: true}];
 }
 
