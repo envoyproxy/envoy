@@ -21,6 +21,11 @@ import kotlin.Unit;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class MainActivity extends Activity {
   private static final String REQUEST_HANDLER_THREAD_NAME = "hello_envoy_java";
@@ -28,6 +33,13 @@ public class MainActivity extends Activity {
   private static final String REQUEST_AUTHORITY = "api.lyft.com";
   private static final String REQUEST_PATH = "/ping";
   private static final String REQUEST_SCHEME = "https";
+  private static final Set<String> FILTERED_HEADERS = new HashSet<String>() {
+    {
+      add("server");
+      add("filter-demo");
+      add("x-envoy-upstream-service-time");
+    }
+  };
 
   private Engine engine;
   private RecyclerView recyclerView;
@@ -81,10 +93,20 @@ public class MainActivity extends Activity {
         .setOnResponseHeaders((responseHeaders, endStream) -> {
           Integer status = responseHeaders.getHttpStatus();
           String message = "received headers with status " + status;
+
+          StringBuilder sb = new StringBuilder();
+          for (Map.Entry<String, List<String>> entry : responseHeaders.getHeaders().entrySet()) {
+            String name = entry.getKey();
+            if (FILTERED_HEADERS.contains(name)) {
+              sb.append(name).append(": ").append(String.join(", ", entry.getValue())).append("\n");
+            }
+          }
+          String headerText = sb.toString();
+
           Log.d("MainActivity", message);
           if (status == 200) {
             String serverHeaderField = responseHeaders.value(ENVOY_SERVER_HEADER).get(0);
-            recyclerView.post(() -> viewAdapter.add(new Success(message, serverHeaderField)));
+            recyclerView.post(() -> viewAdapter.add(new Success(message, headerText)));
           } else {
             recyclerView.post(() -> viewAdapter.add(new Failure(message)));
           }
