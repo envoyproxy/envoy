@@ -168,6 +168,7 @@ envoy_cc_test(
     deps = [
         "//source/common/config:grpc_stream_lib",
         "//test/common/stats:stat_test_utility_lib",
+        "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
