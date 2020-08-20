@@ -12,7 +12,6 @@ import os
 import subprocess
 import sys
 from typing import Type, List, Tuple, Dict
-
 #libclang imports
 import clang.cindex
 from clang.cindex import TranslationUnit, Index, CursorKind, Cursor
@@ -74,7 +73,7 @@ def get_directives(translation_unit: Type[TranslationUnit]) -> str:
     Notes:
         clang lib provides API like tranlation_unit.get_includes() to get include directives.
         But we can't use it as it requires presence of the included files to return the full list.
-        We choose to return the string insead of list of includes since we will simply copy-paste
+        We choose to return the string instead of list of includes since we will simply copy-paste
         the include statements into generated headers. Return string seems more convenient
     """
   cursor = translation_unit.cursor
@@ -100,8 +99,8 @@ def cursors_in_same_file(cursor: Cursor) -> List[Cursor]:
   for descendant in cursor.walk_preorder():
     # We don't want Cursors from files other than the input file,
     # otherwise we get definitions for every file included
-    # when clang parsed the input file (i.e. if we don't limit descendant loction,
-    # it will check definitions from included headers and get class defns like std::string)
+    # when clang parsed the input file (i.e. if we don't limit descendant location,
+    # it will check definitions from included headers and get class definitions like std::string)
     if descendant.location.file is None:
       continue
     if descendant.location.file.name != cursor.displayname:
@@ -123,7 +122,7 @@ def class_definitions(cursor: Cursor) -> List[Cursor]:
   cursors = cursors_in_same_file(cursor)
   class_cursors = []
   for descendant in cursors:
-    # check if descendant is pointing to a class delaration block.
+    # check if descendant is pointing to a class declaration block.
     if descendant.kind != CursorKind.CLASS_DECL:
       continue
     if not descendant.is_definition():
@@ -206,7 +205,7 @@ def get_implline(cursor: Cursor) -> int:
         cursor: libclang cursor pointing to the target mock class definition.
 
     Returns:
-        implline: the first line of the corresponding method implementation code
+        an integer, the line number of the first line of the corresponding method implementation code (zero indexed)
 
     Note:
         This function return line number only. Because in certain case libclang will fail
@@ -215,7 +214,7 @@ def get_implline(cursor: Cursor) -> int:
         We can not get the function body directly with the same way we used in extract_definition() since clang didn't parse 
         function this time.
         Though we can't get the correct method extent offset from Cursor, we can still
-        get the start line of the corresponding method instead. 
+        get the start line of the corresponding method instead.
         (We can't get the correct line number for the last line due to skipping function bodies)
     """
   return cursor.extent.start.line - 1
@@ -304,7 +303,7 @@ def get_enclosing_namespace(defn: Cursor) -> Tuple[str, str]:
   return namespace_prefix, namespace_suffix
 
 
-def write_file(class_name, class_defn, class_impl):
+def write_file_contents(class_name, class_defn, class_impl):
   with open("{}.h".format(to_filename(class_name)), "w") as decl_file:
     decl_file.write(class_defn)
 
@@ -358,7 +357,7 @@ def main(args):
 
     includes = ""
     for name in deps:
-      includes += "#include "{}.h"\n".format(to_filename(name))
+      includes += '#include "{}.h"\n'.format(to_filename(name))
 
     class_defn = decl_includes + includes + class_defn
 
@@ -372,7 +371,7 @@ def main(args):
       class_impl = impl_include + namespace_prefix + \
           classname_to_impl[class_name] + namespace_suffix
 
-    write_file(class_name, class_defn, class_impl)
+    write_file_contents(class_name, class_defn, class_impl)
 
 
 if __name__ == "__main__":
