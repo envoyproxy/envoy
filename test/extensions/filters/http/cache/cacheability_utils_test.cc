@@ -145,6 +145,24 @@ TEST_F(IsCacheableResponseTest, ResponsePrivate) {
   EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers_));
 }
 
+TEST_F(IsCacheableResponseTest, EmptyVary) {
+  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_));
+  response_headers_.setCopy(Http::CustomHeaders::get().Vary, "");
+  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_));
+}
+
+TEST_F(IsCacheableResponseTest, AllowedVary) {
+  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_));
+  response_headers_.setCopy(Http::CustomHeaders::get().Vary, "accept-encoding");
+  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_));
+}
+
+TEST_F(IsCacheableResponseTest, NotAllowedVary) {
+  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_));
+  response_headers_.setCopy(Http::CustomHeaders::get().Vary, "*");
+  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers_));
+}
+
 } // namespace
 } // namespace Cache
 } // namespace HttpFilters

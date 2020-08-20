@@ -70,7 +70,8 @@ bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& heade
       headers.get(Http::Headers::get().Expires);
 
   return !response_cache_control.no_store_ &&
-         cacheableStatusCodes().contains((headers.getStatusValue())) && has_validation_data;
+         cacheableStatusCodes().contains((headers.getStatusValue())) && has_validation_data &&
+         VaryHeader::isAllowed(headers);
 }
 
 } // namespace Cache
