@@ -20,12 +20,10 @@ void BufferHelper::addUint32(Buffer::Instance& buffer, uint32_t val) {
 void BufferHelper::addString(Buffer::Instance& buffer, const std::string& str) { buffer.add(str); }
 
 std::string BufferHelper::encodeHdr(const std::string& cmd_str, uint8_t seq) {
-  MySQLCodec::MySQLHeader mysqlhdr;
-  mysqlhdr.fields_.length_ = cmd_str.length();
-  mysqlhdr.fields_.seq_ = seq;
-
   Buffer::OwnedImpl buffer;
-  addUint32(buffer, mysqlhdr.bits_);
+  // First byte contains sequence number, next 3 bytes contain cmd string size
+  uint32_t header = (seq << 24) | (cmd_str.length() & MYSQL_HDR_PKT_SIZE_MASK);
+  addUint32(buffer, header);
 
   std::string e_string = buffer.toString();
   e_string.append(cmd_str);
