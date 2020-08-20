@@ -109,6 +109,7 @@ TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s
 EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
 COMMENT_REGEX = re.compile(r"//|\*")
 DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
+PROTO_VALIDATION_STRING = re.compile(r'\bmin_bytes\b')
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -907,13 +908,12 @@ def clangFormat(file_path):
 
 # Fix for https://github.com/envoyproxy/envoy/issues/10535
 def checkProtoiValidation(file_path):
-  command = "grep -qrnwl -e 'min_bytes' %s" % (file_path)
   exclude_path = ['v1', 'v2']
-  if os.system(command) == 0:
+  result = PROTO_VALIDATION_STRING.search(readFile(file_path))
+  if result is not None:
       if not any(x in file_path for x in exclude_path):
-          return ["Proto validation Error for min_bytes in file: %s. To fix it use 'min_len'"  % (file_path)]
-  return []  
-
+          return ["Proto validation Error in file: %s. 'min_bytes' is DEPRECATED, Use 'min_len'."  % (file_path)]
+  return []
 
 def checkFormat(file_path):
   if file_path.startswith(EXCLUDED_PREFIXES):
