@@ -177,12 +177,14 @@ message FilterChain {
   // a filter chain will be built on-demand.
   // On-demand filter chains help speedup the warming up of listeners since the building and initialization of
   // an on-demand filter chain will be postponed to the arrival of new connection requests that require this filter chain.
-  // Filter chains that are not often used should be set as on-demand.
+  // Filter chains that are not often used can be set as on-demand.
   message OnDemandConfiguration {
     // The timeout to wait for filter chain placeholders to complete rebuilding.
-    // If the timeout is reached, the filter chain rebuilding fails. Rebuilder send callbacks with failure signal
-    // and all connections related to this filter chain will not be created.
-    // Specify 0 to disable the timeout. If not specified, a default timeout of 15s is used.
+    // 1. If this field is set to 0, timeout is disabled.
+    // 2. If not specified, a default timeout of 15s is used.
+    // Rebuilding will wait until dependencies are ready, have failed, or this timeout is reached.
+    // Upon failure or timeout, all connections related to this filter chain will be closed.
+    // Rebuilding will start again on the next new connection.
     google.protobuf.Duration rebuild_timeout = 1;
   }
 
