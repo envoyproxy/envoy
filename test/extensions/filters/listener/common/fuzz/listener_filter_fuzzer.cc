@@ -113,7 +113,7 @@ size_t FuzzedHeader::size() { return indices_[std::min(nread_, nreads_ - 1)] - i
 
 bool FuzzedHeader::done() { return nread_ >= nreads_; }
 
-bool FuzzedHeader::empty() { return (nreads_ == 0) | data_.empty(); }
+bool FuzzedHeader::empty() { return nreads_ == 0 || data_.empty(); }
 
 } // namespace ListenerFilters
 } // namespace Extensions
