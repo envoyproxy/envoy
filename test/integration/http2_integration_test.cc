@@ -1246,7 +1246,7 @@ TEST_P(Http2IntegrationTest, PauseAndResumeHeadersOnly) {
 }
 
 // Verify the case when we have large pending data with empty trailers. It should not introduce
-// stack-overflow. This is a regression test for
+// stack-overflow (on ASan build). This is a regression test for
 // https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=24714.
 TEST_P(Http2IntegrationTest, EmptyTrailers) {
   initialize();
