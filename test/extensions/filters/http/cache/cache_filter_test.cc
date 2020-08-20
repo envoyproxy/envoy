@@ -329,8 +329,8 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
 
     testDecodeRequestMiss(filter);
 
-    // Encode response
-    // Add Etag & Last-Modified headers to the response for validation
+    // Encode response.
+    // Add Etag & Last-Modified headers to the response for validation.
     response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, "abc123");
     response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
                                       formatter_.now(time_source_));
@@ -342,7 +342,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     filter->onDestroy();
   }
   {
-    // Create filter for request 2
+    // Create filter for request 2.
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Make request require validation
@@ -353,7 +353,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     // exception of injecting validation precondition headers.
     testDecodeRequestMiss(filter);
 
-    // Make sure validation conditional headers are added
+    // Make sure validation conditional headers are added.
     const Http::TestRequestHeaderMapImpl injected_headers = {
         {"if-none-match", "abc123"}, {"if-modified-since", formatter_.now(time_source_)}};
     EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
@@ -379,6 +379,158 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
 
     ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
 
+    filter->onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, SingleSatisfiableRange) {
+  request_headers_.setHost("SingleSatisfiableRange");
+  const std::string body = "abc";
+
+  {
+    // Create filter for request 1.
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+
+    testDecodeRequestMiss(filter);
+
+    // Encode response.
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    filter->onDestroy();
+  }
+  {
+    // Add range info to headers.
+    request_headers_.addReference(Http::Headers::get().Range, "bytes=-2");
+
+    response_headers_.setStatus(static_cast<uint64_t>(Http::Code::PartialContent));
+    response_headers_.addReference(Http::Headers::get().ContentRange, "bytes 1-2/3");
+    response_headers_.setContentLength(2);
+
+    // Create filter for request 2
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+
+    // Decode request 2 header
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              HeaderHasValueRef("age", "0")),
+                               false));
+
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq("bc")), true));
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // The cache lookup callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    // The posted lookup callback will cause another callback to be posted (when getBody() is
+    // called) which should also be invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    filter->onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
+  request_headers_.setHost("MultipleSatisfiableRanges");
+  const std::string body = "abc";
+
+  {
+    // Create filter for request 1
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+
+    testDecodeRequestMiss(filter);
+
+    // Encode response header
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    filter->onDestroy();
+  }
+  {
+    // Add range info to headers
+    // multi-part responses are not supported, 200 expected
+    request_headers_.addReference(Http::Headers::get().Range, "bytes=0-1,-2");
+
+    // Create filter for request 2
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+
+    // Decode request 2 header
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              HeaderHasValueRef("age", "0")),
+                               false));
+
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // The cache lookup callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    // The posted lookup callback will cause another callback to be posted (when getBody() is
+    // called) which should also be invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    filter->onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, NotSatisfiableRange) {
+  request_headers_.setHost("NotSatisfiableRange");
+  const std::string body = "abc";
+
+  {
+    // Create filter for request 1
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+
+    testDecodeRequestMiss(filter);
+
+    // Encode response header
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    filter->onDestroy();
+  }
+  {
+    // Add range info to headers
+    request_headers_.addReference(Http::Headers::get().Range, "bytes=123-");
+
+    response_headers_.setStatus(static_cast<uint64_t>(Http::Code::RangeNotSatisfiable));
+    response_headers_.addReference(Http::Headers::get().ContentRange, "bytes */3");
+    response_headers_.setContentLength(0);
+
+    // Create filter for request 2
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+
+    // Decode request 2 header
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              HeaderHasValueRef("age", "0")),
+                               true));
+
+    // 416 response should not have a body, so we don't expect a call to encodeData
+    EXPECT_CALL(decoder_callbacks_,
+                encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true))
+        .Times(0);
+
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // The cache lookup callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    // The posted lookup callback will cause another callback to be posted (when getBody() is
+    // called) which should also be invoked.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
     filter->onDestroy();
   }
 }

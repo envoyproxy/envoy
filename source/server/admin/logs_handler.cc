@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "common/common/fancy_logger.h"
 #include "common/common/logger.h"
 
 #include "server/admin/utils.h"
@@ -28,12 +29,19 @@ Http::Code LogsHandler::handlerLogging(absl::string_view url, Http::ResponseHead
     rc = Http::Code::NotFound;
   }
 
-  response.add("active loggers:\n");
-  for (const Logger::Logger& logger : Logger::Registry::loggers()) {
-    response.add(fmt::format("  {}: {}\n", logger.name(), logger.levelString()));
+  if (!Logger::Context::useFancyLogger()) {
+    response.add("active loggers:\n");
+    for (const Logger::Logger& logger : Logger::Registry::loggers()) {
+      response.add(fmt::format("  {}: {}\n", logger.name(), logger.levelString()));
+    }
+
+    response.add("\n");
+  } else {
+    response.add("active loggers:\n");
+    std::string logger_info = getFancyContext().listFancyLoggers();
+    response.add(logger_info);
   }
 
-  response.add("\n");
   return rc;
 }
 
@@ -65,27 +73,40 @@ bool LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params) {
     return false;
   }
 
-  // Now either change all levels or a single level.
-  if (name == "level") {
-    ENVOY_LOG(debug, "change all log levels: level='{}'", level);
-    for (Logger::Logger& logger : Logger::Registry::loggers()) {
-      logger.setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
+  if (!Logger::Context::useFancyLogger()) {
+    // Now either change all levels or a single level.
+    if (name == "level") {
+      ENVOY_LOG(debug, "change all log levels: level='{}'", level);
+      for (Logger::Logger& logger : Logger::Registry::loggers()) {
+        logger.setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
+      }
+    } else {
+      ENVOY_LOG(debug, "change log level: name='{}' level='{}'", name, level);
+      Logger::Logger* logger_to_change = nullptr;
+      for (Logger::Logger& logger : Logger::Registry::loggers()) {
+        if (logger.name() == name) {
+          logger_to_change = &logger;
+          break;
+        }
+      }
+
+      if (!logger_to_change) {
+        return false;
+      }
+
+      logger_to_change->setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
     }
   } else {
-    ENVOY_LOG(debug, "change log level: name='{}' level='{}'", name, level);
-    Logger::Logger* logger_to_change = nullptr;
-    for (Logger::Logger& logger : Logger::Registry::loggers()) {
-      if (logger.name() == name) {
-        logger_to_change = &logger;
-        break;
-      }
+    // Level setting with Fancy Logger.
+    spdlog::level::level_enum lv = static_cast<spdlog::level::level_enum>(level_to_use);
+    if (name == "level") {
+      FANCY_LOG(info, "change all log levels: level='{}'", level);
+      getFancyContext().setAllFancyLoggers(lv);
+    } else {
+      FANCY_LOG(info, "change log level: name='{}' level='{}'", name, level);
+      bool res = getFancyContext().setFancyLogger(name, lv);
+      return res;
     }
-
-    if (!logger_to_change) {
-      return false;
-    }
-
-    logger_to_change->setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
   }
 
   return true;

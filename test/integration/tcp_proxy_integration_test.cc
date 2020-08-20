@@ -121,7 +121,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(10));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->write("", true));
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForDisconnect();
 }
 
@@ -369,7 +369,7 @@ TEST_P(TcpProxyIntegrationTest, ShutdownWithOpenConnections) {
   test_server_.reset();
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->close());
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForHalfClose();
   tcp_client->close();
 
@@ -397,7 +397,7 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
 
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  tcp_client->waitForDisconnect(true);
+  tcp_client->waitForDisconnect();
 }
 
 TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
@@ -427,8 +427,8 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   ASSERT_TRUE(tcp_client->write(data));
   ASSERT_TRUE(fake_upstream_connection->write(data));
 
-  tcp_client->waitForDisconnect(true);
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  tcp_client->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 TEST_P(TcpProxyIntegrationTest, TestNoCloseOnHealthFailure) {
@@ -475,7 +475,7 @@ TEST_P(TcpProxyIntegrationTest, TestNoCloseOnHealthFailure) {
 
   ASSERT_TRUE(fake_upstream_health_connection->waitForData(8));
   ASSERT_TRUE(fake_upstream_health_connection->close());
-  ASSERT_TRUE(fake_upstream_health_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_health_connection->waitForDisconnect());
 
   // By waiting we know the previous health check attempt completed (with a failure since we closed
   // the connection on it)
@@ -492,10 +492,10 @@ TEST_P(TcpProxyIntegrationTest, TestNoCloseOnHealthFailure) {
   test_server_.reset();
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->close());
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   ASSERT_TRUE(fake_upstream_health_connection_reconnect->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_health_connection_reconnect->close());
-  ASSERT_TRUE(fake_upstream_health_connection_reconnect->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_health_connection_reconnect->waitForDisconnect());
   tcp_client->waitForHalfClose();
   tcp_client->close();
 }
@@ -545,14 +545,14 @@ TEST_P(TcpProxyIntegrationTest, TestCloseOnHealthFailure) {
   ASSERT_TRUE(fake_upstream_health_connection->waitForData(8));
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   ASSERT_TRUE(fake_upstream_health_connection->close());
-  ASSERT_TRUE(fake_upstream_health_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_health_connection->waitForDisconnect());
 
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   tcp_client->waitForHalfClose();
 
   ASSERT_TRUE(fake_upstream_connection->close());
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 class TcpProxyMetadataMatchIntegrationTest : public TcpProxyIntegrationTest {
@@ -636,7 +636,7 @@ void TcpProxyMetadataMatchIntegrationTest::expectEndpointToMatchRoute() {
   ASSERT_TRUE(fake_upstream_connection->waitForData(10));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->write("", true));
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForDisconnect();
 
   test_server_->waitForCounterGe("cluster.cluster_0.lb_subsets_selected", 1);
@@ -647,9 +647,9 @@ void TcpProxyMetadataMatchIntegrationTest::expectEndpointNotToMatchRoute() {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   ASSERT_TRUE(tcp_client->write("hello", false, false));
 
-  // TODO(yskopets): 'tcp_client->waitForDisconnect(true);' gets stuck indefinitely on Linux builds,
+  // TODO(yskopets): 'tcp_client->waitForDisconnect();' gets stuck indefinitely on Linux builds,
   // e.g. on 'envoy-linux (bazel compile_time_options)' and 'envoy-linux (bazel release)'
-  // tcp_client->waitForDisconnect(true);
+  // tcp_client->waitForDisconnect();
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_none_healthy", 1);
   test_server_->waitForCounterEq("cluster.cluster_0.lb_subsets_selected", 0);

@@ -4,6 +4,7 @@
 #include "envoy/stats/stats.h"
 
 #include "common/http/header_map_impl.h"
+#include "common/router/reset_header_parser.h"
 #include "common/router/retry_state_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 
@@ -42,7 +43,8 @@ public:
 
   void setup(Http::RequestHeaderMap& request_headers) {
     state_ = RetryStateImpl::create(policy_, request_headers, cluster_, &virtual_cluster_, runtime_,
-                                    random_, dispatcher_, Upstream::ResourcePriority::Default);
+                                    random_, dispatcher_, test_time_.timeSystem(),
+                                    Upstream::ResourcePriority::Default);
   }
 
   void expectTimerCreateAndEnable() {
@@ -123,6 +125,7 @@ public:
 
   void TearDown() override { cleanupOutstandingResources(); }
 
+  Event::SimulatedTimeSystem test_time_;
   NiceMock<TestRetryPolicy> policy_;
   NiceMock<Upstream::MockClusterInfo> cluster_;
   TestVirtualCluster virtual_cluster_;
@@ -923,6 +926,128 @@ TEST_F(RouterRetryStateImplTest, CustomBackOffIntervalDefaultMax) {
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
+}
+
+TEST_F(RouterRetryStateImplTest, ParseRateLimitedResetInterval) {
+  // Set a fixed system time to be used for all these tests
+  const time_t known_date_time = 1000000000;
+  test_time_.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
+
+  Protobuf::RepeatedPtrField<envoy::config::route::v3::RetryPolicy::ResetHeader> reset_headers;
+  auto* reset_header_1 = reset_headers.Add();
+  reset_header_1->set_name("Retry-After");
+  reset_header_1->set_format(envoy::config::route::v3::RetryPolicy::SECONDS);
+
+  auto* reset_header_2 = reset_headers.Add();
+  reset_header_2->set_name("X-RateLimit-Reset");
+  reset_header_2->set_format(envoy::config::route::v3::RetryPolicy::UNIX_TIMESTAMP);
+
+  policy_.reset_headers_ = ResetHeaderParserImpl::buildResetHeaderParserVector(reset_headers);
+
+  // Failure case: Matches reset header (seconds) but exceeds max_interval (>5min)
+  {
+    Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+    setup(request_headers);
+    EXPECT_TRUE(state_->enabled());
+
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "429"}, {"Retry-After", "301"}};
+    EXPECT_EQ(absl::nullopt, state_->parseResetInterval(response_headers));
+  }
+
+  // Failure case: Matches reset header (timestamp) but exceeds max_interval (>5min)
+  {
+    Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+    setup(request_headers);
+    EXPECT_TRUE(state_->enabled());
+
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "429"},
+                                                     {"X-RateLimit-Reset", "1000000301"}};
+    EXPECT_EQ(absl::nullopt, state_->parseResetInterval(response_headers));
+  }
+
+  // The only reset header matches (seconds) and the header value is in within range
+  {
+    Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+    setup(request_headers);
+    EXPECT_TRUE(state_->enabled());
+
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "429"}, {"Retry-After", "300"}};
+    EXPECT_EQ(absl::optional<std::chrono::milliseconds>(300000),
+              state_->parseResetInterval(response_headers));
+  }
+
+  // The only reset header matches (timestamp) and the header value is in within range
+  {
+    Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+    setup(request_headers);
+    EXPECT_TRUE(state_->enabled());
+
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "429"},
+                                                     {"x-ratelimit-reset", "1000000300"}};
+    EXPECT_EQ(absl::optional<std::chrono::milliseconds>(300000),
+              state_->parseResetInterval(response_headers));
+  }
+
+  // The second (timestamp) and third (seconds) reset headers match but Retry-After comes first in
+  // reset_headers so it is used
+  {
+    Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+    setup(request_headers);
+    EXPECT_TRUE(state_->enabled());
+
+    Http::TestResponseHeaderMapImpl response_headers{
+        {":status", "429"}, {"x-ratelimit-reset", "1000000002"}, {"retry-after", "3"}};
+    EXPECT_EQ(absl::optional<std::chrono::milliseconds>(3000),
+              state_->parseResetInterval(response_headers));
+  }
+}
+
+TEST_F(RouterRetryStateImplTest, RateLimitedRetryBackoffStrategy) {
+  Protobuf::RepeatedPtrField<envoy::config::route::v3::RetryPolicy::ResetHeader> reset_headers;
+  auto* reset_header = reset_headers.Add();
+  reset_header->set_name("Retry-After");
+  reset_header->set_format(envoy::config::route::v3::RetryPolicy::SECONDS);
+
+  policy_.num_retries_ = 3;
+  policy_.reset_headers_ = ResetHeaderParserImpl::buildResetHeaderParserVector(reset_headers);
+
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  retry_timer_ = new Event::MockTimer(&dispatcher_);
+  Http::TestResponseHeaderMapImpl response_headers_reset_1{{":status", "500"},
+                                                           {"retry-after", "2"}};
+  Http::TestResponseHeaderMapImpl response_headers_plain{{":status", "500"}};
+  Http::TestResponseHeaderMapImpl response_headers_reset_2{{":status", "500"},
+                                                           {"retry-after", "5"}};
+
+  // reset header present -> ratelimit backoff used
+  EXPECT_CALL(random_, random()).WillOnce(Return(190));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(2190), _));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers_reset_1, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->invokeCallback();
+
+  // reset header not present -> exponential backoff used
+  EXPECT_CALL(random_, random()).WillOnce(Return(190));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(15), _));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers_plain, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->invokeCallback();
+
+  // reset header present -> ratelimit backoff used
+  EXPECT_CALL(random_, random()).WillOnce(Return(2190));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(7190), _));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers_reset_2, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->invokeCallback();
+
+  EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
+            state_->shouldRetryHeaders(response_headers_reset_2, callback_));
+
+  EXPECT_EQ(2UL, cluster_.stats().upstream_rq_retry_backoff_ratelimited_.value());
+  EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_backoff_exponential_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, HostSelectionAttempts) {

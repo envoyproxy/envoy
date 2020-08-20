@@ -196,7 +196,7 @@ message Node {
   // for filtering :ref:`listeners <config_listeners>` to be returned. For example,
   // if there is a listener bound to port 80, the list can optionally contain the
   // SocketAddress `(0.0.0.0,80)`. The field is optional and just a hint.
-  repeated Address listening_addresses = 11;
+  repeated Address listening_addresses = 11 [deprecated = true];
 }
 
 // Metadata provides additional inputs to filters based on matched listeners,
