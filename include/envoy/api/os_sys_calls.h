@@ -73,7 +73,7 @@ public:
   virtual bool supportsUdpGso() const PURE;
 
   /**
-   * return true if the OS supports IP_TRANSPARENT option
+   * return true if the OS support both IP_TRANSPARENT and IPV6_TRANSPARENT options
    */
   virtual bool supportsIpTransparent() const PURE;
 
