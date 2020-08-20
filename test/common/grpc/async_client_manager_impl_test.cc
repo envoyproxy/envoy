@@ -6,7 +6,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/upstream/priority_set.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 

@@ -33,6 +33,7 @@ envoy_cc_test_library(
     deps = [
         ":network_readfilter_fuzz_proto_cc_proto",
         "//source/common/config:utility_lib",
+        "//source/common/network:address_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:utility_lib",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",

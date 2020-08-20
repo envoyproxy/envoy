@@ -37,9 +37,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
-
 #include "test/mocks/upstream/thread_local_cluster.h"
-
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/global.h"
