@@ -1,11 +1,15 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/common/http/http2/http2_frame.h"
+#include "test/integration/filters/test_socket_interface.h"
 #include "test/integration/http_integration.h"
 
+#include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
 
 using Envoy::Http::Http2::Http2Frame;
@@ -83,17 +87,45 @@ protected:
 
 class Http2FloodMitigationTest : public Http2FrameIntegrationTest {
 public:
-  Http2FloodMitigationTest() {
-    config_helper_.addConfigModifier(
-        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-               hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
-  }
+  Http2FloodMitigationTest();
+  ~Http2FloodMitigationTest() override;
 
 protected:
-  void floodServer(const Http2Frame& frame, const std::string& flood_stat);
+  // Object of this class hold the state determining the IoHandle which
+  // should return EAGAIN from the `writev` call.
+  struct IoHandleMatcher {
+    bool shouldReturnEgain(uint32_t port) const {
+      absl::ReaderMutexLock lock(&mutex_);
+      return port == port_ && writev_returns_egain_;
+    }
+
+    void setSourcePort(uint32_t port) {
+      absl::WriterMutexLock lock(&mutex_);
+      port_ = port;
+    }
+
+    void setWritevReturnsEgain() {
+      absl::WriterMutexLock lock(&mutex_);
+      writev_returns_egain_ = true;
+    }
+
+  private:
+    mutable absl::Mutex mutex_;
+    uint32_t port_ ABSL_GUARDED_BY(mutex_) = 0;
+    bool writev_returns_egain_ ABSL_GUARDED_BY(mutex_) = false;
+  };
+
+  void floodServer(const Http2Frame& frame, const std::string& flood_stat, uint32_t num_frames);
   void floodServer(absl::string_view host, absl::string_view path,
-                   Http2Frame::ResponseStatus expected_http_status, const std::string& flood_stat);
+                   Http2Frame::ResponseStatus expected_http_status, const std::string& flood_stat,
+                   uint32_t num_frames);
+
   void setNetworkConnectionBufferSize();
   void beginSession() override;
+
+  Envoy::Network::SocketInterface* const previous_socket_interface_{
+      Envoy::Network::SocketInterfaceSingleton::getExisting()};
+  std::shared_ptr<IoHandleMatcher> writev_matcher_{std::make_shared<IoHandleMatcher>()};
+  std::unique_ptr<Envoy::Network::SocketInterfaceLoader> test_socket_interface_loader_;
 };
 } // namespace Envoy

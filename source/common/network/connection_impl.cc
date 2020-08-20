@@ -69,9 +69,9 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 
   // We never ask for both early close and read at the same time. If we are reading, we want to
   // consume all available data.
-  file_event_ = dispatcher_.createFileEvent(
-      ConnectionImpl::ioHandle().fd(), [this](uint32_t events) -> void { onFileEvent(events); },
-      trigger, Event::FileReadyType::Read | Event::FileReadyType::Write);
+  file_event_ = socket_->ioHandle().createFileEvent(
+      dispatcher_, [this](uint32_t events) -> void { onFileEvent(events); }, trigger,
+      Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   transport_socket_->setTransportSocketCallbacks(*this);
 }

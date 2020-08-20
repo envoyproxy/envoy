@@ -1,6 +1,7 @@
 #pragma once
 
 #include "extensions/filters/udp/dns_filter/dns_filter.h"
+#include "extensions/filters/udp/dns_filter/dns_filter_constants.h"
 
 namespace Envoy {
 namespace Extensions {
