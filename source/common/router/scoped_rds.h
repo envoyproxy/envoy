@@ -148,11 +148,21 @@ private:
     ConfigConstSharedPtr routeConfig() { return route_provider_->config(); }
 
     void addOnDemandUpdateCallback(std::function<void()> callback);
+
+    // Run all the callback from worker thread to continue filter chain.
     void runOnDemandUpdateCallback();
+
+    // If route provider has not been initialized, initialize it.
     void maybeInitRdsConfigProvider();
+
+    // Initialize route provider and register for rds update.
     void initRdsConfigProvider(
         envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
         Init::Manager& init_manager);
+
+    // If route table has been initialized, apply update to every worker thread.
+    // The run all the on demand callbacks.
+    void maybeApplyRouteConfigUpdate();
 
     ScopedRdsConfigSubscription& parent_;
     std::string scope_name_;

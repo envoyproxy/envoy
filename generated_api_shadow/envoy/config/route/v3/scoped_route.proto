@@ -104,6 +104,7 @@ message ScopedRouteConfiguration {
     repeated Fragment fragments = 1 [(validate.rules).repeated = {min_items: 1}];
   }
 
+  // Whether the RouteConfiguration should be loaded on demand.
   bool on_demand = 4;
 
   // The name assigned to the routing scope.

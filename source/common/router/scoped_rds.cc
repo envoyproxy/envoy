@@ -150,22 +150,8 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::addOnDemandUpdat
   if (routeConfig() == std::make_shared<NullConfigImpl>()) {
     return;
   }
-  // If route configuration has been initialized, propagate the scoped route configuration to worker
-  // threads.
-  std::shared_ptr<ScopedRouteInfo> scoped_route_info =
-      std::make_shared<ScopedRouteInfo>(envoy::config::route::v3::ScopedRouteConfiguration(
-                                            parent_.scoped_route_map_[scope_name_]->configProto()),
-                                        routeConfig());
-  parent_.scoped_route_map_[scope_name_] = scoped_route_info;
-  parent_.applyConfigUpdate([scoped_route_info](ConfigProvider::ConfigConstSharedPtr config)
-                                -> ConfigProvider::ConfigConstSharedPtr {
-    auto* thread_local_scoped_config =
-        const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
-    thread_local_scoped_config->addOrUpdateRoutingScopes({scoped_route_info});
-    return config;
-  });
-  // Run all the callbacks from worker threads.
-  runOnDemandUpdateCallback();
+  // If route table has been initialized, apply update to all the threads.
+  maybeApplyRouteConfigUpdate();
 }
 
 void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::runOnDemandUpdateCallback() {
@@ -188,6 +174,7 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::initRdsConfigPro
   });
   parent_.stats_.active_scopes_.inc();
 }
+
 void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConfigProvider() {
   if (route_provider_) {
     return;
@@ -212,6 +199,25 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConf
       parent_.scoped_route_map_[scope_name_]->configProto().route_configuration_name());
   initRdsConfigProvider(rds, *srds_init_mgr);
   ENVOY_LOG(debug, fmt::format("Scope on demand update: {}", scope_name_));
+}
+
+void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeApplyRouteConfigUpdate() {
+  // If route configuration has been initialized, propagate the scoped route configuration to worker
+  // threads.
+  std::shared_ptr<ScopedRouteInfo> scoped_route_info =
+      std::make_shared<ScopedRouteInfo>(envoy::config::route::v3::ScopedRouteConfiguration(
+                                            parent_.scoped_route_map_[scope_name_]->configProto()),
+                                        routeConfig());
+  parent_.scoped_route_map_[scope_name_] = scoped_route_info;
+  parent_.applyConfigUpdate([scoped_route_info](ConfigProvider::ConfigConstSharedPtr config)
+                                -> ConfigProvider::ConfigConstSharedPtr {
+    auto* thread_local_scoped_config =
+        const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
+    thread_local_scoped_config->addOrUpdateRoutingScopes({scoped_route_info});
+    return config;
+  });
+  // Run all the callbacks from worker threads if route table has been initialized.
+  runOnDemandUpdateCallback();
 }
 
 bool ScopedRdsConfigSubscription::addOrUpdateScopes(

@@ -16,11 +16,15 @@ Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeader
     filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
     return filter_iteration_state_;
   }
+  // decodeHeaders() is interrupted.
+  decode_header_interrupted_ = true;
   route_config_updated_callback_ =
       std::make_shared<Http::RouteConfigUpdatedCallback>(Http::RouteConfigUpdatedCallback(
           [this](bool route_exists) -> void { onRouteConfigUpdateCompletion(route_exists); }));
-  callbacks_->requestRouteConfigUpdate(route_config_updated_callback_);
   filter_iteration_state_ = Http::FilterHeadersStatus::StopIteration;
+  callbacks_->requestRouteConfigUpdate(route_config_updated_callback_);
+  // decodeHeaders() is completed.
+  decode_header_interrupted_ = false;
   return filter_iteration_state_;
 }
 
@@ -48,6 +52,11 @@ void OnDemandRouteUpdate::onDestroy() { route_config_updated_callback_.reset(); 
 // beginning.
 void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
+
+  // don't call continueDecoding in the middle of decodeHeaders()
+  if (decode_header_interrupted_) {
+    return;
+  }
 
   if (route_exists &&                  // route can be resolved after an on-demand
                                        // VHDS update

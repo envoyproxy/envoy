@@ -22,6 +22,12 @@ public:
    * @return ConfigConstSharedPtr the router's Config matching the request headers.
    */
   virtual ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap& headers) const PURE;
+
+  /**
+   * Based on the incoming HTTP request headers, returns the hash value of its scope key.
+   * @param headers the request headers to match the scoped routing configuration against.
+   * @return absl::optional<uint64_t> the hash value of the scope key computed from header.
+   */
   virtual absl::optional<uint64_t> computeKeyHash(const Http::HeaderMap&) const { return {}; }
 };
 

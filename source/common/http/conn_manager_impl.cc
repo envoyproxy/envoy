@@ -521,7 +521,7 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
     Http::RouteConfigUpdatedCallback route_config_updated_cb) {
   // If it is inline scope_route_config_provider, will be cast to nullptr.
   if (!scoped_route_config_provider_) {
-    thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
+    route_config_updated_cb(false);
     return;
   }
   scoped_route_config_provider_->onDemandRdsUpdate(key_hash, thread_local_dispatcher,
@@ -1563,6 +1563,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
   }
 }
 
+// TODO(chaoqin-li1123): Make on demand vhds and on demand srds works at the same time.
 void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   absl::optional<Router::ConfigConstSharedPtr> route_config = routeConfig();
@@ -1597,13 +1598,7 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
     return;
   }
   // Continue the filter chain if no on demand update is requested.
-  thread_local_dispatcher.post(
-      [weak_route_config_updated_cb =
-           std::weak_ptr<Http::RouteConfigUpdatedCallback>(route_config_updated_cb)] {
-        if (auto cb = weak_route_config_updated_cb.lock()) {
-          (*cb)(false);
-        }
-      });
+  (*route_config_updated_cb)(false);
 }
 
 absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
