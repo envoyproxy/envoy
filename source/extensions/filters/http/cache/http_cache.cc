@@ -41,11 +41,10 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   // TODO(toddmgreer): Let config determine whether to include forwarded_proto, host, and
   // query params.
   // TODO(toddmgreer): get cluster name.
-  // TODO(toddmgreer): handle the resultant vector<AdjustedByteRange> in CacheFilter::onOkHeaders.
-  // Range Requests are only valid for GET requests
   if (request_headers.getMethodValue() == Http::Headers::get().MethodValues.Get) {
-    // TODO(cbdm): using a constant limit of 10 ranges, could make this into a parameter.
-    const int RangeSpecifierLimit = 10;
+    // TODO(cbdm): using a constant limit of 1 range since we don't support multi-part responses nor
+    // coalesce multiple overlapping ranges. Could make this into a parameter based on config.
+    const int RangeSpecifierLimit = 1;
     request_range_spec_ = RangeRequests::parseRanges(request_headers, RangeSpecifierLimit);
   }
   key_.set_cluster_name("cluster_name_goes_here");
@@ -139,7 +138,6 @@ LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& respon
   result.headers_ = std::move(response_headers);
   result.content_length_ = content_length;
   if (!adjustByteRangeSet(result.response_ranges_, request_range_spec_, content_length)) {
-    result.headers_->setStatus(static_cast<uint64_t>(Http::Code::RangeNotSatisfiable));
     result.cache_entry_status_ = CacheEntryStatus::NotSatisfiableRange;
   } else if (!result.response_ranges_.empty()) {
     result.cache_entry_status_ = CacheEntryStatus::SatisfiableRange;
