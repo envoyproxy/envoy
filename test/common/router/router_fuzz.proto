@@ -8,6 +8,8 @@ import "google/protobuf/empty.proto";
 
 import "test/fuzz/common.proto";
 
+import "envoy/extensions/filters/http/router/v3/router.proto";
+
 message DirectionalAction {
   oneof response_action_selector {
     test.fuzz.Headers headers = 1;
@@ -34,4 +36,5 @@ message Action {
 
 message RouterTestCase {
   repeated Action actions = 1;
+  envoy.extensions.filters.http.router.v3.Router config = 2;
 }
