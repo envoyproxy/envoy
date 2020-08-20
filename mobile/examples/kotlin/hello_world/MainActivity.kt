@@ -21,10 +21,10 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 private const val REQUEST_HANDLER_THREAD_NAME = "hello_envoy_kt"
-private const val ENVOY_SERVER_HEADER = "server"
 private const val REQUEST_AUTHORITY = "api.lyft.com"
 private const val REQUEST_PATH = "/ping"
 private const val REQUEST_SCHEME = "https"
+private val FILTERED_HEADERS = setOf("server", "filter-demo", "x-envoy-upstream-service-time")
 
 class MainActivity : Activity() {
   private val thread = HandlerThread(REQUEST_HANDLER_THREAD_NAME)
@@ -89,15 +89,23 @@ class MainActivity : Activity() {
       .newStreamPrototype()
       .setOnResponseHeaders { responseHeaders, _ ->
         val status = responseHeaders.httpStatus ?: 0L
-        var message = "received headers with status $status"
-        val filterDemoValue = responseHeaders?.value("filter-demo")?.first() ?: ""
-        if (filterDemoValue != null) {
-          message = message + " and filter-demo set to $filterDemoValue"
+        val message = "received headers with status $status"
+
+        val sb = StringBuilder()
+        for ((name, value) in responseHeaders.headers) {
+          if (name in FILTERED_HEADERS) {
+            sb.append(name).append(": ").append(value.joinToString()).append("\n")
+          }
         }
+        val headerText = sb.toString()
+
         Log.d("MainActivity", message)
+        responseHeaders.value("filter-demo")?.first()?.let { filterDemoValue ->
+          Log.d("MainActivity", "filter-demo: $filterDemoValue")
+        }
+
         if (status == 200) {
-          val serverHeaderField = responseHeaders?.value(ENVOY_SERVER_HEADER)?.first() ?: ""
-          recyclerView.post { viewAdapter.add(Success(message, serverHeaderField)) }
+          recyclerView.post { viewAdapter.add(Success(message, headerText)) }
         } else {
           recyclerView.post { viewAdapter.add(Failure(message)) }
         }
