@@ -45,6 +45,7 @@ public:
   // Copies data into buffer and returns the number of bytes written
   Api::SysCallSizeResult read(void* buffer, size_t length, bool peek);
 
+  // Returns the number of bytes currently available to read()
   size_t size();
 
   // Returns true if end of stream reached
