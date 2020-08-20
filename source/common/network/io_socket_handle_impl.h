@@ -3,6 +3,7 @@
 #include "envoy/api/io_error.h"
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/platform.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/network/io_handle.h"
 
 #include "common/common/logger.h"
@@ -58,6 +59,8 @@ public:
   absl::optional<int> domain() override;
   Address::InstanceConstSharedPtr localAddress() override;
   Address::InstanceConstSharedPtr peerAddress() override;
+  Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                      Event::FileTriggerType trigger, uint32_t events) override;
 
 protected:
   // Converts a SysCallSizeResult to IoCallUint64Result.

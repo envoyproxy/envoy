@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/network/io_handle.h"
 
 #include "gmock/gmock.h"
@@ -12,6 +13,11 @@ class MockIoHandle : public IoHandle {
 public:
   MockIoHandle();
   ~MockIoHandle() override;
+
+  Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                      Event::FileTriggerType trigger, uint32_t events) override {
+    return Event::FileEventPtr{createFileEvent_(dispatcher, cb, trigger, events)};
+  }
 
   MOCK_METHOD(os_fd_t, fd, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, close, ());
@@ -42,6 +48,9 @@ public:
   MOCK_METHOD(absl::optional<int>, domain, ());
   MOCK_METHOD(Address::InstanceConstSharedPtr, localAddress, ());
   MOCK_METHOD(Address::InstanceConstSharedPtr, peerAddress, ());
+  MOCK_METHOD(Event::FileEvent*, createFileEvent_,
+              (Event::Dispatcher & dispatcher, Event::FileReadyCb cb,
+               Event::FileTriggerType trigger, uint32_t events));
 };
 
 } // namespace Network

@@ -41,6 +41,7 @@ public:
     EXPECT_CALL(socket_, detectedTransportProtocol()).WillRepeatedly(Return("raw_buffer"));
     EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
+    EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
 
     if (include_inline_recv) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
@@ -72,6 +73,7 @@ TEST_F(HttpInspectorTest, SkipHttpInspectForTLS) {
   filter_ = std::make_unique<Filter>(cfg_);
 
   EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
+  EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
   EXPECT_CALL(socket_, detectedTransportProtocol()).WillRepeatedly(Return("TLS"));
   EXPECT_EQ(filter_->onAccept(cb_), Network::FilterStatus::Continue);
 }
