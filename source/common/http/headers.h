@@ -119,7 +119,7 @@ using CustomHeaders = ConstSingleton<CustomHeaderValues>;
  */
 class HeaderValues {
 public:
-  const char* prefix() { return ThreadSafeSingleton<PrefixValue>::get().prefix(); }
+  const char* prefix() const { return ThreadSafeSingleton<PrefixValue>::get().prefix(); }
 
   const LowerCaseString Age{"age"};
   const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};

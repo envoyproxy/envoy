@@ -18,7 +18,7 @@ namespace Fault {
 
 class HeaderNameValues {
 public:
-  const char* prefix() { return ThreadSafeSingleton<Http::PrefixValue>::get().prefix(); }
+  const char* prefix() const { return ThreadSafeSingleton<Http::PrefixValue>::get().prefix(); }
 
   const Http::LowerCaseString AbortRequest{absl::StrCat(prefix(), "-fault-abort-request")};
   const Http::LowerCaseString AbortRequestPercentage{
