@@ -56,23 +56,10 @@ verify_build_configs () {
     fi
 }
 
-load_docker_images () {
-    echo "Optionally loading images if i find them..."
-    pwd
-    ls "$BUILD_STAGINGDIRECTORY" || echo "no staging directory"
-    ls "$ENVOY_DOCKER_IMAGE_DIRECTORY" || echo "image directory"
-    ls
-
-    if [[ -f "$ENVOY_DOCKER_TAR" ]]; then
-	echo "Found docker images, loading..."
-    else
-	echo "No images found, continuing..."
-    fi
-}
-
-
 verify_build_configs
-load_docker_images
+
+env
+
 run_examples
 
 
