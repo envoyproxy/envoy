@@ -17,11 +17,12 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
+GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client, bool internal_timeout,
                                const absl::optional<std::chrono::milliseconds>& timeout,
                                envoy::config::core::v3::ApiVersion transport_api_version,
                                bool use_alpha)
-    : async_client_(std::move(async_client)), timeout_(timeout),
+    : async_client_(std::move(async_client)), internal_timeout_(internal_timeout),
+      timeout_(timeout),
       service_method_(Grpc::VersionedMethods("envoy.service.auth.v3.Authorization.Check",
                                              "envoy.service.auth.v2.Authorization.Check",
                                              "envoy.service.auth.v2alpha.Authorization.Check")
@@ -34,6 +35,7 @@ void GrpcClientImpl::cancel() {
   ASSERT(callbacks_ != nullptr);
   request_->cancel();
   callbacks_ = nullptr;
+  timeout_timer_.reset();
 }
 
 void GrpcClientImpl::check(RequestCallbacks& callbacks,
@@ -42,9 +44,22 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks,
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
+  Http::AsyncClient::RequestOptions options;
+  if (internal_timeout_ && timeout_.has_value()) {
+    auto* dispatcher = async_client_->dispatcher();
+    if (dispatcher) {
+      timeout_timer_ = dispatcher->createTimer([this]() -> void { onTimeout(); });
+      timeout_timer_->enableTimer(timeout_.value());
+    }
+  }
+
+  // no internal timer, set the timeout on the request.
+  if (timeout_timer_ == nullptr) {
+    options.setTimeout(timeout_);
+  }
+
   ENVOY_LOG(trace, "Sending CheckRequest: {}", request.DebugString());
-  request_ = async_client_->send(service_method_, request, *this, parent_span,
-                                 Http::AsyncClient::RequestOptions().setTimeout(timeout_),
+  request_ = async_client_->send(service_method_, request, *this, parent_span, options,
                                  transport_api_version_);
 }
 
@@ -88,6 +103,17 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   ENVOY_LOG(trace, "CheckRequest call failed with status: {}",
             Grpc::Utility::grpcStatusToString(status));
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
+  respondFailure();
+}
+
+void GrpcClientImpl::onTimeout() {
+  ASSERT(request_ != nullptr);
+  request_->cancel();
+  // let the client know of failure:
+  respondFailure();
+}
+
+void GrpcClientImpl::respondFailure() {
   Response response{};
   response.status = CheckStatus::Error;
   response.status_code = Http::Code::Forbidden;

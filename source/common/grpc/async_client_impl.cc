@@ -59,6 +59,10 @@ RawAsyncStream* AsyncClientImpl::startRaw(absl::string_view service_full_name,
   return active_streams_.front().get();
 }
 
+Event::Dispatcher* AsyncClientImpl::dispatcher() {
+  return &cm_.httpAsyncClientForCluster(remote_cluster_name_).dispatcher();
+}
+
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
                                  absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
                                  const Http::AsyncClient::StreamOptions& options)

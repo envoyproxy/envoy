@@ -37,11 +37,12 @@ class ExtAuthzGrpcClientTest : public testing::TestWithParam<Params> {
 public:
   ExtAuthzGrpcClientTest() : async_client_(new Grpc::MockAsyncClient()), timeout_(10) {}
 
-  void initialize(const Params& param) {
+  void initialize(const Params& param, bool internal_timeout = false) {
     api_version_ = std::get<0>(param);
     use_alpha_ = std::get<1>(param);
-    client_ = std::make_unique<GrpcClientImpl>(Grpc::RawAsyncClientPtr{async_client_}, timeout_,
-                                               api_version_, use_alpha_);
+    client_ =
+        std::make_unique<GrpcClientImpl>(Grpc::RawAsyncClientPtr{async_client_}, internal_timeout,
+                                         timeout_, api_version_, use_alpha_);
   }
 
   void expectCallSend(envoy::service::auth::v3::CheckRequest& request) {
@@ -56,6 +57,21 @@ public:
                         service_full_name);
               EXPECT_EQ("Check", method_name);
               EXPECT_EQ(timeout_->count(), options.timeout->count());
+              return &async_request_;
+            }));
+  }
+  void expectCallSendWithNoTimeout(envoy::service::auth::v3::CheckRequest& request) {
+    EXPECT_CALL(*async_client_,
+                sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(*(client_.get())), _, _))
+        .WillOnce(
+            Invoke([this](absl::string_view service_full_name, absl::string_view method_name,
+                          Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                          const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
+              EXPECT_EQ(TestUtility::getVersionedServiceFullName(
+                            "envoy.service.auth.{}.Authorization", api_version_, use_alpha_),
+                        service_full_name);
+              EXPECT_EQ("Check", method_name);
+              EXPECT_FALSE(options.timeout.has_value());
               return &async_request_;
             }));
   }
@@ -250,6 +266,59 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationRequestTimeout) {
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
   client_->onFailure(Grpc::Status::DeadlineExceeded, "", span_);
+}
+
+// Test the client when the request times out on an internal timeout.
+TEST_P(ExtAuthzGrpcClientTest, AuthorizationInternalRequestTimeout) {
+  initialize(GetParam(), true);
+
+  EXPECT_CALL(*async_client_, dispatcher());
+  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&async_client_->dispatcher_);
+  EXPECT_CALL(*timer, enableTimer(timeout_.value(), _));
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSendWithNoTimeout(request);
+
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  EXPECT_CALL(async_request_, cancel());
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+  timer->invokeCallback();
+}
+
+// Test when the client is cancelled with internal timer.
+TEST_P(ExtAuthzGrpcClientTest, AuthorizationInternalRequestTimeoutCancelled) {
+  initialize(GetParam(), true);
+
+  EXPECT_CALL(*async_client_, dispatcher());
+  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&async_client_->dispatcher_);
+  EXPECT_CALL(*timer, enableTimer(timeout_.value(), _));
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSendWithNoTimeout(request);
+
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  EXPECT_CALL(async_request_, cancel());
+  EXPECT_CALL(request_callbacks_, onComplete_(_)).Times(0);
+  client_->cancel();
+}
+
+// Test that the internal timer is not used when dispatcher is nullptr.
+TEST_P(ExtAuthzGrpcClientTest, AuthorizationRequestInternalTimeoutWithNoDispatcher) {
+  initialize(GetParam(), true);
+  EXPECT_CALL(*async_client_, dispatcher()).WillOnce(Return(nullptr));
+
+  envoy::service::auth::v3::CheckRequest request;
+  // if expectCallSend succeed with internal timer, while dispatcher is nullptr, it proves that the
+  // timeout was set on the request.
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  // cancel to make sure the assert in the dtor is not triggered
+  EXPECT_CALL(async_request_, cancel());
+  client_->cancel();
 }
 
 // Test the client when an OK response is received with dynamic metadata in that OK response.

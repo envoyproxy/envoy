@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.ext_authz.v3.ExtAuthz";
@@ -117,6 +117,14 @@ message ExtAuthz {
   // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
   // :ref:`certificate<envoy_api_field_service.auth.v4alpha.AttributeContext.Peer.certificate>`.
   bool include_peer_certificate = 10;
+
+  // By default, the timeout for a check request starts counting when the request is becomes active.
+  // If this is set, the timeout will start when check request is created. There can be a
+  // difference between the two, if requests to the ext authz server become pending due to circuit
+  // breaking (i.e. by default, the duration while the request is pending is not counted towards
+  // the configured timeout). This is ignored for google_grpc service type, as it does not use the envoy
+  // io facilities.
+  bool measure_timeout_on_check_created = 13;
 }
 
 // Configuration for buffering the request data.

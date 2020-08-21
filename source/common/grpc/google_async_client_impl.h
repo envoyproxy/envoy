@@ -184,6 +184,8 @@ public:
   RawAsyncStream* startRaw(absl::string_view service_full_name, absl::string_view method_name,
                            RawAsyncStreamCallbacks& callbacks,
                            const Http::AsyncClient::StreamOptions& options) override;
+  // This does not use the worker thread's dispatcher, so we must return nullptr.
+  Event::Dispatcher* dispatcher() override { return nullptr; }
 
   TimeSource& timeSource() { return dispatcher_.timeSource(); }
   uint64_t perStreamBufferLimitBytes() const { return per_stream_buffer_limit_bytes_; }

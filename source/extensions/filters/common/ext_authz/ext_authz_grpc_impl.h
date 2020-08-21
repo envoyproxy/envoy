@@ -44,7 +44,7 @@ class GrpcClientImpl : public Client,
                        public Logger::Loggable<Logger::Id::ext_authz> {
 public:
   // TODO(gsagula): remove `use_alpha` param when V2Alpha gets deprecated.
-  GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
+  GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client, bool internal_timeout,
                  const absl::optional<std::chrono::milliseconds>& timeout,
                  envoy::config::core::v3::ApiVersion transport_api_version, bool use_alpha);
   ~GrpcClientImpl() override;
@@ -62,16 +62,21 @@ public:
                  Tracing::Span& span) override;
 
 private:
+  void onTimeout();
+  void respondFailure();
   void toAuthzResponseHeader(
       ResponsePtr& response,
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers);
+
   Grpc::AsyncClient<envoy::service::auth::v3::CheckRequest, envoy::service::auth::v3::CheckResponse>
       async_client_;
   Grpc::AsyncRequest* request_{};
+  bool internal_timeout_{};
   absl::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
   const Protobuf::MethodDescriptor& service_method_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
+  Event::TimerPtr timeout_timer_;
 };
 
 using GrpcClientImplPtr = std::unique_ptr<GrpcClientImpl>;

@@ -11,9 +11,12 @@
 
 #include "common/grpc/typed_async_client.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+
+using testing::Return;
 
 namespace Envoy {
 namespace Grpc {
@@ -88,8 +91,10 @@ public:
               (absl::string_view service_full_name, absl::string_view method_name,
                RawAsyncStreamCallbacks& callbacks,
                const Http::AsyncClient::StreamOptions& options));
+  MOCK_METHOD(Event::Dispatcher*, dispatcher, ());
 
   std::unique_ptr<testing::NiceMock<Grpc::MockAsyncRequest>> async_request_;
+  Event::MockDispatcher dispatcher_;
 };
 
 class MockAsyncClientFactory : public AsyncClientFactory {

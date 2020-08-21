@@ -184,6 +184,12 @@ public:
                                    absl::string_view method_name,
                                    RawAsyncStreamCallbacks& callbacks,
                                    const Http::AsyncClient::StreamOptions& options) PURE;
+
+  /**
+   * @return Event::Dispatcher& the dispatcher backing this client. May return nullptr for clients
+   * that do use a dispatcher.
+   */
+  virtual Event::Dispatcher* dispatcher() PURE;
 };
 
 using RawAsyncClientPtr = std::unique_ptr<RawAsyncClient>;

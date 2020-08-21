@@ -116,6 +116,7 @@ public:
    * Returns the configured request header parser.
    */
   const Router::HeaderParser& requestHeaderParser() const { return *request_headers_parser_; }
+  bool internalTimeout() const { return internal_timeout_; }
 
 private:
   static MatcherSharedPtr
@@ -135,6 +136,7 @@ private:
   const MatcherSharedPtr upstream_header_to_append_matchers_;
   const Http::LowerCaseStrPairVector authorization_headers_to_add_;
   const std::string cluster_name_;
+  const bool internal_timeout_;
   const std::chrono::milliseconds timeout_;
   const std::string path_prefix_;
   const std::string tracing_name_;
@@ -170,12 +172,14 @@ public:
                                     const Http::ResponseHeaderMap* response_headers) override;
 
 private:
+  void onTimeout();
   ResponsePtr toResponse(Http::ResponseMessagePtr message);
 
   Upstream::ClusterManager& cm_;
   ClientConfigSharedPtr config_;
   Http::AsyncClient::Request* request_{};
   RequestCallbacks* callbacks_{};
+  Event::TimerPtr timeout_timer_;
 };
 
 } // namespace ExtAuthz

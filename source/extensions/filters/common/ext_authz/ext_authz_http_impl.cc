@@ -141,7 +141,8 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
       upstream_header_to_append_matchers_(toUpstreamMatchers(
           config.http_service().authorization_response().allowed_upstream_headers_to_append(),
           enable_case_sensitive_string_matcher_)),
-      cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
+      cluster_name_(config.http_service().server_uri().cluster()),
+      internal_timeout_(config.measure_timeout_on_check_created()), timeout_(timeout),
       path_prefix_(path_prefix),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
       request_headers_parser_(Router::HeaderParser::configure(
@@ -212,6 +213,7 @@ void RawHttpClientImpl::cancel() {
   ASSERT(callbacks_ != nullptr);
   request_->cancel();
   callbacks_ = nullptr;
+  timeout_timer_.reset();
 }
 
 // Client
@@ -266,12 +268,19 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
     callbacks_ = nullptr;
   } else {
+    auto& async_client = cm_.httpAsyncClientForCluster(cluster);
     auto options = Http::AsyncClient::RequestOptions()
-                       .setTimeout(config_->timeout())
                        .setParentSpan(parent_span)
                        .setChildSpanName(config_->tracingName());
 
-    request_ = cm_.httpAsyncClientForCluster(cluster).send(std::move(message), *this, options);
+    if (config_->internalTimeout()) {
+      timeout_timer_ = async_client.dispatcher().createTimer([this]() -> void { onTimeout(); });
+      timeout_timer_->enableTimer(config_->timeout());
+    } else {
+      options.setTimeout(config_->timeout());
+    }
+
+    request_ = async_client.send(std::move(message), *this, options);
   }
 }
 
@@ -298,6 +307,15 @@ void RawHttpClientImpl::onBeforeFinalizeUpstreamSpan(
                                                          ? TracingConstants::get().TraceOk
                                                          : TracingConstants::get().TraceUnauthz);
   }
+}
+
+void RawHttpClientImpl::onTimeout() {
+  ASSERT(request_ != nullptr);
+  request_->cancel();
+  // let the client know of failure:
+  ASSERT(callbacks_ != nullptr);
+  callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
+  callbacks_ = nullptr;
 }
 
 ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {

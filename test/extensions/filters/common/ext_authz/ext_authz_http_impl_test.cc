@@ -33,18 +33,22 @@ namespace Common {
 namespace ExtAuthz {
 namespace {
 
+constexpr uint32_t REQUEST_TIMEOUT{250};
+
 class ExtAuthzHttpClientTest : public testing::Test {
 public:
   ExtAuthzHttpClientTest() : async_request_{&async_client_} { initialize(EMPTY_STRING); }
 
-  void initialize(const std::string& yaml) {
-    config_ = createConfig(yaml);
+  void initialize(const std::string& yaml, bool internal_timeout = false) {
+    config_ = createConfig(yaml, internal_timeout);
     client_ = std::make_unique<RawHttpClientImpl>(cm_, config_);
     ON_CALL(cm_, httpAsyncClientForCluster(config_->cluster()))
         .WillByDefault(ReturnRef(async_client_));
   }
 
-  ClientConfigSharedPtr createConfig(const std::string& yaml = EMPTY_STRING, uint32_t timeout = 250,
+  ClientConfigSharedPtr createConfig(const std::string& yaml = EMPTY_STRING,
+                                     bool internal_timeout = false,
+                                     uint32_t timeout = REQUEST_TIMEOUT,
                                      const std::string& path_prefix = "/bar") {
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
     if (yaml.empty()) {
@@ -95,7 +99,7 @@ public:
     } else {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-
+    proto_config.set_timeout_starts_in_check(internal_timeout);
     return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix);
   }
 
@@ -472,6 +476,40 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
 // Test the client when the request is canceled.
 TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
   envoy::service::auth::v3::CheckRequest request;
+
+  EXPECT_CALL(async_client_, send_(_, _, _)).WillOnce(Return(&async_request_));
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  EXPECT_CALL(async_request_, cancel());
+  client_->cancel();
+}
+
+// Test the client when the request times out on an internal timeout.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationInternalRequestTimeout) {
+  initialize("", true);
+  envoy::service::auth::v3::CheckRequest request;
+
+  EXPECT_CALL(async_client_, dispatcher());
+  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&async_client_.dispatcher_);
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(REQUEST_TIMEOUT), _));
+
+  EXPECT_CALL(async_client_, send_(_, _, _)).WillOnce(Return(&async_request_));
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  EXPECT_CALL(async_request_, cancel());
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+  timer->invokeCallback();
+}
+
+// Test the client when the request is canceled.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationInternalRequestTimeoutCancelled) {
+  initialize("", true);
+  envoy::service::auth::v3::CheckRequest request;
+
+  EXPECT_CALL(async_client_, dispatcher());
+  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&async_client_.dispatcher_);
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(REQUEST_TIMEOUT), _));
 
   EXPECT_CALL(async_client_, send_(_, _, _)).WillOnce(Return(&async_request_));
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
