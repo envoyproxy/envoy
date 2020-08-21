@@ -629,6 +629,7 @@ envoy_cc_test_library(
         "//test/common/runtime:utility_lib",
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
+        "//test/fuzz:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",

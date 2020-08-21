@@ -22,6 +22,7 @@
 #include "server/options_impl.h"
 #include "server/server.h"
 
+#include "test/fuzz/utility.h"
 #include "test/integration/server_stats.h"
 #include "test/integration/tcp_dump.h"
 #include "test/test_common/test_time_system.h"
@@ -426,11 +427,7 @@ public:
                         Event::Dispatcher* dispatcher = nullptr) override {
     AssertionResult res =
         TestUtility::waitForCounterEq(statStore(), name, value, time_system_, timeout, dispatcher);
-#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-    ASSERT_TRUE(res);
-#else
-    RELEASE_ASSERT(res, fmt::format("timed out waiting for {} == {}", name, value));
-#endif
+    ASSERT_ON_FUZZ(res, fmt::format("timed out waiting for {} == {}", name, value));
   }
 
   void
@@ -438,11 +435,7 @@ public:
                    std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
     AssertionResult res =
         TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout);
-#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-    ASSERT_TRUE(res);
-#else
-    RELEASE_ASSERT(res, fmt::format("timed out waiting for {} >= {}", name, value));
-#endif
+    ASSERT_ON_FUZZ(res, fmt::format("timed out waiting for {} >= {}", name, value));
   }
 
   void
@@ -450,11 +443,7 @@ public:
                  std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
     AssertionResult res =
         TestUtility::waitForGaugeEq(statStore(), name, value, time_system_, timeout);
-#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-    ASSERT_TRUE(res);
-#else
-    RELEASE_ASSERT(res, fmt::format("timed out waiting for {} == {}", name, value));
-#endif
+    ASSERT_ON_FUZZ(res, fmt::format("timed out waiting for {} == {}", name, value));
   }
 
   void
@@ -462,11 +451,7 @@ public:
                  std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
     AssertionResult res =
         TestUtility::waitForGaugeGe(statStore(), name, value, time_system_, timeout);
-#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-    ASSERT_TRUE(res);
-#else
-    RELEASE_ASSERT(res, fmt::format("timed out waiting for {} >= {}", name, value));
-#endif
+    ASSERT_ON_FUZZ(res, fmt::format("timed out waiting for {} >= {}", name, value));
   }
 
   void waitForCounterExists(const std::string& name) override {

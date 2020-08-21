@@ -18,6 +18,12 @@
 // on gtest, which only provides soft fails that don't trip oss-fuzz failures.
 #define FUZZ_ASSERT(x) RELEASE_ASSERT(x, "")
 
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+#define ASSERT_ON_FUZZ(x, msg) RELEASE_ASSERT(x, msg)
+#else
+#define ASSERT_ON_FUZZ(x, msg) ASSERT_TRUE(x) << msg
+#endif
+
 namespace Envoy {
 namespace Fuzz {
 
