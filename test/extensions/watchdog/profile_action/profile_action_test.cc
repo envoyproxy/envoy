@@ -41,8 +41,6 @@ protected:
   ProfileActionTest()
       : time_system_(makeTimeSystem()), api_(Api::createApiForTest(*time_system_)),
         dispatcher_(api_->allocateDispatcher("test")), context_({*api_, *dispatcher_}),
-        thread_(api_->threadFactory().createThread(
-            [this]() -> void { dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); })),
         test_path_(generateTestPath()) {}
 
   // Generates a unique path for a testcase.
@@ -101,7 +99,6 @@ protected:
   Event::DispatcherPtr dispatcher_;
   Server::Configuration::GuardDogActionFactoryContext context_;
   std::unique_ptr<Server::Configuration::GuardDogAction> action_;
-  Thread::ThreadPtr thread_;
   // Path for the test case to dump any profiles to.
   const std::string test_path_;
   // Used to synchronize with the dispatch thread
@@ -117,7 +114,13 @@ TEST_P(ProfileActionTest, CanDoSingleProfile) {
   envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
   config.set_profile_path(test_path_);
   config.mutable_profile_duration()->set_seconds(1);
+
+  // Create the ProfileAction before we start running the dispatcher
+  // otherwise the timer created will in ProfileActions ctor will
+  // not be thread safe.
   action_ = std::make_unique<ProfileAction>(config, context_);
+  Thread::ThreadPtr thread = api_->threadFactory().createThread(
+      [this]() -> void { dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); });
 
   // Create vector of relevant threads
   const auto now = api_->timeSource().monotonicTime();
@@ -136,7 +139,7 @@ TEST_P(ProfileActionTest, CanDoSingleProfile) {
   time_system_->advanceTimeWait(std::chrono::seconds(2));
 
   dispatcher_->exit();
-  thread_->join();
+  thread->join();
 
 #ifdef PROFILER_AVAILABLE
   EXPECT_EQ(countNumberOfProfileInPath(test_path_), 1);
@@ -151,7 +154,12 @@ TEST_P(ProfileActionTest, CanDoMultipleProfiles) {
   envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
   config.set_profile_path(test_path_);
   config.mutable_profile_duration()->set_seconds(1);
+  // Create the ProfileAction before we start running the dispatcher
+  // otherwise the timer created will in ProfileActions ctor will
+  // not be thread safe.
   action_ = std::make_unique<ProfileAction>(config, context_);
+  Thread::ThreadPtr thread = api_->threadFactory().createThread(
+      [this]() -> void { dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); });
 
   // Create vector of relevant threads
   const auto now = api_->timeSource().monotonicTime();
@@ -187,7 +195,7 @@ TEST_P(ProfileActionTest, CanDoMultipleProfiles) {
   time_system_->advanceTimeWait(std::chrono::seconds(2));
 
   dispatcher_->exit();
-  thread_->join();
+  thread->join();
 
 #ifdef PROFILER_AVAILABLE
   EXPECT_EQ(countNumberOfProfileInPath(test_path_), 2);
@@ -202,7 +210,12 @@ TEST_P(ProfileActionTest, CannotTriggerConcurrentProfiles) {
   envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
   TestUtility::loadFromJson(absl::Substitute(R"EOF({ "profile_path": "$0", })EOF", test_path_),
                             config);
+  // Create the ProfileAction before we start running the dispatcher
+  // otherwise the timer created will in ProfileActions ctor will
+  // not be thread safe.
   action_ = std::make_unique<ProfileAction>(config, context_);
+  Thread::ThreadPtr thread = api_->threadFactory().createThread(
+      [this]() -> void { dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); });
 
   // Create vector of relevant threads
   const auto now = api_->timeSource().monotonicTime();
@@ -224,7 +237,7 @@ TEST_P(ProfileActionTest, CannotTriggerConcurrentProfiles) {
   time_system_->advanceTimeWait(std::chrono::seconds(6));
 
   dispatcher_->exit();
-  thread_->join();
+  thread->join();
 #ifdef PROFILER_AVAILABLE
   EXPECT_EQ(countNumberOfProfileInPath(test_path_), 1);
 #else
@@ -239,7 +252,12 @@ TEST_P(ProfileActionTest, ShouldNotProfileIfDirectoryDoesNotExist) {
   const std::string nonexistant_path = test_path_ + "/nonexistant_dir/";
   TestUtility::loadFromJson(
       absl::Substitute(R"EOF({ "profile_path": "$0", })EOF", nonexistant_path), config);
+  // Create the ProfileAction before we start running the dispatcher
+  // otherwise the timer created will in ProfileActions ctor will
+  // not be thread safe.
   action_ = std::make_unique<ProfileAction>(config, context_);
+  Thread::ThreadPtr thread = api_->threadFactory().createThread(
+      [this]() -> void { dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); });
 
   // Create vector of relevant threads
   const auto now = api_->timeSource().monotonicTime();
@@ -257,7 +275,7 @@ TEST_P(ProfileActionTest, ShouldNotProfileIfDirectoryDoesNotExist) {
   time_system_->advanceTimeWait(std::chrono::seconds(6));
 
   dispatcher_->exit();
-  thread_->join();
+  thread->join();
 
   EXPECT_EQ(countNumberOfProfileInPath(test_path_), 0);
   EXPECT_FALSE(api_->fileSystem().directoryExists(nonexistant_path));
@@ -268,7 +286,12 @@ TEST_P(ProfileActionTest, ShouldNotProfileIfNoTids) {
   envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
   TestUtility::loadFromJson(absl::Substitute(R"EOF({ "profile_path": "$0"})EOF", test_path_),
                             config);
+  // Create the ProfileAction before we start running the dispatcher
+  // otherwise the timer created will in ProfileActions ctor will
+  // not be thread safe.
   action_ = std::make_unique<ProfileAction>(config, context_);
+  Thread::ThreadPtr thread = api_->threadFactory().createThread(
+      [this]() -> void { dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); });
 
   // Test that no profiles are created given empty vector of valid TIDs
   dispatcher_->post([this]() -> void {
@@ -284,7 +307,7 @@ TEST_P(ProfileActionTest, ShouldNotProfileIfNoTids) {
   time_system_->advanceTimeWait(std::chrono::seconds(2));
 
   dispatcher_->exit();
-  thread_->join();
+  thread->join();
 
   // No profiles should have been created
   EXPECT_EQ(countNumberOfProfileInPath(test_path_), 0);
@@ -293,15 +316,16 @@ TEST_P(ProfileActionTest, ShouldNotProfileIfNoTids) {
 TEST_P(ProfileActionTest, ShouldSaturateTids) {
   // Create configuration that we'll run until it saturates.
   envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
-  TestUtility::loadFromJson(absl::Substitute(R"EOF({
-          "profile_duration": "1s",
-          "profile_path": "$0",
-          "max_profiles_per_thread": "1"
-        }
-      )EOF",
-                                             test_path_),
-                            config);
+  config.set_profile_path(test_path_);
+  config.mutable_profile_duration()->set_seconds(1);
+  config.set_max_profiles_per_thread(1);
+
+  // Create the ProfileAction before we start running the dispatcher
+  // otherwise the timer created will in ProfileActions ctor will
+  // not be thread safe.
   action_ = std::make_unique<ProfileAction>(config, context_);
+  Thread::ThreadPtr thread = api_->threadFactory().createThread(
+      [this]() -> void { dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); });
 
   // Create vector of relevant threads
   const auto now = api_->timeSource().monotonicTime();
@@ -339,7 +363,7 @@ TEST_P(ProfileActionTest, ShouldSaturateTids) {
   // count) advancing time to make it run.
   time_system_->advanceTimeWait(std::chrono::seconds(2));
   dispatcher_->exit();
-  thread_->join();
+  thread->join();
 
 #ifdef PROFILER_AVAILABLE
   EXPECT_EQ(countNumberOfProfileInPath(test_path_), 1);
