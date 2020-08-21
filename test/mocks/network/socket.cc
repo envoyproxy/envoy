@@ -9,8 +9,6 @@ MockSocket::MockSocket()
 
 MockSocket::~MockSocket() = default;
 
-MockIoHandle& MockSocket::mockIoHandle() const { return *io_handle_; }
-
 IoHandle& MockSocket::ioHandle() { return *io_handle_; };
 
 const IoHandle& MockSocket::ioHandle() const { return *io_handle_; };

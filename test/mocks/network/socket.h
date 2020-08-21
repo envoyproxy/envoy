@@ -14,8 +14,6 @@ public:
   MockSocket();
   ~MockSocket() override;
 
-  MockIoHandle& mockIoHandle() const;
-
   IoHandle& ioHandle() override;
   const IoHandle& ioHandle() const override;
   Api::SysCallIntResult setSocketOption(int level, int optname, const void* optval,
