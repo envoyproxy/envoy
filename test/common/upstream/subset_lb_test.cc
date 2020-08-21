@@ -2396,14 +2396,19 @@ TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, RejectEmptyKey) {
                             "isn't exactly 1 key or if that key is empty.");
 }
 
-TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, RejectDuplicateMetadata) {
-  EXPECT_THROW_WITH_MESSAGE(init({
-                                {"tcp://127.0.0.1:80", {{"key", "a"}}},
-                                {"tcp://127.0.0.1:81", {{"key", "a"}}},
-                            }),
-                            EnvoyException,
-                            "Encountered duplicate metadata 'string_value: \"a\"' value in host "
-                            "'127.0.0.1:81' with `single_host_per_subset`");
+TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, DuplicateMetadataStat) {
+  init({
+      {"tcp://127.0.0.1:80", {{"key", "a"}}},
+      {"tcp://127.0.0.1:81", {{"key", "a"}}},
+      {"tcp://127.0.0.1:82", {{"key", "a"}}},
+      {"tcp://127.0.0.1:83", {{"key", "b"}}},
+  });
+  // The first 'a' is the original, the next 2 instances of 'a' are duplicates (counted
+  // in stat), and 'b' is another non-duplicate.
+  EXPECT_EQ(2, stats_store_
+                   .gaugeFromString("single_host_per_subset_duplicate",
+                                    Stats::Gauge::ImportMode::NeverImport)
+                   .value());
 }
 
 TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, Match) {

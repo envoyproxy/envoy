@@ -116,6 +116,8 @@ void SubsetLoadBalancer::rebuildSingle() {
   // changed, and then figure out the old and new value (to remove from the old key in this map
   // and insert in the new key).
   single_host_per_subset_map_.clear();
+
+  uint32_t collision_count = 0;
   for (const auto& host_set : original_priority_set_.hostSetsPerPriority()) {
     for (const auto& host : host_set->hosts()) {
       MetadataConstSharedPtr metadata = host->metadata();
@@ -128,15 +130,18 @@ void SubsetLoadBalancer::rebuildSingle() {
           auto [iterator, did_insert] =
               single_host_per_subset_map_.try_emplace(fields_it->second, host);
           if (!did_insert) {
-            throw EnvoyException(fmt::format("Encountered duplicate metadata '{}' value in "
-                                             "host '{}' with `single_host_per_subset`",
-                                             StringUtil::trim(fields_it->second.DebugString()),
-                                             host->address()->asStringView()));
+            collision_count++;
           }
         }
       }
     }
   }
+
+  // This stat isn't added to `ClusterStats` because it wouldn't be used
+  // for nearly all clusters, and is only set during configuration updates,
+  // not in the data path, so performance of looking up the stat isn't critical.
+  scope_.gaugeFromString("single_host_per_subset_duplicate", Stats::Gauge::ImportMode::NeverImport)
+      .set(collision_count);
 }
 
 // When in `single_host_per_subset` mode, select a host based on the provided match_criteria.
