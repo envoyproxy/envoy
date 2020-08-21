@@ -101,14 +101,12 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 }
 
 ParseState Filter::onRead() {
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Network::ConnectionSocket& socket = cb_->socket();
-  const Api::SysCallSizeResult result =
-      os_syscalls.recv(socket.ioHandle().fd(), buf_, Config::MAX_INSPECT_SIZE, MSG_PEEK);
+  auto result = cb_->socket().ioHandle().recv(buf_, Config::MAX_INSPECT_SIZE, MSG_PEEK);
   ENVOY_LOG(trace, "http inspector: recv: {}", result.rc_);
-  if (SOCKET_FAILURE(result.rc_) && result.errno_ == SOCKET_ERROR_AGAIN) {
-    return ParseState::Continue;
-  } else if (SOCKET_FAILURE(result.rc_)) {
+  if (!result.ok()) {
+    if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+      return ParseState::Continue;
+    }
     config_->stats().read_error_.inc();
     return ParseState::Error;
   }
