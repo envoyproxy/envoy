@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/event:file_event_interface",
         "//include/envoy/event:timer_interface",
+        "//include/envoy/network:exception_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listener_interface",
         "//include/envoy/upstream:cluster_manager_interface",

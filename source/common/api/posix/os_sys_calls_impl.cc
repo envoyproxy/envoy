@@ -110,8 +110,9 @@ bool OsSysCallsImpl::supportsUdpGso() const {
 #endif
 }
 
-bool OsSysCallsImpl::supportsIpTransparent() const {
+bool OsSysCallsImpl::supportsIpTransparent(bool check_v4only) const {
 #if !defined(__linux__)
+  UNREFERENCED_PARAMETER(check_v4only);
   return false;
 #else
   // The linux kernel supports IP_TRANSPARENT by following patch(starting from v2.6.28) :
@@ -121,7 +122,7 @@ bool OsSysCallsImpl::supportsIpTransparent() const {
   // https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/net/ipv6/ipv6_sockglue.c?id=6c46862280c5f55eda7750391bc65cd7e08c7535
   //
   // So, almost recent linux kernel supports both IP_TRANSPARENT and IPV6_TRANSPARENT options.
-  static const bool is_supported = [] {
+  static const bool is_supported = [check_v4only] {
     // Check ipv4 case
     int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
     if (fd < 0) {
@@ -133,14 +134,16 @@ bool OsSysCallsImpl::supportsIpTransparent() const {
     if (!result) {
       return false;
     }
-    // Check ipv6 case
-    fd = ::socket(AF_INET6, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
-    if (fd < 0) {
-      return false;
+    if (!check_v4only) {
+      // Check ipv6 case
+      fd = ::socket(AF_INET6, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
+      if (fd < 0) {
+        return false;
+      }
+      val = 1;
+      result = (0 == ::setsockopt(fd, IPPROTO_IPV6, IPV6_TRANSPARENT, &val, sizeof(val)));
+      ::close(fd);
     }
-    val = 1;
-    result = (0 == ::setsockopt(fd, IPPROTO_IPV6, IPV6_TRANSPARENT, &val, sizeof(val)));
-    ::close(fd);
     return result;
   }();
   return is_supported;

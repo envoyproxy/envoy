@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     srcs = ["udp_proxy_filter_test.cc"],
     extension_name = "envoy.filters.udp_listener.udp_proxy",
     deps = [
+        "//include/envoy/network:exception_interface",
         "//source/extensions/filters/udp/udp_proxy:udp_proxy_filter_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:socket_mocks",

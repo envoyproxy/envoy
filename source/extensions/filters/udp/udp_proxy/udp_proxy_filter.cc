@@ -1,5 +1,6 @@
 #include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
+#include "envoy/network/exception.h"
 #include "envoy/network/listener.h"
 
 #include "common/network/socket_option_factory.h"
@@ -14,6 +15,16 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
     : UdpListenerReadFilter(callbacks), config_(config),
       cluster_update_callbacks_(
           config->clusterManager().addThreadLocalClusterUpdateCallbacks(*this)) {
+  bool check_v4only =
+      callbacks.udpListener().localAddress()->ip()->version() == Network::Address::IpVersion::v4;
+  if (config_->usingOriginalSrcIp() &&
+      !Api::OsSysCallsSingleton::get().supportsIpTransparent(check_v4only)) {
+    throw Network::CreateListenerException(
+        fmt::format("The platform does not support either {} or the envoy is not running with the "
+                    "CAP_NET_ADMIN capability.",
+                    check_v4only ? "IP_TRANSPARENT" : "IPV6_TRANSPARENT"));
+  }
+
   Upstream::ThreadLocalCluster* cluster = config->clusterManager().get(config->cluster());
   if (cluster != nullptr) {
     onClusterAddOrUpdate(*cluster);
