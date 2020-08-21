@@ -88,6 +88,7 @@ public:
 private:
   const envoy::type::matcher::v3::StringMatcher matcher_;
   Regex::CompiledMatcherPtr regex_;
+  std::string lowercase_contains_match_;
 };
 
 class ListMatcher : public ValueMatcher {

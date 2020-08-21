@@ -17,7 +17,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: String matcher]
 
 // Specifies the way to match a string.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message StringMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.matcher.StringMatcher";
 
@@ -53,6 +53,14 @@ message StringMatcher {
 
     // The input string must match the regular expression specified here.
     RegexMatcher safe_regex = 5 [(validate.rules).message = {required: true}];
+
+    // The input string must have the substring specified here.
+    // Note: empty contains match is not allowed, please use regex instead.
+    //
+    // Examples:
+    //
+    // * *abc* matches the value *xyz.abc.def*
+    string contains = 7 [(validate.rules).string = {min_bytes: 1}];
   }
 
   // If true, indicates the exact/prefix/suffix matching should be case insensitive. This has no

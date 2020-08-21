@@ -67,6 +67,10 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     header_match_type_ = HeaderMatchType::Suffix;
     value_ = config.suffix_match();
     break;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kContainsMatch:
+    header_match_type_ = HeaderMatchType::Contains;
+    value_ = config.contains_match();
+    break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
       HEADER_MATCH_SPECIFIER_NOT_SET:
     FALLTHRU;
@@ -131,6 +135,9 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
     break;
   case HeaderMatchType::Suffix:
     match = absl::EndsWith(header_view, header_data.value_);
+    break;
+  case HeaderMatchType::Contains:
+    match = absl::StrContains(header_view, header_data.value_);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
