@@ -27,7 +27,6 @@ envoy_extension_cc_test(
     name = "original_src_config_factory_test",
     srcs = ["original_src_config_factory_test.cc"],
     extension_name = "envoy.filters.listener.original_src",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/listener/original_src:config",
         "//source/extensions/filters/listener/original_src:config_lib",
