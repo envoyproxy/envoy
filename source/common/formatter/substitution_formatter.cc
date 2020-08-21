@@ -49,6 +49,9 @@ const std::regex& getStartTimeNewlinePattern() {
 }
 const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
 
+template <class... Ts> struct JsonFormatMapVisitor : Ts... { using Ts::operator()...; };
+template <class... Ts> JsonFormatMapVisitor(Ts...) -> JsonFormatMapVisitor<Ts...>;
+
 } // namespace
 
 const std::string SubstitutionFormatUtils::DEFAULT_FORMAT =
@@ -109,14 +112,6 @@ std::string FormatterImpl::format(const Http::RequestHeaderMap& request_headers,
   return log_line;
 }
 
-JsonFormatterImpl::JsonFormatterImpl(
-    const absl::flat_hash_map<std::string, std::string>& format_mapping, bool preserve_types)
-    : preserve_types_(preserve_types) {
-  for (const auto& pair : format_mapping) {
-    json_output_format_.emplace(pair.first, SubstitutionFormatParser::parse(pair.second));
-  }
-}
-
 std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_headers,
                                       const Http::ResponseHeaderMap& response_headers,
                                       const Http::ResponseTrailerMap& response_trailers,
@@ -129,37 +124,61 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
   return absl::StrCat(log_line, "\n");
 }
 
+JsonFormatterImpl::JsonFormatMapWrapper
+JsonFormatterImpl::toFormatMap(const ProtobufWkt::Struct& json_format) const {
+  auto output = std::make_unique<JsonFormatMap>();
+  for (const auto& pair : json_format.fields()) {
+    switch (pair.second.kind_case()) {
+    case ProtobufWkt::Value::kStringValue:
+      output->emplace(pair.first, SubstitutionFormatParser::parse(pair.second.string_value()));
+      break;
+    case ProtobufWkt::Value::kStructValue:
+      output->emplace(pair.first, toFormatMap(pair.second.struct_value()));
+      break;
+    default:
+      throw EnvoyException(
+          "Only string values or nested structs are supported in the JSON access log format.");
+    }
+  }
+  return {std::move(output)};
+};
+
 ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& request_headers,
                                                 const Http::ResponseHeaderMap& response_headers,
                                                 const Http::ResponseTrailerMap& response_trailers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 absl::string_view local_reply_body) const {
-  ProtobufWkt::Struct output;
-  auto* fields = output.mutable_fields();
-  for (const auto& pair : json_output_format_) {
-    const auto& providers = pair.second;
-    ASSERT(!providers.empty());
-
-    if (providers.size() == 1) {
-      const auto& provider = providers.front();
-      const auto val =
-          preserve_types_ ? provider->formatValue(request_headers, response_headers,
-                                                  response_trailers, stream_info, local_reply_body)
-                          : ValueUtil::stringValue(
-                                provider->format(request_headers, response_headers,
-                                                 response_trailers, stream_info, local_reply_body));
-      (*fields)[pair.first] = val;
-    } else {
-      // Multiple providers forces string output.
-      std::string str;
-      for (const auto& provider : providers) {
-        str += provider->format(request_headers, response_headers, response_trailers, stream_info,
-                                local_reply_body);
-      }
-      (*fields)[pair.first] = ValueUtil::stringValue(str);
-    }
-  }
-  return output;
+  const std::function<ProtobufWkt::Value(const std::vector<FormatterProviderPtr>&)>
+      providers_callback = [&](const std::vector<FormatterProviderPtr>& providers) {
+        ASSERT(!providers.empty());
+        if (providers.size() == 1) {
+          const auto& provider = providers.front();
+          if (preserve_types_) {
+            return provider->formatValue(request_headers, response_headers, response_trailers,
+                                         stream_info, local_reply_body);
+          }
+          return ValueUtil::stringValue(provider->format(
+              request_headers, response_headers, response_trailers, stream_info, local_reply_body));
+        }
+        // Multiple providers forces string output.
+        std::string str;
+        for (const auto& provider : providers) {
+          str += provider->format(request_headers, response_headers, response_trailers, stream_info,
+                                  local_reply_body);
+        }
+        return ValueUtil::stringValue(str);
+      };
+  const std::function<ProtobufWkt::Value(const JsonFormatterImpl::JsonFormatMapWrapper&)>
+      json_format_map_callback = [&](const JsonFormatterImpl::JsonFormatMapWrapper& format) {
+        ProtobufWkt::Struct output;
+        auto* fields = output.mutable_fields();
+        JsonFormatMapVisitor visitor{json_format_map_callback, providers_callback};
+        for (const auto& pair : *format.value_) {
+          (*fields)[pair.first] = std::visit(visitor, pair.second);
+        }
+        return ValueUtil::structValue(output);
+      };
+  return json_format_map_callback(json_output_format_).struct_value();
 }
 
 void SubstitutionFormatParser::parseCommandHeader(const std::string& token, const size_t start,
