@@ -384,22 +384,22 @@ message EndpointsConfigDump {
   repeated DynamicEndpointConfig dynamic_endpoint_configs = 3;
 }
 
-// Message of unready targets information of an init manager.
-message UnreadyTargetsConfigDump {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.admin.v3.UnreadyTargetsConfigDump";
-
-  // Name of the init manager. Example: "init_manager_xxx".
-  string name = 1;
-
-  // Names of unready targets in the hash map of the init manager. Example: "target_xxx".
-  repeated string target_names = 2;
-}
-
 // Envoy's admin fills this message with init managers, which provides the information of their unready targets.
 message UnreadyTargetsConfigDumpList {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v3.UnreadyTargetsConfigDumpList";
+
+  // Message of unready targets information of an init manager.
+  message UnreadyTargetsConfigDump {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.admin.v3.UnreadyTargetsConfigDumpList.UnreadyTargetsConfigDump";
+
+    // Name of the init manager. Example: "init_manager_xxx".
+    string name = 1;
+
+    // Names of unready targets in the hash map of the init manager. Example: "target_xxx".
+    repeated string target_names = 2;
+  }
 
   // The list of each init manager's unready targets.
   repeated UnreadyTargetsConfigDump unready_targets_configs = 1;
