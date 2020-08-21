@@ -104,8 +104,8 @@ def envoy_cmake_external(
     cmake_external(
         name = name,
         cache_entries = select({
-            "@envoy//bazel:opt_build": cache_entries,
-            "//conditions:default": cache_entries_debug,
+            "@envoy//bazel:dbg_build": cache_entries_debug,
+            "//conditions:default": cache_entries,
         }),
         cmake_options = cmake_options,
         # TODO(lizan): Make this always true
