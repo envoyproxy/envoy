@@ -33,18 +33,15 @@ sockaddr_un HotRestartingBase::createDomainSocketAddress(uint64_t id, const std:
   id = id % MaxConcurrentProcesses;
   sockaddr_un address;
   initDomainSocketAddress(&address);
-  if (socket_path == "abstract namespace") {
-    // This creates an anonymous domain socket name (where the first byte of the name of \0).
-    StringUtil::strlcpy(&address.sun_path[1],
-                        fmt::format("envoy_domain_socket_{}_{}", role, base_id_ + id).c_str(),
-                        sizeof(address.sun_path) - 1);
-    address.sun_path[0] = 0;
-    return address;
+  if (socket_path.size() >= sizeof(address.sun_path)) {
+    throw EnvoyException(
+        fmt::format("Path \"{}\" exceeds maximum UNIX domain socket path size of {}.", socket_path,
+                    sizeof(address.sun_path)));
   }
-  StringUtil::strlcpy(
-      &address.sun_path[0],
-      fmt::format(socket_path + "/envoy_domain_socket_{}_{}", role, base_id_ + id).c_str(),
-      sizeof(address.sun_path) - 1);
+  StringUtil::strlcpy(&address.sun_path[0],
+                      fmt::format(socket_path + "_{}_{}", role, base_id_ + id).c_str(),
+                      sizeof(address.sun_path));
+  address.sun_path[0] = (address.sun_path[0] == '@') ? '\0' : address.sun_path[0];
   fchmod(my_domain_socket_, socket_mode);
   return address;
 }

@@ -160,8 +160,8 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                                                   "Comma-separated list of extensions to disable",
                                                   false, "", "string", cmd);
 
-  TCLAP::ValueArg<std::string> socket_path("", "socket-path", "Configurable socket file directory",
-                                           false, "abstract namespace", "string", cmd);
+  TCLAP::ValueArg<std::string> socket_path("", "socket-path", "Path to hot restart socket file",
+                                           false, "@envoy_domain_socket", "string", cmd);
 
   TCLAP::ValueArg<mode_t> socket_mode("", "socket-mode", "Socket file permission", false, S_IRWXU,
                                       "mode_t", cmd);
@@ -417,7 +417,7 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
       parent_shutdown_time_(900), drain_strategy_(Server::DrainStrategy::Gradual),
       mode_(Server::Mode::Serve), hot_restart_disabled_(false), signal_handling_enabled_(true),
       mutex_tracing_enabled_(false), cpuset_threads_(false), fake_symbol_table_enabled_(false),
-      socket_path_("abstract namespace"), socket_mode_(S_IRWXU) {}
+      socket_path_("@envoy_domain_socket"), socket_mode_(S_IRWXU) {}
 
 void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
   for (const auto& name : names) {

@@ -194,14 +194,17 @@ following are the command line options that Envoy supports.
 
 .. option:: --socket-path <path string>
 
-  *(optional)* The output file path where the socket address will be created for
-  :ref:`hot restart <arch_overview_hot_restart>`.
+  *(optional)* The output file path to the socket address for:ref:`hot restart <arch_overview_hot_restart>`.
+  Default to "@envoy_domain_socket" which will be created in the abstract namespace. Prefix _{role}_{id}
+  is appended to provide name.
+
+  **NOTE**: The path started with "@" will be created in the abstract namespace.
 
 .. option:: --socket-mode <integer>
 
   *(optional)* The socket file permission for :ref:`hot restart <arch_overview_hot_restart>`.
   The range of value is from 000 to 777(Octal number).
-  This flag may not used when :option:`--socket-path` is "abstract namespace" or not set.
+  This flag may not used when :option:`--socket-path` is start with "@" or not set.
 
 .. option:: --hot-restart-version
 
