@@ -592,13 +592,12 @@ void ListenerImpl::rebuildFilterChain(
   // 1. Receive requests before rebuilding completed, worker name exists in the list. Do nothing.
   // 2. Receive requests after rebuilding completed, will happen only when the previous rebuilding
   // failed.
-  if (!filter_chain_rebuilder_map_[filter_chain_message]->inProgress()) {
+  if (filter_chain_rebuilder_map_[filter_chain_message]->rebuildingFailed()) {
     should_retry_rebuilding = true;
   }
 
   if (should_retry_rebuilding) {
-    // The previous rebuilding has completed and failed. Should create a new rebuilder and start
-    // rebuilding again
+    // The previous rebuilding has failed. Should create a new rebuilder and start rebuilding again.
     ENVOY_LOG(debug, "previous rebuilding for this filter chain has failed. Should create a new "
                      "rebuilder to retry rebuilding");
     filter_chain_rebuilder_map_.erase(filter_chain_message);

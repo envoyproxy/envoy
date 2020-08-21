@@ -212,7 +212,7 @@ private:
 /**
  * PerFilterChainRebuilder is used to rebuild filter chain placeholder. It assigns an init manager
  * to track filter chain dependencies and acts as the filter chain factory context creator.
- * When rebuilding is completed or reaches timeout, it will send callback to workers to retry
+ * When rebuilding is complete or reaches timeout, it will send callback to workers to retry
  * connections.
  */
 class PerFilterChainRebuilder : public FilterChainFactoryContextCreator,
@@ -228,7 +228,7 @@ public:
 
   void storeWorkerInCallbackList(const std::string& worker_name);
   void callbackToWorkers(bool success);
-  bool inProgress() { return state_ == State::Running; }
+  bool rebuildingFailed() { return state_ == State::Failed; }
   bool timeoutEnabled() { return timeout_enabled; }
   Init::Manager& initManager() { return *rebuild_init_manager_; }
   void startRebuilding();
@@ -247,7 +247,7 @@ private:
      */
     Running,
     /**
-     * Rebuilding has completed successfully.
+     * Rebuilding has been completed successfully.
      */
     Succeeded,
     /**
