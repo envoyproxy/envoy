@@ -1,9 +1,10 @@
 #!/bin/bash -e
 
+DELAY="${DELAY:-0}"
+DOCKER_NO_PULL="${DOCKER_NO_PULL:-}"
+MANUAL="${MANUAL:-}"
 NAME="${NAME:-}"
 PATHS="${PATHS:-.}"
-MANUAL="${MANUAL:-}"
-DELAY="${DELAY:-0}"
 UPARGS="${UPARGS:-}"
 
 
@@ -16,9 +17,10 @@ bring_up_example_stack () {
     args=("${UPARGS[@]}")
     path="$1"
     read -ra up_args <<< "up --build -d ${args[*]}"
-
-    run_log "Pull the images ($path)"
-    docker-compose pull || return 1
+    if [[ -z "$DOCKER_NO_PULL" ]]; then
+	run_log "Pull the images ($path)"
+	docker-compose pull || return 1
+    fi
     echo
     run_log "Bring up services ($path)"
     docker-compose "${up_args[@]}" || return 1
