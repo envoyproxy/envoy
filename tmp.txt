@@ -1,0 +1,5 @@
+//source/common/http/http2:codec_lib_with_external_headers
+//source/common/http:conn_manager_lib
+//source/common/http:codec_client_lib
+//source/common/http/http2:codec_lib
+//source/common/http/http2:codec_impl.cc
