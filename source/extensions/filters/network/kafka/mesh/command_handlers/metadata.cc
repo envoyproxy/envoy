@@ -11,7 +11,7 @@ namespace Mesh {
 MetadataRequestHolder::MetadataRequestHolder(
     AbstractRequestListener& filter, const ClusteringConfiguration& clustering_configuration,
     const std::shared_ptr<Request<MetadataRequest>> request)
-    : AbstractInFlightRequest{filter},
+    : BaseInFlightRequest{filter},
       clustering_configuration_{clustering_configuration}, request_{request} {}
 
 // Metadata requests are immediately ready for answer (as they do not need to reach upstream).

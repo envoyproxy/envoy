@@ -47,7 +47,7 @@ TEST(UpstreamKafkaFacadeTest, shouldCreateProducerOnlyOnceForTheSameCluster) {
   EXPECT_CALL(slot_allocator, allocateSlot())
       .WillOnce(Invoke(&slot_allocator, &ThreadLocal::MockInstance::allocateSlot_));
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
-  UpstreamKafkaFacade testee = {clustering_configuration, slot_allocator, thread_factory};
+  UpstreamKafkaFacadeImpl testee = {clustering_configuration, slot_allocator, thread_factory};
 
   // when
   auto& result1 = testee.getProducerForTopic(topic1);
@@ -75,7 +75,7 @@ TEST(UpstreamKafkaFacadeTest, shouldCreateDifferentProducersForDifferentClusters
   EXPECT_CALL(slot_allocator, allocateSlot())
       .WillOnce(Invoke(&slot_allocator, &ThreadLocal::MockInstance::allocateSlot_));
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
-  UpstreamKafkaFacade testee = {clustering_configuration, slot_allocator, thread_factory};
+  UpstreamKafkaFacadeImpl testee = {clustering_configuration, slot_allocator, thread_factory};
 
   // when
   auto& result1 = testee.getProducerForTopic(topic1);

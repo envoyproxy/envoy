@@ -24,8 +24,19 @@ class KafkaMeshFilter : public Network::ReadFilter,
                         public AbstractRequestListener,
                         private Logger::Loggable<Logger::Id::kafka> {
 public:
+  /**
+   * Main constructor.
+   */
   KafkaMeshFilter(const ClusteringConfiguration& clustering_configuration,
                   UpstreamKafkaFacade& upstream_kafka_facade);
+
+  /**
+   * Visible for testing.
+   */
+  KafkaMeshFilter(const ClusteringConfiguration& clustering_configuration,
+                  UpstreamKafkaFacade& upstream_kafka_facade,
+                  RequestDecoderSharedPtr request_decoder);
+
   ~KafkaMeshFilter() override;
 
   // Network::ReadFilter
@@ -39,16 +50,23 @@ public:
   void onBelowWriteBufferLowWatermark() override;
 
   // AbstractRequestListener
-  void onRequest(AbstractInFlightRequestSharedPtr request) override;
+  void onRequest(InFlightRequestSharedPtr request) override;
   void onRequestReadyForAnswer() override;
 
+  std::list<InFlightRequestSharedPtr>& getRequestsInFlightForTest();
+
 private:
+  /**
+   * Helper method invoked when connection gets dropped.
+   */
+  void abandonAllInFlightRequests();
+
   const RequestDecoderSharedPtr request_decoder_;
   UpstreamKafkaFacade& upstream_kafka_facade_;
 
   Network::ReadFilterCallbacks* read_filter_callbacks_;
 
-  std::list<AbstractInFlightRequestSharedPtr> requests_in_flight_;
+  std::list<InFlightRequestSharedPtr> requests_in_flight_;
 };
 
 } // namespace Mesh

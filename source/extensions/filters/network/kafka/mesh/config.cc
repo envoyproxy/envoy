@@ -23,9 +23,10 @@ Network::FilterFactoryCb KafkaMeshConfigFactory::createFilterFactoryFromProtoTyp
   ENVOY_LOG(warn, "Creating ClusteringConfiguration instance");
   const ClusteringConfigurationSharedPtr clustering_configuration =
       std::make_shared<ClusteringConfigurationImpl>(config);
-  ENVOY_LOG(warn, "Creating UpstreamKafkaFacade instance");
-  const UpstreamKafkaFacadeSharedPtr upstream_kafka_facade = std::make_shared<UpstreamKafkaFacade>(
-      *clustering_configuration, context.threadLocal(), context.api().threadFactory());
+  ENVOY_LOG(warn, "Creating UpstreamKafkaFacadeImpl instance");
+  const UpstreamKafkaFacadeSharedPtr upstream_kafka_facade =
+      std::make_shared<UpstreamKafkaFacadeImpl>(*clustering_configuration, context.threadLocal(),
+                                                context.api().threadFactory());
   ENVOY_LOG(warn, "Shared instances have been created");
 
   return [clustering_configuration,

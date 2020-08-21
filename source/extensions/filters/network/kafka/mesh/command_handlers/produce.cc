@@ -10,7 +10,7 @@ namespace Mesh {
 
 ProduceRequestHolder::ProduceRequestHolder(AbstractRequestListener& filter,
                                            const std::shared_ptr<Request<ProduceRequest>> request)
-    : AbstractInFlightRequest{filter}, request_{request} {
+    : BaseInFlightRequest{filter}, request_{request} {
   for (auto const& topic_data : request_->data_.topics_) {
     for (auto const& partition_data : topic_data.partitions_) {
       if (partition_data.records_) {

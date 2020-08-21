@@ -9,7 +9,7 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-class MetadataRequestHolder : public AbstractInFlightRequest {
+class MetadataRequestHolder : public BaseInFlightRequest {
 public:
   MetadataRequestHolder(AbstractRequestListener& filter,
                         const ClusteringConfiguration& clustering_configuration,

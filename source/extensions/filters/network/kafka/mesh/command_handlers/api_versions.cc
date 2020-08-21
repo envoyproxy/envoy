@@ -10,7 +10,7 @@ namespace Mesh {
 
 ApiVersionsRequestHolder::ApiVersionsRequestHolder(
     AbstractRequestListener& filter, const std::shared_ptr<Request<ApiVersionsRequest>> request)
-    : AbstractInFlightRequest{filter}, request_{request} {}
+    : BaseInFlightRequest{filter}, request_{request} {}
 
 // Api Versions requests are immediately ready for answer (as they do not need to reach upstream).
 void ApiVersionsRequestHolder::invoke(UpstreamKafkaFacade&) { notifyFilter(); }

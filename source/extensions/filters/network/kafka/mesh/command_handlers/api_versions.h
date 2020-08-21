@@ -9,7 +9,7 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-class ApiVersionsRequestHolder : public AbstractInFlightRequest {
+class ApiVersionsRequestHolder : public BaseInFlightRequest {
 public:
   ApiVersionsRequestHolder(AbstractRequestListener& filter,
                            const std::shared_ptr<Request<ApiVersionsRequest>> request);

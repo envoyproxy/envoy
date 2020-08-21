@@ -6,12 +6,12 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-void AbstractInFlightRequest::abandon() {
+void BaseInFlightRequest::abandon() {
   ENVOY_LOG(trace, "Abandoning request");
   filter_active_ = false;
 }
 
-void AbstractInFlightRequest::notifyFilter() {
+void BaseInFlightRequest::notifyFilter() {
   if (filter_active_) {
     ENVOY_LOG(trace, "Notifying filter for request");
     filter_.onRequestReadyForAnswer();

@@ -15,24 +15,35 @@ namespace Kafka {
 namespace Mesh {
 
 /**
- * Provides thread-safe access to upstream Kafka clients.
+ * Provides access to upstream Kafka clients.
  */
-class UpstreamKafkaFacade : private Logger::Loggable<Logger::Id::kafka> {
+class UpstreamKafkaFacade {
 public:
-  UpstreamKafkaFacade(const ClusteringConfiguration& clustering_configuration,
-                      ThreadLocal::SlotAllocator& slot_allocator,
-                      Thread::ThreadFactory& thread_factory);
+  virtual ~UpstreamKafkaFacade(){};
+  virtual KafkaProducerWrapper& getProducerForTopic(const std::string& topic) PURE;
+};
+
+using UpstreamKafkaFacadeSharedPtr = std::shared_ptr<UpstreamKafkaFacade>;
+
+/**
+ * Provides access to upstream Kafka clients.
+ * This is done by using thread-local maps of cluster to producer.
+ */
+class UpstreamKafkaFacadeImpl : public UpstreamKafkaFacade,
+                                private Logger::Loggable<Logger::Id::kafka> {
+public:
+  UpstreamKafkaFacadeImpl(const ClusteringConfiguration& clustering_configuration,
+                          ThreadLocal::SlotAllocator& slot_allocator,
+                          Thread::ThreadFactory& thread_factory);
 
   // WRITE DOC
-  KafkaProducerWrapper& getProducerForTopic(const std::string& topic);
+  KafkaProducerWrapper& getProducerForTopic(const std::string& topic) override;
 
   size_t getProducerCountForTest();
 
 private:
   ThreadLocal::SlotPtr tls_;
 };
-
-using UpstreamKafkaFacadeSharedPtr = std::shared_ptr<UpstreamKafkaFacade>;
 
 } // namespace Mesh
 } // namespace Kafka

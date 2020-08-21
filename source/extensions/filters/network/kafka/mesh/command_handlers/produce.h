@@ -14,7 +14,7 @@ namespace Mesh {
  * A single Produce request coming from downstream can map into multiple entries,
  * as the topics can be hosted on different clusters.
  */
-class ProduceRequestHolder : public AbstractInFlightRequest,
+class ProduceRequestHolder : public BaseInFlightRequest,
                              public ProduceFinishCb,
                              public std::enable_shared_from_this<ProduceRequestHolder> {
 public:

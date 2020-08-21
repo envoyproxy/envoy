@@ -18,16 +18,17 @@ namespace Mesh {
 
 KafkaMeshFilter::KafkaMeshFilter(const ClusteringConfiguration& clustering_configuration,
                                  UpstreamKafkaFacade& upstream_kafka_facade)
-    : request_decoder_{new RequestDecoder(
-          {std::make_shared<RequestProcessor>(*this, clustering_configuration)})},
-      upstream_kafka_facade_{upstream_kafka_facade} {}
-
-KafkaMeshFilter::~KafkaMeshFilter() {
-  ENVOY_LOG(trace, "KafkaMeshFilter - dtor");
-  for (const auto& request : requests_in_flight_) {
-    request->abandon();
-  }
+    : KafkaMeshFilter{clustering_configuration, upstream_kafka_facade,
+                      std::shared_ptr<RequestDecoder>(new RequestDecoder(
+                          {std::make_shared<RequestProcessor>(*this, clustering_configuration)}))} {
 }
+
+KafkaMeshFilter::KafkaMeshFilter(const ClusteringConfiguration&,
+                                 UpstreamKafkaFacade& upstream_kafka_facade,
+                                 RequestDecoderSharedPtr request_decoder)
+    : request_decoder_{request_decoder}, upstream_kafka_facade_{upstream_kafka_facade} {}
+
+KafkaMeshFilter::~KafkaMeshFilter() { abandonAllInFlightRequests(); }
 
 Network::FilterStatus KafkaMeshFilter::onNewConnection() {
   ENVOY_LOG(trace, "KafkaMeshFilter - onNewConnection");
@@ -59,10 +60,7 @@ Network::FilterStatus KafkaMeshFilter::onData(Buffer::Instance& data, bool) {
 void KafkaMeshFilter::onEvent(Network::ConnectionEvent event) {
   if (Network::ConnectionEvent::RemoteClose == event ||
       Network::ConnectionEvent::LocalClose == event) {
-    for (const auto& request : requests_in_flight_) {
-      request->abandon();
-    }
-    requests_in_flight_.erase(requests_in_flight_.begin(), requests_in_flight_.end());
+    abandonAllInFlightRequests();
   }
 }
 
@@ -73,7 +71,7 @@ void KafkaMeshFilter::onBelowWriteBufferLowWatermark() {}
 /**
  * We have received a request we can actually process.
  */
-void KafkaMeshFilter::onRequest(AbstractInFlightRequestSharedPtr request) {
+void KafkaMeshFilter::onRequest(InFlightRequestSharedPtr request) {
   requests_in_flight_.push_back(request);
   request->invoke(upstream_kafka_facade_);
 }
@@ -86,7 +84,7 @@ void KafkaMeshFilter::onRequest(AbstractInFlightRequestSharedPtr request) {
  */
 void KafkaMeshFilter::onRequestReadyForAnswer() {
   while (!requests_in_flight_.empty()) {
-    AbstractInFlightRequestSharedPtr rq = requests_in_flight_.front();
+    InFlightRequestSharedPtr rq = requests_in_flight_.front();
     if (rq->finished()) {
       // The request has been finished, so we no longer need to store it.
       requests_in_flight_.erase(requests_in_flight_.begin());
@@ -101,6 +99,21 @@ void KafkaMeshFilter::onRequestReadyForAnswer() {
       break;
     }
   }
+}
+
+// Request references are stored in 2 places: this filter (request's origin) and in
+// UpstreamKafkaClient instances (to match pure-Kafka confirmations to the requests). Because filter
+// can die before confirmation from Kafka is received, we are just going to mark them as abandoned,
+// so they do not attempt to reference this filter anymore.
+void KafkaMeshFilter::abandonAllInFlightRequests() {
+  for (const auto& request : requests_in_flight_) {
+    request->abandon();
+  }
+  requests_in_flight_.erase(requests_in_flight_.begin(), requests_in_flight_.end());
+}
+
+std::list<InFlightRequestSharedPtr>& KafkaMeshFilter::getRequestsInFlightForTest() {
+  return requests_in_flight_;
 }
 
 } // namespace Mesh

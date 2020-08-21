@@ -18,7 +18,7 @@ namespace {
 
 class MockAbstractRequestListener : public AbstractRequestListener {
 public:
-  MOCK_METHOD(void, onRequest, (AbstractInFlightRequestSharedPtr));
+  MOCK_METHOD(void, onRequest, (InFlightRequestSharedPtr));
   MOCK_METHOD(void, onRequestReadyForAnswer, ());
 };
 
@@ -39,7 +39,7 @@ TEST(RequestProcessorTest, shouldProcessProduceRequest) {
   const ProduceRequest data = {0, 0, {}};
   const auto message = std::make_shared<Request<ProduceRequest>>(header, data);
 
-  AbstractInFlightRequestSharedPtr capture = nullptr;
+  InFlightRequestSharedPtr capture = nullptr;
   EXPECT_CALL(listener, onRequest(_)).WillOnce(testing::SaveArg<0>(&capture));
 
   // when
@@ -59,7 +59,7 @@ TEST(RequestProcessorTest, shouldProcessMetadataRequest) {
   const MetadataRequest data = {absl::nullopt};
   const auto message = std::make_shared<Request<MetadataRequest>>(header, data);
 
-  AbstractInFlightRequestSharedPtr capture = nullptr;
+  InFlightRequestSharedPtr capture = nullptr;
   EXPECT_CALL(listener, onRequest(_)).WillOnce(testing::SaveArg<0>(&capture));
 
   // when
@@ -79,7 +79,7 @@ TEST(RequestProcessorTest, shouldProcessApiVersionsRequest) {
   const ApiVersionsRequest data = {};
   const auto message = std::make_shared<Request<ApiVersionsRequest>>(header, data);
 
-  AbstractInFlightRequestSharedPtr capture = nullptr;
+  InFlightRequestSharedPtr capture = nullptr;
   EXPECT_CALL(listener, onRequest(_)).WillOnce(testing::SaveArg<0>(&capture));
 
   // when

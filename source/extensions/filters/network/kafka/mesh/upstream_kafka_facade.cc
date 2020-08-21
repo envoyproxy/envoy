@@ -71,9 +71,9 @@ size_t ThreadLocalKafkaFacade::getProducerCountForTest() const {
   return cluster_to_kafka_client_.size();
 }
 
-UpstreamKafkaFacade::UpstreamKafkaFacade(const ClusteringConfiguration& clustering_configuration,
-                                         ThreadLocal::SlotAllocator& slot_allocator,
-                                         Thread::ThreadFactory& thread_factory)
+UpstreamKafkaFacadeImpl::UpstreamKafkaFacadeImpl(
+    const ClusteringConfiguration& clustering_configuration,
+    ThreadLocal::SlotAllocator& slot_allocator, Thread::ThreadFactory& thread_factory)
     : tls_{slot_allocator.allocateSlot()} {
 
   ThreadLocal::Slot::InitializeCb cb =
@@ -86,11 +86,11 @@ UpstreamKafkaFacade::UpstreamKafkaFacade(const ClusteringConfiguration& clusteri
 }
 
 // Return Producer instance that is local to given thread, via ThreadLocalKafkaFacade.
-KafkaProducerWrapper& UpstreamKafkaFacade::getProducerForTopic(const std::string& topic) {
+KafkaProducerWrapper& UpstreamKafkaFacadeImpl::getProducerForTopic(const std::string& topic) {
   return tls_->getTyped<ThreadLocalKafkaFacade>().getProducerForTopic(topic);
 }
 
-size_t UpstreamKafkaFacade::getProducerCountForTest() {
+size_t UpstreamKafkaFacadeImpl::getProducerCountForTest() {
   return tls_->getTyped<ThreadLocalKafkaFacade>().getProducerCountForTest();
 }
 
