@@ -29,7 +29,7 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
     ThreadLocal::SlotAllocator& tls, GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
     Stats::Scope& scope)
     : Common::ImplBase(std::move(filter)), scope_(scope), config_(std::move(config)),
-      tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)) {
+      access_logger_cache_(std::move(access_logger_cache)), tls_slot_(tls.allocateSlot()) {
   for (const auto& header : config_.additional_request_headers_to_log()) {
     request_headers_to_log_.emplace_back(header);
   }

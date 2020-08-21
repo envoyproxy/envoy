@@ -17,26 +17,77 @@ thread_local InstanceImpl::ThreadLocalData InstanceImpl::thread_local_data_;
 
 InstanceImpl::~InstanceImpl() {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
-  ASSERT(shutdown_);
+  ASSERT(state_ == State::Shutdown);
   thread_local_data_.data_.clear();
 }
 
 SlotPtr InstanceImpl::allocateSlot() {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
-  ASSERT(!shutdown_);
+  ASSERT(state_ != State::Shutdown);
 
   if (free_slot_indexes_.empty()) {
     SlotImplPtr slot(new SlotImpl(*this, slots_.size()));
-    auto wrapper = std::make_unique<Bookkeeper>(*this, std::move(slot));
-    slots_.push_back(wrapper->slot_.get());
-    return wrapper;
+    slots_.push_back(slot.get());
+    return slot;
   }
   const uint32_t idx = free_slot_indexes_.front();
   free_slot_indexes_.pop_front();
   ASSERT(idx < slots_.size());
   SlotImplPtr slot(new SlotImpl(*this, idx));
   slots_[idx] = slot.get();
-  return std::make_unique<Bookkeeper>(*this, std::move(slot));
+  return slot;
+}
+
+InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint64_t index)
+    : parent_(parent), index_(index), still_alive_guard_(std::make_shared<bool>()),
+      active_callback_guard_(
+          new bool,
+          [&parent, still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), this](bool* b) {
+            // If TLS is in the running state, signal that this slot is ready to be destroyed. This
+            // may happen on a worker when callbacks are run. We do not do this check during:
+            // a) initializing: there are error flows during initialization in which it is too
+            //    complicated to destroy all pending callbacks before the slot is destroyed. Given
+            //    that no workers are running there is nothing to synchronize anyway.
+            // b) shutting down: no slots will be destroyed between the time shutdown starts and all
+            //    workers exit, so there is nothing to synchronize once all workers have exited.
+            //    Additionally, there are initialization failure cases in which we move directly
+            //    from initializing to shutting down, so for similar reasons to (a) we don't
+            //    synchronize.
+            // c) when we can't lock the still alive guard. It's only possible for that to happen
+            //    when a slot was destroyed before we entered the running state (during xDS init).
+            //    This is guaranteed by the blocking in slot destruction. Thus, no further
+            //    synchronization is needed.
+            if (parent.state_ == State::Running && still_alive_guard.lock()) {
+              absl::MutexLock lock(&shutdown_mutex_);
+              ready_to_destroy_ = true;
+            }
+
+            delete b;
+          }) {}
+
+InstanceImpl::SlotImpl::~SlotImpl() {
+  // Reset active_callback_guard_ so the only active references will be held by pending callbacks.
+  active_callback_guard_.reset();
+  // If running only, synchronize slot removal with all callbacks being drained from workers.
+  // See the constructor for why we only do this in the running state.
+  if (parent_.state_ == State::Running) {
+    absl::MutexLock lock(&shutdown_mutex_);
+    shutdown_mutex_.Await(absl::Condition(&ready_to_destroy_));
+  }
+
+  parent_.removeSlot(*this);
+}
+
+Event::PostCb InstanceImpl::SlotImpl::wrapCallback(Event::PostCb cb) {
+  // Capture active_callback_guard_ so that we can synchronize slot destruction. See ~SlotImpl().
+  // Also capture still_alive_guard_ so we can verify the slot is still alive as it might have
+  // been destroyed pre-running state. See SlotImpl().
+  return [active_callback_guard = active_callback_guard_,
+          still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), cb] {
+    if (still_alive_guard.lock()) {
+      cb();
+    }
+  };
 }
 
 bool InstanceImpl::SlotImpl::currentThreadRegistered() {
@@ -44,11 +95,33 @@ bool InstanceImpl::SlotImpl::currentThreadRegistered() {
 }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb) {
-  parent_.runOnAllThreads([this, cb]() { setThreadLocal(index_, cb(get())); });
+  runOnAllThreads([this, cb]() { setThreadLocal(index_, cb(get())); });
 }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
-  parent_.runOnAllThreads([this, cb]() { setThreadLocal(index_, cb(get())); }, complete_cb);
+  runOnAllThreads([this, cb]() { setThreadLocal(index_, cb(get())); }, complete_cb);
+}
+
+void InstanceImpl::SlotImpl::runOnAllThreads(Event::PostCb cb) {
+  parent_.runOnAllThreads(wrapCallback(cb));
+}
+
+void InstanceImpl::SlotImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) {
+  parent_.runOnAllThreads(wrapCallback(cb), main_callback);
+}
+
+void InstanceImpl::SlotImpl::set(InitializeCb cb) {
+  ASSERT(std::this_thread::get_id() == parent_.main_thread_id_);
+  ASSERT(parent_.state_ != State::Shutdown);
+
+  for (Event::Dispatcher& dispatcher : parent_.registered_threads_) {
+    const uint32_t index = index_;
+    dispatcher.post(wrapCallback(
+        [index, cb, &dispatcher]() -> void { setThreadLocal(index, cb(dispatcher)); }));
+  }
+
+  // Handle main thread.
+  setThreadLocal(index_, cb(*parent_.main_thread_dispatcher_));
 }
 
 ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() {
@@ -56,54 +129,9 @@ ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() {
   return thread_local_data_.data_[index_];
 }
 
-InstanceImpl::Bookkeeper::Bookkeeper(InstanceImpl& parent, SlotImplPtr&& slot)
-    : parent_(parent), slot_(std::move(slot)),
-      ref_count_(/*not used.*/ nullptr,
-                 [slot = slot_.get(), &parent = this->parent_](uint32_t* /* not used */) {
-                   // On destruction, post a cleanup callback on main thread, this could happen on
-                   // any thread.
-                   parent.scheduleCleanup(slot);
-                 }) {}
-
-ThreadLocalObjectSharedPtr InstanceImpl::Bookkeeper::get() { return slot_->get(); }
-
-void InstanceImpl::Bookkeeper::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
-  slot_->runOnAllThreads(
-      [cb, ref_count = this->ref_count_](ThreadLocalObjectSharedPtr previous) {
-        return cb(std::move(previous));
-      },
-      complete_cb);
-}
-
-void InstanceImpl::Bookkeeper::runOnAllThreads(const UpdateCb& cb) {
-  slot_->runOnAllThreads([cb, ref_count = this->ref_count_](ThreadLocalObjectSharedPtr previous) {
-    return cb(std::move(previous));
-  });
-}
-
-bool InstanceImpl::Bookkeeper::currentThreadRegistered() {
-  return slot_->currentThreadRegistered();
-}
-
-void InstanceImpl::Bookkeeper::runOnAllThreads(Event::PostCb cb) {
-  // Use ref_count_ to bookkeep how many on-the-fly callback are out there.
-  slot_->runOnAllThreads([cb, ref_count = this->ref_count_]() { cb(); });
-}
-
-void InstanceImpl::Bookkeeper::runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) {
-  // Use ref_count_ to bookkeep how many on-the-fly callback are out there.
-  slot_->runOnAllThreads([cb, main_callback, ref_count = this->ref_count_]() { cb(); },
-                         main_callback);
-}
-
-void InstanceImpl::Bookkeeper::set(InitializeCb cb) {
-  slot_->set([cb, ref_count = this->ref_count_](Event::Dispatcher& dispatcher)
-                 -> ThreadLocalObjectSharedPtr { return cb(dispatcher); });
-}
-
 void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_thread) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
-  ASSERT(!shutdown_);
+  ASSERT(state_ != State::Shutdown);
 
   if (main_thread) {
     main_thread_dispatcher_ = &dispatcher;
@@ -115,38 +143,6 @@ void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_threa
   }
 }
 
-// Puts the slot into a deferred delete container, the slot will be destructed when its out-going
-// callback reference count goes to 0.
-void InstanceImpl::recycle(SlotImplPtr&& slot) {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
-  ASSERT(slot != nullptr);
-  auto* slot_addr = slot.get();
-  deferred_deletes_.insert({slot_addr, std::move(slot)});
-}
-
-// Called by the Bookkeeper ref_count destructor, the SlotImpl in the deferred deletes map can be
-// destructed now.
-void InstanceImpl::scheduleCleanup(SlotImpl* slot) {
-  if (shutdown_) {
-    // If server is shutting down, do nothing here.
-    // The destruction of Bookkeeper has already transferred the SlotImpl to the deferred_deletes_
-    // queue. No matter if this method is called from a Worker thread, the SlotImpl will be
-    // destructed on main thread when InstanceImpl destructs.
-    return;
-  }
-  if (std::this_thread::get_id() == main_thread_id_) {
-    // If called from main thread, save a callback.
-    ASSERT(deferred_deletes_.contains(slot));
-    deferred_deletes_.erase(slot);
-    return;
-  }
-  main_thread_dispatcher_->post([slot, this]() {
-    ASSERT(deferred_deletes_.contains(slot));
-    // The slot is guaranteed to be put into the deferred_deletes_ map by Bookkeeper destructor.
-    deferred_deletes_.erase(slot);
-  });
-}
-
 void InstanceImpl::removeSlot(SlotImpl& slot) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
 
@@ -154,7 +150,7 @@ void InstanceImpl::removeSlot(SlotImpl& slot) {
   // threads have already shut down and the dispatcher is no longer alive. There is also no reason
   // to do removal, because no allocations happen during shutdown and shutdownThread() will clean
   // things up on the other thread.
-  if (shutdown_) {
+  if (state_ == State::Shutdown) {
     return;
   }
 
@@ -176,7 +172,7 @@ void InstanceImpl::removeSlot(SlotImpl& slot) {
 
 void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
-  ASSERT(!shutdown_);
+  ASSERT(state_ != State::Shutdown);
 
   for (Event::Dispatcher& dispatcher : registered_threads_) {
     dispatcher.post(cb);
@@ -188,7 +184,7 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
 
 void InstanceImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_complete_cb) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
-  ASSERT(!shutdown_);
+  ASSERT(state_ != State::Shutdown);
   // Handle main thread first so that when the last worker thread wins, we could just call the
   // all_threads_complete_cb method. Parallelism of main thread execution is being traded off
   // for programming simplicity here.
@@ -205,19 +201,6 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_c
   }
 }
 
-void InstanceImpl::SlotImpl::set(InitializeCb cb) {
-  ASSERT(std::this_thread::get_id() == parent_.main_thread_id_);
-  ASSERT(!parent_.shutdown_);
-
-  for (Event::Dispatcher& dispatcher : parent_.registered_threads_) {
-    const uint32_t index = index_;
-    dispatcher.post([index, cb, &dispatcher]() -> void { setThreadLocal(index, cb(dispatcher)); });
-  }
-
-  // Handle main thread.
-  setThreadLocal(index_, cb(*parent_.main_thread_dispatcher_));
-}
-
 void InstanceImpl::setThreadLocal(uint32_t index, ThreadLocalObjectSharedPtr object) {
   if (thread_local_data_.data_.size() <= index) {
     thread_local_data_.data_.resize(index + 1);
@@ -226,14 +209,19 @@ void InstanceImpl::setThreadLocal(uint32_t index, ThreadLocalObjectSharedPtr obj
   thread_local_data_.data_[index] = object;
 }
 
+void InstanceImpl::startGlobalThreading() {
+  ASSERT(state_ == State::Initializing);
+  state_ = State::Running;
+}
+
 void InstanceImpl::shutdownGlobalThreading() {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
-  ASSERT(!shutdown_);
-  shutdown_ = true;
+  ASSERT(state_ != State::Shutdown);
+  state_ = State::Shutdown;
 }
 
 void InstanceImpl::shutdownThread() {
-  ASSERT(shutdown_);
+  ASSERT(state_ == State::Shutdown);
 
   // Destruction of slots is done in *reverse* order. This is so that filters and higher layer
   // things that are built on top of the cluster manager, stats, etc. will be destroyed before

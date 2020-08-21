@@ -192,9 +192,7 @@ TEST_F(ThreadSafeTest, StateDestructedBeforeWorkerRun) {
   state_->registerType<TestObject>();
 
   main_dispatcher_->run(Event::Dispatcher::RunType::Block);
-
-  // Destroy state_.
-  state_.reset(nullptr);
+  tls_.startGlobalThreading();
 
   // Start a new worker thread to execute the callback functions in the worker dispatcher.
   Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([this]() {
@@ -202,6 +200,9 @@ TEST_F(ThreadSafeTest, StateDestructedBeforeWorkerRun) {
     // Verify we have the expected dispatcher for the new worker thread.
     EXPECT_EQ(worker_dispatcher_.get(), &tls_.dispatcher());
   });
+
+  // Destroy state_. This will block until the worker callback runs or is destroyed.
+  state_.reset(nullptr);
   thread->join();
 
   tls_.shutdownGlobalThreading();
