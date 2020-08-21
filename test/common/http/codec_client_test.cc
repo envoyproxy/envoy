@@ -6,6 +6,7 @@
 #include "common/http/exception.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
+#include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
@@ -15,7 +16,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
