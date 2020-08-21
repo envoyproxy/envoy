@@ -16,12 +16,10 @@
 
 // Strong assertion that applies across all compilation modes and doesn't rely
 // on gtest, which only provides soft fails that don't trip oss-fuzz failures.
-#define FUZZ_ASSERT(x) RELEASE_ASSERT(x, "")
-
 #ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-#define ASSERT_ON_FUZZ(x, msg) RELEASE_ASSERT(x, msg)
+#define FUZZ_ASSERT(x) RELEASE_ASSERT(x, "")
 #else
-#define ASSERT_ON_FUZZ(x, msg) ASSERT_TRUE(x) << msg
+#define FUZZ_ASSERT(x) ASSERT_TRUE(x)
 #endif
 
 namespace Envoy {

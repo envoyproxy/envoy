@@ -427,7 +427,7 @@ public:
                         Event::Dispatcher* dispatcher = nullptr) override {
     AssertionResult res =
         TestUtility::waitForCounterEq(statStore(), name, value, time_system_, timeout, dispatcher);
-    ASSERT_ON_FUZZ(res, fmt::format("timed out waiting for {} == {}", name, value));
+    FUZZ_ASSERT(res);
   }
 
   void
@@ -435,7 +435,7 @@ public:
                    std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
     AssertionResult res =
         TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout);
-    ASSERT_ON_FUZZ(res, fmt::format("timed out waiting for {} >= {}", name, value));
+    FUZZ_ASSERT(res);
   }
 
   void
@@ -443,7 +443,7 @@ public:
                  std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
     AssertionResult res =
         TestUtility::waitForGaugeEq(statStore(), name, value, time_system_, timeout);
-    ASSERT_ON_FUZZ(res, fmt::format("timed out waiting for {} == {}", name, value));
+    FUZZ_ASSERT(res);
   }
 
   void
@@ -451,7 +451,7 @@ public:
                  std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
     AssertionResult res =
         TestUtility::waitForGaugeGe(statStore(), name, value, time_system_, timeout);
-    ASSERT_ON_FUZZ(res, fmt::format("timed out waiting for {} >= {}", name, value));
+    FUZZ_ASSERT(res);
   }
 
   void waitForCounterExists(const std::string& name) override {

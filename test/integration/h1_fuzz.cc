@@ -30,7 +30,7 @@ void H1FuzzIntegrationTest::replay(const test::integration::CaptureFuzzTestCase&
     }
     switch (event.event_selector_case()) {
     case test::integration::Event::kDownstreamSendBytes:
-      ASSERT_TRUE(tcp_client->write(event.downstream_send_bytes(), false, false));
+      FUZZ_ASSERT(tcp_client->write(event.downstream_send_bytes(), false, false));
       break;
     case test::integration::Event::kDownstreamRecvBytes:
       // TODO(htuch): Should we wait for some data?
