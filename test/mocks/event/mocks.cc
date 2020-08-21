@@ -4,6 +4,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::Assign;
 using testing::DoAll;
 using testing::Invoke;
@@ -37,6 +38,9 @@ MockTimer::MockTimer() {
       }));
   ON_CALL(*this, disableTimer()).WillByDefault(Assign(&enabled_, false));
   ON_CALL(*this, enabled()).WillByDefault(ReturnPointee(&enabled_));
+  // timerDestroyed will be called in the dtor, but as it is rarely needed, make the expection
+  // optional.
+  EXPECT_CALL(*this, timerDestroyed()).Times(AnyNumber());
 }
 
 // Ownership of each MockTimer instance is transferred to the (caller of) dispatcher's
@@ -49,7 +53,7 @@ MockTimer::MockTimer(MockDispatcher* dispatcher) : MockTimer() {
       .RetiresOnSaturation();
 }
 
-MockTimer::~MockTimer() = default;
+MockTimer::~MockTimer() { timerDestroyed(); }
 
 MockSchedulableCallback::~MockSchedulableCallback() = default;
 

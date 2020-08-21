@@ -99,7 +99,7 @@ public:
     } else {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    proto_config.set_timeout_starts_in_check(internal_timeout);
+    proto_config.set_measure_timeout_on_check_created(internal_timeout);
     return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix);
   }
 
@@ -502,7 +502,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationInternalRequestTimeout) {
   timer->invokeCallback();
 }
 
-// Test the client when the request is canceled.
+// Test when the client is cancelled with internal timeout.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationInternalRequestTimeoutCancelled) {
   initialize("", true);
   envoy::service::auth::v3::CheckRequest request;
@@ -514,8 +514,14 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationInternalRequestTimeoutCancelled) {
   EXPECT_CALL(async_client_, send_(_, _, _)).WillOnce(Return(&async_request_));
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
+  // make sure cancel resets the timer:
   EXPECT_CALL(async_request_, cancel());
+  bool timer_destroyed = false;
+  EXPECT_CALL(*timer, timerDestroyed()).WillOnce(Invoke([&timer_destroyed]() {
+    timer_destroyed = true;
+  }));
   client_->cancel();
+  EXPECT_EQ(timer_destroyed, true);
 }
 
 // Test the client when the configured cluster is missing/removed.

@@ -287,7 +287,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationInternalRequestTimeout) {
   timer->invokeCallback();
 }
 
-// Test when the client is cancelled with internal timer.
+// Test when the client is cancelled with internal timeout.
 TEST_P(ExtAuthzGrpcClientTest, AuthorizationInternalRequestTimeoutCancelled) {
   initialize(GetParam(), true);
 
@@ -302,7 +302,13 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationInternalRequestTimeoutCancelled) {
 
   EXPECT_CALL(async_request_, cancel());
   EXPECT_CALL(request_callbacks_, onComplete_(_)).Times(0);
+  // make sure cancel resets the timer:
+  bool timer_destroyed = false;
+  EXPECT_CALL(*timer, timerDestroyed()).WillOnce(Invoke([&timer_destroyed]() {
+    timer_destroyed = true;
+  }));
   client_->cancel();
+  EXPECT_EQ(timer_destroyed, true);
 }
 
 // Test that the internal timer is not used when dispatcher is nullptr.
@@ -311,8 +317,8 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationRequestInternalTimeoutWithNoDispatch
   EXPECT_CALL(*async_client_, dispatcher()).WillOnce(Return(nullptr));
 
   envoy::service::auth::v3::CheckRequest request;
-  // if expectCallSend succeed with internal timer, while dispatcher is nullptr, it proves that the
-  // timeout was set on the request.
+  // if expectCallSend succeeds with internal_timeout, while dispatcher is nullptr, it proves that
+  // the timeout was set on the request.
   expectCallSend(request);
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
 
