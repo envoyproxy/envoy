@@ -397,7 +397,7 @@ message UnreadyTargetsConfigDumpList {
     // Name of the init manager. Example: "init_manager_xxx".
     string name = 1;
 
-    // Names of unready targets in the hash map of the init manager. Example: "target_xxx".
+    // Names of unready targets of the init manager. Example: "target_xxx".
     repeated string target_names = 2;
   }
 
