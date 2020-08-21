@@ -176,7 +176,7 @@ public:
     ON_CALL(os_sys_calls_, supportsIpTransparent(_)).WillByDefault(Return(true));
     ON_CALL(callbacks_.udp_listener_, localAddress()).WillByDefault(ReturnRef(listener_address_));
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
-    EXPECT_CALL(callbacks_.udp_listener_, localAddress()).Times(1);
+    EXPECT_CALL(callbacks_.udp_listener_, localAddress()).Times(AtLeast(0));
     EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, address())
         .WillRepeatedly(Return(upstream_address_));
     EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, health())
