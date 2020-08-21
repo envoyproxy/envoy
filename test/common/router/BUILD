@@ -377,3 +377,12 @@ envoy_cc_test(
         "//test/mocks/router:router_filter_interface",
     ],
 )
+
+envoy_proto_library(
+    name = "router_fuzz_proto",
+    srcs = ["router_fuzz.proto"],
+    deps = [
+        "//test/fuzz:common_proto",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg",
+    ],
+)
