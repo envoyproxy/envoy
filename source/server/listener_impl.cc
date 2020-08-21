@@ -231,15 +231,18 @@ PerFilterChainRebuilder::PerFilterChainRebuilder(
     ListenerImpl& listener, const envoy::config::listener::v3::FilterChain* const& filter_chain,
     Configuration::FactoryContext& factory_context)
     : listener_(listener), filter_chain_(filter_chain), parent_context_(factory_context),
+      state_(State::Running),
       rebuild_init_manager_(std::make_unique<Init::ManagerImpl>("rebuild_init_manager")),
       rebuild_watcher_(
           "rebuild_watcher",
           [this] {
-            if (!rebuild_complete_) {
+            if (state_ == State::Running) {
               ENVOY_LOG(debug, "rebuild_watcher is ready, rebuilder will callback to workers");
-              rebuild_success_ = true;
-              callbackToWorkers(rebuild_success_);
-              rebuild_timer_->disableTimer();
+              state_ = State::Succeeded;
+              callbackToWorkers(true);
+              if (timeout_enabled) {
+                rebuild_timer_->disableTimer();
+              }
             }
           }),
       rebuild_timer_(listener_.dispatcher().createTimer([this]() -> void { onTimeout(); })),
@@ -259,8 +262,6 @@ PerFilterChainRebuilder::createFilterChainFactoryContext(
 }
 
 void PerFilterChainRebuilder::callbackToWorkers(bool success) {
-  rebuild_complete_ = true;
-
   // Find all matching workers and listeners, sending callbacks.
   // TODO(ASOPVII): Possible optimization: send callback to all workers.
   for (const auto& worker_name : workers_to_callback_) {
@@ -280,21 +281,22 @@ void PerFilterChainRebuilder::startRebuilding() {
 }
 
 void PerFilterChainRebuilder::startTimer() {
+  // If rebuild_timeout_ = 0, timeout is disabled.
   if (rebuild_timeout_.count() > 0) {
+    timeout_enabled = true;
     rebuild_timer_->enableTimer(rebuild_timeout_);
   }
 }
 
 void PerFilterChainRebuilder::onTimeout() {
-  if (rebuild_complete_) {
-    // If rebuilding has completed before timeout, just stop this timer.
+  if (state_ != State::Running) {
+    // If rebuilding has stopped, just stop this timer.
     rebuild_timer_->disableTimer();
   } else {
-    // If timeout before getting response from dependencies, rebuilding fails. Filter chain go back
-    // to placeholder.
+    // If timeout before getting response from dependencies, rebuilding fails.
+    state_ = State::Failed;
     listener_.stopRebuildingFilterChain(filter_chain_);
-    rebuild_success_ = false;
-    callbackToWorkers(rebuild_success_);
+    callbackToWorkers(false);
   }
 }
 
@@ -590,10 +592,8 @@ void ListenerImpl::rebuildFilterChain(
   // 1. Receive requests before rebuilding completed, worker name exists in the list. Do nothing.
   // 2. Receive requests after rebuilding completed, will happen only when the previous rebuilding
   // failed.
-  if (filter_chain_rebuilder_map_[filter_chain_message]->rebuildCompleted()) {
+  if (!filter_chain_rebuilder_map_[filter_chain_message]->inProgress()) {
     should_retry_rebuilding = true;
-    // rebuilder->callbackToWorkers(rebuilder->rebuildSuccess());
-    // return;
   }
 
   if (should_retry_rebuilding) {

@@ -211,7 +211,9 @@ private:
 
 /**
  * PerFilterChainRebuilder is used to rebuild filter chain placeholder. It assigns an init manager
- * to dependencies and send callback to workers when the rebuilding is completed or reaches timeout.
+ * to track filter chain dependencies and acts as the filter chain factory context creator.
+ * When rebuilding is completed or reaches timeout, it will send callback to workers to retry
+ * connections.
  */
 class PerFilterChainRebuilder : public FilterChainFactoryContextCreator,
                                 Logger::Loggable<Logger::Id::config> {
@@ -226,8 +228,8 @@ public:
 
   void storeWorkerInCallbackList(const std::string& worker_name);
   void callbackToWorkers(bool success);
-  bool rebuildCompleted() { return rebuild_complete_; }
-  bool rebuildSuccess() { return rebuild_success_; }
+  bool inProgress() { return state_ == State::Running; }
+  bool timeoutEnabled() { return timeout_enabled; }
   Init::Manager& initManager() { return *rebuild_init_manager_; }
   void startRebuilding();
 
@@ -239,21 +241,26 @@ private:
   const envoy::config::listener::v3::FilterChain* const& filter_chain_;
   Configuration::FactoryContext& parent_context_;
 
-  // Rebuilding completion state:
-  // true: rebuilding has finished successfully
-  // false: still in the rebuilding process
-  bool rebuild_complete_{false};
+  enum class State {
+    /**
+     * Rebuilding is still in progress.
+     */
+    Running,
+    /**
+     * Rebuilding has completed successfully.
+     */
+    Succeeded,
+    /**
+     * Rebuilding has failed due to timeout or error.
+     */
+    Failed
+  };
+  State state_;
 
-  // Rebuilding success state:
-  // true: dependencies are ready and the filter chain is ready.
-  // false: timeout or dependencies timeout or requiring dependencies failed.
-  bool rebuild_success_{false};
-
-  // This init manager is populated with targets from the filter chain factories, namely
-  // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
   std::unique_ptr<Init::Manager> rebuild_init_manager_;
   Init::WatcherImpl rebuild_watcher_;
 
+  bool timeout_enabled{false};
   Event::TimerPtr rebuild_timer_;
   const std::chrono::milliseconds rebuild_timeout_;
 
