@@ -11,8 +11,10 @@ if __name__ == "__main__":
   commits = ""
   for line in f:
     line_list = line.split(' ')
+    print(line)
     if line_list[0] == 'Merge:':
       commits= line_list[1] + '...' + line_list[2]
+      break;
 
   os.system("git diff --name-only {} > {}".format(commits, TMP_OUTPUT))
   print(commits)
