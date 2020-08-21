@@ -35,14 +35,6 @@ def get(service_number, response_id):
   return response.make_conditional(request)
 
 
-@app.after_request
-def add_validation_header(response):
-  if request.if_none_match:
-    response.headers['validation'] = 'not-modified' if response.status_code == 304 \
-                                      else 'new-response'
-  return response
-
-
 if __name__ == "__main__":
   if not os.path.isfile('/etc/responses.yaml'):
     print('Responses file not found at /etc/responses.yaml')
