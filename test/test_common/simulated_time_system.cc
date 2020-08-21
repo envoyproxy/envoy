@@ -210,6 +210,9 @@ private:
   // Used to randomize the ordering of alarms scheduled for the same time when the runtime feature
   // envoy.reloadable_features.activate_timers_next_event_loop is enabled. This mimics the trigger
   // order of real timers scheduled for the same absolute time is non-deterministic.
+  // Each simulated scheduler has it's own TestRandomGenerator with the same seed to improve test
+  // failure reproducibility when running against a specific seed by minimizing cross scheduler
+  // interactions.
   TestRandomGenerator random_source_ ABSL_GUARDED_BY(mutex_);
   uint64_t legacy_next_idx_ ABSL_GUARDED_BY(mutex_) = 0;
 };
