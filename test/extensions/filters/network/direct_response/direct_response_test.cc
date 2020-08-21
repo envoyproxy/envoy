@@ -30,7 +30,7 @@ public:
 TEST_F(DirectResponseFilterTest, OnNewConnection) {
   initialize("hello");
   Buffer::OwnedImpl response("hello");
-  EXPECT_CALL(read_filter_callbacks_.connection_, write(BufferEqual(&response), false));
+  EXPECT_CALL(read_filter_callbacks_.connection_, write(BufferEqual(&response), true));
   EXPECT_CALL(read_filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(read_filter_callbacks_.connection_.stream_info_,
               setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().DirectResponse));
