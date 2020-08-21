@@ -18,7 +18,6 @@ public:
   const IoHandle& ioHandle() const override;
   Api::SysCallIntResult setSocketOption(int level, int optname, const void* optval,
                                         socklen_t len) override;
-  void addOptions(const Socket::OptionsSharedPtr& options) override;
 
   MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
   MOCK_METHOD(void, setLocalAddress, (const Address::InstanceConstSharedPtr&), (override));
@@ -35,9 +34,9 @@ public:
               (const, override));
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool), (override));
   MOCK_METHOD(void, addOption, (const Socket::OptionConstSharedPtr&), (override));
+  MOCK_METHOD(void, addOptions, (const Socket::OptionsSharedPtr&), (override));
 
   const std::unique_ptr<MockIoHandle> io_handle_;
-  Socket::OptionsSharedPtr options_;
 };
 
 } // namespace Network

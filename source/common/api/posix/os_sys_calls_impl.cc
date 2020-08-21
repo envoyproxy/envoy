@@ -122,6 +122,9 @@ bool OsSysCallsImpl::supportsIpTransparent(bool check_v4only) const {
   // https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/net/ipv6/ipv6_sockglue.c?id=6c46862280c5f55eda7750391bc65cd7e08c7535
   //
   // So, almost recent linux kernel supports both IP_TRANSPARENT and IPV6_TRANSPARENT options.
+  //
+  // And these socket options need CAP_NET_ADMIN capability to be applied.
+  // The CAP_NET_ADMIN capability should be applied by root user before call this function.
   static const bool is_supported = [check_v4only] {
     // Check ipv4 case
     int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);

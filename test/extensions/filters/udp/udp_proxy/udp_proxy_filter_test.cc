@@ -142,19 +142,6 @@ public:
       file_event_cb_(Event::FileReadyType::Read);
     }
 
-    absl::optional<Network::Socket::Option::Details>
-    findOptionDetails(const Network::SocketOptionName& name,
-                      envoy::config::core::v3::SocketOption::SocketState state) {
-      for (const auto& option : *socket_->options_) {
-        const auto details = option->getOptionDetails(*socket_, state);
-        if (details.has_value() && details->name_ == name) {
-          return details;
-        }
-      }
-
-      return absl::nullopt;
-    }
-
     UdpProxyFilterTest& parent_;
     const Network::Address::InstanceConstSharedPtr upstream_address_;
     Event::MockTimer* idle_timer_{};
@@ -242,18 +229,10 @@ public:
                           int ipv6_expect) {
     EXPECT_EQ(ipv4_expect, session.sock_opts_[ipv4_option.level()][ipv4_option.option()]);
     EXPECT_EQ(ipv6_expect, session.sock_opts_[ipv6_option.level()][ipv6_option.option()]);
-
-    const auto ipv4_option_details = session.findOptionDetails(
-        ENVOY_SOCKET_IP_TRANSPARENT, envoy::config::core::v3::SocketOption::STATE_PREBIND);
-    const auto ipv6_option_details = session.findOptionDetails(
-        ENVOY_SOCKET_IPV6_TRANSPARENT, envoy::config::core::v3::SocketOption::STATE_PREBIND);
-
-    EXPECT_EQ(ipv4_expect == 1, ipv4_option_details.has_value());
-    EXPECT_EQ(ipv6_expect == 1, ipv6_option_details.has_value());
   }
 
   bool isTransparentSocketOptionsSupported() {
-    for (const auto& option_name : transparent_options) {
+    for (const auto& option_name : transparent_options_) {
       if (!option_name.hasValue()) {
         return false;
       }
@@ -275,8 +254,8 @@ public:
   Network::Address::InstanceConstSharedPtr listener_address_;
   const Network::Address::InstanceConstSharedPtr upstream_address_;
   const Network::Address::InstanceConstSharedPtr peer_address_;
-  const std::vector<Network::SocketOptionName> transparent_options{ENVOY_SOCKET_IP_TRANSPARENT,
-                                                                   ENVOY_SOCKET_IPV6_TRANSPARENT};
+  const std::vector<Network::SocketOptionName> transparent_options_{ENVOY_SOCKET_IP_TRANSPARENT,
+                                                                    ENVOY_SOCKET_IPV6_TRANSPARENT};
   inline static const std::string listener_ip_address_ = "0.0.0.0:2000";
   inline static const std::string upstream_ip_address_ = "20.0.0.1:443";
   inline static const std::string peer_ip_address_ = "10.0.0.1:1000";
@@ -296,7 +275,6 @@ public:
         .WillRepeatedly(Return(upstream_address_v6_));
   }
 
-  const Network::Address::InstanceConstSharedPtr listener_address_v6_;
   const Network::Address::InstanceConstSharedPtr upstream_address_v6_;
   inline static const std::string listener_ipv6_address_ = "[::1]:2000";
   inline static const std::string upstream_ipv6_address_ = "[2001:db8:85a3::8a2e:370:7334]:443";

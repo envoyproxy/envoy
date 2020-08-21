@@ -195,7 +195,6 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
     RELEASE_ASSERT(ok, "Should never occur!");
     ENVOY_LOG(debug, "The original src is enabled for address {}.",
               addresses_.peer_->asStringView());
-    socket_->addOptions(socket_options);
   }
 
   // TODO(mattklein123): Enable dropped packets socket option. In general the Socket abstraction
