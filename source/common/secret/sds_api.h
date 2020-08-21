@@ -49,6 +49,10 @@ public:
 
   SecretData secretData();
 
+  void registerInitTarget(Init::Manager& init_manager) {
+    init_manager.add(init_target_);
+  }
+
 protected:
   // Creates new secrets.
   virtual void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret&) PURE;
@@ -111,24 +115,24 @@ public:
     // We need to do this early as we invoke the subscription factory during initialization, which
     // is too late to throw.
     Config::Utility::checkLocalInfo("TlsCertificateSdsApi", secret_provider_context.localInfo());
-    return std::make_shared<TlsCertificateSdsApi>(
+    auto ret = std::make_shared<TlsCertificateSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        secret_provider_context.initManager(), destructor_cb, secret_provider_context.dispatcher(),
+        destructor_cb, secret_provider_context.dispatcher(),
         secret_provider_context.api());
+    ret->registerInitTarget(secret_provider_context.initManager());
+    return ret;
   }
 
   TlsCertificateSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                        const std::string& sds_config_name,
                        Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
-                       Init::Manager& init_manager, std::function<void()> destructor_cb,
+                       std::function<void()> destructor_cb,
                        Event::Dispatcher& dispatcher, Api::Api& api)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, std::move(destructor_cb), dispatcher, api) {
-    init_manager.add(init_target_);
-  }
+               stats, std::move(destructor_cb), dispatcher, api) {}
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::TlsCertificate* secret() const override {
@@ -174,25 +178,25 @@ public:
     // is too late to throw.
     Config::Utility::checkLocalInfo("CertificateValidationContextSdsApi",
                                     secret_provider_context.localInfo());
-    return std::make_shared<CertificateValidationContextSdsApi>(
+    auto ret = std::make_shared<CertificateValidationContextSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        secret_provider_context.initManager(), destructor_cb, secret_provider_context.dispatcher(),
+        destructor_cb, secret_provider_context.dispatcher(),
         secret_provider_context.api());
+    ret->registerInitTarget(secret_provider_context.initManager());
+    return ret;
   }
   CertificateValidationContextSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                                      const std::string& sds_config_name,
                                      Config::SubscriptionFactory& subscription_factory,
                                      TimeSource& time_source,
                                      ProtobufMessage::ValidationVisitor& validation_visitor,
-                                     Stats::Store& stats, Init::Manager& init_manager,
+                                     Stats::Store& stats,
                                      std::function<void()> destructor_cb,
                                      Event::Dispatcher& dispatcher, Api::Api& api)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, std::move(destructor_cb), dispatcher, api) {
-    init_manager.add(init_target_);
-  }
+               stats, std::move(destructor_cb), dispatcher, api) {}
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext*
@@ -247,12 +251,14 @@ public:
     // is too late to throw.
     Config::Utility::checkLocalInfo("TlsSessionTicketKeysSdsApi",
                                     secret_provider_context.localInfo());
-    return std::make_shared<TlsSessionTicketKeysSdsApi>(
+    auto ret = std::make_shared<TlsSessionTicketKeysSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        secret_provider_context.initManager(), destructor_cb, secret_provider_context.dispatcher(),
+        destructor_cb, secret_provider_context.dispatcher(),
         secret_provider_context.api());
+    ret->registerInitTarget(secret_provider_context.initManager());
+    return ret;
   }
 
   TlsSessionTicketKeysSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
@@ -260,13 +266,11 @@ public:
                              Config::SubscriptionFactory& subscription_factory,
                              TimeSource& time_source,
                              ProtobufMessage::ValidationVisitor& validation_visitor,
-                             Stats::Store& stats, Init::Manager& init_manager,
+                             Stats::Store& stats,
                              std::function<void()> destructor_cb, Event::Dispatcher& dispatcher,
                              Api::Api& api)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, std::move(destructor_cb), dispatcher, api) {
-    init_manager.add(init_target_);
-  }
+               stats, std::move(destructor_cb), dispatcher, api) {}
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys*
@@ -320,24 +324,24 @@ public:
     // We need to do this early as we invoke the subscription factory during initialization, which
     // is too late to throw.
     Config::Utility::checkLocalInfo("GenericSecretSdsApi", secret_provider_context.localInfo());
-    return std::make_shared<GenericSecretSdsApi>(
+    auto ret = std::make_shared<GenericSecretSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        secret_provider_context.initManager(), destructor_cb, secret_provider_context.dispatcher(),
+        destructor_cb, secret_provider_context.dispatcher(),
         secret_provider_context.api());
+    ret->registerInitTarget(secret_provider_context.initManager());
+    return ret;
   }
 
   GenericSecretSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                       const std::string& sds_config_name,
                       Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
                       ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
-                      Init::Manager& init_manager, std::function<void()> destructor_cb,
+                      std::function<void()> destructor_cb,
                       Event::Dispatcher& dispatcher, Api::Api& api)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, std::move(destructor_cb), dispatcher, api) {
-    init_manager.add(init_target_);
-  }
+               stats, std::move(destructor_cb), dispatcher, api) {}
 
   // SecretProvider
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret* secret() const override {
