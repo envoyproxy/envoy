@@ -106,7 +106,7 @@ public:
   // Checks if the HeaderEntry contains a valid value in the Vary header.
   static bool isAllowed(const Http::ResponseHeaderMap& headers);
 
-  // Checks if the HeaderEntry doesn't contain a Vary header or if it's empty.
+  // Checks if the HeaderEntry contains a populated Vary header.
   static bool hasVary(const Http::ResponseHeaderMap& headers);
 
   // Creates a single string combining the values of the varied headers from entry_headers.
