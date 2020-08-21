@@ -309,7 +309,7 @@ public:
           return *header_status_;
         }));
     fakeOnData();
-    FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
+    RELEASE_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_), "");
   }
 
   void fakeOnData() {
