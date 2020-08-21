@@ -218,9 +218,9 @@ ContextConfigImpl::ContextConfigImpl(
 
   HandshakerFactoryContextImpl handshaker_factory_context(api_, alpnProtocols());
   Ssl::HandshakerFactory* handshaker_factory;
-  if (config.has_custom_listener_handshaker()) {
+  if (config.has_custom_handshaker()) {
     // If a custom handshaker is configured, derive the factory from the config.
-    const auto& handshaker_config = config.custom_listener_handshaker();
+    const auto& handshaker_config = config.custom_handshaker();
     handshaker_factory =
         &Config::Utility::getAndCheckFactory<Ssl::HandshakerFactory>(handshaker_config);
     handshaker_factory_cb_ = handshaker_factory->createHandshakerCb(

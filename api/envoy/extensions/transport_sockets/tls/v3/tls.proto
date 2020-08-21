@@ -241,5 +241,5 @@ message CommonTlsContext {
 
   // Custom TLS handshaker. If empty, defaults to native TLS handshaking
   // behavior.
-  config.core.v3.TypedExtensionConfig custom_listener_handshaker = 13;
+  config.core.v3.TypedExtensionConfig custom_handshaker = 13;
 }
