@@ -204,7 +204,7 @@ void FilterChainManagerImpl::addFilterChain(
       // If this filter chain include OnDemandConfiguration, we build a placeholder.
       // Otherwise, we build the filter chain directly.
       if (filter_chain->has_on_demand_configuration()) {
-        ENVOY_LOG(debug, "Filter chain will be built on-demand, first build a placeholder");
+        ENVOY_LOG(debug, "filter chain will be built on-demand, first build a placeholder");
         filter_chain_impl = std::make_shared<FilterChainImpl>(filter_chain);
       } else {
         filter_chain_impl =
@@ -253,7 +253,7 @@ void FilterChainManagerImpl::rebuildFilterChain(
     }
   }
 
-  // FilterChainManager maintains the lifetime of FilterChainFactoryContext
+  // PerFilterChainRebuilder maintains the lifetime of FilterChainFactoryContext
   // ListenerImpl maintains the dependencies of FilterChainFactoryContext
   auto filter_chain_impl =
       filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
@@ -269,6 +269,9 @@ void FilterChainManagerImpl::rebuildFilterChain(
 
 void FilterChainManagerImpl::stopRebuildingFilterChain(
     const envoy::config::listener::v3::FilterChain* const& filter_chain) {
+  if (filter_chain == nullptr) {
+    return;
+  }
   auto rebuilt_placeholder = fc_contexts_[*filter_chain];
   if (rebuilt_placeholder != nullptr) {
     rebuilt_placeholder->backToPlaceholder();

@@ -67,7 +67,6 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& facto
                                                  const std::string& listener_name, bool reuse_port)
     : factory_(factory), local_address_(address), socket_type_(socket_type), options_(options),
       bind_to_port_(bind_to_port), listener_name_(listener_name), reuse_port_(reuse_port) {
-  ENVOY_LOG(debug, "inside ::createListenSocketFactory");
 
   bool create_socket = false;
   if (local_address_->type() == Network::Address::Type::Ip) {
@@ -90,7 +89,6 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& facto
   }
 
   if (create_socket) {
-    ENVOY_LOG(debug, "create_socket");
     socket_ = createListenSocketAndApplyOptions();
   }
 
@@ -267,7 +265,7 @@ void PerFilterChainRebuilder::callbackToWorkers(bool success) {
     ENVOY_LOG(debug, "rebuilding completed, callback to worker: {}", worker_name);
     if (listener_.hasWorker(worker_name)) {
       auto& worker = listener_.getWorkerByName(worker_name);
-      worker->notifyListenersOnRebuilt(success, filter_chain_);
+      worker->onFilterChainRebuilt(success, filter_chain_);
     } else {
       ENVOY_LOG(debug, "worker with name: {} does not exists", worker_name);
     }
@@ -275,17 +273,16 @@ void PerFilterChainRebuilder::callbackToWorkers(bool success) {
   workers_to_callback_.clear();
 }
 void PerFilterChainRebuilder::startRebuilding() {
-  startTimer();
-  rebuild_init_manager_->initialize(rebuild_watcher_);
-}
-
-void PerFilterChainRebuilder::startTimer() {
   // If rebuild_timeout_ = 0, timeout is disabled.
   if (rebuild_timeout_.count() > 0) {
     timeout_enabled_ = true;
-    rebuild_timer_->enableTimer(rebuild_timeout_);
+    startTimer();
   }
+
+  rebuild_init_manager_->initialize(rebuild_watcher_);
 }
+
+void PerFilterChainRebuilder::startTimer() { rebuild_timer_->enableTimer(rebuild_timeout_); }
 
 void PerFilterChainRebuilder::onTimeout() {
   if (state_ != State::Running) {
@@ -572,6 +569,7 @@ void ListenerImpl::rebuildFilterChain(
   ENVOY_LOG(debug, "receive rebuilding request from worker: {}", worker_name);
   if (filter_chain_message == nullptr) {
     ENVOY_LOG(debug, "filter chain message is empty");
+    return;
   }
 
   // Start only when there is no existing rebuilding.
@@ -587,16 +585,16 @@ void ListenerImpl::rebuildFilterChain(
     should_start_rebuilding = true;
   }
 
-  // Two cases for duplicate requests:
-  // 1. Receive requests before rebuilding completed, worker name exists in the list. Do nothing.
-  // 2. Receive requests after rebuilding completed, will happen only when the previous rebuilding
-  // failed.
+  // Two cases for multiple requests:
+  // 1. Receive new requests while rebuilding is running, store worker name in the callback list.
+  // 2. Receive new requests after rebuilding is complete, will happen only when the previous
+  // rebuilding failed.
   if (filter_chain_rebuilder_map_[filter_chain_message]->rebuildingFailed()) {
     should_retry_rebuilding = true;
   }
 
   if (should_retry_rebuilding) {
-    // The previous rebuilding has failed. Should create a new rebuilder and start rebuilding again.
+    // Previous rebuilding has failed. Should create a new rebuilder and start rebuilding again.
     ENVOY_LOG(debug, "previous rebuilding for this filter chain has failed. Should create a new "
                      "rebuilder to retry rebuilding");
     filter_chain_rebuilder_map_.erase(filter_chain_message);
@@ -620,7 +618,6 @@ void ListenerImpl::rebuildFilterChain(
     ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
     // Rebuilder acts as the context creator.
     filter_chain_manager_.rebuildFilterChain(filter_chain_message, builder, *rebuilder);
-    // Start initializing after passing init manager to transport factory context.
     ENVOY_LOG(debug, "start rebuilding filter chain");
     rebuilder->startRebuilding();
   }
@@ -632,6 +629,7 @@ void ListenerImpl::stopRebuildingFilterChain(
 }
 
 bool ListenerImpl::hasWorker(const std::string& name) { return parent_.hasWorker(name); }
+
 WorkerPtr& ListenerImpl::getWorkerByName(const std::string& name) {
   return parent_.getWorkerByName(name);
 }

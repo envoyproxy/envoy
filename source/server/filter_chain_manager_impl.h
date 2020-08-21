@@ -135,7 +135,7 @@ public:
 
     is_placeholder_ = true;
     has_rebuilt_filter_chain_ = false;
-    // rebuilt_filter_chain_.reset();
+    rebuilt_filter_chain_.reset();
     rebuilt_filter_chain_ = nullptr;
   }
 

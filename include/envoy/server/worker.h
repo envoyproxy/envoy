@@ -94,8 +94,9 @@ public:
    * and ready. Retry all connections that requiring this filter chain.
    * @param filter_chain filter chain protobuf message.
    */
-  virtual void notifyListenersOnRebuilt(
-      bool success, const envoy::config::listener::v3::FilterChain* const& filter_chain) PURE;
+  virtual void
+  onFilterChainRebuilt(bool success,
+                       const envoy::config::listener::v3::FilterChain* const& filter_chain) PURE;
 };
 
 using WorkerPtr = std::unique_ptr<Worker>;

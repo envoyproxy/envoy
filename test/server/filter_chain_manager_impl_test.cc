@@ -177,7 +177,6 @@ TEST_F(FilterChainManagerImplTest, RebuildOnDemandFilterChain) {
   EXPECT_TRUE(on_demand_filter_chain->isPlaceholder());
 
   auto filter_chain_impl = std::make_shared<FilterChainImpl>(&on_demand_filter_chain_template_);
-  // EXPECT_CALL(rebuilder_filter_chain_factory_builder_, buildFilterChain(_, _)).Times(1);
   EXPECT_CALL(rebuilder_filter_chain_factory_builder_, buildFilterChain(_, _))
       .WillOnce(Return(filter_chain_impl));
 

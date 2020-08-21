@@ -54,7 +54,7 @@ public:
   void initializeStats(Stats::Scope& scope) override;
   void stop() override;
   void stopListener(Network::ListenerConfig& listener, std::function<void()> completion) override;
-  void notifyListenersOnRebuilt(
+  void onFilterChainRebuilt(
       bool success, const envoy::config::listener::v3::FilterChain* const& filter_chain) override;
 
 private:
