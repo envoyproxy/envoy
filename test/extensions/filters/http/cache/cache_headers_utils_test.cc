@@ -377,7 +377,8 @@ TEST(ParseHeaderValue, Empty) {
   std::vector<std::string> result =
       VaryHeader::parseHeaderValue(headers.get(Http::Headers::get().Vary));
 
-  EXPECT_EQ(result.size(), 0);
+  EXPECT_EQ(result.size(), 1);
+  EXPECT_EQ(result[0], "");
 }
 
 TEST(ParseHeaderValue, SingleValue) {
@@ -408,22 +409,6 @@ TEST_P(ParseHeaderValueMultipleTest, MultipleValuesMixedSpaces) {
   EXPECT_EQ(result.size(), 2);
   EXPECT_EQ(result[0], "accept-encoding");
   EXPECT_EQ(result[1], "accept-language");
-}
-
-class ParseHeaderValueInvalid : public testing::Test,
-                                public testing::WithParamInterface<std::string> {
-protected:
-  Http::TestResponseHeaderMapImpl headers{{"vary", GetParam()}};
-};
-
-INSTANTIATE_TEST_SUITE_P(InvalidValues, ParseHeaderValueInvalid,
-                         testing::Values("*", "accept encoding", "accept,,encoding",
-                                         ",accept-encoding", "accept-encoding,"));
-
-TEST_P(ParseHeaderValueInvalid, InvalidValues) {
-  std::vector<std::string> result =
-      VaryHeader::parseHeaderValue(headers.get(Http::Headers::get().Vary));
-  EXPECT_TRUE(result.empty());
 }
 
 TEST(VaryIsAllowed, Null) {
@@ -484,7 +469,7 @@ TEST(CreateVaryKey, EmptyVaryEntry) {
 
   ASSERT_EQ(VaryHeader::createVaryKey(headers.get(Http::Headers::get().Vary),
                                       createHeaderVector(request_headers)),
-            "vary-key:\n");
+            "vary-key:;\n\n");
 }
 
 TEST(CreateVaryKey, SingleHeaderExists) {

@@ -171,6 +171,8 @@ absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::str
 absl::flat_hash_set<std::string> VaryHeader::parseAllowlist() {
   // TODO(cbdm): Populate the hash_set from
   // envoy::extensions::filters::http::cache::v3alpha::CacheConfig::allowed_vary_headers.
+  // Need to make sure that the headers we add here are valid values (i.e., not malformed). That
+  // way, we won't have to check this again in isAllowed.
   return {"accept-encoding"};
 }
 
@@ -181,11 +183,8 @@ bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) {
 
   std::vector<std::string> varied_headers =
       parseHeaderValue(headers.get(Http::Headers::get().Vary));
-  if (varied_headers.empty()) {
-    // Value was malformed.
-    return false;
-  }
 
+  // If the vary value was malformed, it will not be contained in allowed_headers_.
   for (const std::string& header : varied_headers) {
     if (!allowed_headers_.contains(header)) {
       return false;
@@ -198,10 +197,6 @@ bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) {
 bool VaryHeader::noVary(const Http::ResponseHeaderMap& headers) {
   const Http::HeaderEntry* vary_header = headers.get(Http::Headers::get().Vary);
   return ((!vary_header) || (vary_header->value().empty()));
-}
-
-bool VaryHeader::noVary(const Http::ResponseHeaderMapPtr& headers) {
-  return ((!headers) || (noVary(*headers)));
 }
 
 std::string VaryHeader::createVaryKey(const Http::HeaderEntry* vary_header,
@@ -249,35 +244,9 @@ std::vector<std::string> VaryHeader::parseHeaderValue(const Http::HeaderEntry* v
   for (std::string& value : header_values) {
     absl::StripAsciiWhitespace(&value);
     absl::AsciiStrToLower(&value);
-
-    // "Vary: *" should always be ignored per:
-    // https://tools.ietf.org/html/rfc7234#section-4.1
-    if (!isValidHeaderName(value) || value == "*") {
-      return {};
-    }
   }
 
   return header_values;
-}
-
-bool VaryHeader::isValidHeaderName(const std::string value) {
-  // Header name rules per:
-  // https://tools.ietf.org/html/rfc7230#section-3.2
-
-  if (value.empty()) {
-    return false;
-  }
-
-  static const absl::flat_hash_set<char> separators = {'(', ')',  '<',  '>', '@', ',', ';',
-                                                       ':', '\\', '\"', '/', '[', ']', '?',
-                                                       '=', '{',  '}',  ' ', '\t'};
-
-  for (const char& c : value) {
-    if (31 > c || c > 126 || separators.contains(c)) {
-      return false;
-    }
-  }
-  return true;
 }
 
 std::vector<const Http::HeaderEntry*>

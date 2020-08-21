@@ -108,7 +108,6 @@ public:
 
   // Checks if the HeaderEntry doesn't contain a Vary header or if it's empty.
   static bool noVary(const Http::ResponseHeaderMap& headers);
-  static bool noVary(const Http::ResponseHeaderMapPtr& headers);
 
   // Creates a single string combining the values of the varied headers from entry_headers.
   static std::string createVaryKey(const Http::HeaderEntry* vary_header,

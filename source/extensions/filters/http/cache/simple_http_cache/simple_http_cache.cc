@@ -80,7 +80,7 @@ public:
 private:
   void commit() {
     committed_ = true;
-    if (VaryHeader::noVary(response_headers_)) {
+    if (VaryHeader::noVary(*response_headers_)) {
       cache_.insert(key_, std::move(response_headers_), body_.toString());
     } else {
       cache_.varyInsert(key_, std::move(response_headers_), body_.toString(), entry_vary_headers_);
@@ -114,7 +114,7 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
   }
   ASSERT(iter->second.response_headers_);
 
-  if (VaryHeader::noVary(iter->second.response_headers_)) {
+  if (VaryHeader::noVary(*iter->second.response_headers_)) {
     return SimpleHttpCache::Entry{
         Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*iter->second.response_headers_),
         iter->second.body_};
