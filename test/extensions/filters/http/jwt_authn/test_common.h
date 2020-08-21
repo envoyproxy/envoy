@@ -188,6 +188,36 @@ const char ExpectedPayloadJSON[] = R"(
 }
 )";
 
+// Token copied from https://github.com/google/jwt_verify_lib/blob/master/src/verify_jwk_ec_test.cc
+// Use jwt.io to modify payload as:
+// {
+//  "iss11": "628645741881-noabiu23f5a8m8ovd8ucv698lj78vv0l@developer.gserviceaccount.com",
+//  "sub": "628645741881-noabiu23f5a8m8ovd8ucv698lj78vv0l@developer.gserviceaccount.com",
+//  "aud": "example_service"
+// }
+const char ES256WithoutIssToken[] =
+    "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImFiYyJ9."
+    "eyJpc3MxMSI6IjYyODY0NTc0MTg4MS1ub2FiaXUyM2Y1YThtOG92ZDh1Y3Y2OThsajc4dnYwbEBkZXZlbG9wZXIuZ3Nlcn"
+    "ZpY2VhY2NvdW50LmNvbSIsInN1YiI6IjYyODY0NTc0MTg4MS1ub2FiaXUyM2Y1YThtOG92ZDh1Y3Y2OThsajc4dnYwbEBk"
+    "ZXZlbG9wZXIuZ3NlcnZpY2VhY2NvdW50LmNvbSIsImF1ZCI6ImV4YW1wbGVfc2VydmljZSJ9.f-_"
+    "NAdznQK9o93AZTqNawu1yal1igNLgYvuj0JzW9SVmJJQuBT_12wJi9XQzZLFwSFn6D3f7bPWSZQlScTFSMg";
+
+// Public key for above ES256 tokens.
+const char ES256PublicKey[] = R"(
+{
+  "keys": [
+    {
+      "kty": "EC",
+      "crv": "P-256",
+      "alg": "ES256",
+      "kid": "abc",
+      "x": "EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k",
+      "y": "92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8"
+    }
+  ]
+}
+)";
+
 // Config with requires_all requirement
 const char RequiresAllConfig[] = R"(
 providers:

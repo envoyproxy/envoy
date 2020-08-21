@@ -40,6 +40,7 @@ Bug Fixes
 * fault: made the HeaderNameValues::prefix() method const.
 * grpc-web: fixed an issue with failing HTTP/2 requests on some browsers. Notably, WebKit-based browsers (https://bugs.webkit.org/show_bug.cgi?id=210108), Internet Explorer 11, and Edge (pre-Chromium).
 * http: made the HeaderValues::prefix() method const.
+* jwt_authn: supports jwt payload without "iss" field.
 * rocketmq_proxy network-level filter: fixed an issue involving incorrect header lengths. In debug mode it causes crash and in release mode it causes underflow.
 
 Removed Config or Runtime
