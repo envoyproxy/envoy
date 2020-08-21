@@ -4,8 +4,6 @@ TESTFILTER="${1:-*}"
 FAILED=()
 SRCDIR="${SRCDIR:-$(pwd)}"
 EXCLUDED_BUILD_CONFIGS=${EXCLUDED_BUILD_CONFIGS:-"^./jaeger-native-tracing|docker-compose"}
-ENVOY_DOCKER_IMAGE_DIRECTORY="${ENVOY_DOCKER_IMAGE_DIRECTORY:-${BUILD_STAGINGDIRECTORY:-.}/build_images}"
-ENVOY_DOCKER_TAR="${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy-docker-images.tar.xz"
 
 
 trap_errors () {
@@ -57,9 +55,6 @@ verify_build_configs () {
 }
 
 verify_build_configs
-
-env
-
 run_examples
 
 
