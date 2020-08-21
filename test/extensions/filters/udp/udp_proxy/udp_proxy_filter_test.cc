@@ -179,21 +179,18 @@ public:
 
   ~UdpProxyFilterTest() override { EXPECT_CALL(callbacks_.udp_listener_, onDestroy()); }
 
-  void setup(const std::string& yaml, bool has_cluster = true, bool may_occur_exception = false) {
+  void setup(const std::string& yaml, bool has_cluster = true) {
     envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig config;
     TestUtility::loadFromYamlAndValidate(yaml, config);
     config_ = std::make_shared<UdpProxyFilterConfig>(cluster_manager_, time_system_, stats_store_,
                                                      config);
-
-    if (!may_occur_exception) {
-      EXPECT_CALL(cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
-          .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),
-                          ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
-      if (has_cluster) {
-        EXPECT_CALL(cluster_manager_, get(_));
-      } else {
-        EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(nullptr));
-      }
+    EXPECT_CALL(cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
+      .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),
+                      ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
+    if (has_cluster) {
+      EXPECT_CALL(cluster_manager_, get(_));
+    } else {
+      EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(nullptr));
     }
     filter_ = std::make_unique<TestUdpProxyFilter>(callbacks_, config_);
   }
@@ -725,7 +722,7 @@ use_original_src_ip: true
 
   EXPECT_CALL(os_sys_calls_, supportsIpTransparent()).WillOnce(Return(false));
   EXPECT_THROW_WITH_REGEX(
-      setup(config, true), EnvoyException,
+      setup(config), EnvoyException,
       "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy is "
       "not running with the CAP_NET_ADMIN capability.");
 }

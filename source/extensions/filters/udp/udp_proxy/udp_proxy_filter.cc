@@ -180,7 +180,7 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
     const bool ok = Network::Socket::applyOptions(
         socket_options, *socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND);
 
-    RELEASE_ASSERT(ok, "Should not be never occurred!!");
+    RELEASE_ASSERT(ok, "Should never occur!");
     ENVOY_LOG(debug, "The original src is enabled for address {}.",
               addresses_.peer_->asStringView());
     socket_->addOptions(socket_options);
