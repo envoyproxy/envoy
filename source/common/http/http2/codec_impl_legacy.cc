@@ -222,9 +222,14 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   if (pending_send_data_.length() > 0) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.
+    // However, for empty trailers, we don't need to to save the trailers.
     ASSERT(!pending_trailers_to_encode_);
-    pending_trailers_to_encode_ = cloneTrailers(trailers);
-    createPendingFlushTimer();
+    const bool skip_encoding_empty_trailers =
+        trailers.empty() && parent_.skip_encoding_empty_trailers_;
+    if (!skip_encoding_empty_trailers) {
+      pending_trailers_to_encode_ = cloneTrailers(trailers);
+      createPendingFlushTimer();
+    }
   } else {
     submitTrailers(trailers);
     parent_.sendPendingFrames();
