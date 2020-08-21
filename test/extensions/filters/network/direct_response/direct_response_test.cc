@@ -19,6 +19,7 @@ namespace DirectResponse {
 class DirectResponseFilterTest : public testing::Test {
 public:
   void initialize(const std::string& response) {
+    EXPECT_CALL(read_filter_callbacks_.connection_, enableHalfClose(true));
     filter_ = std::make_shared<DirectResponseFilter>(response);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
   }
