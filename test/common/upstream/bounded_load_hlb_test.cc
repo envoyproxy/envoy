@@ -14,7 +14,7 @@ namespace {
 class TestHashingLoadBalancer : public ThreadAwareLoadBalancerBase::HashingLoadBalancer {
 public:
   TestHashingLoadBalancer(NormalizedHostWeightVector ring) : ring_(std::move(ring)) {}
-  TestHashingLoadBalancer() {}
+  TestHashingLoadBalancer() = default;
   HostConstSharedPtr chooseHost(uint64_t hash, uint32_t /* attempt */) const override {
     if (ring_.empty()) {
       return nullptr;
