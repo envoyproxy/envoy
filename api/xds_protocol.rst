@@ -453,7 +453,7 @@ Duplicate Resource Names
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 It is an error for a server to send a single response that contains the same resource name
-twice.  Clients should NACK responses that contain multiple instances of the same resource name.
+twice. Clients should NACK responses that contain multiple instances of the same resource name.
 
 Deleting Resources
 ^^^^^^^^^^^^^^^^^^
