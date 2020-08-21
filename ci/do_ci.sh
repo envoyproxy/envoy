@@ -16,7 +16,17 @@ SRCDIR="${PWD}"
 . "$(dirname "$0")"/build_setup.sh $build_setup_args
 cd "${SRCDIR}"
 
+if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+  BUILD_ARCH_DIR="/linux/amd64"
+elif [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]]; then
+  BUILD_ARCH_DIR="/linux/arm64"
+else
+  # Fall back to use the ENVOY_BUILD_ARCH itself.
+  BUILD_ARCH_DIR="/linux/${ENVOY_BUILD_ARCH}"
+fi
+
 echo "building using ${NUM_CPUS} CPUs"
+echo "building for ${ENVOY_BUILD_ARCH}"
 
 function collect_build_profile() {
   declare -g build_profile_count=${build_profile_count:-1}
@@ -50,20 +60,33 @@ function cp_binary_for_outside_access() {
     "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}"
 }
 
+function cp_debug_info_for_outside_access() {
+  DELIVERY_LOCATION="$1"
+  cp -f \
+    bazel-bin/"${ENVOY_BIN}".dwp \
+    "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}".dwp
+}
+
+
 function cp_binary_for_image_build() {
   # TODO(mattklein123): Replace this with caching and a different job which creates images.
+  local BASE_TARGET_DIR="${ENVOY_SRCDIR}${BUILD_ARCH_DIR}"
   echo "Copying binary for image build..."
-  mkdir -p "${ENVOY_SRCDIR}"/build_"$1"
-  cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_"$1"
-  mkdir -p "${ENVOY_SRCDIR}"/build_"$1"_stripped
-  strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_"$1"_stripped/envoy
+  COMPILE_TYPE="$2"
+  mkdir -p "${BASE_TARGET_DIR}"/build_"$1"
+  cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${BASE_TARGET_DIR}"/build_"$1"
+  if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
+    cp -f "${ENVOY_DELIVERY_DIR}"/envoy.dwp "${BASE_TARGET_DIR}"/build_"$1"
+  fi
+  mkdir -p "${BASE_TARGET_DIR}"/build_"$1"_stripped
+  strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/build_"$1"_stripped/envoy
 
   # Copy for azp which doesn't preserve permissions, creating a tar archive
-  tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${ENVOY_SRCDIR}" build_"$1" build_"$1"_stripped
+  tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${BASE_TARGET_DIR}" build_"$1" build_"$1"_stripped
 
   # Remove binaries to save space, only if BUILD_REASON exists (running in AZP)
   [[ -z "${BUILD_REASON}" ]] || \
-    rm -rf "${ENVOY_SRCDIR}"/build_"$1" "${ENVOY_SRCDIR}"/build_"$1"_stripped "${ENVOY_DELIVERY_DIR}"/envoy \
+    rm -rf "${BASE_TARGET_DIR}"/build_"$1" "${BASE_TARGET_DIR}"/build_"$1"_stripped "${ENVOY_DELIVERY_DIR}"/envoy \
       bazel-bin/"${ENVOY_BIN}"
 }
 
@@ -95,7 +118,16 @@ function bazel_binary_build() {
   # container.
   cp_binary_for_outside_access envoy
 
-  cp_binary_for_image_build "${BINARY_TYPE}"
+  if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
+    # Generate dwp file for debugging since we used split DWARF to reduce binary
+    # size
+    bazel build ${BAZEL_BUILD_OPTIONS} -c "${COMPILE_TYPE}" "${ENVOY_BUILD_DEBUG_INFORMATION}" ${CONFIG_ARGS}
+    # Copy the debug information
+    cp_debug_info_for_outside_access envoy
+  fi
+
+  cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}"
+
 }
 
 CI_TARGET=$1
@@ -117,7 +149,7 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   # toolchain is kept consistent. This ifdef is checked in
   # test/common/stats/stat_test_utility.cc when computing
   # Stats::TestUtil::MemoryTest::mode().
-  [[ "$(uname -m)" == "x86_64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_MEMORY_TEST_EXACT=true"
+  [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_MEMORY_TEST_EXACT=true"
 
   setup_clang_toolchain
   echo "Testing ${TEST_TARGETS}"

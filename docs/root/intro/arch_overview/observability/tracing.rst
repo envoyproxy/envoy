@@ -113,3 +113,17 @@ request ID :ref:`config_http_conn_man_headers_x-request-id` (LightStep) or
 the trace ID configuration (Zipkin and Datadog). See
 :ref:`v3 API reference <envoy_v3_api_msg_config.trace.v3.Tracing>`
 for more information on how to setup tracing in Envoy.
+
+Baggage
+-----------------------------
+Baggage provides a mechanism for data to be available throughout the entirety of a trace.
+While metadata such as tags are usually communicated to collectors out-of-band, baggage data is injected into the actual
+request context and available to applications during the duration of the request. This enables metadata to transparently
+travel from the beginning of the request throughout your entire mesh without relying on application-specific modifications for
+propagation. See `OpenTracing's documentation <https://opentracing.io/docs/overview/tags-logs-baggage/>`_ for more information about baggage.
+
+Tracing providers have varying level of support for getting and setting baggage:
+
+* Lightstep (and any OpenTracing-compliant tracer) can read/write baggage
+* Zipkin support is not yet implemented
+* X-Ray and OpenCensus don't support baggage

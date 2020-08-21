@@ -17,7 +17,8 @@ def _get_azp_checks():
     check_ids = []
     checks = []
     for check in github_checks:
-        if check["app"]["slug"] == "azure-pipelines" and check["external_id"] not in check_ids:
+        # Filter out job level GitHub check, which is not individually retriable.
+        if check["app"]["slug"] == "azure-pipelines" and "jobId" not in check["details_url"] and check["external_id"] not in check_ids:
             check_ids.append(check["external_id"])
             checks.append(check)
 
