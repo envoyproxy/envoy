@@ -1450,7 +1450,8 @@ Status ServerConnectionImpl::checkInboundFrameLimits(int32_t stream_id) {
     return bufferFloodError("Too many consecutive frames with an empty payload");
   }
 
-  if (inbound_priority_frames_ > max_inbound_priority_frames_per_stream_ * (1 + inbound_streams_)) {
+  if (inbound_priority_frames_ >
+      static_cast<uint64_t>(max_inbound_priority_frames_per_stream_) * (1 + inbound_streams_)) {
     ENVOY_CONN_LOG(trace,
                    "error reading frame: Too many PRIORITY frames received in this HTTP/2 session.",
                    connection_);

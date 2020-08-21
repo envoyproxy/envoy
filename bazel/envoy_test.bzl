@@ -247,10 +247,12 @@ def envoy_cc_test_binary(
 def envoy_cc_benchmark_binary(
         name,
         deps = [],
+        repository = "",
         **kargs):
     envoy_cc_test_binary(
         name,
-        deps = deps + ["//test/benchmark:main"],
+        deps = deps + [repository + "//test/benchmark:main"],
+        repository = repository,
         **kargs
     )
 

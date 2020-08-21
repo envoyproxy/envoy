@@ -211,10 +211,8 @@ public:
     new_session.idle_timer_ = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
     EXPECT_CALL(*filter_, createSocket(_))
         .WillOnce(Return(ByMove(Network::SocketPtr{test_sessions_.back().socket_})));
-    EXPECT_CALL(*new_session.socket_->io_handle_, fd());
-    EXPECT_CALL(
-        callbacks_.udp_listener_.dispatcher_,
-        createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+    EXPECT_CALL(new_session.socket_->mockIoHandle(), createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                                          Event::FileReadyType::Read))
         .WillOnce(DoAll(SaveArg<1>(&new_session.file_event_cb_), Return(nullptr)));
     // Internal Buffer is Empty, flush will be a no-op
     ON_CALL(callbacks_.udp_listener_, flush())

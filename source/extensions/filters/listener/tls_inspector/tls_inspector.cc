@@ -92,8 +92,8 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
     return Network::FilterStatus::Continue;
   case ParseState::Continue:
     // do nothing but create the event
-    file_event_ = cb.dispatcher().createFileEvent(
-        socket.ioHandle().fd(),
+    file_event_ = socket.ioHandle().createFileEvent(
+        cb.dispatcher(),
         [this](uint32_t events) {
           if (events & Event::FileReadyType::Closed) {
             config_->stats().connection_closed_.inc();
