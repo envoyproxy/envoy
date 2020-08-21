@@ -31,8 +31,8 @@ namespace Network {
 UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
                                  UdpListenerCallbacks& cb, TimeSource& time_source)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source) {
-  file_event_ = dispatcher_.createFileEvent(
-      socket_->ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); },
+  file_event_ = socket_->ioHandle().createFileEvent(
+      dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   ASSERT(file_event_);
