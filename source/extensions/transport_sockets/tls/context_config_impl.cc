@@ -233,7 +233,7 @@ ContextConfigImpl::ContextConfigImpl(
         *handshaker_factory->createEmptyConfigProto(), handshaker_factory_context,
         factory_context.messageValidationVisitor());
   }
-  require_certificates_ = handshaker_factory->requireCertificates();
+  requirements_ = handshaker_factory->requirements();
 }
 
 Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(
@@ -427,10 +427,10 @@ ServerContextConfigImpl::ServerContextConfigImpl(
     }
   }
 
-  if (requireCertificates()) {
+  if (requirements().require_certificates) {
     if ((config.common_tls_context().tls_certificates().size() +
          config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0) {
-        throw EnvoyException("No TLS certificates found for server context");
+      throw EnvoyException("No TLS certificates found for server context");
     } else if (!config.common_tls_context().tls_certificates().empty() &&
                !config.common_tls_context().tls_certificate_sds_secret_configs().empty()) {
       throw EnvoyException("SDS and non-SDS TLS certificates may not be mixed in server contexts");

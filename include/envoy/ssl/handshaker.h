@@ -65,6 +65,42 @@ public:
   virtual absl::string_view alpnProtocols() const PURE;
 };
 
+struct HandshakerRequirements {
+  // Should be true if a handshaker requires certificates in the config.
+  bool require_certificates = true;
+
+  // Should be true if a handshaker requires that Envoy sets the session
+  // resumption callback described by SSL_CTX_set_select_certificate_cb.
+  bool should_set_select_certificate_cb = true;
+
+  // Should be true if a handshaker requires that Envoy sets the ALPN selection
+  // callback described by SSL_CTX_set_alpn_select_cb.
+  bool should_set_alpn_select_cb = true;
+
+  // Should be true if a handshaker requires that Envoy sets the TLS extension
+  // ticket key callback described by SSL_CTX_set_tlsext_ticket_key_cb.
+  bool should_set_tlsext_ticket_key_cb = true;
+
+  // Should be true if a handshaker requires that Envoy sets the SSL timeout as
+  // described by SSL_CTX_set_timeout.
+  bool should_set_timeout = true;
+
+  // Should be true if a handshaker requires that Envoy set the list of ciphers,
+  // as described by SSL_CTX_set_strict_cipher_list.
+  bool should_set_strict_cipher_list = true;
+
+  // Should be true if a handshaker requires that Envoy set the list of curves,
+  // as described by SSL_CTX_set1_curves_list.
+  bool should_set1_curves_list = true;
+
+  // Should be true if a handshaker requires that Envoy verify certificates.
+  bool should_verify_certificates = true;
+
+  // Should return true if this handshaker is FIPS-compliant.
+  // Envoy will fail to compile if this returns true and `--define=boringssl=fips`.
+  bool is_fips_compliant = true;
+};
+
 class HandshakerFactory : public Config::TypedFactory {
 public:
   /**
@@ -80,10 +116,10 @@ public:
   std::string category() const override { return "envoy.tls_handshakers"; }
 
   /**
-   * Implementations should return true if the tls context accompanying this
-   * handshaker expects certificates.
+   * Implementations should return a struct with their requirements; see
+   * HandshakerRequirements above.
    */
-  virtual bool requireCertificates() const PURE;
+  virtual HandshakerRequirements requirements() const PURE;
 };
 
 } // namespace Ssl

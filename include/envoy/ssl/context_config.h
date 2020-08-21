@@ -81,10 +81,9 @@ public:
   virtual HandshakerFactoryCb createHandshaker() const PURE;
 
   /**
-   * @return whether or not this context requires certificates for TLS
-   * handshakes.
+   * @return the set of requirements for handshakers created by this context.
    */
-  virtual bool requireCertificates() const PURE;
+  virtual HandshakerRequirements requirements() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {

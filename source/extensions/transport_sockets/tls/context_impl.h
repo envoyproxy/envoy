@@ -209,7 +209,7 @@ protected:
   const Stats::StatName ssl_versions_;
   const Stats::StatName ssl_curves_;
   const Stats::StatName ssl_sigalgs_;
-  const bool require_certificates_;
+  const Ssl::HandshakerRequirements requirements_;
 };
 
 using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;

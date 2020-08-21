@@ -131,9 +131,9 @@ public:
     };
   }
 
-  bool requireCertificates() const override {
-    // The default handshaker impl does require certificates.
-    return true;
+  Ssl::HandshakerRequirements requirements() const override {
+    // The default handshaker impl requires Envoy to handle all enumerated behaviors.
+    return Ssl::HandshakerRequirements{};
   }
 
   static HandshakerFactory* getDefaultHandshakerFactory() {
