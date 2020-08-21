@@ -229,7 +229,7 @@ public:
   void storeWorkerInCallbackList(const std::string& worker_name);
   void callbackToWorkers(bool success);
   bool rebuildingFailed() { return state_ == State::Failed; }
-  bool timeoutEnabled() { return timeout_enabled; }
+  bool timeoutEnabled() { return timeout_enabled_; }
   Init::Manager& initManager() { return *rebuild_init_manager_; }
   void startRebuilding();
 
@@ -260,7 +260,7 @@ private:
   std::unique_ptr<Init::Manager> rebuild_init_manager_;
   Init::WatcherImpl rebuild_watcher_;
 
-  bool timeout_enabled{false};
+  bool timeout_enabled_{false};
   Event::TimerPtr rebuild_timer_;
   const std::chrono::milliseconds rebuild_timeout_;
 

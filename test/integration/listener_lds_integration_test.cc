@@ -179,7 +179,7 @@ protected:
                          const std::string& version) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
-    response.set_type_url("type.googleapis.com/envoy.api.v3.Listener");
+    response.set_type_url("type.googleapis.com/envoy.config.listener.v3.Listener");
     for (const auto& listener_blob : listener_configs) {
       const auto listener_config =
           TestUtility::parseYaml<envoy::config::listener::v3::Listener>(listener_blob);
@@ -192,7 +192,7 @@ protected:
   void sendRdsResponseV3(const std::string& route_config, const std::string& version) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
-    response.set_type_url("type.googleapis.com/envoy.api.v3.RouteConfiguration");
+    response.set_type_url("type.googleapis.com/envoy.config.route.v3.RouteConfiguration");
     const auto route_configuration =
         TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(route_config);
     response.add_resources()->PackFrom(route_configuration);
@@ -290,9 +290,9 @@ TEST_P(ListenerIntegrationTest, BasicSuccessWithOnDemandFilterChain) {
     // Make all filter chains of this listener to be built on-demand.
     // for (auto i = 0; i < listener_config_.filter_chains().size(); i++) {
     //   auto* filter_chain = listener_config_.mutable_filter_chains(i);
-    //   auto* on_demand_config = filter_chain->mutable_on_demand_configuration();
-    //   on_demand_config->mutable_rebuild_timeout()->CopyFrom(
-    //   Protobuf::util::TimeUtil::MillisecondsToDuration(30000));
+    //   auto* on_demand_configuration = filter_chain->mutable_on_demand_configuration();
+    //   on_demand_configuration->mutable_rebuild_timeout()->CopyFrom(
+    //   Protobuf::util::TimeUtil::MillisecondsToDuration(15000));
     // }
     sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
     createRdsStream(route_table_name_);

@@ -240,7 +240,7 @@ PerFilterChainRebuilder::PerFilterChainRebuilder(
               ENVOY_LOG(debug, "rebuild_watcher is ready, rebuilder will callback to workers");
               state_ = State::Succeeded;
               callbackToWorkers(true);
-              if (timeout_enabled) {
+              if (timeout_enabled_) {
                 rebuild_timer_->disableTimer();
               }
             }
@@ -256,7 +256,6 @@ void PerFilterChainRebuilder::storeWorkerInCallbackList(const std::string& worke
 Configuration::FilterChainFactoryContextPtr
 PerFilterChainRebuilder::createFilterChainFactoryContext(
     const ::envoy::config::listener::v3::FilterChain* const filter_chain) {
-  // TODO(lambdai): add stats
   UNREFERENCED_PARAMETER(filter_chain);
   return std::make_unique<PerFilterChainFactoryContextImpl>(parent_context_, initManager());
 }
@@ -283,7 +282,7 @@ void PerFilterChainRebuilder::startRebuilding() {
 void PerFilterChainRebuilder::startTimer() {
   // If rebuild_timeout_ = 0, timeout is disabled.
   if (rebuild_timeout_.count() > 0) {
-    timeout_enabled = true;
+    timeout_enabled_ = true;
     rebuild_timer_->enableTimer(rebuild_timeout_);
   }
 }
@@ -619,6 +618,7 @@ void ListenerImpl::rebuildFilterChain(
     // Use init manager of the rebuilder to request dependencies.
     transport_factory_context.setInitManager(rebuilder->initManager());
     ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
+    // Rebuilder acts as the context creator.
     filter_chain_manager_.rebuildFilterChain(filter_chain_message, builder, *rebuilder);
     // Start initializing after passing init manager to transport factory context.
     ENVOY_LOG(debug, "start rebuilding filter chain");
