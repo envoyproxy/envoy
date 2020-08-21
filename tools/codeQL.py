@@ -6,7 +6,7 @@ if __name__ == "__main__":
   search_folder = "//source/common/..."
 
   diff_file_whitelist = ['source', 'include']
-  os.system("git show > {}".format(TMP_OUTPUT))
+  os.system("git show --name-only > {}".format(TMP_OUTPUT))
   f = open(TMP_OUTPUT, 'r+')
   commits = ""
   for line in f:
@@ -14,7 +14,7 @@ if __name__ == "__main__":
     if line_list[0] == 'Merge:':
       commits= line_list[1] + '...' + line_list[2]
 
-  os.system("git diff {} > {}".format(commits, TMP_OUTPUT))
+  os.system("git diff --name-only {} > {}".format(commits, TMP_OUTPUT))
   print(commits)
   f = open(TMP_OUTPUT, 'r+')
   diff_file_list = []
