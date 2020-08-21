@@ -16,10 +16,13 @@ bring_up_example_stack () {
     local args path up_args
     args=("${UPARGS[@]}")
     path="$1"
-    read -ra up_args <<< "up --build -d ${args[*]}"
     if [[ -z "$DOCKER_NO_PULL" ]]; then
 	run_log "Pull the images ($path)"
-	docker-compose pull || return 1
+	read -ra up_args <<< "up --build -d ${args[*]}"
+    else
+	# this prevents docker pulling the load images in ci
+	docker-compose build || return 1
+	read -ra up_args <<< "up -d ${args[*]}"
     fi
     echo
     run_log "Bring up services ($path)"
