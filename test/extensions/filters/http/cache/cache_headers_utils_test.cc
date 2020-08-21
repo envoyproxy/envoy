@@ -349,19 +349,19 @@ TEST(ReadAndRemoveLeadingDigits, ComprehensiveTest) {
   testReadAndRemoveLeadingDigits("184467440737095516159yz", -1, "184467440737095516159yz");
 }
 
-TEST(NoVary, Null) {
+TEST(HasVary, Null) {
   Http::TestResponseHeaderMapImpl headers;
-  ASSERT_TRUE(VaryHeader::noVary(headers));
+  ASSERT_FALSE(VaryHeader::hasVary(headers));
 }
 
-TEST(NoVary, Empty) {
+TEST(HasVary, Empty) {
   Http::TestResponseHeaderMapImpl headers{{"vary", ""}};
-  ASSERT_TRUE(VaryHeader::noVary(headers));
+  ASSERT_FALSE(VaryHeader::hasVary(headers));
 }
 
-TEST(NoVary, NotEmpty) {
+TEST(HasVary, NotEmpty) {
   Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding"}};
-  ASSERT_FALSE(VaryHeader::noVary(headers));
+  ASSERT_TRUE(VaryHeader::hasVary(headers));
 }
 
 TEST(ParseHeaderValue, Null) {
@@ -449,9 +449,10 @@ TEST(VaryIsAllowed, MultipleNotAllowed) {
 
 std::vector<const Http::HeaderEntry*>
 createHeaderVector(const Http::TestRequestHeaderMapImpl& request_headers) {
-  std::vector<const Http::HeaderEntry*> header_vector;
+  // Allow these 3 headers to be varied on for the tests.
   static const absl::flat_hash_set<std::string> allowed_headers = {"accept-encoding",
                                                                    "accept-language", "width"};
+  std::vector<const Http::HeaderEntry*> header_vector;
 
   for (const std::string& header : allowed_headers) {
     const Http::HeaderEntry* cur_header = request_headers.get(Http::LowerCaseString(header));
@@ -526,6 +527,21 @@ TEST(CreateVaryKey, MultipleHeadersNoneExist) {
   ASSERT_EQ(VaryHeader::createVaryKey(headers.get(Http::Headers::get().Vary),
                                       createHeaderVector(request_headers)),
             "vary-key:accept-encoding;accept-language;width;\n\n\n\n");
+}
+
+TEST(CreateVaryKey, DifferentHeadersSameValue) {
+  // Two requests with the same value for different headers must have different vary-keys.
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding, accept-language"}};
+
+  Http::TestRequestHeaderMapImpl request_headers1{{"accept-encoding", "foo"}};
+  std::string vary_key1 = VaryHeader::createVaryKey(headers.get(Http::Headers::get().Vary),
+                                                    createHeaderVector(request_headers1));
+
+  Http::TestRequestHeaderMapImpl request_headers2{{"accept-language", "foo"}};
+  std::string vary_key2 = VaryHeader::createVaryKey(headers.get(Http::Headers::get().Vary),
+                                                    createHeaderVector(request_headers2));
+
+  ASSERT_NE(vary_key1, vary_key2);
 }
 
 TEST(PossibleVariedHeaders, Empty) {

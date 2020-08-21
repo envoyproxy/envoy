@@ -107,14 +107,13 @@ public:
   static bool isAllowed(const Http::ResponseHeaderMap& headers);
 
   // Checks if the HeaderEntry doesn't contain a Vary header or if it's empty.
-  static bool noVary(const Http::ResponseHeaderMap& headers);
+  static bool hasVary(const Http::ResponseHeaderMap& headers);
 
   // Creates a single string combining the values of the varied headers from entry_headers.
   static std::string createVaryKey(const Http::HeaderEntry* vary_header,
                                    const std::vector<const Http::HeaderEntry*>& entry_headers);
 
-  // Parses the header names that are in the Vary header value. If the header value is malformed,
-  // returns {}.
+  // Parses the header names that are in the Vary header value.
   static std::vector<std::string> parseHeaderValue(const Http::HeaderEntry* vary_header);
 
   // Returns a vector with the headers that can be varied from the request.

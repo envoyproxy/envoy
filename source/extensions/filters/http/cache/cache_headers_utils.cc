@@ -177,7 +177,7 @@ absl::flat_hash_set<std::string> VaryHeader::parseAllowlist() {
 }
 
 bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) {
-  if (noVary(headers)) {
+  if (!hasVary(headers)) {
     return true;
   }
 
@@ -194,9 +194,9 @@ bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) {
   return true;
 }
 
-bool VaryHeader::noVary(const Http::ResponseHeaderMap& headers) {
+bool VaryHeader::hasVary(const Http::ResponseHeaderMap& headers) {
   const Http::HeaderEntry* vary_header = headers.get(Http::Headers::get().Vary);
-  return ((!vary_header) || (vary_header->value().empty()));
+  return ((vary_header) && (!vary_header->value().empty()));
 }
 
 std::string VaryHeader::createVaryKey(const Http::HeaderEntry* vary_header,
@@ -215,7 +215,10 @@ std::string VaryHeader::createVaryKey(const Http::HeaderEntry* vary_header,
 
     for (const Http::HeaderEntry* cur_entry : entry_headers) {
       if (cur_entry->key() == header) {
-        // TODO(cbdm): Can add some bucketing logic here based on header.
+        // TODO(cbdm): Can add some bucketing logic here based on header. For example, we could
+        // normalize the values for accept-language by making all of {en-CA, en-GB, en-US} into
+        // "en". This way we would not need to store multiple versions of the same payload, and any
+        // of of those values would find the payload in the requested language.
         absl::StrAppend(&vary_key_values, cur_entry->value().getStringView());
         break;
       }
