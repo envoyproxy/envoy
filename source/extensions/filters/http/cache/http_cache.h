@@ -248,11 +248,20 @@ public:
   virtual void insertTrailers(const Http::ResponseTrailerMap& trailers) PURE;
 
   // This routine is called prior to an InsertContext being destroyed. InsertContext is responsible
-  // for making sure that any async events are cleaned up in the context of this routine. This
-  // includes timers, network calls, etc. The reason there is an onDestroy() method vs. doing this
-  // type of cleanup in the destructor is due to the deferred deletion model that Envoy uses to
-  // avoid stack unwind complications. InsertContext must not invoke any callbacks after having
-  // onDestroy() invoked.
+  // for making sure that any async activities are cleaned up before returning from onDestroy().
+  // This includes timers, network calls, etc. The reason there is an onDestroy() method vs. doing
+  // this type of cleanup in the destructor is to avoid potential data races between an async
+  // callback and the destructor in case the connection terminates abruptly.
+  // Example scenario with a hypothetical cache that uses RPC:
+  // 1. [Filter's thread] CacheFilter calls InsertContext::insertBody.
+  // 2. [Filter's thread] RPCInsertContext sends RPC and returns.
+  // 3. [Filter's thread] Client disconnects; Destroying stream; CacheFilter destructor begins.
+  // 4. [Filter's thread] RPCInsertContext destructor begins.
+  // 5. [Other thread] RPC completes and calls RPCInsertContext::onRPCDone.
+  // --> RPCInsertContext's destructor and onRpcDone cause a data race in RpcInsertContext.
+  // onDestroy() should cancel any outstanding async operations and, if necessary,
+  // it should block on that cancellation to avoid data races. InsertContext must not invoke any
+  // callbacks to the CacheFilter after having onDestroy() invoked.
   virtual void onDestroy() PURE;
 
   virtual ~InsertContext() = default;
@@ -291,12 +300,21 @@ public:
   // Http::ResponseTrailerMapPtr passed to cb must not be null.
   virtual void getTrailers(LookupTrailersCallback&& cb) PURE;
 
-  // This routine is called prior to an LookupContext being destroyed. LookupContext is responsible
-  // for making sure that any async events are cleaned up in the context of this routine. This
-  // includes timers, network calls, etc. The reason there is an onDestroy() method vs. doing this
-  // type of cleanup in the destructor is due to the deferred deletion model that Envoy uses to
-  // avoid stack unwind complications. LookupContext must not invoke any callbacks after having
-  // onDestroy() invoked.
+  // This routine is called prior to a LookupContext being destroyed. LookupContext is responsible
+  // for making sure that any async activities are cleaned up before returning from onDestroy().
+  // This includes timers, network calls, etc. The reason there is an onDestroy() method vs. doing
+  // this type of cleanup in the destructor is to avoid potential data races between an async
+  // callback and the destructor in case the connection terminates abruptly.
+  // Example scenario with a hypothetical cache that uses RPC:
+  // 1. [Filter's thread] CacheFilter calls LookupContext::getHeaders.
+  // 2. [Filter's thread] RPCLookupContext sends RPC and returns.
+  // 3. [Filter's thread] Client disconnects; Destroying stream; CacheFilter destructor begins.
+  // 4. [Filter's thread] RPCLookupContext destructor begins.
+  // 5. [Other thread] RPC completes and calls RPCLookupContext::onRPCDone.
+  // --> RPCLookupContext's destructor and onRpcDone cause a data race in RPCLookupContext.
+  // onDestroy() should cancel any outstanding async operations and, if necessary,
+  // it should block on that cancellation to avoid data races. InsertContext must not invoke any
+  // callbacks to the CacheFilter after having onDestroy() invoked.
   virtual void onDestroy() PURE;
 
   virtual ~LookupContext() = default;
