@@ -120,7 +120,9 @@ enum class UpdateOrder { RemovesFirst, Simultaneous };
 
 class SubsetLoadBalancerTest : public testing::TestWithParam<UpdateOrder> {
 public:
-  SubsetLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {
+  SubsetLoadBalancerTest()
+      : scope_(stats_store_.createScope("testprefix")),
+        stats_(ClusterInfoImpl::generateStats(stats_store_)) {
     stats_.max_host_weight_.set(1UL);
     least_request_lb_config_.mutable_choice_count()->set_value(2);
   }
@@ -188,7 +190,7 @@ public:
     }
 
     lb_ = std::make_shared<SubsetLoadBalancer>(
-        lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_, random_, subset_info_,
+        lb_type_, priority_set_, nullptr, stats_, *scope_, runtime_, random_, subset_info_,
         ring_hash_lb_config_, least_request_lb_config_, common_config_);
   }
 
@@ -237,7 +239,7 @@ public:
         {}, {}, {}, absl::nullopt);
 
     lb_ = std::make_shared<SubsetLoadBalancer>(
-        lb_type_, priority_set_, &local_priority_set_, stats_, stats_store_, runtime_, random_,
+        lb_type_, priority_set_, &local_priority_set_, stats_, *scope_, runtime_, random_,
         subset_info_, ring_hash_lb_config_, least_request_lb_config_, common_config_);
   }
 
@@ -282,7 +284,6 @@ public:
                    LbSubsetSelectorFallbackPolicy fallback_policy,
                const std::set<std::string>& fallback_keys_subset,
                bool single_host_per_subset = false) {
-
     Protobuf::RepeatedPtrField<std::string> selector_keys_mapped;
     for (const auto& it : selector_keys) {
       selector_keys_mapped.Add(std::string(it));
@@ -466,6 +467,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
+  Stats::ScopePtr scope_;
   ClusterStats stats_;
   PrioritySetImpl local_priority_set_;
   HostVectorSharedPtr local_hosts_;
@@ -2405,10 +2407,12 @@ TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, DuplicateMetadataStat) {
   });
   // The first 'a' is the original, the next 2 instances of 'a' are duplicates (counted
   // in stat), and 'b' is another non-duplicate.
-  EXPECT_EQ(2, stats_store_
-                   .gaugeFromString("single_host_per_subset_duplicate",
-                                    Stats::Gauge::ImportMode::NeverImport)
-                   .value());
+  for (auto& gauge : stats_store_.gauges()) {
+    ENVOY_LOG_MISC(error, "name {} value {}", gauge->name(), gauge->value());
+  }
+  EXPECT_EQ(
+      2,
+      TestUtility::findGauge(stats_store_, "testprefix.single_host_per_subset_duplicate")->value());
 }
 
 TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, Match) {

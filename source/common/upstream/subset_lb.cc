@@ -140,7 +140,9 @@ void SubsetLoadBalancer::rebuildSingle() {
   // This stat isn't added to `ClusterStats` because it wouldn't be used
   // for nearly all clusters, and is only set during configuration updates,
   // not in the data path, so performance of looking up the stat isn't critical.
-  scope_.gaugeFromString("single_host_per_subset_duplicate", Stats::Gauge::ImportMode::NeverImport)
+  Stats::Utility::gaugeFromElements(scope_,
+                                    {Stats::DynamicName("single_host_per_subset_duplicate")},
+                                    Stats::Gauge::ImportMode::Accumulate)
       .set(collision_count);
 }
 
