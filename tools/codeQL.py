@@ -23,5 +23,5 @@ if __name__ == "__main__":
   for target in target_list:
     ret += target + " "
 
-  os.remove("{}".format(TMP_OUTPUT));
+  os.remove("{}".format(TMP_OUTPUT))
   print(ret)
