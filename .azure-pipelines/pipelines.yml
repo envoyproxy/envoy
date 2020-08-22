@@ -22,20 +22,20 @@ jobs:
           path: $(Build.StagingDirectory)/repository_cache
         continueOnError: true
 
-      # - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
-      #   workingDirectory: $(Build.SourcesDirectory)
-      #   env:
-      #     ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-      #     BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-      #     BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-      #     GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-      #   displayName: "Run check format scripts"
+      - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
+        workingDirectory: $(Build.SourcesDirectory)
+        env:
+          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+          GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+        displayName: "Run check format scripts"
 
-      # - task: PublishBuildArtifacts@1
-      #   inputs:
-      #     pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
-      #     artifactName: format
-      #   condition: failed()
+      - task: PublishBuildArtifacts@1
+        inputs:
+          pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
+          artifactName: format
+        condition: failed()
 
   - job: release
     displayName: "Linux-x64 release"
@@ -170,7 +170,7 @@ jobs:
       - script: ./ci/mac_ci_steps.sh
         displayName: "Run Mac CI"
         env:
-          BAZEL_BUILD_EXTRA_OPTIONS: "--cache_test_results=no --remote_download_toplevel --flaky_test_attempts=2"
+          BAZEL_BUILD_EXTRA_OPTIONS: "--remote_download_toplevel --flaky_test_attempts=2"
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)

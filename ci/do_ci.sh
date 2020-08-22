@@ -271,7 +271,6 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
-
   if [[ "${TEST_TARGETS}" == "//test/..." ]]; then
     cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
     TEST_TARGETS="@envoy//test/..."
@@ -291,7 +290,6 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   echo "Building binary..."
   bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   collect_build_profile build
-
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   setup_clang_toolchain
   echo "Validating API structure..."
@@ -306,7 +304,6 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   echo "Testing API boosting (golden C++ tests)..."
   # We use custom BAZEL_BUILD_OPTIONS here; the API booster isn't capable of working with libc++ yet.
   LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config BAZEL_BUILD_OPTIONS="--config=clang" python3.8 ./tools/api_boost/api_boost_test.py
-
 elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
   setup_clang_toolchain
   echo "${CI_TARGET} build with tests ${COVERAGE_TEST_TARGETS}"
@@ -315,7 +312,6 @@ elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage
 
   test/run_envoy_bazel_coverage.sh ${COVERAGE_TEST_TARGETS}
   collect_build_profile coverage
-
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   # clang-tidy will warn on standard library issues with libc++
   ENVOY_STDLIB="libstdc++"
@@ -338,14 +334,12 @@ elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   cp -f \
      "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz \
      "${ENVOY_DELIVERY_DIR}"/envoy-coverity-output.tgz
-
 elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   setup_clang_toolchain
   FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',${TEST_TARGETS})")"
   echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
   echo "Building envoy fuzzers and executing 100 fuzz iterations..."
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} --test_arg="-runs=10"
-
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
@@ -353,7 +347,6 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
   ./tools/code_format/check_format.py fix
   ./tools/code_format/format_python_tools.sh fix
   ./tools/proto_format/proto_format.sh fix --test
-
 elif [[ "$CI_TARGET" == "check_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
@@ -363,31 +356,24 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   ./tools/code_format/check_format.py check
   ./tools/code_format/format_python_tools.sh check
   ./tools/proto_format/proto_format.sh check --test
-
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
   echo "check_repositories..."
   ./tools/check_repositories.sh
-
 elif [[ "$CI_TARGET" == "check_spelling" ]]; then
   echo "check_spelling..."
   ./tools/spelling/check_spelling.sh check
-
 elif [[ "$CI_TARGET" == "fix_spelling" ]];then
   echo "fix_spell..."
   ./tools/spelling/check_spelling.sh fix
-
 elif [[ "$CI_TARGET" == "check_spelling_pedantic" ]]; then
   echo "check_spelling_pedantic..."
   ./tools/spelling/check_spelling_pedantic.py --mark check
-
 elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
   echo "fix_spelling_pedantic..."
   ./tools/spelling/check_spelling_pedantic.py fix
-
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."
   docs/build.sh
-
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."
   exit 1

@@ -1,6 +1,3 @@
-#include <stdlib.h>
-#include <time.h>
-
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -442,9 +439,9 @@ TEST(Primes, isPrime) {
 }
 
 TEST(Primes, findPrimeLargerThan) {
-  srand(time(NULL));
-  int v1 = rand() % 9;
-  EXPECT_LT(5, v1);
+  EXPECT_EQ(67, Primes::findPrimeLargerThan(62));
+  EXPECT_EQ(107, Primes::findPrimeLargerThan(103));
+  EXPECT_EQ(10007, Primes::findPrimeLargerThan(9991));
 }
 
 class WeightedClusterEntry {

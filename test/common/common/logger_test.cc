@@ -1,6 +1,3 @@
-#include <stdlib.h>
-#include <time.h>
-
 #include <string>
 
 #include "common/common/logger.h"
@@ -16,9 +13,7 @@ TEST(LoggerTest, StackingStderrSinkDelegate) {
 }
 
 TEST(LoggerEscapeTest, LinuxEOL) {
-  srand(time(NULL));
-  int v1 = rand() % 9;
-  EXPECT_LT(5, v1);
+  EXPECT_EQ("line 1 \\n line 2\n", DelegatingLogSink::escapeLogLine("line 1 \n line 2\n"));
 }
 
 TEST(LoggerEscapeTest, WindowEOL) {

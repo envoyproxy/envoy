@@ -86,7 +86,7 @@ export BAZEL_BUILD_OPTIONS=" ${BAZEL_OPTIONS} --verbose_failures --show_task_fin
   --test_output=errors --repository_cache=${BUILD_DIR}/repository_cache --experimental_repository_cache_hardlinks \
   ${BAZEL_BUILD_EXTRA_OPTIONS} ${BAZEL_EXTRA_TEST_OPTIONS}"
 
-[[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --flaky_test_attempts=5 --test_env=HEAPCHECK="
+[[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --flaky_test_attempts=2 --test_env=HEAPCHECK="
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean --expunge
 
