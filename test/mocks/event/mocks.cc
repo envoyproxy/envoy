@@ -38,7 +38,7 @@ MockTimer::MockTimer() {
       }));
   ON_CALL(*this, disableTimer()).WillByDefault(Assign(&enabled_, false));
   ON_CALL(*this, enabled()).WillByDefault(ReturnPointee(&enabled_));
-  // timerDestroyed will be called in the dtor, but as it is rarely needed, make the expection
+  // timerDestroyed will be called in the dtor, but as it is rarely needed, make the exception
   // optional.
   EXPECT_CALL(*this, timerDestroyed()).Times(AnyNumber());
 }
