@@ -522,7 +522,7 @@ message Cluster {
     // connections to upstream hosts whenever hosts are added or removed from the cluster.
     bool close_connections_on_host_set_change = 6;
 
-    //Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
+    // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
     ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
   }
 
