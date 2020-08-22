@@ -11,6 +11,7 @@
 #include "common/filter/http/filter_config_discovery_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/request_id_extension_uuid_impl.h"
+#include "common/network/address_impl.h"
 
 #include "extensions/filters/network/http_connection_manager/config.h"
 
