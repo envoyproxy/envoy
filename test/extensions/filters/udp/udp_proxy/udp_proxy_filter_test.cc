@@ -67,8 +67,8 @@ public:
           }));
     }
 
-    void expectUpstreamWrite(const std::string& data, int sys_errno = 0,
-                             const Network::Address::Ip* local_ip = nullptr) {
+    void expectWriteToUpstream(const std::string& data, int sys_errno = 0,
+                               const Network::Address::Ip* local_ip = nullptr) {
       EXPECT_CALL(*idle_timer_, enableTimer(parent_.config_->sessionTimeout(), nullptr));
       EXPECT_CALL(*socket_->io_handle_, sendmsg(_, 1, 0, _, _))
           .WillOnce(Invoke(
@@ -79,10 +79,10 @@ public:
                 EXPECT_EQ(data, absl::string_view(static_cast<const char*>(slices[0].mem_),
                                                   slices[0].len_));
                 EXPECT_EQ(peer_address, *upstream_address_);
-                if (self_ip && local_ip) {
-                  EXPECT_EQ(self_ip->addressAsString(), local_ip->addressAsString());
+                if (local_ip == nullptr) {
+                  EXPECT_EQ(nullptr, self_ip);
                 } else {
-                  EXPECT_EQ(self_ip, local_ip);
+                  EXPECT_EQ(self_ip->addressAsString(), local_ip->addressAsString());
                 }
                 // For suppression of clang-tidy NewDeleteLeaks rule, don't use the ternary
                 // operator.
@@ -231,6 +231,42 @@ public:
     EXPECT_EQ(ipv6_expect, session.sock_opts_[ipv6_option.level()][ipv6_option.option()]);
   }
 
+  void
+  ensureIpTransparentSocketOptions(const Network::Address::InstanceConstSharedPtr& upstream_address,
+                                   const std::string& local_address, int ipv4_expect,
+                                   int ipv6_expect) {
+    setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+use_original_src_ip: true
+    )EOF");
+
+    expectSessionCreate(upstream_address);
+    test_sessions_[0].expectSetIpTransparentSocketOption();
+    test_sessions_[0].expectWriteToUpstream("hello", 0, peer_address_->ip());
+    recvDataFromDownstream(peer_address_->asString(), local_address, "hello");
+
+    checkSocketOptions(test_sessions_[0], ENVOY_SOCKET_IP_TRANSPARENT, ipv4_expect,
+                       ENVOY_SOCKET_IPV6_TRANSPARENT, ipv6_expect);
+    EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+    EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+    checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
+
+    test_sessions_[0].recvDataFromUpstream("world");
+    checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+  }
+
+  void ensureExitNoIpTransparentSocketOptionSupport(const std::string& error_message) {
+    auto config = R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+use_original_src_ip: true
+    )EOF";
+
+    EXPECT_THROW_WITH_REGEX(setup(config, true, true), Network::CreateListenerException,
+                            error_message);
+  }
+
   bool isTransparentSocketOptionsSupported() {
     for (const auto& option_name : transparent_options_) {
       if (!option_name.hasValue()) {
@@ -286,6 +322,22 @@ public:
   UdpProxyFilterIpv4Ipv6Test()
       : UdpProxyFilterIpv6Test(Network::Utility::parseInternetAddressAndPort(
             UdpProxyFilterIpv6Test::upstream_ipv6_address_, false)) {}
+
+  void ensureNoIpTransparentSocketOptions() {
+    expectSessionCreate(upstream_address_v6_);
+    test_sessions_[0].expectWriteToUpstream("hello");
+    recvDataFromDownstream("[2001:db8:85a3::9a2e:370:7334]:1000",
+                           "[2001:db8:85a3::9a2e:370:7335]:80", "hello");
+
+    checkSocketOptions(test_sessions_[0], ENVOY_SOCKET_IP_TRANSPARENT, 0,
+                       ENVOY_SOCKET_IPV6_TRANSPARENT, 0);
+    EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+    EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+    checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
+
+    test_sessions_[0].recvDataFromUpstream("world");
+    checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+  }
 };
 
 // Basic UDP proxy flow with a single session.
@@ -298,7 +350,7 @@ cluster: fake_cluster
   )EOF");
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -306,8 +358,8 @@ cluster: fake_cluster
   test_sessions_[0].recvDataFromUpstream("world");
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
 
-  test_sessions_[0].expectUpstreamWrite("hello2");
-  test_sessions_[0].expectUpstreamWrite("hello3");
+  test_sessions_[0].expectWriteToUpstream("hello2");
+  test_sessions_[0].expectWriteToUpstream("hello3");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
   checkTransferStats(11 /*rx_bytes*/, 2 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello3");
@@ -329,7 +381,7 @@ cluster: fake_cluster
   )EOF");
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -339,7 +391,7 @@ cluster: fake_cluster
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectUpstreamWrite("hello");
+  test_sessions_[1].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -358,7 +410,7 @@ cluster: fake_cluster
   EXPECT_EQ(1, config_->stats().downstream_sess_rx_errors_.value());
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
   EXPECT_EQ(5, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
@@ -379,7 +431,7 @@ cluster: fake_cluster
                    "udp.sess_rx_errors")
                    ->value());
 
-  test_sessions_[0].expectUpstreamWrite("hello", SOCKET_ERROR_MSG_SIZE);
+  test_sessions_[0].expectWriteToUpstream("hello", SOCKET_ERROR_MSG_SIZE);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   checkTransferStats(10 /*rx_bytes*/, 2 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
   EXPECT_EQ(5, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
@@ -446,7 +498,7 @@ cluster: fake_cluster
   // Now add the cluster we care about.
   cluster_update_callbacks_->onClusterAddOrUpdate(cluster_manager_.thread_local_cluster_);
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -473,7 +525,7 @@ cluster: fake_cluster
   cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(1, 0, 0, 0, 0);
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -491,7 +543,7 @@ cluster: fake_cluster
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectUpstreamWrite("hello");
+  test_sessions_[1].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.2:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -507,7 +559,7 @@ cluster: fake_cluster
   )EOF");
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -518,7 +570,7 @@ cluster: fake_cluster
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectUpstreamWrite("hello");
+  test_sessions_[1].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -535,14 +587,14 @@ cluster: fake_cluster
   )EOF");
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 
   EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, health())
       .WillRepeatedly(Return(Upstream::Host::Health::Unhealthy));
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
 }
 
@@ -557,7 +609,7 @@ cluster: fake_cluster
   )EOF");
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -570,7 +622,7 @@ cluster: fake_cluster
   ON_CALL(*new_host, health()).WillByDefault(Return(Upstream::Host::Health::Healthy));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(new_host));
   expectSessionCreate(new_host_address);
-  test_sessions_[1].expectUpstreamWrite("hello");
+  test_sessions_[1].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -586,25 +638,7 @@ TEST_F(UdpProxyFilterTest, SocketOptionForUseOriginalSrcIp) {
 
   InSequence s;
 
-  setup(R"EOF(
-stat_prefix: foo
-cluster: fake_cluster
-use_original_src_ip: true
-  )EOF");
-
-  expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectSetIpTransparentSocketOption();
-  test_sessions_[0].expectUpstreamWrite("hello", 0, peer_address_->ip());
-  recvDataFromDownstream(peer_address_->asString(), "10.0.0.2:80", "hello");
-
-  checkSocketOptions(test_sessions_[0], ENVOY_SOCKET_IP_TRANSPARENT, 1,
-                     ENVOY_SOCKET_IPV6_TRANSPARENT, 0);
-  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
-  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
-  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
-
-  test_sessions_[0].recvDataFromUpstream("world");
-  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+  ensureIpTransparentSocketOptions(upstream_address_, "10.0.0.2:80", 1, 0);
 }
 
 // Make sure socket option is set correctly if use_original_src_ip is set in case of ipv6.
@@ -617,25 +651,7 @@ TEST_F(UdpProxyFilterIpv6Test, SocketOptionForUseOriginalSrcIpInCaseOfIpv6) {
 
   InSequence s;
 
-  setup(R"EOF(
-stat_prefix: foo
-cluster: fake_cluster
-use_original_src_ip: true
-  )EOF");
-
-  expectSessionCreate(upstream_address_v6_);
-  test_sessions_[0].expectSetIpTransparentSocketOption();
-  test_sessions_[0].expectUpstreamWrite("hello", 0, peer_address_->ip());
-  recvDataFromDownstream(peer_address_->asString(), "[2001:db8:85a3::9a2e:370:7335]:80", "hello");
-
-  checkSocketOptions(test_sessions_[0], ENVOY_SOCKET_IP_TRANSPARENT, 0,
-                     ENVOY_SOCKET_IPV6_TRANSPARENT, 1);
-  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
-  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
-  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
-
-  test_sessions_[0].recvDataFromUpstream("world");
-  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+  ensureIpTransparentSocketOptions(upstream_address_v6_, "[2001:db8:85a3::9a2e:370:7335]:80", 0, 1);
 }
 
 // Make sure socket options should not be set if use_original_src_ip is not set.
@@ -653,19 +669,7 @@ cluster: fake_cluster
 use_original_src_ip: false
   )EOF");
 
-  expectSessionCreate(upstream_address_v6_);
-  test_sessions_[0].expectUpstreamWrite("hello");
-  recvDataFromDownstream("[2001:db8:85a3::9a2e:370:7334]:1000", "[2001:db8:85a3::9a2e:370:7335]:80",
-                         "hello");
-
-  checkSocketOptions(test_sessions_[0], ENVOY_SOCKET_IP_TRANSPARENT, 0,
-                     ENVOY_SOCKET_IPV6_TRANSPARENT, 0);
-  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
-  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
-  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
-
-  test_sessions_[0].recvDataFromUpstream("world");
-  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+  ensureNoIpTransparentSocketOptions();
 }
 
 // Make sure socket options should not be set if use_original_src_ip is not mentioned.
@@ -682,19 +686,7 @@ stat_prefix: foo
 cluster: fake_cluster
   )EOF");
 
-  expectSessionCreate(upstream_address_v6_);
-  test_sessions_[0].expectUpstreamWrite("hello");
-  recvDataFromDownstream("[2001:db8:85a3::9a2e:370:7334]:1000", "[2001:db8:85a3::9a2e:370:7335]:80",
-                         "hello");
-
-  checkSocketOptions(test_sessions_[0], ENVOY_SOCKET_IP_TRANSPARENT, 0,
-                     ENVOY_SOCKET_IPV6_TRANSPARENT, 0);
-  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
-  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
-  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
-
-  test_sessions_[0].recvDataFromUpstream("world");
-  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+  ensureNoIpTransparentSocketOptions();
 }
 
 // Make sure print error when use the use_original_src_ip but platform does not support ip
@@ -704,15 +696,9 @@ TEST_F(UdpProxyFilterTest, ErrorIpTransparentNoPlatformSupport) {
 
   InSequence s;
 
-  auto config = R"EOF(
-stat_prefix: foo
-cluster: fake_cluster
-use_original_src_ip: true
-  )EOF";
-
-  EXPECT_THROW_WITH_REGEX(setup(config, true, true), Network::CreateListenerException,
-                          "The platform does not support either IP_TRANSPARENT or the envoy is not "
-                          "running with the CAP_NET_ADMIN capability.");
+  ensureExitNoIpTransparentSocketOptionSupport(
+      "The platform does not support either IP_TRANSPARENT or the envoy is not running with the "
+      "CAP_NET_ADMIN capability.");
 }
 
 // Make sure print error when use the use_original_src_ip but platform does not support ipv6
@@ -722,15 +708,9 @@ TEST_F(UdpProxyFilterIpv6Test, ErrorIpv6TransparentNoPlatformSupport) {
 
   InSequence s;
 
-  auto config = R"EOF(
-stat_prefix: foo
-cluster: fake_cluster
-use_original_src_ip: true
-  )EOF";
-
-  EXPECT_THROW_WITH_REGEX(setup(config, true, true), Network::CreateListenerException,
-                          "The platform does not support either IPV6_TRANSPARENT or the envoy is "
-                          "not running with the CAP_NET_ADMIN capability.");
+  ensureExitNoIpTransparentSocketOptionSupport(
+      "The platform does not support either IPV6_TRANSPARENT or the envoy is not running with the "
+      "CAP_NET_ADMIN capability.");
 }
 
 } // namespace
