@@ -173,6 +173,9 @@ jobs:
           targetPath: $(Build.StagingDirectory)
       - bash: |
           docker load < $(Build.StagingDirectory)/docker/envoy-docker-images.tar.xz
+
+          docker images
+
           sudo apt-get update -y
           sudo apt-get install -y -qq --no-install-recommends redis-tools
           export DOCKER_NO_PULL=1
