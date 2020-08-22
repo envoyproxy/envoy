@@ -483,6 +483,7 @@ private:
   void onClusterInit(Cluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();
+  void clusterWarmingToActive(const std::string& cluster_name);
 
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;

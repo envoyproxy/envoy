@@ -1048,7 +1048,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
     last_updated:
       seconds: 1234567891
       nanos: 234000000
- dynamic_active_clusters:
+ dynamic_warming_clusters:
   - version_info: "version1"
     cluster:
       "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
@@ -1100,7 +1100,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
     last_updated:
       seconds: 1234567891
       nanos: 234000000
- dynamic_warming_clusters:
+ dynamic_active_clusters:
 )EOF");
 
   EXPECT_CALL(*cluster3, initialize(_));

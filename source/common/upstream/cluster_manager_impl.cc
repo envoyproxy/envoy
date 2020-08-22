@@ -417,6 +417,11 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   // of operations here is important. We start by initializing the thread aware load balancer if
   // needed. This must happen first so cluster updates are heard first by the load balancer.
   auto cluster_data = active_clusters_.find(cluster.info()->name());
+  if (cluster_data == active_clusters_.end()) {
+    clusterWarmingToActive(cluster.info()->name());
+  }
+  cluster_data = active_clusters_.find(cluster.info()->name());
+
   if (cluster_data->second->thread_aware_lb_ != nullptr) {
     cluster_data->second->thread_aware_lb_->initialize();
   }
@@ -613,38 +618,40 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   //       the future we may decide to undergo a refactor to unify the logic but the effort/risk to
   //       do that right now does not seem worth it given that the logic is generally pretty clean
   //       and easy to understand.
-  const bool use_active_map =
-      init_helper_.state() != ClusterManagerInitHelper::State::AllClustersInitialized;
-  loadCluster(cluster, version_info, true, use_active_map ? active_clusters_ : warming_clusters_);
-
-  if (use_active_map) {
+  const bool all_clusters_initialized =
+      init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
+  loadCluster(cluster, version_info, true, warming_clusters_);
+  auto& cluster_entry = warming_clusters_.at(cluster_name);
+  if (!all_clusters_initialized) {
     ENVOY_LOG(debug, "add/update cluster {} during init", cluster_name);
-    auto& cluster_entry = active_clusters_.at(cluster_name);
     createOrUpdateThreadLocalCluster(*cluster_entry);
     init_helper_.addCluster(*cluster_entry->cluster_);
   } else {
-    auto& cluster_entry = warming_clusters_.at(cluster_name);
     ENVOY_LOG(debug, "add/update cluster {} starting warming", cluster_name);
     cluster_entry->cluster_->initialize([this, cluster_name] {
-      auto warming_it = warming_clusters_.find(cluster_name);
-      auto& cluster_entry = *warming_it->second;
-
-      // If the cluster is being updated, we need to cancel any pending merged updates.
-      // Otherwise, applyUpdates() will fire with a dangling cluster reference.
-      updates_map_.erase(cluster_name);
-
-      active_clusters_[cluster_name] = std::move(warming_it->second);
-      warming_clusters_.erase(warming_it);
-
       ENVOY_LOG(debug, "warming cluster {} complete", cluster_name);
-      createOrUpdateThreadLocalCluster(cluster_entry);
-      onClusterInit(*cluster_entry.cluster_);
+      clusterWarmingToActive(cluster_name);
+      auto state_changed_cluster_entry = active_clusters_.find(cluster_name);
+      createOrUpdateThreadLocalCluster(*state_changed_cluster_entry->second);
+      onClusterInit(*state_changed_cluster_entry->second->cluster_);
       updateClusterCounts();
     });
   }
 
   updateClusterCounts();
   return true;
+}
+
+void ClusterManagerImpl::clusterWarmingToActive(const std::string& cluster_name) {
+  auto warming_it = warming_clusters_.find(cluster_name);
+  ASSERT(warming_it != warming_clusters_.end());
+
+  // If the cluster is being updated, we need to cancel any pending merged updates.
+  // Otherwise, applyUpdates() will fire with a dangling cluster reference.
+  updates_map_.erase(cluster_name);
+
+  active_clusters_[cluster_name] = std::move(warming_it->second);
+  warming_clusters_.erase(warming_it);
 }
 
 void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) {
@@ -695,6 +702,7 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
   if (existing_warming_cluster != warming_clusters_.end() &&
       existing_warming_cluster->second->added_via_api_) {
     removed = true;
+    init_helper_.removeCluster(*existing_warming_cluster->second->cluster_);
     warming_clusters_.erase(existing_warming_cluster);
     ENVOY_LOG(info, "removing warming cluster {}", cluster_name);
   }
