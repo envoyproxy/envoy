@@ -69,7 +69,7 @@ static_resources:
         address: 127.0.0.1
         port_value: 0
 )EOF",
-                     platform_null_device_path, platform_null_device_path);
+                     platform::null_device_path, platform::null_device_path);
 }
 
 std::string ConfigHelper::baseUdpListenerConfig() {
@@ -100,7 +100,7 @@ static_resources:
         port_value: 0
         protocol: udp
 )EOF",
-                     platform_null_device_path);
+                     platform::null_device_path);
 }
 
 std::string ConfigHelper::tcpProxyConfig() {
@@ -153,7 +153,7 @@ std::string ConfigHelper::httpProxyConfig() {
               domains: "*"
             name: route_config_0
 )EOF",
-                                                platform_null_device_path));
+                                                platform::null_device_path));
 }
 
 // TODO(danzh): For better compatibility with HTTP integration test framework,
@@ -192,7 +192,7 @@ std::string ConfigHelper::quicHttpProxyConfig() {
     udp_listener_config:
       udp_listener_name: "quiche_quic_listener"
 )EOF",
-                                                           platform_null_device_path));
+                                                           platform::null_device_path));
 }
 
 std::string ConfigHelper::defaultBufferFilter() {
@@ -309,7 +309,7 @@ static_resources:
                   prefix: "/cluster2"
               domains: "*"
 )EOF",
-      platform_null_device_path, api_type);
+      platform::null_device_path, api_type);
 }
 
 // TODO(#6327) cleaner approach to testing with static config.
@@ -351,7 +351,7 @@ admin:
       port_value: 0
 )EOF",
                      api_type, api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3",
-                     platform_null_device_path);
+                     platform::null_device_path);
 }
 
 // TODO(samflattery): bundle this up with buildCluster

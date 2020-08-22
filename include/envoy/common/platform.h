@@ -143,7 +143,9 @@ struct msghdr {
 #define SOCKET_ERROR_INVAL WSAEINVAL
 #define SOCKET_ERROR_ADDR_IN_USE WSAEADDRINUSE
 
-static constexpr std::string_view platform_null_device_path{"NUL"};
+namespace platform {
+    constexpr std::string_view null_device_path{"NUL"};
+}
 #else // POSIX
 
 #include <arpa/inet.h>
@@ -229,7 +231,9 @@ typedef int os_fd_t;
 #define SOCKET_ERROR_INVAL EINVAL
 #define SOCKET_ERROR_ADDR_IN_USE EADDRINUSE
 
-static constexpr std::string_view platform_null_device_path{"/dev/null"};
+namespace platform {
+    constexpr std::string_view null_device_path{"/dev/null"};
+}
 #endif
 
 // Note: chromium disabled recvmmsg regardless of ndk version. However, the only Android target

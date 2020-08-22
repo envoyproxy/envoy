@@ -109,7 +109,7 @@ static_resources:
                   prefix: "/aggregatecluster"
               domains: "*"
 )EOF",
-                                                  platform_null_device_path));
+                                                  platform::null_device_path));
 }
 
 class AggregateIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,

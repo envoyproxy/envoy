@@ -297,7 +297,8 @@ std::string TestEnvironment::substitute(const std::string& str,
 
   // Substitute platform specific null device.
   const std::regex null_device_regex(R"(\{\{ null_device_path \}\})");
-  out_json_string = std::regex_replace(out_json_string, null_device_regex, std::string(platform_null_device_path).c_str());
+  out_json_string = std::regex_replace(out_json_string, null_device_regex,
+                                      std::string(platform::null_device_path).c_str());
 
   // Substitute IP loopback addresses.
   const std::regex loopback_address_regex(R"(\{\{ ip_loopback_address \}\})");

@@ -45,7 +45,7 @@ static_resources:
             op_timeout: 5s
             enable_redirection: true
 )EOF",
-                                                  platform_null_device_path));
+                                                  platform::null_device_path));
 }
 
 const std::string& clusterConfig() {

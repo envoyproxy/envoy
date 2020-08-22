@@ -194,7 +194,7 @@ protected:
         std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
         std::move(process_context_));
-    EXPECT_TRUE(server_->api().fileSystem().fileExists(platform_null_device_path));
+    EXPECT_TRUE(server_->api().fileSystem().fileExists(platform::null_device_path));
   }
 
   void initializeWithHealthCheckParams(const std::string& bootstrap_path, const double timeout,
@@ -213,7 +213,7 @@ protected:
         std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
 
-    EXPECT_TRUE(server_->api().fileSystem().fileExists(platform_null_device_path));
+    EXPECT_TRUE(server_->api().fileSystem().fileExists(platform::null_device_path));
   }
 
   Thread::ThreadPtr startTestServer(const std::string& bootstrap_path,

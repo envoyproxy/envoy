@@ -62,7 +62,7 @@ admin:
       address: 127.0.0.1
       port_value: 0
 )EOF",
-                     api_type, platform_null_device_path);
+                     api_type, platform::null_device_path);
 }
 
 class RtdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
