@@ -166,13 +166,15 @@ public:
   MOCK_METHOD(void, enableHRTimer,
               (const std::chrono::microseconds&, const ScopeTrackedObject* scope));
   MOCK_METHOD(bool, enabled, ());
-  MOCK_METHOD(void, timerDestroyed, ());
 
   MockDispatcher* dispatcher_{};
   const ScopeTrackedObject* scope_{};
   bool enabled_{};
 
   Event::TimerCb callback_;
+
+  // If not nullptr, will be set on dtor. This can help to verify that the timer was destroyed.
+  bool* timer_destroyed_{};
 };
 
 class MockSchedulableCallback : public SchedulableCallback {

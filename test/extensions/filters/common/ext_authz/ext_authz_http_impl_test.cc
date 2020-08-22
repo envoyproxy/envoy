@@ -517,9 +517,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationInternalRequestTimeoutCancelled) {
   // make sure cancel resets the timer:
   EXPECT_CALL(async_request_, cancel());
   bool timer_destroyed = false;
-  EXPECT_CALL(*timer, timerDestroyed()).WillOnce(Invoke([&timer_destroyed]() {
-    timer_destroyed = true;
-  }));
+  timer->timer_destroyed_ = &timer_destroyed;
   client_->cancel();
   EXPECT_EQ(timer_destroyed, true);
 }

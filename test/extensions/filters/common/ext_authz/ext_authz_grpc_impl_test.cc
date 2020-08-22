@@ -304,9 +304,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationInternalRequestTimeoutCancelled) {
   EXPECT_CALL(request_callbacks_, onComplete_(_)).Times(0);
   // make sure cancel resets the timer:
   bool timer_destroyed = false;
-  EXPECT_CALL(*timer, timerDestroyed()).WillOnce(Invoke([&timer_destroyed]() {
-    timer_destroyed = true;
-  }));
+  timer->timer_destroyed_ = &timer_destroyed;
   client_->cancel();
   EXPECT_EQ(timer_destroyed, true);
 }
