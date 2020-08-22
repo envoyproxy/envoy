@@ -21,7 +21,8 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/tcp:tcp_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:utility_lib",
     ],
 )

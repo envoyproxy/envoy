@@ -21,7 +21,6 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/host.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 

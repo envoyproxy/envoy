@@ -340,7 +340,8 @@ private:
    */
   void doEndStream(ActiveStream& stream);
 
-  void resetAllStreams(absl::optional<StreamInfo::ResponseFlag> response_flag);
+  void resetAllStreams(absl::optional<StreamInfo::ResponseFlag> response_flag,
+                       absl::string_view details);
   void onIdleTimeout();
   void onConnectionDurationTimeout();
   void onDrainTimeout();
@@ -348,7 +349,8 @@ private:
   Tracing::HttpTracer& tracer() { return *config_.tracer(); }
   void handleCodecError(absl::string_view error);
   void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
-                         absl::optional<StreamInfo::ResponseFlag> response_flag);
+                         absl::optional<StreamInfo::ResponseFlag> response_flag,
+                         absl::string_view details);
 
   enum class DrainState { NotDraining, Draining, Closing };
 
