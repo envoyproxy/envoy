@@ -167,3 +167,43 @@ Thanks,
 
 $PERSON (on behalf of the Envoy security team and maintainers)
 ```
+
+## Security Fix of Main Branch Announcement
+
+```
+Subject: Security fix of Envoy main branch (that includes $GITSHORTCOMMITHASH) is now available
+To: envoy-security-announce@googlegroups.com
+Cc: envoy-announce@googlegroups.com, envoy-security@googlegroups.com, envoy-maintainers@googlegroups.com
+
+Hello Envoy Community,
+
+The Envoy security team would like to announce the availability of the security fix for security
+defects introduced in the main branch by [$GITSHORTCOMMITHASH]($GITHUBCOMMITURL) commit.
+
+$DEFECTSSUMMARY
+
+<!-- Provide details on features, extensions, configuration that make it likely that a system is
+vulnerable in practice. -->
+
+**Security fix timeline**
+
+1. The defect introduced in [$GITSHORTCOMMITHASH]($GITHUBCOMMITURL) was landed in the main
+   $ORDINALDAY of $MONTH $YEAR at $PDTHOUR PDT ($GMTHOUR GMT).
+2. The defect introduced in [$GITSHORTCOMMITHASH]($GITHUBCOMMITURL) is not part of any Envoy stable
+   releases.
+3. The fix [$FIXGITSHORTCOMMITHASH]($FIXGITHUBCOMMITURL) is merged into the main branch on $ORDINALDAY of
+   $MONTH $YEAR at $PDTHOUR PDT ($GMTHOUR GMT).
+
+The CVSS score for this is [$CVSSSTRING]($CVSSURL).
+
+Including this [$FIXGITSHORTCOMMITHASH]($FIXGITHUBCOMMITURL) commit is encouraged to fix this issue.
+
+**Thank you**
+
+Thank you to $REPORTER, $DEVELOPERS, and the $RELEASEMANAGERS for the coordination in making this
+release.
+
+Thanks,
+
+$PERSON (on behalf of the Envoy security team and maintainers)
+```
