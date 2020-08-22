@@ -81,10 +81,10 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     envoy_build_tools = dict(
         project_name = "envoy-build-tools",
         project_url = "https://github.com/envoyproxy/envoy-build-tools",
-        version = "1d6573e60207efaae6436b25ecc594360294f63a",
-        sha256 = "88e58fdb42021e64a0b35ae3554a82e92f5c37f630a4dab08a132fc77f8db4b7",
+        version = "2d13ad4157997715a4939bd218a89c81c26ff28e",
+        sha256 = "0dc8ce5eb645ae069ce710c1010975456f723ffd4fc788a03dacfcd0647b05b9",
         strip_prefix = "envoy-build-tools-{version}",
-        # 2020-07-18
+        # 2020-08-21
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/{version}.tar.gz"],
         use_category = ["build"],
     ),
