@@ -8,6 +8,7 @@
 // The goal is to eventually not require this file of envoy header declarations,
 // but limit the use of these architecture-specific types and declarations
 // to the corresponding .cc implementation files.
+#include <string_view>
 
 #ifdef _MSC_VER
 
@@ -142,6 +143,7 @@ struct msghdr {
 #define SOCKET_ERROR_INVAL WSAEINVAL
 #define SOCKET_ERROR_ADDR_IN_USE WSAEADDRINUSE
 
+static constexpr std::string_view platform_null_device_path{"NUL"};
 #else // POSIX
 
 #include <arpa/inet.h>
@@ -227,6 +229,7 @@ typedef int os_fd_t;
 #define SOCKET_ERROR_INVAL EINVAL
 #define SOCKET_ERROR_ADDR_IN_USE EADDRINUSE
 
+static constexpr std::string_view platform_null_device_path{"/dev/null"};
 #endif
 
 // Note: chromium disabled recvmmsg regardless of ndk version. However, the only Android target
@@ -280,4 +283,5 @@ struct mmsghdr {
 #else
 // On non-Linux platforms use 128 which is libevent listener default
 #define ENVOY_TCP_BACKLOG_SIZE 128
+
 #endif
