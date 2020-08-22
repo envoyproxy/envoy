@@ -38,7 +38,7 @@ run_log "Test service inside front-envoy: localhost:8080/service/2"
 docker-compose exec -T front-envoy curl -s http://localhost:8080/service/2 | grep Hello | grep "service 2"
 
 run_log "Test service info: localhost:8080/server_info"
-docker-compose exec -T front-envoy curl http://localhost:8001/server_info | jq '.'
+docker-compose exec -T front-envoy curl -s http://localhost:8001/server_info | jq '.'
 
 run_log "Test service stats: localhost:8080/stats"
-docker-compose exec -T front-envoy curl http://localhost:8001/stats | grep ":"
+docker-compose exec -T front-envoy curl -s http://localhost:8001/stats | grep ":"
