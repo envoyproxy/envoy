@@ -5,6 +5,7 @@
 #include "envoy/api/io_error.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/event/file_event.h"
 #include "envoy/network/address.h"
 
 #include "absl/container/fixed_array.h"
@@ -14,6 +15,10 @@ namespace Envoy {
 namespace Buffer {
 struct RawSlice;
 } // namespace Buffer
+
+namespace Event {
+class Dispatcher;
+} // namespace Event
 
 using RawSliceArrays = absl::FixedArray<absl::FixedArray<Buffer::RawSlice>>;
 
@@ -139,6 +144,14 @@ public:
                                            RecvMsgOutput& output) PURE;
 
   /**
+   * Read data into given buffer for connected handles
+   * @param buffer buffer to read the data into
+   * @param length buffer length
+   * @param flags flags to pass to the underlying recv function (see man 2 recv)
+   */
+  virtual Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) PURE;
+
+  /**
    * return true if the platform supports recvmmsg() and sendmmsg().
    */
   virtual bool supportsMmsg() const PURE;
@@ -223,6 +236,18 @@ public:
    * @return peer's address as @ref Address::InstanceConstSharedPtr
    */
   virtual Address::InstanceConstSharedPtr peerAddress() PURE;
+
+  /**
+   * Creates a file event that will signal when the io handle is readable, writable or closed.
+   * @param dispatcher dispatcher to be used to allocate the file event.
+   * @param cb supplies the callback to fire when the handle is ready.
+   * @param trigger specifies whether to edge or level trigger.
+   * @param events supplies a logical OR of @ref Event::FileReadyType events that the file event
+   *               should initially listen on.
+   * @return @ref Event::FileEventPtr
+   */
+  virtual Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                              Event::FileTriggerType trigger, uint32_t events) PURE;
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;
