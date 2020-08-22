@@ -144,7 +144,7 @@ struct msghdr {
 #define SOCKET_ERROR_ADDR_IN_USE WSAEADDRINUSE
 
 namespace platform {
-    constexpr std::string_view null_device_path{"NUL"};
+constexpr std::string_view null_device_path{"NUL"};
 }
 #else // POSIX
 
@@ -232,7 +232,7 @@ typedef int os_fd_t;
 #define SOCKET_ERROR_ADDR_IN_USE EADDRINUSE
 
 namespace platform {
-    constexpr std::string_view null_device_path{"/dev/null"};
+constexpr std::string_view null_device_path{"/dev/null"};
 }
 #endif
 
