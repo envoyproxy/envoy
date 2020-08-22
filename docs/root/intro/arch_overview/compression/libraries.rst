@@ -16,6 +16,6 @@ Currently Envoy uses `zlib <http://zlib.net>`_ as a compression library.
   Envoy can be built to use `zlib-ng <https://github.com/zlib-ng/zlib-ng>`_ instead of regular
   `zlib <http://zlib.net>`_ by using ``--define zlib=ng`` Bazel option. In order to use
   `zlib-ng <https://github.com/zlib-ng/zlib-ng>`_ with optimizations turned on, apply ``--define
-  zlib=ng-with-optimizations``. Please note that building Envoy with ``ng-with-optimizations`` means
+  zlib=ng_with_optimizations``. Please note that building Envoy with ``ng_with_optimizations`` means
   having a different behavior to generate checksums. Currently, these options are only
   available on Linux.

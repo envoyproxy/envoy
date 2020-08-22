@@ -256,7 +256,7 @@ config_setting(
     constraint_values = [
         "@bazel_tools//platforms:linux",
     ],
-    values = {"define": "zlib=ng-with-optimizations"},
+    values = {"define": "zlib=ng_with_optimizations"},
 )
 
 config_setting(
