@@ -180,6 +180,7 @@ jobs:
                   docker tag ${images[$i]}:${tags[$i]} ${images[$i]}:latest
               fi
           done
+          docker images
           sudo apt-get update -y
           sudo apt-get install -y -qq --no-install-recommends redis-tools
           export DOCKER_NO_PULL=1
