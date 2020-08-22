@@ -4,7 +4,11 @@
 #include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/mocks/network/io_handle.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster_update_callbacks.h"
+#include "test/mocks/upstream/cluster_update_callbacks_handle.h"
+#include "test/mocks/upstream/host.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -162,10 +166,8 @@ public:
     new_session.idle_timer_ = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
     EXPECT_CALL(*filter_, createIoHandle(_))
         .WillOnce(Return(ByMove(Network::IoHandlePtr{test_sessions_.back().io_handle_})));
-    EXPECT_CALL(*new_session.io_handle_, fd());
-    EXPECT_CALL(
-        callbacks_.udp_listener_.dispatcher_,
-        createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+    EXPECT_CALL(*new_session.io_handle_, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                                          Event::FileReadyType::Read))
         .WillOnce(DoAll(SaveArg<1>(&new_session.file_event_cb_), Return(nullptr)));
     // Internal Buffer is Empty, flush will be a no-op
     ON_CALL(callbacks_.udp_listener_, flush())

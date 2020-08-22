@@ -9,7 +9,9 @@
 #include "test/mocks/server/admin_stream.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/priority_set.h"
 
 #include "absl/strings/str_split.h"
 #include "circllhist.h"

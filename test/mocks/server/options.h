@@ -36,6 +36,7 @@ public:
               componentLogLevels, (), (const));
   MOCK_METHOD(const std::string&, logFormat, (), (const));
   MOCK_METHOD(bool, logFormatEscaped, (), (const));
+  MOCK_METHOD(bool, enableFineGrainLogging, (), (const));
   MOCK_METHOD(const std::string&, logPath, (), (const));
   MOCK_METHOD(uint64_t, restartEpoch, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, fileFlushIntervalMsec, (), (const));

@@ -130,6 +130,14 @@ TEST_F(AllowFailedInSingleRequirementTest, BadJwt) {
   EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
 }
 
+TEST_F(AllowFailedInSingleRequirementTest, MissingIssToken) {
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ES256WithoutIssToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+}
+
 TEST_F(AllowFailedInSingleRequirementTest, OneGoodJwt) {
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}};
