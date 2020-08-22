@@ -12,12 +12,17 @@ namespace Network {
 
 class BufferSourceSocket : public TransportSocket,
                            public WritablePeer,
+                           public ReadableSource,
                            protected Logger::Loggable<Logger::Id::connection> {
 public:
   uint64_t bsid() { return bsid_; }
 
   BufferSourceSocket();
 
+  void setEventSchedulable(Network::EventSchedulable* schedulable) {
+    ASSERT(schedulable_ == nullptr);
+    schedulable_ = schedulable;
+  }
   // Network::TransportSocket
   void setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
@@ -39,16 +44,30 @@ public:
 
   uint64_t bsid_;
   Buffer::WatermarkBuffer read_buffer_;
+  // Drained to empty. The following write should switch the state to false.
+  bool last_read_to_empty_{true};
   // True if read_buffer_ is not addable. Note that read_buffer_ may have pending data to drain.
   bool read_end_stream_{false};
 
+  // ReadableSource
+  bool isPeerShutDownWrite() const override { return read_end_stream_; }
+  bool isReadable() const override {
+    return isPeerShutDownWrite() || read_buffer_.length() > 0;
+  }
   // WritablePeer
   void setWriteEnd() override {
     ASSERT(!read_end_stream_);
     read_end_stream_ = true;
     ENVOY_LOG_MISC(debug, "lambdai: B{} set write end = true", bsid());
   }
-  bool isPeerShutDownWrite() const override { return read_end_stream_; }
+
+  void maybeSetNewData() override {
+    if (last_read_to_empty_) {
+      last_read_to_empty_ = false;
+      schedulable_->scheduleWriteEvent();
+      schedulable_->scheduleNextEvent();
+    }
+  }
 
   Buffer::Instance* getWriteBuffer() override { return &read_buffer_; }
 
@@ -82,6 +101,8 @@ private:
   // The flag whether the peer is valid. Any write attempt should check flag.
   bool peer_closed_{false};
   bool over_high_watermark_{false};
+
+  EventSchedulable* schedulable_{nullptr};
 };
 
 class BufferSourceSocketFactory : public TransportSocketFactory {

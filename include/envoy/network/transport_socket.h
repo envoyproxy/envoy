@@ -264,10 +264,11 @@ public:
    * Set the flag to indicate no further write.
    */
   virtual void setWriteEnd() PURE;
+
   /**
-   * Read the flag to indicate no further write. Used by early close detection.
+   * Notify that consumable data arrives. The consumable data can be either data to read, or the end of stream event.
    */
-  virtual bool isPeerShutDownWrite() const PURE;
+  virtual void maybeSetNewData() PURE;
 
   /**
    * @return the buffer to be written.
@@ -278,6 +279,29 @@ public:
    * @return false more data is acceptable.
    */
   virtual bool isOverHighWatermark() const PURE;
+};
+
+class ReadableSource {
+public:
+  virtual ~ReadableSource() = default;
+
+  /**
+   * Read the flag to indicate no further write. Used by early close detection.
+   */
+  virtual bool isPeerShutDownWrite() const PURE;
+
+  virtual bool isReadable() const PURE;
+};
+
+class EventSchedulable {
+public:
+  virtual ~EventSchedulable() = default;
+
+  virtual void scheduleNextEvent() PURE;
+
+  virtual void scheduleWriteEvent() PURE;
+  virtual void scheduleReadEvent() PURE;
+  virtual void scheduleClosedEvent() PURE;
 };
 
 } // namespace Network

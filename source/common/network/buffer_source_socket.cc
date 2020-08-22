@@ -46,6 +46,9 @@ IoResult BufferSourceSocket::doRead(Buffer::Instance& buffer) {
     bytes_read = read_buffer_.length();
     buffer.move(read_buffer_);
   }
+  if (read_buffer_.length() == 0) {
+    last_read_to_empty_ = true;
+  }
   ENVOY_CONN_LOG(trace, "read returns: {} read_end_stream_={}", callbacks_->connection(),
                  bytes_read, read_end_stream_);
   return {PostIoAction::KeepOpen, bytes_read, read_end_stream_};
@@ -69,6 +72,7 @@ IoResult BufferSourceSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
   if (buffer.length() > 0) {
     bytes_written = buffer.length();
     writable_peer_->getWriteBuffer()->move(buffer);
+    writable_peer_->maybeSetNewData();
   }
   // Since we move all bytes to the peer. doWrite always drain the buffer. It's safe to shutdown.
   // VS TCP: shutdown_ could be delayed if os buffer is full.
@@ -77,6 +81,7 @@ IoResult BufferSourceSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
     shutdown_ = true;
     // Notify peer that no more data will be written. Think it sending the FIN.
     writable_peer_->setWriteEnd();
+    writable_peer_->maybeSetNewData();
   }
   ENVOY_CONN_LOG(debug, "lambdai: bs write returns: {}", callbacks_->connection(), bytes_written);
   ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), bytes_written);

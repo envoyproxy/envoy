@@ -148,13 +148,13 @@ DispatcherImpl::createUserspacePipe(Network::Address::InstanceConstSharedPtr pee
   auto server_socket = std::make_unique<Network::BufferSourceSocket>();
   auto client_socket_raw = client_socket.get();
   auto server_socket_raw = server_socket.get();
-  auto client_conn = std::make_unique<Network::ClientPipeImpl>(*this, peer_address, local_address,
-                                                               std::move(client_socket), nullptr);
+  auto client_conn = std::make_unique<Network::ClientPipeImpl>(
+      *this, peer_address, local_address, std::move(client_socket), *client_socket_raw, nullptr);
   ENVOY_LOG_MISC(debug, "lambdai: client pipe C{} owns TS{} and B{}", client_conn->id(),
                  client_socket_raw->bsid(), client_socket_raw->read_buffer_.bid());
 
-  auto server_conn = std::make_unique<Network::ServerPipeImpl>(*this, local_address, peer_address,
-                                                               std::move(server_socket), nullptr);
+  auto server_conn = std::make_unique<Network::ServerPipeImpl>(
+      *this, local_address, peer_address, std::move(server_socket), *server_socket_raw, nullptr);
   ENVOY_LOG_MISC(debug, "lambdai: server pipe C{} owns TS{} and B{}", server_conn->id(),
                  server_socket_raw->bsid(), server_socket_raw->read_buffer_.bid());
 
@@ -164,8 +164,10 @@ DispatcherImpl::createUserspacePipe(Network::Address::InstanceConstSharedPtr pee
   // TODO(lambdai): Add to dest buffer to generic IoHandle, or TransportSocketCallback.
   // client_socket_raw->setReadSourceBuffer(&server_conn->getWriteBuffer().buffer);
   client_socket_raw->setWritablePeer(server_socket_raw);
+  client_socket_raw->setEventSchedulable(client_conn.get());
   // server_socket_raw->setReadSourceBuffer(&client_conn->getWriteBuffer().buffer);
   server_socket_raw->setWritablePeer(client_socket_raw);
+  server_socket_raw->setEventSchedulable(server_conn.get());
   (iter->second)(peer_address, std::move(server_conn));
   return client_conn;
 }
