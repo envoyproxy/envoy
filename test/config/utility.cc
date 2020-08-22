@@ -785,9 +785,6 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
     listener->mutable_per_connection_buffer_limit_bytes()->set_value(downstream_buffer_limit);
   }
 
-  auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
-  listener->mutable_per_connection_buffer_limit_bytes()->set_value(downstream_buffer_limit);
-
   auto* static_resources = bootstrap_.mutable_static_resources();
   for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);

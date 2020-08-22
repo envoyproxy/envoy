@@ -266,7 +266,8 @@ public:
   virtual void setWriteEnd() PURE;
 
   /**
-   * Notify that consumable data arrives. The consumable data can be either data to read, or the end of stream event.
+   * Notify that consumable data arrives. The consumable data can be either data to read, or the end
+   * of stream event.
    */
   virtual void maybeSetNewData() PURE;
 

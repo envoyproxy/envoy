@@ -152,9 +152,9 @@ public:
     EXPECT_CALL(*socket_factory_, getListenSocket()).WillOnce(Return(listeners_.back()->socket_));
     if (socket_type == Network::Socket::Type::Stream) {
       EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
-          .WillOnce(Invoke([listener, listener_callbacks](Network::SocketSharedPtr&&,
-                                                          Network::ListenerCallbacks& cb,
-                                                          bool, const std::string&) -> Network::Listener* {
+          .WillOnce(Invoke([listener, listener_callbacks](
+                               Network::SocketSharedPtr&&, Network::ListenerCallbacks& cb, bool,
+                               const std::string&) -> Network::Listener* {
             if (listener_callbacks != nullptr) {
               *listener_callbacks = &cb;
             }

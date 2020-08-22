@@ -58,7 +58,7 @@ ClientPipeImpl::ClientPipeImpl(Event::Dispatcher& dispatcher,
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
       remote_address_(remote_address), source_address_(source_address),
       readable_source_(readable_source),
-      io_timer_(dispatcher.createTimer([this]() { onFileEvent(); })) {
+      io_callback_(dispatcher.createSchedulableCallback([this]() { onFileEvent(); })) {
   ENVOY_LOG_MISC(debug, "lambdai: client pipe C{} owns rb B{} and wb B{}", id(), read_buffer_.bid(),
                  write_buffer_->bid());
 
@@ -234,11 +234,12 @@ void ClientPipeImpl::closeSocket(ConnectionEvent close_type) {
     // Passively set peer to nullptr so futher peer operation won't crash.
     peer_ = nullptr;
   }
+  if (io_callback_->enabled()) {
+    io_callback_->cancel();
+  }
 }
 
-void ClientPipeImpl::mayScheduleReadReady() {
-  scheduleNextEvent();
-}
+void ClientPipeImpl::mayScheduleReadReady() { scheduleNextEvent(); }
 
 void ClientPipeImpl::noDelay(bool enable) {
   // Enable is noop while disable doesn't make sense in pipe.
@@ -486,7 +487,7 @@ uint32_t ClientPipeImpl::checkTriggeredEvents() {
   }
   if (events_ & Event::FileReadyType::Write) {
     if (was_peer_writable_ && isPeerWritable()) {
-       events |= Event::FileReadyType::Write;
+      events |= Event::FileReadyType::Write;
     }
   }
   if (events_ & Event::FileReadyType::Read) {
@@ -608,7 +609,7 @@ void ClientPipeImpl::onWriteReady() {
 
   IoResult result = transport_socket_->doWrite(*write_buffer_, write_end_stream_);
   ASSERT(!result.end_stream_read_); // The interface guarantees that only read operations set this.
-  
+
   uint64_t new_buffer_size = write_buffer_->length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 
@@ -693,7 +694,7 @@ void ClientPipeImpl::connect() {
   // Try read and write.
   // TODO(lambdai): Verify that the timer could be cancelled if buffer is empty.
   events_ |= (Event::FileReadyType::Write | Event::FileReadyType::Read);
-  io_timer_->enableTimer(std::chrono::milliseconds(0));
+  io_callback_->scheduleCallbackCurrentIteration();
 }
 
 ServerPipeImpl::ServerPipeImpl(Event::Dispatcher& dispatcher,
@@ -703,8 +704,7 @@ ServerPipeImpl::ServerPipeImpl(Event::Dispatcher& dispatcher,
                                Network::ReadableSource& readable_source,
                                const Network::ConnectionSocket::OptionsSharedPtr&)
     : ConnectionImplBase(dispatcher, next_global_id_++),
-      transport_socket_(std::move(transport_socket)), 
-      filter_manager_(*this),
+      transport_socket_(std::move(transport_socket)), filter_manager_(*this),
       read_buffer_([this]() -> void { this->onReadBufferLowWatermark(); },
                    [this]() -> void { this->onReadBufferHighWatermark(); },
                    []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }),
@@ -717,7 +717,7 @@ ServerPipeImpl::ServerPipeImpl(Event::Dispatcher& dispatcher,
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
       remote_address_(remote_address), source_address_(source_address),
       readable_source_(readable_source),
-      io_timer_(dispatcher.createTimer([this]() { onFileEvent(); })) {
+      io_callback_(dispatcher.createSchedulableCallback([this]() { onFileEvent(); })) {
   ENVOY_LOG_MISC(debug, "lambdai: server pipe C{} owns rb B{} and wb B{}", id(), read_buffer_.bid(),
                  write_buffer_->bid());
 
@@ -823,11 +823,12 @@ void ServerPipeImpl::closeSocket(ConnectionEvent close_type) {
     // Passively set peer to nullptr so futher peer operation won't crash.
     peer_ = nullptr;
   }
+  if (io_callback_->enabled()) {
+    io_callback_->cancel();
+  }
 }
 
-void ServerPipeImpl::mayScheduleReadReady() {
-  scheduleNextEvent();
-}
+void ServerPipeImpl::mayScheduleReadReady() { scheduleNextEvent(); }
 
 void ServerPipeImpl::noDelay(bool enable) {
   // Enable is noop while disable doesn't make sense in pipe.
@@ -1076,7 +1077,7 @@ uint32_t ServerPipeImpl::checkTriggeredEvents() {
   }
   if (events_ & Event::FileReadyType::Write) {
     if (was_peer_writable_ && isPeerWritable()) {
-       events |= Event::FileReadyType::Write;
+      events |= Event::FileReadyType::Write;
     }
   }
   if (events_ & Event::FileReadyType::Read) {
@@ -1201,7 +1202,7 @@ void ServerPipeImpl::onWriteReady() {
   } else if ((inDelayedClose() && new_buffer_size == 0) || bothSidesHalfClosed()) {
     ENVOY_LOG_MISC(debug, "lambdai: C{} trigger peer check read ready", connection().id());
     peer_->mayScheduleReadReady();
-    
+
     ENVOY_CONN_LOG(debug, "write flush complete", *this);
     if (delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
       ASSERT(delayed_close_timer_ != nullptr);

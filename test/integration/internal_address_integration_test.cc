@@ -257,7 +257,7 @@ TEST_P(InternalAddressIntegrationTest, TestIdletimeoutWithNoData) {
   tcp_client->waitForDisconnect(true);
 }
 
-TEST_P(InternalAddressIntegrationTest, DISABLED_TcpProxyLargeWrite) {
+TEST_P(InternalAddressIntegrationTest, TcpProxyLargeWrite) {
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 

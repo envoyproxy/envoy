@@ -49,7 +49,6 @@ protected:
   PeeringPipe* peer_;
 };
 
-
 std::string eventDebugString(uint32_t events);
 
 class ClientPipeImpl : public ConnectionImplBase,
@@ -68,34 +67,26 @@ public:
   ~ClientPipeImpl() override;
 
   void setConnected() { scheduleWriteEvent(); }
-  
-  void resetSourceReadableFlag() {
-    was_source_readable_ = readable_source_.isReadable();
-  }
-  void resetPeerWritableFlag() {
-    was_peer_writable_ = isPeerWritable();
-  }
+
+  void resetSourceReadableFlag() { was_source_readable_ = readable_source_.isReadable(); }
+  void resetPeerWritableFlag() { was_peer_writable_ = isPeerWritable(); }
 
   void scheduleNextEvent() override {
-    if (!io_timer_->enabled()) {
-      io_timer_->enableTimer(std::chrono::milliseconds(0));
+    if (!io_callback_->enabled()) {
+      io_callback_->scheduleCallbackNextIteration();
     }
     ENVOY_LOG_MISC(debug, "lambdai: C{} scheduled persist events {} and ephermal events {}", id(),
                    eventDebugString(events_), eventDebugString(ephermal_events_));
   }
 
-  //TODO(lambdai): check above watermark.
+  // TODO(lambdai): check above watermark.
   // Check if peer writable regardless there is data to write.
-  bool isPeerWritable() {
-    return peer_ != nullptr;
-  }
+  bool isPeerWritable() { return peer_ != nullptr; }
   // Check if source readable regardless the buffer is ready to read.
   bool isReadSourceReadable() {
     return (read_buffer_.length() > 0 || read_end_stream_ || readable_source_.isReadable());
   }
-  bool isPeerClosed() {
-    return readable_source_.isPeerShutDownWrite();
-  }
+  bool isPeerClosed() { return readable_source_.isPeerShutDownWrite(); }
   void enableWrite() {
     events_ = Event::FileReadyType::Write;
     if (isPeerWritable()) {
@@ -118,7 +109,7 @@ public:
   }
   void enableWriteClose() {
     events_ = Event::FileReadyType::Write | Event::FileReadyType::Closed;
-     if (isPeerWritable()) {
+    if (isPeerWritable()) {
       ephermal_events_ |= Event::FileReadyType::Write;
       scheduleNextEvent();
     }
@@ -133,15 +124,9 @@ public:
   }
   bool isWriteEnabled() { return events_ | Event::FileReadyType::Write; }
 
-  void scheduleWriteEvent() override {
-    ephermal_events_ |= Event::FileReadyType::Write;
-  }
-  void scheduleReadEvent() override {
-    ephermal_events_ |= Event::FileReadyType::Read;
-  }
-  void scheduleClosedEvent() override {
-    ephermal_events_ |= Event::FileReadyType::Closed;
-  }
+  void scheduleWriteEvent() override { ephermal_events_ |= Event::FileReadyType::Write; }
+  void scheduleReadEvent() override { ephermal_events_ |= Event::FileReadyType::Read; }
+  void scheduleClosedEvent() override { ephermal_events_ |= Event::FileReadyType::Closed; }
 
   // Network::FilterManager
   void addWriteFilter(WriteFilterSharedPtr filter) override;
@@ -202,8 +187,10 @@ public:
   // fair sharing of CPU resources, the underlying event loop does not make any fairness guarantees.
   // Reconsider how to make fairness happen.
   void setReadBufferReady() override {
-    events_ |= Event::FileReadyType::Read;
-    io_timer_->enableTimer(std::chrono::milliseconds(0));
+    ephermal_events_ |= Event::FileReadyType::Read;
+    if (!io_callback_->enabled()) {
+      io_callback_->scheduleCallbackNextIteration();
+    }
   }
   void flushWriteBuffer() override;
 
@@ -295,8 +282,8 @@ private:
   const Network::ConnectionSocket::OptionsSharedPtr options_;
 
   Network::ReadableSource& readable_source_;
-  // This timer is used to trigger the next event.
-  Event::TimerPtr io_timer_;
+  // Trigger of the io event.
+  Event::SchedulableCallbackPtr io_callback_;
   // Persistent events.
   uint32_t events_{0};
   // Set by activate and cleared when the callbacks are triggered.
@@ -320,42 +307,28 @@ public:
   ~ServerPipeImpl() override;
 
   void setConnected() { onWriteReady(); }
-  
-  void resetSourceReadableFlag() {
-    was_source_readable_ = readable_source_.isReadable();
-  }
-  void resetPeerWritableFlag() {
-    was_peer_writable_ = isPeerWritable();
-  }
 
-  void scheduleWriteEvent() override {
-    ephermal_events_ |= Event::FileReadyType::Write;
-  }
-  void scheduleReadEvent() override {
-    ephermal_events_ |= Event::FileReadyType::Read;
-  }
-  void scheduleClosedEvent() override {
-    ephermal_events_ |= Event::FileReadyType::Closed;
-  }
+  void resetSourceReadableFlag() { was_source_readable_ = readable_source_.isReadable(); }
+  void resetPeerWritableFlag() { was_peer_writable_ = isPeerWritable(); }
+
+  void scheduleWriteEvent() override { ephermal_events_ |= Event::FileReadyType::Write; }
+  void scheduleReadEvent() override { ephermal_events_ |= Event::FileReadyType::Read; }
+  void scheduleClosedEvent() override { ephermal_events_ |= Event::FileReadyType::Closed; }
   void scheduleNextEvent() override {
-    if (!io_timer_->enabled()) {
-      io_timer_->enableTimer(std::chrono::milliseconds(0));
+    if (!io_callback_->enabled()) {
+      io_callback_->scheduleCallbackNextIteration();
     }
     ENVOY_LOG_MISC(debug, "lambdai: C{} scheduled persist events {} and ephermal events {}", id(),
                    eventDebugString(events_), eventDebugString(ephermal_events_));
   }
-  //TODO(lambdai): check above watermark.
+  // TODO(lambdai): check above watermark.
   // Check if peer writable regardless there is data to write.
-  bool isPeerWritable() {
-    return peer_ != nullptr;
-  }
+  bool isPeerWritable() { return peer_ != nullptr; }
   // Check if source readable regardless the buffer is ready to read.
   bool isReadSourceReadable() {
     return (read_buffer_.length() > 0 || read_end_stream_ || readable_source_.isReadable());
   }
-  bool isPeerClosed() {
-    return readable_source_.isPeerShutDownWrite();
-  }
+  bool isPeerClosed() { return readable_source_.isPeerShutDownWrite(); }
   void enableWrite() {
     events_ = Event::FileReadyType::Write;
     if (isPeerWritable()) {
@@ -378,7 +351,7 @@ public:
   }
   void enableWriteClose() {
     events_ = Event::FileReadyType::Write | Event::FileReadyType::Closed;
-     if (isPeerWritable()) {
+    if (isPeerWritable()) {
       ephermal_events_ |= Event::FileReadyType::Write;
       scheduleNextEvent();
     }
@@ -456,8 +429,10 @@ public:
   // Reconsider how to make fairness happen.
   // TODO(lambdai):
   void setReadBufferReady() override {
-    events_ |= Event::FileReadyType::Read;
-    io_timer_->enableTimer(std::chrono::milliseconds(0));
+    ephermal_events_ |= Event::FileReadyType::Read;
+    if (!io_callback_->enabled()) {
+      io_callback_->scheduleCallbackNextIteration();
+    }
   }
   void flushWriteBuffer() override;
 
@@ -547,8 +522,8 @@ private:
   const Network::ConnectionSocket::OptionsSharedPtr options_;
 
   Network::ReadableSource& readable_source_;
-  // This timer is used to trigger the next event.
-  Event::TimerPtr io_timer_;
+  // Trigger of the io event.
+  Event::SchedulableCallbackPtr io_callback_;
   // Persistent events.
   uint32_t events_{0};
   // Set by activate and cleared when the callbacks are triggered.
