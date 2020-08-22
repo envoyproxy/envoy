@@ -95,8 +95,8 @@ void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& 
 
   // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
   // loss of the trigger due to transient accept errors.
-  file_event_ = dispatcher.createFileEvent(
-      socket.ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); },
+  file_event_ = socket.ioHandle().createFileEvent(
+      dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::FileTriggerType::Level, Event::FileReadyType::Read);
 
   if (!Network::Socket::applyOptions(socket.options(), socket,

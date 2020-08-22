@@ -100,6 +100,7 @@ envoy_cc_library(
         ":address_interface",
         "//include/envoy/api:io_error_interface",
         "//include/envoy/api:os_sys_calls_interface",
+        "//include/envoy/event:file_event_interface",
         "//source/common/common:assert_lib",
     ],
 )

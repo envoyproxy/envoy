@@ -472,5 +472,12 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
   return Address::addressFromSockAddr(ss, ss_len);
 }
 
+Event::FileEventPtr IoSocketHandleImpl::createFileEvent(Event::Dispatcher& dispatcher,
+                                                        Event::FileReadyCb cb,
+                                                        Event::FileTriggerType trigger,
+                                                        uint32_t events) {
+  return dispatcher.createFileEvent(fd_, cb, trigger, events);
+}
+
 } // namespace Network
 } // namespace Envoy

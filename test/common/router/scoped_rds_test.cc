@@ -106,7 +106,6 @@ protected:
 
   Event::SimulatedTimeSystem time_system_;
 
-  std::function<void(bool)> route_config_updated_cb_ = [](bool) {};
   NiceMock<Event::MockDispatcher> event_dispatcher_;
 };
 
@@ -1109,7 +1108,9 @@ key:
       getScopedRdsProvider()->config<ScopedConfigImpl>()->computeKeyHash(
           TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
   EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
-  getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_, route_config_updated_cb_);
+  std::function<void(bool)> route_config_updated_cb = [](bool) {};
+  getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_,
+                                            move(route_config_updated_cb));
   // After on demand request, push rds update, both scopes should find the route configuration.
   pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
@@ -1194,10 +1195,12 @@ key:
   absl::optional<uint64_t> key_hash =
       getScopedRdsProvider()->config<ScopedConfigImpl>()->computeKeyHash(
           TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
-  EXPECT_CALL(server_factory_context_, dispatcher());
-  EXPECT_CALL(server_factory_context_.dispatcher_, post(_));
+  // EXPECT_CALL(server_factory_context_, dispatcher());
+  EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).Times(1);
   EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
-  getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_, route_config_updated_cb_);
+  std::function<void(bool)> route_config_updated_cb = [](bool) {};
+  getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_,
+                                            move(route_config_updated_cb));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
@@ -1369,8 +1372,9 @@ key:
   // All the on demand updated callbacks will be executed when the route table comes.
   EXPECT_CALL(event_dispatcher_, post(_)).Times(5);
   for (int i = 0; i < 5; i++) {
+    std::function<void(bool)> route_config_updated_cb = [](bool) {};
     getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_,
-                                              route_config_updated_cb_);
+                                              move(route_config_updated_cb));
   }
   // After on demand request, push rds update.
   pushRdsConfig({"foo_routes"}, "111");
@@ -1392,6 +1396,7 @@ key:
 
 TEST_F(ScopedRdsTest, DanglingSubscriptionOnDemandUpdate) {
   setup();
+  std::function<void(bool)> route_config_updated_cb = [](bool) {};
   Event::PostCb temp_post_cb;
   {
     const std::string config_yaml = R"EOF(
@@ -1416,7 +1421,7 @@ scope_key_builder:
     EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
         .WillOnce(testing::SaveArg<0>(&temp_post_cb));
     dynamic_cast<ScopedRdsConfigProvider*>(provider.get())
-        ->onDemandRdsUpdate(666, event_dispatcher_, route_config_updated_cb_);
+        ->onDemandRdsUpdate(666, event_dispatcher_, move(route_config_updated_cb));
     EXPECT_NO_THROW(temp_post_cb());
   }
   EXPECT_NO_THROW(temp_post_cb());

@@ -53,7 +53,7 @@ void OnDemandRouteUpdate::onDestroy() { route_config_updated_callback_.reset(); 
 void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
 
-  // don't call continueDecoding in the middle of decodeHeaders()
+  // Don't call continueDecoding in the middle of decodeHeaders()
   if (decode_header_interrupted_) {
     return;
   }
