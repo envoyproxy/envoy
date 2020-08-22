@@ -344,7 +344,7 @@ should only be done to correct a DCO mistake.
 
 ## Triggering CI re-run without making changes
 
-To rerun failed tasks in CI, add a comment with the the line
+To rerun failed tasks in CI, add a comment with the line
 
 ```
 /retest

@@ -74,7 +74,7 @@ private:
   Http::StreamEncoderFilterSharedPtr encoder_filter_;
   AccessLog::InstanceSharedPtr access_logger_;
 
-  // Headers/trailers need to be saved for the lifetime of the the filter,
+  // Headers/trailers need to be saved for the lifetime of the filter,
   // so save them as member variables.
   // TODO(nareddyt): Use for access logging in a followup PR.
   Http::TestRequestHeaderMapImpl request_headers_;

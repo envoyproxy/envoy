@@ -86,7 +86,7 @@ public:
   struct RecvMsgPerPacketInfo {
     // The destination address from transport header.
     Address::InstanceConstSharedPtr local_address_;
-    // The the source address from transport header.
+    // The source address from transport header.
     Address::InstanceConstSharedPtr peer_address_;
     // The payload length of this packet.
     unsigned int msg_len_{0};
