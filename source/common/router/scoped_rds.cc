@@ -132,7 +132,7 @@ ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProvide
 }
 
 // Constructor for RdsRouteConfigProviderHelper when scope is on demand.
-// Leave the RdsRouteConfigProvider unintialized.
+// Leave the RdsRouteConfigProvider uninitialized.
 ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProviderHelper(
     ScopedRdsConfigSubscription& parent, std::string scope_name)
     : parent_(parent), scope_name_(scope_name), on_demand_(true) {
