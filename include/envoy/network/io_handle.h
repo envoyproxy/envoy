@@ -144,6 +144,14 @@ public:
                                            RecvMsgOutput& output) PURE;
 
   /**
+   * Read data into given buffer for connected handles
+   * @param buffer buffer to read the data into
+   * @param length buffer length
+   * @param flags flags to pass to the underlying recv function (see man 2 recv)
+   */
+  virtual Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) PURE;
+
+  /**
    * return true if the platform supports recvmmsg() and sendmmsg().
    */
   virtual bool supportsMmsg() const PURE;

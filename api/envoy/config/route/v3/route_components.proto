@@ -1687,7 +1687,7 @@ message RateLimit {
 //   value.
 //
 //  [#next-major-version: HeaderMatcher should be refactored to use StringMatcher.]
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message HeaderMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.HeaderMatcher";
 
@@ -1741,6 +1741,15 @@ message HeaderMatcher {
     //
     // * The suffix *abcd* matches the value *xyzabcd*, but not for *xyzbcd*.
     string suffix_match = 10 [(validate.rules).string = {min_bytes: 1}];
+
+    // If specified, header match will be performed based on whether the header value contains
+    // the given value or not.
+    // Note: empty contains match is not allowed, please use present_match instead.
+    //
+    // Examples:
+    //
+    // * The value *abcd* matches the value *xyzabcdpqr*, but not for *xyzbcdpqr*.
+    string contains_match = 12 [(validate.rules).string = {min_bytes: 1}];
   }
 
   // If specified, the match result will be inverted before checking. Defaults to false.

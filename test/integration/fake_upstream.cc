@@ -623,7 +623,8 @@ AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* 
   };
   ENVOY_LOG(debug, "waiting for {} bytes of data", num_bytes);
   if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
-    return AssertionFailure() << "Timed out waiting for data.";
+    return AssertionFailure() << fmt::format(
+               "Timed out waiting for data. Got '{}', waiting for {} bytes.", data_, num_bytes);
   }
   if (data != nullptr) {
     *data = data_;
