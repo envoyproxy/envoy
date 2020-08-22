@@ -478,8 +478,8 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     io_bazel_rules_go = dict(
         project_name = "Go rules for Bazel",
         project_url = "https://github.com/bazelbuild/rules_go",
-        version = "0.23.8",
-        sha256 = "2697f6bc7c529ee5e6a2d9799870b9ec9eaeb3ee7d70ed50b87a2c2c97e13d9e",
+        version = "0.23.7",
+        sha256 = "0310e837aed522875791750de44408ec91046c630374990edd51827cb169f616",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.tar.gz"],
         use_category = ["build"],
     ),
