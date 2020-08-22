@@ -176,7 +176,9 @@ jobs:
           images=($(docker image list --format "{{.Repository}}"))
           tags=($(docker image list --format "{{.Tag}}"))
           for i in "${!images[@]}"; do
-            docker tag ${images[$i]}:${tags[$i]} ${images[$i]}:latest
+              if [[ "${images[i]}" =~ "envoy" ]]; then
+                  docker tag ${images[$i]}:${tags[$i]} ${images[$i]}:latest
+              fi
           done
           sudo apt-get update -y
           sudo apt-get install -y -qq --no-install-recommends redis-tools
