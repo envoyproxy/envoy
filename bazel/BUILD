@@ -343,11 +343,11 @@ config_setting(
 
 config_setting(
     name = "libfuzzer_coverage",
-    values = {
-        "define": "ENVOY_CONFIG_COVERAGE=1",
-    },
     flag_values = {
         "@rules_fuzzing//fuzzing:engine": "libfuzzer",
+    },
+    values = {
+        "define": "ENVOY_CONFIG_COVERAGE=1",
     },
 )
 

@@ -11,7 +11,6 @@ load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@fuzzing_py_deps//:requirements.bzl", fuzzing_pip_install = "pip_install")
 
-
 # go version for rules_go
 GO_VERSION = "1.14.7"
 

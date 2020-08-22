@@ -505,6 +505,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         use_category = ["build"],
     ),
     rules_fuzzing = dict(
+        project_name = "Rules for fuzzing in Bazel",
         sha256 = "3bf7f43c095bc1aa0b6bde9d110b5b7c2e1ecb5c65919b01d19c591172230fd9",
         strip_prefix = "bazel-rules-fuzzing-9ae0b0a1f4cca0ea2e26e9f7da0754904488398a",
         # 2020-08-21

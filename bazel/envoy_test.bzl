@@ -353,4 +353,3 @@ def envoy_sh_test(
             tags = tags + ["nocoverage"],
             **kargs
         )
-
