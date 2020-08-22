@@ -1,7 +1,8 @@
-ARG BUILD_FROM=18.04
+ARG BUILD_OS=ubuntu
+ARG BUILD_TAG=18.04
 
 # Build stage
-FROM buildpack-deps:$BUILD_FROM as build
+FROM buildpack-deps:$BUILD_TAG as build
 
 RUN echo "d6c40440609a23483f12eb6295b5191e94baf08298a856bab6e15b10c3b82891  /tmp/su-exec.c" > /tmp/checksum \
     && curl -o /tmp/su-exec.c https://raw.githubusercontent.com/ncopa/su-exec/212b75144bbc06722fbd7661f651390dc47a43d1/su-exec.c \
@@ -11,7 +12,7 @@ RUN echo "d6c40440609a23483f12eb6295b5191e94baf08298a856bab6e15b10c3b82891  /tmp
     && chmod 0755 /usr/local/bin/su-exec
 
 # Final stage
-FROM ubuntu:$BUILD_FROM
+FROM $BUILD_OS:$BUILD_TAG
 ARG TARGETPLATFORM
 
 RUN apt-get update && apt-get upgrade -y \
