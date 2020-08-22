@@ -2,7 +2,6 @@
 
 #include "common/grpc/google_grpc_utils.h"
 
-#include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/utility.h"
 

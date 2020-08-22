@@ -29,7 +29,7 @@
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/test_host_predicate_config.h"
 #include "test/integration/utility.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"

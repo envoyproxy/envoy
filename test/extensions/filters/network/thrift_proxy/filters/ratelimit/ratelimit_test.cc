@@ -17,7 +17,7 @@
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 

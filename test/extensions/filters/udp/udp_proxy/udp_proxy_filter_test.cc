@@ -4,7 +4,11 @@
 #include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/mocks/network/io_handle.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster_update_callbacks.h"
+#include "test/mocks/upstream/cluster_update_callbacks_handle.h"
+#include "test/mocks/upstream/host.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

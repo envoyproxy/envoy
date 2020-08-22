@@ -11,6 +11,8 @@
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/upstream/load_balancer.h"
+#include "test/mocks/upstream/load_balancer_context.h"
 #include "test/test_common/environment.h"
 
 using testing::Eq;

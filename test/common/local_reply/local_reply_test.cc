@@ -1,6 +1,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/http/codes.h"
 
+#include "common/http/header_utility.h"
 #include "common/local_reply/local_reply.h"
 
 #include "test/mocks/http/mocks.h"

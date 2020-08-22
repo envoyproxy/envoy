@@ -12,7 +12,7 @@
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/host.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"

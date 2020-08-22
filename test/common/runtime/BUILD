@@ -55,7 +55,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

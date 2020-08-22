@@ -19,6 +19,13 @@
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/mocks/upstream/cluster.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster_update_callbacks.h"
+#include "test/mocks/upstream/cluster_update_callbacks_handle.h"
+#include "test/mocks/upstream/host.h"
+#include "test/mocks/upstream/host_set.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

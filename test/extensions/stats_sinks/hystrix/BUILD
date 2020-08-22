@@ -38,7 +38,9 @@ envoy_extension_cc_test(
         "//test/mocks/server:admin_stream_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/stats:stats_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:priority_set_mocks",
     ],
 )
 
