@@ -775,19 +775,19 @@ def checkSourceLine(line, file_path, reportError):
 
 def checkBuildLine(line, file_path, reportError):
   if "@bazel_tools" in line and not (isStarlarkFile(file_path) or
-                                    file_path.startswith("./bazel/") or "python/runfiles" in line):
+                                     file_path.startswith("./bazel/") or "python/runfiles" in line):
     reportError("unexpected @bazel_tools reference, please indirect via a definition in //bazel")
   if not allowlistedForProtobufDeps(file_path) and '"protobuf"' in line:
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
   if (envoy_build_rule_check and not isStarlarkFile(file_path) and
-     not isWorkspaceFile(file_path) and not isExternalBuildFile(file_path) and "@envoy//" in line):
+      not isWorkspaceFile(file_path) and not isExternalBuildFile(file_path) and "@envoy//" in line):
     reportError("Superfluous '@envoy//' prefix")
 
 
 def fixBuildLine(file_path, line, line_number):
   if (envoy_build_rule_check and not isStarlarkFile(file_path) and
-     not isWorkspaceFile(file_path) and not isExternalBuildFile(file_path)):
+      not isWorkspaceFile(file_path) and not isExternalBuildFile(file_path)):
     line = line.replace("@envoy//", "//")
   return line
 
