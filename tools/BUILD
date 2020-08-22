@@ -26,6 +26,12 @@ envoy_py_test_binary(
     ],
 )
 
+py_binary(
+    name = "make_corpus_dir",
+    srcs = ["make_corpus_dir.py"],
+    visibility = ["//visibility:public"],
+)
+
 py_library(
     name = "run_command",
     srcs = [

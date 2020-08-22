@@ -505,10 +505,10 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         use_category = ["build"],
     ),
     rules_fuzzing = dict(
-        sha256 = "8d98c444600ce25082b320a3364150806109fe33620a4e1c5bb856861591acb9",
-        strip_prefix = "bazel-rules-fuzzing-8520424714e827ff0360283e3237e35c8723d931",
-        # 2020-08-04
-        urls = ["https://github.com/googleinterns/bazel-rules-fuzzing/archive/8520424714e827ff0360283e3237e35c8723d931.zip"],
+        sha256 = "3bf7f43c095bc1aa0b6bde9d110b5b7c2e1ecb5c65919b01d19c591172230fd9",
+        strip_prefix = "bazel-rules-fuzzing-9ae0b0a1f4cca0ea2e26e9f7da0754904488398a",
+        # 2020-08-21
+        urls = ["https://github.com/googleinterns/bazel-rules-fuzzing/archive/9ae0b0a1f4cca0ea2e26e9f7da0754904488398a.zip"],
         use_category = ["test"],
     ),
     rules_python = dict(

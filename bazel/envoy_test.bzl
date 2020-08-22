@@ -1,6 +1,6 @@
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
-load("@rules_fuzzing//fuzzing:common.bzl", "fuzzing_corpus")
+load("@rules_fuzzing//fuzzing:common.bzl", "fuzzing_corpus", "fuzzing_launcher")
 
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy test targets. This includes both test library and test binary targets.
@@ -110,7 +110,7 @@ def envoy_cc_fuzz_test(
         **kwargs
     )
     cc_test(
-        name = name,
+        name = name + "_binary",
         copts = fuzz_copts + envoy_copts("@envoy", test = True),
         linkopts = _envoy_test_linkopts() + select({
             "@envoy//bazel:libfuzzer": ["-fsanitize=fuzzer"],
@@ -145,14 +145,21 @@ def envoy_cc_fuzz_test(
         testonly = True,
     )
 
-    envoy_fuzzing_launcher(
-        name = name + "_run",
-        target = name,
+    # Target for regression test
+    fuzzing_launcher(
+        name = name,
+        target = name + "_binary",
         corpus = name + "_corpus_dir" if corpus_name else None,
-        need_launcher = select({
-            "@envoy//bazel:libfuzzer": True,
-            "//conditions:default": False,
-        }),
+        is_regression = True,
+        testonly = True,
+    )
+
+    # Target for continuous fuzzing test or regression gUnit test
+    fuzzing_launcher(
+        name = name + "_run",
+        target = name + "_binary",
+        corpus = name + "_corpus_dir" if corpus_name else None,
+        is_regression = False,
         testonly = True,
     )
 
@@ -347,64 +354,3 @@ def envoy_sh_test(
             **kargs
         )
 
-def _envoy_fuzzing_launcher_impl(ctx):
-    # Generate a script to launcher the fuzzing test.
-    script = ctx.actions.declare_file("%s" % ctx.label.name)
-
-    if ctx.attr.need_launcher:
-        script_template = """#!/bin/sh
-exec {launcher_path} {target_binary_path} --corpus_dir={corpus_dir} "$@"
-"""
-
-        script_content = script_template.format(
-            launcher_path = ctx.executable._launcher.short_path,
-            target_binary_path = ctx.executable.target.short_path,
-            corpus_dir = ctx.file.corpus.short_path if ctx.attr.corpus else "",
-        )
-    else:
-        script_template = """#!/bin/sh
-exec {target_binary_path} {corpus_dir}
-"""
-        script_content = script_template.format(
-            target_binary_path = ctx.executable.target.short_path,
-            corpus_dir = ctx.file.corpus.short_path if ctx.attr.corpus else "",
-        )
-    ctx.actions.write(script, script_content, is_executable = True)
-
-    # Merge the dependencies.
-    runfiles = ctx.attr._launcher[DefaultInfo].default_runfiles
-    runfiles = runfiles.merge(ctx.attr.target[DefaultInfo].default_runfiles)
-    if ctx.attr.corpus:
-        runfiles = runfiles.merge(ctx.attr.corpus[DefaultInfo].default_runfiles)
-
-    return [DefaultInfo(executable = script, runfiles = runfiles)]
-
-envoy_fuzzing_launcher = rule(
-    implementation = _envoy_fuzzing_launcher_impl,
-    doc = """
-Rule for creating a script to run the fuzzing test or regression test.
-""",
-    attrs = {
-        "_launcher": attr.label(
-            default = Label("@rules_fuzzing//fuzzing/tools:launcher"),
-            doc = "The launcher script to start the fuzzing test.",
-            executable = True,
-            cfg = "host",
-        ),
-        "target": attr.label(
-            executable = True,
-            doc = "The fuzzing test to run.",
-            cfg = "target",
-            mandatory = True,
-        ),
-        "corpus": attr.label(
-            doc = "The target to create a directory containing corpus files.",
-            allow_single_file = True,
-        ),
-        "need_launcher": attr.bool(
-            doc = "If set true, the laucher script will be used otherwise just run target with corpus",
-            default = False,
-        ),
-    },
-    executable = True,
-)
