@@ -449,6 +449,38 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
+TEST_F(RateLimitPolicyEntryTest, GenericKeyWithSetDescriptorKey) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_key: fake_key
+    descriptor_value: fake_value
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
+                                         dynamic_metadata_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "fake_value"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, GenericKeyWithEmptyDescriptorKey) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_key: ""
+    descriptor_value: fake_value
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
+                                         dynamic_metadata_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "fake_value"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
 TEST_F(RateLimitPolicyEntryTest, DynamicMetaDataMatch) {
   const std::string yaml = R"EOF(
 actions:
