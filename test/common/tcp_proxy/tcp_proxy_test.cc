@@ -31,7 +31,6 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/host.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"

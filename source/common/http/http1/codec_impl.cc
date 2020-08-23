@@ -839,7 +839,7 @@ ServerConnectionImpl::ServerConnectionImpl(
       headers_with_underscores_action_(headers_with_underscores_action) {}
 
 uint32_t ServerConnectionImpl::getHeadersSize() {
-  // Add in the the size of the request URL if processing request headers.
+  // Add in the size of the request URL if processing request headers.
   const uint32_t url_size = (!processing_trailers_ && active_request_.has_value())
                                 ? active_request_.value().request_url_.size()
                                 : 0;

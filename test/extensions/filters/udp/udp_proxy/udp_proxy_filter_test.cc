@@ -9,7 +9,11 @@
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/socket.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster_update_callbacks.h"
+#include "test/mocks/upstream/cluster_update_callbacks_handle.h"
+#include "test/mocks/upstream/host.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"

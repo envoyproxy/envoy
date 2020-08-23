@@ -321,7 +321,7 @@ public:
 class HttpCacheFactory : public Config::TypedFactory {
 public:
   // From UntypedFactory
-  std::string category() const override { return "http_cache_factory"; }
+  std::string category() const override { return "envoy.http.cache"; }
 
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).

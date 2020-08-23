@@ -22,9 +22,10 @@ envoy_cc_mock(
     name = "mock_lib",
     hdrs = ["mock.h"],
     deps = [
+        "//source/common/http:message_lib",
         "//source/extensions/filters/http/jwt_authn:authenticator_lib",
         "//source/extensions/filters/http/jwt_authn:verifier_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 
