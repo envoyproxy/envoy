@@ -115,7 +115,7 @@ message ExtAuthz {
   // Specifies if the peer certificate is sent to the external service.
   //
   // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
-  // :ref:`certificate<envoy_api_field_service.auth.v3.AttributeContext.Peer.certificate>`.
+  // :ref:`certificate<envoy_api_field_service.auth.v4alpha.AttributeContext.Peer.certificate>`.
   bool include_peer_certificate = 10;
 }
 
@@ -253,7 +253,7 @@ message CheckSettings {
       "envoy.extensions.filters.http.ext_authz.v3.CheckSettings";
 
   // Context extensions to set on the CheckRequest's
-  // :ref:`AttributeContext.context_extensions<envoy_api_field_service.auth.v3.AttributeContext.context_extensions>`
+  // :ref:`AttributeContext.context_extensions<envoy_api_field_service.auth.v4alpha.AttributeContext.context_extensions>`
   //
   // Merge semantics for this field are such that keys from more specific configs override.
   //

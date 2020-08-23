@@ -265,14 +265,7 @@ public:
                        Ssl::ConnectionInfoConstSharedPtr ssl_info);
 
   // Upstream::LoadBalancerContext
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
-    if (route_) {
-      return route_->metadataMatchCriteria();
-    }
-    return nullptr;
-  }
-
-  // Upstream::LoadBalancerContext
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() override;
   absl::optional<uint64_t> computeHashKey() override {
     auto hash_policy = config_->hashPolicy();
     if (hash_policy) {
@@ -376,6 +369,7 @@ protected:
                                                           // read filter.
   std::unique_ptr<GenericUpstream> upstream_;
   RouteConstSharedPtr route_;
+  Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   uint32_t connect_attempts_{};
   bool connecting_{};

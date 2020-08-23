@@ -159,8 +159,9 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
       // NOTE: The socket call can only fail due to memory/fd exhaustion. No local ephemeral port
       //       is bound until the first packet is sent to the upstream host.
       io_handle_(cluster.filter_.createIoHandle(host)),
-      socket_event_(cluster.filter_.read_callbacks_->udpListener().dispatcher().createFileEvent(
-          io_handle_->fd(), [this](uint32_t) { onReadReady(); }, Event::PlatformDefaultTriggerType,
+      socket_event_(io_handle_->createFileEvent(
+          cluster.filter_.read_callbacks_->udpListener().dispatcher(),
+          [this](uint32_t) { onReadReady(); }, Event::PlatformDefaultTriggerType,
           Event::FileReadyType::Read)) {
   ENVOY_LOG(debug, "creating new session: downstream={} local={} upstream={}",
             addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
@@ -180,6 +181,9 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
 }
 
 UdpProxyFilter::ActiveSession::~ActiveSession() {
+  ENVOY_LOG(debug, "deleting the session: downstream={} local={} upstream={}",
+            addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
+            host_->address()->asStringView());
   cluster_.filter_.config_->stats().downstream_sess_active_.dec();
   cluster_.cluster_.info()
       ->resourceManager(Upstream::ResourcePriority::Default)

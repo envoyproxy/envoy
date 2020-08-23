@@ -19,7 +19,11 @@ envoy_extension_cc_test(
         "//source/common/common:hash_lib",
         "//source/extensions/filters/udp/udp_proxy:udp_proxy_filter_lib",
         "//test/mocks/network:io_handle_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:cluster_update_callbacks_handle_mocks",
+        "//test/mocks/upstream:cluster_update_callbacks_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/mocks/upstream:thread_local_cluster_mocks",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
     ],
 )

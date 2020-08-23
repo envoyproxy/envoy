@@ -146,6 +146,12 @@ struct LookupResult {
   // TODO(toddmgreer): Implement trailer support.
   // True if the cached response has trailers.
   bool has_trailers_ = false;
+
+  // Update the content length of the object and its response headers.
+  void setContentLength(uint64_t new_length) {
+    content_length_ = new_length;
+    headers_->setContentLength(new_length);
+  }
 };
 using LookupResultPtr = std::unique_ptr<LookupResult>;
 
@@ -315,7 +321,7 @@ public:
 class HttpCacheFactory : public Config::TypedFactory {
 public:
   // From UntypedFactory
-  std::string category() const override { return "http_cache_factory"; }
+  std::string category() const override { return "envoy.http.cache"; }
 
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).
