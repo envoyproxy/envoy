@@ -20,7 +20,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.udp_listener.udp_proxy]
 
 // Configuration for the UDP proxy filter.
-// [#next-free-field: 6]
 message UdpProxyConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig";
@@ -42,5 +41,5 @@ message UdpProxyConfig {
   // Optional configuration for UDP proxy hash policy. If hash_policy is not set, the hash-based
   // load balancing algorithms will select a host randomly. Currently the number of hash policies is
   // limited to 1.
-  repeated type.v3.HashPolicy hash_policy = 5 [(validate.rules).repeated = {max_items: 1}];
+  repeated type.v3.HashPolicy hash_policy = 4 [(validate.rules).repeated = {max_items: 1}];
 }
