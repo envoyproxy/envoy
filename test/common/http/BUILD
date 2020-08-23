@@ -169,6 +169,7 @@ envoy_cc_fuzz_test(
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/common/http:date_provider_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:request_id_extension_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
