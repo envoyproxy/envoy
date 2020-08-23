@@ -177,6 +177,14 @@ public:
             InvokeWithoutArgs([]() -> Api::IoCallUint64Result { return makeNoError(0); }));
   }
 
+  std::shared_ptr<NiceMock<Upstream::MockHost>>
+  createHost(const Network::Address::InstanceConstSharedPtr& host_address) {
+    auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
+    ON_CALL(*host, address()).WillByDefault(Return(host_address));
+    ON_CALL(*host, health()).WillByDefault(Return(Upstream::Host::Health::Healthy));
+    return host;
+  }
+
   void checkTransferStats(uint64_t rx_bytes, uint64_t rx_datagrams, uint64_t tx_bytes,
                           uint64_t tx_datagrams) {
     EXPECT_EQ(rx_bytes, config_->stats().downstream_sess_rx_bytes_.value());
@@ -472,10 +480,8 @@ cluster: fake_cluster
 
   EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, health())
       .WillRepeatedly(Return(Upstream::Host::Health::Unhealthy));
-  auto new_host = std::make_shared<NiceMock<Upstream::MockHost>>();
   auto new_host_address = Network::Utility::parseInternetAddressAndPort("20.0.0.2:443");
-  ON_CALL(*new_host, address()).WillByDefault(Return(new_host_address));
-  ON_CALL(*new_host, health()).WillByDefault(Return(Upstream::Host::Health::Healthy));
+  auto new_host = createHost(new_host_address);
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(new_host));
   expectSessionCreate(new_host_address);
   test_sessions_[1].expectUpstreamWrite("hello");
@@ -484,7 +490,8 @@ cluster: fake_cluster
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 }
 
-TEST_F(UdpProxyFilterTest, HashWithSourceIpConfig) {
+// Make sure hash policy with source_ip is created.
+TEST_F(UdpProxyFilterTest, HashPolicyWithSourceIp) {
   InSequence s;
 
   setup(R"EOF(
@@ -497,7 +504,8 @@ hash_policy:
   EXPECT_NE(nullptr, config_->hashPolicy());
 }
 
-TEST_F(UdpProxyFilterTest, HashWithSourceIpDefaultConfig) {
+// Make sure hash policy is null if it is not mentioned.
+TEST_F(UdpProxyFilterTest, NoHashPolicy) {
   InSequence s;
 
   setup(R"EOF(
@@ -508,6 +516,7 @@ cluster: fake_cluster
   EXPECT_EQ(nullptr, config_->hashPolicy());
 }
 
+// Expect correct hash is created if hash_policy with source_ip is mentioned.
 TEST_F(UdpProxyFilterTest, HashWithSourceIp) {
   InSequence s;
 
@@ -518,10 +527,7 @@ hash_policy:
 - source_ip: {}
   )EOF");
 
-  auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
-  ON_CALL(*host, address()).WillByDefault(Return(upstream_address_));
-  ON_CALL(*host, health()).WillByDefault(Return(Upstream::Host::Health::Healthy));
-
+  auto host = createHost(upstream_address_);
   auto generated_hash = HashUtil::xxHash64("10.0.0.1");
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Invoke([host, generated_hash](
@@ -531,6 +537,29 @@ hash_policy:
         EXPECT_EQ(generated_hash, hash.value());
         return host;
       }));
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectUpstreamWrite("hello");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  test_sessions_[0].recvDataFromUpstream("world");
+}
+
+// Expect null hash value if hash_policy is not mentioned.
+TEST_F(UdpProxyFilterTest, NullHashWithoutHashPolicy) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+  )EOF");
+
+  auto host = createHost(upstream_address_);
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(
+          Invoke([host](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+            auto hash = context->computeHashKey();
+            EXPECT_FALSE(hash.has_value());
+            return host;
+          }));
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectUpstreamWrite("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");

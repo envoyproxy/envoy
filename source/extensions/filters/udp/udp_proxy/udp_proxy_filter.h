@@ -112,7 +112,7 @@ public:
   absl::optional<uint64_t> computeHashKey() override { return hash_; }
 
 private:
-  absl::optional<uint64_t> hash_{};
+  absl::optional<uint64_t> hash_;
 };
 
 class UdpProxyFilter : public Network::UdpListenerReadFilter,
