@@ -40,5 +40,14 @@ public:
               (const));
 };
 
+class MockReadableSource : public ReadableSource {
+public:
+  MockReadableSource();
+  ~MockReadableSource() override;
+  
+  MOCK_METHOD(bool, isPeerShutDownWrite, (), (const));
+  MOCK_METHOD(bool, isReadable, (), (const));
+};
+
 } // namespace Network
 } // namespace Envoy

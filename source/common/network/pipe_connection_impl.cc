@@ -414,8 +414,13 @@ void ClientPipeImpl::write(Buffer::Instance& data, bool end_stream, bool through
     // we never change existing write_buffer_ chain elements between calls to SSL_write(). That code
     // might need to change if we ever copy here.
     write_buffer_->move(data);
-    onWriteReady();
-    RELEASE_ASSERT(!connecting_, "Userspace pipe should not see connecting state.");
+    // Activating a write event before the socket is connected has the side-effect of tricking
+    // doWriteReady into thinking the socket is connected. On macOS, the underlying write may fail
+    // with a connection error if a call to write(2) occurs before the connection is completed.
+    if (!connecting_) {
+      scheduleWriteEvent();
+      scheduleNextEvent();
+    }
   }
 }
 
@@ -1005,7 +1010,8 @@ void ServerPipeImpl::write(Buffer::Instance& data, bool end_stream, bool through
     // we never change existing write_buffer_ chain elements between calls to SSL_write(). That code
     // might need to change if we ever copy here.
     write_buffer_->move(data);
-    onWriteReady();
+    scheduleWriteEvent();
+    scheduleNextEvent();
   }
 }
 

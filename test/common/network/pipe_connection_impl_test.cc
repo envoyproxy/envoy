@@ -53,22 +53,6 @@ protected:
   PipeConnectionImplTest()
       : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_) {}
 
-  void setUpBasicConnection() {
-    if (dispatcher_.get() == nullptr) {
-      dispatcher_ = api_->allocateDispatcher("test_thread");
-    }
-    socket_ = std::make_shared<Network::TcpListenSocket>(
-        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, "");
-    client_connection_ = std::make_unique<Network::ClientPipeImpl>(
-        *dispatcher_, socket_->localAddress(), source_address_,
-        Network::Test::createRawBufferSocket(), socket_options_);
-    client_connection_->addConnectionCallbacks(client_callbacks_);
-    EXPECT_EQ(nullptr, client_connection_->ssl());
-    const Network::ClientConnection& const_connection = *client_connection_;
-    EXPECT_EQ(nullptr, const_connection.ssl());
-  }
-
   void setupPipe() {
     if (dispatcher_.get() == nullptr) {
       dispatcher_ = api_->allocateDispatcher("test_thread");
@@ -79,13 +63,15 @@ protected:
     auto client_socket_raw = client_socket.get();
     auto server_socket_raw = server_socket.get();
     auto client_conn = std::make_unique<Network::ClientPipeImpl>(
-        *dispatcher_, server_address_, client_address_, std::move(client_socket), nullptr);
+        *dispatcher_, server_address_, client_address_, std::move(client_socket),
+        *client_socket_raw, nullptr);
     ENVOY_LOG_MISC(debug, "lambdai: client pipe C{} owns TS{} and B{}", client_conn->id(),
                    client_socket_raw->bsid(), client_socket_raw->read_buffer_.bid());
     client_conn->addConnectionCallbacks(client_callbacks_);
 
     auto server_conn = std::make_unique<Network::ServerPipeImpl>(
-        *dispatcher_, client_address_, server_address_, std::move(server_socket), nullptr);
+        *dispatcher_, client_address_, server_address_, std::move(server_socket),
+        *server_socket_raw, nullptr);
     ENVOY_LOG_MISC(debug, "lambdai: server pipe C{} owns TS{} and B{}", server_conn->id(),
                    server_socket_raw->bsid(), server_socket_raw->read_buffer_.bid());
 
@@ -93,10 +79,11 @@ protected:
     client_conn->setPeer(server_conn.get());
     // TODO(lambdai): Retrieve buffer each time when supporting close.
     // TODO(lambdai): Add to dest buffer to generic IoHandle, or TransportSocketCallback.
-    // client_socket_raw->setReadSourceBuffer(&server_conn->getWriteBuffer().buffer);
     client_socket_raw->setWritablePeer(server_socket_raw);
-    // server_socket_raw->setReadSourceBuffer(&client_conn->getWriteBuffer().buffer);
+    client_socket_raw->setEventSchedulable(client_conn.get());
     server_socket_raw->setWritablePeer(client_socket_raw);
+    server_socket_raw->setEventSchedulable(server_conn.get());
+    
     server_connection_ = std::move(server_conn);
     client_connection_ = std::move(client_conn);
     server_socket_ = server_socket_raw;
@@ -120,6 +107,12 @@ protected:
     server_connection_->addConnectionCallbacks(server_callbacks_);
     read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
     server_connection_->addReadFilter(read_filter_);
+
+    // TODO(lambdai): scheduleNextEvent() should automatically trigger Write at established.
+    client_connection_->scheduleWriteEvent();
+    client_connection_->scheduleNextEvent();
+    server_connection_->scheduleWriteEvent();
+    server_connection_->scheduleNextEvent();
   }
 
   void disconnect(bool wait_for_remote_close) {
@@ -238,9 +231,10 @@ TEST_P(PipeConnectionImplTest, UniqueId) {
 TEST_P(PipeConnectionImplTest, ClientClose) {
   setupPipe();
   doConnect();
-  Buffer::OwnedImpl buffer("hello world");
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected));
+  Buffer::OwnedImpl buffer("hello world");
   client_connection_->write(buffer, false);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
@@ -259,11 +253,13 @@ TEST_P(PipeConnectionImplTest, DISABLED_ReadDisable) {
         // wraps the returned raw pointer below with a unique_ptr.
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
+  auto mock_readable_source = std::make_unique<MockReadableSource>();
   auto transport_socket = std::make_unique<NiceMock<MockTransportSocket>>();
   EXPECT_CALL(*transport_socket, canFlushClose()).WillRepeatedly(Return(true));
   auto& transport_socket_ref = *transport_socket;
   auto connection = std::make_unique<Network::ServerPipeImpl>(
-      *dispatcher, server_address_, client_address_, std::move(transport_socket), nullptr);
+      *dispatcher, server_address_, client_address_, std::move(transport_socket),
+      *mock_readable_source, nullptr);
   connection->setStreamInfo(&stream_info_);
   ON_CALL(transport_socket_ref, doRead(_))
       .WillByDefault(Return(Network::IoResult{Network::PostIoAction::KeepOpen, 0, false}));
