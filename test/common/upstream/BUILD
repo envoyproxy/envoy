@@ -37,6 +37,9 @@ envoy_cc_test(
     ],
     deps = [
         ":test_cluster_manager",
+        "//test/mocks/upstream:cds_api_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/mocks/upstream:thread_aware_load_balancer_mocks",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
