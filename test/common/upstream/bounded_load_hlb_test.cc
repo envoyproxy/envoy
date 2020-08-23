@@ -23,7 +23,7 @@ public:
   }
 
 private:
-  const NormalizedHostWeightVector ring_;
+  const NormalizedHostWeightVector ring_{};
 };
 
 using HostOverloadedPredicate = std::function<bool(const Host& host, double weight)>;
