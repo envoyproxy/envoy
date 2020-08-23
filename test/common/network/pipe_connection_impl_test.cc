@@ -83,7 +83,7 @@ protected:
     client_socket_raw->setEventSchedulable(client_conn.get());
     server_socket_raw->setWritablePeer(client_socket_raw);
     server_socket_raw->setEventSchedulable(server_conn.get());
-    
+
     server_connection_ = std::move(server_conn);
     client_connection_ = std::move(client_conn);
     server_socket_ = server_socket_raw;
@@ -109,10 +109,10 @@ protected:
     server_connection_->addReadFilter(read_filter_);
 
     // TODO(lambdai): scheduleNextEvent() should automatically trigger Write at established.
-    client_connection_->scheduleWriteEvent();
-    client_connection_->scheduleNextEvent();
-    server_connection_->scheduleWriteEvent();
-    server_connection_->scheduleNextEvent();
+    client_connection_->enableWriteRead();
+//    client_connection_->scheduleNextEvent();
+    server_connection_->enableWriteRead();
+//    server_connection_->scheduleNextEvent();
   }
 
   void disconnect(bool wait_for_remote_close) {
@@ -324,8 +324,8 @@ TEST_P(PipeConnectionImplTest, ReadEnableDispatches) {
           dispatcher_->exit();
           return FilterStatus::StopIteration;
         }));
-
     server_connection_->write(buffer, false);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
   {
@@ -337,7 +337,7 @@ TEST_P(PipeConnectionImplTest, ReadEnableDispatches) {
           return FilterStatus::StopIteration;
         }));
     client_connection_->readDisable(false);
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
