@@ -7,11 +7,11 @@
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/mocks/upstream/cds_api.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/mocks/upstream/cluster_real_priority_set.h"
 #include "test/mocks/upstream/cluster_update_callbacks.h"
 #include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/thread_aware_load_balancer.h"
-
 namespace Envoy {
 namespace Upstream {
 namespace {
