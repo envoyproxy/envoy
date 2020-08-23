@@ -4,7 +4,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AnyNumber;
 using testing::Assign;
 using testing::DoAll;
 using testing::Invoke;
