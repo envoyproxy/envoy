@@ -38,6 +38,7 @@ envoy_cc_test(
     deps = [
         ":test_cluster_manager",
         "//test/mocks/upstream:cds_api_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:cluster_update_callbacks_mocks",
         "//test/mocks/upstream:health_checker_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
