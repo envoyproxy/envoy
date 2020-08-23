@@ -105,6 +105,8 @@ public:
               clusterType, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&,
               lbRingHashConfig, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>&,
+              lbMaglevConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&,
               lbLeastRequestConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&,
