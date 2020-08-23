@@ -187,7 +187,7 @@ public:
 
   /**
    * @return Event::Dispatcher& the dispatcher backing this client. May return nullptr for clients
-   * that do use a dispatcher.
+   * that do not use a dispatcher to perform their i/o.
    */
   virtual Event::Dispatcher* dispatcher() PURE;
 };
