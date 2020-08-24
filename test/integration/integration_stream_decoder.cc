@@ -122,4 +122,5 @@ void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason, abs
     dispatcher_.exit();
   }
 }
+
 } // namespace Envoy

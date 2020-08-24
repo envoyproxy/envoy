@@ -27,8 +27,7 @@ namespace Envoy {
  */
 class IntegrationTcpClient {
 public:
-  IntegrationTcpClient(Event::Dispatcher& dispatcher, Event::TestTimeSystem& time_system,
-                       MockBufferFactory& factory, uint32_t port,
+  IntegrationTcpClient(Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
                        Network::Address::IpVersion version, bool enable_half_close,
                        const Network::ConnectionSocket::OptionsSharedPtr& options);
 
@@ -60,7 +59,6 @@ private:
     IntegrationTcpClient& parent_;
   };
 
-  Event::TestTimeSystem& time_system_;
   std::shared_ptr<WaitForPayloadReader> payload_reader_;
   std::shared_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr connection_;
@@ -71,3 +69,4 @@ private:
 using IntegrationTcpClientPtr = std::unique_ptr<IntegrationTcpClient>;
 
 } // namespace Envoy
+

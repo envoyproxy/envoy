@@ -43,6 +43,7 @@ using ::testing::Invoke;
 using ::testing::IsSubstring;
 using ::testing::NiceMock;
 using ::testing::ReturnRef;
+
 BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                                          Network::Address::IpVersion version,
                                          const std::string& config)

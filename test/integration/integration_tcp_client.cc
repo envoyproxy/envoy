@@ -37,10 +37,10 @@ using ::testing::NiceMock;
 using ::testing::ReturnRef;
 
 IntegrationTcpClient::IntegrationTcpClient(
-    Event::Dispatcher& dispatcher, Event::TestTimeSystem& time_system, MockBufferFactory& factory,
-    uint32_t port, Network::Address::IpVersion version, bool enable_half_close,
+    Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
+    Network::Address::IpVersion version, bool enable_half_close,
     const Network::ConnectionSocket::OptionsSharedPtr& options)
-    : time_system_(time_system), payload_reader_(new WaitForPayloadReader(dispatcher)),
+    : payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
   EXPECT_CALL(factory, create_(_, _, _))
       .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
@@ -113,7 +113,7 @@ void IntegrationTcpClient::readDisable(bool disabled) { connection_->readDisable
 
 AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_stream, bool verify,
                                             std::chrono::milliseconds timeout) {
-  auto end_time = time_system_.monotonicTime() + timeout;
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
   Buffer::OwnedImpl buffer(data);
   if (verify) {
     EXPECT_CALL(*client_write_buffer_, move(_));
@@ -130,9 +130,9 @@ AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_st
     if (client_write_buffer_->bytes_written() == bytes_expected || disconnected_) {
       break;
     }
-  } while (time_system_.monotonicTime() < end_time);
+  } while (bound.withinBound());
 
-  if (time_system_.monotonicTime() >= end_time) {
+  if (!bound.withinBound()) {
     return AssertionFailure() << "Timed out completing write";
   } else if (verify && (disconnected_ || client_write_buffer_->bytes_written() != bytes_expected)) {
     return AssertionFailure()
@@ -150,4 +150,5 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
     parent_.connection_->dispatcher().exit();
   }
 }
+
 } // namespace Envoy
