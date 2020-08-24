@@ -6,6 +6,8 @@ if __name__ == "__main__":
   search_folder = "//source/common/..."
 
   diff_file_whitelist = ['source', 'include']
+  os.system("git fetch")
+  os.system("git diff --name-only ..origin/master ")
   os.system("git show --name-only > {}".format(TMP_OUTPUT))
   f = open(TMP_OUTPUT, 'r+')
   commit = ""
