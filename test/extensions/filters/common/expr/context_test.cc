@@ -31,9 +31,7 @@ TEST(Context, EmptyHeadersAttributes) {
 }
 
 TEST(Context, InvalidHeaderAttributes) {
-  Http::TestRequestHeaderMapImpl header_map{
-      {"referer", "dogs.com\n"}
-  };
+  Http::TestRequestHeaderMapImpl header_map{{"referer", "dogs.com\n"}};
   HeadersWrapper<Http::RequestHeaderMap> headers(&header_map);
   auto header = headers[CelValue::CreateStringView(Referer)];
   EXPECT_FALSE(header.has_value());
