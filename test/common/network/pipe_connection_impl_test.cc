@@ -870,89 +870,86 @@ TEST_P(PipeConnectionImplTest, WritePartialAndHighwatermarkRemains) {
   // call to write() will succeed, bringing the connection back under the low watermark.
   EXPECT_CALL(*client_write_buffer_, write(_)).Times(0);
 
+  EXPECT_CALL(*client_write_buffer_, drain(0)).Times(AnyNumber());
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose));
   client_connection_->close(ConnectionCloseType::FlushWrite);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-// // Read and write random bytes and ensure we don't encounter issues.
-// TEST_P(PipeConnectionImplTest, WatermarkFuzzing) {
-//   useMockBuffer();
-//   setUpBasicConnection();
+// Read and write random bytes and ensure we don't encounter issues.
+TEST_P(PipeConnectionImplTest, DISABLED_WatermarkFuzzing) {
+  useMockBuffer();
+  setupPipe();
+  doConnect();
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected));
 
-//   connect();
-//   client_connection_->setBufferLimits(10);
+  client_connection_->setBufferLimits(10);
 
-//   TestRandomGenerator rand;
-//   int bytes_buffered = 0;
-//   int new_bytes_buffered = 0;
+  TestRandomGenerator rand;
+  int bytes_buffered = 0;
+  int new_bytes_buffered = 0;
 
-//   bool is_below = true;
-//   bool is_above = false;
+  bool is_below = true;
+  bool is_above = false;
 
-//   ON_CALL(*client_write_buffer_, write(_))
-//       .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::failWrite));
-//   ON_CALL(*client_write_buffer_, drain(_))
-//       .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::baseDrain));
-//   EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AnyNumber());
+  ON_CALL(*client_write_buffer_, write(_)).WillByDefault(testing::Invoke([](Network::IoHandle&) {
+    RELEASE_ASSERT(false, "should never write to IoHandle in pipe connection");
+    return Api::IoCallUint64Result(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+  }));
+  ON_CALL(*client_write_buffer_, drain(_))
+      .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::baseDrain));
+  EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AnyNumber());
 
-//   // Randomly write 1-20 bytes and read 1-30 bytes per loop.
-//   for (int i = 0; i < 50; ++i) {
-//     // The bytes to read this loop.
-//     int bytes_to_write = rand.random() % 20 + 1;
-//     // The bytes buffered at the beginning of this loop.
-//     bytes_buffered = new_bytes_buffered;
-//     // Bytes to flush upstream.
-//     int bytes_to_flush = std::min<int>(rand.random() % 30 + 1, bytes_to_write +
-//     bytes_buffered);
-//     // The number of bytes buffered at the end of this loop.
-//     new_bytes_buffered = bytes_buffered + bytes_to_write - bytes_to_flush;
-//     ENVOY_LOG_MISC(trace,
-//                    "Loop iteration {} bytes_to_write {} bytes_to_flush {} bytes_buffered is {}
-//                    and " "will be be {}", i, bytes_to_write, bytes_to_flush, bytes_buffered,
-//                    new_bytes_buffered);
+  // Randomly write 1-20 bytes and read 1-30 bytes per loop.
+  for (int i = 0; i < 1; ++i) {
+    // The bytes to read this loop.
+    int bytes_to_write = rand.random() % 20 + 1;
+    // The bytes buffered at the beginning of this loop.
+    bytes_buffered = new_bytes_buffered;
+    // Bytes to flush upstream.
+    int bytes_to_flush = std::min<int>(rand.random() % 30 + 1, bytes_to_write + bytes_buffered);
+    // The number of bytes buffered at the end of this loop.
+    new_bytes_buffered = bytes_buffered + bytes_to_write - bytes_to_flush;
+    ENVOY_LOG_MISC(trace,
+                   "Loop iteration {} bytes_to_write {} bytes_to_flush {} bytes_buffered is {} and "
+                   "will be be {} ",
+                   i, bytes_to_write, bytes_to_flush, bytes_buffered, new_bytes_buffered);
 
-//     std::string data(bytes_to_write, 'a');
-//     Buffer::OwnedImpl buffer_to_write(data);
+    std::string data(bytes_to_write, 'a');
+    Buffer::OwnedImpl buffer_to_write(data);
 
-//     // If the current bytes buffered plus the bytes we write this loop go over
-//     // the watermark and we're not currently above, we will get a callback for
-//     // going above.
-//     if (bytes_to_write + bytes_buffered > 11 && is_below) {
-//       ENVOY_LOG_MISC(trace, "Expect onAboveWriteBufferHighWatermark");
-//       EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
-//       is_below = false;
-//       is_above = true;
-//     }
-//     // If after the bytes are flushed upstream the number of bytes remaining is
-//     // below the low watermark and the bytes were not previously below the low
-//     // watermark, expect the callback for going below.
-//     if (new_bytes_buffered <= 5 && is_above) {
-//       ENVOY_LOG_MISC(trace, "Expect onBelowWriteBufferLowWatermark");
-//       EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark());
-//       is_below = true;
-//       is_above = false;
-//     }
+    // If the current bytes buffered plus the bytes we write this loop go over
+    // the watermark and we're not currently above, we will get a callback for
+    // going above.
+    if (bytes_to_write + bytes_buffered > 11 && is_below) {
+      ENVOY_LOG_MISC(trace, "Expect onAboveWriteBufferHighWatermark");
+      EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
+      is_below = false;
+      is_above = true;
+    }
+    // If after the bytes are flushed upstream the number of bytes remaining is
+    // below the low watermark and the bytes were not previously below the low
+    // watermark, expect the callback for going below.
+    if (new_bytes_buffered <= 5 && is_above) {
+      ENVOY_LOG_MISC(trace, "Expect onBelowWriteBufferLowWatermark");
+      EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark());
+      is_below = true;
+      is_above = false;
+    }
 
-//     // Do the actual work. Write |buffer_to_write| bytes to the connection and
-//     // drain |bytes_to_flush| before having the buffer failWrite()
-//     EXPECT_CALL(*client_write_buffer_, move(_))
-//         .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
-//     EXPECT_CALL(*client_write_buffer_, write(_))
-//         .WillOnce(
-//             DoAll(Invoke([&](IoHandle&) -> void { client_write_buffer_->drain(bytes_to_flush);
-//             }),
-//                   Return(testing::ByMove(Api::IoCallUint64Result(
-//                       bytes_to_flush, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}))))))
-//         .WillRepeatedly(testing::Invoke(client_write_buffer_,
-//         &MockWatermarkBuffer::failWrite));
-//     client_connection_->write(buffer_to_write, false);
-//     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-//   }
+    // Do the actual work. Write |buffer_to_write| bytes to the connection and
+    // drain |bytes_to_flush| before having the buffer failWrite()
+    EXPECT_CALL(*client_write_buffer_, move(_))
+        .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
+    EXPECT_CALL(*client_write_buffer_, drain(bytes_to_flush));
+    client_connection_->write(buffer_to_write, false);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
 
-//   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(AnyNumber());
-//   disconnect(true);
-// }
+  EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(AnyNumber());
+  disconnect(true);
+}
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, PipeConnectionImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
