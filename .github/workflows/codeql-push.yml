@@ -55,10 +55,9 @@ jobs:
 
     - name: Build
       run: |
+       echo $ENV_BUILD_TARGETS
        bazel/setup_clang.sh bin/clang10
        bazelisk shutdown
-       . .github/workflows/get_build_targets.sh 
-       echo $ENV_BUILD_TARGETS
        bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ $ENV_BUILD_TARGETS
 
     - name: Clean Artifacts
