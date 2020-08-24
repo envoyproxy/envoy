@@ -5,6 +5,7 @@
 #include "envoy/event/timer.h"
 
 #include "common/common/scope_tracker.h"
+#include "common/common/utility.h"
 #include "common/event/event_impl_base.h"
 #include "common/event/libevent.h"
 
@@ -29,7 +30,7 @@ public:
    */
   template <typename Duration> static void durationToTimeval(const Duration& d, timeval& tv) {
     if (d.count() < 0) {
-      throw EnvoyException(
+      ExceptionUtil::throwEnvoyException(
           fmt::format("Negative duration passed to durationToTimeval(): {}", d.count()));
     };
     constexpr int64_t clip_to = INT32_MAX; // 136.102208 years
@@ -70,6 +71,11 @@ private:
   // example if the DispatcherImpl::post is called by two threads, they race to
   // both set this to null.
   std::atomic<const ScopeTrackedObject*> object_{};
+
+  // Latched "envoy.reloadable_features.activate_timers_next_event_loop" runtime feature. If true,
+  // timers scheduled with a 0 time delta are evaluated in the next iteration of the event loop
+  // after polling and activating new fd events.
+  const bool activate_timers_next_event_loop_;
 };
 
 } // namespace Event

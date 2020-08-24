@@ -11,6 +11,8 @@
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
+#include "extensions/filters/http/cache/inline_headers_handles.h"
+
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
@@ -19,35 +21,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
-
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    request_cache_control_handle(Http::CustomHeaders::get().CacheControl);
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    response_cache_control_handle(Http::CustomHeaders::get().CacheControl);
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    pragma_handler(Http::CustomHeaders::get().Pragma);
-
-std::ostream& operator<<(std::ostream& os, CacheEntryStatus status) {
-  switch (status) {
-  case CacheEntryStatus::Ok:
-    return os << "Ok";
-  case CacheEntryStatus::Unusable:
-    return os << "Unusable";
-  case CacheEntryStatus::RequiresValidation:
-    return os << "RequiresValidation";
-  case CacheEntryStatus::FoundNotModified:
-    return os << "FoundNotModified";
-  case CacheEntryStatus::NotSatisfiableRange:
-    return os << "NotSatisfiableRange";
-  case CacheEntryStatus::SatisfiableRange:
-    return os << "SatisfiableRange";
-  }
-  NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
-std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range) {
-  return os << "[" << range.begin() << "," << range.end() << ")";
-}
 
 LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp)
     : timestamp_(timestamp) {
@@ -68,11 +41,10 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   // TODO(toddmgreer): Let config determine whether to include forwarded_proto, host, and
   // query params.
   // TODO(toddmgreer): get cluster name.
-  // TODO(toddmgreer): handle the resultant vector<AdjustedByteRange> in CacheFilter::onOkHeaders.
-  // Range Requests are only valid for GET requests
   if (request_headers.getMethodValue() == Http::Headers::get().MethodValues.Get) {
-    // TODO(cbdm): using a constant limit of 10 ranges, could make this into a parameter
-    const int RangeSpecifierLimit = 10;
+    // TODO(cbdm): using a constant limit of 1 range since we don't support multi-part responses nor
+    // coalesce multiple overlapping ranges. Could make this into a parameter based on config.
+    const int RangeSpecifierLimit = 1;
     request_range_spec_ = RangeRequests::parseRanges(request_headers, RangeSpecifierLimit);
   }
   key_.set_cluster_name("cluster_name_goes_here");
@@ -90,21 +62,21 @@ size_t localHashKey(const Key& key) { return stableHashKey(key); }
 void LookupRequest::initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers) {
   const absl::string_view cache_control =
       request_headers.getInlineValue(request_cache_control_handle.handle());
-  const absl::string_view pragma = request_headers.getInlineValue(pragma_handler.handle());
+  const absl::string_view pragma = request_headers.getInlineValue(pragma_handle.handle());
 
   if (!cache_control.empty()) {
     request_cache_control_ = RequestCacheControl(cache_control);
   } else {
-    // According to: https://httpwg.org/specs/rfc7234.html#header.pragma
+    // According to: https://httpwg.org/specs/rfc7234.html#header.pragma,
     // when Cache-Control header is missing, "Pragma:no-cache" is equivalent to
-    // "Cache-Control:no-cache" Any other directives are ignored
+    // "Cache-Control:no-cache". Any other directives are ignored.
     request_cache_control_.must_validate_ = RequestCacheControl(pragma).must_validate_;
   }
 }
 
 bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_headers) const {
   // TODO(yosrym93): Store parsed response cache-control in cache instead of parsing it on every
-  // lookup
+  // lookup.
   const absl::string_view cache_control =
       response_headers.getInlineValue(response_cache_control_handle.handle());
   const ResponseCacheControl response_cache_control(cache_control);
@@ -112,7 +84,7 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
   const SystemTime response_time = CacheHeadersUtils::httpTime(response_headers.Date());
 
   if (timestamp_ < response_time) {
-    // Response time is in the future, validate response
+    // Response time is in the future, validate response.
     return true;
   }
 
@@ -121,14 +93,14 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
                                         request_cache_control_.max_age_.value() < response_age;
   if (response_cache_control.must_validate_ || request_cache_control_.must_validate_ ||
       request_max_age_exceeded) {
-    // Either the request or response explicitly require validation or a request max-age requirement
-    // is not satisfied
+    // Either the request or response explicitly require validation, or a request max-age
+    // requirement is not satisfied.
     return true;
   }
 
-  // CacheabilityUtils::isCacheableResponse(..) guarantees that any cached response satisfies this
+  // CacheabilityUtils::isCacheableResponse(..) guarantees that any cached response satisfies this.
   // When date metadata injection for responses with no date
-  // is implemented, this ASSERT will need to be updated
+  // is implemented, this ASSERT will need to be updated.
   ASSERT((response_headers.Date() && response_cache_control.max_age_.has_value()) ||
              response_headers.get(Http::Headers::get().Expires),
          "Cache entry does not have valid expiration data.");
@@ -139,15 +111,15 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
           : CacheHeadersUtils::httpTime(response_headers.get(Http::Headers::get().Expires));
 
   if (timestamp_ > expiration_time) {
-    // Response is stale, requires validation
-    // if the response does not allow being served stale
-    // or the request max-stale directive does not allow it
+    // Response is stale, requires validation if
+    // the response does not allow being served stale,
+    // or the request max-stale directive does not allow it.
     const bool allowed_by_max_stale =
         request_cache_control_.max_stale_.has_value() &&
         request_cache_control_.max_stale_.value() > timestamp_ - expiration_time;
     return response_cache_control.no_stale_ || !allowed_by_max_stale;
   } else {
-    // Response is fresh, requires validation only if there is an unsatisfied min-fresh requirement
+    // Response is fresh, requires validation only if there is an unsatisfied min-fresh requirement.
     const bool min_fresh_unsatisfied =
         request_cache_control_.min_fresh_.has_value() &&
         request_cache_control_.min_fresh_.value() > expiration_time - timestamp_;
@@ -166,7 +138,6 @@ LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& respon
   result.headers_ = std::move(response_headers);
   result.content_length_ = content_length;
   if (!adjustByteRangeSet(result.response_ranges_, request_range_spec_, content_length)) {
-    result.headers_->setStatus(static_cast<uint64_t>(Http::Code::RangeNotSatisfiable));
     result.cache_entry_status_ = CacheEntryStatus::NotSatisfiableRange;
   } else if (!result.response_ranges_.empty()) {
     result.cache_entry_status_ = CacheEntryStatus::SatisfiableRange;
@@ -190,7 +161,7 @@ bool adjustByteRangeSet(std::vector<AdjustedByteRange>& response_ranges,
 
   for (const RawByteRange& spec : request_range_spec) {
     if (spec.isSuffix()) {
-      // spec is a suffix-byte-range-spec
+      // spec is a suffix-byte-range-spec.
       if (spec.suffixLength() == 0) {
         // This range is unsatisfiable, so skip it.
         continue;

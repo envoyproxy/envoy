@@ -8,7 +8,6 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
 WINDOWS_SKIP_TARGETS = [
-    "envoy.filters.http.lua",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.lightstep",
     "envoy.tracers.datadog",
@@ -19,24 +18,48 @@ WINDOWS_SKIP_TARGETS = [
 # archives, e.g. cares.
 BUILD_ALL_CONTENT = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])"""
 
+def _fail_missing_attribute(attr, key):
+    fail("The '%s' attribute must be defined for external dependecy " % attr + key)
+
 # Method for verifying content of the DEPENDENCY_REPOSITORIES defined in bazel/repository_locations.bzl
 # Verification is here so that bazel/repository_locations.bzl can be loaded into other tools written in Python,
 # and as such needs to be free of bazel specific constructs.
+#
+# We also remove the attributes for further consumption in this file, since rules such as http_archive
+# don't recognize them.
 def _repository_locations():
-    locations = dict(DEPENDENCY_REPOSITORIES)
-    for key, location in locations.items():
+    locations = {}
+    for key, location in DEPENDENCY_REPOSITORIES.items():
+        mutable_location = dict(location)
+        locations[key] = mutable_location
+
         if "sha256" not in location or len(location["sha256"]) == 0:
-            fail("SHA256 missing for external dependency " + str(location["urls"]))
+            _fail_missing_attribute("sha256", key)
+
+        if "project_name" not in location:
+            _fail_missing_attribute("project_name", key)
+        mutable_location.pop("project_name")
+
+        if "project_url" not in location:
+            _fail_missing_attribute("project_url", key)
+        mutable_location.pop("project_url")
+
+        if "version" not in location:
+            _fail_missing_attribute("version", key)
+        mutable_location.pop("version")
 
         if "use_category" not in location:
-            fail("The 'use_category' attribute must be defined for external dependecy " + str(location["urls"]))
+            _fail_missing_attribute("use_category", key)
+        mutable_location.pop("use_category")
 
-        if "cpe" not in location and not [category for category in USE_CATEGORIES_WITH_CPE_OPTIONAL if category in location["use_category"]]:
-            fail("The 'cpe' attribute must be defined for external dependecy " + str(location["urls"]))
+        if "cpe" in location:
+            mutable_location.pop("cpe")
+        elif not [category for category in USE_CATEGORIES_WITH_CPE_OPTIONAL if category in location["use_category"]]:
+            _fail_missing_attribute("cpe", key)
 
         for category in location["use_category"]:
             if category not in USE_CATEGORIES:
-                fail("Unknown use_category value '" + category + "' for dependecy " + str(location["urls"]))
+                fail("Unknown use_category value '" + category + "' for dependecy " + key)
 
     return locations
 
@@ -339,15 +362,12 @@ def _com_github_google_libprotobuf_mutator():
     )
 
 def _com_github_jbeder_yaml_cpp():
-    location = _get_location("com_github_jbeder_yaml_cpp")
-    http_archive(
+    _repository_impl(
         name = "com_github_jbeder_yaml_cpp",
-        build_file_content = BUILD_ALL_CONTENT,
-        **location
     )
     native.bind(
         name = "yaml_cpp",
-        actual = "@envoy//bazel/foreign_cc:yaml",
+        actual = "@com_github_jbeder_yaml_cpp//:yaml-cpp",
     )
 
 def _com_github_libevent_libevent():
@@ -903,11 +923,6 @@ def _org_unicode_icuuc():
     _repository_impl(
         name = "org_unicode_icuuc",
         build_file = "@envoy//bazel/external:icuuc.BUILD",
-        # TODO(dio): Consider patching udata when we need to embed some data.
-    )
-    native.bind(
-        name = "icuuc",
-        actual = "@org_unicode_icuuc//:common",
     )
 
 def _foreign_cc_dependencies():

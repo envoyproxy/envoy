@@ -89,7 +89,7 @@ private:
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
     const std::string& resolvedHost() const override { return resolved_host_; }
     bool isIpAddress() const override { return is_ip_address_; }
-    void touch() override { last_used_time_ = time_source_.monotonicTime().time_since_epoch(); }
+    void touch() final { last_used_time_ = time_source_.monotonicTime().time_since_epoch(); }
 
     TimeSource& time_source_;
     const std::string resolved_host_;
