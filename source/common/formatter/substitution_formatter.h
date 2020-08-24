@@ -89,7 +89,7 @@ private:
  */
 class FormatterImpl : public Formatter {
 public:
-  FormatterImpl(const std::string& format, bool omit_empty_values);
+  FormatterImpl(const std::string& format, bool omit_empty_values = false);
 
   // Formatter::format
   std::string format(const Http::RequestHeaderMap& request_headers,
