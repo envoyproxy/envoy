@@ -154,13 +154,6 @@ envoy_cmake_external(
                 "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib_ng/include",
             },
         },
-        {
-            "name": "curl_with_zlib_ng_with_optimizations",
-            "cache_entries": {
-                "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/zlib_ng_with_optimizations",
-                "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib_ng_with_optimizations/include",
-            },
-        },
     ],
     deps = [
         ":ares",
@@ -243,24 +236,6 @@ envoy_cmake_external(
     variants = [
         {
             "name": "zlib_ng",
-            "cache_entries": {
-                # zlib-ng build options. Reference: https://github.com/zlib-ng/zlib-ng#build-options.
-                "ZLIB_COMPAT": "on",
-                "ZLIB_ENABLE_TESTS": "off",
-
-                # Turning off WITH_OPTIM and WITH_NEW_STRATEGIES fixes checksum, but not sure if that is
-                # what we want.
-                "WITH_OPTIM": "off",
-                "WITH_NEW_STRATEGIES": "off",
-
-                # zlib-ng advance build options. Reference: https://github.com/zlib-ng/zlib-ng#advanced-build-options.
-                # Only allow aligned address.
-                "UNALIGNED_OK": "off",
-            },
-            "lib_source": "@com_github_zlib_ng_zlib_ng//:all",
-        },
-        {
-            "name": "zlib_ng_with_optimizations",
             "cache_entries": {
                 # zlib-ng build options. Reference: https://github.com/zlib-ng/zlib-ng#build-options.
                 "ZLIB_COMPAT": "on",

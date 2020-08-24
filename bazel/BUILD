@@ -252,14 +252,6 @@ config_setting(
 )
 
 config_setting(
-    name = "zlib_ng_with_optimizations",
-    constraint_values = [
-        "@bazel_tools//platforms:linux",
-    ],
-    values = {"define": "zlib=ng_with_optimizations"},
-)
-
-config_setting(
     name = "enable_quiche",
     values = {"define": "quiche=enabled"},
 )
@@ -277,22 +269,22 @@ alias(
 
 # Alias pointing to the selected version of zlib:
 # - zlib-ng from //bazel/foreign_cc:zlib_ng,
-# - zlib-ng with optimization from //bazel/foreign_cc:zlib_ng_with_optimizations,
 # - zlib from //bazel/foreign_cc:zlib.
 alias(
     name = "zlib",
     actual = select({
         "//bazel:zlib_ng": "//bazel/foreign_cc:zlib_ng",
-        "//bazel:zlib_ng_with_optimizations": "//bazel/foreign_cc:zlib_ng_with_optimizations",
         "//conditions:default": "//bazel/foreign_cc:zlib",
     }),
 )
 
+# Alias pointing to the selected version of curl:
+# - curl with zlib-ng from //bazel/foreign_cc:curl_with_zlib_ng,
+# - curl from //bazel/foreign_cc:curl.
 alias(
     name = "curl",
     actual = select({
         "//bazel:zlib_ng": "//bazel/foreign_cc:curl_with_zlib_ng",
-        "//bazel:zlib_ng_with_optimizations": "//bazel/foreign_cc:curl_with_zlib_ng_with_optimizations",
         "//conditions:default": "//bazel/foreign_cc:curl",
     }),
 )
