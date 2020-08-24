@@ -5,6 +5,8 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
+#include "common/common/lock_guard.h"
+#include "common/common/thread.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -60,6 +62,12 @@ ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAll
 
   // Now initialize on all threads.
   tls_slot_->set([code](Event::Dispatcher&) {
+    // Avoid creating lua_State in different threads at the same time. In the process of creating
+    // lua_State, some static variables are used to assist memory allocation. Creating lua_State in
+    // different threads at the same time may cause data race. Although 'LuaJIT' uses retries to
+    // ensure the final safety of the memory allocation, it may still trigger the TSAN alarm.
+    static Thread::MutexBasicLockable lua_thread_local_lock;
+    Thread::LockGuard guard(lua_thread_local_lock);
     return ThreadLocal::ThreadLocalObjectSharedPtr{new LuaThreadLocal(code)};
   });
 }
