@@ -960,6 +960,7 @@ repeatability
 reperform
 repicked
 repo
+reproducibility
 requirepass
 reselecting
 reserialize
