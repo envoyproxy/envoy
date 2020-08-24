@@ -18,7 +18,9 @@ config_env() {
 
 build_platforms() {
   TYPE=$1
-  if [[ -z "${TYPE}" ]]; then
+  FILE_SUFFIX="${TYPE/-debug/}"
+
+  if [[ -z "${FILE_SUFFIX}" ]]; then
     echo "linux/arm64,linux/amd64"
   else
     echo "linux/amd64"
@@ -27,6 +29,10 @@ build_platforms() {
 
 build_args() {
   TYPE=$1
+  FILE_SUFFIX="${TYPE/-debug/}"
+
+  echo "-f ci/Dockerfile-envoy${FILE_SUFFIX}"
+  [[ "${TYPE}" == *-debug ]] && echo "--build-arg ENVOY_BINARY_SUFFIX="
   if [[ "${TYPE}" == "-google-vrp" ]]; then
     echo "--build-arg ENVOY_VRP_BASE_IMAGE=${VRP_BASE_IMAGE}"
   fi
@@ -51,7 +57,7 @@ build_images() {
   ARGS="$(build_args ${TYPE})"
   PLATFORM="$(build_platforms ${TYPE})"
 
-  docker buildx build --platform "${PLATFORM}" -f ci/Dockerfile-envoy"${TYPE}" ${ARGS} -t "${BUILD_TAG}" .
+  docker buildx build --platform "${PLATFORM}" ${ARGS} -t "${BUILD_TAG}" .
 
   PLATFORM="$(build_platforms ${TYPE} | tr ',' ' ')"
   # docker buildx load cannot have multiple platform, load individually
@@ -61,7 +67,7 @@ build_images() {
     else
       IMAGE_TAG="${BUILD_TAG}-${ARCH/linux\//}"
     fi
-    docker buildx build --platform "${ARCH}" -f ci/Dockerfile-envoy"${TYPE}" ${ARGS} -t "${IMAGE_TAG}" . --load
+    docker buildx build --platform "${ARCH}" ${ARGS} -t "${IMAGE_TAG}" . --load
     IMAGES_TO_SAVE+=("${IMAGE_TAG}")
   done
 }
@@ -74,7 +80,7 @@ push_images() {
   ARGS="$(build_args ${TYPE})"
   PLATFORM="$(build_platforms ${TYPE})"
   # docker buildx doesn't do push with default builder
-  docker buildx build --platform "${PLATFORM}" -f ci/Dockerfile-envoy"${TYPE}" ${ARGS} -t ${BUILD_TAG} . --push || \
+  docker buildx build --platform "${PLATFORM}" ${ARGS} -t ${BUILD_TAG} . --push || \
     docker push "${BUILD_TAG}"
 }
 
@@ -96,7 +102,7 @@ fi
 DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
 
 # "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
-BUILD_TYPES=("" "-alpine" "-alpine-debug" "-google-vrp")
+BUILD_TYPES=("" "-debug" "-alpine" "-alpine-debug" "-google-vrp")
 
 # Configure docker-buildx tools
 config_env

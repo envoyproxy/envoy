@@ -11,6 +11,7 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* build: an :ref:`Ubuntu based debug image <install_binaries>` is built and published in DockerHub.
 * build: the debug information will be generated separately to reduce target size and reduce compilation time when build in compilation mode `dbg` and `opt`. Users will need to build dwp file to debug with gdb.
 * compressor: always insert `Vary` headers for compressible resources even if it's decided not to compress a response due to incompatible `Accept-Encoding` value. The `Vary` header needs to be inserted to let a caching proxy in front of Envoy know that the requested resource still can be served with compression applied.
 * decompressor: headers-only requests were incorrectly not advertising accept-encoding when configured to do so. This is now fixed.
@@ -97,6 +98,8 @@ New Features
 
 Deprecated
 ----------
+
+* build: Alpine based debug image is deprecated in favor of :ref:`Ubuntu based debug image <install_binaries>`.
 * The :ref:`track_timeout_budgets <envoy_v3_api_field_config.cluster.v3.Cluster.track_timeout_budgets>`
   field has been deprecated in favor of `timeout_budgets` part of an :ref:`Optional Configuration <envoy_v3_api_field_config.cluster.v3.Cluster.track_cluster_stats>`.
 * hds: the :ref:`endpoints_health <envoy_v3_api_field_service.health.v3.EndpointHealthResponse.endpoints_health>`
