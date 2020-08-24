@@ -8,6 +8,19 @@
 namespace Envoy {
 namespace Network {
 
+/**
+ * Utility functions for the connection implementation base class.
+ */
+class ConnectionImplBaseUtility {
+public:
+  /**
+   * Add a connection id to a hash key
+   * @param hash_key the current hash key -- the function will only append to this vector
+   * @param connection_id the 64-bit connection id
+   */
+  static void addIdToHashKey(std::vector<uint8_t>& hash_key, uint64_t connection_id);
+};
+
 class ConnectionImplBase : public FilterManagerConnection,
                            protected Logger::Loggable<Logger::Id::connection> {
 public:
@@ -17,6 +30,7 @@ public:
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   uint64_t id() const override { return id_; }
+  void hashKey(std::vector<uint8_t>& hash) const override;
   void setConnectionStats(const ConnectionStats& stats) override;
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
 
