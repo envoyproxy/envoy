@@ -21,9 +21,13 @@ jobs:
         # a pull request then we can checkout the head.
         fetch-depth: 2
     
-    # - name: Get Build Targets
-    #   run: |
-    #    . .github/workflows/get_build_targets.sh 
+    - name: Get Build Targets
+      run: |
+       . .github/workflows/get_build_targets.sh 
+       echo '::set-env ENV_BUILD_TARGETS=$BUILD_TARGETS'
+
+     - name: Check Environment variable
+        run: echo $ENV_BUILD_TARGETS
 
     # If this run was triggered by a pull request event, then checkout
     # the head of the pull request instead of the merge commit.
