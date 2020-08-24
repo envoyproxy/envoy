@@ -86,8 +86,8 @@ function cp_binary_for_image_build() {
 
   # Remove binaries to save space, only if BUILD_REASON exists (running in AZP)
   [[ -z "${BUILD_REASON}" ]] || \
-    rm -rf "${BASE_TARGET_DIR}"/build_"$1" "${BASE_TARGET_DIR}"/build_"$1"_stripped "${ENVOY_DELIVERY_DIR}"/envoy \
-      bazel-bin/"${ENVOY_BIN}"
+    rm -rf "${BASE_TARGET_DIR}"/build_"$1" "${BASE_TARGET_DIR}"/build_"$1"_stripped "${ENVOY_DELIVERY_DIR}"/envoy{,.dwp} \
+      bazel-bin/"${ENVOY_BIN}"{,.dwp}
 }
 
 function bazel_binary_build() {

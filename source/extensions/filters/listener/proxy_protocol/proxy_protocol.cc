@@ -68,8 +68,8 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "proxy_protocol: New connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
   ASSERT(file_event_.get() == nullptr);
-  file_event_ = cb.dispatcher().createFileEvent(
-      socket.ioHandle().fd(),
+  file_event_ = socket.ioHandle().createFileEvent(
+      cb.dispatcher(),
       [this](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Read);
         onRead();

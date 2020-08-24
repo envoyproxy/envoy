@@ -372,6 +372,12 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
   return sysCallResultToIoCallResult(result);
 }
 
+Api::IoCallUint64Result IoSocketHandleImpl::recv(void* buffer, size_t length, int flags) {
+  const Api::SysCallSizeResult result =
+      Api::OsSysCallsSingleton::get().recv(fd_, buffer, length, flags);
+  return sysCallResultToIoCallResult(result);
+}
+
 bool IoSocketHandleImpl::supportsMmsg() const {
   return Api::OsSysCallsSingleton::get().supportsMmsg();
 }
@@ -470,6 +476,13 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
     }
   }
   return Address::addressFromSockAddr(ss, ss_len);
+}
+
+Event::FileEventPtr IoSocketHandleImpl::createFileEvent(Event::Dispatcher& dispatcher,
+                                                        Event::FileReadyCb cb,
+                                                        Event::FileTriggerType trigger,
+                                                        uint32_t events) {
+  return dispatcher.createFileEvent(fd_, cb, trigger, events);
 }
 
 } // namespace Network

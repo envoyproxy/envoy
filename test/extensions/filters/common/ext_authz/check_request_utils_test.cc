@@ -1,4 +1,3 @@
-#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "common/network/address_impl.h"
@@ -6,10 +5,10 @@
 
 #include "extensions/filters/common/ext_authz/check_request_utils.h"
 
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/upstream/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
