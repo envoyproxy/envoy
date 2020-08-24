@@ -11,7 +11,6 @@
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
 #include "common/common/random_generator.h"
-#include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "source/extensions/tracers/xray/daemon.pb.validate.h"
@@ -76,7 +75,13 @@ void Span::finishSpan() {
   s.set_start_time(time_point_cast<SecondsWithFraction>(startTime()).time_since_epoch().count());
   s.set_end_time(
       time_point_cast<SecondsWithFraction>(time_source_.systemTime()).time_since_epoch().count());
+  s.set_origin(origin());
   s.set_parent_id(parentId());
+
+  auto* aws = s.mutable_aws()->mutable_fields();
+  for (const auto& field : aws_metadata_) {
+    aws->insert({field.first, field.second});
+  }
 
   auto* request_fields = s.mutable_http()->mutable_request()->mutable_fields();
   for (const auto& field : http_request_annotations_) {
@@ -129,6 +134,8 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name, Envoy::Sys
   // Even though we have a TimeSource member in the tracer, we assume the start_time argument has a
   // more precise value than calling the systemTime() at this point in time.
   span_ptr->setStartTime(start_time);
+  span_ptr->setOrigin(origin_);
+  span_ptr->setAwsMetadata(aws_metadata_);
 
   if (xray_header) { // there's a previous span that this span should be based-on
     span_ptr->setParentId(xray_header->parent_id_);
@@ -154,7 +161,9 @@ XRay::SpanPtr Tracer::createNonSampledSpan() const {
   const auto ticks = time_source_.monotonicTime().time_since_epoch().count();
   span_ptr->setId(ticks);
   span_ptr->setName(segment_name_);
+  span_ptr->setOrigin(origin_);
   span_ptr->setTraceId(generateTraceId(time_source_.systemTime()));
+  span_ptr->setAwsMetadata(aws_metadata_);
   span_ptr->setSampled(false);
   return span_ptr;
 }

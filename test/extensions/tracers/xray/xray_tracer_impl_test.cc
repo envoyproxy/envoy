@@ -4,9 +4,6 @@
 #include "extensions/tracers/xray/xray_configuration.h"
 #include "extensions/tracers/xray/xray_tracer_impl.h"
 
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/instance.h"
-#include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
@@ -25,6 +22,7 @@ namespace {
 class XRayDriverTest : public ::testing::Test {
 public:
   const std::string operation_name_ = "test_operation_name";
+  absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
   NiceMock<Server::Configuration::MockTracerFactoryContext> context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Tracing::MockConfig> tracing_config_;
@@ -35,7 +33,8 @@ public:
 TEST_F(XRayDriverTest, XRayTraceHeaderNotSampled) {
   request_headers_.addCopy(XRayTraceHeader, "Root=1-272793;Parent=5398ad8;Sampled=0");
 
-  XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/};
+  XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
+                           "" /*origin*/, aws_metadata_};
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
@@ -50,7 +49,8 @@ TEST_F(XRayDriverTest, XRayTraceHeaderNotSampled) {
 TEST_F(XRayDriverTest, XRayTraceHeaderSampled) {
   request_headers_.addCopy(XRayTraceHeader, "Root=1-272793;Parent=5398ad8;Sampled=1");
 
-  XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/};
+  XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
+                           "" /*origin*/, aws_metadata_};
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
@@ -63,7 +63,8 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSampled) {
 TEST_F(XRayDriverTest, XRayTraceHeaderSamplingUnknown) {
   request_headers_.addCopy(XRayTraceHeader, "Root=1-272793;Parent=5398ad8");
 
-  XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/};
+  XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
+                           "" /*origin*/, aws_metadata_};
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};
@@ -78,7 +79,8 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSamplingUnknown) {
 }
 
 TEST_F(XRayDriverTest, NoXRayTracerHeader) {
-  XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/};
+  XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
+                           "" /*origin*/, aws_metadata_};
   Driver driver(config, context_);
 
   Tracing::Decision tracing_decision{Tracing::Reason::Sampling, false /*sampled*/};

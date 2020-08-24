@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/config/trace/v3/xray.pb.h"
-#include "envoy/config/trace/v3/xray.pb.validate.h"
 
 #include "common/common/logger.h"
 
