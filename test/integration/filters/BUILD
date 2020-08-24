@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -173,6 +174,25 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "set_response_code_filter_lib",
+    srcs = [
+        "set_response_code_filter.cc",
+    ],
+    deps = [
+        ":set_response_code_filter_config_proto_cc_proto",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "set_response_code_filter_config_proto",
+    srcs = [":set_response_code_filter_config.proto"],
+)
+
+envoy_cc_test_library(
     name = "stop_iteration_and_continue",
     srcs = [
         "stop_iteration_and_continue_filter.cc",
@@ -317,5 +337,24 @@ envoy_cc_test_library(
         "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "test_socket_interface_lib",
+    srcs = [
+        "test_socket_interface.cc",
+    ],
+    hdrs = [
+        "test_socket_interface.h",
+    ],
+    deps = [
+        "//include/envoy/network:socket_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:default_socket_interface_lib",
+        "@com_google_absl//absl/types:optional",
+        "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ],
 )

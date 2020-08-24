@@ -60,12 +60,6 @@ DecompressorFilter::DecompressorFilter(DecompressorFilterConfigSharedPtr config)
 
 Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                             bool end_stream) {
-  // Headers only request, continue.
-  if (end_stream) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-  ENVOY_STREAM_LOG(debug, "DecompressorFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
-
   // Two responsibilities on the request side:
   //   1. If response decompression is enabled (and advertisement is enabled), then advertise to
   //      the upstream that this hop is able to decompress responses via the Accept-Encoding header.
@@ -77,7 +71,13 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
                      *decoder_callbacks_, headers.getInlineValue(accept_encoding_handle.handle()));
   }
 
-  //   2. If request decompression is enabled, then decompress the request.
+  // Headers-only requests do not, by definition, get decompressed.
+  if (end_stream) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+  ENVOY_STREAM_LOG(debug, "DecompressorFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
+
+  //   2. Setup request decompression if all checks comply.
   return maybeInitDecompress(config_->requestDirectionConfig(), request_decompressor_,
                              *decoder_callbacks_, headers);
 };

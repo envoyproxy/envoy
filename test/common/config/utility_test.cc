@@ -16,7 +16,8 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
@@ -265,7 +266,7 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
     BackOffStrategyPtr strategy =
         Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(cluster, 5000,
                                                                                 random);
-    EXPECT_NE(nullptr, dynamic_cast<JitteredBackOffStrategy*>(strategy.get()));
+    EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
   }
 
   {

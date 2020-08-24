@@ -17,7 +17,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
-#include "common/network/socket_interface_impl.h"
+#include "common/network/socket_interface.h"
 #include "common/network/utility.h"
 #include "common/stats/symbol_table_impl.h"
 

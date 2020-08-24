@@ -243,10 +243,13 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeout) {
 
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  // Trigger per try timeout (but not global timeout).
+  // Trigger per try timeout (but not global timeout) and wait for reset.
   timeSystem().advanceTimeWait(std::chrono::milliseconds(400));
+  ASSERT_TRUE(upstream_request_->waitForReset());
 
-  // Wait for a second request to be sent upstream
+  // Wait for a second request to be sent upstream. Max retry backoff is 25ms so advance time that
+  // much.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(25));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
@@ -279,7 +282,7 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeoutWithoutGlobalTimeout) {
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-on", "5xx"},
                                      {"x-envoy-upstream-rq-timeout-ms", "0"},
-                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}});
+                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "50"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
 
@@ -290,10 +293,13 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeoutWithoutGlobalTimeout) {
 
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  // Trigger per try timeout.
-  timeSystem().advanceTimeWait(std::chrono::milliseconds(5));
+  // Trigger per try timeout (but not global timeout) and wait for reset.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(50));
+  ASSERT_TRUE(upstream_request_->waitForReset());
 
-  // Wait for a second request to be sent upstream
+  // Wait for a second request to be sent upstream. Max retry backoff is 25ms so advance time that
+  // much. This is always less than the next request's per try timeout.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(25));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));

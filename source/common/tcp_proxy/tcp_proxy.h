@@ -45,6 +45,7 @@ namespace TcpProxy {
   COUNTER(downstream_flow_control_paused_reading_total)                                            \
   COUNTER(downstream_flow_control_resumed_reading_total)                                           \
   COUNTER(idle_timeout)                                                                            \
+  COUNTER(max_downstream_connection_duration)                                                      \
   COUNTER(upstream_flush_total)                                                                    \
   GAUGE(downstream_cx_rx_bytes_buffered, Accumulate)                                               \
   GAUGE(downstream_cx_tx_bytes_buffered, Accumulate)                                               \
@@ -107,8 +108,8 @@ public:
     const TcpProxyStats& stats() { return stats_; }
     const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
     const absl::optional<TunnelingConfig> tunnelingConfig() { return tunneling_config_; }
-    const absl::optional<std::chrono::milliseconds>& maxConnectinDuration() {
-      return max_connection_duration_;
+    const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectinDuration() const {
+      return max_downstream_connection_duration_;
     }
 
   private:
@@ -121,7 +122,7 @@ public:
     const TcpProxyStats stats_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
     absl::optional<TunnelingConfig> tunneling_config_;
-    absl::optional<std::chrono::milliseconds> max_connection_duration_;
+    absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -146,8 +147,8 @@ public:
   const absl::optional<std::chrono::milliseconds>& idleTimeout() {
     return shared_config_->idleTimeout();
   }
-  const absl::optional<std::chrono::milliseconds>& maxConnectionDuration() {
-    return shared_config_->maxConnectinDuration();
+  const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
+    return shared_config_->maxDownstreamConnectinDuration();
   }
   const absl::optional<TunnelingConfig> tunnelingConfig() {
     return shared_config_->tunnelingConfig();
@@ -272,14 +273,7 @@ public:
                        Ssl::ConnectionInfoConstSharedPtr ssl_info);
 
   // Upstream::LoadBalancerContext
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
-    if (route_) {
-      return route_->metadataMatchCriteria();
-    }
-    return nullptr;
-  }
-
-  // Upstream::LoadBalancerContext
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() override;
   absl::optional<uint64_t> computeHashKey() override {
     auto hash_policy = config_->hashPolicy();
     if (hash_policy) {
@@ -329,7 +323,7 @@ public:
     bool on_high_watermark_called_{false};
   };
 
-  virtual StreamInfo::StreamInfo& getStreamInfo();
+  StreamInfo::StreamInfo& getStreamInfo();
 
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
@@ -370,7 +364,7 @@ protected:
   void onIdleTimeout();
   void resetIdleTimer();
   void disableIdleTimer();
-  void onMaxConnectionDuration();
+  void onMaxDownstreamConnectionDuration();
 
   const ConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
@@ -385,6 +379,7 @@ protected:
                                                           // read filter.
   std::unique_ptr<GenericUpstream> upstream_;
   RouteConstSharedPtr route_;
+  Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   uint32_t connect_attempts_{};
   bool connecting_{};

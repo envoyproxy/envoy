@@ -110,10 +110,10 @@ Config::SharedConfig::SharedConfig(
   if (config.has_tunneling_config()) {
     tunneling_config_ = config.tunneling_config();
   }
-  if (config.has_max_connection_duration()) {
+  if (config.has_max_downstream_connection_duration()) {
     const uint64_t connection_duration =
-        DurationUtil::durationToMilliseconds(config.max_connection_duration());
-    max_connection_duration_ = std::chrono::milliseconds(connection_duration);
+        DurationUtil::durationToMilliseconds(config.max_downstream_connection_duration());
+    max_downstream_connection_duration_ = std::chrono::milliseconds(connection_duration);
   }
 }
 
@@ -390,6 +390,12 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
+  if (config_->maxDownstreamConnectionDuration()) {
+    connection_duration_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onMaxDownstreamConnectionDuration(); });
+    connection_duration_timer_->enableTimer(config_->maxDownstreamConnectionDuration().value());
+  }
+
   Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
   getStreamInfo().setUpstreamClusterInfo(cluster);
 
@@ -543,6 +549,25 @@ void Filter::onPoolReady(Http::RequestEncoder& request_encoder,
                   info.downstreamSslConnection());
 }
 
+const Router::MetadataMatchCriteria* Filter::metadataMatchCriteria() {
+  const Router::MetadataMatchCriteria* route_criteria =
+      (route_ != nullptr) ? route_->metadataMatchCriteria() : nullptr;
+
+  const auto& request_metadata = getStreamInfo().dynamicMetadata().filter_metadata();
+  const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+
+  if (filter_it != request_metadata.end() && route_criteria != nullptr) {
+    metadata_match_criteria_ = route_criteria->mergeMatchCriteria(filter_it->second);
+    return metadata_match_criteria_.get();
+  } else if (filter_it != request_metadata.end()) {
+    metadata_match_criteria_ =
+        std::make_unique<Router::MetadataMatchCriteriaImpl>(filter_it->second);
+    return metadata_match_criteria_.get();
+  } else {
+    return route_criteria;
+  }
+}
+
 void Filter::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->outlierDetector().putResult(
@@ -649,11 +674,6 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
         });
       }
     }
-    if (config_->maxConnectionDuration()) {
-      connection_duration_timer_ = read_callbacks_->connection().dispatcher().createTimer(
-          [this]() -> void { onMaxConnectionDuration(); });
-      connection_duration_timer_->enableTimer(config_->maxConnectionDuration().value());
-    }
   }
 }
 
@@ -665,8 +685,9 @@ void Filter::onIdleTimeout() {
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
-void Filter::onMaxConnectionDuration() {
+void Filter::onMaxDownstreamConnectionDuration() {
   ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
+  config_->stats().max_downstream_connection_duration_.inc();
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 

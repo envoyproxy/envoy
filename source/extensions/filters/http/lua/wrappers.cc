@@ -190,16 +190,10 @@ int DynamicMetadataMapWrapper::luaPairs(lua_State* state) {
 }
 
 int PublicKeyWrapper::luaGet(lua_State* state) {
-  if (public_key_ == nullptr || public_key_.get() == nullptr) {
+  if (public_key_.empty()) {
     lua_pushnil(state);
   } else {
-    auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*public_key_);
-    EVP_PKEY* pkey = wrapper->getEVP_PKEY();
-    if (pkey == nullptr) {
-      lua_pushnil(state);
-    } else {
-      lua_pushlightuserdata(state, public_key_.get());
-    }
+    lua_pushstring(state, public_key_.c_str());
   }
   return 1;
 }

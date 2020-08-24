@@ -20,6 +20,7 @@
 #include "common/http/headers.h"
 #include "common/http/http2/codec_stats.h"
 #include "common/http/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -226,9 +227,14 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   if (pending_send_data_.length() > 0) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.
+    // However, for empty trailers, we don't need to to save the trailers.
     ASSERT(!pending_trailers_to_encode_);
-    pending_trailers_to_encode_ = cloneTrailers(trailers);
-    createPendingFlushTimer();
+    const bool skip_encoding_empty_trailers =
+        trailers.empty() && parent_.skip_encoding_empty_trailers_;
+    if (!skip_encoding_empty_trailers) {
+      pending_trailers_to_encode_ = cloneTrailers(trailers);
+      createPendingFlushTimer();
+    }
   } else {
     submitTrailers(trailers);
     auto status = parent_.sendPendingFrames();
@@ -344,6 +350,18 @@ void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& 
 }
 
 void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
+  ASSERT(local_end_stream_);
+  const bool skip_encoding_empty_trailers =
+      trailers.empty() && parent_.skip_encoding_empty_trailers_;
+  if (skip_encoding_empty_trailers) {
+    ENVOY_CONN_LOG(debug, "skipping submitting trailers", parent_.connection_);
+
+    // Instead of submitting empty trailers, we send empty data instead.
+    Buffer::OwnedImpl empty_buffer;
+    encodeDataHelper(empty_buffer, /*end_stream=*/true, skip_encoding_empty_trailers);
+    return;
+  }
+
   std::vector<nghttp2_nv> final_headers;
   buildHeaders(final_headers, trailers);
   int rc = nghttp2_submit_trailer(parent_.session_, stream_id_, final_headers.data(),
@@ -442,6 +460,15 @@ void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
 
 void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!local_end_stream_);
+  encodeDataHelper(data, end_stream, /*skip_encoding_empty_trailers=*/false);
+}
+
+void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool end_stream,
+                                                  bool skip_encoding_empty_trailers) {
+  if (skip_encoding_empty_trailers) {
+    ASSERT(data.length() == 0 && end_stream);
+  }
+
   local_end_stream_ = end_stream;
   parent_.stats_.pending_send_bytes_.add(data.length());
   pending_send_data_.move(data);
@@ -530,6 +557,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           http2_options.max_inbound_priority_frames_per_stream().value()),
       max_inbound_window_update_frames_per_data_frame_sent_(
           http2_options.max_inbound_window_update_frames_per_data_frame_sent().value()),
+      skip_encoding_empty_trailers_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_skip_encoding_empty_trailers")),
       dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {}
 
 ConnectionImpl::~ConnectionImpl() {
@@ -1426,7 +1455,8 @@ Status ServerConnectionImpl::checkInboundFrameLimits(int32_t stream_id) {
     return bufferFloodError("Too many consecutive frames with an empty payload");
   }
 
-  if (inbound_priority_frames_ > max_inbound_priority_frames_per_stream_ * (1 + inbound_streams_)) {
+  if (inbound_priority_frames_ >
+      static_cast<uint64_t>(max_inbound_priority_frames_per_stream_) * (1 + inbound_streams_)) {
     ENVOY_CONN_LOG(trace,
                    "error reading frame: Too many PRIORITY frames received in this HTTP/2 session.",
                    connection_);
