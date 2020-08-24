@@ -12,7 +12,7 @@
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
