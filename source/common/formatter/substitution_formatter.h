@@ -22,7 +22,8 @@ namespace Formatter {
  */
 class SubstitutionFormatParser {
 public:
-  static std::vector<FormatterProviderPtr> parse(const std::string& format);
+  static std::vector<FormatterProviderPtr> parse(const std::string& format,
+                                                 bool omit_empty_values = false);
 
 private:
   /**
@@ -73,7 +74,8 @@ private:
 class SubstitutionFormatUtils {
 public:
   static FormatterPtr defaultSubstitutionFormatter();
-  static const std::string& protocolToString(const absl::optional<Http::Protocol>& protocol);
+  static const std::string& protocolToString(const absl::optional<Http::Protocol>& protocol,
+                                             bool omit_empty_values = false);
   static const std::string getHostname();
 
 private:
@@ -87,7 +89,7 @@ private:
  */
 class FormatterImpl : public Formatter {
 public:
-  FormatterImpl(const std::string& format);
+  FormatterImpl(const std::string& format, bool omit_empty_values);
 
   // Formatter::format
   std::string format(const Http::RequestHeaderMap& request_headers,
@@ -97,13 +99,16 @@ public:
                      absl::string_view local_reply_body) const override;
 
 private:
+  bool omit_empty_values_;
   std::vector<FormatterProviderPtr> providers_;
 };
 
 class JsonFormatterImpl : public Formatter {
 public:
-  JsonFormatterImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types)
-      : preserve_types_(preserve_types), json_output_format_(toFormatMap(format_mapping)) {}
+  JsonFormatterImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                    bool omit_empty_values)
+      : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
+        json_output_format_(toFormatMap(format_mapping)) {}
 
   // Formatter::format
   std::string format(const Http::RequestHeaderMap& request_headers,
@@ -124,7 +129,8 @@ private:
     JsonFormatMapPtr value_;
   };
 
-  const bool preserve_types_;
+  bool omit_empty_values_;
+  bool preserve_types_;
   const JsonFormatMapWrapper json_output_format_;
 
   ProtobufWkt::Struct toStruct(const Http::RequestHeaderMap& request_headers,
@@ -174,9 +180,10 @@ public:
 class HeaderFormatter {
 public:
   HeaderFormatter(const std::string& main_header, const std::string& alternative_header,
-                  absl::optional<size_t> max_length);
+                  absl::optional<size_t> max_length, bool omit_empty_values);
 
 protected:
+  const std::string unspecified_value_str_;
   std::string format(const Http::HeaderMap& headers) const;
   ProtobufWkt::Value formatValue(const Http::HeaderMap& headers) const;
 
@@ -194,7 +201,7 @@ private:
 class RequestHeaderFormatter : public FormatterProvider, HeaderFormatter {
 public:
   RequestHeaderFormatter(const std::string& main_header, const std::string& alternative_header,
-                         absl::optional<size_t> max_length);
+                         absl::optional<size_t> max_length, bool omit_empty_values);
 
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap&,
@@ -211,7 +218,7 @@ public:
 class ResponseHeaderFormatter : public FormatterProvider, HeaderFormatter {
 public:
   ResponseHeaderFormatter(const std::string& main_header, const std::string& alternative_header,
-                          absl::optional<size_t> max_length);
+                          absl::optional<size_t> max_length, bool omit_empty_values);
 
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
@@ -228,7 +235,7 @@ public:
 class ResponseTrailerFormatter : public FormatterProvider, HeaderFormatter {
 public:
   ResponseTrailerFormatter(const std::string& main_header, const std::string& alternative_header,
-                           absl::optional<size_t> max_length);
+                           absl::optional<size_t> max_length, bool omit_empty_values);
 
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
@@ -245,7 +252,7 @@ public:
 class GrpcStatusFormatter : public FormatterProvider, HeaderFormatter {
 public:
   GrpcStatusFormatter(const std::string& main_header, const std::string& alternative_header,
-                      absl::optional<size_t> max_length);
+                      absl::optional<size_t> max_length, bool omit_empty_values);
 
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
@@ -261,7 +268,7 @@ public:
  */
 class StreamInfoFormatter : public FormatterProvider {
 public:
-  StreamInfoFormatter(const std::string& field_name);
+  StreamInfoFormatter(const std::string& field_name, bool omit_empty_values);
 
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
@@ -292,13 +299,14 @@ private:
 class MetadataFormatter {
 public:
   MetadataFormatter(const std::string& filter_namespace, const std::vector<std::string>& path,
-                    absl::optional<size_t> max_length);
+                    absl::optional<size_t> max_length, bool omit_empty_values);
 
 protected:
   std::string formatMetadata(const envoy::config::core::v3::Metadata& metadata) const;
   ProtobufWkt::Value formatMetadataValue(const envoy::config::core::v3::Metadata& metadata) const;
 
 private:
+  const std::string unspecified_value_str_;
   std::string filter_namespace_;
   std::vector<std::string> path_;
   absl::optional<size_t> max_length_;
@@ -310,7 +318,8 @@ private:
 class DynamicMetadataFormatter : public FormatterProvider, MetadataFormatter {
 public:
   DynamicMetadataFormatter(const std::string& filter_namespace,
-                           const std::vector<std::string>& path, absl::optional<size_t> max_length);
+                           const std::vector<std::string>& path, absl::optional<size_t> max_length,
+                           bool omit_empty_values);
 
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
@@ -327,7 +336,7 @@ public:
 class FilterStateFormatter : public FormatterProvider {
 public:
   FilterStateFormatter(const std::string& key, absl::optional<size_t> max_length,
-                       bool serialize_as_string);
+                       bool serialize_as_string, bool omit_empty_values);
 
   // FormatterProvider
   std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
@@ -344,6 +353,7 @@ private:
   std::string key_;
   absl::optional<size_t> max_length_;
 
+  const std::string unspecified_value_str_;
   bool serialize_as_string_;
 };
 
