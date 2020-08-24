@@ -100,6 +100,7 @@ envoy_cc_library(
         ":address_interface",
         "//include/envoy/api:io_error_interface",
         "//include/envoy/api:os_sys_calls_interface",
+        "//include/envoy/event:file_event_interface",
         "//source/common/common:assert_lib",
     ],
 )
@@ -110,8 +111,16 @@ envoy_cc_library(
     deps = [
         ":address_interface",
         ":io_handle_interface",
-        "//include/envoy/config:typed_config_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "socket_interface_interface",
+    hdrs = ["socket_interface.h"],
+    deps = [
+        ":socket_interface",
+        "//include/envoy/config:typed_config_interface",
     ],
 )
 
@@ -130,10 +139,17 @@ envoy_cc_library(
     hdrs = ["transport_socket.h"],
     deps = [
         ":io_handle_interface",
+        ":post_io_action_interface",
         ":proxy_protocol_options_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/ssl:connection_interface",
     ],
+)
+
+envoy_cc_library(
+    name = "post_io_action_interface",
+    hdrs = ["post_io_action.h"],
+    deps = [],
 )
 
 envoy_cc_library(

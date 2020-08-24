@@ -165,7 +165,8 @@ public:
             {"streamInfo", static_luaStreamInfo},
             {"connection", static_luaConnection},
             {"importPublicKey", static_luaImportPublicKey},
-            {"verifySignature", static_luaVerifySignature}};
+            {"verifySignature", static_luaVerifySignature},
+            {"base64Escape", static_luaBase64Escape}};
   }
 
 private:
@@ -268,6 +269,13 @@ private:
    */
   DECLARE_LUA_CLOSURE(StreamHandleWrapper, luaBodyIterator);
 
+  /**
+   * Base64 escape a string.
+   * @param1 (string) string to be base64 escaped.
+   * @return (string) base64 escaped string.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaBase64Escape);
+
   int doSynchronousHttpCall(lua_State* state, Tracing::Span& span);
   int doAsynchronousHttpCall(lua_State* state, Tracing::Span& span);
 
@@ -308,6 +316,9 @@ private:
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
+
+  // The inserted crypto object pointers will not be removed from this map.
+  absl::flat_hash_map<std::string, Envoy::Common::Crypto::CryptoObjectPtr> public_key_storage_;
 };
 
 /**

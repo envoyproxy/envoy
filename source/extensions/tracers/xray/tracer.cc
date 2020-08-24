@@ -213,7 +213,7 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   } else if (name == PeerAddress) {
     http_request_annotations_.emplace(SpanClientIp, ValueUtil::stringValue(std::string(value)));
     // In this case, PeerAddress refers to the client's actual IP address, not
-    // the address specified in the the HTTP X-Forwarded-For header.
+    // the address specified in the HTTP X-Forwarded-For header.
     http_request_annotations_.emplace(SpanXForwardedFor, ValueUtil::boolValue(false));
   } else {
     custom_annotations_.emplace(name, value);
