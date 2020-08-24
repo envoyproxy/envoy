@@ -24,7 +24,8 @@ jobs:
     - name: Get Build Targets
       run: |
        . .github/workflows/get_build_targets.sh 
-       echo '::set-env ENV_BUILD_TARGETS=$BUILD_TARGETS'
+       echo $BUILD_TARGETS
+       echo "::set-env name=ENV_BUILD_TARGETS::$BUILD_TARGETS"
 
     - name: Check Environment variable
       run: |
