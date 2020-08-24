@@ -564,27 +564,38 @@ TEST_F(CacheFilterTest, GetRequestWithBodyAndTrailers) {
 // reliably fail if the CacheFilter is accessed after being deleted.
 TEST_F(CacheFilterTest, FilterDeletedBeforePostedCallbackExecuted) {
   request_headers_.setHost("FilterDeletedBeforePostedCallbackExecuted");
+  {
+    // Create filter for request 1.
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
-  // Create the filter
-  CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    testDecodeRequestMiss(filter);
 
-  // Call decode headers to start the cache lookup, which should immediately post the callback to
-  // the dispatcher.
-  EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
-            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+    // Encode response headers.
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter->onDestroy();
+  }
+  {
+    // Create filter for request 2.
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
-  // Destroy the filter
-  filter->onDestroy();
-  filter.reset();
+    // Call decode headers to start the cache lookup, which should immediately post the callback to
+    // the dispatcher.
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
-  // Make sure that onHeaders was not called by making sure no decoder callbacks were made.
-  EXPECT_CALL(decoder_callbacks_, continueDecoding).Times(0);
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    // Destroy the filter
+    filter->onDestroy();
+    filter.reset();
 
-  // Run events on the dispatcher so that the callback is invoked after the filter deletion.
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+    // Make sure that onHeaders was not called by making sure no decoder callbacks were made.
+    EXPECT_CALL(decoder_callbacks_, continueDecoding).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
 
-  ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    // Run events on the dispatcher so that the callback is invoked after the filter deletion.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+  }
 }
 
 // A new type alias for a different type of tests that use the exact same class
