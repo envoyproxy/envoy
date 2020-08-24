@@ -131,8 +131,7 @@ TEST_F(SdsApiTest, BadConfigSource) {
       }));
   EXPECT_THROW_WITH_MESSAGE(TlsCertificateSdsApi(
                                 config_source, "abc.com", subscription_factory_, time_system_,
-                                validation_visitor_, server.stats(), []() {},
-                                *dispatcher_, *api_),
+                                validation_visitor_, server.stats(), []() {}, *dispatcher_, *api_),
                             EnvoyException, "bad config");
 }
 

@@ -49,9 +49,7 @@ public:
 
   SecretData secretData();
 
-  void registerInitTarget(Init::Manager& init_manager) {
-    init_manager.add(init_target_);
-  }
+  void registerInitTarget(Init::Manager& init_manager) { init_manager.add(init_target_); }
 
 protected:
   // Creates new secrets.
@@ -119,8 +117,7 @@ public:
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        destructor_cb, secret_provider_context.dispatcher(),
-        secret_provider_context.api());
+        destructor_cb, secret_provider_context.dispatcher(), secret_provider_context.api());
     ret->registerInitTarget(secret_provider_context.initManager());
     return ret;
   }
@@ -129,8 +126,8 @@ public:
                        const std::string& sds_config_name,
                        Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
-                       std::function<void()> destructor_cb,
-                       Event::Dispatcher& dispatcher, Api::Api& api)
+                       std::function<void()> destructor_cb, Event::Dispatcher& dispatcher,
+                       Api::Api& api)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
                stats, std::move(destructor_cb), dispatcher, api) {}
 
@@ -182,8 +179,7 @@ public:
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        destructor_cb, secret_provider_context.dispatcher(),
-        secret_provider_context.api());
+        destructor_cb, secret_provider_context.dispatcher(), secret_provider_context.api());
     ret->registerInitTarget(secret_provider_context.initManager());
     return ret;
   }
@@ -192,8 +188,7 @@ public:
                                      Config::SubscriptionFactory& subscription_factory,
                                      TimeSource& time_source,
                                      ProtobufMessage::ValidationVisitor& validation_visitor,
-                                     Stats::Store& stats,
-                                     std::function<void()> destructor_cb,
+                                     Stats::Store& stats, std::function<void()> destructor_cb,
                                      Event::Dispatcher& dispatcher, Api::Api& api)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
                stats, std::move(destructor_cb), dispatcher, api) {}
@@ -255,8 +250,7 @@ public:
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        destructor_cb, secret_provider_context.dispatcher(),
-        secret_provider_context.api());
+        destructor_cb, secret_provider_context.dispatcher(), secret_provider_context.api());
     ret->registerInitTarget(secret_provider_context.initManager());
     return ret;
   }
@@ -266,9 +260,8 @@ public:
                              Config::SubscriptionFactory& subscription_factory,
                              TimeSource& time_source,
                              ProtobufMessage::ValidationVisitor& validation_visitor,
-                             Stats::Store& stats,
-                             std::function<void()> destructor_cb, Event::Dispatcher& dispatcher,
-                             Api::Api& api)
+                             Stats::Store& stats, std::function<void()> destructor_cb,
+                             Event::Dispatcher& dispatcher, Api::Api& api)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
                stats, std::move(destructor_cb), dispatcher, api) {}
 
@@ -328,8 +321,7 @@ public:
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        destructor_cb, secret_provider_context.dispatcher(),
-        secret_provider_context.api());
+        destructor_cb, secret_provider_context.dispatcher(), secret_provider_context.api());
     ret->registerInitTarget(secret_provider_context.initManager());
     return ret;
   }
@@ -338,8 +330,8 @@ public:
                       const std::string& sds_config_name,
                       Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
                       ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
-                      std::function<void()> destructor_cb,
-                      Event::Dispatcher& dispatcher, Api::Api& api)
+                      std::function<void()> destructor_cb, Event::Dispatcher& dispatcher,
+                      Api::Api& api)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
                stats, std::move(destructor_cb), dispatcher, api) {}
 
