@@ -41,8 +41,6 @@ enum class CacheEntryStatus {
   SatisfiableRange,
 };
 
-std::ostream& operator<<(std::ostream& os, CacheEntryStatus status);
-
 // Byte range from an HTTP request.
 class RawByteRange {
 public:
@@ -112,8 +110,6 @@ inline bool operator==(const AdjustedByteRange& lhs, const AdjustedByteRange& rh
   return lhs.begin() == rhs.begin() && lhs.end() == rhs.end();
 }
 
-std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range);
-
 // Adjusts request_range_spec to fit a cached response of size content_length, putting the results
 // in response_ranges. Returns true if response_ranges is satisfiable (empty is considered
 // satisfiable, as it denotes the entire body).
@@ -150,6 +146,12 @@ struct LookupResult {
   // TODO(toddmgreer): Implement trailer support.
   // True if the cached response has trailers.
   bool has_trailers_ = false;
+
+  // Update the content length of the object and its response headers.
+  void setContentLength(uint64_t new_length) {
+    content_length_ = new_length;
+    headers_->setContentLength(new_length);
+  }
 };
 using LookupResultPtr = std::unique_ptr<LookupResult>;
 
@@ -319,7 +321,7 @@ public:
 class HttpCacheFactory : public Config::TypedFactory {
 public:
   // From UntypedFactory
-  std::string category() const override { return "http_cache_factory"; }
+  std::string category() const override { return "envoy.http.cache"; }
 
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).

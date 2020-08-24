@@ -21,7 +21,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/common/expr:context_lib",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:host_mocks",
         "//test/test_common:utility_lib",
     ],
 )

@@ -264,7 +264,6 @@ protected:
   // HTTP/1 message has been flushed from the parser. This allows raising an HTTP/2 style headers
   // block with end stream set to true with no further protocol data remaining.
   bool deferred_end_stream_headers_ : 1;
-  const bool connection_header_sanitization_ : 1;
   const bool enable_trailers_ : 1;
   const bool strict_1xx_and_204_headers_ : 1;
 

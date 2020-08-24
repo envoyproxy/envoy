@@ -12,6 +12,7 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/request_id_extension_impl.h"
+#include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -22,7 +23,6 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -152,8 +152,8 @@ TEST_F(HttpConnManFinalizerImplTest, OriginalAndLongPath) {
   const std::string path_prefix = "http://";
   const std::string expected_path(256, 'a');
   const std::string expected_ip = "10.0.0.100";
-  const auto remote_address =
-      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(expected_ip, 0)};
+  const auto remote_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
 
   Http::TestRequestHeaderMapImpl request_headers{{"x-request-id", "id"},
                                                  {"x-envoy-original-path", path},
@@ -187,8 +187,8 @@ TEST_F(HttpConnManFinalizerImplTest, NoGeneratedId) {
   const std::string path_prefix = "http://";
   const std::string expected_path(256, 'a');
   const std::string expected_ip = "10.0.0.100";
-  const auto remote_address =
-      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(expected_ip, 0)};
+  const auto remote_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", ""},
                                                  {"x-envoy-original-path", path},
@@ -221,8 +221,8 @@ TEST_F(HttpConnManFinalizerImplTest, Connect) {
   const std::string path_prefix = "http://";
   const std::string expected_path(256, 'a');
   const std::string expected_ip = "10.0.0.100";
-  const auto remote_address =
-      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(expected_ip, 0)};
+  const auto remote_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
 
   Http::TestRequestHeaderMapImpl request_headers{{":method", "CONNECT"},
                                                  {"x-forwarded-proto", "http"}};
@@ -352,8 +352,8 @@ TEST_F(HttpConnManFinalizerImplTest, SpanOptionalHeaders) {
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
   const std::string expected_ip = "10.0.0.100";
-  const auto remote_address =
-      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(expected_ip, 0)};
+  const auto remote_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
@@ -537,8 +537,8 @@ TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
   const std::string expected_ip = "10.0.0.100";
-  const auto remote_address =
-      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(expected_ip, 0)};
+  const auto remote_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
 
   request_headers.setHost("api");
   request_headers.setUserAgent("agent");
@@ -587,8 +587,8 @@ TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {
 TEST_F(HttpConnManFinalizerImplTest, GrpcOkStatus) {
   const std::string path_prefix = "http://";
   const std::string expected_ip = "10.0.0.100";
-  const auto remote_address =
-      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(expected_ip, 0)};
+  const auto remote_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
 
   Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
                                                  {":scheme", "http"},
@@ -637,8 +637,8 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcOkStatus) {
 TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
   const std::string path_prefix = "http://";
   const std::string expected_ip = "10.0.0.100";
-  const auto remote_address =
-      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(expected_ip, 0)};
+  const auto remote_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
 
   Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
                                                  {":scheme", "http"},
@@ -683,8 +683,8 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
 TEST_F(HttpConnManFinalizerImplTest, GrpcTrailersOnly) {
   const std::string path_prefix = "http://";
   const std::string expected_ip = "10.0.0.100";
-  const auto remote_address =
-      Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(expected_ip, 0)};
+  const auto remote_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
 
   Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
                                                  {":scheme", "http"},

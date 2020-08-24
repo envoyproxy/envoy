@@ -23,6 +23,8 @@ envoy_extension_cc_test(
         "//test/mocks/server:admin_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/mocks/upstream:load_balancer_mocks",
         "//test/test_common:environment_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/aggregate/v3:pkg_cc_proto",
@@ -54,7 +56,6 @@ envoy_extension_cc_test(
     name = "cluster_integration_test",
     srcs = ["cluster_integration_test.cc"],
     extension_name = "envoy.clusters.aggregate",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",

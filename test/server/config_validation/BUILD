@@ -15,7 +15,6 @@ envoy_cc_test(
         "//source/server/config_validation:async_client_lib",
         "//source/server/config_validation:dns_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
     ],
 )
@@ -42,7 +41,6 @@ envoy_cc_test(
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:admin_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
-        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -145,6 +143,7 @@ envoy_cc_test_library(
     deps = [
         ":xds_fuzz_proto_cc_proto",
         ":xds_verifier_lib",
+        "//test/fuzz:utility_lib",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",

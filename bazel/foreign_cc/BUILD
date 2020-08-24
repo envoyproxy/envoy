@@ -46,6 +46,7 @@ configure_make(
         # TODO(htuch): Remove when #6084 is fixed
         "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
         "//bazel:msan_build": {"ENVOY_CONFIG_MSAN": "1"},
+        "//bazel:windows_dbg_build": {"WINDOWS_DBG_BUILD": "debug"},
         "//conditions:default": {},
     }),
     lib_source = "@com_github_luajit_luajit//:all",
@@ -55,7 +56,6 @@ configure_make(
         "//bazel:windows_x86_64": ["lua51.lib"],
         "//conditions:default": ["libluajit-5.1.a"],
     }),
-    tags = ["skip_on_windows"],
 )
 
 configure_make(
@@ -67,6 +67,7 @@ configure_make(
         # TODO(htuch): Remove when #6084 is fixed
         "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
         "//bazel:msan_build": {"ENVOY_CONFIG_MSAN": "1"},
+        "//bazel:windows_dbg_build": {"WINDOWS_DBG_BUILD": "debug"},
         "//conditions:default": {},
     }),
     lib_source = "@com_github_moonjit_moonjit//:all",
@@ -76,7 +77,6 @@ configure_make(
         "//bazel:windows_x86_64": ["lua51.lib"],
         "//conditions:default": ["libluajit-5.1.a"],
     }),
-    tags = ["skip_on_windows"],
 )
 
 envoy_cmake_external(
@@ -208,22 +208,6 @@ envoy_cmake_external(
     static_libraries = select({
         "//bazel:windows_x86_64": ["nghttp2.lib"],
         "//conditions:default": ["libnghttp2.a"],
-    }),
-)
-
-envoy_cmake_external(
-    name = "yaml",
-    cache_entries = {
-        "YAML_CPP_BUILD_TESTS": "off",
-        "YAML_CPP_BUILD_TOOLS": "off",
-        "YAML_BUILD_SHARED_LIBS": "off",
-        "CMAKE_CXX_COMPILER_FORCED": "on",
-        "YAML_MSVC_SHARED_RT": "off",
-    },
-    lib_source = "@com_github_jbeder_yaml_cpp//:all",
-    static_libraries = select({
-        "//bazel:windows_x86_64": ["yaml-cpp.lib"],
-        "//conditions:default": ["libyaml-cpp.a"],
     }),
 )
 

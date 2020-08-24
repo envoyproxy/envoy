@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
-#include "envoy/http/header_map.h"
 
 #include "common/common/logger.h"
 
@@ -81,9 +80,10 @@ private:
   InsertContextPtr insert_;
   LookupResultPtr lookup_result_;
 
-  // Tracks what body bytes still need to be read from the cache. This is currently only one Range,
-  // but will expand when full range support is added. Initialized by encodeCachedResponse.
-  std::vector<AdjustedByteRange> remaining_body_;
+  // Tracks what body bytes still need to be read from the cache. This is
+  // currently only one Range, but will expand when full range support is added. Initialized by
+  // onHeaders for Range Responses, otherwise initialized by encodeCachedResponse.
+  std::vector<AdjustedByteRange> remaining_ranges_;
 
   // True if the response has trailers.
   // TODO(toddmgreer): cache trailers.
