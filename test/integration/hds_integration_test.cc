@@ -4,6 +4,7 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/service/health/v3/hds.pb.h"
+#include "envoy/type/v3/http.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/config/metadata.h"
@@ -59,11 +60,9 @@ public:
     HttpIntegrationTest::initialize();
 
     // Endpoint connections
-    host_upstream_ =
-        std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem());
+    host_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type_, version_, timeSystem());
     host_upstream_->set_allow_unexpected_disconnects(true);
-    host2_upstream_ =
-        std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem());
+    host2_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type_, version_, timeSystem());
     host2_upstream_->set_allow_unexpected_disconnects(true);
   }
 
@@ -125,30 +124,61 @@ public:
 
   // Creates a basic HealthCheckSpecifier message containing one endpoint and
   // one HTTP health_check
-  envoy::service::health::v3::HealthCheckSpecifier makeHttpHealthCheckSpecifier() {
+  envoy::service::health::v3::HealthCheckSpecifier
+  makeHttpHealthCheckSpecifier(bool enable_transport_socket_match = false) {
     envoy::service::health::v3::HealthCheckSpecifier server_health_check_specifier_;
     server_health_check_specifier_.mutable_interval()->set_nanos(100000000); // 0.1 seconds
 
-    auto* health_check = server_health_check_specifier_.add_cluster_health_checks();
+    auto* cluster_health_check = server_health_check_specifier_.add_cluster_health_checks();
 
-    health_check->set_cluster_name("anna");
+    cluster_health_check->set_cluster_name("anna");
     Network::Utility::addressToProtobufAddress(
         *host_upstream_->localAddress(),
-        *health_check->add_locality_endpoints()->add_endpoints()->mutable_address());
-    health_check->mutable_locality_endpoints(0)->mutable_locality()->set_region("middle_earth");
-    health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("shire");
-    health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("hobbiton");
+        *cluster_health_check->add_locality_endpoints()->add_endpoints()->mutable_address());
+    cluster_health_check->mutable_locality_endpoints(0)->mutable_locality()->set_region(
+        "middle_earth");
+    cluster_health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("shire");
+    cluster_health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone(
+        "hobbiton");
+    auto* health_check = cluster_health_check->add_health_checks();
+    health_check->mutable_timeout()->set_seconds(MaxTimeout);
+    health_check->mutable_interval()->set_seconds(MaxTimeout);
+    health_check->mutable_unhealthy_threshold()->set_value(2);
+    health_check->mutable_healthy_threshold()->set_value(2);
+    health_check->mutable_grpc_health_check();
+    auto* http_health_check = health_check->mutable_http_health_check();
+    http_health_check->set_path("/healthcheck");
+    http_health_check->set_codec_client_type(envoy::type::v3::CodecClientType::HTTP1);
+    if (enable_transport_socket_match) {
+      // set bool for use in struct.
+      ProtobufWkt::Value v;
+      v.set_bool_value(true);
 
-    health_check->add_health_checks()->mutable_timeout()->set_seconds(MaxTimeout);
-    health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(MaxTimeout);
-    health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
-    health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
-    health_check->mutable_health_checks(0)->mutable_grpc_health_check();
-    health_check->mutable_health_checks(0)
-        ->mutable_http_health_check()
-        ->set_hidden_envoy_deprecated_use_http2(false);
-    health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
+      // map our transport socket matches with our matcher.
+      http_health_check->set_codec_client_type(envoy::type::v3::CodecClientType::HTTP2);
+      auto* match_filter = health_check->mutable_transport_socket_match_criteria();
+      match_filter->mutable_fields()->insert({"tls_socket", v});
 
+      // create the list of all possible matches.
+      const std::string match_yaml = absl::StrFormat(
+          R"EOF(
+  name: "tls_socket"
+  match:
+    mtlsReady: "true"
+  transport_socket:
+    name: tls
+    typed_config:
+      "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+      common_tls_context:
+        tls_certificates:
+        - certificate_chain: { filename: "%s" }
+          private_key: { filename: "%s" }
+  )EOF",
+          TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"),
+          TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+      auto* transport_socket_match = cluster_health_check->add_transport_socket_matches();
+      TestUtility::loadFromYaml(match_yaml, *transport_socket_match);
+    }
     return server_health_check_specifier_;
   }
 
@@ -307,6 +337,8 @@ public:
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse envoy_msg_;
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse response_;
   envoy::service::health::v3::HealthCheckSpecifier server_health_check_specifier_;
+
+  FakeHttpConnection::Type http_conn_type_ = FakeHttpConnection::Type::HTTP1;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, HdsIntegrationTest,
@@ -872,6 +904,41 @@ TEST_P(HdsIntegrationTest, TestDefaultTimer) {
   // an update should be received after interval
   ASSERT_TRUE(
       hds_stream_->waitForGrpcMessage(*dispatcher_, response_, std::chrono::milliseconds(2500)));
+
+  // Clean up connections
+  cleanupHostConnections();
+  cleanupHdsConnection();
+}
+
+// Tests Envoy HTTP health checking a single healthy endpoint and reporting that it is
+// indeed healthy to the server.
+TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttpsContext) {
+  http_conn_type_ = FakeHttpConnection::Type::HTTP2;
+  initialize();
+
+  // Server <--> Envoy
+  waitForHdsStream();
+  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
+  EXPECT_EQ(envoy_msg_.health_check_request().capability().health_check_protocols(0),
+            envoy::service::health::v3::Capability::HTTP);
+
+  // Server asks for health checking
+  server_health_check_specifier_ = makeHttpHealthCheckSpecifier(true);
+  hds_stream_->startGrpcStream();
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
+
+  // Envoy sends a health check message to an endpoint
+  healthcheckEndpoints();
+
+  // Endpoint responds to the health check
+  host_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  host_stream_->encodeData(1024, true);
+
+  // Receive updates until the one we expect arrives
+  waitForEndpointHealthResponse(envoy::config::core::v3::HEALTHY);
+
+  checkCounters(1, 2, 1, 0);
 
   // Clean up connections
   cleanupHostConnections();

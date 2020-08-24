@@ -787,6 +787,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hds_integration_test",
     srcs = ["hds_integration_test.cc"],
+    data = [
+        "//test/config/integration/certs",
+    ],
     shard_count = 2,
     tags = ["flaky_on_windows"],
     deps = [
@@ -805,6 +808,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/health/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
