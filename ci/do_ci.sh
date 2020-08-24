@@ -382,6 +382,12 @@ elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
   echo "fix_spelling_pedantic..."
   ./tools/spelling/check_spelling_pedantic.py fix
   exit 0
+elif [[ "$CI_TARGET" == "headersplit" ]]; then
+  echo "headersplit_test..."
+  bazel_with_collection //tools/envoy_headersplit:headersplit_test LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
+  bazel_with_collection //tools/envoy_headersplit:replace_includes_test LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
+  ./tools/headersplit "$@"
+  exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."
   docs/build.sh

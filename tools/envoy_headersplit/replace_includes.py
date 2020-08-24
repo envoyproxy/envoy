@@ -23,9 +23,7 @@ import argparse
 def to_classname(filename: str) -> str:
   """
     maps divided mock class file name to class names
-
     inverse function of headersplit.to_filename
-
     e.g. map "test/mocks/server/admin_stream.h" to "MockAdminStream"
 
     Args:
@@ -42,7 +40,6 @@ def to_classname(filename: str) -> str:
 def to_bazelname(filename: str, mockname: str) -> str:
   """
     maps divided mock class file name to bazel target name
-
     e.g. map "test/mocks/server/admin_stream.h" to "//test/mocks/server:admin_stream_mocks"
 
     Args:
@@ -63,7 +60,7 @@ def get_filenames(mockname: str) -> List[str]:
 
     Args:
       mockname: string, mock directory name
-    
+
     Returns:
       List of file name for the headers in test/mock/{mocksname}
   """

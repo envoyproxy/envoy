@@ -25,3 +25,22 @@ py_test(
         requirement("clang"),
     ],
 )
+
+py_test(
+    name = "replace_includes_test",
+    srcs = [
+        "replace_includes_test.py",
+        "replace_includes.py",
+        "headersplit.py",
+        "headersplit_test.py",
+    ],
+    data = glob(["code_corpus/**"]),
+    main = "replace_includes_test.py",
+    python_version = "PY3",
+    srcs_version = "PY3",
+    tags = ["no-sandbox"],
+    visibility = ["//visibility:public"],
+    deps = [
+        requirement("clang"),
+    ],
+)

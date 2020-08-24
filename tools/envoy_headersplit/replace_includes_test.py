@@ -28,7 +28,7 @@ class ReplaceIncludesTest(unittest.TestCase):
 
   class FakeDir():
     # fake directory to test get_filenames
-    def glob(sefl, _):
+    def glob(self, _):
       return [
           Path("test/mocks/server/admin_stream.h"),
           Path("test/mocks/server/admin.h"),
@@ -43,8 +43,8 @@ class ReplaceIncludesTest(unittest.TestCase):
     ])
 
   def test_replace_includes(self):
-    fake_source_code = open("code_corpus/fake_source_code.cc", "r").read()
-    fake_build_file = open("code_corpus/fake_build", "r").read()
+    fake_source_code = open("tools/envoy_headersplit/code_corpus/fake_source_code.cc", "r").read()
+    fake_build_file = open("tools/envoy_headersplit/code_corpus/fake_build", "r").read()
     os.mkdir("test")
     os.mkdir("test/mocks")
     os.mkdir("test/mocks/upstream")
