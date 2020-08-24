@@ -44,8 +44,8 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& r
     clusters_to_remove.erase(resource.get().name());
   }
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
-  for (const auto& cluster : clusters_to_remove) {
-    *to_remove_repeated.Add() = cluster.first;
+  for (const auto& [cluster_name, _] : clusters_to_remove) {
+    *to_remove_repeated.Add() = cluster_name;
   }
   onConfigUpdate(resources, to_remove_repeated, version_info);
 }
