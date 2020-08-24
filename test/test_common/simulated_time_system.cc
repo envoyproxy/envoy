@@ -96,7 +96,8 @@ public:
       if (!pending_dec_ && (!registered_alarms_.empty() || !triggered_alarms_.empty())) {
         // Selectively increment the pending updates counter only on dispatchers that have active
         // alarms to allow advanceTimeWait to work but avoid getting stuck if some of the event
-        // loops associated with some of the registerd simulated schedulers is not currently active.
+        // loops associated with some of the registered simulated schedulers is not currently
+        // active.
         inc_pending = true;
         pending_dec_ = true;
       }
