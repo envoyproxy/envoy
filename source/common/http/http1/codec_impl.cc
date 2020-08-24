@@ -42,6 +42,7 @@ struct Http1ResponseCodeDetailValues {
   const absl::string_view TransferEncodingNotAllowed = "http1.transfer_encoding_not_allowed";
   const absl::string_view ContentLengthNotAllowed = "http1.content_length_not_allowed";
   const absl::string_view InvalidUnderscore = "http1.unexpected_underscore";
+  const absl::string_view ChunkedContentLength = "http1.content_length_and_chunked_not_allowed";
 };
 
 struct Http1HeaderTypesValues {
@@ -747,7 +748,7 @@ Envoy::StatusOr<int> ConnectionImpl::onHeadersCompleteBase() {
       request_or_response_headers.removeContentLength();
     } else {
       error_code_ = Http::Code::BadRequest;
-      RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().ContentLengthNotAllowed));
+      RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().ChunkedContentLength));
       return codecProtocolError(
           "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
     }
