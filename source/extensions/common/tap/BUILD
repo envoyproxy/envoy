@@ -1,19 +1,19 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "tap_interface",
     hdrs = ["tap.h"],
     deps = [
-        ":tap_matcher",
         "//include/envoy/http:header_map_interface",
+        "//source/extensions/common/matcher:matcher_lib",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",
     ],
@@ -25,23 +25,11 @@ envoy_cc_library(
     hdrs = ["tap_config_base.h"],
     deps = [
         ":tap_interface",
-        ":tap_matcher",
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
+        "//source/extensions/common/matcher:matcher_lib",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "tap_matcher",
-    srcs = ["tap_matcher.cc"],
-    hdrs = ["tap_matcher.h"],
-    deps = [
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:matchers_lib",
-        "//source/common/http:header_utility_lib",
-        "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
     ],
 )
 

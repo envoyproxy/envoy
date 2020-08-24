@@ -20,17 +20,63 @@ namespace HeaderToMetadataFilter {
 using ProtoRule = envoy::extensions::filters::http::header_to_metadata::v3::Config::Rule;
 using ValueType = envoy::extensions::filters::http::header_to_metadata::v3::Config::ValueType;
 using ValueEncode = envoy::extensions::filters::http::header_to_metadata::v3::Config::ValueEncode;
+using KeyValuePair = envoy::extensions::filters::http::header_to_metadata::v3::Config::KeyValuePair;
 
-class Rule {
+// Interface for getting values from a cookie or a header.
+class ValueSelector {
 public:
-  Rule(const std::string& header, const ProtoRule& rule);
-  const ProtoRule& rule() const { return rule_; }
-  const Regex::CompiledMatcherPtr& regexRewrite() const { return regex_rewrite_; }
-  const std::string& regexSubstitution() const { return regex_rewrite_substitution_; }
-  const Http::LowerCaseString& header() const { return header_; }
+  virtual ~ValueSelector() = default;
+
+  /**
+   * Called to extract the value of a given header or cookie.
+   * @param http header map.
+   * @return absl::optional<std::string> the extracted header or cookie.
+   */
+  virtual absl::optional<std::string> extract(Http::HeaderMap& map) const PURE;
+
+  /**
+   * @return a string representation of either a cookie or a header passed in the request.
+   */
+  virtual std::string toString() const PURE;
+};
+
+// Get value from a header.
+class HeaderValueSelector : public ValueSelector {
+public:
+  // ValueSelector.
+  explicit HeaderValueSelector(Http::LowerCaseString header, bool remove)
+      : header_(std::move(header)), remove_(std::move(remove)) {}
+  absl::optional<std::string> extract(Http::HeaderMap& map) const override;
+  std::string toString() const override { return fmt::format("header '{}'", header_.get()); }
+  ~HeaderValueSelector() override = default;
 
 private:
   const Http::LowerCaseString header_;
+  const bool remove_;
+};
+
+// Get value from a cookie.
+class CookieValueSelector : public ValueSelector {
+public:
+  // ValueSelector.
+  explicit CookieValueSelector(std::string cookie) : cookie_(std::move(cookie)) {}
+  absl::optional<std::string> extract(Http::HeaderMap& map) const override;
+  std::string toString() const override { return fmt::format("cookie '{}'", cookie_); }
+  ~CookieValueSelector() override = default;
+
+private:
+  const std::string cookie_;
+};
+
+class Rule {
+public:
+  Rule(const ProtoRule& rule);
+  const ProtoRule& rule() const { return rule_; }
+  const Regex::CompiledMatcherPtr& regexRewrite() const { return regex_rewrite_; }
+  const std::string& regexSubstitution() const { return regex_rewrite_substitution_; }
+  std::shared_ptr<const ValueSelector> selector_;
+
+private:
   const ProtoRule rule_;
   Regex::CompiledMatcherPtr regex_rewrite_{};
   std::string regex_rewrite_substitution_{};
@@ -142,8 +188,9 @@ private:
    */
   void writeHeaderToMetadata(Http::HeaderMap& headers, const HeaderToMetadataRules& rules,
                              Http::StreamFilterCallbacks& callbacks);
-  bool addMetadata(StructMap&, const std::string&, const std::string&, absl::string_view, ValueType,
+  bool addMetadata(StructMap&, const std::string&, const std::string&, std::string, ValueType,
                    ValueEncode) const;
+  void applyKeyValue(std::string, const Rule&, const KeyValuePair&, StructMap&);
   const std::string& decideNamespace(const std::string& nspace) const;
   const Config* getConfig() const;
 };

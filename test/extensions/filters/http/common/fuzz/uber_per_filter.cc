@@ -3,6 +3,8 @@
 #include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 
+#include "common/tracing/http_tracer_impl.h"
+
 #include "extensions/filters/http/common/utility.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -103,6 +105,23 @@ void cleanTapConfig(Protobuf::Message* message) {
     config.mutable_common_config()->mutable_static_config()->mutable_match_config()->set_any_match(
         true);
   }
+  // TODO(samflattery): remove once StreamingGrpcSink is implemented
+  // a static config filter is required to have one sink, but since validation isn't performed on
+  // the filter until after this function runs, we have to manually check that there are sinks
+  // before checking that they are not StreamingGrpc
+  else if (config.common_config().config_type_case() ==
+               envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::
+                   kStaticConfig &&
+           !config.common_config().static_config().output_config().sinks().empty() &&
+           config.common_config()
+                   .static_config()
+                   .output_config()
+                   .sinks(0)
+                   .output_sink_type_case() ==
+               envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc) {
+    // will be caught in UberFilterFuzzer::fuzz
+    throw EnvoyException("received input with not implemented output_sink_type StreamingGrpcSink");
+  }
 }
 
 void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
@@ -116,7 +135,7 @@ void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
   } else if (name == HttpFilterNames::get().Squash) {
     cleanAttachmentTemplate(message);
   } else if (name == HttpFilterNames::get().Tap) {
-    // TapDS oneof field not implemented.
+    // TapDS oneof field and OutputSinkType StreamingGrpc not implemented
     cleanTapConfig(message);
   }
   if (filter_name == HttpFilterNames::get().JwtAuthn) {

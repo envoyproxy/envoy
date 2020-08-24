@@ -12,6 +12,14 @@
 namespace Envoy {
 namespace Fuzz {
 
+namespace {
+
+// The maximum number of iterations the fuzz test can run until stopped. This is
+// to avoid lengthy tests and timeouts.
+constexpr size_t MaxIterations = 1000;
+
+} // namespace
+
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
 
   Stats::Utility::sanitizeStatsName(absl::string_view(reinterpret_cast<const char*>(buf), len));
@@ -52,8 +60,10 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     Stats::Utility::counterFromStatNames(*scope, {});
     Stats::Utility::counterFromElements(*scope, {});
   } else {
-    // add random length string in each loop
-    while (provider.remaining_bytes() > 3) {
+    // Run until either running out of strings to process or a maximal number of
+    // iterations is reached.
+    for (size_t iter = 0; iter < MaxIterations && provider.remaining_bytes() > 3; iter++) {
+      // add random length string in each loop
       if (provider.ConsumeBool()) {
         absl::string_view str = make_string(
             provider.ConsumeRandomLengthString(std::min(max_len, provider.remaining_bytes())));

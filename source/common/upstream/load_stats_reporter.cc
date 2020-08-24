@@ -140,9 +140,9 @@ void LoadStatsReporter::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& me
 void LoadStatsReporter::onReceiveMessage(
     std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) {
   ENVOY_LOG(debug, "New load report epoch: {}", message->DebugString());
-  stats_.requests_.inc();
   message_ = std::move(message);
   startLoadReportPeriod();
+  stats_.requests_.inc();
 }
 
 void LoadStatsReporter::startLoadReportPeriod() {
@@ -152,7 +152,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
   // problems due to referencing of temporaries in the below loop with Google's
   // internal string type. Consider this optimization when the string types
   // converge.
-  std::unordered_map<std::string, std::chrono::steady_clock::duration> existing_clusters;
+  absl::node_hash_map<std::string, std::chrono::steady_clock::duration> existing_clusters;
   if (message_->send_all_clusters()) {
     for (const auto& p : cm_.clusters()) {
       const std::string& cluster_name = p.first;

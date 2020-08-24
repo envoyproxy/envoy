@@ -298,7 +298,8 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public RouterFilterInterface {
 public:
   Filter(FilterConfig& config)
-      : config_(config), final_upstream_request_(nullptr), downstream_response_started_(false),
+      : config_(config), final_upstream_request_(nullptr),
+        downstream_100_continue_headers_encoded_(false), downstream_response_started_(false),
         downstream_end_stream_(false), is_retry_(false),
         attempting_internal_redirect_with_complete_stream_(false) {}
 
@@ -472,11 +473,13 @@ private:
                           bool dropped);
   void chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request);
   void cleanup();
-  virtual RetryStatePtr
-  createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
-                   const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                   Runtime::Loader& runtime, Random::RandomGenerator& random,
-                   Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) PURE;
+  virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
+                                         Http::RequestHeaderMap& request_headers,
+                                         const Upstream::ClusterInfo& cluster,
+                                         const VirtualCluster* vcluster, Runtime::Loader& runtime,
+                                         Random::RandomGenerator& random,
+                                         Event::Dispatcher& dispatcher, TimeSource& time_source,
+                                         Upstream::ResourcePriority priority) PURE;
 
   std::unique_ptr<GenericConnPool> createConnPool();
   UpstreamRequestPtr createUpstreamRequest();
@@ -544,6 +547,7 @@ private:
   // list of cookies to add to upstream headers
   std::vector<std::string> downstream_set_cookies_;
 
+  bool downstream_100_continue_headers_encoded_ : 1;
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
   bool is_retry_ : 1;
@@ -565,6 +569,7 @@ private:
                                  const Upstream::ClusterInfo& cluster,
                                  const VirtualCluster* vcluster, Runtime::Loader& runtime,
                                  Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                                 TimeSource& time_source,
                                  Upstream::ResourcePriority priority) override;
 };
 

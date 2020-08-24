@@ -2,7 +2,6 @@
 #include <limits>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/router/router.h"
@@ -15,6 +14,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
+#include "absl/container/node_hash_map.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -468,7 +468,7 @@ TEST_P(RingHashLoadBalancerTest, HostWeightedTinyRing) {
   LoadBalancerPtr lb = lb_->factory()->create();
 
   // :90 should appear once, :91 should appear twice and :92 should appear three times.
-  std::unordered_map<uint64_t, uint32_t> expected{
+  absl::node_hash_map<uint64_t, uint32_t> expected{
       {928266305478181108UL, 2},  {4443673547860492590UL, 2},  {5583722120771150861UL, 1},
       {6311230543546372928UL, 1}, {13444792449719432967UL, 2}, {16117243373044804889UL, 0}};
   for (const auto& entry : expected) {
@@ -547,7 +547,7 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedTinyRing) {
 
   // :90 should appear once, :91 should appear twice, :92 should appear three times,
   // and :93 shouldn't appear at all.
-  std::unordered_map<uint64_t, uint32_t> expected{
+  absl::node_hash_map<uint64_t, uint32_t> expected{
       {928266305478181108UL, 2},  {4443673547860492590UL, 2},  {5583722120771150861UL, 1},
       {6311230543546372928UL, 1}, {13444792449719432967UL, 2}, {16117243373044804889UL, 0}};
   for (const auto& entry : expected) {
@@ -617,7 +617,7 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedTinyRing) {
 
   // :90 should appear once, :91 and :92 should each appear two times, and :93 should appear four
   // times, to get the correct overall proportions.
-  std::unordered_map<uint64_t, uint32_t> expected{
+  absl::node_hash_map<uint64_t, uint32_t> expected{
       {928266305478181108UL, 2},   {3851675632748031481UL, 3},  {5583722120771150861UL, 1},
       {6311230543546372928UL, 1},  {7700377290971790572UL, 3},  {12559126875973811811UL, 3},
       {13444792449719432967UL, 2}, {13784988426630141778UL, 3}, {16117243373044804889UL, 0}};
@@ -763,7 +763,7 @@ TEST_P(RingHashLoadBalancerTest, LopsidedWeightSmallScale) {
 
   // Every 128th host in the light-but-dense locality should have an entry on the ring, for a total
   // of 8 entries. This gives us the right ratio of 1/128.
-  std::unordered_map<uint64_t, uint32_t> expected{
+  absl::node_hash_map<uint64_t, uint32_t> expected{
       {11664790346325243808UL, 1},   {15894554872961148518UL, 128}, {13958138884277627155UL, 256},
       {15803774069438192949UL, 384}, {3829253010855396576UL, 512},  {17918147347826565154UL, 640},
       {6442769608292299103UL, 768},  {5881074926069334434UL, 896}};

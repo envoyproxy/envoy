@@ -15,13 +15,14 @@ namespace TapFilter {
 namespace TapCommon = Extensions::Common::Tap;
 
 namespace {
-Http::HeaderMap::Iterate fillHeaderList(const Http::HeaderEntry& header, void* context) {
-  Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& header_list =
-      *reinterpret_cast<Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>*>(context);
-  auto& new_header = *header_list.Add();
-  new_header.set_key(std::string(header.key().getStringView()));
-  new_header.set_value(std::string(header.value().getStringView()));
-  return Http::HeaderMap::Iterate::Continue;
+Http::HeaderMap::ConstIterateCb
+fillHeaderList(Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>* output) {
+  return [output](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    auto& new_header = *output->Add();
+    new_header.set_key(std::string(header.key().getStringView()));
+    new_header.set_value(std::string(header.value().getStringView()));
+    return Http::HeaderMap::Iterate::Continue;
+  };
 }
 } // namespace
 
@@ -35,9 +36,8 @@ HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper(uint64_t strea
 
 void HttpPerRequestTapperImpl::streamRequestHeaders() {
   TapCommon::TraceWrapperPtr trace = makeTraceSegment();
-  request_headers_->iterate(
-      fillHeaderList,
-      trace->mutable_http_streamed_trace_segment()->mutable_request_headers()->mutable_headers());
+  request_headers_->iterate(fillHeaderList(
+      trace->mutable_http_streamed_trace_segment()->mutable_request_headers()->mutable_headers()));
   sink_handle_->submitTrace(std::move(trace));
 }
 
@@ -67,9 +67,9 @@ void HttpPerRequestTapperImpl::onRequestBody(const Buffer::Instance& data) {
 void HttpPerRequestTapperImpl::streamRequestTrailers() {
   if (request_trailers_ != nullptr) {
     TapCommon::TraceWrapperPtr trace = makeTraceSegment();
-    request_trailers_->iterate(fillHeaderList, trace->mutable_http_streamed_trace_segment()
-                                                   ->mutable_request_trailers()
-                                                   ->mutable_headers());
+    request_trailers_->iterate(fillHeaderList(trace->mutable_http_streamed_trace_segment()
+                                                  ->mutable_request_trailers()
+                                                  ->mutable_headers()));
     sink_handle_->submitTrace(std::move(trace));
   }
 }
@@ -91,9 +91,8 @@ void HttpPerRequestTapperImpl::onRequestTrailers(const Http::RequestTrailerMap& 
 
 void HttpPerRequestTapperImpl::streamResponseHeaders() {
   TapCommon::TraceWrapperPtr trace = makeTraceSegment();
-  response_headers_->iterate(
-      fillHeaderList,
-      trace->mutable_http_streamed_trace_segment()->mutable_response_headers()->mutable_headers());
+  response_headers_->iterate(fillHeaderList(
+      trace->mutable_http_streamed_trace_segment()->mutable_response_headers()->mutable_headers()));
   sink_handle_->submitTrace(std::move(trace));
 }
 
@@ -141,9 +140,9 @@ void HttpPerRequestTapperImpl::onResponseTrailers(const Http::ResponseTrailerMap
     }
 
     TapCommon::TraceWrapperPtr trace = makeTraceSegment();
-    trailers.iterate(fillHeaderList, trace->mutable_http_streamed_trace_segment()
-                                         ->mutable_response_trailers()
-                                         ->mutable_headers());
+    trailers.iterate(fillHeaderList(trace->mutable_http_streamed_trace_segment()
+                                        ->mutable_response_trailers()
+                                        ->mutable_headers()));
     sink_handle_->submitTrace(std::move(trace));
   }
 }
@@ -156,16 +155,16 @@ bool HttpPerRequestTapperImpl::onDestroyLog() {
   makeBufferedFullTraceIfNeeded();
   auto& http_trace = *buffered_full_trace_->mutable_http_buffered_trace();
   if (request_headers_ != nullptr) {
-    request_headers_->iterate(fillHeaderList, http_trace.mutable_request()->mutable_headers());
+    request_headers_->iterate(fillHeaderList(http_trace.mutable_request()->mutable_headers()));
   }
   if (request_trailers_ != nullptr) {
-    request_trailers_->iterate(fillHeaderList, http_trace.mutable_request()->mutable_trailers());
+    request_trailers_->iterate(fillHeaderList(http_trace.mutable_request()->mutable_trailers()));
   }
   if (response_headers_ != nullptr) {
-    response_headers_->iterate(fillHeaderList, http_trace.mutable_response()->mutable_headers());
+    response_headers_->iterate(fillHeaderList(http_trace.mutable_response()->mutable_headers()));
   }
   if (response_trailers_ != nullptr) {
-    response_trailers_->iterate(fillHeaderList, http_trace.mutable_response()->mutable_trailers());
+    response_trailers_->iterate(fillHeaderList(http_trace.mutable_response()->mutable_trailers()));
   }
 
   ENVOY_LOG(debug, "submitting buffered trace sink");

@@ -172,20 +172,16 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
     // Exercise some read-only accessors.
     header_map->size();
     header_map->byteSize();
-    header_map->iterate(
-        [](const Http::HeaderEntry& header, void * /*context*/) -> Http::HeaderMap::Iterate {
-          header.key();
-          header.value();
-          return Http::HeaderMap::Iterate::Continue;
-        },
-        nullptr);
-    header_map->iterateReverse(
-        [](const Http::HeaderEntry& header, void * /*context*/) -> Http::HeaderMap::Iterate {
-          header.key();
-          header.value();
-          return Http::HeaderMap::Iterate::Continue;
-        },
-        nullptr);
+    header_map->iterate([](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      header.key();
+      header.value();
+      return Http::HeaderMap::Iterate::Continue;
+    });
+    header_map->iterateReverse([](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      header.key();
+      header.value();
+      return Http::HeaderMap::Iterate::Continue;
+    });
   }
 }
 

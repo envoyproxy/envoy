@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -23,6 +22,8 @@
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_features.h"
 
+#include "absl/container/node_hash_map.h"
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 
@@ -119,6 +120,18 @@ bool SnapshotImpl::featureEnabled(absl::string_view key,
     percent.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   } else {
     percent = default_value;
+  }
+
+  // When numerator > denominator condition is always evaluates to TRUE
+  // It becomes hard to debug why configuration does not work in case of wrong numerator.
+  // Log debug message that numerator is invalid.
+  uint64_t denominator_value =
+      ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent.denominator());
+  if (percent.numerator() > denominator_value) {
+    ENVOY_LOG(debug,
+              "WARNING runtime key '{}': numerator ({}) > denominator ({}), condition always "
+              "evaluates to true",
+              key, percent.numerator(), denominator_value);
   }
 
   return ProtobufPercentHelper::evaluateFractionalPercent(percent, random_value);
@@ -232,7 +245,7 @@ void SnapshotImpl::parseEntryFractionalPercentValue(Entry& entry) {
   entry.fractional_percent_value_ = converted_fractional_percent;
 }
 
-void AdminLayer::mergeValues(const std::unordered_map<std::string, std::string>& values) {
+void AdminLayer::mergeValues(const absl::node_hash_map<std::string, std::string>& values) {
   for (const auto& kv : values) {
     values_.erase(kv.first);
     if (!kv.second.empty()) {
@@ -349,8 +362,8 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : generator_(generator), stats_(generateStats(store)), tls_(tls.allocateSlot()),
       config_(config), service_cluster_(local_info.clusterName()), api_(api),
-      init_watcher_("RDTS", [this]() { onRdtsReady(); }), store_(store) {
-  std::unordered_set<std::string> layer_names;
+      init_watcher_("RTDS", [this]() { onRtdsReady(); }), store_(store) {
+  absl::node_hash_set<std::string> layer_names;
   for (const auto& layer : config_.layers()) {
     auto ret = layer_names.insert(layer.name());
     if (!ret.second) {
@@ -400,7 +413,7 @@ void LoaderImpl::startRtdsSubscriptions(ReadyCallback on_done) {
   init_manager_.initialize(init_watcher_);
 }
 
-void LoaderImpl::onRdtsReady() {
+void LoaderImpl::onRtdsReady() {
   ENVOY_LOG(info, "RTDS has finished initialization");
   on_rtds_initialized_();
 }
@@ -488,7 +501,7 @@ SnapshotConstSharedPtr LoaderImpl::threadsafeSnapshot() {
   }
 }
 
-void LoaderImpl::mergeValues(const std::unordered_map<std::string, std::string>& values) {
+void LoaderImpl::mergeValues(const absl::node_hash_map<std::string, std::string>& values) {
   if (admin_layer_ == nullptr) {
     throw EnvoyException("No admin layer specified");
   }

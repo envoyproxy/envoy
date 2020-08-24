@@ -1,7 +1,5 @@
 #include "common/secret/sds_api.h"
 
-#include <unordered_map>
-
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"

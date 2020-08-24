@@ -31,14 +31,19 @@ using Envoy::ProtobufUtil::Status;
 using Envoy::ProtobufUtil::error::Code;
 using google::api::HttpRule;
 using google::grpc::transcoding::JsonRequestTranslator;
+using JsonRequestTranslatorPtr = std::unique_ptr<JsonRequestTranslator>;
 using google::grpc::transcoding::MessageStream;
 using google::grpc::transcoding::PathMatcherBuilder;
 using google::grpc::transcoding::PathMatcherUtility;
 using google::grpc::transcoding::RequestInfo;
 using google::grpc::transcoding::RequestMessageTranslator;
+using RequestMessageTranslatorPtr = std::unique_ptr<RequestMessageTranslator>;
 using google::grpc::transcoding::ResponseToJsonTranslator;
+using ResponseToJsonTranslatorPtr = std::unique_ptr<ResponseToJsonTranslator>;
 using google::grpc::transcoding::Transcoder;
+using TranscoderPtr = std::unique_ptr<Transcoder>;
 using google::grpc::transcoding::TranscoderInputStream;
+using TranscoderInputStreamPtr = std::unique_ptr<TranscoderInputStream>;
 
 namespace Envoy {
 namespace Extensions {
@@ -71,9 +76,9 @@ public:
    * @param request_translator a JsonRequestTranslator that does the request translation
    * @param response_translator a ResponseToJsonTranslator that does the response translation
    */
-  TranscoderImpl(std::unique_ptr<RequestMessageTranslator> request_translator,
-                 std::unique_ptr<JsonRequestTranslator> json_request_translator,
-                 std::unique_ptr<ResponseToJsonTranslator> response_translator)
+  TranscoderImpl(RequestMessageTranslatorPtr request_translator,
+                 JsonRequestTranslatorPtr json_request_translator,
+                 ResponseToJsonTranslatorPtr response_translator)
       : request_translator_(std::move(request_translator)),
         json_request_translator_(std::move(json_request_translator)),
         request_message_stream_(request_translator_ ? *request_translator_
@@ -92,12 +97,12 @@ public:
   ProtobufUtil::Status ResponseStatus() override { return response_translator_->Status(); }
 
 private:
-  std::unique_ptr<RequestMessageTranslator> request_translator_;
-  std::unique_ptr<JsonRequestTranslator> json_request_translator_;
+  RequestMessageTranslatorPtr request_translator_;
+  JsonRequestTranslatorPtr json_request_translator_;
   MessageStream& request_message_stream_;
-  std::unique_ptr<ResponseToJsonTranslator> response_translator_;
-  std::unique_ptr<TranscoderInputStream> request_stream_;
-  std::unique_ptr<TranscoderInputStream> response_stream_;
+  ResponseToJsonTranslatorPtr response_translator_;
+  TranscoderInputStreamPtr request_stream_;
+  TranscoderInputStreamPtr response_stream_;
 };
 
 } // namespace
@@ -141,7 +146,11 @@ JsonTranscoderConfig::JsonTranscoderConfig(
                                                        &descriptor_pool_));
 
   PathMatcherBuilder<MethodInfoSharedPtr> pmb;
+  // clang-format off
+  // We cannot convert this to a absl hash set as PathMatcherUtility::RegisterByHttpRule takes a
+  // std::unordered_set as an argument
   std::unordered_set<std::string> ignored_query_parameters;
+  // clang-format on
   for (const auto& query_param : proto_config.ignored_query_parameters()) {
     ignored_query_parameters.insert(query_param);
   }
@@ -279,8 +288,8 @@ bool JsonTranscoderConfig::convertGrpcStatus() const { return convert_grpc_statu
 
 ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     const Http::RequestHeaderMap& headers, ZeroCopyInputStream& request_input,
-    google::grpc::transcoding::TranscoderInputStream& response_input,
-    std::unique_ptr<Transcoder>& transcoder, MethodInfoSharedPtr& method_info) {
+    google::grpc::transcoding::TranscoderInputStream& response_input, TranscoderPtr& transcoder,
+    MethodInfoSharedPtr& method_info) {
   if (Grpc::Common::isGrpcRequestHeaders(headers)) {
     return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
                                 "Request headers has application/grpc content-type");
@@ -324,8 +333,8 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     request_info.variable_bindings.emplace_back(std::move(resolved_binding));
   }
 
-  std::unique_ptr<RequestMessageTranslator> request_translator;
-  std::unique_ptr<JsonRequestTranslator> json_request_translator;
+  RequestMessageTranslatorPtr request_translator;
+  JsonRequestTranslatorPtr json_request_translator;
   if (method_info->request_type_is_http_body_) {
     request_translator = std::make_unique<RequestMessageTranslator>(*type_helper_->Resolver(),
                                                                     false, std::move(request_info));
@@ -338,7 +347,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
 
   const auto response_type_url =
       Grpc::Common::typeUrl(method_info->descriptor_->output_type()->full_name());
-  std::unique_ptr<ResponseToJsonTranslator> response_translator{new ResponseToJsonTranslator(
+  ResponseToJsonTranslatorPtr response_translator{new ResponseToJsonTranslator(
       type_helper_->Resolver(), response_type_url, method_info->descriptor_->server_streaming(),
       &response_input, print_options_)};
 

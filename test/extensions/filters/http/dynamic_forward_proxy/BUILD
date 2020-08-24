@@ -17,13 +17,17 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.dynamic_forward_proxy",
     deps = [
         "//source/common/stats:isolated_store_lib",
+        "//source/extensions/clusters:well_known_names",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_impl",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
         "//test/extensions/common/dynamic_forward_proxy:mocks",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:basic_resource_limit_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:transport_socket_match_mocks",
         "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -35,7 +39,7 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_name = "envoy.filters.http.dynamic_forward_proxy",
-    tags = ["fails_on_windows"],
+    tags = ["flaky_on_windows"],
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",

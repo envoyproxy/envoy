@@ -25,6 +25,7 @@ envoy_cc_mock(
     srcs = ["io_handle.cc"],
     hdrs = ["io_handle.h"],
     deps = [
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:io_handle_interface",
         "//source/common/buffer:buffer_lib",
     ],
@@ -61,13 +62,5 @@ envoy_cc_mock(
     deps = [
         "//include/envoy/network:transport_socket_interface",
         "//source/common/network:utility_lib",
-    ],
-)
-
-envoy_cc_mock(
-    name = "network_fakes",
-    hdrs = ["fakes.h"],
-    deps = [
-        ":network_mocks",
     ],
 )

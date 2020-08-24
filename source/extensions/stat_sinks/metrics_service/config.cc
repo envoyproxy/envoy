@@ -17,8 +17,9 @@ namespace Extensions {
 namespace StatSinks {
 namespace MetricsService {
 
-Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
-                                                          Server::Instance& server) {
+Stats::SinkPtr
+MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
+                                           Server::Configuration::ServerFactoryContext& server) {
   validateProtoDescriptors();
 
   const auto& sink_config =
@@ -31,7 +32,7 @@ Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Messag
   std::shared_ptr<GrpcMetricsStreamer> grpc_metrics_streamer =
       std::make_shared<GrpcMetricsStreamerImpl>(
           server.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-              grpc_service, server.stats(), false),
+              grpc_service, server.scope(), false),
           server.localInfo(), transport_api_version);
 
   return std::make_unique<MetricsServiceSink>(

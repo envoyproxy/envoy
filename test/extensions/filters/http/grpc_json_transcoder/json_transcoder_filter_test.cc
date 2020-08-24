@@ -1,5 +1,6 @@
 #include <fstream>
 #include <functional>
+#include <memory>
 
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
 
@@ -12,7 +13,6 @@
 #include "extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/proto/bookstore.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
@@ -31,6 +31,7 @@ using Envoy::Protobuf::util::MessageDifferencer;
 using Envoy::ProtobufUtil::error::Code;
 using google::api::HttpRule;
 using google::grpc::transcoding::Transcoder;
+using TranscoderPtr = std::unique_ptr<Transcoder>;
 
 namespace Envoy {
 namespace Extensions {
@@ -222,7 +223,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoder) {
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/shelves"}};
 
   TranscoderInputStreamImpl request_in, response_in;
-  std::unique_ptr<Transcoder> transcoder;
+  TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
   const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
@@ -243,7 +244,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoderAutoMap) {
                                          {":path", "/bookstore.Bookstore/DeleteShelf"}};
 
   TranscoderInputStreamImpl request_in, response_in;
-  std::unique_ptr<Transcoder> transcoder;
+  TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
   const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
@@ -262,7 +263,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidQueryParameter) {
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/shelves?foo=bar"}};
 
   TranscoderInputStreamImpl request_in, response_in;
-  std::unique_ptr<Transcoder> transcoder;
+  TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
   const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
@@ -282,7 +283,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsIgnored) {
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/shelves?foo=bar"}};
 
   TranscoderInputStreamImpl request_in, response_in;
-  std::unique_ptr<Transcoder> transcoder;
+  TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
   const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
@@ -301,7 +302,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, IgnoredQueryParameter) {
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/shelves?key=API_KEY"}};
 
   TranscoderInputStreamImpl request_in, response_in;
-  std::unique_ptr<Transcoder> transcoder;
+  TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
   const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
@@ -323,7 +324,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/book/1"}};
 
   TranscoderInputStreamImpl request_in, response_in;
-  std::unique_ptr<Transcoder> transcoder;
+  TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
   const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_info);

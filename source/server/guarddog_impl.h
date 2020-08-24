@@ -4,9 +4,11 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/guarddog.h"
+#include "envoy/server/guarddog_config.h"
 #include "envoy/server/watchdog.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
@@ -100,6 +102,13 @@ private:
   bool killEnabled() const { return kill_timeout_ > std::chrono::milliseconds(0); }
   bool multikillEnabled() const { return multi_kill_timeout_ > std::chrono::milliseconds(0); }
 
+  using WatchDogAction = envoy::config::bootstrap::v3::Watchdog::WatchdogAction;
+  // Helper function to invoke all the GuardDogActions registered for an Event.
+  void
+  invokeGuardDogActions(WatchDogAction::WatchdogEvent event,
+                        std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs,
+                        MonotonicTime now);
+
   struct WatchedDog {
     WatchedDog(Stats::Scope& stats_scope, const std::string& thread_name,
                const WatchDogSharedPtr& watch_dog);
@@ -120,6 +129,7 @@ private:
   const std::chrono::milliseconds megamiss_timeout_;
   const std::chrono::milliseconds kill_timeout_;
   const std::chrono::milliseconds multi_kill_timeout_;
+  const double multi_kill_fraction_;
   const std::chrono::milliseconds loop_interval_;
   Stats::Counter& watchdog_miss_counter_;
   Stats::Counter& watchdog_megamiss_counter_;
@@ -128,6 +138,9 @@ private:
   Thread::ThreadPtr thread_;
   Event::DispatcherPtr dispatcher_;
   Event::TimerPtr loop_timer_;
+  using EventToActionsMap = absl::flat_hash_map<WatchDogAction::WatchdogEvent,
+                                                std::vector<Configuration::GuardDogActionPtr>>;
+  EventToActionsMap events_to_actions_;
   Thread::MutexBasicLockable mutex_;
   bool run_thread_ ABSL_GUARDED_BY(mutex_);
 };

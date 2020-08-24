@@ -50,8 +50,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "codec_client_test",
     srcs = ["codec_client_test.cc"],
-    # IpVersions/CodecNetworkTest.SendData/IPv4: Test times out on Windows.
-    tags = ["fails_on_windows"],
     deps = [
         ":common_lib",
         "//source/common/buffer:buffer_lib",
@@ -226,7 +224,9 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",

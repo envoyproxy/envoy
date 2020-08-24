@@ -12,10 +12,14 @@
 #include "common/config/api_version.h"
 #include "common/network/utility.h"
 
+#include "extensions/filters/network/common/factory_base.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/integration/ssl_utility.h"
+#include "test/integration/tcp_proxy_integration_test.pb.h"
+#include "test/integration/tcp_proxy_integration_test.pb.validate.h"
 #include "test/integration/utility.h"
+#include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
 
@@ -121,7 +125,26 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(10));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->write("", true));
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->waitForDisconnect();
+}
+
+TEST_P(TcpProxyIntegrationTest, NoUpstream) {
+  // Set the first upstream to have an invalid port, so connection will fail,
+  // but it won't fail synchronously (as it would if there were simply no
+  // upstreams)
+  fake_upstreams_count_ = 0;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* lb_endpoint =
+        cluster->mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
+    lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(1);
+  });
+  config_helper_.skipPortUsageValidation();
+  enable_half_close_ = false;
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->waitForDisconnect();
 }
 
@@ -350,7 +373,7 @@ TEST_P(TcpProxyIntegrationTest, ShutdownWithOpenConnections) {
   test_server_.reset();
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->close());
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForHalfClose();
   tcp_client->close();
 
@@ -378,7 +401,7 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
 
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  tcp_client->waitForDisconnect(true);
+  tcp_client->waitForDisconnect();
 }
 
 TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
@@ -408,8 +431,8 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   ASSERT_TRUE(tcp_client->write(data));
   ASSERT_TRUE(fake_upstream_connection->write(data));
 
-  tcp_client->waitForDisconnect(true);
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  tcp_client->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 TEST_P(TcpProxyIntegrationTest, TestNoCloseOnHealthFailure) {
@@ -456,7 +479,7 @@ TEST_P(TcpProxyIntegrationTest, TestNoCloseOnHealthFailure) {
 
   ASSERT_TRUE(fake_upstream_health_connection->waitForData(8));
   ASSERT_TRUE(fake_upstream_health_connection->close());
-  ASSERT_TRUE(fake_upstream_health_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_health_connection->waitForDisconnect());
 
   // By waiting we know the previous health check attempt completed (with a failure since we closed
   // the connection on it)
@@ -473,10 +496,10 @@ TEST_P(TcpProxyIntegrationTest, TestNoCloseOnHealthFailure) {
   test_server_.reset();
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->close());
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   ASSERT_TRUE(fake_upstream_health_connection_reconnect->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_health_connection_reconnect->close());
-  ASSERT_TRUE(fake_upstream_health_connection_reconnect->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_health_connection_reconnect->waitForDisconnect());
   tcp_client->waitForHalfClose();
   tcp_client->close();
 }
@@ -526,27 +549,31 @@ TEST_P(TcpProxyIntegrationTest, TestCloseOnHealthFailure) {
   ASSERT_TRUE(fake_upstream_health_connection->waitForData(8));
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   ASSERT_TRUE(fake_upstream_health_connection->close());
-  ASSERT_TRUE(fake_upstream_health_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_health_connection->waitForDisconnect());
 
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   tcp_client->waitForHalfClose();
 
   ASSERT_TRUE(fake_upstream_connection->close());
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 class TcpProxyMetadataMatchIntegrationTest : public TcpProxyIntegrationTest {
 public:
+  TcpProxyMetadataMatchIntegrationTest(uint32_t tcp_proxy_filter_index = 0)
+      : tcp_proxy_filter_index_(tcp_proxy_filter_index) {}
   void initialize() override;
 
-  void expectEndpointToMatchRoute();
-  void expectEndpointNotToMatchRoute();
+  void expectEndpointToMatchRoute(
+      std::function<std::string(IntegrationTcpClient&)> initial_data_cb = nullptr);
+  void expectEndpointNotToMatchRoute(const std::string& write_data = "hello");
 
   envoy::config::core::v3::Metadata lbMetadata(std::map<std::string, std::string> values);
 
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy_;
   envoy::config::core::v3::Metadata endpoint_metadata_;
+  const uint32_t tcp_proxy_filter_index_;
 };
 
 envoy::config::core::v3::Metadata
@@ -575,7 +602,7 @@ void TcpProxyMetadataMatchIntegrationTest::initialize() {
     ASSERT(static_resources->listeners_size() == 1);
     static_resources->mutable_listeners(0)
         ->mutable_filter_chains(0)
-        ->mutable_filters(0)
+        ->mutable_filters(tcp_proxy_filter_index_)
         ->mutable_typed_config()
         ->PackFrom(tcp_proxy_);
 
@@ -605,32 +632,40 @@ void TcpProxyMetadataMatchIntegrationTest::initialize() {
 }
 
 // Verifies successful connection.
-void TcpProxyMetadataMatchIntegrationTest::expectEndpointToMatchRoute() {
+void TcpProxyMetadataMatchIntegrationTest::expectEndpointToMatchRoute(
+    std::function<std::string(IntegrationTcpClient&)> initial_data_cb) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(tcp_client->write("hello"));
+  std::string expected_upstream_data;
+  if (initial_data_cb) {
+    expected_upstream_data = initial_data_cb(*tcp_client);
+  } else {
+    expected_upstream_data = "hello";
+    ASSERT_TRUE(tcp_client->write(expected_upstream_data));
+  }
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(expected_upstream_data.length()));
   ASSERT_TRUE(fake_upstream_connection->write("world"));
   tcp_client->waitForData("world");
   ASSERT_TRUE(tcp_client->write("hello", true));
-  ASSERT_TRUE(fake_upstream_connection->waitForData(10));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5 + expected_upstream_data.length()));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->write("", true));
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForDisconnect();
 
   test_server_->waitForCounterGe("cluster.cluster_0.lb_subsets_selected", 1);
 }
 
 // Verifies connection failure.
-void TcpProxyMetadataMatchIntegrationTest::expectEndpointNotToMatchRoute() {
+void TcpProxyMetadataMatchIntegrationTest::expectEndpointNotToMatchRoute(
+    const std::string& write_data) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(tcp_client->write("hello", false, false));
+  ASSERT_TRUE(tcp_client->write(write_data, false, false));
 
-  // TODO(yskopets): 'tcp_client->waitForDisconnect(true);' gets stuck indefinitely on Linux builds,
+  // TODO(yskopets): 'tcp_client->waitForDisconnect();' gets stuck indefinitely on Linux builds,
   // e.g. on 'envoy-linux (bazel compile_time_options)' and 'envoy-linux (bazel release)'
-  // tcp_client->waitForDisconnect(true);
+  // tcp_client->waitForDisconnect();
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_none_healthy", 1);
   test_server_->waitForCounterEq("cluster.cluster_0.lb_subsets_selected", 0);
@@ -822,6 +857,134 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   initialize();
 
   expectEndpointNotToMatchRoute();
+}
+
+class InjectDynamicMetadata : public Network::ReadFilter {
+public:
+  explicit InjectDynamicMetadata(const std::string& key) : key_(key) {}
+
+  Network::FilterStatus onData(Buffer::Instance& data, bool) override {
+    if (!metadata_set_) {
+      // To allow testing a write that returns `StopIteration`, only proceed
+      // when more than 1 byte is received.
+      if (data.length() < 2) {
+        ASSERT(data.length() == 1);
+
+        // Echo data back to test can verify it was received.
+        Buffer::OwnedImpl copy(data);
+        read_callbacks_->connection().write(copy, false);
+        return Network::FilterStatus::StopIteration;
+      }
+
+      ProtobufWkt::Value val;
+      val.set_string_value(data.toString());
+
+      ProtobufWkt::Struct& map =
+          (*read_callbacks_->connection()
+                .streamInfo()
+                .dynamicMetadata()
+                .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB];
+      (*map.mutable_fields())[key_] = val;
+
+      // Put this back in the state that TcpProxy expects.
+      read_callbacks_->connection().readDisable(true);
+
+      metadata_set_ = true;
+    }
+    return Network::FilterStatus::Continue;
+  }
+
+  Network::FilterStatus onNewConnection() override {
+    // TcpProxy disables read; must re-enable so we can read headers.
+    read_callbacks_->connection().readDisable(false);
+
+    // Stop until we read the value and can set the metadata for TcpProxy.
+    return Network::FilterStatus::StopIteration;
+  }
+
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
+    read_callbacks_ = &callbacks;
+  }
+
+  const std::string key_;
+  Network::ReadFilterCallbacks* read_callbacks_{};
+  bool metadata_set_{false};
+};
+
+class InjectDynamicMetadataFactory : public Extensions::NetworkFilters::Common::FactoryBase<
+                                         test::integration::tcp_proxy::InjectDynamicMetadata> {
+public:
+  InjectDynamicMetadataFactory() : FactoryBase("test.inject_dynamic_metadata") {}
+
+private:
+  Network::FilterFactoryCb
+  createFilterFactoryFromProtoTyped(const test::integration::tcp_proxy::InjectDynamicMetadata& cfg,
+                                    Server::Configuration::FactoryContext&) override {
+    std::string key = cfg.key();
+    return [key = std::move(key)](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(std::make_shared<InjectDynamicMetadata>(key));
+    };
+  }
+};
+
+class TcpProxyDynamicMetadataMatchIntegrationTest : public TcpProxyMetadataMatchIntegrationTest {
+public:
+  TcpProxyDynamicMetadataMatchIntegrationTest() : TcpProxyMetadataMatchIntegrationTest(1) {
+    config_helper_.addNetworkFilter(R"EOF(
+      name: test.inject_dynamic_metadata
+      typed_config:
+        "@type": type.googleapis.com/test.integration.tcp_proxy.InjectDynamicMetadata
+        key: role
+)EOF");
+  }
+
+  InjectDynamicMetadataFactory factory_;
+  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> register_factory_{
+      factory_};
+};
+
+INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyDynamicMetadataMatchIntegrationTest,
+                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
+
+TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataMatch) {
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+
+  // Note: role isn't set here; it will be set in the dynamic metadata.
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"version", "v1"}, {"stage", "prod"}}));
+  auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
+  cluster_0->set_name("cluster_0");
+  cluster_0->set_weight(1);
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
+
+  expectEndpointToMatchRoute([](IntegrationTcpClient& tcp_client) -> std::string {
+    // Break the write into two; validate that the first is received before sending the second. This
+    // validates that a downstream filter can use this functionality, even if it can't make a
+    // decision after the first `onData()`.
+    EXPECT_TRUE(tcp_client.write("p", false));
+    tcp_client.waitForData("p");
+    tcp_client.clearData();
+    EXPECT_TRUE(tcp_client.write("rimary", false));
+    return "primary";
+  });
+}
+
+TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataNonMatch) {
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+
+  // Note: role isn't set here; it will be set in the dynamic metadata.
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"version", "v1"}, {"stage", "prod"}}));
+  auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
+  cluster_0->set_name("cluster_0");
+  cluster_0->set_weight(1);
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
+
+  expectEndpointNotToMatchRoute("does_not_match_role_primary");
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxySslIntegrationTest,

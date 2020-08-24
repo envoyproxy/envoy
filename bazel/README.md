@@ -406,11 +406,15 @@ be installed.
 
 ```
 bazel build -c dbg //test/common/http:async_client_impl_test
+bazel build -c dbg //test/common/http:async_client_impl_test.dwp
 gdb bazel-bin/test/common/http/async_client_impl_test
 ```
 
-Without the `-c dbg` Bazel option at the end of the command line the test
-binaries will not include debugging symbols and GDB will not be very useful.
+We need to use `-c dbg` Bazel option to generate debugging symbols and without
+that GDB will not be very useful. The debugging symbols are stored as separate
+debugging information files (`.dwo` files) and we can build a DWARF package file
+with `.dwp ` target. The `.dwp` file need to be presented in the same folder with the
+binary for a full debugging experience.
 
 # Running Bazel tests requiring privileges
 
@@ -463,8 +467,8 @@ modes](https://docs.bazel.build/versions/master/user-manual.html#flag--compilati
 that Bazel supports:
 
 * `fastbuild`: `-O0`, aimed at developer speed (default).
-* `opt`: `-O2 -DNDEBUG -ggdb3`, for production builds and performance benchmarking.
-* `dbg`: `-O0 -ggdb3`, no optimization and debug symbols.
+* `opt`: `-O2 -DNDEBUG -ggdb3 -gsplit-dwarf`, for production builds and performance benchmarking.
+* `dbg`: `-O0 -ggdb3 -gsplit-dwarf`, no optimization and debug symbols.
 
 You can use the `-c <compilation_mode>` flag to control this, e.g.
 
@@ -611,6 +615,17 @@ local_repository(
 ...
 ```
 
+## Extra extensions
+
+If you are building your own Envoy extensions or custom Envoy builds and encounter visibility
+problems with, you may need to adjust the default visibility rules.
+By default, Envoy extensions are set up to only be visible to code within the
+[//source/extensions](../source/extensions/), or the Envoy server target. To adjust this,
+add any additional targets you need to `ADDITIONAL_VISIBILITY` in
+[extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
+See the instructions above about how to create your own custom version of
+[extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
+
 # Release builds
 
 Release builds should be built in `opt` mode, processed with `strip` and have a
@@ -638,13 +653,19 @@ test/run_envoy_bazel_coverage.sh
 The summary results are printed to the standard output and the full coverage
 report is available in `generated/coverage/coverage.html`.
 
+To generate coverage results for fuzz targets, use the `FUZZ_COVERAGE` environment variable, e.g.:
+```
+FUZZ_COVERAGE=true VALIDATE_COVERAGE=false test/run_envoy_bazel_coverage.sh
+```
+This generates a coverage report for fuzz targets after running the target for one minute against fuzzing engine libfuzzer using its coprus as initial seed inputs. The full coverage report will be available in `generated/fuzz_coverage/coverage.html`.
+
 Coverage for every PR is available in Circle in the "artifacts" tab of the coverage job. You will
 need to navigate down and open "coverage.html" but then you can navigate per normal. NOTE: We
 have seen some issues with seeing the artifacts tab. If you can't see it, log out of Circle, and
 then log back in and it should start working.
 
 The latest coverage report for master is available
-[here](https://storage.googleapis.com/envoy-postsubmit/master/coverage/index.html).
+[here](https://storage.googleapis.com/envoy-postsubmit/master/coverage/index.html). The latest fuzz coverage report for master is available [here](https://storage.googleapis.com/envoy-postsubmit/master/fuzz_coverage/index.html).
 
 It's also possible to specialize the coverage build to a specified test or test dir. This is useful
 when doing things like exploring the coverage of a fuzzer over its corpus. This can be done by
@@ -718,7 +739,7 @@ For example, you can use [You Complete Me](https://valloric.github.io/YouComplet
 For example, use following command to prepare a compilation database:
 
 ```
-TEST_TMPDIR=/tmp tools/gen_compilation_database.py --run_bazel_build
+TEST_TMPDIR=/tmp tools/gen_compilation_database.py
 ```
 
 

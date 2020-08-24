@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
@@ -29,6 +28,8 @@
 #include "common/stream_info/stream_info_impl.h"
 #include "common/tcp_proxy/upstream.h"
 #include "common/upstream/load_balancer_impl.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -264,14 +265,7 @@ public:
                        Ssl::ConnectionInfoConstSharedPtr ssl_info);
 
   // Upstream::LoadBalancerContext
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
-    if (route_) {
-      return route_->metadataMatchCriteria();
-    }
-    return nullptr;
-  }
-
-  // Upstream::LoadBalancerContext
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() override;
   absl::optional<uint64_t> computeHashKey() override {
     auto hash_policy = config_->hashPolicy();
     if (hash_policy) {
@@ -321,7 +315,7 @@ public:
     bool on_high_watermark_called_{false};
   };
 
-  virtual StreamInfo::StreamInfo& getStreamInfo();
+  StreamInfo::StreamInfo& getStreamInfo();
 
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
@@ -375,6 +369,7 @@ protected:
                                                           // read filter.
   std::unique_ptr<GenericUpstream> upstream_;
   RouteConstSharedPtr route_;
+  Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   uint32_t connect_attempts_{};
   bool connecting_{};
@@ -421,7 +416,7 @@ private:
   // This must be a map instead of set because there is no way to move elements
   // out of a set, and these elements get passed to deferredDelete() instead of
   // being deleted in-place. The key and value will always be equal.
-  std::unordered_map<Drainer*, DrainerPtr> drainers_;
+  absl::node_hash_map<Drainer*, DrainerPtr> drainers_;
 };
 
 } // namespace TcpProxy

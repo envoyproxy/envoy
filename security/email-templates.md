@@ -50,6 +50,7 @@ Envoy maintainers on the Envoy GitHub.
 We will address the following CVE(s):
 
 * CVE-YEAR-ABCDEF (CVSS score $CVSS, $SEVERITY): $CVESUMMARY
+  - Link to the appropriate section of the CVE writeup document with gh-cve-template.md content.
 ...
 
 We intend to make candidates release patches available under embargo on the

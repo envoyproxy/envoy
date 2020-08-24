@@ -11,7 +11,6 @@
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
-#include "extensions/tracers/well_known_names.h"
 #include "extensions/tracers/zipkin/span_context_extractor.h"
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
 
@@ -35,6 +34,10 @@ void ZipkinSpan::setTag(absl::string_view name, absl::string_view value) {
 void ZipkinSpan::log(SystemTime timestamp, const std::string& event) {
   span_.log(timestamp, event);
 }
+
+// TODO(#11622): Implement baggage storage for zipkin spans
+void ZipkinSpan::setBaggage(absl::string_view, absl::string_view) {}
+std::string ZipkinSpan::getBaggage(absl::string_view) { return std::string(); }
 
 void ZipkinSpan::injectContext(Http::RequestHeaderMap& request_headers) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.
@@ -74,7 +77,7 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
                                 POOL_COUNTER_PREFIX(scope, "tracing.zipkin."))},
       tls_(tls.allocateSlot()), runtime_(runtime), local_info_(local_info),
       time_source_(time_source) {
-  Config::Utility::checkCluster(TracerNames::get().Zipkin, zipkin_config.collector_cluster(), cm_,
+  Config::Utility::checkCluster("envoy.tracers.zipkin", zipkin_config.collector_cluster(), cm_,
                                 /* allow_added_via_api */ true);
   cluster_ = zipkin_config.collector_cluster();
 

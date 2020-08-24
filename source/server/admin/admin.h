@@ -4,7 +4,6 @@
 #include <functional>
 #include <list>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -78,7 +77,7 @@ public:
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream& admin_stream);
   const Network::Socket& socket() override { return *socket_; }
-  Network::Socket& mutable_socket() { return *socket_; }
+  Network::Socket& mutableSocket() { return *socket_; }
 
   // Server::Admin
   // TODO(jsedgwick) These can be managed with a generic version of ConfigTracker.
@@ -94,6 +93,7 @@ public:
                          Network::Address::InstanceConstSharedPtr address,
                          const Network::Socket::OptionsSharedPtr& socket_options,
                          Stats::ScopePtr&& listener_scope) override;
+  uint32_t concurrency() const override { return server_.options().concurrency(); }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -256,7 +256,7 @@ private:
     struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
 
-      const OverloadActionState inactive_ = OverloadActionState::Inactive;
+      const OverloadActionState inactive_ = OverloadActionState::inactive();
     };
 
     NullOverloadManager(ThreadLocal::SlotAllocator& slot_allocator)
@@ -379,6 +379,9 @@ private:
     Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }
@@ -387,6 +390,7 @@ private:
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return empty_access_logs_;
     }
+    uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
 
     AdminImpl& parent_;
     const std::string name_;

@@ -15,7 +15,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -446,6 +446,38 @@ actions:
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
                                          dynamic_metadata_);
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "fake_key"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, GenericKeyWithSetDescriptorKey) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_key: fake_key
+    descriptor_value: fake_value
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
+                                         dynamic_metadata_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "fake_value"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, GenericKeyWithEmptyDescriptorKey) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_key: ""
+    descriptor_value: fake_value
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, default_remote_address_,
+                                         dynamic_metadata_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
 

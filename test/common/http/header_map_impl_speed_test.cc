@@ -20,7 +20,7 @@ static void addDummyHeaders(HeaderMap& headers, size_t num_headers) {
 static void headerMapImplCreate(benchmark::State& state) {
   // Make sure first time construction is not counted.
   Http::ResponseHeaderMapImpl::create();
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     auto headers = Http::ResponseHeaderMapImpl::create();
     benchmark::DoNotOptimize(headers->size());
   }
@@ -39,7 +39,7 @@ static void headerMapImplSetReference(benchmark::State& state) {
   const std::string value("01234567890123456789");
   auto headers = Http::ResponseHeaderMapImpl::create();
   addDummyHeaders(*headers, state.range(0));
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     headers->setReference(key, value);
   }
   benchmark::DoNotOptimize(headers->size());
@@ -61,7 +61,7 @@ static void headerMapImplGet(benchmark::State& state) {
   addDummyHeaders(*headers, state.range(0));
   headers->setReference(key, value);
   size_t successes = 0;
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     successes += (headers->get(key) != nullptr);
   }
   benchmark::DoNotOptimize(successes);
@@ -78,7 +78,7 @@ static void headerMapImplGetInline(benchmark::State& state) {
   addDummyHeaders(*headers, state.range(0));
   headers->setReferenceConnection(value);
   size_t size = 0;
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     size += headers->Connection()->value().size();
   }
   benchmark::DoNotOptimize(size);
@@ -93,7 +93,7 @@ static void headerMapImplSetInlineMacro(benchmark::State& state) {
   const std::string value("01234567890123456789");
   auto headers = Http::ResponseHeaderMapImpl::create();
   addDummyHeaders(*headers, state.range(0));
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     headers->setReferenceConnection(value);
   }
   benchmark::DoNotOptimize(headers->size());
@@ -108,7 +108,7 @@ static void headerMapImplSetInlineInteger(benchmark::State& state) {
   uint64_t value = 12345;
   auto headers = Http::ResponseHeaderMapImpl::create();
   addDummyHeaders(*headers, state.range(0));
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     headers->setConnection(value);
   }
   benchmark::DoNotOptimize(headers->size());
@@ -120,7 +120,7 @@ static void headerMapImplGetByteSize(benchmark::State& state) {
   auto headers = Http::ResponseHeaderMapImpl::create();
   addDummyHeaders(*headers, state.range(0));
   uint64_t size = 0;
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     size += headers->byteSize();
   }
   benchmark::DoNotOptimize(size);
@@ -132,12 +132,12 @@ static void headerMapImplIterate(benchmark::State& state) {
   auto headers = Http::ResponseHeaderMapImpl::create();
   size_t num_callbacks = 0;
   addDummyHeaders(*headers, state.range(0));
-  auto counting_callback = [](const HeaderEntry&, void* context) -> HeaderMap::Iterate {
-    (*static_cast<size_t*>(context))++;
+  auto counting_callback = [&num_callbacks](const HeaderEntry&) -> HeaderMap::Iterate {
+    num_callbacks++;
     return HeaderMap::Iterate::Continue;
   };
-  for (auto _ : state) {
-    headers->iterate(counting_callback, &num_callbacks);
+  for (auto _ : state) { // NOLINT
+    headers->iterate(counting_callback);
   }
   benchmark::DoNotOptimize(num_callbacks);
 }
@@ -153,7 +153,7 @@ static void headerMapImplRemove(benchmark::State& state) {
   const std::string value("01234567890123456789");
   auto headers = Http::ResponseHeaderMapImpl::create();
   addDummyHeaders(*headers, state.range(0));
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     headers->addReference(key, value);
     headers->remove(key);
   }
@@ -172,7 +172,7 @@ static void headerMapImplRemoveInline(benchmark::State& state) {
   const std::string value("01234567890123456789");
   auto headers = Http::ResponseHeaderMapImpl::create();
   addDummyHeaders(*headers, state.range(0));
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     headers->addReference(key, value);
     headers->remove(key);
   }
@@ -197,7 +197,7 @@ static void headerMapImplPopulate(benchmark::State& state) {
       {LowerCaseString("set-cookie"), "_cookie1=12345678; path = /; secure"},
       {LowerCaseString("set-cookie"), "_cookie2=12345678; path = /; secure"},
   };
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     auto headers = Http::ResponseHeaderMapImpl::create();
     for (const auto& key_value : headers_to_add) {
       headers->addReference(key_value.first, key_value.second);

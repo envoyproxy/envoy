@@ -326,10 +326,13 @@ public:
   virtual RequestTrailerMap& addDecodedTrailers() PURE;
 
   /**
-   * Create a locally generated response using the provided response_code and body_text parameters.
-   * If the request was a gRPC request the local reply will be encoded as a gRPC response with a 200
-   * HTTP response code and grpc-status and grpc-message headers mapped from the provided
-   * parameters.
+   * Attempts to create a locally generated response using the provided response_code and body_text
+   * parameters. If the request was a gRPC request the local reply will be encoded as a gRPC
+   * response with a 200 HTTP response code and grpc-status and grpc-message headers mapped from the
+   * provided parameters.
+   *
+   * If a response has already started (e.g. if the router calls sendSendLocalReply after encoding
+   * headers) this will either ship the reply directly to the downstream codec, or reset the stream.
    *
    * @param response_code supplies the HTTP response code.
    * @param body_text supplies the optional body text which is sent using the text/plain content
@@ -356,9 +359,10 @@ public:
   /**
    * Called with 100-Continue headers to be encoded.
    *
-   * This is not folded into encodeHeaders because most Envoy users and filters
-   * will not be proxying 100-continue and with it split out, can ignore the
-   * complexity of multiple encodeHeaders calls.
+   * This is not folded into encodeHeaders because most Envoy users and filters will not be proxying
+   * 100-continue and with it split out, can ignore the complexity of multiple encodeHeaders calls.
+   *
+   * This must not be invoked more than once per request.
    *
    * @param headers supplies the headers to be encoded.
    */
@@ -369,6 +373,9 @@ public:
    *
    * The connection manager inspects certain pseudo headers that are not actually sent downstream.
    * - See source/common/http/headers.h
+   *
+   * The only 1xx that may be provided to encodeHeaders() is a 101 upgrade, which will be the final
+   * encodeHeaders() for a response.
    *
    * @param headers supplies the headers to be encoded.
    * @param end_stream supplies whether this is a header only request/response.
@@ -715,6 +722,8 @@ public:
    * will not be proxying 100-continue and with it split out, can ignore the
    * complexity of multiple encodeHeaders calls.
    *
+   * This will only be invoked once per request.
+   *
    * @param headers supplies the 100-continue response headers to be encoded.
    * @return FilterHeadersStatus determines how filter chain iteration proceeds.
    *
@@ -723,6 +732,10 @@ public:
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
+   *
+   * The only 1xx that may be provided to encodeHeaders() is a 101 upgrade, which will be the final
+   * encodeHeaders() for a response.
+   *
    * @param headers supplies the headers to be encoded.
    * @param end_stream supplies whether this is a header only request/response.
    * @return FilterHeadersStatus determines how filter chain iteration proceeds.

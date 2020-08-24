@@ -60,7 +60,7 @@ public:
     data_[key] = std::move(value);
   }
 
-  std::unordered_map<std::string, std::unique_ptr<const TypedMetadata::Object>>& data() {
+  absl::node_hash_map<std::string, std::unique_ptr<const TypedMetadata::Object>>& data() {
     return data_;
   }
 };
@@ -89,6 +89,7 @@ public:
   MOCK_METHOD(bool, addedViaApi, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, connectTimeout, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
+  MOCK_METHOD(float, prefetchRatio, (), (const));
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
   MOCK_METHOD(uint64_t, features, (), (const));
   MOCK_METHOD(const Http::Http1Settings&, http1Settings, (), (const));
@@ -119,7 +120,8 @@ public:
   MOCK_METHOD(ClusterStats&, stats, (), (const));
   MOCK_METHOD(Stats::Scope&, statsScope, (), (const));
   MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const));
-  MOCK_METHOD(absl::optional<ClusterTimeoutBudgetStats>&, timeoutBudgetStats, (), (const));
+  MOCK_METHOD(ClusterRequestResponseSizeStatsOptRef, requestResponseSizeStats, (), (const));
+  MOCK_METHOD(ClusterTimeoutBudgetStatsOptRef, timeoutBudgetStats, (), (const));
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, sourceAddress, (), (const));
   MOCK_METHOD(const LoadBalancerSubsetInfo&, lbSubsetInfo, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
@@ -150,8 +152,10 @@ public:
   Upstream::TransportSocketMatcherPtr transport_socket_matcher_;
   NiceMock<Stats::MockIsolatedStatsStore> load_report_stats_store_;
   ClusterLoadReportStats load_report_stats_;
+  NiceMock<Stats::MockIsolatedStatsStore> request_response_size_stats_store_;
+  ClusterRequestResponseSizeStatsPtr request_response_size_stats_;
   NiceMock<Stats::MockIsolatedStatsStore> timeout_budget_stats_store_;
-  absl::optional<ClusterTimeoutBudgetStats> timeout_budget_stats_;
+  ClusterTimeoutBudgetStatsPtr timeout_budget_stats_;
   ClusterCircuitBreakersStats circuit_breakers_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;

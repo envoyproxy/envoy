@@ -61,6 +61,14 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildSocketMarkOptions(uin
   return options;
 }
 
+std::unique_ptr<Socket::Options> SocketOptionFactory::buildSocketNoSigpipeOptions() {
+  // Provide additional handling for `SIGPIPE` at the socket layer by converting it to `EPIPE`.
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+  options->push_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  return options;
+}
+
 std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketOption>& socket_options) {
   auto options = std::make_unique<Socket::Options>();

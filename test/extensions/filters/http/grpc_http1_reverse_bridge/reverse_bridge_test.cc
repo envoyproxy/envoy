@@ -38,7 +38,7 @@ protected:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  std::unique_ptr<Filter> filter_;
+  FilterPtr filter_;
   std::shared_ptr<Router::MockRoute> route_ = std::make_shared<Router::MockRoute>();
   Router::RouteSpecificFilterConfig filter_config_;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;

@@ -9,6 +9,7 @@
 #include "common/formatter/substitution_format_string.h"
 #include "common/formatter/substitution_formatter.h"
 #include "common/http/header_map_impl.h"
+#include "common/router/header_parser.h"
 
 namespace Envoy {
 namespace LocalReply {
@@ -43,6 +44,7 @@ private:
 };
 
 using BodyFormatterPtr = std::unique_ptr<BodyFormatter>;
+using HeaderParserPtr = std::unique_ptr<Envoy::Router::HeaderParser>;
 
 class ResponseMapper {
 public:
@@ -63,6 +65,8 @@ public:
     if (config.has_body_format_override()) {
       body_formatter_ = std::make_unique<BodyFormatter>(config.body_format_override());
     }
+
+    header_parser_ = Envoy::Router::HeaderParser::configure(config.headers_to_add());
   }
 
   bool matchAndRewrite(const Http::RequestHeaderMap& request_headers,
@@ -78,6 +82,8 @@ public:
     if (body_.has_value()) {
       body = body_.value();
     }
+
+    header_parser_->evaluateHeaders(response_headers, stream_info);
 
     if (status_code_.has_value() && code != status_code_.value()) {
       code = status_code_.value();
@@ -95,6 +101,7 @@ private:
   const AccessLog::FilterPtr filter_;
   absl::optional<Http::Code> status_code_;
   absl::optional<std::string> body_;
+  HeaderParserPtr header_parser_;
   BodyFormatterPtr body_formatter_;
 };
 

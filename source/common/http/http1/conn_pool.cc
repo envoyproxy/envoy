@@ -57,7 +57,7 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
   } else {
     client.stream_wrapper_.reset();
 
-    if (!pending_requests_.empty() && !upstream_ready_enabled_) {
+    if (!pending_streams_.empty() && !upstream_ready_enabled_) {
       upstream_ready_enabled_ = true;
       upstream_ready_cb_->scheduleCallbackCurrentIteration();
     }

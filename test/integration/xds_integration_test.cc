@@ -452,8 +452,7 @@ TEST_P(LdsIntegrationTest, FailConfigLoad) {
     filter_chain->mutable_filters(0)->clear_typed_config();
     filter_chain->mutable_filters(0)->set_name("grewgragra");
   });
-  EXPECT_DEATH_LOG_TO_STDERR(initialize(),
-                             "Didn't find a registered implementation for name: 'grewgragra'");
+  EXPECT_DEATH(initialize(), "Didn't find a registered implementation for name: 'grewgragra'");
 }
 } // namespace
 } // namespace Envoy

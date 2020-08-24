@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/runtime/runtime.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -10,6 +9,7 @@
 
 #include "test/mocks/stats/mocks.h"
 
+#include "absl/container/node_hash_map.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -65,7 +65,7 @@ public:
   MOCK_METHOD(void, initialize, (Upstream::ClusterManager & cm));
   MOCK_METHOD(const Snapshot&, snapshot, ());
   MOCK_METHOD(SnapshotConstSharedPtr, threadsafeSnapshot, ());
-  MOCK_METHOD(void, mergeValues, ((const std::unordered_map<std::string, std::string>&)));
+  MOCK_METHOD(void, mergeValues, ((const absl::node_hash_map<std::string, std::string>&)));
   MOCK_METHOD(void, startRtdsSubscriptions, (ReadyCallback));
   MOCK_METHOD(Stats::Scope&, getRootScope, ());
 

@@ -151,7 +151,7 @@ by using a volume.
 By default the Docker image will run as the ``envoy`` user created at build time.
 
 The ``uid`` and ``gid`` of this user can be set at runtime using the ``ENVOY_UID`` and ``ENVOY_GID``
-environment variables. This can be done, for example, on the Docker command line:
+environment variables. This can be done, for example, on the Docker command line::
 
   $ docker run -d --name envoy -e ENVOY_UID=777 -e ENVOY_GID=777 -p 9901:9901 -p 10000:10000 envoy:v1
 
@@ -178,6 +178,20 @@ For example, to mount a log folder from the host and make it writable, you can:
 You can then configure ``envoy`` to log to files in ``/var/log``
 
 The default ``envoy`` ``uid`` and ``gid`` are ``101``.
+
+The ``envoy`` user also needs to have permission to access any required configuration files mounted
+into the container.
+
+If you are running in an environment with a strict ``umask`` setting, you may need to provide envoy with
+access either by setting the ``uid`` or ``gid`` of the file, or by making the configuration file readable
+by the envoy user.
+
+One method of doing this without changing any file permissions or running as root inside the container
+is to start the container with the host user's ``uid``, for example:
+
+.. substitution-code-block:: none
+
+  $ docker run -d --name envoy -e ENVOY_UID=`id -u` -p 9901:9901 -p 10000:10000 envoy:v1
 
 
 Sandboxes

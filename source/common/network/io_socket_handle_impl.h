@@ -3,6 +3,7 @@
 #include "envoy/api/io_error.h"
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/platform.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/network/io_handle.h"
 
 #include "common/common/logger.h"
@@ -16,7 +17,8 @@ namespace Network {
  */
 class IoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
 public:
-  explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET) : fd_(fd) {}
+  explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false)
+      : fd_(fd), socket_v6only_(socket_v6only) {}
 
   // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;
@@ -42,12 +44,14 @@ public:
 
   Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
                                    RecvMsgOutput& output) override;
+  Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override;
 
   bool supportsMmsg() const override;
   bool supportsUdpGro() const override;
 
   Api::SysCallIntResult bind(Address::InstanceConstSharedPtr address) override;
   Api::SysCallIntResult listen(int backlog) override;
+  IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
   Api::SysCallIntResult connect(Address::InstanceConstSharedPtr address) override;
   Api::SysCallIntResult setOption(int level, int optname, const void* optval,
                                   socklen_t optlen) override;
@@ -56,8 +60,10 @@ public:
   absl::optional<int> domain() override;
   Address::InstanceConstSharedPtr localAddress() override;
   Address::InstanceConstSharedPtr peerAddress() override;
+  Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                      Event::FileTriggerType trigger, uint32_t events) override;
 
-private:
+protected:
   // Converts a SysCallSizeResult to IoCallUint64Result.
   template <typename T>
   Api::IoCallUint64Result sysCallResultToIoCallResult(const Api::SysCallResult<T>& result) {
@@ -77,6 +83,7 @@ private:
   }
 
   os_fd_t fd_;
+  int socket_v6only_{false};
 
   // The minimum cmsg buffer size to filled in destination address, packets dropped and gso
   // size when receiving a packet. It is possible for a received packet to contain both IPv4

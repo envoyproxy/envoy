@@ -53,8 +53,7 @@ TEST_P(HeaderPrefixIntegrationTest, FailedCustomHeaderPrefix) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.set_header_prefix("x-custom-but-not-set");
   });
-  EXPECT_DEATH_LOG_TO_STDERR(initialize(),
-                             "Attempting to change the header prefix after it has been used!");
+  EXPECT_DEATH(initialize(), "Attempting to change the header prefix after it has been used!");
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, HeaderPrefixIntegrationTest,

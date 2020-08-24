@@ -2,7 +2,6 @@
 
 #include <map>
 #include <string>
-#include <unordered_set>
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/http/header_map.h"

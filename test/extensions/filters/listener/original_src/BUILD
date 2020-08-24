@@ -27,7 +27,6 @@ envoy_extension_cc_test(
     name = "original_src_config_factory_test",
     srcs = ["original_src_config_factory_test.cc"],
     extension_name = "envoy.filters.listener.original_src",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/listener/original_src:config",
         "//source/extensions/filters/listener/original_src:config_lib",
@@ -56,7 +55,7 @@ envoy_proto_library(
     name = "original_src_fuzz_test_proto",
     srcs = ["original_src_fuzz_test.proto"],
     deps = [
-        "//test/extensions/filters/listener/common:listener_filter_fuzzer_proto",
+        "//test/extensions/filters/listener/common/fuzz:listener_filter_fuzzer_proto",
         "@envoy_api//envoy/extensions/filters/listener/original_src/v3:pkg",
     ],
 )
@@ -68,6 +67,6 @@ envoy_cc_fuzz_test(
     deps = [
         ":original_src_fuzz_test_proto_cc_proto",
         "//source/extensions/filters/listener/original_src:original_src_lib",
-        "//test/extensions/filters/listener/common:listener_filter_fuzzer_lib",
+        "//test/extensions/filters/listener/common/fuzz:listener_filter_fuzzer_lib",
     ],
 )

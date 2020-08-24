@@ -2,20 +2,22 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
 # Built-in TLS connection transport socket.
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "robust_to_untrusted_downstream_and_upstream",
+    # TLS is core functionality.
+    visibility = ["//visibility:public"],
     deps = [
         ":ssl_socket_lib",
         "//include/envoy/network:transport_socket_interface",
@@ -37,13 +39,17 @@ envoy_cc_library(
         "abseil_synchronization",
         "ssl",
     ],
+    # TLS is core functionality.
+    visibility = ["//visibility:public"],
     deps = [
         ":context_config_lib",
         ":context_lib",
         ":utility_lib",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/ssl:handshaker_interface",
         "//include/envoy/ssl:ssl_socket_extended_info_interface",
+        "//include/envoy/ssl:ssl_socket_state",
         "//include/envoy/ssl/private_key:private_key_callbacks_interface",
         "//include/envoy/ssl/private_key:private_key_interface",
         "//include/envoy/stats:stats_macros",
@@ -62,6 +68,8 @@ envoy_cc_library(
     external_deps = [
         "ssl",
     ],
+    # TLS is core functionality.
+    visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/secret:secret_callbacks_interface",
         "//include/envoy/secret:secret_provider_interface",
@@ -91,9 +99,12 @@ envoy_cc_library(
         "context_manager_impl.h",
     ],
     external_deps = [
+        "abseil_node_hash_set",
         "abseil_synchronization",
         "ssl",
     ],
+    # TLS is core functionality.
+    visibility = ["//visibility:public"],
     deps = [
         ":utility_lib",
         "//include/envoy/ssl:context_config_interface",

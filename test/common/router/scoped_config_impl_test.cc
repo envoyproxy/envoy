@@ -445,8 +445,8 @@ public:
 // Test a ScopedConfigImpl returns the correct route Config.
 TEST_F(ScopedConfigImplTest, PickRoute) {
   scoped_config_impl_ = std::make_unique<ScopedConfigImpl>(std::move(key_builder_config_));
-  scoped_config_impl_->addOrUpdateRoutingScope(scope_info_a_);
-  scoped_config_impl_->addOrUpdateRoutingScope(scope_info_b_);
+  scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_a_});
+  scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_b_});
 
   // Key (foo, bar) maps to scope_info_a_.
   ConfigConstSharedPtr route_config = scoped_config_impl_->getRouteConfig(TestRequestHeaderMapImpl{
@@ -482,19 +482,21 @@ TEST_F(ScopedConfigImplTest, Update) {
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), nullptr);
 
   // Add scope_key (bar, baz).
-  scoped_config_impl_->addOrUpdateRoutingScope(scope_info_b_);
+  scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_b_});
+  // scope_info_a_ not found
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), nullptr);
+  // scope_info_b_ found
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(TestRequestHeaderMapImpl{
                 {"foo_header", ",,key=v,bar=bar,"}, {"bar_header", ";val1;baz"}}),
             scope_info_b_->routeConfig());
 
   // Add scope_key (foo, bar).
-  scoped_config_impl_->addOrUpdateRoutingScope(scope_info_a_);
+  scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_a_});
   // Found scope_info_a_.
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), scope_info_a_->routeConfig());
 
   // Update scope foo_scope.
-  scoped_config_impl_->addOrUpdateRoutingScope(scope_info_a_v2_);
+  scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_a_v2_});
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), nullptr);
 
   // foo_scope now is keyed by (xyz, xyz).
@@ -503,15 +505,13 @@ TEST_F(ScopedConfigImplTest, Update) {
             scope_info_a_v2_->routeConfig());
 
   // Remove scope "foo_scope".
-  scoped_config_impl_->removeRoutingScope("foo_scope");
+  scoped_config_impl_->removeRoutingScopes({"foo_scope"});
   // scope_info_a_ is gone.
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), nullptr);
 
   // Now delete some non-existent scopes.
-  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("foo_scope1"));
-  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("base_scope"));
-  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("bluh_scope"));
-  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("xyz_scope"));
+  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScopes(
+      {"foo_scope1", "base_scope", "bluh_scope", "xyz_scope"}));
 }
 
 } // namespace
