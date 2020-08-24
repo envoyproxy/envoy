@@ -8,16 +8,7 @@ if __name__ == "__main__":
   diff_file_whitelist = ['source', 'include']
   os.system("git fetch")
   os.system("git diff --name-only ..origin/master > {}".format(TMP_OUTPUT))
-  # os.system("git show --name-only > {}".format(TMP_OUTPUT))
-  # f = open(TMP_OUTPUT, 'r+')
-  # commit = ""
-  # for line in f:
-  #   line_list = line.split(' ')
-  #   if line_list[0] == 'commit':
-  #     commit= line_list[1][0:7]
-  #     break
 
-  # os.system("git show -m {} --name-only  > {}".format(commit, TMP_OUTPUT))
   f = open(TMP_OUTPUT, 'r+')
   diff_file_list = []
   for line in f:
