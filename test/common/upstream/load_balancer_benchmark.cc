@@ -98,7 +98,7 @@ public:
 };
 
 void benchmarkRoundRobinLoadBalancerBuild(benchmark::State& state) {
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
     const uint64_t weighted_subset_percent = state.range(1);
@@ -169,7 +169,7 @@ uint64_t hashInt(uint64_t i) {
 }
 
 void benchmarkRingHashLoadBalancerBuildRing(benchmark::State& state) {
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
     const uint64_t min_ring_size = state.range(1);
@@ -197,7 +197,7 @@ BENCHMARK(benchmarkRingHashLoadBalancerBuildRing)
     ->Unit(benchmark::kMillisecond);
 
 void benchmarkMaglevLoadBalancerBuildTable(benchmark::State& state) {
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
     MaglevTester tester(num_hosts);
@@ -249,7 +249,7 @@ void computeHitStats(benchmark::State& state,
 }
 
 void benchmarkLeastRequestLoadBalancerChooseHost(benchmark::State& state) {
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
     const uint64_t choice_count = state.range(1);
@@ -279,7 +279,7 @@ BENCHMARK(benchmarkLeastRequestLoadBalancerChooseHost)
     ->Unit(benchmark::kMillisecond);
 
 void benchmarkRingHashLoadBalancerChooseHost(benchmark::State& state) {
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     // Do not time the creation of the ring.
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
@@ -318,7 +318,7 @@ BENCHMARK(benchmarkRingHashLoadBalancerChooseHost)
     ->Unit(benchmark::kMillisecond);
 
 void benchmarkMaglevLoadBalancerChooseHost(benchmark::State& state) {
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     // Do not time the creation of the table.
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
@@ -351,7 +351,7 @@ BENCHMARK(benchmarkMaglevLoadBalancerChooseHost)
     ->Unit(benchmark::kMillisecond);
 
 void benchmarkRingHashLoadBalancerHostLoss(benchmark::State& state) {
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     const uint64_t num_hosts = state.range(0);
     const uint64_t min_ring_size = state.range(1);
     const uint64_t hosts_to_lose = state.range(2);
@@ -397,7 +397,7 @@ BENCHMARK(benchmarkRingHashLoadBalancerHostLoss)
     ->Unit(benchmark::kMillisecond);
 
 void benchmarkMaglevLoadBalancerHostLoss(benchmark::State& state) {
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     const uint64_t num_hosts = state.range(0);
     const uint64_t hosts_to_lose = state.range(1);
     const uint64_t keys_to_simulate = state.range(2);
@@ -442,7 +442,7 @@ BENCHMARK(benchmarkMaglevLoadBalancerHostLoss)
     ->Unit(benchmark::kMillisecond);
 
 void benchmarkMaglevLoadBalancerWeighted(benchmark::State& state) {
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     const uint64_t num_hosts = state.range(0);
     const uint64_t weighted_subset_percent = state.range(1);
     const uint64_t before_weight = state.range(2);
@@ -546,7 +546,7 @@ public:
 void benchmarkSubsetLoadBalancerCreate(benchmark::State& state) {
   const bool single_host_per_subset = state.range(0);
   const uint64_t num_hosts = state.range(1);
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     SubsetLbTester tester(num_hosts, single_host_per_subset);
   }
 }
@@ -560,7 +560,7 @@ void benchmarkSubsetLoadBalancerUpdate(benchmark::State& state) {
   const uint64_t num_hosts = state.range(1);
   SubsetLbTester tester(num_hosts, single_host_per_subset);
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     tester.update();
   }
 }
