@@ -135,16 +135,15 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
   }
   case test::integration::H2TestFrame::kMetadata: {
     const Http2Frame::MetadataFlags metadata_flags =
-        static_cast<Http2Frame::MetadataFlags>(proto_frame.data().flags());
-    const uint32_t stream_idx = proto_frame.post_request().stream_index();
+        static_cast<Http2Frame::MetadataFlags>(proto_frame.metadata().flags());
+    const uint32_t stream_idx = proto_frame.metadata().stream_index();
     Http::MetadataMap metadata_map;
-    for (const auto& metadata : proto_frame.metadata().metadata()) {
-      for (const auto& metadataPair: metadata.metadata()) {
-        metadata_map.insert(metadataPair);
-      }
+    for (const auto& metadataPair: proto_frame.metadata().metadata().metadata()) {
+      metadata_map.insert(metadataPair);
     }
     ENVOY_LOG_MISC(trace, "Sending metadata frame.");
-    h2_frame = Http2Frame::makeMetadataFrameFromMetadataMap(stream_idx, metadata_map, metadata_flags);
+    h2_frame =
+        Http2Frame::makeMetadataFrameFromMetadataMap(stream_idx, metadata_map, metadata_flags);
     break;
   }
   case test::integration::H2TestFrame::kGeneric: {
@@ -184,46 +183,16 @@ void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCas
       ENVOY_LOG_MISC(debug, "Disconnected, no further event processing.");
       break;
     }
-    if (!preamble_sent) {
-        // Start H2 session - send hello string
-        ASSERT_TRUE(tcp_client->write(Http2Frame::Preamble, false, false));
-        //Send empty settings string
-        auto settings = Http2Frame::makeEmptySettingsFrame();
-        ASSERT_TRUE(tcp_client->write(std::string(settings), false, false));
-        
-        if (fake_upstream_connection == nullptr) {
-        if (!fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection, max_wait_ms_)) {
-          // If we timed out, we fail out.
-          if (tcp_client->connected()) {
-            tcp_client->close();
-          }
-          stop_further_inputs = true;
-          break;
-        }
-      }
-      //ADD SETTINGS BITHERE
-      //if (setUpConnection)
-        //Recieve empty setting string from upstream
-        ASSERT_TRUE(fake_upstream_connection->write(std::string(settings)));
-
-        //Send a settings ACK
-        settings = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack);
-        ASSERT_TRUE(tcp_client->write(std::string(settings), false, false));
-
-        //Recieve settings and window update frame?
-        ASSERT_TRUE(fake_upstream_connection->write(std::string(settings)));
-
-        //auto window_update = Http2Frame::makeWindowUpdateFrame(uint32_t stream_index, uint32_t increment)
-        //ASSERT_TRUE(fake_upstream_connection->write());
-
-
-        preamble_sent = true;
-    }
     switch (event.event_selector_case()) {
     case test::integration::Event::kDownstreamSendEvent: {
       auto downstream_write_func = [&](const Http2Frame& h2_frame) -> void {
         ASSERT_TRUE(tcp_client->write(std::string(h2_frame), false, false));
       };
+      if (!preamble_sent) {
+        // Start H2 session - send hello string
+        ASSERT_TRUE(tcp_client->write(Http2Frame::Preamble, false, false));
+        preamble_sent = true;
+      }
       for (auto& frame : event.downstream_send_event().h2_frames()) {
         if (!tcp_client->connected()) {
           ENVOY_LOG_MISC(debug,

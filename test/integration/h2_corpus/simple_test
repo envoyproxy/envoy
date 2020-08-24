@@ -1,6 +1,16 @@
 events {
   downstream_send_event {
     h2_frames {
+      settings {
+        flags: NONE
+      }
+    }
+    h2_frames {
+      settings {
+        flags: ACK
+      }
+    }
+    h2_frames {
       request {
         stream_index: 1
         host: "host"
@@ -12,9 +22,13 @@ events {
 events {
   upstream_send_event {
     h2_frames {
-      data {
+      settings {
         flags: NONE
-	stream_index: 1
+      }
+    }
+    h2_frames {
+      settings {
+        flags: ACK
       }
     }
   }

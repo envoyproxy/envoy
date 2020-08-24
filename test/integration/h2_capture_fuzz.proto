@@ -129,7 +129,7 @@ message Metadata {
 message H2FrameMetadata {
   H2HeadersFlags flags = 1;
   uint32 stream_index = 2;
-  repeated Metadata metadata = 3;
+  Metadata metadata = 3;
 }
 
 message H2TestFrame {
