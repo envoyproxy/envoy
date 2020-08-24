@@ -70,27 +70,27 @@ struct HandshakerRequirements {
   bool require_certificates = true;
 
   // Should be true if a handshaker requires that Envoy sets the session
-  // resumption callback described by SSL_CTX_set_select_certificate_cb.
+  // resumption callback described by `SSL_CTX_set_select_certificate_cb`.
   bool should_set_select_certificate_cb = true;
 
   // Should be true if a handshaker requires that Envoy sets the ALPN selection
-  // callback described by SSL_CTX_set_alpn_select_cb.
+  // callback described by `SSL_CTX_set_alpn_select_cb`.
   bool should_set_alpn_select_cb = true;
 
   // Should be true if a handshaker requires that Envoy sets the TLS extension
-  // ticket key callback described by SSL_CTX_set_tlsext_ticket_key_cb.
+  // ticket key callback described by `SSL_CTX_set_tlsext_ticket_key_cb`.
   bool should_set_tlsext_ticket_key_cb = true;
 
   // Should be true if a handshaker requires that Envoy sets the SSL timeout as
-  // described by SSL_CTX_set_timeout.
+  // described by `SSL_CTX_set_timeout`.
   bool should_set_timeout = true;
 
   // Should be true if a handshaker requires that Envoy set the list of ciphers,
-  // as described by SSL_CTX_set_strict_cipher_list.
+  // as described by `SSL_CTX_set_strict_cipher_list`.
   bool should_set_strict_cipher_list = true;
 
   // Should be true if a handshaker requires that Envoy set the list of curves,
-  // as described by SSL_CTX_set1_curves_list.
+  // as described by `SSL_CTX_set1_curves_list`.
   bool should_set1_curves_list = true;
 
   // Should be true if a handshaker requires that Envoy verify certificates.
