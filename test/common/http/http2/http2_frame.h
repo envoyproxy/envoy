@@ -1,14 +1,16 @@
 #pragma once
 
+#include <sys/types.h>
+
 #include <cstdint>
 #include <string>
-#include <sys/types.h>
 #include <vector>
+
+#include "envoy/http/metadata_interface.h"
 
 #include "common/common/assert.h"
 
 #include "absl/strings/string_view.h"
-#include "envoy/http/metadata_interface.h"
 
 namespace Envoy {
 namespace Http {
@@ -109,9 +111,13 @@ public:
   static Http2Frame makeEmptyGoAwayFrame(uint32_t last_stream_index, ErrorCode error_code);
 
   static Http2Frame makeWindowUpdateFrame(uint32_t stream_index, uint32_t increment);
-  static Http2Frame makeEmptyMetadataFrame(uint32_t stream_index, MetadataFlags flags = MetadataFlags::None);
-  static Http2Frame makeMetadataFrameFromHex(uint32_t stream_index, absl::string_view metadata, MetadataFlags flags);
-  static Http2Frame makeMetadataFrameFromMetadataMap(uint32_t stream_index, MetadataMap& metadata_map, MetadataFlags flags);
+  static Http2Frame makeEmptyMetadataFrame(uint32_t stream_index,
+                                           MetadataFlags flags = MetadataFlags::None);
+  static Http2Frame makeMetadataFrameFromHex(uint32_t stream_index, absl::string_view metadata,
+                                             MetadataFlags flags);
+  static Http2Frame makeMetadataFrameFromMetadataMap(uint32_t stream_index,
+                                                     MetadataMap& metadata_map,
+                                                     MetadataFlags flags);
 
   static Http2Frame makeMalformedRequest(uint32_t stream_index);
   static Http2Frame makeMalformedRequestWithZerolenHeader(uint32_t stream_index,
@@ -173,7 +179,7 @@ private:
   }
   void appendDataAfterHeaders(std::vector<uint8_t> data) {
     int index = 9;
-    for (uint8_t value: data) {
+    for (uint8_t value : data) {
       data_.at(index) = value;
       index++;
     }

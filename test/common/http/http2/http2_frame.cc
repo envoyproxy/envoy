@@ -1,12 +1,15 @@
 #include "test/common/http/http2/http2_frame.h"
 
 #include <bits/stdint-uintn.h>
+
 #include <cstddef>
 #include <type_traits>
-#include "envoy/common/platform.h"
-#include "common/common/c_smart_ptr.h"
 
+#include "envoy/common/platform.h"
+
+#include "common/common/c_smart_ptr.h"
 #include "common/common/hex.h"
+
 #include "nghttp2/nghttp2.h"
 
 namespace {
@@ -217,43 +220,51 @@ Http2Frame Http2Frame::makeWindowUpdateFrame(uint32_t stream_index, uint32_t inc
 
 Http2Frame Http2Frame::makeEmptyMetadataFrame(uint32_t stream_index, MetadataFlags flags) {
   Http2Frame frame;
-  frame.buildHeader(Type::Metadata, 0, static_cast<uint8_t>(flags), makeRequestStreamId(stream_index));
+  frame.buildHeader(Type::Metadata, 0, static_cast<uint8_t>(flags),
+                    makeRequestStreamId(stream_index));
   return frame;
 }
 
-Http2Frame Http2Frame::makeMetadataFrameFromHex(uint32_t stream_index, absl::string_view metadata, MetadataFlags flags) {
+Http2Frame Http2Frame::makeMetadataFrameFromHex(uint32_t stream_index, absl::string_view metadata,
+                                                MetadataFlags flags) {
   Http2Frame frame;
-  frame.buildHeader(Type::Metadata, metadata.size(), static_cast<uint8_t>(flags), makeRequestStreamId(stream_index));
+  frame.buildHeader(Type::Metadata, metadata.size(), static_cast<uint8_t>(flags),
+                    makeRequestStreamId(stream_index));
   frame.appendDataAfterHeaders(Hex::decode(std::string(metadata)));
   return frame;
 }
 
-//Note: encoder in codebase persists multiple maps, with each map representing an individual frame.
-Http2Frame Http2Frame::makeMetadataFrameFromMetadataMap(uint32_t stream_index, MetadataMap& metadata_map, MetadataFlags flags) {
+// Note: encoder in codebase persists multiple maps, with each map representing an individual frame.
+Http2Frame Http2Frame::makeMetadataFrameFromMetadataMap(uint32_t stream_index,
+                                                        MetadataMap& metadata_map,
+                                                        MetadataFlags flags) {
   const int numberOfNameValuePairs = metadata_map.size();
   absl::FixedArray<nghttp2_nv> nameValues(numberOfNameValuePairs);
   int i = 0;
-  for (const auto& metadata: metadata_map) {
+  for (const auto& metadata : metadata_map) {
     nameValues[i] = {const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(metadata.first.data())),
-                const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(metadata.second.data())),
-                metadata.first.size(), metadata.second.size(), NGHTTP2_NV_FLAG_NO_INDEX};
+                     const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(metadata.second.data())),
+                     metadata.first.size(), metadata.second.size(), NGHTTP2_NV_FLAG_NO_INDEX};
     i++;
   }
 
   nghttp2_hd_deflater* deflater;
   nghttp2_hd_deflate_new(&deflater, 4096);
 
-  const size_t upperBoundBufferLength = nghttp2_hd_deflate_bound(deflater, nameValues.begin(), numberOfNameValuePairs);
+  const size_t upperBoundBufferLength =
+      nghttp2_hd_deflate_bound(deflater, nameValues.begin(), numberOfNameValuePairs);
 
   uint8_t* buffer = new uint8_t[upperBoundBufferLength];
 
-  const size_t numberOfBytesInMetadataPayload = nghttp2_hd_deflate_hd(deflater, buffer, upperBoundBufferLength, nameValues.begin(), numberOfNameValuePairs);
+  const size_t numberOfBytesInMetadataPayload = nghttp2_hd_deflate_hd(
+      deflater, buffer, upperBoundBufferLength, nameValues.begin(), numberOfNameValuePairs);
 
   Http2Frame frame;
-  frame.buildHeader(Type::Metadata, numberOfBytesInMetadataPayload, static_cast<uint8_t>(flags), makeRequestStreamId(stream_index));
-  std::vector<uint8_t> bufferVector(buffer, buffer +  numberOfBytesInMetadataPayload);
+  frame.buildHeader(Type::Metadata, numberOfBytesInMetadataPayload, static_cast<uint8_t>(flags),
+                    makeRequestStreamId(stream_index));
+  std::vector<uint8_t> bufferVector(buffer, buffer + numberOfBytesInMetadataPayload);
   frame.appendDataAfterHeaders(bufferVector);
-  delete [] buffer;
+  delete[] buffer;
   nghttp2_hd_deflate_del(deflater);
   return frame;
 }

@@ -138,7 +138,7 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
         static_cast<Http2Frame::MetadataFlags>(proto_frame.metadata().flags());
     const uint32_t stream_idx = proto_frame.metadata().stream_index();
     Http::MetadataMap metadata_map;
-    for (const auto& metadataPair: proto_frame.metadata().metadata().metadata()) {
+    for (const auto& metadataPair : proto_frame.metadata().metadata().metadata()) {
       metadata_map.insert(metadataPair);
     }
     ENVOY_LOG_MISC(trace, "Sending metadata frame.");
