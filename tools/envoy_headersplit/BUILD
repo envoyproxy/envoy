@@ -29,10 +29,10 @@ py_test(
 py_test(
     name = "replace_includes_test",
     srcs = [
-        "replace_includes_test.py",
-        "replace_includes.py",
         "headersplit.py",
         "headersplit_test.py",
+        "replace_includes.py",
+        "replace_includes_test.py",
     ],
     data = glob(["code_corpus/**"]),
     main = "replace_includes_test.py",
