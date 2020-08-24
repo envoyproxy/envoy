@@ -100,15 +100,14 @@ private:
    * throws EnvoyException on any socket errors.
    * @return bool true valid header, false if more data is needed.
    */
-  bool readProxyHeader(Network::IoHandle& io_handle);
+  bool readProxyHeader(os_fd_t fd);
 
   /**
    * Parse (and discard unknown) header extensions (until hdr.extensions_length == 0)
    */
-  bool parseExtensions(Network::IoHandle& io_handle, uint8_t* buf, size_t buf_size,
-                       size_t* buf_off = nullptr);
+  bool parseExtensions(os_fd_t fd, uint8_t* buf, size_t buf_size, size_t* buf_off = nullptr);
   void parseTlvs(const std::vector<uint8_t>& tlvs);
-  bool readExtensions(Network::IoHandle& io_handle);
+  bool readExtensions(os_fd_t fd);
 
   /**
    * Given a char * & len, parse the header as per spec
