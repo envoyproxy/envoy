@@ -59,7 +59,6 @@ protected:
   }
 
   void testDecodeRequestHitNoBody(CacheFilterSharedPtr filter) {
-    const std::string age = std::to_string(delay_.count());
     // The filter should encode cached headers.
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
@@ -86,7 +85,6 @@ protected:
   }
 
   void testDecodeRequestHitWithBody(CacheFilterSharedPtr filter, std::string body) {
-    const std::string age = std::to_string(delay_.count());
     // The filter should encode cached headers.
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
@@ -131,7 +129,8 @@ protected:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Api::ApiPtr api_ = Api::createApiForTest();
   Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
-  std::chrono::seconds delay_ = std::chrono::seconds(10);
+  const std::chrono::seconds delay_ = std::chrono::seconds(10);
+  const std::string age = std::to_string(delay_.count());
 };
 
 TEST_F(CacheFilterTest, UncacheableRequest) {
@@ -408,6 +407,7 @@ TEST_F(CacheFilterTest, SingleSatisfiableRange) {
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
     filter->onDestroy();
   }
+  waitBeforeSecondRequest();
   {
     // Add range info to headers.
     request_headers_.addReference(Http::Headers::get().Range, "bytes=-2");
@@ -422,7 +422,7 @@ TEST_F(CacheFilterTest, SingleSatisfiableRange) {
     // Decode request 2 header
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef("age", "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
                                false));
 
     EXPECT_CALL(
@@ -459,6 +459,7 @@ TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
     filter->onDestroy();
   }
+  waitBeforeSecondRequest();
   {
     // Add range info to headers
     // multi-part responses are not supported, 200 expected
@@ -470,7 +471,7 @@ TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
     // Decode request 2 header
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef("age", "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
                                false));
 
     EXPECT_CALL(
@@ -507,6 +508,7 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
     filter->onDestroy();
   }
+  waitBeforeSecondRequest();
   {
     // Add range info to headers
     request_headers_.addReference(Http::Headers::get().Range, "bytes=123-");
@@ -521,7 +523,7 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
     // Decode request 2 header
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef("age", "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
                                true));
 
     // 416 response should not have a body, so we don't expect a call to encodeData

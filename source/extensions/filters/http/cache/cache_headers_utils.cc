@@ -4,10 +4,7 @@
 #include <chrono>
 #include <string>
 
-#include "envoy/common/time.h"
 #include "envoy/http/header_map.h"
-
-#include "common/common/utility.h"
 
 #include "extensions/filters/http/cache/inline_headers_handles.h"
 
@@ -168,7 +165,7 @@ CacheHeadersUtils::calculateAge(const Http::ResponseHeaderMap& response_headers,
   const SystemTime::duration corrected_age_value = std::chrono::seconds(age_value);
   const SystemTime::duration corrected_initial_age = std::max(apparent_age, corrected_age_value);
 
-  // Caclulate current_age:
+  // Calculate current_age:
   const SystemTime::duration resident_time = now - response_time;
   const SystemTime::duration current_age = corrected_initial_age + resident_time;
 

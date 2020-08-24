@@ -84,8 +84,8 @@ private:
 
   // Format: IMF-fixdate. As per:
   // https://tools.ietf.org/html/rfc7231#section-7.1.1.1
-  DateFormatter date_formatter_ {"%a, %d %b %Y %H:%M:%S GMT"};
-  
+  DateFormatter date_formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
+
   // Tracks what body bytes still need to be read from the cache. This is
   // currently only one Range, but will expand when full range support is added. Initialized by
   // onHeaders for Range Responses, otherwise initialized by encodeCachedResponse.
