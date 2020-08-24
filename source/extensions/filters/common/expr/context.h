@@ -82,6 +82,7 @@ public:
     }
     auto str = std::string(key.StringOrDie().value());
     if (!Http::validHeaderString(str)) {
+      // Reject key if it is an invalid header string
       return {};
     }
     auto out = value_->get(Http::LowerCaseString(str));
