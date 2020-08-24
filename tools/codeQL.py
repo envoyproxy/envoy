@@ -8,16 +8,14 @@ if __name__ == "__main__":
   diff_file_whitelist = ['source', 'include']
   os.system("git show --name-only > {}".format(TMP_OUTPUT))
   f = open(TMP_OUTPUT, 'r+')
-  commits = ""
+  commit = ""
   for line in f:
     line_list = line.split(' ')
-    print(line)
-    if line_list[0] == 'Merge:':
-      commits= line_list[1] + '...' + line_list[2]
+    if line_list[0] == 'commit':
+      commit= line_list[1][0:7]
       break
 
-  os.system("git diff --name-only {} > {}".format(commits, TMP_OUTPUT))
-  print(commits)
+  os.system("git show -m {} --name-only  > {}".format(commit, TMP_OUTPUT))
   f = open(TMP_OUTPUT, 'r+')
   diff_file_list = []
   for line in f:
