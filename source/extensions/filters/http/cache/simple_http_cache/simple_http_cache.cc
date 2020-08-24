@@ -37,6 +37,7 @@ public:
   }
 
   const LookupRequest& request() const { return request_; }
+  void onDestroy() override {}
 
 private:
   SimpleHttpCache& cache_;
@@ -73,6 +74,8 @@ public:
   void insertTrailers(const Http::ResponseTrailerMap&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // TODO(toddmgreer): support trailers
   }
+
+  void onDestroy() override {}
 
 private:
   void commit() {
