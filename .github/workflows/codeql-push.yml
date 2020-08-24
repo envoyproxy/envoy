@@ -21,10 +21,9 @@ jobs:
         # a pull request then we can checkout the head.
         fetch-depth: 2
     
-    - name: Get Diff
+    - name: Get Build Targets
       run: |
        . .github/workflows/get_build_targets.sh 
-       echo $BUILD_TARGETS
 
     # If this run was triggered by a pull request event, then checkout
     # the head of the pull request instead of the merge commit.
@@ -52,9 +51,8 @@ jobs:
       run: |
        bazel/setup_clang.sh bin/clang10
        bazelisk shutdown
-       BUILD_TARGETS=$(tools/codeQL.py)
        echo $BUILD_TARGETS
-       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ //source/common/http/http1:codec_lib //source/common/http/http2:codec_lib
+       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ $BUILD_TARGETS
 
     - name: Clean Artifacts
       run: |
