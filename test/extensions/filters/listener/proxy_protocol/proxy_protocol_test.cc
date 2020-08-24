@@ -184,6 +184,7 @@ public:
 
   Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
+  BasicResourceLimitImpl open_connections_;
   Event::DispatcherPtr dispatcher_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::MockListenSocketFactory socket_factory_;
@@ -194,7 +195,6 @@ public:
   NiceMock<Network::MockConnectionCallbacks> connection_callbacks_;
   Network::Connection* server_connection_;
   Network::MockConnectionCallbacks server_callbacks_;
-  BasicResourceLimitImpl open_connections_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   Api::OsSysCallsImpl os_sys_calls_actual_;
