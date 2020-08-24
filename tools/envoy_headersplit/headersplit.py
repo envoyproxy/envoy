@@ -299,9 +299,11 @@ def get_enclosing_namespace(defn: Cursor) -> Tuple[str, str]:
   namespace_suffix += "\n"
   return namespace_prefix, namespace_suffix
 
+
 def read_file_contents(path):
-    with open(path, "r") as input_file:
-      return input_file.read()
+  with open(path, "r") as input_file:
+    return input_file.read()
+
 
 def write_file_contents(class_name, class_defn, class_impl):
   with open("{}.h".format(to_filename(class_name)), "w") as decl_file:

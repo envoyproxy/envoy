@@ -107,8 +107,10 @@ def replace_includes(mockname):
       with (test_file.parent / 'BUILD').open() as f:
         # write building files
         content = f.read()
-        content = content.replace('"//test/mocks/{}:{}_mocks",'.format(mockname, mockname),
-                                  bazel_targets)
+        split_content = content.split(test_file.name)
+        split_content[1] = split_content[1].replace(
+            '"//test/mocks/{}:{}_mocks",'.format(mockname, mockname), bazel_targets, 1)
+        content = split_content[0] + test_file.name + split_content[1]
       with (test_file.parent / 'BUILD').open('w') as f:
         f.write(content)
   with open("changed.txt", "w") as f:

@@ -12,16 +12,16 @@ envoy_package()
 py_test(
     name = "headersplit_test",
     srcs = [
+        "headersplit.py",
         "headersplit_test.py",
-        "headersplit.py"
     ],
     data = glob(["code_corpus/**"]),
-    deps = [
-        requirement("clang"),
-    ],
     main = "headersplit_test.py",
     python_version = "PY3",
     srcs_version = "PY3",
+    tags = ["no-sandbox"],
     visibility = ["//visibility:public"],
+    deps = [
+        requirement("clang"),
+    ],
 )
-
