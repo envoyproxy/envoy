@@ -12,6 +12,7 @@ public:
   virtual ~ActionRegistration() = default;
 };
 using ActionRegistrationPtr = std::unique_ptr<ActionRegistration>;
+/* for testing */
 
 /**
  * Sets an action to be invoked when a debug assertion failure is detected
