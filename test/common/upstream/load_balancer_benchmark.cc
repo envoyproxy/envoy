@@ -97,7 +97,7 @@ public:
   std::unique_ptr<LeastRequestLoadBalancer> lb_;
 };
 
-void BM_RoundRobinLoadBalancerBuild(benchmark::State& state) {
+void benchmarkRoundRobinLoadBalancerBuild(benchmark::State& state) {
   for (auto _ : state) {
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
@@ -120,7 +120,7 @@ void BM_RoundRobinLoadBalancerBuild(benchmark::State& state) {
     state.ResumeTiming();
   }
 }
-BENCHMARK(BM_RoundRobinLoadBalancerBuild)
+BENCHMARK(benchmarkRoundRobinLoadBalancerBuild)
     ->Args({1, 0, 1})
     ->Args({500, 0, 1})
     ->Args({500, 50, 50})
@@ -168,7 +168,7 @@ uint64_t hashInt(uint64_t i) {
   return HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i)));
 }
 
-void BM_RingHashLoadBalancerBuildRing(benchmark::State& state) {
+void benchmarkRingHashLoadBalancerBuildRing(benchmark::State& state) {
   for (auto _ : state) {
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
@@ -187,7 +187,7 @@ void BM_RingHashLoadBalancerBuildRing(benchmark::State& state) {
     state.ResumeTiming();
   }
 }
-BENCHMARK(BM_RingHashLoadBalancerBuildRing)
+BENCHMARK(benchmarkRingHashLoadBalancerBuildRing)
     ->Args({100, 65536})
     ->Args({200, 65536})
     ->Args({500, 65536})
@@ -196,7 +196,7 @@ BENCHMARK(BM_RingHashLoadBalancerBuildRing)
     ->Args({500, 256000})
     ->Unit(benchmark::kMillisecond);
 
-void BM_MaglevLoadBalancerBuildTable(benchmark::State& state) {
+void benchmarkMaglevLoadBalancerBuildTable(benchmark::State& state) {
   for (auto _ : state) {
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
@@ -214,7 +214,7 @@ void BM_MaglevLoadBalancerBuildTable(benchmark::State& state) {
     state.ResumeTiming();
   }
 }
-BENCHMARK(BM_MaglevLoadBalancerBuildTable)
+BENCHMARK(benchmarkMaglevLoadBalancerBuildTable)
     ->Arg(100)
     ->Arg(200)
     ->Arg(500)
@@ -248,7 +248,7 @@ void computeHitStats(benchmark::State& state,
   state.counters["relative_stddev_hits"] = (stddev / mean);
 }
 
-void BM_LeastRequestLoadBalancerChooseHost(benchmark::State& state) {
+void benchmarkLeastRequestLoadBalancerChooseHost(benchmark::State& state) {
   for (auto _ : state) {
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
@@ -269,7 +269,7 @@ void BM_LeastRequestLoadBalancerChooseHost(benchmark::State& state) {
     state.ResumeTiming();
   }
 }
-BENCHMARK(BM_LeastRequestLoadBalancerChooseHost)
+BENCHMARK(benchmarkLeastRequestLoadBalancerChooseHost)
     ->Args({100, 1, 1000000})
     ->Args({100, 2, 1000000})
     ->Args({100, 3, 1000000})
@@ -278,7 +278,7 @@ BENCHMARK(BM_LeastRequestLoadBalancerChooseHost)
     ->Args({100, 100, 1000000})
     ->Unit(benchmark::kMillisecond);
 
-void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
+void benchmarkRingHashLoadBalancerChooseHost(benchmark::State& state) {
   for (auto _ : state) {
     // Do not time the creation of the ring.
     state.PauseTiming();
@@ -308,7 +308,7 @@ void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
     state.ResumeTiming();
   }
 }
-BENCHMARK(BM_RingHashLoadBalancerChooseHost)
+BENCHMARK(benchmarkRingHashLoadBalancerChooseHost)
     ->Args({100, 65536, 100000})
     ->Args({200, 65536, 100000})
     ->Args({500, 65536, 100000})
@@ -317,7 +317,7 @@ BENCHMARK(BM_RingHashLoadBalancerChooseHost)
     ->Args({500, 256000, 100000})
     ->Unit(benchmark::kMillisecond);
 
-void BM_MaglevLoadBalancerChooseHost(benchmark::State& state) {
+void benchmarkMaglevLoadBalancerChooseHost(benchmark::State& state) {
   for (auto _ : state) {
     // Do not time the creation of the table.
     state.PauseTiming();
@@ -344,13 +344,13 @@ void BM_MaglevLoadBalancerChooseHost(benchmark::State& state) {
     state.ResumeTiming();
   }
 }
-BENCHMARK(BM_MaglevLoadBalancerChooseHost)
+BENCHMARK(benchmarkMaglevLoadBalancerChooseHost)
     ->Args({100, 100000})
     ->Args({200, 100000})
     ->Args({500, 100000})
     ->Unit(benchmark::kMillisecond);
 
-void BM_RingHashLoadBalancerHostLoss(benchmark::State& state) {
+void benchmarkRingHashLoadBalancerHostLoss(benchmark::State& state) {
   for (auto _ : state) {
     const uint64_t num_hosts = state.range(0);
     const uint64_t min_ring_size = state.range(1);
@@ -390,13 +390,13 @@ void BM_RingHashLoadBalancerHostLoss(benchmark::State& state) {
         (static_cast<double>(hosts_to_lose) / num_hosts) * 100;
   }
 }
-BENCHMARK(BM_RingHashLoadBalancerHostLoss)
+BENCHMARK(benchmarkRingHashLoadBalancerHostLoss)
     ->Args({500, 256000, 1, 10000})
     ->Args({500, 256000, 2, 10000})
     ->Args({500, 256000, 3, 10000})
     ->Unit(benchmark::kMillisecond);
 
-void BM_MaglevLoadBalancerHostLoss(benchmark::State& state) {
+void benchmarkMaglevLoadBalancerHostLoss(benchmark::State& state) {
   for (auto _ : state) {
     const uint64_t num_hosts = state.range(0);
     const uint64_t hosts_to_lose = state.range(1);
@@ -435,13 +435,13 @@ void BM_MaglevLoadBalancerHostLoss(benchmark::State& state) {
         (static_cast<double>(hosts_to_lose) / num_hosts) * 100;
   }
 }
-BENCHMARK(BM_MaglevLoadBalancerHostLoss)
+BENCHMARK(benchmarkMaglevLoadBalancerHostLoss)
     ->Args({500, 1, 10000})
     ->Args({500, 2, 10000})
     ->Args({500, 3, 10000})
     ->Unit(benchmark::kMillisecond);
 
-void BM_MaglevLoadBalancerWeighted(benchmark::State& state) {
+void benchmarkMaglevLoadBalancerWeighted(benchmark::State& state) {
   for (auto _ : state) {
     const uint64_t num_hosts = state.range(0);
     const uint64_t weighted_subset_percent = state.range(1);
@@ -488,7 +488,7 @@ void BM_MaglevLoadBalancerWeighted(benchmark::State& state) {
         std::abs(weighted_hosts_percent(before_weight) - weighted_hosts_percent(after_weight));
   }
 }
-BENCHMARK(BM_MaglevLoadBalancerWeighted)
+BENCHMARK(benchmarkMaglevLoadBalancerWeighted)
     ->Args({500, 5, 1, 1, 10000})
     ->Args({500, 5, 1, 127, 1000})
     ->Args({500, 5, 127, 1, 10000})
@@ -543,7 +543,7 @@ public:
   HostVector host_moved_;
 };
 
-void BM_SubsetLoadBalancerCreate(benchmark::State& state) {
+void benchmarkSubsetLoadBalancerCreate(benchmark::State& state) {
   const bool single_host_per_subset = state.range(0);
   const uint64_t num_hosts = state.range(1);
   for (auto _ : state) {
@@ -551,11 +551,11 @@ void BM_SubsetLoadBalancerCreate(benchmark::State& state) {
   }
 }
 
-BENCHMARK(BM_SubsetLoadBalancerCreate)
+BENCHMARK(benchmarkSubsetLoadBalancerCreate)
     ->Ranges({{false, true}, {50, 2500}})
     ->Unit(benchmark::kMillisecond);
 
-void BM_SubsetLoadBalancerUpdate(benchmark::State& state) {
+void benchmarkSubsetLoadBalancerUpdate(benchmark::State& state) {
   const bool single_host_per_subset = state.range(0);
   const uint64_t num_hosts = state.range(1);
   SubsetLbTester tester(num_hosts, single_host_per_subset);
@@ -565,7 +565,7 @@ void BM_SubsetLoadBalancerUpdate(benchmark::State& state) {
   }
 }
 
-BENCHMARK(BM_SubsetLoadBalancerUpdate)
+BENCHMARK(benchmarkSubsetLoadBalancerUpdate)
     ->Ranges({{false, true}, {50, 2500}})
     ->Unit(benchmark::kMillisecond);
 
