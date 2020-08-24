@@ -8,6 +8,8 @@
 
 #include "common/config/metadata.h"
 #include "common/config/utility.h"
+#include "common/http/header_utility.h"
+#include "common/network/address_impl.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
 #include "common/router/string_accessor_impl.h"
@@ -18,7 +20,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/host.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -613,6 +615,21 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMiss
   ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
 
   testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithRequestMetadata) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  envoy::config::core::v3::Metadata metadata;
+  ProtobufWkt::Struct struct_obj;
+
+  auto& fields_map = *struct_obj.mutable_fields();
+  fields_map["foo"] = ValueUtil::stringValue("bar");
+  (*metadata.mutable_filter_metadata())["envoy.lb"] = struct_obj;
+
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+  EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+
+  testFormatting(stream_info, "DYNAMIC_METADATA([\"envoy.lb\", \"foo\"])", "bar");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {

@@ -186,7 +186,7 @@ envoy_cc_mock(
         "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 
@@ -197,6 +197,7 @@ envoy_cc_mock(
     deps = [
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:overload_manager_interface",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -221,7 +222,7 @@ envoy_cc_mock(
         "//source/common/secret:secret_manager_impl_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/server:config_tracker_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 
@@ -241,12 +242,15 @@ envoy_cc_mock(
     hdrs = ["health_checker_factory_context.h"],
     deps = [
         "//include/envoy/server:health_checker_config_interface",
+        "//test/mocks:common_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/mocks/upstream:health_check_event_logger_mocks",
+        "//test/mocks/upstream:health_checker_mocks",
     ],
 )
 
