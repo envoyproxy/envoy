@@ -63,5 +63,29 @@ TEST_P(SocketInterfaceIntegrationTest, Basic) {
   EXPECT_EQ("hello", response);
 }
 
+TEST_P(SocketInterfaceIntegrationTest, AddressWithSocketInterface) {
+  BaseIntegrationTest::initialize();
+
+  ConnectionStatusCallbacks connect_callbacks_;
+  Network::ClientConnectionPtr client_;
+  const Network::SocketInterface* sock_interface = Network::socketInterface(
+      "envoy.extensions.network.socket_interface.default_socket_interface");
+  Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::Ipv4Instance>(
+          Network::Test::getLoopbackAddressUrlString(Network::Address::IpVersion::v4),
+          lookupPort("listener_0"), sock_interface);
+
+  client_ = dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                                Network::Test::createRawBufferSocket(), nullptr);
+
+  client_->addConnectionCallbacks(connect_callbacks_);
+  client_->connect();
+  while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  client_->close(Network::ConnectionCloseType::FlushWrite);
+}
+
 } // namespace
 } // namespace Envoy

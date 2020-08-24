@@ -61,7 +61,7 @@ public:
   ~ConnPoolImplForTest() override {
     EXPECT_EQ(0U, ready_clients_.size());
     EXPECT_EQ(0U, busy_clients_.size());
-    EXPECT_EQ(0U, pending_requests_.size());
+    EXPECT_EQ(0U, pending_streams_.size());
   }
 
   struct TestCodecClient {

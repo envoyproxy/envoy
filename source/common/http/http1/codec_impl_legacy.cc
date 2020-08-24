@@ -453,8 +453,6 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
     : connection_(connection), stats_(stats),
       header_key_formatter_(std::move(header_key_formatter)), processing_trailers_(false),
       handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
-      connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.connection_header_sanitization")),
       enable_trailers_(enable_trailers),
       strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
@@ -784,7 +782,7 @@ ServerConnectionImpl::ServerConnectionImpl(
       headers_with_underscores_action_(headers_with_underscores_action) {}
 
 uint32_t ServerConnectionImpl::getHeadersSize() {
-  // Add in the the size of the request URL if processing request headers.
+  // Add in the size of the request URL if processing request headers.
   const uint32_t url_size = (!processing_trailers_ && active_request_.has_value())
                                 ? active_request_.value().request_url_.size()
                                 : 0;
@@ -853,7 +851,7 @@ int ServerConnectionImpl::onHeadersComplete() {
     ENVOY_CONN_LOG(trace, "Server: onHeadersComplete size={}", connection_, headers->size());
     const char* method_string = http_method_str(static_cast<http_method>(parser_.method));
 
-    if (!handling_upgrade_ && connection_header_sanitization_ && headers->Connection()) {
+    if (!handling_upgrade_ && headers->Connection()) {
       // If we fail to sanitize the request, return a 400 to the client
       if (!Utility::sanitizeConnectionHeader(*headers)) {
         absl::string_view header_value = headers->getConnectionValue();
@@ -1011,10 +1009,9 @@ void ServerConnectionImpl::sendProtocolError(absl::string_view details) {
       is_grpc_request =
           Grpc::Common::isGrpcRequestHeaders(*absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
     }
-    const bool is_head_request = parser_.method == HTTP_HEAD;
     active_request_->request_decoder_->sendLocalReply(is_grpc_request, error_code_,
                                                       CodeUtility::toString(error_code_), nullptr,
-                                                      is_head_request, absl::nullopt, details);
+                                                      absl::nullopt, details);
     return;
   }
 }
@@ -1093,6 +1090,8 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
 }
 
 int ClientConnectionImpl::onHeadersComplete() {
+  ENVOY_CONN_LOG(trace, "status_code {}", connection_, parser_.status_code);
+
   // Handle the case where the client is closing a kept alive connection (by sending a 408
   // with a 'Connection: close' header). In this case we just let response flush out followed
   // by the remote close.
@@ -1138,19 +1137,23 @@ int ClientConnectionImpl::onHeadersComplete() {
       }
     }
 
-    if (parser_.status_code == 100) {
-      // http-parser treats 100 continue headers as their own complete response.
-      // Swallow the spurious onMessageComplete and continue processing.
-      ignore_message_complete_for_100_continue_ = true;
+    if (parser_.status_code == enumToInt(Http::Code::Continue)) {
       pending_response_.value().decoder_->decode100ContinueHeaders(std::move(headers));
-
-      // Reset to ensure no information from the continue headers is used for the response headers
-      // in case the callee does not move the headers out.
-      headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
     } else if (cannotHaveBody() && !handling_upgrade_) {
       deferred_end_stream_headers_ = true;
     } else {
       pending_response_.value().decoder_->decodeHeaders(std::move(headers), false);
+    }
+
+    // http-parser treats 1xx headers as their own complete response. Swallow the spurious
+    // onMessageComplete and continue processing for purely informational headers.
+    // 101-SwitchingProtocols is exempt as all data after the header is proxied through after
+    // upgrading.
+    if (CodeUtility::is1xx(parser_.status_code) &&
+        parser_.status_code != enumToInt(Http::Code::SwitchingProtocols)) {
+      ignore_message_complete_for_1xx_ = true;
+      // Reset to ensure no information from the 1xx headers is used for the response headers.
+      headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
     }
   }
 
@@ -1176,8 +1179,8 @@ void ClientConnectionImpl::onBody(Buffer::Instance& data) {
 
 void ClientConnectionImpl::onMessageComplete() {
   ENVOY_CONN_LOG(trace, "message complete", connection_);
-  if (ignore_message_complete_for_100_continue_) {
-    ignore_message_complete_for_100_continue_ = false;
+  if (ignore_message_complete_for_1xx_) {
+    ignore_message_complete_for_1xx_ = false;
     return;
   }
   if (pending_response_.has_value()) {

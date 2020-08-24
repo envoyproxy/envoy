@@ -1,8 +1,6 @@
 #pragma once
 
 #include <chrono>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "envoy/api/api.h"
@@ -17,6 +15,9 @@
 
 #include "common/common/logger.h"
 
+#include "absl/container/node_hash_map.h"
+#include "absl/container/node_hash_set.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -29,8 +30,8 @@ public:
   // has changed state.
   bool updateResourcePressure(const std::string& name, double pressure);
 
-  // Returns whether the action is currently active or not.
-  bool isActive() const;
+  // Returns the current action state, which is the max state across all registered triggers.
+  OverloadActionState getState() const;
 
   class Trigger {
   public:
@@ -39,15 +40,16 @@ public:
     // Updates the current value of the metric and returns whether the trigger has changed state.
     virtual bool updateValue(double value) PURE;
 
-    // Returns whether the trigger is currently fired or not.
-    virtual bool isFired() const PURE;
+    // Returns the action state for the trigger.
+    virtual OverloadActionState actionState() const PURE;
   };
   using TriggerPtr = std::unique_ptr<Trigger>;
 
 private:
-  std::unordered_map<std::string, TriggerPtr> triggers_;
-  std::unordered_set<std::string> fired_triggers_;
+  absl::node_hash_map<std::string, TriggerPtr> triggers_;
+  OverloadActionState state_;
   Stats::Gauge& active_gauge_;
+  Stats::Gauge& scale_percent_gauge_;
 };
 
 class OverloadManagerImpl : Logger::Loggable<Logger::Id::main>, public OverloadManager {
@@ -104,8 +106,8 @@ private:
   ThreadLocal::SlotPtr tls_;
   const std::chrono::milliseconds refresh_interval_;
   Event::TimerPtr timer_;
-  std::unordered_map<std::string, Resource> resources_;
-  std::unordered_map<std::string, OverloadAction> actions_;
+  absl::node_hash_map<std::string, Resource> resources_;
+  absl::node_hash_map<std::string, OverloadAction> actions_;
 
   using ResourceToActionMap = std::unordered_multimap<std::string, std::string>;
   ResourceToActionMap resource_to_actions_;

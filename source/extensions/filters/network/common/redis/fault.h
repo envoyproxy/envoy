@@ -45,6 +45,8 @@ public:
 
 using FaultManagerPtr = std::unique_ptr<FaultManager>;
 
+using FaultManagerSharedPtr = std::shared_ptr<FaultManager>;
+
 } // namespace Redis
 } // namespace Common
 } // namespace NetworkFilters

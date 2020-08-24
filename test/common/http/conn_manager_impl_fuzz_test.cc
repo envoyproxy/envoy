@@ -90,7 +90,11 @@ public:
           callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filter_});
           callbacks.addStreamEncoderFilter(StreamEncoderFilterSharedPtr{encoder_filter_});
         }));
-    EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_));
+    EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+        .WillOnce(Invoke([this](StreamDecoderFilterCallbacks& callbacks) -> void {
+          decoder_filter_->callbacks_ = &callbacks;
+          callbacks.streamInfo().setResponseCodeDetails("");
+        }));
     EXPECT_CALL(*encoder_filter_, setEncoderFilterCallbacks(_));
     EXPECT_CALL(filter_factory_, createUpgradeFilterChain("WebSocket", _, _))
         .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
@@ -255,7 +259,12 @@ public:
   // course, it's the codecs must be robust to wire-level violations. We
   // explore these violations via MutateAction and SwapAction at the connection
   // buffer level.
-  enum class StreamState { PendingHeaders, PendingDataOrTrailers, Closed };
+  enum class StreamState {
+    PendingHeaders,
+    PendingNonInformationalHeaders,
+    PendingDataOrTrailers,
+    Closed
+  };
 
   FuzzStream(ConnectionManagerImpl& conn_manager, FuzzConfig& config,
              const HeaderMap& request_headers,
@@ -455,18 +464,28 @@ public:
             Fuzz::fromHeaders<TestResponseHeaderMapImpl>(response_action.continue_headers()));
         headers->setReferenceKey(Headers::get().Status, "100");
         decoder_filter_->callbacks_->encode100ContinueHeaders(std::move(headers));
+        // We don't allow multiple 100-continue headers in HCM, UpstreamRequest is responsible
+        // for coalescing.
+        state = StreamState::PendingNonInformationalHeaders;
       }
       break;
     }
     case test::common::http::ResponseAction::kHeaders: {
-      if (state == StreamState::PendingHeaders) {
+      if (state == StreamState::PendingHeaders ||
+          state == StreamState::PendingNonInformationalHeaders) {
         auto headers = std::make_unique<TestResponseHeaderMapImpl>(
             Fuzz::fromHeaders<TestResponseHeaderMapImpl>(response_action.headers()));
         // The client codec will ensure we always have a valid :status.
         // Similarly, local replies should always contain this.
+        uint64_t status;
         try {
-          Utility::getResponseStatus(*headers);
+          status = Utility::getResponseStatus(*headers);
         } catch (const CodecClientException&) {
+          headers->setReferenceKey(Headers::get().Status, "200");
+        }
+        // The only 1xx header that may be provided to encodeHeaders() is a 101 upgrade,
+        // guaranteed by the codec parsers. See include/envoy/http/filter.h.
+        if (CodeUtility::is1xx(status) && status != enumToInt(Http::Code::SwitchingProtocols)) {
           headers->setReferenceKey(Headers::get().Status, "200");
         }
         decoder_filter_->callbacks_->encodeHeaders(std::move(headers), end_stream);

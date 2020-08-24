@@ -6,7 +6,6 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <utility>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -42,7 +41,8 @@ public:
    * @param config supplies the custom proto configuration for the Stats::Sink
    * @param server supplies the server instance
    */
-  virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config, Instance& server) PURE;
+  virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config,
+                                         Server::Configuration::ServerFactoryContext& server) PURE;
 
   std::string category() const override { return "envoy.stats_sinks"; }
 };
@@ -111,6 +111,10 @@ public:
   }
 
   double wdMultiKillThreshold() const override { return watchdog_multikill_threshold_; }
+  Protobuf::RepeatedPtrField<envoy::config::bootstrap::v3::Watchdog::WatchdogAction>
+  wdActions() const override {
+    return watchdog_actions_;
+  }
 
 private:
   /**
@@ -129,6 +133,8 @@ private:
   std::chrono::milliseconds watchdog_kill_timeout_;
   std::chrono::milliseconds watchdog_multikill_timeout_;
   double watchdog_multikill_threshold_;
+  Protobuf::RepeatedPtrField<envoy::config::bootstrap::v3::Watchdog::WatchdogAction>
+      watchdog_actions_;
 };
 
 /**

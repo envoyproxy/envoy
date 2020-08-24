@@ -228,7 +228,7 @@ protected:
 
   struct HostsSourceHash {
     size_t operator()(const HostsSource& hs) const {
-      // This is only used for std::unordered_map keys, so we don't need a deterministic hash.
+      // This is only used for absl::node_hash_map keys, so we don't need a deterministic hash.
       size_t hash = std::hash<uint32_t>()(hs.priority_);
       hash = 37 * hash + std::hash<size_t>()(static_cast<std::size_t>(hs.source_type_));
       hash = 37 * hash + std::hash<uint32_t>()(hs.locality_index_);
@@ -387,7 +387,7 @@ private:
                                                 const HostsSource& source) PURE;
 
   // Scheduler for each valid HostsSource.
-  std::unordered_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
+  absl::node_hash_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
 };
 
 /**
@@ -422,7 +422,7 @@ private:
     return hosts_to_use[rr_indexes_[source]++ % hosts_to_use.size()];
   }
 
-  std::unordered_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
+  absl::node_hash_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
 };
 
 /**

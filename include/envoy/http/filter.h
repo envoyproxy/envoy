@@ -359,9 +359,10 @@ public:
   /**
    * Called with 100-Continue headers to be encoded.
    *
-   * This is not folded into encodeHeaders because most Envoy users and filters
-   * will not be proxying 100-continue and with it split out, can ignore the
-   * complexity of multiple encodeHeaders calls.
+   * This is not folded into encodeHeaders because most Envoy users and filters will not be proxying
+   * 100-continue and with it split out, can ignore the complexity of multiple encodeHeaders calls.
+   *
+   * This must not be invoked more than once per request.
    *
    * @param headers supplies the headers to be encoded.
    */
@@ -372,6 +373,9 @@ public:
    *
    * The connection manager inspects certain pseudo headers that are not actually sent downstream.
    * - See source/common/http/headers.h
+   *
+   * The only 1xx that may be provided to encodeHeaders() is a 101 upgrade, which will be the final
+   * encodeHeaders() for a response.
    *
    * @param headers supplies the headers to be encoded.
    * @param end_stream supplies whether this is a header only request/response.
@@ -718,6 +722,8 @@ public:
    * will not be proxying 100-continue and with it split out, can ignore the
    * complexity of multiple encodeHeaders calls.
    *
+   * This will only be invoked once per request.
+   *
    * @param headers supplies the 100-continue response headers to be encoded.
    * @return FilterHeadersStatus determines how filter chain iteration proceeds.
    *
@@ -726,6 +732,10 @@ public:
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
+   *
+   * The only 1xx that may be provided to encodeHeaders() is a 101 upgrade, which will be the final
+   * encodeHeaders() for a response.
+   *
    * @param headers supplies the headers to be encoded.
    * @param end_stream supplies whether this is a header only request/response.
    * @return FilterHeadersStatus determines how filter chain iteration proceeds.

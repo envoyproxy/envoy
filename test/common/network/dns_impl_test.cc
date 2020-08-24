@@ -1,7 +1,6 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/common/platform.h"
@@ -27,6 +26,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/container/fixed_array.h"
+#include "absl/container/node_hash_map.h"
 #include "ares.h"
 #include "ares_dns.h"
 #include "gtest/gtest.h"
@@ -53,9 +53,9 @@ namespace {
 // List of IP address (in human readable format).
 using IpList = std::list<std::string>;
 // Map from hostname to IpList.
-using HostMap = std::unordered_map<std::string, IpList>;
+using HostMap = absl::node_hash_map<std::string, IpList>;
 // Map from hostname to CNAME
-using CNameMap = std::unordered_map<std::string, std::string>;
+using CNameMap = absl::node_hash_map<std::string, std::string>;
 // Represents a single TestDnsServer query state and lifecycle. This implements
 // just enough of RFC 1035 to handle queries we generate in the tests below.
 enum class RecordType { A, AAAA };
@@ -320,7 +320,7 @@ public:
 
   ares_channel channel() const { return resolver_->channel_; }
   bool isChannelDirty() const { return resolver_->dirty_channel_; }
-  const std::unordered_map<int, Event::FileEventPtr>& events() { return resolver_->events_; }
+  const absl::node_hash_map<int, Event::FileEventPtr>& events() { return resolver_->events_; }
   // Reset the channel state for a DnsResolverImpl such that it will only use
   // TCP and optionally has a zero timeout (for validating timeout behavior).
   void resetChannelTcpOnly(bool zero_timeout) {
@@ -393,6 +393,9 @@ public:
   const sockaddr* sockAddr() const override { return instance_.sockAddr(); }
   socklen_t sockAddrLen() const override { return instance_.sockAddrLen(); }
   Address::Type type() const override { return instance_.type(); }
+  const SocketInterface& socketInterface() const override {
+    return SocketInterfaceSingleton::get();
+  }
 
 private:
   std::string antagonistic_name_;
@@ -434,7 +437,7 @@ public:
     server_ = std::make_unique<TestDnsServer>(*dispatcher_);
     socket_ = std::make_shared<Network::TcpListenSocket>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ = dispatcher_->createListener(socket_, *server_, true);
+    listener_ = dispatcher_->createListener(socket_, *server_, true, ENVOY_TCP_BACKLOG_SIZE);
 
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_ = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver_.get()));

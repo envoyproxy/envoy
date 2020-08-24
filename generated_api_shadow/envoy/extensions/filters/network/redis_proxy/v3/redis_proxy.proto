@@ -156,7 +156,7 @@ message RedisProxy {
 
       // String prefix that must match the beginning of the keys. Envoy will always favor the
       // longest match.
-      string prefix = 1;
+      string prefix = 1 [(validate.rules).string = {max_bytes: 1000}];
 
       // Indicates if the prefix needs to be removed from the key when forwarded.
       bool remove_prefix = 2;

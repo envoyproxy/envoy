@@ -20,6 +20,7 @@
 #include "common/http/headers.h"
 #include "common/http/http2/codec_stats.h"
 #include "common/http/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -29,17 +30,23 @@ namespace Legacy {
 namespace Http2 {
 
 class Http2ResponseCodeDetailValues {
+public:
   // Invalid HTTP header field was received and stream is going to be
   // closed.
   const absl::string_view ng_http2_err_http_header_ = "http2.invalid.header.field";
-
   // Violation in HTTP messaging rule.
   const absl::string_view ng_http2_err_http_messaging_ = "http2.violation.of.messaging.rule";
-
   // none of the above
   const absl::string_view ng_http2_err_unknown_ = "http2.unknown.nghttp2.error";
+  // The number of headers (or trailers) exceeded the configured limits
+  const absl::string_view too_many_headers = "http2.too_many_headers";
+  // Envoy detected an HTTP/2 frame flood from the server.
+  const absl::string_view outbound_frame_flood = "http2.outbound_frames_flood";
+  // Envoy detected an inbound HTTP/2 frame flood.
+  const absl::string_view inbound_empty_frame_flood = "http2.inbound_empty_frames_flood";
+  // Envoy was configured to drop requests with header keys beginning with underscores.
+  const absl::string_view invalid_underscore = "http2.unexpected_underscore";
 
-public:
   const absl::string_view errorDetails(int error_code) const {
     switch (error_code) {
     case NGHTTP2_ERR_HTTP_HEADER:
@@ -97,7 +104,7 @@ template <typename T> static T* removeConst(const void* object) {
 
 ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
     : parent_(parent), local_end_stream_sent_(false), remote_end_stream_(false),
-      data_deferred_(false), waiting_for_non_informational_headers_(false),
+      data_deferred_(false), received_noninformational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
       pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false) {
   parent_.stats_.streams_active_.inc();
@@ -215,9 +222,14 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   if (pending_send_data_.length() > 0) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.
+    // However, for empty trailers, we don't need to to save the trailers.
     ASSERT(!pending_trailers_to_encode_);
-    pending_trailers_to_encode_ = cloneTrailers(trailers);
-    createPendingFlushTimer();
+    const bool skip_encoding_empty_trailers =
+        trailers.empty() && parent_.skip_encoding_empty_trailers_;
+    if (!skip_encoding_empty_trailers) {
+      pending_trailers_to_encode_ = cloneTrailers(trailers);
+      createPendingFlushTimer();
+    }
   } else {
     submitTrailers(trailers);
     parent_.sendPendingFrames();
@@ -267,18 +279,20 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
   readDisable(false);
 }
 
-void ConnectionImpl::ClientStreamImpl::decodeHeaders(bool allow_waiting_for_informational_headers) {
+void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
   auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
-  if (allow_waiting_for_informational_headers &&
-      CodeUtility::is1xx(Http::Utility::getResponseStatus(*headers))) {
-    waiting_for_non_informational_headers_ = true;
-  }
+  const uint64_t status = Http::Utility::getResponseStatus(*headers);
 
   if (!upgrade_type_.empty() && headers->Status()) {
     Http::Utility::transformUpgradeResponseFromH2toH1(*headers, upgrade_type_);
   }
 
-  if (headers->Status()->value() == "100") {
+  // Non-informational headers are non-1xx OR 101-SwitchingProtocols, since 101 implies that further
+  // proxying is on an upgrade path.
+  received_noninformational_headers_ =
+      !CodeUtility::is1xx(status) || status == enumToInt(Http::Code::SwitchingProtocols);
+
+  if (status == enumToInt(Http::Code::Continue)) {
     ASSERT(!remote_end_stream_);
     response_decoder_.decode100ContinueHeaders(std::move(headers));
   } else {
@@ -291,8 +305,7 @@ void ConnectionImpl::ClientStreamImpl::decodeTrailers() {
       std::move(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_)));
 }
 
-void ConnectionImpl::ServerStreamImpl::decodeHeaders(bool allow_waiting_for_informational_headers) {
-  ASSERT(!allow_waiting_for_informational_headers);
+void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
   auto& headers = absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
   if (Http::Utility::isH2UpgradeRequest(*headers)) {
     Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
@@ -326,6 +339,18 @@ void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& 
 }
 
 void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
+  ASSERT(local_end_stream_);
+  const bool skip_encoding_empty_trailers =
+      trailers.empty() && parent_.skip_encoding_empty_trailers_;
+  if (skip_encoding_empty_trailers) {
+    ENVOY_CONN_LOG(debug, "skipping submitting trailers", parent_.connection_);
+
+    // Instead of submitting empty trailers, we send empty data instead.
+    Buffer::OwnedImpl empty_buffer;
+    encodeDataHelper(empty_buffer, /*end_stream=*/true, skip_encoding_empty_trailers);
+    return;
+  }
+
   std::vector<nghttp2_nv> final_headers;
   buildHeaders(final_headers, trailers);
   int rc = nghttp2_submit_trailer(parent_.session_, stream_id_, final_headers.data(),
@@ -373,6 +398,7 @@ int ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t 
   if (!parent_.addOutboundFrameFragment(output, framehd, FRAME_HEADER_SIZE)) {
     ENVOY_CONN_LOG(debug, "error sending data frame: Too many frames in the outbound queue",
                    parent_.connection_);
+    setDetails(Http2ResponseCodeDetails::get().outbound_frame_flood);
     return NGHTTP2_ERR_FLOODED;
   }
 
@@ -420,6 +446,15 @@ void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
 
 void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!local_end_stream_);
+  encodeDataHelper(data, end_stream, /*skip_encoding_empty_trailers=*/false);
+}
+
+void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool end_stream,
+                                                  bool skip_encoding_empty_trailers) {
+  if (skip_encoding_empty_trailers) {
+    ASSERT(data.length() == 0 && end_stream);
+  }
+
   local_end_stream_ = end_stream;
   parent_.stats_.pending_send_bytes_.add(data.length());
   pending_send_data_.move(data);
@@ -504,6 +539,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           http2_options.max_inbound_priority_frames_per_stream().value()),
       max_inbound_window_update_frames_per_data_frame_sent_(
           http2_options.max_inbound_window_update_frames_per_data_frame_sent().value()),
+      skip_encoding_empty_trailers_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_skip_encoding_empty_trailers")),
       dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {}
 
 ConnectionImpl::~ConnectionImpl() {
@@ -655,7 +692,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     switch (frame->headers.cat) {
     case NGHTTP2_HCAT_RESPONSE:
     case NGHTTP2_HCAT_REQUEST: {
-      stream->decodeHeaders(frame->headers.cat == NGHTTP2_HCAT_RESPONSE);
+      stream->decodeHeaders();
       break;
     }
 
@@ -663,30 +700,15 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
       // It's possible that we are waiting to send a deferred reset, so only raise headers/trailers
       // if local is not complete.
       if (!stream->deferred_reset_) {
-        if (!stream->waiting_for_non_informational_headers_) {
-          if (!stream->remote_end_stream_) {
-            // This indicates we have received more headers frames than Envoy
-            // supports. Even if this is valid HTTP (something like 103 early hints) fail here
-            // rather than trying to push unexpected headers through the Envoy pipeline as that
-            // will likely result in Envoy crashing.
-            // It would be cleaner to reset the stream rather than reset the/ entire connection but
-            // it's also slightly more dangerous so currently we err on the side of safety.
-            stats_.too_many_header_frames_.inc();
-            throw CodecProtocolException("Unexpected 'trailers' with no end stream.");
-          } else {
-            stream->decodeTrailers();
-          }
+        if (nghttp2_session_check_server_session(session_) ||
+            stream->received_noninformational_headers_) {
+          ASSERT(stream->remote_end_stream_);
+          stream->decodeTrailers();
         } else {
-          ASSERT(!nghttp2_session_check_server_session(session_));
-          stream->waiting_for_non_informational_headers_ = false;
-
-          // Even if we have :status 100 in the client case in a response, when
-          // we received a 1xx to start out with, nghttp2 message checking
-          // guarantees proper flow here.
-          stream->decodeHeaders(false);
+          // We're a client session and still waiting for non-informational headers.
+          stream->decodeHeaders();
         }
       }
-
       break;
     }
 
@@ -951,6 +973,7 @@ int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
 
   auto should_return = checkHeaderNameForUnderscores(name.getStringView());
   if (should_return) {
+    stream->setDetails(Http2ResponseCodeDetails::get().invalid_underscore);
     name.clear();
     value.clear();
     return should_return.value();
@@ -960,8 +983,9 @@ int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
 
   if (stream->headers().byteSize() > max_headers_kb_ * 1024 ||
       stream->headers().size() > max_headers_count_) {
-    // This will cause the library to reset/close the stream.
+    stream->setDetails(Http2ResponseCodeDetails::get().too_many_headers);
     stats_.header_overflow_.inc();
+    // This will cause the library to reset/close the stream.
     return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
   } else {
     return 0;
@@ -1256,7 +1280,7 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& decoder) {
     stream->runHighWatermarkCallbacks();
   }
   ClientStreamImpl& stream_ref = *stream;
-  stream->moveIntoList(std::move(stream), active_streams_);
+  LinkedList::moveIntoList(std::move(stream), active_streams_);
   return stream_ref;
 }
 
@@ -1322,7 +1346,7 @@ int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   }
   stream->request_decoder_ = &callbacks_.newStream(*stream);
   stream->stream_id_ = frame->hd.stream_id;
-  stream->moveIntoList(std::move(stream), active_streams_);
+  LinkedList::moveIntoList(std::move(stream), active_streams_);
   nghttp2_session_set_stream_user_data(session_, frame->hd.stream_id,
                                        active_streams_.front().get());
   return 0;
@@ -1367,7 +1391,7 @@ bool ServerConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd, uint32
     break;
   }
 
-  if (!checkInboundFrameLimits()) {
+  if (!checkInboundFrameLimits(hd->stream_id)) {
     // NGHTTP2_ERR_FLOODED is overridden within nghttp2 library and it doesn't propagate
     // all the way to nghttp2_session_mem_recv() where we need it.
     flood_detected_ = true;
@@ -1377,8 +1401,9 @@ bool ServerConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd, uint32
   return true;
 }
 
-bool ServerConnectionImpl::checkInboundFrameLimits() {
+bool ServerConnectionImpl::checkInboundFrameLimits(int32_t stream_id) {
   ASSERT(dispatching_downstream_data_);
+  ConnectionImpl::StreamImpl* stream = getStream(stream_id);
 
   if (consecutive_inbound_frames_with_empty_payload_ >
       max_consecutive_inbound_frames_with_empty_payload_) {
@@ -1386,6 +1411,9 @@ bool ServerConnectionImpl::checkInboundFrameLimits() {
                    "error reading frame: Too many consecutive frames with an empty payload "
                    "received in this HTTP/2 session.",
                    connection_);
+    if (stream) {
+      stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
+    }
     stats_.inbound_empty_frames_flood_.inc();
     return false;
   }

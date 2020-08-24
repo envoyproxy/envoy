@@ -6,7 +6,6 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "envoy/config/cluster/v3/circuit_breaker.pb.h"
@@ -53,6 +52,7 @@
 #include "extensions/filters/network/common/utility.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -139,7 +139,7 @@ parseClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
 ProtocolOptionsConfigConstSharedPtr
 createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
                             const ProtobufWkt::Struct& config,
-                            ProtobufMessage::ValidationVisitor& validation_visitor) {
+                            Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   Server::Configuration::ProtocolOptionsFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
           name);
@@ -160,15 +160,15 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
     throw EnvoyException(fmt::format("filter {} does not support protocol options", name));
   }
 
-  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validation_visitor,
-                                                *proto_config);
+  Envoy::Config::Utility::translateOpaqueConfig(
+      typed_config, config, factory_context.messageValidationVisitor(), *proto_config);
 
-  return factory->createProtocolOptionsConfig(*proto_config, validation_visitor);
+  return factory->createProtocolOptionsConfig(*proto_config, factory_context);
 }
 
-std::map<std::string, ProtocolOptionsConfigConstSharedPtr>
-parseExtensionProtocolOptions(const envoy::config::cluster::v3::Cluster& config,
-                              ProtobufMessage::ValidationVisitor& validation_visitor) {
+std::map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtocolOptions(
+    const envoy::config::cluster::v3::Cluster& config,
+    Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   if (!config.typed_extension_protocol_options().empty() &&
       !config.hidden_envoy_deprecated_extension_protocol_options().empty()) {
     throw EnvoyException("Only one of typed_extension_protocol_options or "
@@ -184,7 +184,7 @@ parseExtensionProtocolOptions(const envoy::config::cluster::v3::Cluster& config,
     auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
     auto object = createProtocolOptionsConfig(
-        name, it.second, ProtobufWkt::Struct::default_instance(), validation_visitor);
+        name, it.second, ProtobufWkt::Struct::default_instance(), factory_context);
     if (object != nullptr) {
       options[name] = std::move(object);
     }
@@ -197,7 +197,7 @@ parseExtensionProtocolOptions(const envoy::config::cluster::v3::Cluster& config,
     auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
     auto object = createProtocolOptionsConfig(name, ProtobufWkt::Any::default_instance(), it.second,
-                                              validation_visitor);
+                                              factory_context);
     if (object != nullptr) {
       options[name] = std::move(object);
     }
@@ -233,8 +233,8 @@ bool updateHealthFlag(const Host& updated_host, Host& existing_host, Host::Healt
 // Converts a set of hosts into a HostVector, excluding certain hosts.
 // @param hosts hosts to convert
 // @param excluded_hosts hosts to exclude from the resulting vector.
-HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
-                       const std::unordered_set<HostSharedPtr>& excluded_hosts) {
+HostVector filterHosts(const absl::node_hash_set<HostSharedPtr>& hosts,
+                       const absl::node_hash_set<HostSharedPtr>& excluded_hosts) {
   HostVector net_hosts;
   net_hosts.reserve(hosts.size());
 
@@ -440,7 +440,7 @@ void HostSetImpl::rebuildLocalityScheduler(
   // scheduler.
   //
   // TODO(htuch): if the underlying locality index ->
-  // envoy::api::v2::core::Locality hasn't changed in hosts_/healthy_hosts_/degraded_hosts_, we
+  // envoy::config::core::v3::Locality hasn't changed in hosts_/healthy_hosts_/degraded_hosts_, we
   // could just update locality_weight_ without rebuilding. Similar to how host
   // level WRR works, we would age out the existing entries via picks and lazily
   // apply the new weights.
@@ -677,7 +677,6 @@ ClusterInfoImpl::ClusterInfoImpl(
     const envoy::config::cluster::v3::Cluster& config,
     const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
     TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope, bool added_via_api,
-    ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : runtime_(runtime), name_(config.name()), type_(config.type()),
       max_requests_per_connection_(
@@ -688,6 +687,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                                          Http::DEFAULT_MAX_HEADERS_COUNT))),
       connect_timeout_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, connect_timeout))),
+      prefetch_ratio_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.prefetch_policy(), prefetch_ratio, 1.0)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
@@ -700,7 +701,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       http2_options_(Http2::Utility::initializeAndValidateOptions(config.http2_protocol_options())),
       common_http_protocol_options_(config.common_http_protocol_options()),
-      extension_protocol_options_(parseExtensionProtocolOptions(config, validation_visitor)),
+      extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
       resource_managers_(config, runtime, name_, *stats_scope_),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       source_address_(getSourceAddress(config, bind_config)),
@@ -896,10 +897,9 @@ ClusterImplBase::ClusterImplBase(
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
       cluster.transport_socket_matches(), factory_context, socket_factory, *stats_scope);
-  info_ = std::make_unique<ClusterInfoImpl>(
-      cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_matcher),
-      std::move(stats_scope), added_via_api, factory_context.messageValidationVisitor(),
-      factory_context);
+  info_ = std::make_unique<ClusterInfoImpl>(cluster, factory_context.clusterManager().bindConfig(),
+                                            runtime, std::move(socket_matcher),
+                                            std::move(stats_scope), added_via_api, factory_context);
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);
@@ -1360,7 +1360,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // do the same thing.
 
   // Keep track of hosts we see in new_hosts that we are able to match up with an existing host.
-  std::unordered_set<std::string> existing_hosts_for_current_priority(
+  absl::node_hash_set<std::string> existing_hosts_for_current_priority(
       current_priority_hosts.size());
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {

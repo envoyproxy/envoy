@@ -70,7 +70,7 @@ private:
   Http::RequestHeaderMap& headers_;
   Tracing::Span& parent_span_;
   Verifier::Callbacks* callback_;
-  std::unordered_map<const Verifier*, CompletionState> completion_states_;
+  absl::node_hash_map<const Verifier*, CompletionState> completion_states_;
   std::vector<AuthenticatorPtr> auths_;
   ProtobufWkt::Struct payload_;
 };

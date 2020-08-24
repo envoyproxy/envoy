@@ -1,10 +1,11 @@
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/retry.h"
 
-#include "extensions/retry/host/previous_hosts/config.h"
-#include "extensions/retry/host/well_known_names.h"
+#include "common/network/address_impl.h"
 
-#include "test/mocks/upstream/mocks.h"
+#include "extensions/retry/host/previous_hosts/config.h"
+
+#include "test/mocks/upstream/host.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -19,7 +20,7 @@ namespace {
 
 TEST(PreviousHostsRetryPredicateConfigTest, PredicateTest) {
   auto factory = Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
-      RetryHostPredicateValues::get().PreviousHostsPredicate);
+      "envoy.retry_host_predicates.previous_hosts");
 
   ASSERT_NE(nullptr, factory);
 
@@ -50,7 +51,7 @@ TEST(PreviousHostsRetryPredicateConfigTest, PredicateTest) {
 
 TEST(PreviousHostsRetryPredicateConfigTest, EmptyConfig) {
   auto factory = Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
-      RetryHostPredicateValues::get().PreviousHostsPredicate);
+      "envoy.retry_host_predicates.previous_hosts");
 
   ASSERT_NE(nullptr, factory);
 

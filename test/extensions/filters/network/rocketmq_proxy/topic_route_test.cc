@@ -1,9 +1,8 @@
-#include <unordered_map>
-
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/network/rocketmq_proxy/topic_route.h"
 
+#include "absl/container/node_hash_map.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -26,7 +25,7 @@ TEST(TopicRouteTest, Serialization) {
 }
 
 TEST(BrokerDataTest, Serialization) {
-  std::unordered_map<int64_t, std::string> broker_addrs;
+  absl::node_hash_map<int64_t, std::string> broker_addrs;
   std::string dummy_address("127.0.0.1:10911");
   for (int64_t i = 0; i < 3; i++) {
     broker_addrs[i] = dummy_address;
@@ -56,7 +55,7 @@ TEST(TopicRouteDataTest, Serialization) {
   std::string dummy_address("127.0.0.1:10911");
 
   for (int i = 0; i < 16; i++) {
-    std::unordered_map<int64_t, std::string> broker_addrs;
+    absl::node_hash_map<int64_t, std::string> broker_addrs;
     for (int64_t i = 0; i < 3; i++) {
       broker_addrs[i] = dummy_address;
     }

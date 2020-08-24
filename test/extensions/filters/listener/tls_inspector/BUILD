@@ -1,8 +1,10 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_library",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -26,6 +28,25 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "tls_inspector_fuzz_test_proto",
+    srcs = ["tls_inspector_fuzz_test.proto"],
+    deps = [
+        "//test/extensions/filters/listener/common/fuzz:listener_filter_fuzzer_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "tls_inspector_fuzz_test",
+    srcs = ["tls_inspector_fuzz_test.cc"],
+    corpus = "tls_inspector_corpus",
+    deps = [
+        ":tls_inspector_fuzz_test_proto_cc_proto",
+        "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
+        "//test/extensions/filters/listener/common/fuzz:listener_filter_fuzzer_lib",
     ],
 )
 

@@ -2,9 +2,8 @@
 #include "envoy/upstream/retry.h"
 
 #include "extensions/retry/host/omit_canary_hosts/config.h"
-#include "extensions/retry/host/well_known_names.h"
 
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/host.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -19,7 +18,7 @@ namespace {
 
 TEST(OmitCanaryHostsRetryPredicateTest, PredicateTest) {
   auto factory = Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
-      RetryHostPredicateValues::get().OmitCanaryHostsPredicate);
+      "envoy.retry_host_predicates.omit_canary_hosts");
 
   ASSERT_NE(nullptr, factory);
 
@@ -39,7 +38,7 @@ TEST(OmitCanaryHostsRetryPredicateTest, PredicateTest) {
 
 TEST(OmitCanaryHostsRetryPredicateTest, EmptyConfig) {
   auto factory = Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
-      RetryHostPredicateValues::get().OmitCanaryHostsPredicate);
+      "envoy.retry_host_predicates.omit_canary_hosts");
 
   ASSERT_NE(nullptr, factory);
 

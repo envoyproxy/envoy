@@ -6,6 +6,7 @@
 
 #include "envoy/formatter/substitution_formatter.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -22,7 +23,7 @@ public:
 
   /**
    * @return bool indicating whether the formatted header should be appended to the existing
-   *              headers
+   *              headers or replace any existing values for the header
    */
   virtual bool append() const PURE;
 };
@@ -45,7 +46,7 @@ public:
 private:
   FieldExtractor field_extractor_;
   const bool append_;
-  std::unordered_map<std::string, std::vector<Envoy::Formatter::FormatterProviderPtr>>
+  absl::node_hash_map<std::string, std::vector<Envoy::Formatter::FormatterProviderPtr>>
       start_time_formatters_;
 };
 

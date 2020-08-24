@@ -617,8 +617,8 @@ void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string&
   (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
 }
 
-void ConfigHelper::setLegacyCodecs() {
-  addRuntimeOverride("envoy.reloadable_features.new_codec_behavior", "false");
+void ConfigHelper::setNewCodecs() {
+  addRuntimeOverride("envoy.reloadable_features.new_codec_behavior", "true");
 }
 
 void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
@@ -671,11 +671,16 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
         for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
           auto lb_endpoint = locality_lb->mutable_lb_endpoints(k);
           if (lb_endpoint->endpoint().address().has_socket_address()) {
-            RELEASE_ASSERT(ports.size() > port_idx, "");
-            lb_endpoint->mutable_endpoint()
-                ->mutable_address()
-                ->mutable_socket_address()
-                ->set_port_value(ports[port_idx++]);
+            if (lb_endpoint->endpoint().address().socket_address().port_value() == 0) {
+              RELEASE_ASSERT(ports.size() > port_idx, "");
+              lb_endpoint->mutable_endpoint()
+                  ->mutable_address()
+                  ->mutable_socket_address()
+                  ->set_port_value(ports[port_idx++]);
+            } else {
+              ENVOY_LOG_MISC(debug, "Not overriding preset port",
+                             lb_endpoint->endpoint().address().socket_address().port_value());
+            }
           }
         }
       }

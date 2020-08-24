@@ -12,6 +12,8 @@
 #include "common/http/header_utility.h"
 #include "common/router/config_impl.h"
 
+#include "extensions/filters/http/ratelimit/ratelimit_headers.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -125,6 +127,7 @@ void Filter::onDestroy() {
 }
 
 void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
+                      Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
                       Http::ResponseHeaderMapPtr&& response_headers_to_add,
                       Http::RequestHeaderMapPtr&& request_headers_to_add) {
   state_ = State::Complete;
@@ -159,6 +162,17 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     response_headers_to_add_->setReferenceEnvoyRateLimited(
         Http::Headers::get().EnvoyRateLimitedValues.True);
     break;
+  }
+
+  if (config_->enableXRateLimitHeaders()) {
+    Http::ResponseHeaderMapPtr rate_limit_headers =
+        XRateLimitHeaderUtils::create(std::move(descriptor_statuses));
+    if (response_headers_to_add_ == nullptr) {
+      response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
+    }
+    Http::HeaderUtility::addHeaders(*response_headers_to_add_, *rate_limit_headers);
+  } else {
+    descriptor_statuses = nullptr;
   }
 
   if (status == Filters::Common::RateLimit::LimitStatus::OverLimit &&

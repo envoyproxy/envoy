@@ -589,7 +589,7 @@ class RstFormatVisitor(visitor.Visitor):
     with open(r.Rlocation('envoy/docs/protodoc_manifest.yaml'), 'r') as f:
       # Load as YAML, emit as JSON and then parse as proto to provide type
       # checking.
-      protodoc_manifest_untyped = yaml.load(f.read())
+      protodoc_manifest_untyped = yaml.safe_load(f.read())
       self.protodoc_manifest = manifest_pb2.Manifest()
       json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
 

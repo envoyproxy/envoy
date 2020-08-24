@@ -192,7 +192,7 @@ message Node {
   // for filtering :ref:`listeners <config_listeners>` to be returned. For example,
   // if there is a listener bound to port 80, the list can optionally contain the
   // SocketAddress `(0.0.0.0,80)`. The field is optional and just a hint.
-  repeated Address listening_addresses = 11;
+  repeated Address listening_addresses = 11 [deprecated = true];
 
   string hidden_envoy_deprecated_build_version = 5 [deprecated = true];
 }
@@ -291,7 +291,7 @@ message HeaderValueOption {
   HeaderValue header = 1 [(validate.rules).message = {required: true}];
 
   // Should the value be appended? If true (default), the value is appended to
-  // existing values.
+  // existing values. Otherwise it replaces any existing values.
   google.protobuf.BoolValue append = 2;
 }
 

@@ -520,6 +520,20 @@ TEST(HeaderMapImplTest, Remove) {
   EXPECT_EQ(0UL, headers.remove(Headers::get().ContentLength));
 }
 
+TEST(HeaderMapImplTest, RemoveHost) {
+  TestRequestHeaderMapImpl headers;
+  headers.setHost("foo");
+  EXPECT_EQ("foo", headers.get_("host"));
+  EXPECT_EQ("foo", headers.get_(":authority"));
+  // Make sure that when we remove by "host" without using the inline functions, the mapping to
+  // ":authority" still takes place.
+  // https://github.com/envoyproxy/envoy/pull/12160
+  EXPECT_EQ(1UL, headers.remove("host"));
+  EXPECT_EQ("", headers.get_("host"));
+  EXPECT_EQ("", headers.get_(":authority"));
+  EXPECT_EQ(nullptr, headers.Host());
+}
+
 TEST(HeaderMapImplTest, RemoveIf) {
   LowerCaseString key1 = LowerCaseString("X-postfix-foo");
   LowerCaseString key2 = LowerCaseString("X-postfix-");
@@ -991,14 +1005,14 @@ TEST(HeaderMapImplTest, TestAppendHeader) {
 TEST(TestHeaderMapImplDeathTest, TestHeaderLengthChecks) {
   HeaderString value;
   value.setCopy("some;");
-  EXPECT_DEATH_LOG_TO_STDERR(value.append(nullptr, std::numeric_limits<uint32_t>::max()),
-                             "Trying to allocate overly large headers.");
+  EXPECT_DEATH(value.append(nullptr, std::numeric_limits<uint32_t>::max()),
+               "Trying to allocate overly large headers.");
 
   std::string source("hello");
   HeaderString reference;
   reference.setReference(source);
-  EXPECT_DEATH_LOG_TO_STDERR(reference.append(nullptr, std::numeric_limits<uint32_t>::max()),
-                             "Trying to allocate overly large headers.");
+  EXPECT_DEATH(reference.append(nullptr, std::numeric_limits<uint32_t>::max()),
+               "Trying to allocate overly large headers.");
 }
 
 TEST(HeaderMapImplTest, PseudoHeaderOrder) {

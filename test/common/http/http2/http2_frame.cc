@@ -4,6 +4,8 @@
 
 #include "envoy/common/platform.h"
 
+#include "common/common/hex.h"
+
 namespace {
 
 // Make request stream ID in the network byte order
@@ -107,6 +109,14 @@ void Http2Frame::appendHeaderWithoutIndexing(StaticHeaderIndex index, absl::stri
   appendHpackInt(static_cast<uint8_t>(index), 0xf);
   appendHpackInt(value.size(), 0x7f);
   appendData(value);
+}
+
+void Http2Frame::appendHeaderWithoutIndexing(const Header& header) {
+  data_.push_back(0);
+  appendHpackInt(header.key_.size(), 0x7f);
+  appendData(header.key_);
+  appendHpackInt(header.value_.size(), 0x7f);
+  appendData(header.value_);
 }
 
 void Http2Frame::appendEmptyHeader() {
@@ -248,6 +258,17 @@ Http2Frame Http2Frame::makeRequest(uint32_t stream_index, absl::string_view host
   return frame;
 }
 
+Http2Frame Http2Frame::makeRequest(uint32_t stream_index, absl::string_view host,
+                                   absl::string_view path,
+                                   const std::vector<Header> extra_headers) {
+  auto frame = makeRequest(stream_index, host, path);
+  for (const auto& header : extra_headers) {
+    frame.appendHeaderWithoutIndexing(header);
+  }
+  frame.adjustPayloadSize();
+  return frame;
+}
+
 Http2Frame Http2Frame::makePostRequest(uint32_t stream_index, absl::string_view host,
                                        absl::string_view path) {
   Http2Frame frame;
@@ -264,6 +285,12 @@ Http2Frame Http2Frame::makePostRequest(uint32_t stream_index, absl::string_view 
 Http2Frame Http2Frame::makeGenericFrame(absl::string_view contents) {
   Http2Frame frame;
   frame.appendData(contents);
+  return frame;
+}
+
+Http2Frame Http2Frame::makeGenericFrameFromHexDump(absl::string_view contents) {
+  Http2Frame frame;
+  frame.appendData(Hex::decode(std::string(contents)));
   return frame;
 }
 

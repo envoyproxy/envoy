@@ -23,6 +23,7 @@
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_features.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
@@ -61,7 +62,7 @@ namespace {
 void validateCustomSettingsParameters(
     const envoy::config::core::v3::Http2ProtocolOptions& options) {
   std::vector<std::string> parameter_collisions, custom_parameter_collisions;
-  std::unordered_set<nghttp2_settings_entry, SettingsEntryHash, SettingsEntryEquals>
+  absl::node_hash_set<nghttp2_settings_entry, SettingsEntryHash, SettingsEntryEquals>
       custom_parameters;
   // User defined and named parameters with the same SETTINGS identifier can not both be set.
   for (const auto& it : options.custom_settings_parameters()) {

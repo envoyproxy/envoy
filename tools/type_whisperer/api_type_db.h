@@ -1,8 +1,8 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
@@ -25,7 +25,7 @@ struct TypeInformation {
   const bool enum_type_;
 
   // Field or enum value renames.
-  std::unordered_map<std::string, std::string> renames_;
+  absl::node_hash_map<std::string, std::string> renames_;
 };
 
 // We don't expose the raw API type database to consumers, as this requires RTTI

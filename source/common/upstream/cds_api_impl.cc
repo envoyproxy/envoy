@@ -14,6 +14,7 @@
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
@@ -43,8 +44,8 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& r
     clusters_to_remove.erase(resource.get().name());
   }
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
-  for (const auto& cluster : clusters_to_remove) {
-    *to_remove_repeated.Add() = cluster.first;
+  for (const auto& [cluster_name, _] : clusters_to_remove) {
+    *to_remove_repeated.Add() = cluster_name;
   }
   onConfigUpdate(resources, to_remove_repeated, version_info);
 }
@@ -63,7 +64,7 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
             removed_resources.size());
 
   std::vector<std::string> exception_msgs;
-  std::unordered_set<std::string> cluster_names;
+  absl::node_hash_set<std::string> cluster_names;
   bool any_applied = false;
   for (const auto& resource : added_resources) {
     envoy::config::cluster::v3::Cluster cluster;

@@ -38,7 +38,7 @@ public:
       : RedisCommandSplitterImplTest(latency_in_macro, nullptr) {}
   RedisCommandSplitterImplTest(bool latency_in_macro, Common::Redis::FaultSharedPtr fault_ptr)
       : latency_in_micros_(latency_in_macro) {
-    ON_CALL(fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault_ptr.get()));
+    ON_CALL(*getFaultManager(), getFaultForCommand(_)).WillByDefault(Return(fault_ptr.get()));
   }
   void makeBulkStringArray(Common::Redis::RespValue& value,
                            const std::vector<std::string>& strings) {
@@ -57,20 +57,28 @@ public:
     route_->policies_.push_back(mirror_policy);
   }
 
+  MockFaultManager* getFaultManager() {
+    auto fault_manager_ptr = splitter_.fault_manager_.get();
+    return static_cast<MockFaultManager*>(fault_manager_ptr);
+  }
+
   const bool latency_in_micros_;
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
-  ConnPool::InstanceSharedPtr conn_pool_shared_ptr_{conn_pool_};
   ConnPool::MockInstance* mirror_conn_pool_{new ConnPool::MockInstance()};
   ConnPool::InstanceSharedPtr mirror_conn_pool_shared_ptr_{mirror_conn_pool_};
-  std::shared_ptr<NiceMock<MockRoute>> route_{new NiceMock<MockRoute>(conn_pool_shared_ptr_)};
-  std::shared_ptr<NiceMock<MockRouter>> router_{new NiceMock<MockRouter>(route_)};
+  std::shared_ptr<NiceMock<MockRoute>> route_{
+      new NiceMock<MockRoute>(ConnPool::InstanceSharedPtr{conn_pool_})};
   NiceMock<Stats::MockIsolatedStatsStore> store_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<MockFaultManager> fault_manager_;
 
   Event::SimulatedTimeSystem time_system_;
-  InstanceImpl splitter_{*router_,           store_,         "redis.foo.", time_system_,
-                         latency_in_micros_, fault_manager_, dispatcher_};
+  InstanceImpl splitter_{std::make_unique<NiceMock<MockRouter>>(route_),
+                         store_,
+                         "redis.foo.",
+                         time_system_,
+                         latency_in_micros_,
+                         std::make_unique<NiceMock<MockFaultManager>>(fault_manager_)};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
 };
@@ -82,7 +90,7 @@ TEST_F(RedisCommandSplitterImplTest, AuthWithNoPassword) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"auth"});
-  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_, dispatcher_));
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.invalid_request").value());
 }
@@ -95,7 +103,7 @@ TEST_F(RedisCommandSplitterImplTest, CommandWhenAuthStillNeeded) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"get", "foo"});
-  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_, dispatcher_));
 }
 
 TEST_F(RedisCommandSplitterImplTest, InvalidRequestNotArray) {
@@ -104,7 +112,7 @@ TEST_F(RedisCommandSplitterImplTest, InvalidRequestNotArray) {
   response.asString() = Response::get().InvalidRequest;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
-  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_, dispatcher_));
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.invalid_request").value());
 }
@@ -116,7 +124,7 @@ TEST_F(RedisCommandSplitterImplTest, InvalidRequestEmptyArray) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   request->type(Common::Redis::RespType::Array);
-  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_, dispatcher_));
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.invalid_request").value());
 }
@@ -129,7 +137,7 @@ TEST_F(RedisCommandSplitterImplTest, InvalidRequestArrayTooSmall) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"incr"});
-  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_, dispatcher_));
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.invalid_request").value());
 }
@@ -142,7 +150,7 @@ TEST_F(RedisCommandSplitterImplTest, InvalidRequestArrayNotStrings) {
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"incr", ""});
   request->asArray()[1].type(Common::Redis::RespType::Null);
-  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_, dispatcher_));
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.invalid_request").value());
 }
@@ -155,7 +163,7 @@ TEST_F(RedisCommandSplitterImplTest, UnsupportedCommand) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"newcommand", "hello"});
-  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_, dispatcher_));
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.unsupported_command").value());
 }
@@ -183,7 +191,7 @@ public:
           .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&mirror_pool_callbacks_)),
                           Return(&mirror_pool_request_)));
     }
-    handle_ = splitter_.makeRequest(std::move(request), callbacks_);
+    handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_);
   }
 
   void fail() {
@@ -354,7 +362,7 @@ TEST_P(RedisSingleServerRequestTest, NoUpstream) {
   response.type(Common::Redis::RespType::Error);
   response.asString() = Response::get().NoUpstreamHost;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
-  handle_ = splitter_.makeRequest(std::move(request), callbacks_);
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_);
   EXPECT_EQ(nullptr, handle_);
 };
 
@@ -376,7 +384,7 @@ TEST_F(RedisSingleServerRequestTest, PingSuccess) {
 
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
-  handle_ = splitter_.makeRequest(std::move(request), callbacks_);
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_);
   EXPECT_EQ(nullptr, handle_);
 };
 
@@ -436,13 +444,13 @@ TEST_F(RedisSingleServerRequestTest, EvalWrongNumberOfArgs) {
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   makeBulkStringArray(*request1, {"eval", "return {ARGV[1]}"});
-  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request1), callbacks_));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request1), callbacks_, dispatcher_));
 
   response.asString() = "wrong number of arguments for 'evalsha' command";
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   makeBulkStringArray(*request2, {"evalsha", "return {ARGV[1]}", "1"});
-  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request2), callbacks_));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request2), callbacks_, dispatcher_));
 };
 
 TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
@@ -458,7 +466,7 @@ TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
   response.type(Common::Redis::RespType::Error);
   response.asString() = Response::get().NoUpstreamHost;
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
-  handle_ = splitter_.makeRequest(std::move(request), callbacks_);
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_);
   EXPECT_EQ(nullptr, handle_);
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.eval.total").value());
@@ -519,7 +527,7 @@ public:
       }
     }
 
-    handle_ = splitter_.makeRequest(std::move(request), callbacks_);
+    handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_);
   }
 
   std::vector<std::vector<std::string>> expected_requests_;
@@ -857,7 +865,7 @@ TEST_F(RedisMSETCommandHandlerTest, WrongNumberOfArgs) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"mset", "foo", "bar", "fizz"});
-  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(request), callbacks_, dispatcher_));
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.total").value());
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.error").value());
 };
@@ -1021,7 +1029,7 @@ public:
     delay_ms_ = 0;
     fault_ptr_ = Common::Redis::FaultManagerImpl::makeFaultForTest(
         Common::Redis::FaultType::Error, std::chrono::milliseconds(delay_ms_));
-    ON_CALL(fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault_ptr_.get()));
+    ON_CALL(*getFaultManager(), getFaultForCommand(_)).WillByDefault(Return(fault_ptr_.get()));
   }
 };
 
@@ -1034,7 +1042,7 @@ TEST_P(RedisSingleServerRequestWithErrorFaultTest, Fault) {
 
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(_));
-  handle_ = splitter_.makeRequest(std::move(request), callbacks_);
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_);
   EXPECT_EQ(nullptr, handle_);
 
   EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
@@ -1050,7 +1058,7 @@ public:
     delay_ms_ = 5;
     fault_ptr_ = Common::Redis::FaultManagerImpl::makeFaultForTest(
         Common::Redis::FaultType::Error, std::chrono::milliseconds(delay_ms_));
-    ON_CALL(fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault_ptr_.get()));
+    ON_CALL(*getFaultManager(), getFaultForCommand(_)).WillByDefault(Return(fault_ptr_.get()));
     timer_ = new NiceMock<Event::MockTimer>();
   }
 };
@@ -1073,7 +1081,7 @@ TEST_P(RedisSingleServerRequestWithErrorWithDelayFaultTest, Fault) {
     return timer_;
   }));
 
-  handle_ = splitter_.makeRequest(std::move(request), callbacks_);
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_);
   EXPECT_NE(nullptr, handle_);
   time_system_.setMonotonicTime(std::chrono::milliseconds(delay_ms_));
   EXPECT_CALL(store_, deliverHistogramToSinks(
@@ -1099,7 +1107,7 @@ public:
     delay_ms_ = 15;
     fault_ptr_ = Common::Redis::FaultManagerImpl::makeFaultForTest(
         Common::Redis::FaultType::Delay, std::chrono::milliseconds(delay_ms_));
-    ON_CALL(fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault_ptr_.get()));
+    ON_CALL(*getFaultManager(), getFaultForCommand(_)).WillByDefault(Return(fault_ptr_.get()));
     timer_ = new NiceMock<Event::MockTimer>();
   }
 };
@@ -1121,7 +1129,7 @@ TEST_P(RedisSingleServerRequestWithDelayFaultTest, Fault) {
   EXPECT_CALL(*conn_pool_, makeRequest_(hash_key, RespVariantEq(*request), _))
       .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
 
-  handle_ = splitter_.makeRequest(std::move(request), callbacks_);
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_);
 
   EXPECT_NE(nullptr, handle_);
 

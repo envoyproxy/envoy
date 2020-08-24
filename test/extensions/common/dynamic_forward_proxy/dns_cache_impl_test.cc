@@ -671,6 +671,34 @@ TEST_F(DnsCacheImplTest, ClustersCircuitBreakersOverflow) {
   EXPECT_EQ(0, TestUtility::findCounter(store_, "dns_cache.foo.dns_rq_pending_overflow")->value());
 }
 
+TEST(DnsCacheImplOptionsTest, UseTcpForDnsLookupsOptionSet) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Runtime::MockLoader> loader;
+  Stats::IsolatedStoreImpl store;
+
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+  config.set_use_tcp_for_dns_lookups(true);
+  EXPECT_CALL(dispatcher, createDnsResolver(_, true)).WillOnce(Return(resolver));
+  DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
+}
+
+TEST(DnsCacheImplOptionsTest, UseTcpForDnsLookupsOptionUnSet) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Runtime::MockLoader> loader;
+  Stats::IsolatedStoreImpl store;
+
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+  config.set_use_tcp_for_dns_lookups(false);
+  EXPECT_CALL(dispatcher, createDnsResolver(_, false)).WillOnce(Return(resolver));
+  DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
+}
+
 // DNS cache manager config tests.
 TEST(DnsCacheManagerImplTest, LoadViaConfig) {
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -729,7 +757,7 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
     BackOffStrategyPtr strategy = Config::Utility::prepareDnsRefreshStrategy<
         envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig>(dns_cache_config,
                                                                               5000, random);
-    EXPECT_NE(nullptr, dynamic_cast<JitteredBackOffStrategy*>(strategy.get()));
+    EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
   }
 
   {

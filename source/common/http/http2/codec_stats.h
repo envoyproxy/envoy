@@ -24,7 +24,6 @@ namespace Http2 {
   COUNTER(requests_rejected_with_underscores_in_headers)                                           \
   COUNTER(rx_messaging_error)                                                                      \
   COUNTER(rx_reset)                                                                                \
-  COUNTER(too_many_header_frames)                                                                  \
   COUNTER(trailers)                                                                                \
   COUNTER(tx_flush_timeout)                                                                        \
   COUNTER(tx_reset)                                                                                \

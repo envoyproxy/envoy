@@ -28,19 +28,13 @@ EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address
   }
   auto& cert_config = cert_config_ref.value().get();
   const std::string& chain_str = cert_config.certificateChain();
-  std::string pem_str = std::string(const_cast<char*>(chain_str.data()), chain_str.size());
   std::stringstream pem_stream(chain_str);
   std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
-  if (chain.empty()) {
-    ENVOY_LOG(warn, "Failed to load certificate chain from %s", cert_config.certificateChainPath());
-    return quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>(
-        new quic::ProofSource::Chain({}));
-  }
   return quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>(
       new quic::ProofSource::Chain(chain));
 }
 
-void EnvoyQuicProofSource::ComputeTlsSignature(
+void EnvoyQuicProofSource::signPayload(
     const quic::QuicSocketAddress& server_address, const quic::QuicSocketAddress& client_address,
     const std::string& hostname, uint16_t signature_algorithm, quiche::QuicheStringPiece in,
     std::unique_ptr<quic::ProofSource::SignatureCallback> callback) {
@@ -59,10 +53,24 @@ void EnvoyQuicProofSource::ComputeTlsSignature(
   std::stringstream pem_str(pkey);
   std::unique_ptr<quic::CertificatePrivateKey> pem_key =
       quic::CertificatePrivateKey::LoadPemFromStream(&pem_str);
+  if (pem_key == nullptr) {
+    ENVOY_LOG(warn, "Failed to load private key.");
+    callback->Run(false, "", nullptr);
+    return;
+  }
+  // Verify the signature algorithm is as expected.
+  std::string error_details;
+  int sign_alg = deduceSignatureAlgorithmFromPublicKey(pem_key->private_key(), &error_details);
+  if (sign_alg != signature_algorithm) {
+    ENVOY_LOG(warn,
+              fmt::format("The signature algorithm {} from the private key is not expected: {}",
+                          sign_alg, error_details));
+    callback->Run(false, "", nullptr);
+    return;
+  }
 
   // Sign.
   std::string sig = pem_key->Sign(in, signature_algorithm);
-
   bool success = !sig.empty();
   ASSERT(res.filter_chain_.has_value());
   callback->Run(success, sig,
@@ -85,7 +93,6 @@ EnvoyQuicProofSource::getTlsCertConfigAndFilterChain(const quic::QuicSocketAddre
   const Network::FilterChain* filter_chain =
       filter_chain_manager_.findFilterChain(connection_socket);
   if (filter_chain == nullptr) {
-    ENVOY_LOG(warn, "No matching filter chain found for handshake.");
     listener_stats_.no_filter_chain_match_.inc();
     return {absl::nullopt, absl::nullopt};
   }

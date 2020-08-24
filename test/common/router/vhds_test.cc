@@ -17,7 +17,6 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -86,7 +85,7 @@ vhds:
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
   const std::string context_ = "vhds_test";
-  std::unordered_set<Envoy::Router::RouteConfigProvider*> providers_;
+  absl::node_hash_set<Envoy::Router::RouteConfigProvider*> providers_;
   Protobuf::util::MessageDifferencer messageDifferencer_;
   std::string default_vhds_config_;
   NiceMock<Envoy::Config::MockSubscriptionFactory> subscription_factory_;
