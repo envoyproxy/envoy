@@ -81,7 +81,7 @@ public:
   virtual HandshakerFactoryCb createHandshaker() const PURE;
 
   /**
-   * @return the set of requirements for handshakers created by this context.
+   * @return the set of requirements for handshaker instances created by this context.
    */
   virtual HandshakerRequirements requirements() const PURE;
 };
