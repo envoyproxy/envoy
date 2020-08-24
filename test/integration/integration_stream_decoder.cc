@@ -1,17 +1,19 @@
 #include "test/integration/integration_stream_decoder.h"
 
-#include <algorithm>                    
-#include <cstdint>                      
-#include <memory>                       
-#include <string>                       
-#include <utility>                      
-#include "common/common/assert.h"       
-#include "envoy/buffer/buffer.h"        
-#include "envoy/event/dispatcher.h"     
-#include "envoy/http/header_map.h"      
+#include <algorithm>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
 
-#include "gtest/gtest.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/http/header_map.h"
+
+#include "common/common/assert.h"
+
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 

@@ -32,7 +32,6 @@
 #include "absl/strings/str_join.h"
 #include "gtest/gtest.h"
 
-
 namespace Envoy {
 using ::testing::_;
 using ::testing::AnyNumber;

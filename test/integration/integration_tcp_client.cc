@@ -1,27 +1,28 @@
 #include "test/integration/integration_tcp_client.h"
 
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+#include <type_traits>
+
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/time.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/event/timer.h"
+
+#include "common/buffer/buffer_impl.h"
 #include "common/common/fmt.h"
+#include "common/network/utility.h"
 
-#include <chrono>                               
-#include <cstdint>                              
-#include <functional>                           
-#include <memory>                               
-#include <string>                               
-#include <type_traits>                          
-#include "common/buffer/buffer_impl.h"          
-#include "common/network/utility.h"             
-#include "envoy/buffer/buffer.h"          
-#include "envoy/common/time.h"                  
-#include "envoy/event/dispatcher.h"             
-#include "envoy/event/timer.h"                  
-#include "test/integration/utility.h"           
-#include "test/mocks/buffer/mocks.h"            
-#include "test/test_common/network_utility.h"   
-#include "test/test_common/test_time_system.h"  
+#include "test/integration/utility.h"
+#include "test/mocks/buffer/mocks.h"
+#include "test/test_common/network_utility.h"
+#include "test/test_common/test_time_system.h"
 
-
-#include "gtest/gtest.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 using ::testing::_;

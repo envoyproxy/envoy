@@ -1,14 +1,16 @@
 #pragma once
 
-#include <cstdint>                          
-#include <memory>                           
-#include <string>                           
-#include "absl/container/node_hash_map.h"   
-#include "absl/strings/string_view.h"       
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "envoy/event/dispatcher.h"
-#include "envoy/http/codec.h"               
-#include "envoy/http/header_map.h"          
-#include "envoy/http/metadata_interface.h"  
+#include "envoy/http/codec.h"
+#include "envoy/http/header_map.h"
+#include "envoy/http/metadata_interface.h"
+
+#include "absl/container/node_hash_map.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 /**

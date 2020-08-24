@@ -1,22 +1,25 @@
 #pragma once
 
-#include <stddef.h>                       
-#include <stdint.h>                       
-#include <chrono>                         
-#include <memory>                         
-#include <string>                         
-#include "envoy/event/dispatcher.h"
-#include "envoy/network/address.h"        
-#include "envoy/network/connection.h"     
-#include "envoy/network/listen_socket.h"  
-#include "envoy/network/socket.h"         
-#include "gtest/gtest_pred_impl.h"        
-#include "test/mocks/buffer/mocks.h"
-#include "test/integration/utility.h"     
-#include "test/test_common/utility.h"     
+#include <stddef.h>
+#include <stdint.h>
 
-#include "gtest/gtest.h"
+#include <chrono>
+#include <memory>
+#include <string>
+
+#include "envoy/event/dispatcher.h"
+#include "envoy/network/address.h"
+#include "envoy/network/connection.h"
+#include "envoy/network/listen_socket.h"
+#include "envoy/network/socket.h"
+
+#include "test/integration/utility.h"
+#include "test/mocks/buffer/mocks.h"
+#include "test/test_common/utility.h"
+
 #include "absl/types/optional.h"
+#include "gtest/gtest.h"
+#include "gtest/gtest_pred_impl.h"
 
 namespace Envoy {
 /**
