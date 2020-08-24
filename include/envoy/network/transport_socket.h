@@ -280,6 +280,10 @@ public:
    * @return false more data is acceptable.
    */
   virtual bool isOverHighWatermark() const PURE;
+
+  virtual bool triggeredHighToLowWatermark() const PURE;
+  virtual void clearTriggeredHighToLowWatermark() PURE;
+  virtual void setTriggeredHighToLowWatermark() PURE;
 };
 
 class ReadableSource {
@@ -291,6 +295,7 @@ public:
    */
   virtual bool isPeerShutDownWrite() const PURE;
 
+  virtual bool isOverHighWatermark() const PURE;
   virtual bool isReadable() const PURE;
 };
 

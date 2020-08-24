@@ -43,7 +43,10 @@ public:
   virtual ~PeeringPipe() = default;
   void setPeer(PeeringPipe* peer) { peer_ = peer; }
   virtual void mayScheduleReadReady() PURE;
+  virtual WritablePeer& getWritablePeer() PURE;
+
   virtual void closeSocket(ConnectionEvent close_type) PURE;
+  virtual bool isWritable() PURE;
 
 protected:
   PeeringPipe* peer_;
@@ -60,7 +63,7 @@ public:
   ClientPipeImpl(Event::Dispatcher& dispatcher,
                  const Address::InstanceConstSharedPtr& remote_address,
                  const Address::InstanceConstSharedPtr& source_address,
-                 Network::TransportSocketPtr transport_socket,
+                 Network::TransportSocketPtr transport_socket, Network::WritablePeer& writable_peer,
                  Network::ReadableSource& readable_source,
                  const Network::ConnectionSocket::OptionsSharedPtr& options);
 
@@ -213,6 +216,8 @@ protected:
   // PeeringPipe
   void closeSocket(ConnectionEvent close_type) override;
   void mayScheduleReadReady() override;
+  bool isWritable() override;
+  WritablePeer& getWritablePeer() override { return writable_peer_; }
 
   void onReadBufferLowWatermark();
   void onReadBufferHighWatermark();
@@ -281,6 +286,7 @@ private:
   const Address::InstanceConstSharedPtr source_address_;
   const Network::ConnectionSocket::OptionsSharedPtr options_;
 
+  Network::WritablePeer& writable_peer_;
   Network::ReadableSource& readable_source_;
   // Trigger of the io event.
   Event::SchedulableCallbackPtr io_callback_;
@@ -300,13 +306,13 @@ public:
   ServerPipeImpl(Event::Dispatcher& dispatcher,
                  const Address::InstanceConstSharedPtr& remote_address,
                  const Address::InstanceConstSharedPtr& source_address,
-                 Network::TransportSocketPtr transport_socket,
+                 Network::TransportSocketPtr transport_socket, Network::WritablePeer& writable_peer,
                  Network::ReadableSource& readable_source,
                  const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   ~ServerPipeImpl() override;
 
-  void setConnected() { onWriteReady(); }
+  void setConnected() { onWriteReady(); ASSERT(peer_); peer_->getWritablePeer().clearTriggeredHighToLowWatermark();}
 
   void resetSourceReadableFlag() { was_source_readable_ = readable_source_.isReadable(); }
   void resetPeerWritableFlag() { was_peer_writable_ = isPeerWritable(); }
@@ -458,6 +464,8 @@ protected:
   // PeeringPipe
   void closeSocket(ConnectionEvent close_type) override;
   void mayScheduleReadReady() override;
+  bool isWritable() override;
+  WritablePeer& getWritablePeer() override { return writable_peer_; }
 
   void onReadBufferLowWatermark();
   void onReadBufferHighWatermark();
@@ -520,7 +528,7 @@ private:
   const Address::InstanceConstSharedPtr remote_address_;
   const Address::InstanceConstSharedPtr source_address_;
   const Network::ConnectionSocket::OptionsSharedPtr options_;
-
+  Network::WritablePeer& writable_peer_;
   Network::ReadableSource& readable_source_;
   // Trigger of the io event.
   Event::SchedulableCallbackPtr io_callback_;

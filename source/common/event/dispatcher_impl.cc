@@ -149,12 +149,14 @@ DispatcherImpl::createUserspacePipe(Network::Address::InstanceConstSharedPtr pee
   auto client_socket_raw = client_socket.get();
   auto server_socket_raw = server_socket.get();
   auto client_conn = std::make_unique<Network::ClientPipeImpl>(
-      *this, peer_address, local_address, std::move(client_socket), *client_socket_raw, nullptr);
+      *this, peer_address, local_address, std::move(client_socket), *client_socket_raw,
+      *client_socket_raw, nullptr);
   ENVOY_LOG_MISC(debug, "lambdai: client pipe C{} owns TS{} and B{}", client_conn->id(),
                  client_socket_raw->bsid(), client_socket_raw->read_buffer_.bid());
 
   auto server_conn = std::make_unique<Network::ServerPipeImpl>(
-      *this, local_address, peer_address, std::move(server_socket), *server_socket_raw, nullptr);
+      *this, local_address, peer_address, std::move(server_socket), *server_socket_raw,
+      *server_socket_raw, nullptr);
   ENVOY_LOG_MISC(debug, "lambdai: server pipe C{} owns TS{} and B{}", server_conn->id(),
                  server_socket_raw->bsid(), server_socket_raw->read_buffer_.bid());
 

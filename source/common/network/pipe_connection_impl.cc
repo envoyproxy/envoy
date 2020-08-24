@@ -41,6 +41,7 @@ ClientPipeImpl::ClientPipeImpl(Event::Dispatcher& dispatcher,
                                const Address::InstanceConstSharedPtr& remote_address,
                                const Address::InstanceConstSharedPtr& source_address,
                                TransportSocketPtr transport_socket,
+                               Network::WritablePeer& writable_peer,
                                Network::ReadableSource& readable_source,
                                const Network::ConnectionSocket::OptionsSharedPtr&)
     : ConnectionImplBase(dispatcher, next_global_id_++),
@@ -57,7 +58,7 @@ ClientPipeImpl::ClientPipeImpl(Event::Dispatcher& dispatcher,
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
       remote_address_(remote_address), source_address_(source_address),
-      readable_source_(readable_source),
+      writable_peer_(writable_peer), readable_source_(readable_source),
       io_callback_(dispatcher.createSchedulableCallback([this]() { onFileEvent(); })) {
   ENVOY_LOG_MISC(debug, "lambdai: client pipe C{} owns rb B{} and wb B{}", id(), read_buffer_.bid(),
                  write_buffer_->bid());
@@ -240,6 +241,7 @@ void ClientPipeImpl::closeSocket(ConnectionEvent close_type) {
 }
 
 void ClientPipeImpl::mayScheduleReadReady() { scheduleNextEvent(); }
+bool ClientPipeImpl::isWritable() { return readable_source_.isOverHighWatermark(); }
 
 void ClientPipeImpl::noDelay(bool enable) {
   // Enable is noop while disable doesn't make sense in pipe.
@@ -491,7 +493,8 @@ uint32_t ClientPipeImpl::checkTriggeredEvents() {
     }
   }
   if (events_ & Event::FileReadyType::Write) {
-    if (was_peer_writable_ && isPeerWritable()) {
+    //    if (was_peer_writable_ && isPeerWritable()) {
+    if (peer_ && peer_->getWritablePeer().triggeredHighToLowWatermark()) {
       events |= Event::FileReadyType::Write;
     }
   }
@@ -531,6 +534,7 @@ void ClientPipeImpl::onFileEvent(uint32_t events) {
 
   if (events & Event::FileReadyType::Write) {
     onWriteReady();
+    // peer_->getWritablePeer().clearTriggeredHighToLowWatermark();
   }
 
   // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).
@@ -539,7 +543,9 @@ void ClientPipeImpl::onFileEvent(uint32_t events) {
     onReadReady();
   }
   resetSourceReadableFlag();
-  resetPeerWritableFlag();
+  if (peer_) {
+    peer_->getWritablePeer().clearTriggeredHighToLowWatermark();
+  }
 }
 
 void ClientPipeImpl::onReadReady() {
@@ -691,6 +697,7 @@ absl::string_view ClientPipeImpl::transportFailureReason() const {
 void ClientPipeImpl::flushWriteBuffer() {
   if (state() == State::Open && write_buffer_->length() > 0) {
     onWriteReady();
+    peer_->getWritablePeer().clearTriggeredHighToLowWatermark();
   }
 }
 
@@ -706,6 +713,7 @@ ServerPipeImpl::ServerPipeImpl(Event::Dispatcher& dispatcher,
                                const Address::InstanceConstSharedPtr& remote_address,
                                const Address::InstanceConstSharedPtr& source_address,
                                TransportSocketPtr transport_socket,
+                               Network::WritablePeer& writable_peer,
                                Network::ReadableSource& readable_source,
                                const Network::ConnectionSocket::OptionsSharedPtr&)
     : ConnectionImplBase(dispatcher, next_global_id_++),
@@ -721,7 +729,7 @@ ServerPipeImpl::ServerPipeImpl(Event::Dispatcher& dispatcher,
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
       remote_address_(remote_address), source_address_(source_address),
-      readable_source_(readable_source),
+      writable_peer_(writable_peer), readable_source_(readable_source),
       io_callback_(dispatcher.createSchedulableCallback([this]() { onFileEvent(); })) {
   ENVOY_LOG_MISC(debug, "lambdai: server pipe C{} owns rb B{} and wb B{}", id(), read_buffer_.bid(),
                  write_buffer_->bid());
@@ -834,6 +842,7 @@ void ServerPipeImpl::closeSocket(ConnectionEvent close_type) {
 }
 
 void ServerPipeImpl::mayScheduleReadReady() { scheduleNextEvent(); }
+bool ServerPipeImpl::isWritable() { return readable_source_.isOverHighWatermark(); }
 
 void ServerPipeImpl::noDelay(bool enable) {
   // Enable is noop while disable doesn't make sense in pipe.
@@ -1082,7 +1091,8 @@ uint32_t ServerPipeImpl::checkTriggeredEvents() {
     }
   }
   if (events_ & Event::FileReadyType::Write) {
-    if (was_peer_writable_ && isPeerWritable()) {
+    // if (was_peer_writable_ && isPeerWritable()) {
+    if (peer_ && peer_->getWritablePeer().triggeredHighToLowWatermark()) {
       events |= Event::FileReadyType::Write;
     }
   }
@@ -1121,6 +1131,7 @@ void ServerPipeImpl::onFileEvent(uint32_t events) {
 
   if (events & Event::FileReadyType::Write) {
     onWriteReady();
+    // peer_->getWritablePeer().clearTriggeredHighToLowWatermark();
   }
 
   // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).
@@ -1129,7 +1140,9 @@ void ServerPipeImpl::onFileEvent(uint32_t events) {
     onReadReady();
   }
   resetSourceReadableFlag();
-  resetPeerWritableFlag();
+  if (peer_) {
+    peer_->getWritablePeer().clearTriggeredHighToLowWatermark();
+  }
 }
 
 void ServerPipeImpl::onReadReady() {
@@ -1269,6 +1282,7 @@ absl::string_view ServerPipeImpl::transportFailureReason() const {
 void ServerPipeImpl::flushWriteBuffer() {
   if (state() == State::Open && write_buffer_->length() > 0) {
     onWriteReady();
+    peer_->getWritablePeer().clearTriggeredHighToLowWatermark();
   }
 }
 

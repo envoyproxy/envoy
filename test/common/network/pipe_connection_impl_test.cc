@@ -64,14 +64,14 @@ protected:
     auto server_socket_raw = server_socket.get();
     auto client_conn = std::make_unique<Network::ClientPipeImpl>(
         *dispatcher_, server_address_, client_address_, std::move(client_socket),
-        *client_socket_raw, nullptr);
+        *client_socket_raw,*client_socket_raw, nullptr);
     ENVOY_LOG_MISC(debug, "lambdai: client pipe C{} owns TS{} and B{}", client_conn->id(),
                    client_socket_raw->bsid(), client_socket_raw->read_buffer_.bid());
     client_conn->addConnectionCallbacks(client_callbacks_);
 
     auto server_conn = std::make_unique<Network::ServerPipeImpl>(
         *dispatcher_, client_address_, server_address_, std::move(server_socket),
-        *server_socket_raw, nullptr);
+        *server_socket_raw,*server_socket_raw, nullptr);
     ENVOY_LOG_MISC(debug, "lambdai: server pipe C{} owns TS{} and B{}", server_conn->id(),
                    server_socket_raw->bsid(), server_socket_raw->read_buffer_.bid());
 
@@ -253,13 +253,16 @@ TEST_P(PipeConnectionImplTest, DISABLED_ReadDisable) {
         // wraps the returned raw pointer below with a unique_ptr.
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
+  
+  auto mock_writable_peer = std::make_unique<MockWritablePeer>();
   auto mock_readable_source = std::make_unique<MockReadableSource>();
+
   auto transport_socket = std::make_unique<NiceMock<MockTransportSocket>>();
   EXPECT_CALL(*transport_socket, canFlushClose()).WillRepeatedly(Return(true));
   auto& transport_socket_ref = *transport_socket;
   auto connection = std::make_unique<Network::ServerPipeImpl>(
       *dispatcher, server_address_, client_address_, std::move(transport_socket),
-      *mock_readable_source, nullptr);
+      *mock_writable_peer, *mock_readable_source, nullptr);
   connection->setStreamInfo(&stream_info_);
   ON_CALL(transport_socket_ref, doRead(_))
       .WillByDefault(Return(Network::IoResult{Network::PostIoAction::KeepOpen, 0, false}));

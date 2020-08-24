@@ -25,5 +25,8 @@ MockTransportSocketFactory::~MockTransportSocketFactory() = default;
 MockReadableSource::MockReadableSource() = default;
 MockReadableSource::~MockReadableSource() = default;
 
+MockWritablePeer::MockWritablePeer() = default;
+MockWritablePeer::~MockWritablePeer() = default;
+
 } // namespace Network
 } // namespace Envoy

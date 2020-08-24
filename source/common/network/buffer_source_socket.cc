@@ -18,6 +18,7 @@ BufferSourceSocket::BufferSourceSocket()
           [this]() -> void {
             ENVOY_LOG_MISC(debug, "lambdai: BufferSourceTS {} is below high watermark", bsid());
             over_high_watermark_ = false;
+            triggered_high_to_low_watermark_ = true;
           },
           [this]() -> void {
             ENVOY_LOG_MISC(debug, "lambdai: BufferSourceTS {} is over high watermark", bsid());
