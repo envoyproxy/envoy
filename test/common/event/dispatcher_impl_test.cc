@@ -532,7 +532,7 @@ private:
     auto self = static_cast<TimerImplTest*>(arg);
     auto check_callbacks = self->check_callbacks_;
     self->check_callbacks_.clear();
-    for (auto cb : check_callbacks) {
+    for (const auto& cb : check_callbacks) {
       cb();
     }
     self->adjustCachedTime();
