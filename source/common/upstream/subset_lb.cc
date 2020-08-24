@@ -130,6 +130,8 @@ void SubsetLoadBalancer::rebuildSingle() {
           auto [iterator, did_insert] =
               single_host_per_subset_map_.try_emplace(fields_it->second, host);
           if (!did_insert) {
+            // Two hosts with the same metadata value were found. Ignore all but one of them, and
+            // set a metric for how many times this happened.
             collision_count++;
           }
         }
@@ -140,9 +142,9 @@ void SubsetLoadBalancer::rebuildSingle() {
   // This stat isn't added to `ClusterStats` because it wouldn't be used
   // for nearly all clusters, and is only set during configuration updates,
   // not in the data path, so performance of looking up the stat isn't critical.
-  Stats::Utility::gaugeFromElements(scope_,
-                                    {Stats::DynamicName("single_host_per_subset_duplicate")},
-                                    Stats::Gauge::ImportMode::Accumulate)
+  Stats::Utility::gaugeFromElements(
+      scope_, {Stats::DynamicName("lb_subsets_single_host_per_subset_duplicate")},
+      Stats::Gauge::ImportMode::Accumulate)
       .set(collision_count);
 }
 

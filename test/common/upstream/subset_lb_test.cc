@@ -2410,9 +2410,9 @@ TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, DuplicateMetadataStat) {
   for (auto& gauge : stats_store_.gauges()) {
     ENVOY_LOG_MISC(error, "name {} value {}", gauge->name(), gauge->value());
   }
-  EXPECT_EQ(
-      2,
-      TestUtility::findGauge(stats_store_, "testprefix.single_host_per_subset_duplicate")->value());
+  EXPECT_EQ(2, TestUtility::findGauge(stats_store_,
+                                      "testprefix.lb_subsets_single_host_per_subset_duplicate")
+                   ->value());
 }
 
 TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, Match) {

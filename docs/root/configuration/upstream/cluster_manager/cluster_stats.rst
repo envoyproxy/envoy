@@ -283,6 +283,7 @@ decisions. Stats are rooted at *cluster.<name>.* and contain the following stati
   lb_subsets_selected, Counter, Number of times any subset was selected for load balancing
   lb_subsets_fallback, Counter, Number of times the fallback policy was invoked
   lb_subsets_fallback_panic, Counter, Number of times the subset panic mode triggered
+  lb_subsets_single_host_per_subset_duplicate, Gauge, Number of duplicate (unused) hosts when using :ref:`single_host_per_subset <envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.single_host_per_subset>`
 
 .. _config_cluster_manager_cluster_stats_ring_hash_lb:
 
