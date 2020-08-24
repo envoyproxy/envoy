@@ -64,14 +64,14 @@ protected:
     auto server_socket_raw = server_socket.get();
     auto client_conn = std::make_unique<Network::ClientPipeImpl>(
         *dispatcher_, server_address_, client_address_, std::move(client_socket),
-        *client_socket_raw,*client_socket_raw, nullptr);
+        *client_socket_raw, *client_socket_raw, nullptr);
     ENVOY_LOG_MISC(debug, "lambdai: client pipe C{} owns TS{} and B{}", client_conn->id(),
                    client_socket_raw->bsid(), client_socket_raw->read_buffer_.bid());
     client_conn->addConnectionCallbacks(client_callbacks_);
 
     auto server_conn = std::make_unique<Network::ServerPipeImpl>(
         *dispatcher_, client_address_, server_address_, std::move(server_socket),
-        *server_socket_raw,*server_socket_raw, nullptr);
+        *server_socket_raw, *server_socket_raw, nullptr);
     ENVOY_LOG_MISC(debug, "lambdai: server pipe C{} owns TS{} and B{}", server_conn->id(),
                    server_socket_raw->bsid(), server_socket_raw->read_buffer_.bid());
 
@@ -110,9 +110,9 @@ protected:
 
     // TODO(lambdai): scheduleNextEvent() should automatically trigger Write at established.
     client_connection_->enableWriteRead();
-//    client_connection_->scheduleNextEvent();
+    //    client_connection_->scheduleNextEvent();
     server_connection_->enableWriteRead();
-//    server_connection_->scheduleNextEvent();
+    //    server_connection_->scheduleNextEvent();
   }
 
   void disconnect(bool wait_for_remote_close) {
@@ -253,7 +253,7 @@ TEST_P(PipeConnectionImplTest, DISABLED_ReadDisable) {
         // wraps the returned raw pointer below with a unique_ptr.
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
-  
+
   auto mock_writable_peer = std::make_unique<MockWritablePeer>();
   auto mock_readable_source = std::make_unique<MockReadableSource>();
 
@@ -829,7 +829,7 @@ TEST_P(PipeConnectionImplTest, WriteAllAndClearHighwatermark) {
   client_connection_->close(ConnectionCloseType::NoFlush);
 }
 
-TEST_P(PipeConnectionImplTest, DISABLED_WritePartialAndHighwatermarkRemains) {
+TEST_P(PipeConnectionImplTest, WritePartialAndHighwatermarkRemains) {
   useMockBuffer();
   setupPipe();
   doConnect();

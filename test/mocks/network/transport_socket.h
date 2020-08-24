@@ -57,7 +57,7 @@ public:
 
   MOCK_METHOD(void, setWriteEnd, ());
 
-  MOCK_METHOD(void,maybeSetNewData, ());
+  MOCK_METHOD(void, maybeSetNewData, ());
 
   MOCK_METHOD(Buffer::Instance*, getWriteBuffer, ());
 

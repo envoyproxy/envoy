@@ -159,8 +159,11 @@ void ClientPipeImpl::close(ConnectionCloseType type) {
       delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
     }
 
-    events_ |=
-        (Event::FileReadyType::Write | (enable_half_close_ ? 0 : Event::FileReadyType::Closed));
+    if (enable_half_close_) {
+      enableWriteClose();
+    } else {
+      enableWrite();
+    }
   }
 }
 
@@ -760,12 +763,81 @@ void ServerPipeImpl::addReadFilter(ReadFilterSharedPtr filter) {
 
 bool ServerPipeImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
-void ServerPipeImpl::close(ConnectionCloseType) {
+void ServerPipeImpl::close(ConnectionCloseType type) {
   if (!isOpen()) {
-    ENVOY_LOG_MISC(debug, "lambdai: attempt to close a closed server pipe CS{}", id());
     return;
   }
-  closeConnectionImmediately();
+
+  uint64_t data_to_write = write_buffer_->length();
+  ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
+  const bool delayed_close_timeout_set = delayed_close_timeout_.count() > 0;
+  if (data_to_write == 0 || type == ConnectionCloseType::NoFlush ||
+      !transport_socket_->canFlushClose()) {
+    if (data_to_write > 0) {
+      // We aren't going to wait to flush, but try to write as much as we can if there is pending
+      // data.
+      transport_socket_->doWrite(*write_buffer_, true);
+    }
+
+    if (type == ConnectionCloseType::FlushWriteAndDelay && delayed_close_timeout_set) {
+      // The socket is being closed and either there is no more data to write or the data can not be
+      // flushed (!transport_socket_->canFlushClose()). Since a delayed close has been requested,
+      // start the delayed close timer if it hasn't been done already by a previous close().
+      // NOTE: Even though the delayed_close_state_ is being set to CloseAfterFlushAndWait, since
+      // a write event is not being registered for the socket, this logic is simply setting the
+      // timer and waiting for it to trigger to close the socket.
+      if (!inDelayedClose()) {
+        initializeDelayedCloseTimer();
+        delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
+        // Monitor for the peer closing the connection.
+        events_ |= (enable_half_close_ ? 0 : Event::FileReadyType::Closed);
+      }
+    } else {
+      closeConnectionImmediately();
+    }
+  } else {
+    ASSERT(type == ConnectionCloseType::FlushWrite ||
+           type == ConnectionCloseType::FlushWriteAndDelay);
+
+    // If there is a pending delayed close, simply update the delayed close state.
+    //
+    // An example of this condition manifests when a downstream connection is closed early by Envoy,
+    // such as when a route can't be matched:
+    //   In ConnectionManagerImpl::onData()
+    //     1) Via codec_->dispatch(), a local reply with a 404 is sent to the client
+    //       a) ConnectionManagerImpl::doEndStream() issues the first connection close() via
+    //          ConnectionManagerImpl::checkForDeferredClose()
+    //     2) A second close is issued by a subsequent call to
+    //        ConnectionManagerImpl::checkForDeferredClose() prior to returning from onData()
+    if (inDelayedClose()) {
+      // Validate that a delayed close timer is already enabled unless it was disabled via
+      // configuration.
+      ASSERT(!delayed_close_timeout_set || delayed_close_timer_ != nullptr);
+      if (type == ConnectionCloseType::FlushWrite || !delayed_close_timeout_set) {
+        delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
+      } else {
+        delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
+      }
+      return;
+    }
+
+    // NOTE: At this point, it's already been validated that the connection is not already in
+    // delayed close processing and therefore the timer has not yet been created.
+    if (delayed_close_timeout_set) {
+      initializeDelayedCloseTimer();
+      delayed_close_state_ = (type == ConnectionCloseType::FlushWrite)
+                                 ? DelayedCloseState::CloseAfterFlush
+                                 : DelayedCloseState::CloseAfterFlushAndWait;
+    } else {
+      delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
+    }
+
+    if (enable_half_close_) {
+      enableWriteClose();
+    } else {
+      enableWrite();
+    }
+  }
 }
 
 Connection::State ServerPipeImpl::state() const {

@@ -72,15 +72,9 @@ public:
 
   bool isOverHighWatermark() const override { return over_high_watermark_; }
 
-  bool triggeredHighToLowWatermark() const override {
-    return triggered_high_to_low_watermark_;
-  }
-  void clearTriggeredHighToLowWatermark() override {
-    triggered_high_to_low_watermark_ = false;
-  }
-  void setTriggeredHighToLowWatermark() override {
-    triggered_high_to_low_watermark_ = true;
-  }
+  bool triggeredHighToLowWatermark() const override { return triggered_high_to_low_watermark_; }
+  void clearTriggeredHighToLowWatermark() override { triggered_high_to_low_watermark_ = false; }
+  void setTriggeredHighToLowWatermark() override { triggered_high_to_low_watermark_ = true; }
 
   void setWritablePeer(WritablePeer* writable_peer) {
     // Swapping writable peer is undefined behavior.

@@ -312,7 +312,11 @@ public:
 
   ~ServerPipeImpl() override;
 
-  void setConnected() { onWriteReady(); ASSERT(peer_); peer_->getWritablePeer().clearTriggeredHighToLowWatermark();}
+  void setConnected() {
+    onWriteReady();
+    ASSERT(peer_);
+    peer_->getWritablePeer().clearTriggeredHighToLowWatermark();
+  }
 
   void resetSourceReadableFlag() { was_source_readable_ = readable_source_.isReadable(); }
   void resetPeerWritableFlag() { was_peer_writable_ = isPeerWritable(); }
