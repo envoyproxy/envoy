@@ -3,6 +3,8 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/handshaker.h"
 
+#include "common/stream_info/stream_info_impl.h"
+
 #include "extensions/transport_sockets/tls/ssl_handshaker.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_certs_test.h"

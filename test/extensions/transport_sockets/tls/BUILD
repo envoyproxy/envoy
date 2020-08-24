@@ -160,6 +160,7 @@ envoy_cc_test(
     deps = [
         ":ssl_socket_test",
         ":ssl_test_utils",
+        "//source/common/stream_info:stream_info_lib",
         "//source/extensions/transport_sockets/tls:ssl_handshaker_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
