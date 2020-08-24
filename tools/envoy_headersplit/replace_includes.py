@@ -86,7 +86,7 @@ def replace_includes(mockname):
         for classname in classnames:
           if classname in content:
             # replace mocks.h with mock class header used by this test library
-            # limitation: if some class names in classnames are substrings of others, this part 
+            # limitation: if some class names in classnames are substrings of others, this part
             # will bring over-inclusion e.g. if we have MockCluster and MockClusterFactory, and
             # the source code only used MockClusterFactory, then the result code will also include
             # MockCluster since it also shows in the file.

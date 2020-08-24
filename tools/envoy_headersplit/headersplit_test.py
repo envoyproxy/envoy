@@ -86,7 +86,7 @@ class HeadersplitTest(unittest.TestCase):
     self.assertEqual(impls_names, ["getFoo", "val", "DeadBeaf"])
 
   def test_class_implementations_error(self):
-    # LibClang will fail in parse this source file (it's modified from the original 
+    # LibClang will fail in parse this source file (it's modified from the original
     # test/server/mocks.cc from Envoy repository) if we don't add flag PARSE_SKIP_FUNCTION_BODIES
     # to ignore function bodies.
     impl_translation_unit = TranslationUnit.from_source(
@@ -99,7 +99,7 @@ class HeadersplitTest(unittest.TestCase):
     #     : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
     #       ^
     # Since parsing stops early, we will have incomplete method list.
-    # The reason is not clear, however, this issue can be addressed by adding parsing flag to 
+    # The reason is not clear, however, this issue can be addressed by adding parsing flag to
     # ignore function body
 
     # get correct list of member methods
