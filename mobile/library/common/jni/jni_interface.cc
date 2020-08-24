@@ -5,20 +5,19 @@
 #include <string>
 
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
+#include "library/common/jni/jni_utility.h"
+#include "library/common/jni/jni_version.h"
 #include "library/common/main_interface.h"
-
-static JavaVM* static_jvm = nullptr;
-static JNIEnv* static_env = nullptr;
-const static jint JNI_VERSION = JNI_VERSION_1_6;
 
 // NOLINT(namespace-envoy)
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
-  static_jvm = vm;
-  if (vm->GetEnv((void**)&static_env, JNI_VERSION) != JNI_OK) {
+  JNIEnv* env = nullptr;
+  if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION) != JNI_OK) {
     return -1;
   }
 
+  set_vm(vm);
   return JNI_VERSION;
 }
 
@@ -37,7 +36,7 @@ static void jvm_on_exit() {
   // needs to be detached is the engine thread.
   // This function is called from the context of the engine's
   // thread due to it being posted to the engine's event dispatcher.
-  static_jvm->DetachCurrentThread();
+  jvm_detach_thread();
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_runEngine(
@@ -73,7 +72,7 @@ Java_io_envoyproxy_envoymobile_engine_AndroidJniLibrary_initialize(JNIEnv* env,
   // c-ares jvm init is necessary in order to let c-ares perform DNS resolution in Envoy.
   // More information can be found at:
   // https://c-ares.haxx.se/ares_library_init_android.html
-  ares_library_init_jvm(static_jvm);
+  ares_library_init_jvm(get_vm());
 
   return ares_library_init_android(connectivity_manager);
 }
@@ -99,100 +98,6 @@ Java_io_envoyproxy_envoymobile_engine_AndroidJniLibrary_flushStats(JNIEnv* env,
 ) {
   __android_log_write(ANDROID_LOG_INFO, "[Envoy]", "triggering stats flush");
   flush_stats();
-}
-
-// Utility functions
-static JNIEnv* get_env() {
-  JNIEnv* env = nullptr;
-  int get_env_res = static_jvm->GetEnv((void**)&env, JNI_VERSION);
-  if (get_env_res == JNI_EDETACHED) {
-    __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "environment is JNI_EDETACHED");
-    // Note: the only thread that should need to be attached is Envoy's engine std::thread.
-    // TODO: harden this piece of code to make sure that we are only needing to attach Envoy
-    // engine's std::thread, and that we detach it successfully.
-    static_jvm->AttachCurrentThread(&env, nullptr);
-    static_jvm->GetEnv((void**)&env, JNI_VERSION);
-  }
-  return env;
-}
-
-static void jni_delete_global_ref(void* context) {
-  JNIEnv* env = get_env();
-  jobject ref = static_cast<jobject>(context);
-  env->DeleteGlobalRef(ref);
-}
-
-static void jni_delete_const_global_ref(const void* context) {
-  jni_delete_global_ref(const_cast<void*>(context));
-}
-
-static int unbox_integer(JNIEnv* env, jobject boxedInteger) {
-  jclass jcls_Integer = env->FindClass("java/lang/Integer");
-  jmethodID jmid_intValue = env->GetMethodID(jcls_Integer, "intValue", "()I");
-  return env->CallIntMethod(boxedInteger, jmid_intValue);
-}
-
-static envoy_data array_to_native_data(JNIEnv* env, jbyteArray j_data) {
-  size_t data_length = env->GetArrayLength(j_data);
-  uint8_t* native_bytes = (uint8_t*)malloc(data_length);
-  void* critical_data = env->GetPrimitiveArrayCritical(j_data, 0);
-  memcpy(native_bytes, critical_data, data_length);
-  env->ReleasePrimitiveArrayCritical(j_data, critical_data, 0);
-  return {data_length, native_bytes, free, native_bytes};
-}
-
-static envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data) {
-  uint8_t* direct_address = static_cast<uint8_t*>(env->GetDirectBufferAddress(j_data));
-
-  if (direct_address == nullptr) {
-    jclass jcls_ByteBuffer = env->FindClass("java/nio/ByteBuffer");
-    // We skip checking hasArray() because only direct ByteBuffers or array-backed ByteBuffers
-    // are supported. We will crash here if this is an invalid buffer, but guards may be
-    // implemented in the JVM layer.
-    jmethodID jmid_array = env->GetMethodID(jcls_ByteBuffer, "array", "()[B");
-    jbyteArray array = static_cast<jbyteArray>(env->CallObjectMethod(j_data, jmid_array));
-    return array_to_native_data(env, array);
-  }
-
-  envoy_data native_data;
-  native_data.bytes = direct_address;
-  native_data.length = env->GetDirectBufferCapacity(j_data);
-  native_data.release = jni_delete_global_ref;
-  native_data.context = env->NewGlobalRef(j_data);
-
-  return native_data;
-}
-
-static envoy_headers to_native_headers(JNIEnv* env, jobjectArray headers) {
-  // Note that headers is a flattened array of key/value pairs.
-  // Therefore, the length of the native header array is n envoy_data or n/2 envoy_header.
-  envoy_header_size_t length = env->GetArrayLength(headers);
-  envoy_header* header_array = (envoy_header*)safe_malloc(sizeof(envoy_header) * length / 2);
-
-  for (envoy_header_size_t i = 0; i < length; i += 2) {
-    // Copy native byte array for header key
-    jbyteArray j_key = (jbyteArray)env->GetObjectArrayElement(headers, i);
-    size_t key_length = env->GetArrayLength(j_key);
-    uint8_t* native_key = (uint8_t*)safe_malloc(key_length);
-    void* critical_key = env->GetPrimitiveArrayCritical(j_key, 0);
-    memcpy(native_key, critical_key, key_length);
-    env->ReleasePrimitiveArrayCritical(j_key, critical_key, 0);
-    envoy_data header_key = {key_length, native_key, free, native_key};
-
-    // Copy native byte array for header value
-    jbyteArray j_value = (jbyteArray)env->GetObjectArrayElement(headers, i + 1);
-    size_t value_length = env->GetArrayLength(j_value);
-    uint8_t* native_value = (uint8_t*)safe_malloc(value_length);
-    void* critical_value = env->GetPrimitiveArrayCritical(j_value, 0);
-    memcpy(native_value, critical_value, value_length);
-    env->ReleasePrimitiveArrayCritical(j_value, critical_value, 0);
-    envoy_data header_value = {value_length, native_value, free, native_value};
-
-    header_array[i / 2] = {header_key, header_value};
-  }
-
-  envoy_headers native_headers = {length / 2, header_array};
-  return native_headers;
 }
 
 // JvmCallbackContext
@@ -242,6 +147,7 @@ static void pass_headers(JNIEnv* env, envoy_headers headers, jobject j_context) 
 }
 
 // Platform callback implementation
+
 static void* jvm_on_headers(const char* method, envoy_headers headers, bool end_stream,
                             void* context) {
   __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "jvm_on_headers");

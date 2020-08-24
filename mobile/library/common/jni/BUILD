@@ -1,9 +1,25 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary")
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_cc_library(
+    name = "jni_utility_lib",
+    srcs = [
+        "jni_utility.cc",
+        "jni_version.cc",
+    ],
+    hdrs = [
+        "jni_utility.h",
+        "jni_version.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        "//library/common/types:c_types_lib",
+    ],
+)
 
 cc_binary(
     name = "libenvoy_jni.so",
@@ -17,5 +33,8 @@ cc_binary(
         "-Wl,-s",
     ],
     linkshared = True,
-    deps = ["//library/common:envoy_main_interface_lib"],
+    deps = [
+        ":jni_utility_lib",
+        "//library/common:envoy_main_interface_lib",
+    ],
 )
