@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import unittest
+
 # libclang imports
 import clang.cindex
 from clang.cindex import TranslationUnit, Index, CursorKind
@@ -19,7 +20,8 @@ if "LLVM_CONFIG" in os.environ:
   clang.cindex.Config.set_library_path(clang_tools_lib_path.decode("utf-8"))
 else:
   sys.exit(
-      "llvm-config not found, please set the environment variable:\nexport LLVM_CONFIG=<path to clang installation>/bin/llvm-config"
+      "llvm-config not found, please set the environment variable:\n" \
+      "export LLVM_CONFIG=<path to clang installation>/bin/llvm-config"
   )
 
 
@@ -31,7 +33,7 @@ class HeadersplitTest(unittest.TestCase):
   # almost the same as above, but classes are not enclosed by namespace
   source_class_defn_without_namespace = open(
       "tools/envoy_headersplit/code_corpus/class_defn_without_namespace.h", "r").read()
-  # A C++ source code contains method implementaions for class_defn.h
+  # A C++ source code contains method implementations for class_defn.h
   source_class_impl = open("tools/envoy_headersplit/code_corpus/class_impl.cc", "r").read()
 
   def test_to_filename(self):
@@ -84,8 +86,9 @@ class HeadersplitTest(unittest.TestCase):
     self.assertEqual(impls_names, ["getFoo", "val", "DeadBeaf"])
 
   def test_class_implementations_error(self):
-    # LibClang will fail in parse this source file (it's modified from the original test/server/mocks.cc from Envoy repository)
-    # if we don't add flag PARSE_SKIP_FUNCTION_BODIES to ignore function bodies.
+    # LibClang will fail in parse this source file (it's modified from the original 
+    # test/server/mocks.cc from Envoy repository) if we don't add flag PARSE_SKIP_FUNCTION_BODIES
+    # to ignore function bodies.
     impl_translation_unit = TranslationUnit.from_source(
         "tools/envoy_headersplit/code_corpus/fail_mocks.cc")
     impls_cursors = headersplit.class_implementations(impl_translation_unit.cursor)
@@ -96,7 +99,8 @@ class HeadersplitTest(unittest.TestCase):
     #     : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
     #       ^
     # Since parsing stops early, we will have incomplete method list.
-    # The reason is not clear, however, this issue can be addressed by adding parsing flag to ignore function body
+    # The reason is not clear, however, this issue can be addressed by adding parsing flag to 
+    # ignore function body
 
     # get correct list of member methods
     impl_translation_unit_correct = TranslationUnit.from_source(

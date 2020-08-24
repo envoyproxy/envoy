@@ -1,19 +1,17 @@
 # !/usr/bin/env python3
 # Lint as: python3
 """
-This python script can be used to refactor Envoy source code
-#include after dividing the monolith mock headers into different
-mock classes. This will reduce the building time for specific tests
+This python script can be used to refactor Envoy source code #include after dividing the monolithic
+mock headers into different mock classes. This will reduce the building time for specific tests
 significantly.
 
 e.g.
 
-#include "test/mocks/server.h" -> #include "test/mocks/admin.h" if the 
-source code only used Server::MockAdmin.
+#include "test/mocks/server.h" -> #include "test/mocks/admin.h" if the source code only used mock
+class Server::MockAdmin.
 
-this script need to be executed in the Envoy directory
+this script needs to be executed in the Envoy directory
 """
-
 from pathlib import Path
 from headersplit import to_filename
 from typing import List
@@ -22,16 +20,16 @@ import argparse
 
 def to_classname(filename: str) -> str:
   """
-    maps divided mock class file name to class names
-    inverse function of headersplit.to_filename
-    e.g. map "test/mocks/server/admin_stream.h" to "MockAdminStream"
+  maps divided mock class file name to class names
+  inverse function of headersplit.to_filename
+  e.g. map "test/mocks/server/admin_stream.h" to "MockAdminStream"
 
-    Args:
-        filename: string, mock class header file name (might be the whole path instead of the base name)
+  Args:
+      filename: string, mock class header file name (might be the whole path instead of the base name)
 
-    Returns:
-        corresponding class name
-    """
+  Returns:
+      corresponding class name
+  """
   classname_tokens = filename.split('/')[-1].replace('.h', '').split('_')
   classname = "Mock" + ''.join(map(lambda x: x[:1].upper() + x[1:], classname_tokens))
   return classname
@@ -39,16 +37,16 @@ def to_classname(filename: str) -> str:
 
 def to_bazelname(filename: str, mockname: str) -> str:
   """
-    maps divided mock class file name to bazel target name
-    e.g. map "test/mocks/server/admin_stream.h" to "//test/mocks/server:admin_stream_mocks"
+  maps divided mock class file name to bazel target name
+  e.g. map "test/mocks/server/admin_stream.h" to "//test/mocks/server:admin_stream_mocks"
 
-    Args:
-        filename: string, mock class header file name (might be the whole path instead of the base name)
-        mockname: string, mock directory name
+  Args:
+      filename: string, mock class header file name (might be the whole path instead of the base name)
+      mockname: string, mock directory name
 
-    Returns:
-        corresponding bazel target name
-    """
+  Returns:
+      corresponding bazel target name
+  """
   bazelname = "//test/mocks/{}:".format(mockname)
   bazelname += filename.split('/')[-1].replace('.h', '') + '_mocks'.format(mockname)
   return bazelname
@@ -56,13 +54,13 @@ def to_bazelname(filename: str, mockname: str) -> str:
 
 def get_filenames(mockname: str) -> List[str]:
   """
-    scans all headers in test/mocks/{mockname}, return corresponding file names
+  scans all headers in test/mocks/{mockname}, return corresponding file names
 
-    Args:
-      mockname: string, mock directory name
+  Args:
+    mockname: string, mock directory name
 
-    Returns:
-      List of file name for the headers in test/mock/{mocksname}
+  Returns:
+    List of file name for the headers in test/mock/{mocksname}
   """
   dir = Path("test/mocks/{}/".format(mockname))
   filenames = list(map(str, dir.glob('*.h')))
@@ -88,9 +86,10 @@ def replace_includes(mockname):
         for classname in classnames:
           if classname in content:
             # replace mocks.h with mock class header used by this test library
-            # limitation: if some class names in classnames are substrings of others, this part will bring over-inclusion
-            # e.g. if we have MockCluster and MockClusterFactory, and the source code only used MockClusterFactory,
-            # then the result code will also include MockCluster since it also shows in the file.
+            # limitation: if some class names in classnames are substrings of others, this part 
+            # will bring over-inclusion e.g. if we have MockCluster and MockClusterFactory, and
+            # the source code only used MockClusterFactory, then the result code will also include
+            # MockCluster since it also shows in the file.
             # TODO: use clang to analysis class usage instead by simple find and replace
             replace_includes += '#include "test/mocks/{}/{}.h"\n'.format(
                 mockname, to_filename(classname))

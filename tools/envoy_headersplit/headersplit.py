@@ -1,18 +1,17 @@
 # !/usr/bin/env python3
 # Lint as: python3
 """
-This python script can dividing monolithic mock headers
-into different mock classes. We need to remove the
-over-included header files in generated class codes and
-resolve dependencies in the corresponding Bazel files
-manually.
+This python script can dividing monolithic mock headers into different mock classes. We need to
+remove the over-included header files in generated class codes and resolve dependencies in the
+corresponding Bazel files manually.
 """
 import argparse
 import os
 import subprocess
 import sys
 from typing import Type, List, Tuple, Dict
-#libclang imports
+
+# libclang imports
 import clang.cindex
 from clang.cindex import TranslationUnit, Index, CursorKind, Cursor
 
@@ -24,21 +23,22 @@ if "LLVM_CONFIG" in os.environ:
   clang.cindex.Config.set_library_path(clang_tools_lib_path.decode("utf-8"))
 else:
   sys.exit(
-      "llvm-config not found, please set the environment variable:\nexport LLVM_CONFIG=<path to clang installation>/bin/llvm-config"
+      "llvm-config not found, please set the environment variable:\n" \
+      "export LLVM_CONFIG=<path to clang installation>/bin/llvm-config"
   )
 
 
 def to_filename(classname: str) -> str:
   """
-    maps mock class name (in C++ codes) to filenames under the Envoy naming convention.
-    e.g. map "MockAdminStream" to "admin_stream"
+  maps mock class name (in C++ codes) to filenames under the Envoy naming convention.
+  e.g. map "MockAdminStream" to "admin_stream"
 
-    Args:
-        classname: mock class name from source
+  Args:
+      classname: mock class name from source
 
-    Returns:
-        corresponding file name
-    """
+  Returns:
+      corresponding file name
+  """
   filename = classname.replace("Mock", "", 1)  # Remove only first "Mock"
   ret = ""
   for index, val in enumerate(filename):
@@ -50,32 +50,32 @@ def to_filename(classname: str) -> str:
 
 def get_directives(translation_unit: Type[TranslationUnit]) -> str:
   """
-    "extracts" all header includes statements and other directives from the target code file (translation_unit)
+  "extracts" all header includes statements and other directives from the target source code file
 
-    for instance:
-        foo.h:
-        #pragma once
-        #include "a.h"
-        #include "b.h"
+  for instance:
+      foo.h:
+      #pragma once
+      #include "a.h"
+      #include "b.h"
 
-        int foo(){
-        }
-    this function should return
-    '#pragma once\n#include "a.h"\n#include "b.h"'
+      int foo(){
+      }
+  this function should return
+  '#pragma once\n#include "a.h"\n#include "b.h"'
 
-    Args:
-        translation_unit: parsing result of target source code by libclang
+  Args:
+      translation_unit: parsing result of target source code by libclang
 
-    Returns:
-        A string, contains all includes statements and other preprocessor directives before the
-        first non-directive statement.
+  Returns:
+      A string, contains all includes statements and other preprocessor directives before the
+      first non-directive statement.
 
-    Notes:
-        clang lib provides API like tranlation_unit.get_includes() to get include directives.
-        But we can't use it as it requires presence of the included files to return the full list.
-        We choose to return the string instead of list of includes since we will simply copy-paste
-        the include statements into generated headers. Return string seems more convenient
-    """
+  Notes:
+      clang lib provides API like tranlation_unit.get_includes() to get include directives.
+      But we can't use it as it requires presence of the included files to return the full list.
+      We choose to return the string instead of list of includes since we will simply copy-paste
+      the include statements into generated headers. Return string seems more convenient
+  """
   cursor = translation_unit.cursor
   for descendant in cursor.walk_preorder():
     if descendant.location.file is not None and descendant.location.file.name == cursor.displayname:
@@ -87,14 +87,14 @@ def get_directives(translation_unit: Type[TranslationUnit]) -> str:
 
 def cursors_in_same_file(cursor: Cursor) -> List[Cursor]:
   """
-    get all child cursors which are pointing to the same file as the input cursor
+  get all child cursors which are pointing to the same file as the input cursor
 
-    Args:
-      cursor: cursor of parsing result of target source code by libclang
+  Args:
+    cursor: cursor of parsing result of target source code by libclang
 
-    Returns:
-      a list of cursor
-    """
+  Returns:
+    a list of cursor
+  """
   cursors = []
   for descendant in cursor.walk_preorder():
     # We don't want Cursors from files other than the input file,
@@ -111,14 +111,14 @@ def cursors_in_same_file(cursor: Cursor) -> List[Cursor]:
 
 def class_definitions(cursor: Cursor) -> List[Cursor]:
   """
-    extracts all class definitions in the file pointed by cursor. (typical mocks.h)
+  extracts all class definitions in the file pointed by cursor. (typical mocks.h)
 
-    Args:
-        cursor: cursor of parsing result of target source code by libclang
+  Args:
+      cursor: cursor of parsing result of target source code by libclang
 
-    Returns:
-        a list of cursor, each pointing to a class definition.
-    """
+  Returns:
+      a list of cursor, each pointing to a class definition.
+  """
   cursors = cursors_in_same_file(cursor)
   class_cursors = []
   for descendant in cursors:
@@ -136,43 +136,45 @@ def class_definitions(cursor: Cursor) -> List[Cursor]:
 
 def class_implementations(cursor: Cursor) -> List[Cursor]:
   """
-    extracts all class implementation in the file pointed by cursor. (typical mocks.cc)
+  extracts all class implementation in the file pointed by cursor. (typical mocks.cc)
 
-    Args:
-        cursor: cursor of parsing result of target source code by libclang
+  Args:
+      cursor: cursor of parsing result of target source code by libclang
 
-    Returns:
-        a list of cursor, each pointing to a class implementation.
-    """
+  Returns:
+      a list of cursor, each pointing to a class implementation.
+  """
   cursors = cursors_in_same_file(cursor)
   impl_cursors = []
   for descendant in cursors:
     if descendant.kind == CursorKind.NAMESPACE:
       continue
     # check if descendant is pointing to a class method
-    if descendant.semantic_parent is not None and descendant.semantic_parent.kind == CursorKind.CLASS_DECL:
+    if descendant.semantic_parent is None:
+      continue
+    if descendant.semantic_parent.kind == CursorKind.CLASS_DECL:
       impl_cursors.append(descendant)
   return impl_cursors
 
 
 def extract_definition(cursor: Cursor, classnames: List[str]) -> Tuple[str, str, List[str]]:
   """
-    extracts class definition source code pointed by the cursor parameter.
-    and find dependent mock classes by naming look up.
+  extracts class definition source code pointed by the cursor parameter.
+  and find dependent mock classes by naming look up.
 
-    Args:
-        cursor: libclang cursor pointing to the target mock class definition.
-        classnames: all mock class names defined in the definition header that needs to be
-            divided, used to parse class dependencies.
-    Returns:
-        class_name: a string representing the mock class name.
-        class_defn: a string contains the whole class definition body.
-        deps: a set of string contains all dependent classes for the return class.
+  Args:
+      cursor: libclang cursor pointing to the target mock class definition.
+      classnames: all mock class names defined in the definition header that needs to be
+          divided, used to parse class dependencies.
+  Returns:
+      class_name: a string representing the mock class name.
+      class_defn: a string contains the whole class definition body.
+      deps: a set of string contains all dependent classes for the return class.
 
-    Note:
-        It can not detect and resolve forward declaration and cyclic dependency. Need to address
-        manually.
-    """
+  Note:
+      It can not detect and resolve forward declaration and cyclic dependency. Need to address
+      manually.
+  """
   filename = cursor.location.file.name
   contents = read_file_contents(filename)
   class_name = cursor.spelling
@@ -196,41 +198,42 @@ def extract_definition(cursor: Cursor, classnames: List[str]) -> Tuple[str, str,
 
 def get_implline(cursor: Cursor) -> int:
   """
-    finds the first line of implementation source code for class method pointed by the cursor parameter.
-    and finds dependent mock classes by naming look up.
+  finds the first line of implementation source code for class method pointed by the cursor
+  parameter. 
 
-    Args:
-        cursor: libclang cursor pointing to the target mock class definition.
+  Args:
+      cursor: libclang cursor pointing to the target mock class definition.
 
-    Returns:
-        an integer, the line number of the first line of the corresponding method implementation code (zero indexed)
+  Returns:
+      an integer, the line number of the first line of the corresponding method implementation
+      code (zero indexed)
 
-    Note:
-        This function return line number only. Because in certain case libclang will fail
-        in parsing the method body and stops parsing early (see headersplit_test.test_class_implementations_error for details).
-        To address this issue when parsing implementation code, we passed the flag that ask clang to ignore function bodies.
-        We can not get the function body directly with the same way we used in extract_definition() since clang didn't parse 
-        function this time.
-        Though we can't get the correct method extent offset from Cursor, we can still
-        get the start line of the corresponding method instead.
-        (We can't get the correct line number for the last line due to skipping function bodies)
-    """
+  Note:
+      This function return line number only. Because in certain case libclang will fail in parsing
+      the method body and stops parsing early (see headersplit_test.test_class_implementations_error
+      for details). To address this issue when parsing implementation code, we passed the flag that
+      ask clang to ignore function bodies.
+      We can not get the function body directly with the same way we used in extract_definition() 
+      since clang didn't parse function this time. Though we can't get the correct method extent
+      offset from Cursor, we can still get the start line of the corresponding method instead.
+      (We can't get the correct line number for the last line due to skipping function bodies)
+  """
   return cursor.extent.start.line - 1
 
 
 def extract_implementations(impl_cursors: List[Cursor], source_code: str) -> Dict[str, str]:
   """
-    extracts method function body for each cursor in list impl_cursors from source code
-    groups those function bodies with class name to help generating the divided {classname}.cc
-    returns a dict maps class name to the concatenation of all its member methods implementations.
+  extracts method function body for each cursor in list impl_cursors from source code
+  groups those function bodies with class name to help generating the divided {classname}.cc
+  returns a dict maps class name to the concatenation of all its member methods implementations.
 
-    Args:
-        impl_cursors: list of libclang cursors, each pointing to a mock class member function implementation.
-        source_code: string, the source code for implementations (e.g. mocks.cc)
+  Args:
+      impl_cursors: list of cursors, each pointing to a mock class member function implementation.
+      source_code: string, the source code for implementations (e.g. mocks.cc)
 
-    Returns:
-        classname_to_impl: a dict maps class name to its member methods implementations
-    """
+  Returns:
+      classname_to_impl: a dict maps class name to its member methods implementations
+  """
   classname_to_impl = dict()
   for i, cursor in enumerate(impl_cursors):
     classname = cursor.semantic_parent.spelling
@@ -260,33 +263,31 @@ def extract_implementations(impl_cursors: List[Cursor], source_code: str) -> Dic
 
 def get_enclosing_namespace(defn: Cursor) -> Tuple[str, str]:
   """
-    retrieves all enclosing namespaces for the class pointed by defn.
+  retrieves all enclosing namespaces for the class pointed by defn.
+  this is necessary to construct the mock class header
+  e.g.:
+  defn is pointing MockClass in the follow source code:
 
-    this is necessary to construct the mock class header
+  namespace Envoy {
+  namespace Server {
+  class MockClass2 {...}
+  namespace Configuration {
+  class MockClass {...}
+        ^ 
+        defn
+  }
+  }
+  }
 
-    e.g.
+  this function will return:
+  "namespace Envoy {\nnamespace Server {\nnamespace Configuration{\n" and "\n}\n}\n}\n" 
 
-    defn is pointing MockClass in the follow source code:
+  Args:
+      defn: libclang Cursor pointing to a mock class
 
-    namespace Envoy {
-    namespace Server {
-    class MockClass2 {...}
-    namespace Configuration {
-    class MockClass {...}
-          ^ 
-          defn
-    }
-    }
-    }
-
-    this function will return "namespace Envoy {\nnamespace Server {\nnamespace Configuration{\n" and "\n}\n}\n}\n" 
-
-    Args:
-        defn: libclang Cursor pointing to a mock class
-
-    Returns:
-        namespace_prefix, namespace_suffix: a pair of string, representing the enclosing namespaces
-    """
+  Returns:
+      namespace_prefix, namespace_suffix: a pair of string, representing the enclosing namespaces
+  """
   namespace_prefix = ""
   namespace_suffix = ""
   parent_cursor = defn.semantic_parent
@@ -327,8 +328,8 @@ envoy_cc_mock(
 
 def main(args):
   """
-    divides the monolithic mock file into different mock class files.
-    """
+  divides the monolithic mock file into different mock class files.
+  """
   decl_filename = args["decl"]
   impl_filename = args["impl"]
   idx = Index.create()

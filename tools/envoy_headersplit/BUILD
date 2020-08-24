@@ -19,7 +19,6 @@ py_test(
     main = "headersplit_test.py",
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = ["no-sandbox"],
     visibility = ["//visibility:public"],
     deps = [
         requirement("clang"),
@@ -38,7 +37,6 @@ py_test(
     main = "replace_includes_test.py",
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = ["no-sandbox"],
     visibility = ["//visibility:public"],
     deps = [
         requirement("clang"),
