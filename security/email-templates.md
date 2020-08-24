@@ -178,8 +178,9 @@ Cc: envoy-announce@googlegroups.com, envoy-security@googlegroups.com, envoy-main
 Hello Envoy Community,
 
 The Envoy security team would like to announce the availability of the security fix for security
-defects introduced in the main branch by [$GITSHORTCOMMITHASH]($GITHUBCOMMITURL) commit. The defects
-caused by [$GITSHORTCOMMITHASH]($GITHUBCOMMITURL) is not part of any Envoy stable releases.
+defect(s) introduced in the main branch by [$GITSHORTCOMMITHASH]($GITHUBCOMMITURL) commit. The
+defect(s) caused by the [$GITSHORTCOMMITHASH]($GITHUBCOMMITURL) were not part of any Envoy stable
+releases.
 
 $DEFECTSSUMMARY
 
@@ -188,13 +189,13 @@ vulnerable in practice. -->
 
 The CVSS score for this is [$CVSSSTRING]($CVSSURL).
 
-Including this [$FIXGITSHORTCOMMITHASH]($FIXGITHUBCOMMITURL) commit is encouraged to fix this issue.
+Including the [$FIXGITSHORTCOMMITHASH]($FIXGITHUBCOMMITURL) commit is encouraged to fix this issue.
 
 **Security fix timeline**
 
-1. The defects introduced in [$GITSHORTCOMMITHASH]($GITHUBCOMMITURL) was landed in the main branch
-   on $ORDINALDAY of $MONTH $YEAR at $PDTHOUR PDT ($GMTHOUR GMT).
-2. The fix [$FIXGITSHORTCOMMITHASH]($FIXGITHUBCOMMITURL) is merged into the main branch on
+1. The defect(s) introduced in [$GITSHORTCOMMITHASH]($GITHUBCOMMITURL) were landed in the main
+   branch on $ORDINALDAY of $MONTH $YEAR at $PDTHOUR PDT ($GMTHOUR GMT).
+2. The fix [$FIXGITSHORTCOMMITHASH]($FIXGITHUBCOMMITURL) was merged into the main branch on
    $ORDINALDAY of $MONTH $YEAR at $PDTHOUR PDT ($GMTHOUR GMT).
 
 **Thank you**
