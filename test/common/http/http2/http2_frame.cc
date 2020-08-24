@@ -1,13 +1,9 @@
 #include "test/common/http/http2/http2_frame.h"
 
-#include <bits/stdint-uintn.h>
-
-#include <cstddef>
 #include <type_traits>
 
 #include "envoy/common/platform.h"
 
-#include "common/common/c_smart_ptr.h"
 #include "common/common/hex.h"
 
 #include "nghttp2/nghttp2.h"

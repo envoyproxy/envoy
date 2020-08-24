@@ -1,5 +1,3 @@
-#include <sys/types.h>
-
 #include <string>
 
 #include "envoy/http/metadata_interface.h"
@@ -28,9 +26,7 @@ TEST(EqualityMetadataFrame, Http2FrameTest) {
   metadataEncoder.createPayload(metadata_map_vector);
   std::string payloadFromEncoder = metadataEncoder.payload();
   std::string payloadFromHttp2Frame(http2FrameFromUtility);
-  // 9 octets of headers - encodes same way - flaky! Both things do same thing - encode flaky
-  // (unordered map) ASSERT_EQ(payloadFromEncoder, payloadFromHttp2Frame.substr(9,
-  // payloadFromHttp2Frame.size() - 9));
+  // Note: the actual encoding of the metadata map is nondeterministic and flaky. This is okay!
   ASSERT_EQ(static_cast<int>(http2FrameFromUtility.type()), 0x4D); // type
   ASSERT_EQ(payloadFromHttp2Frame[4], 4);                          // flags
   ASSERT_EQ(std::to_string(payloadFromHttp2Frame[8]),
