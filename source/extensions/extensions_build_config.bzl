@@ -193,10 +193,12 @@ EXTENSIONS = {
     "envoy.internal_redirect_predicates.previous_routes":     "//source/extensions/internal_redirect/previous_routes:config",
     "envoy.internal_redirect_predicates.safe_cross_scheme":   "//source/extensions/internal_redirect/safe_cross_scheme:config",
 
+    #
     # Http Upstreams (excepting envoy.upstreams.http.generic which is hard-coded into the build so not registered here)
-    "envoy.upstreams.http.http":                     "//source/extensions/upstreams/http/http:config",
-    "envoy.upstreams.http.tcp":                     "//source/extensions/upstreams/http/tcp:config",
+    #
 
+    "envoy.upstreams.http.http":                        "//source/extensions/upstreams/http/http:config",
+    "envoy.upstreams.http.tcp":                         "//source/extensions/upstreams/http/tcp:config",
 
 }
 
@@ -204,4 +206,4 @@ EXTENSIONS = {
 # (//:extension_config and //:extension_library in //BUILD)
 # if downstream Envoy builds need to directly reference envoy extensions.
 ADDITIONAL_VISIBILITY = [
-  ]
+]
