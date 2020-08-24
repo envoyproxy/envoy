@@ -163,8 +163,8 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::ValueArg<std::string> socket_path("", "socket-path", "Path to hot restart socket file",
                                            false, "@envoy_domain_socket", "string", cmd);
 
-  TCLAP::ValueArg<mode_t> socket_mode("", "socket-mode", "Socket file permission", false, S_IRWXU,
-                                      "mode_t", cmd);
+  TCLAP::ValueArg<std::string> socket_mode("", "socket-mode", "Socket file permission", false, "0",
+                                           "string", cmd);
 
   cmd.setExceptionHandling(false);
   try {
@@ -270,7 +270,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   socket_path_ = socket_path.getValue();
-  socket_mode_ = StringUtil::octalToDecimal(socket_mode.getValue());
+  StringUtil::atoull(socket_mode.getValue().c_str(), reinterpret_cast<uint64_t&>(socket_mode_), 8);
 
   if (drain_strategy.getValue() == "immediate") {
     drain_strategy_ = Server::DrainStrategy::Immediate;
@@ -417,7 +417,7 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
       parent_shutdown_time_(900), drain_strategy_(Server::DrainStrategy::Gradual),
       mode_(Server::Mode::Serve), hot_restart_disabled_(false), signal_handling_enabled_(true),
       mutex_tracing_enabled_(false), cpuset_threads_(false), fake_symbol_table_enabled_(false),
-      socket_path_("@envoy_domain_socket"), socket_mode_(S_IRWXU) {}
+      socket_path_("@envoy_domain_socket"), socket_mode_(0) {}
 
 void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
   for (const auto& name : names) {

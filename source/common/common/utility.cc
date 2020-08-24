@@ -520,17 +520,6 @@ std::string StringUtil::removeCharacters(const absl::string_view& str,
   return absl::StrJoin(pieces, "");
 }
 
-int StringUtil::octalToDecimal(int octal_number) {
-  int decimal_number = 0, i = 0, rem;
-  while (octal_number != 0) {
-    rem = octal_number % 10;
-    octal_number /= 10;
-    decimal_number += rem * pow(8, i);
-    ++i;
-  }
-  return decimal_number;
-}
-
 bool Primes::isPrime(uint32_t x) {
   if (x < 4) {
     return true; // eliminates special-casing 2.

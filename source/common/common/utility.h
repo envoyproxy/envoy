@@ -379,12 +379,6 @@ public:
    */
   static std::string removeCharacters(const absl::string_view& str,
                                       const IntervalSet<size_t>& remove_characters);
-  /**
-   * Convert octal number to decimal number.
-   * @param octal_number The octal number to be converted in decimal.
-   * @return int the decimal value.
-   */
-  static int octalToDecimal(int octal_number);
 };
 
 /**

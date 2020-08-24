@@ -2,6 +2,7 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/utility.h"
+#include "common/network/address_impl.h"
 #include "common/stats/utility.h"
 
 namespace Envoy {
@@ -33,15 +34,9 @@ sockaddr_un HotRestartingBase::createDomainSocketAddress(uint64_t id, const std:
   id = id % MaxConcurrentProcesses;
   sockaddr_un address;
   initDomainSocketAddress(&address);
-  if (socket_path.size() >= sizeof(address.sun_path)) {
-    throw EnvoyException(
-        fmt::format("Path \"{}\" exceeds maximum UNIX domain socket path size of {}.", socket_path,
-                    sizeof(address.sun_path)));
-  }
-  StringUtil::strlcpy(&address.sun_path[0],
-                      fmt::format(socket_path + "_{}_{}", role, base_id_ + id).c_str(),
-                      sizeof(address.sun_path));
-  address.sun_path[0] = (address.sun_path[0] == '@') ? '\0' : address.sun_path[0];
+  Network::Address::PipeInstance addr(fmt::format(socket_path + "_{}_{}", role, base_id_ + id),
+                                      socket_mode, nullptr);
+  memcpy(&address, addr.sockAddr(), addr.sockAddrLen());
   fchmod(my_domain_socket_, socket_mode);
   return address;
 }

@@ -200,7 +200,7 @@ following are the command line options that Envoy supports.
 
   **NOTE**: The path started with "@" will be created in the abstract namespace.
 
-.. option:: --socket-mode <integer>
+.. option:: --socket-mode <string>
 
   *(optional)* The socket file permission for :ref:`hot restart <arch_overview_hot_restart>`.
   The range of value is from 000 to 777(Octal number).
