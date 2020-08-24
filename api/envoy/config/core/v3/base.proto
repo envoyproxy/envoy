@@ -293,7 +293,7 @@ message HeaderValueOption {
   HeaderValue header = 1 [(validate.rules).message = {required: true}];
 
   // Should the value be appended? If true (default), the value is appended to
-  // existing values.
+  // existing values. Otherwise it replaces any existing values.
   google.protobuf.BoolValue append = 2;
 }
 
