@@ -21,7 +21,6 @@ envoy_extension_cc_test(
         "//source/common/stats:fake_symbol_table_lib",
         "//source/extensions/filters/http/grpc_http1_bridge:http1_bridge_filter_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:global_lib",
         "//test/test_common:utility_lib",
     ],

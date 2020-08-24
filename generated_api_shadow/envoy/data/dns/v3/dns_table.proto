@@ -39,8 +39,70 @@ message DnsTable {
     }];
   }
 
-  // This message type is extensible and can contain a list of addresses, clusters or
-  // dictate a different method for resolving the addresses for an endpoint
+  // Specify the service protocol using a numeric or string value
+  message DnsServiceProtocol {
+    oneof protocol_config {
+      option (validate.required) = true;
+
+      // Specify the protocol number for the service. Envoy will try to resolve the number to
+      // the protocol name. For example, 6 will resolve to "tcp". Refer to:
+      // https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
+      // for protocol names and numbers
+      uint32 number = 1 [(validate.rules).uint32 = {lt: 255}];
+
+      // Specify the protocol name for the service.
+      string name = 2 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+    }
+  }
+
+  // Specify the target for a given DNS service
+  // [#next-free-field: 6]
+  message DnsServiceTarget {
+    // Specify the name of the endpoint for the Service. The name is a hostname or a cluster
+    oneof endpoint_type {
+      option (validate.required) = true;
+
+      // Use a resolvable hostname as the endpoint for a service.
+      string host_name = 1
+          [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+
+      // Use a cluster name as the endpoint for a service.
+      string cluster_name = 2
+          [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+    }
+
+    // The priority of the service record target
+    uint32 priority = 3 [(validate.rules).uint32 = {lt: 65536}];
+
+    // The weight of the service record target
+    uint32 weight = 4 [(validate.rules).uint32 = {lt: 65536}];
+
+    // The port to which the service is bound. This value is optional if the target is a
+    // cluster. Setting port to zero in this case makes the filter use the port value
+    // from the cluster host
+    uint32 port = 5 [(validate.rules).uint32 = {lt: 65536}];
+  }
+
+  // This message defines a service selection record returned for a service query in a domain
+  message DnsService {
+    // The name of the service without the protocol or domain name
+    string service_name = 1;
+
+    // The service protocol. This can be specified as a string or the numeric value of the protocol
+    DnsServiceProtocol protocol = 2;
+
+    // The service entry time to live. This is independent from the DNS Answer record TTL
+    google.protobuf.Duration ttl = 3 [(validate.rules).duration = {gte {seconds: 1}}];
+
+    // The list of targets hosting the service
+    repeated DnsServiceTarget targets = 4 [(validate.rules).repeated = {min_items: 1}];
+  }
+
+  // Define a list of service records for a given service
+  message DnsServiceList {
+    repeated DnsService services = 1 [(validate.rules).repeated = {min_items: 1}];
+  }
+
   message DnsEndpoint {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.data.dns.v2alpha.DnsTable.DnsEndpoint";
@@ -48,9 +110,14 @@ message DnsTable {
     oneof endpoint_config {
       option (validate.required) = true;
 
+      // Define a list of addresses to return for the specified endpoint
       AddressList address_list = 1;
 
+      // Define a cluster whose addresses are returned for the specified endpoint
       string cluster_name = 2;
+
+      // Define a DNS Service List for the specified endpoint
+      DnsServiceList service_list = 3;
     }
   }
 
