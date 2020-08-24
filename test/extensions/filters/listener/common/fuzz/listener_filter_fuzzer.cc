@@ -109,9 +109,9 @@ Api::SysCallSizeResult FuzzedHeader::read(void* buffer, size_t length, bool peek
   return Api::SysCallSizeResult{static_cast<ssize_t>(len), 0};
 }
 
-size_t FuzzedHeader::size() { return indices_[std::min(nread_, nreads_ - 1)] - index_ + 1; }
+size_t FuzzedHeader::size() { return indices_[nread_] - index_ + 1; }
 
-bool FuzzedHeader::done() { return nread_ >= nreads_; }
+bool FuzzedHeader::done() { return nread_ >= nreads_ - 1; }
 
 bool FuzzedHeader::empty() { return nreads_ == 0 || data_.empty(); }
 
