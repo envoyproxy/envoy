@@ -21,24 +21,24 @@ DEPENDENCY_ANNOTATIONS = [
 # NOTE: If a dependency use case is either dataplane or controlplane, the other uses are not needed
 # to be declared.
 USE_CATEGORIES = [
-    # This dependency is used in build process.
-    "build",
-    # This dependency is used for unit tests.
-    "test",
     # This dependency is used in API protos.
     "api",
-    # This dependency is used in processing downstream or upstream requests.
-    "dataplane",
+    # This dependency is used in build process.
+    "build",
     # This dependency is used to process xDS requests.
     "controlplane",
+    # This dependency is used in processing downstream or upstream requests.
+    "dataplane",
     # This dependecy is used for logging, metrics or tracing. It may process unstrusted input.
     "observability",
     # This dependency does not handle untrusted data and is used for various utility purposes.
     "other",
+    # This dependency is used for unit tests.
+    "test",
 ]
 
 # Components with these use categories are not required to specify the 'cpe' annotation.
-USE_CATEGORIES_WITH_CPE_OPTIONAL = ["build", "test", "other"]
+USE_CATEGORIES_WITH_CPE_OPTIONAL = ["build", "other", "test"]
 
 DEPENDENCY_REPOSITORIES_SPEC = dict(
     bazel_compdb = dict(
@@ -53,16 +53,16 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     bazel_gazelle = dict(
         project_name = "Gazelle",
         project_url = "https://github.com/bazelbuild/bazel-gazelle",
-        version = "0.19.1",
-        sha256 = "86c6d481b3f7aedc1d60c1c211c6f76da282ae197c3b3160f54bd3a8f847896f",
+        version = "0.21.1",
+        sha256 = "cdb02a887a7187ea4d5a27452311a75ed8637379a1287d8eeb952138ea485f7d",
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v{version}/bazel-gazelle-v{version}.tar.gz"],
         use_category = ["build"],
     ),
     bazel_toolchains = dict(
         project_name = "bazel-toolchains",
         project_url = "https://github.com/bazelbuild/bazel-toolchains",
-        version = "3.4.0",
-        sha256 = "882fecfc88d3dc528f5c5681d95d730e213e39099abff2e637688a91a9619395",
+        version = "3.4.1",
+        sha256 = "7ebb200ed3ca3d1f7505659c7dfed01c4b5cb04c3a6f34140726fe22f5d35e86",
         strip_prefix = "bazel-toolchains-{version}",
         urls = [
             "https://github.com/bazelbuild/bazel-toolchains/releases/download/{version}/bazel-toolchains-{version}.tar.gz",
@@ -81,10 +81,10 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     envoy_build_tools = dict(
         project_name = "envoy-build-tools",
         project_url = "https://github.com/envoyproxy/envoy-build-tools",
-        version = "1d6573e60207efaae6436b25ecc594360294f63a",
-        sha256 = "88e58fdb42021e64a0b35ae3554a82e92f5c37f630a4dab08a132fc77f8db4b7",
+        version = "2d13ad4157997715a4939bd218a89c81c26ff28e",
+        sha256 = "0dc8ce5eb645ae069ce710c1010975456f723ffd4fc788a03dacfcd0647b05b9",
         strip_prefix = "envoy-build-tools-{version}",
-        # 2020-07-18
+        # 2020-08-21
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/{version}.tar.gz"],
         use_category = ["build"],
     ),
@@ -409,8 +409,8 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_github_pallets_markupsafe = dict(
         project_name = "MarkupSafe",
         project_url = "https://github.com/pallets/markupsafe",
-        version = "1.1.1",
-        sha256 = "222a10e3237d92a9cd45ed5ea882626bc72bc5e0264d3ed0f2c9129fa69fc167",
+        version = "2.0.0a1",
+        sha256 = "2b0c5c2a067d9268813d55523bc513a12181cffb23b2f3d5618eb5d93776bad8",
         strip_prefix = "markupsafe-{version}/src",
         urls = ["https://github.com/pallets/markupsafe/archive/{version}.tar.gz"],
         use_category = ["build"],
@@ -508,9 +508,9 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     rules_foreign_cc = dict(
         project_name = "Rules for using foreign build systems in Bazel",
         project_url = "https://github.com/bazelbuild/rules_foreign_cc",
-        # 2020-06-09
-        version = "f54b7ae56dcf1b81bcafed3a08d58fc08ac095a7",
-        sha256 = "7ca49ac5b0bc8f5a2c9a7e87b7f86aca604bda197259c9b96f8b7f0a4f38b57b",
+        # 2020-08-21
+        version = "594bf4d7731e606a705f3ad787dd0a70c5a28b30",
+        sha256 = "2b1cf88de0b6e0195f6571cfde3a5bd406d11b42117d6adef2395c9525a1902e",
         strip_prefix = "rules_foreign_cc-{version}",
         urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/{version}.tar.gz"],
         use_category = ["build"],

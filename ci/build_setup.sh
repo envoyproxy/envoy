@@ -9,6 +9,7 @@ export PPROF_PATH=/thirdparty_build/bin/pprof
 [ -z "${NUM_CPUS}" ] && NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 [ -z "${ENVOY_SRCDIR}" ] && export ENVOY_SRCDIR=/source
 [ -z "${ENVOY_BUILD_TARGET}" ] && export ENVOY_BUILD_TARGET=//source/exe:envoy-static
+[ -z "${ENVOY_BUILD_DEBUG_INFORMATION}" ] && export ENVOY_BUILD_DEBUG_INFORMATION=//source/exe:envoy-static.dwp
 [ -z "${ENVOY_BUILD_ARCH}" ] && export ENVOY_BUILD_ARCH=$(uname -m)
 echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
 echo "ENVOY_BUILD_TARGET=${ENVOY_BUILD_TARGET}"
