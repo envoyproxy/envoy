@@ -175,10 +175,9 @@ size_t stableHashKey(const Key& key);
 // to determine what ranges are needed.
 class LookupRequest {
 public:
-  using HeaderVector = std::vector<const Http::HeaderEntry*>;
-
   // Prereq: request_headers's Path(), Scheme(), and Host() are non-null.
-  LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp);
+  LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
+                const absl::flat_hash_set<std::string>& allowed_vary_headers);
 
   const RequestCacheControl& requestCacheControl() const { return request_cache_control_; }
 
@@ -198,7 +197,7 @@ public:
   LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
                                 uint64_t content_length) const;
 
-  HeaderVector getVaryHeaders() const { return vary_headers_; }
+  const Http::RequestHeaderMapPtr& getVaryHeaders() const { return vary_headers_; }
 
 private:
   void initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers);
@@ -213,7 +212,8 @@ private:
   // storage implementation forwards lookup requests to a remote cache server that supports *vary*
   // headers, that server may need to see these headers. For local implementations, it may be
   // simpler to instead call makeLookupResult with each potential response.
-  HeaderVector vary_headers_;
+  // Warning: this should not be accesses out-of-thread!
+  Http::RequestHeaderMapPtr vary_headers_;
 
   RequestCacheControl request_cache_control_;
 };

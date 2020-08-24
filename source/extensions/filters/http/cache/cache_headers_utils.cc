@@ -176,7 +176,8 @@ absl::flat_hash_set<std::string> VaryHeader::parseAllowlist() {
   return {"accept-encoding"};
 }
 
-bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) {
+bool VaryHeader::isAllowed(const absl::flat_hash_set<std::string>& allowed_headers,
+                           const Http::ResponseHeaderMap& headers) {
   if (!hasVary(headers)) {
     return true;
   }
@@ -184,9 +185,9 @@ bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) {
   std::vector<std::string> varied_headers =
       parseHeaderValue(headers.get(Http::Headers::get().Vary));
 
-  // If the vary value was malformed, it will not be contained in allowed_headers_.
+  // If the vary value was malformed, it will not be contained in allowed_headers.
   for (const std::string& header : varied_headers) {
-    if (!allowed_headers_.contains(header)) {
+    if (!allowed_headers.contains(header)) {
       return false;
     }
   }
@@ -200,34 +201,26 @@ bool VaryHeader::hasVary(const Http::ResponseHeaderMap& headers) {
 }
 
 std::string VaryHeader::createVaryKey(const Http::HeaderEntry* vary_header,
-                                      const std::vector<const Http::HeaderEntry*>& entry_headers) {
+                                      const Http::RequestHeaderMapPtr& entry_headers) {
   if (!vary_header) {
     return "";
   }
 
   ASSERT(vary_header->key() == "vary");
 
-  std::string vary_key = "vary-key:";
-  std::string vary_key_values;
+  std::string vary_key = "vary-key\n";
 
   for (const std::string& header : parseHeaderValue(vary_header)) {
-    absl::StrAppend(&vary_key, header, ";");
-
-    for (const Http::HeaderEntry* cur_entry : entry_headers) {
-      if (cur_entry->key() == header) {
-        // TODO(cbdm): Can add some bucketing logic here based on header. For example, we could
-        // normalize the values for accept-language by making all of {en-CA, en-GB, en-US} into
-        // "en". This way we would not need to store multiple versions of the same payload, and any
-        // of those values would find the payload in the requested language.
-        absl::StrAppend(&vary_key_values, cur_entry->value().getStringView());
-        break;
-      }
-    }
-
-    absl::StrAppend(&vary_key_values, "\n");
+    // TODO(cbdm): Can add some bucketing logic here based on header. For example, we could
+    // normalize the values for accept-language by making all of {en-CA, en-GB, en-US} into
+    // "en". This way we would not need to store multiple versions of the same payload, and any
+    // of those values would find the payload in the requested language. The config should enable
+    // and control the bucketing wanted.
+    std::vector<absl::string_view> header_values;
+    Http::HeaderUtility::getAllOfHeader(*entry_headers, header, header_values);
+    absl::StrAppend(&vary_key, header, in_value_separator,
+                    absl::StrJoin(header_values, in_value_separator), header_separator);
   }
-
-  absl::StrAppend(&vary_key, "\n", vary_key_values);
 
   return vary_key;
 }
@@ -252,17 +245,17 @@ std::vector<std::string> VaryHeader::parseHeaderValue(const Http::HeaderEntry* v
   return header_values;
 }
 
-std::vector<const Http::HeaderEntry*>
-VaryHeader::possibleVariedHeaders(const Http::RequestHeaderMap& request_headers) {
-  // TODO(cbdm): Could use a map for faster lookup when combining these values with the response
-  // headers in createVaryKey.
-  std::vector<const Http::HeaderEntry*> possible_headers;
+Http::RequestHeaderMapPtr
+VaryHeader::possibleVariedHeaders(const absl::flat_hash_set<std::string>& allowed_headers,
+                                  const Http::RequestHeaderMap& request_headers) {
+  Http::RequestHeaderMapPtr possible_headers =
+      Http::createHeaderMap<Http::RequestHeaderMapImpl>({});
 
-  for (const std::string& header : allowed_headers_) {
-    const Http::HeaderEntry* cur_header = request_headers.get(Http::LowerCaseString(header));
-
-    if (cur_header) {
-      possible_headers.emplace_back(cur_header);
+  for (const std::string& header : allowed_headers) {
+    std::vector<absl::string_view> values;
+    Http::HeaderUtility::getAllOfHeader(request_headers, header, values);
+    for (const absl::string_view& value : values) {
+      possible_headers->addCopy(Http::LowerCaseString(header), value);
     }
   }
 

@@ -65,7 +65,8 @@ protected:
 
   LookupRequest makeLookupRequest(absl::string_view request_path) {
     request_headers_.setPath(request_path);
-    return LookupRequest(request_headers_, current_time_);
+    absl::flat_hash_set<std::string> allowed_vary_headers{"accept-encoding"};
+    return LookupRequest(request_headers_, current_time_, allowed_vary_headers);
   }
 
   AssertionResult expectLookupSuccessWithBody(LookupContext* lookup_context,

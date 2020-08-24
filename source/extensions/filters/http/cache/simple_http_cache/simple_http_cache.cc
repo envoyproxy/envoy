@@ -89,7 +89,7 @@ private:
 
   Key key_;
   Http::ResponseHeaderMapPtr response_headers_;
-  std::vector<const Http::HeaderEntry*> entry_vary_headers_;
+  const Http::RequestHeaderMapPtr& entry_vary_headers_;
   SimpleHttpCache& cache_;
   Buffer::OwnedImpl body_;
   bool committed_ = false;
@@ -135,7 +135,7 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
   // This method should be called from lookup, which holds the mutex for reading.
   mutex_.AssertReaderHeld();
 
-  const Http::HeaderEntry* vary_header = response_headers.get()->get(Http::Headers::get().Vary);
+  const Http::HeaderEntry* vary_header = response_headers->get(Http::Headers::get().Vary);
   ASSERT(vary_header);
 
   Key varied_request_key = request.key();
@@ -153,9 +153,9 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
       iter->second.body_};
 }
 
-void SimpleHttpCache::varyInsert(
-    const Key& request_key, Http::ResponseHeaderMapPtr&& response_headers, std::string&& body,
-    const std::vector<const Http::HeaderEntry*>& request_vary_headers) {
+void SimpleHttpCache::varyInsert(const Key& request_key,
+                                 Http::ResponseHeaderMapPtr&& response_headers, std::string&& body,
+                                 const Http::RequestHeaderMapPtr& request_vary_headers) {
   absl::WriterMutexLock lock(&mutex_);
 
   const Http::HeaderEntry* vary_header = response_headers->get(Http::Headers::get().Vary);
