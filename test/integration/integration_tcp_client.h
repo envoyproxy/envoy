@@ -69,4 +69,3 @@ private:
 using IntegrationTcpClientPtr = std::unique_ptr<IntegrationTcpClient>;
 
 } // namespace Envoy
-
