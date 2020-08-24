@@ -80,7 +80,11 @@ public:
     if (value_ == nullptr || !key.IsString()) {
       return {};
     }
-    auto out = value_->get(Http::LowerCaseString(std::string(key.StringOrDie().value())));
+    auto str = std::string(key.StringOrDie().value());
+    if (!Http::validHeaderString(str)) {
+      return {};
+    }
+    auto out = value_->get(Http::LowerCaseString(str));
     return convertHeaderEntry(out);
   }
   int size() const override { return value_ == nullptr ? 0 : value_->size(); }
