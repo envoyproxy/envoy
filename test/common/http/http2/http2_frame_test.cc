@@ -11,9 +11,6 @@
 namespace Envoy {
 namespace Http {
 namespace Http2 {
-
-class EqualityMetadataFrame : public ::testing::Test {};
-
 // From metadata map
 TEST(EqualityMetadataFrame, Http2FrameTest) {
   MetadataMap metadataMap = {{"Connections", "15"}, {"Timeout Seconds", "10"}};

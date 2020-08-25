@@ -214,38 +214,24 @@ Http2Frame Http2Frame::makeWindowUpdateFrame(uint32_t stream_index, uint32_t inc
   return frame;
 }
 
-Http2Frame Http2Frame::makeEmptyMetadataFrame(uint32_t stream_index, MetadataFlags flags) {
-  Http2Frame frame;
-  frame.buildHeader(Type::Metadata, 0, static_cast<uint8_t>(flags),
-                    makeRequestStreamId(stream_index));
-  return frame;
-}
-
-Http2Frame Http2Frame::makeMetadataFrameFromHex(uint32_t stream_index, absl::string_view metadata,
-                                                MetadataFlags flags) {
-  Http2Frame frame;
-  frame.buildHeader(Type::Metadata, metadata.size(), static_cast<uint8_t>(flags),
-                    makeRequestStreamId(stream_index));
-  frame.appendDataAfterHeaders(Hex::decode(std::string(metadata)));
-  return frame;
-}
-
 // Note: encoder in codebase persists multiple maps, with each map representing an individual frame.
 Http2Frame Http2Frame::makeMetadataFrameFromMetadataMap(uint32_t stream_index,
                                                         MetadataMap& metadata_map,
                                                         MetadataFlags flags) {
   const int numberOfNameValuePairs = metadata_map.size();
   absl::FixedArray<nghttp2_nv> nameValues(numberOfNameValuePairs);
-  int i = 0;
+  absl::FixedArray<nghttp2_nv>::iterator iterator = nameValues.begin();
   for (const auto& metadata : metadata_map) {
-    nameValues[i] = {const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(metadata.first.data())),
-                     const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(metadata.second.data())),
-                     metadata.first.size(), metadata.second.size(), NGHTTP2_NV_FLAG_NO_INDEX};
-    i++;
+    *iterator = {const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(metadata.first.data())),
+                 const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(metadata.second.data())),
+                 metadata.first.size(), metadata.second.size(), NGHTTP2_NV_FLAG_NO_INDEX};
+    iterator = std::next(iterator, 1);
   }
 
   nghttp2_hd_deflater* deflater;
-  nghttp2_hd_deflate_new(&deflater, 4096);
+  // Note: this has no effect, as metadata frames do not add onto Dynamic table.
+  const int maxDynamicTableSize = 4096;
+  nghttp2_hd_deflate_new(&deflater, maxDynamicTableSize);
 
   const size_t upperBoundBufferLength =
       nghttp2_hd_deflate_bound(deflater, nameValues.begin(), numberOfNameValuePairs);

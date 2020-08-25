@@ -109,10 +109,6 @@ public:
   static Http2Frame makeEmptyGoAwayFrame(uint32_t last_stream_index, ErrorCode error_code);
 
   static Http2Frame makeWindowUpdateFrame(uint32_t stream_index, uint32_t increment);
-  static Http2Frame makeEmptyMetadataFrame(uint32_t stream_index,
-                                           MetadataFlags flags = MetadataFlags::None);
-  static Http2Frame makeMetadataFrameFromHex(uint32_t stream_index, absl::string_view metadata,
-                                             MetadataFlags flags);
   static Http2Frame makeMetadataFrameFromMetadataMap(uint32_t stream_index,
                                                      MetadataMap& metadata_map,
                                                      MetadataFlags flags);
