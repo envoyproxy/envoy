@@ -35,7 +35,8 @@ int pemPasswordCallback(char* buf, int buf_size, int, void* u) {
     return 0;
   }
   std::string passphrase = *reinterpret_cast<std::string*>(u);
-  ASSERT(buf_size >= static_cast<int>(passphrase.size()));
+  RELEASE_ASSERT(buf_size >= static_cast<int>(passphrase.size()),
+                 "Passphrase was larger than buffer.");
   memcpy(buf, passphrase.data(), passphrase.size());
   return passphrase.size();
 }
@@ -52,7 +53,9 @@ class HandshakerTest : public SslCertsTest {
 protected:
   HandshakerTest()
       : dispatcher_(api_->allocateDispatcher("test_thread")), stream_info_(api_->timeSource()),
-        client_ctx_(SSL_CTX_new(TLS_method())), server_ctx_(SSL_CTX_new(TLS_method())) {
+        client_ctx_(SSL_CTX_new(TLS_method())), server_ctx_(SSL_CTX_new(TLS_method())) {}
+
+  void SetUp() override {
     // Set up key and cert, initialize two SSL objects and a pair of BIOs for
     // handshaking.
     auto key = makeKey();
@@ -61,13 +64,14 @@ protected:
 
     server_ssl_ = bssl::UniquePtr<SSL>(SSL_new(server_ctx_.get()));
     SSL_set_accept_state(server_ssl_.get());
-    ASSERT(
-        SSL_set_chain_and_key(server_ssl_.get(), chain.data(), chain.size(), key.get(), nullptr));
+    ASSERT_NE(key, nullptr);
+    ASSERT_EQ(1, SSL_set_chain_and_key(server_ssl_.get(), chain.data(), chain.size(), key.get(),
+                                       nullptr));
 
     client_ssl_ = bssl::UniquePtr<SSL>(SSL_new(client_ctx_.get()));
     SSL_set_connect_state(client_ssl_.get());
 
-    ASSERT(BIO_new_bio_pair(&client_bio_, kBufferLength, &server_bio_, kBufferLength));
+    ASSERT_EQ(1, BIO_new_bio_pair(&client_bio_, kBufferLength, &server_bio_, kBufferLength));
 
     BIO_up_ref(client_bio_);
     BIO_up_ref(server_bio_);
@@ -87,7 +91,8 @@ protected:
     bssl::UniquePtr<EVP_PKEY> key(EVP_PKEY_new());
 
     RSA* rsa = PEM_read_bio_RSAPrivateKey(bio.get(), nullptr, &pemPasswordCallback, &passphrase);
-    ASSERT(rsa && EVP_PKEY_assign_RSA(key.get(), rsa));
+    RELEASE_ASSERT(rsa != nullptr, "PEM_read_bio_RSAPrivateKey failed.");
+    RELEASE_ASSERT(1 == EVP_PKEY_assign_RSA(key.get(), rsa), "EVP_PKEY_assign_RSA failed.");
     return key;
   }
 
@@ -99,7 +104,9 @@ protected:
 
     uint8_t* data = nullptr;
     long len = 0;
-    ASSERT(PEM_bytes_read_bio(&data, &len, nullptr, PEM_STRING_X509, bio.get(), nullptr, nullptr));
+    RELEASE_ASSERT(
+        PEM_bytes_read_bio(&data, &len, nullptr, PEM_STRING_X509, bio.get(), nullptr, nullptr),
+        "PEM_bytes_read_bio failed");
     bssl::UniquePtr<uint8_t> tmp(data); // Prevents memory leak.
     return bssl::UniquePtr<CRYPTO_BUFFER>(CRYPTO_BUFFER_new(data, len, nullptr));
   }
@@ -179,8 +186,9 @@ public:
   }
 
   Network::PostIoAction doHandshake() override {
-    ASSERT(state() != Ssl::SocketState::HandshakeComplete &&
-           state() != Ssl::SocketState::ShutdownSent);
+    RELEASE_ASSERT(state() != Ssl::SocketState::HandshakeComplete &&
+                       state() != Ssl::SocketState::ShutdownSent,
+                   "Handshaker state was either complete or sent.");
 
     int rc = SSL_do_handshake(ssl());
     if (rc == 1) {
