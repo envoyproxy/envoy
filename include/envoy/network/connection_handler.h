@@ -94,15 +94,18 @@ public:
   virtual const std::string& statPrefix() const PURE;
 
   /**
-   * Close all sockets that were stored to retry when rebuilding succeeded. This function helps to
-   * avoid using updated listener to retry connections that belongs to old active tcp listeners.
+   * Close stored sockets when listener is updated. This function helps to avoid using updated
+   * listener to retry connections that can only be connected with old active tcp listeners. When a
+   * new listener does not include filter chains as the old listener does, those stored sockets
+   * waiting for this filter chain will be closed.
    */
-  virtual void closeAllSocketsOfOldListener(const std::string& listener_name) PURE;
+  virtual void closeSocketsOnListenerUpdate(Network::ListenerConfig& old_config,
+                                            Network::ListenerConfig& new_config) PURE;
 
   /**
-   * Retry all connections requiring this filter chain.
+   * Retry all stored sockets that require a filter chain after it is rebuilt successfully or not.
    */
-  virtual void retryAllConnections(
+  virtual void retryConnections(
       bool success,
       const envoy::config::listener::v3::FilterChain* const& filter_chain_message) PURE;
 

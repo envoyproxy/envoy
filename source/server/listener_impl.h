@@ -386,6 +386,10 @@ public:
   envoy::config::core::v3::TrafficDirection direction() const override {
     return config().traffic_direction();
   }
+  bool
+  containFilterChain(const envoy::config::listener::v3::FilterChain* const filter_chain) override {
+    return filter_chains_.find(filter_chain) != filter_chains_.end();
+  }
 
   // Stop rebuilding filter chain on timeout of rebuilder, make the filter chain back to a
   // placeholder. Will be called by the rebuilder.
@@ -491,6 +495,7 @@ private:
   // callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
 
+  absl::flat_hash_set<const envoy::config::listener::v3::FilterChain* const> filter_chains_;
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
 };

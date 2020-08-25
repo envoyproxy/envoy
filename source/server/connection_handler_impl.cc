@@ -37,12 +37,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     if (overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
         if (listener.second.listener_->listenerTag() == overridden_listener) {
-          // Since the listener is updated, the sockets stored inside 'sockets_using_filter_chain_'
-          // have no original tcp_listener to retry A brute force solution is that we close all the
-          // sockets stored for the old active tcp listener.
-          // TODO(ASOPVII): Possible optimization: Only close sockets that requires filter chain
-          // that have been removed in the new listener.
-          closeAllSocketsOfOldListener(config.name());
+          auto& old_config = *listener.second.tcp_listener_->get().config_;
+          closeSocketsOnListenerUpdate(old_config, config);
           listener.second.tcp_listener_->get().updateListenerConfig(config);
           return;
         }
@@ -115,22 +111,32 @@ void ConnectionHandlerImpl::enableListeners() {
   }
 }
 
-void ConnectionHandlerImpl::closeAllSocketsOfOldListener(const std::string& listener_name) {
-  ENVOY_LOG(debug, "close all sockets that listener:{} has stored because it is updated.",
+void ConnectionHandlerImpl::closeSocketsOnListenerUpdate(Network::ListenerConfig& old_config,
+                                                         Network::ListenerConfig& new_config) {
+  const std::string& listener_name = new_config.name();
+  ENVOY_LOG(debug,
+            "close sockets that the old listener {} has stored if the updated listener does not "
+            "contain the same filter chain.",
             listener_name);
-  for (auto& [filter_chain_message, listener_sockets_map] : sockets_using_filter_chain_) {
+  for (auto& [filter_chain_message, listener_sockets_map] : pending_sockets_) {
     for (auto& [name, socket_metadata_pairs] : listener_sockets_map) {
       if (name == listener_name) {
-        for (auto& [socket, metadata] : socket_metadata_pairs) {
-          socket->close();
+        if (old_config.containFilterChain(filter_chain_message) &&
+            !new_config.containFilterChain(filter_chain_message)) {
+          ENVOY_LOG(debug, "close sockets because the updated listener does not have the filter "
+                           "chain that the old one had.");
+          for (auto& [socket, metadata] : socket_metadata_pairs) {
+            socket->close();
+          }
+          listener_sockets_map.erase(name);
         }
+        break;
       }
     }
-    listener_sockets_map.erase(listener_name);
   }
 }
 
-void ConnectionHandlerImpl::retryAllConnections(
+void ConnectionHandlerImpl::retryConnections(
     bool success, const envoy::config::listener::v3::FilterChain* const& filter_chain_message) {
   // If the filter_chain_message has been cleared, we have no connections to retry.
   // TODO(ASOPVII): the sockets stored are still there, even though the listener has been updated.
@@ -139,17 +145,18 @@ void ConnectionHandlerImpl::retryAllConnections(
     ENVOY_LOG(debug, "filter chain has been cleared.");
     return;
   }
-  if (sockets_using_filter_chain_.find(filter_chain_message) == sockets_using_filter_chain_.end()) {
+  if (pending_sockets_.find(filter_chain_message) == pending_sockets_.end()) {
     ENVOY_LOG(debug, "filter chain is not found to store any sockets to retry connection.");
     return;
   }
-  auto& listener_sockets_map = sockets_using_filter_chain_[filter_chain_message];
+  auto& listener_sockets_map = pending_sockets_[filter_chain_message];
   // Go through all listeners on this worker, if a listener has sent request to rebuild
   // filter_chain, now retry connection with those stored sockets.
   for (auto& listener : listeners_) {
     if (listener.second.tcp_listener_.has_value()) {
       auto& active_tcp_listener = listener.second.tcp_listener_->get();
       const auto& listener_name = active_tcp_listener.config_->name();
+      ENVOY_LOG(debug, "connection handler has active tcp listener with name: {}.", listener_name);
       // Find all SocketMetadataPair of this active tcp listener.
       if (listener_sockets_map.find(listener_name) != listener_sockets_map.end()) {
         ENVOY_LOG(debug, "found listener: {} that has sockets to retry.", listener_name);
@@ -167,7 +174,7 @@ void ConnectionHandlerImpl::retryAllConnections(
       }
     }
   }
-  sockets_using_filter_chain_.erase(filter_chain_message);
+  pending_sockets_.erase(filter_chain_message);
 }
 
 void ConnectionHandlerImpl::ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
@@ -477,8 +484,8 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     // TODO(ASOPVII): listener update during old filter chain rebuilding sent to master.
     // New/old listeners share the same name. If new listener deletes one filter chain , some
     // sockets stored will be forgotten.
-    parent_.sockets_using_filter_chain_[filter_chain_message][listener_name].emplace_back(
-        std::move(socket), dynamic_metadata);
+    parent_.pending_sockets_[filter_chain_message][listener_name].emplace_back(std::move(socket),
+                                                                               dynamic_metadata);
 
     auto& server_dispatcher = config_->dispatcher();
     server_dispatcher.post([&filter_chain_message, &worker_name, &listener = config_]() {

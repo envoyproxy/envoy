@@ -230,7 +230,6 @@ void FilterChainManagerImpl::rebuildFilterChain(
     const envoy::config::listener::v3::FilterChain* const& filter_chain,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
-  Cleanup cleanup([this]() { origin_ = absl::nullopt; });
   if (filter_chain == nullptr) {
     return;
   }

@@ -176,6 +176,12 @@ public:
                      const std::string& worker_name) PURE;
 
   /**
+   * @return true if this listener contains the given filter chain.
+   */
+  virtual bool
+  containFilterChain(const envoy::config::listener::v3::FilterChain* const filter_chain) PURE;
+
+  /**
    * @return pending connection backlog for TCP listeners.
    */
   virtual uint32_t tcpBacklogSize() const PURE;

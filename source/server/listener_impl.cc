@@ -224,7 +224,6 @@ Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *d
 // Must be overridden
 Init::Manager& ListenerFactoryContextBaseImpl::initManager() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-// Since we use non-virtual function of listenerImpl, we can not make the rebuilder a virtual class.
 PerFilterChainRebuilder::PerFilterChainRebuilder(
     ListenerImpl& listener, const envoy::config::listener::v3::FilterChain* const& filter_chain,
     Configuration::FactoryContext& factory_context)
@@ -259,8 +258,8 @@ PerFilterChainRebuilder::createFilterChainFactoryContext(
 }
 
 void PerFilterChainRebuilder::callbackToWorkers(bool success) {
-  // Find all matching workers and listeners, sending callbacks.
-  // TODO(ASOPVII): Possible optimization: send callback to all workers.
+  // Send callbacks to all stored workers.
+  // Possible optimization: send callback to all workers.
   for (const auto& worker_name : workers_to_callback_) {
     ENVOY_LOG(debug, "rebuilding completed, callback to worker: {}", worker_name);
     if (listener_.hasWorker(worker_name)) {
@@ -272,6 +271,7 @@ void PerFilterChainRebuilder::callbackToWorkers(bool success) {
   }
   workers_to_callback_.clear();
 }
+
 void PerFilterChainRebuilder::startRebuilding() {
   // If rebuild_timeout_ = 0, timeout is disabled.
   if (rebuild_timeout_.count() > 0) {
@@ -422,6 +422,9 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
   buildProxyProtocolListenerFilter();
   buildTlsInspectorListenerFilter();
   open_connections_ = origin.open_connections_;
+  for (const auto& filter_chain : config.filter_chains()) {
+    filter_chains_.insert(&filter_chain);
+  }
 }
 
 void ListenerImpl::buildAccessLog() {

@@ -50,9 +50,9 @@ public:
         listener_filter_matcher_(std::make_shared<NiceMock<Network::MockListenerFilterMatcher>>()) {
     TestUtility::loadFromYaml(
         TestEnvironment::substitute(on_demand_filter_chain_yaml, Network::Address::IpVersion::v4),
-        on_demand_filter_chain_template_);
+        on_demand_filter_chain_message_);
     on_demand_filter_chain_ =
-        std::make_shared<Network::Test::EmptyFilterChain>(&on_demand_filter_chain_template_);
+        std::make_shared<Network::Test::EmptyFilterChain>(&on_demand_filter_chain_message_);
     ON_CALL(*listener_filter_matcher_, matches(_)).WillByDefault(Return(false));
   }
 
@@ -121,6 +121,11 @@ public:
     Event::Dispatcher& dispatcher() override { return parent_.master_dispatcher_; }
     void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const&,
                             const std::string&) override {}
+    bool containFilterChain(const envoy::config::listener::v3::FilterChain* const) override {
+      // for testing listener update with new listener remove old filter chain. We set old listener
+      // contain the filter chain, while updated listener not.
+      return inline_filter_chain_manager_ == nullptr ? true : false;
+    }
 
     ResourceLimit& openConnections() override { return open_connections_; }
     uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
@@ -241,7 +246,7 @@ public:
         name: tls
       on_demand_configuration: {}
   )EOF";
-  envoy::config::listener::v3::FilterChain on_demand_filter_chain_template_;
+  envoy::config::listener::v3::FilterChain on_demand_filter_chain_message_;
   Stats::TestUtil::TestStore stats_store_;
   std::shared_ptr<Network::MockListenSocketFactory> socket_factory_;
   Network::Address::InstanceConstSharedPtr local_address_{
@@ -567,10 +572,10 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingSuccess) {
 
   // After start rebuilding, rebuilt filter chain will be stored inside placeholder.
   on_demand_filter_chain_->storeRebuiltFilterChain(filter_chain_);
-  // Master thread sends callback to worker to call retryAllConnections. Then newConnection will be
+  // Master thread sends callback to worker to call retryConnections. Then newConnection will be
   // called again. At this time, the same filter chain is found not to be a placeholder. Will call
   // createServerConnection.
-  handler_->retryAllConnections(true, &on_demand_filter_chain_template_);
+  handler_->retryConnections(true, &on_demand_filter_chain_message_);
   EXPECT_EQ(1UL, handler_->numConnections());
 
   connection->close(Network::ConnectionCloseType::NoFlush);
@@ -608,9 +613,9 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingFail) {
   // Filter chain manager will make the filter chain back to a placeholder.
   on_demand_filter_chain_->backToPlaceholder();
 
-  // Master thread sends callback to worker to call retryAllConnections.
+  // Master thread sends callback to worker to call retryConnections.
   // Since rebuilding fails, the socket will be closed with no new connections created.
-  handler_->retryAllConnections(false, &on_demand_filter_chain_template_);
+  handler_->retryConnections(false, &on_demand_filter_chain_message_);
   EXPECT_EQ(0UL, handler_->numConnections());
 
   EXPECT_CALL(*listener, onDestroy());
@@ -656,10 +661,10 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainMultipleRebuildingRequests) {
 
   // After start rebuilding, rebuilt filter chain will be stored inside placeholder.
   on_demand_filter_chain_->storeRebuiltFilterChain(filter_chain_);
-  // Master thread sends callback to worker to call retryAllConnections. Then newConnection will be
+  // Master thread sends callback to worker to call retryConnections. Then newConnection will be
   // called again. At this time, the same filter chain is found not to be a placeholder. Will call
   // createServerConnection.
-  handler_->retryAllConnections(true, &on_demand_filter_chain_template_);
+  handler_->retryConnections(true, &on_demand_filter_chain_message_);
   EXPECT_EQ(3UL, handler_->numConnections());
 
   EXPECT_CALL(*listener, onDestroy());
@@ -699,16 +704,18 @@ TEST_F(ConnectionHandlerTest, ListenerUpdateDuringOnDemandFilterChainRebuilding)
       addListener(new_listener_tag, true, false, "test_listener", /* Network::Listener */ nullptr,
                   &new_listener_callbacks, nullptr, nullptr, Network::Socket::Type::Stream,
                   std::chrono::milliseconds(15000), false, overridden_filter_chain_manager);
-  // Will close all sockets of the old listener when listener update.
-  // EXPECT_CALL(handler_, closeAllSocketsOfOldListener(_).Times(1));
+  // Will close some sockets of the old listener when listener is updated.
+  // EXPECT_CALL(handler_, closeSocketsOnListenerUpdate(_).Times(1));
   handler_->addListener(old_listener_tag, *new_test_listener);
 
   ASSERT_EQ(new_listener_callbacks, nullptr)
       << "new listener should be inplace added and callback should not change";
 
-  // All sockets closed, no new connection will be created.
-  handler_->retryAllConnections(true, &on_demand_filter_chain_template_);
-  EXPECT_EQ(0UL, handler_->numConnections());
+  // On listener updated, some stored sockets will be closed when the new listener does not have the
+  // filter chain. However, if the new listener include the same filter chain as the old listener,
+  // those sockets will not be closed.
+  handler_->retryConnections(true, &on_demand_filter_chain_message_);
+  EXPECT_EQ(0L, handler_->numConnections());
   EXPECT_CALL(*old_listener, onDestroy());
 }
 

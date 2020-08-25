@@ -718,6 +718,9 @@ private:
     Event::Dispatcher& dispatcher() override { return *parent_.dispatcher_; }
     void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const&,
                             const std::string&) override {}
+    bool containFilterChain(const envoy::config::listener::v3::FilterChain* const) override {
+      return false;
+    }
 
     FakeUpstream& parent_;
     const std::string name_;

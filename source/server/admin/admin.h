@@ -393,6 +393,10 @@ private:
     Event::Dispatcher& dispatcher() override { return parent_.server_.dispatcher(); }
     void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const&,
                             const std::string&) override {}
+    bool containFilterChain(const envoy::config::listener::v3::FilterChain* const) override {
+      return false;
+    }
+
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
 
     AdminImpl& parent_;
@@ -446,7 +450,7 @@ private:
     void backToPlaceholder() override {
       is_placeholder_ = true;
       has_rebuilt_filter_chain_ = false;
-      // rebuilt_filter_chain_.reset();
+      rebuilt_filter_chain_.reset();
       rebuilt_filter_chain_ = nullptr;
     }
 

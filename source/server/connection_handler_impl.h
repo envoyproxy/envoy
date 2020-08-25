@@ -83,8 +83,11 @@ public:
   void enableListeners() override;
   const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
 
-  void closeAllSocketsOfOldListener(const std::string& listener_name) override;
-  void retryAllConnections(
+  // Will close stored sockets that require the filter chains owned by the old listener only.
+  void closeSocketsOnListenerUpdate(Network::ListenerConfig& old_config,
+                                    Network::ListenerConfig& new_config) override;
+
+  void retryConnections(
       bool success,
       const envoy::config::listener::v3::FilterChain* const& filter_chain_message) override;
 
@@ -350,7 +353,7 @@ private:
   // map<filter_chain_message, map<listener_name, list<SocketMetadataPair>>>
   absl::flat_hash_map<const envoy::config::listener::v3::FilterChain* const,
                       absl::flat_hash_map<std::string, std::list<SocketMetadataPair>>>
-      sockets_using_filter_chain_;
+      pending_sockets_;
 };
 
 /**
