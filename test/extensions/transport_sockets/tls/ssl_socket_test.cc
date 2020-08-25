@@ -15,6 +15,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
+#include "common/stream_info/stream_info_impl.h"
 
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/context_impl.h"
