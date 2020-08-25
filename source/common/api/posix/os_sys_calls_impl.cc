@@ -110,9 +110,8 @@ bool OsSysCallsImpl::supportsUdpGso() const {
 #endif
 }
 
-bool OsSysCallsImpl::supportsIpTransparent(bool check_v4only) const {
+bool OsSysCallsImpl::supportsIpTransparent() const {
 #if !defined(__linux__)
-  UNREFERENCED_PARAMETER(check_v4only);
   return false;
 #else
   // The linux kernel supports IP_TRANSPARENT by following patch(starting from v2.6.28) :
@@ -125,7 +124,7 @@ bool OsSysCallsImpl::supportsIpTransparent(bool check_v4only) const {
   //
   // And these socket options need CAP_NET_ADMIN capability to be applied.
   // The CAP_NET_ADMIN capability should be applied by root user before call this function.
-  static const bool is_supported = [check_v4only] {
+  static const bool is_supported = [] {
     // Check ipv4 case
     int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
     if (fd < 0) {
@@ -137,16 +136,14 @@ bool OsSysCallsImpl::supportsIpTransparent(bool check_v4only) const {
     if (!result) {
       return false;
     }
-    if (!check_v4only) {
-      // Check ipv6 case
-      fd = ::socket(AF_INET6, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
-      if (fd < 0) {
-        return false;
-      }
-      val = 1;
-      result = (0 == ::setsockopt(fd, IPPROTO_IPV6, IPV6_TRANSPARENT, &val, sizeof(val)));
-      ::close(fd);
+    // Check ipv6 case
+    fd = ::socket(AF_INET6, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
+    if (fd < 0) {
+      return false;
     }
+    val = 1;
+    result = (0 == ::setsockopt(fd, IPPROTO_IPV6, IPV6_TRANSPARENT, &val, sizeof(val)));
+    ::close(fd);
     return result;
   }();
   return is_supported;

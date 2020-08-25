@@ -1,6 +1,5 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
-#include "envoy/network/exception.h"
 
 #include "common/network/socket_impl.h"
 #include "common/network/socket_option_impl.h"
@@ -25,7 +24,6 @@ using testing::InSequence;
 using testing::InvokeWithoutArgs;
 using testing::Return;
 using testing::ReturnNew;
-using testing::ReturnRef;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -155,19 +153,15 @@ public:
   };
 
   UdpProxyFilterTest()
-      : UdpProxyFilterTest(Network::Utility::parseInternetAddressAndPort(listener_ip_address_),
-                           Network::Utility::parseInternetAddressAndPort(peer_ip_address_)) {}
+      : UdpProxyFilterTest(Network::Utility::parseInternetAddressAndPort(peer_ip_address_)) {}
 
-  explicit UdpProxyFilterTest(Network::Address::InstanceConstSharedPtr&& listener_address,
-                              Network::Address::InstanceConstSharedPtr&& peer_address)
-      : os_calls_(&os_sys_calls_), listener_address_(std::move(listener_address)),
+  explicit UdpProxyFilterTest(Network::Address::InstanceConstSharedPtr&& peer_address)
+      : os_calls_(&os_sys_calls_),
         upstream_address_(Network::Utility::parseInternetAddressAndPort(upstream_ip_address_)),
         peer_address_(std::move(peer_address)) {
     // Disable strict mock warnings.
-    ON_CALL(os_sys_calls_, supportsIpTransparent(_)).WillByDefault(Return(true));
-    ON_CALL(callbacks_.udp_listener_, localAddress()).WillByDefault(ReturnRef(listener_address_));
+    ON_CALL(os_sys_calls_, supportsIpTransparent()).WillByDefault(Return(true));
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
-    EXPECT_CALL(callbacks_.udp_listener_, localAddress()).Times(AtLeast(0));
     EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, address())
         .WillRepeatedly(Return(upstream_address_));
     EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, health())
@@ -176,7 +170,7 @@ public:
 
   ~UdpProxyFilterTest() override { EXPECT_CALL(callbacks_.udp_listener_, onDestroy()); }
 
-  void setup(const std::string& yaml, bool has_cluster = true, bool may_occur_exception = false) {
+  void setup(const std::string& yaml, bool has_cluster = true) {
     envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig config;
     TestUtility::loadFromYamlAndValidate(yaml, config);
     config_ = std::make_shared<UdpProxyFilterConfig>(cluster_manager_, time_system_, stats_store_,
@@ -184,12 +178,10 @@ public:
     EXPECT_CALL(cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),
                         ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
-    if (!may_occur_exception) {
-      if (has_cluster) {
-        EXPECT_CALL(cluster_manager_, get(_));
-      } else {
-        EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(nullptr));
-      }
+    if (has_cluster) {
+      EXPECT_CALL(cluster_manager_, get(_));
+    } else {
+      EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(nullptr));
     }
     filter_ = std::make_unique<TestUdpProxyFilter>(callbacks_, config_);
   }
@@ -260,17 +252,6 @@ use_original_src_ip: true
     checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
   }
 
-  void ensureExitNoIpTransparentSocketOptionSupport(const std::string& error_message) {
-    auto config = R"EOF(
-stat_prefix: foo
-cluster: fake_cluster
-use_original_src_ip: true
-    )EOF";
-
-    EXPECT_THROW_WITH_REGEX(setup(config, true, true), Network::CreateListenerException,
-                            error_message);
-  }
-
   bool isTransparentSocketOptionsSupported() {
     for (const auto& option_name : transparent_options_) {
       if (!option_name.hasValue()) {
@@ -291,12 +272,10 @@ use_original_src_ip: true
   Upstream::ClusterUpdateCallbacks* cluster_update_callbacks_{};
   std::unique_ptr<TestUdpProxyFilter> filter_;
   std::vector<TestSession> test_sessions_;
-  Network::Address::InstanceConstSharedPtr listener_address_;
   const Network::Address::InstanceConstSharedPtr upstream_address_;
   const Network::Address::InstanceConstSharedPtr peer_address_;
   const std::vector<Network::SocketOptionName> transparent_options_{ENVOY_SOCKET_IP_TRANSPARENT,
                                                                     ENVOY_SOCKET_IPV6_TRANSPARENT};
-  inline static const std::string listener_ip_address_ = "0.0.0.0:2000";
   inline static const std::string upstream_ip_address_ = "20.0.0.1:443";
   inline static const std::string peer_ip_address_ = "10.0.0.1:1000";
 };
@@ -308,15 +287,13 @@ public:
             Network::Utility::parseInternetAddressAndPort(upstream_ipv6_address_)) {}
 
   explicit UdpProxyFilterIpv6Test(Network::Address::InstanceConstSharedPtr&& upstream_address_v6)
-      : UdpProxyFilterTest(Network::Utility::parseInternetAddressAndPort(listener_ipv6_address_),
-                           Network::Utility::parseInternetAddressAndPort(peer_ipv6_address_)),
+      : UdpProxyFilterTest(Network::Utility::parseInternetAddressAndPort(peer_ipv6_address_)),
         upstream_address_v6_(std::move(upstream_address_v6)) {
     EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, address())
         .WillRepeatedly(Return(upstream_address_v6_));
   }
 
   const Network::Address::InstanceConstSharedPtr upstream_address_v6_;
-  inline static const std::string listener_ipv6_address_ = "[::1]:2000";
   inline static const std::string upstream_ipv6_address_ = "[2001:db8:85a3::8a2e:370:7334]:443";
   inline static const std::string peer_ipv6_address_ = "[2001:db8:85a3::9a2e:370:7334]:1000";
 };
@@ -638,7 +615,7 @@ TEST_F(UdpProxyFilterTest, SocketOptionForUseOriginalSrcIp) {
     // The option is not supported on this platform. Just skip the test.
     GTEST_SKIP();
   }
-  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(true));
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent());
 
   InSequence s;
 
@@ -651,7 +628,7 @@ TEST_F(UdpProxyFilterIpv6Test, SocketOptionForUseOriginalSrcIpInCaseOfIpv6) {
     // The option is not supported on this platform. Just skip the test.
     GTEST_SKIP();
   }
-  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(false));
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent());
 
   InSequence s;
 
@@ -693,28 +670,23 @@ cluster: fake_cluster
   ensureNoIpTransparentSocketOptions();
 }
 
-// Make sure print error when use the use_original_src_ip but platform does not support ip
+// Make sure exit when use the use_original_src_ip but platform does not support ip
 // transparent option.
-TEST_F(UdpProxyFilterTest, ErrorIpTransparentNoPlatformSupport) {
-  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(true)).WillOnce(Return(false));
+TEST_F(UdpProxyFilterTest, ExitIpTransparentNoPlatformSupport) {
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent()).WillOnce(Return(false));
 
   InSequence s;
 
-  ensureExitNoIpTransparentSocketOptionSupport(
-      "The platform does not support either IP_TRANSPARENT or the envoy is not running with the "
-      "CAP_NET_ADMIN capability.");
-}
+  auto config = R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+use_original_src_ip: true
+  )EOF";
 
-// Make sure print error when use the use_original_src_ip but platform does not support ipv6
-// transparent option.
-TEST_F(UdpProxyFilterIpv6Test, ErrorIpv6TransparentNoPlatformSupport) {
-  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(false)).WillOnce(Return(false));
-
-  InSequence s;
-
-  ensureExitNoIpTransparentSocketOptionSupport(
-      "The platform does not support either IPV6_TRANSPARENT or the envoy is not running with the "
-      "CAP_NET_ADMIN capability.");
+  EXPECT_THROW_WITH_REGEX(
+      setup(config), EnvoyException,
+      "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy is "
+      "not running with the CAP_NET_ADMIN capability.");
 }
 
 } // namespace

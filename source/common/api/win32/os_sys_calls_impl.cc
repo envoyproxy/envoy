@@ -179,7 +179,7 @@ bool OsSysCallsImpl::supportsUdpGso() const {
   return false;
 }
 
-bool OsSysCallsImpl::supportsIpTransparent(bool) const {
+bool OsSysCallsImpl::supportsIpTransparent() const {
   // Windows doesn't support it.
   return false;
 }
