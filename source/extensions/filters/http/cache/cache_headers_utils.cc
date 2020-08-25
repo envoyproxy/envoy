@@ -173,7 +173,7 @@ absl::flat_hash_set<std::string> VaryHeader::parseAllowlist() {
   // envoy::extensions::filters::http::cache::v3alpha::CacheConfig::allowed_vary_headers.
   // Need to make sure that the headers we add here are valid values (i.e., not malformed). That
   // way, we won't have to check this again in isAllowed.
-  return {"accept"};
+  return {"x-temporary-standin-header-name"};
 }
 
 bool VaryHeader::isAllowed(const absl::flat_hash_set<std::string>& allowed_headers,
@@ -200,8 +200,18 @@ bool VaryHeader::hasVary(const Http::ResponseHeaderMap& headers) {
   return vary_header != nullptr && !vary_header->value().empty();
 }
 
+namespace {
+// The separator characters are used to create the vary-key, and must be characters that are
+// invalid to be inside values and header names. The chosen characters are invalid per:
+// https://tools.ietf.org/html/rfc2616#section-4.2.
+// Used to separate the values of different headers.
+const std::string header_separator = "\n";
+// Used to separate multiple values of a same header.
+static const std::string in_value_separator = "\r";
+}; // namespace
+
 std::string VaryHeader::createVaryKey(const Http::HeaderEntry* vary_header,
-                                      const Http::RequestHeaderMapPtr& entry_headers) {
+                                      const Http::RequestHeaderMap& entry_headers) {
   if (vary_header == nullptr) {
     return "";
   }
@@ -219,7 +229,7 @@ std::string VaryHeader::createVaryKey(const Http::HeaderEntry* vary_header,
     // do that normalization and could be used as an inspiration for some bucketing configuration.
     // The config should enable and control the bucketing wanted.
     std::vector<absl::string_view> header_values;
-    Http::HeaderUtility::getAllOfHeader(*entry_headers, header, header_values);
+    Http::HeaderUtility::getAllOfHeader(entry_headers, header, header_values);
     absl::StrAppend(&vary_key, header, in_value_separator,
                     absl::StrJoin(header_values, in_value_separator), header_separator);
   }

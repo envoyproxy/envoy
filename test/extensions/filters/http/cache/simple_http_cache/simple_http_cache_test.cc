@@ -65,6 +65,7 @@ protected:
 
   LookupRequest makeLookupRequest(absl::string_view request_path) {
     request_headers_.setPath(request_path);
+    // Using 'accept' as an allowed header to be varied for testing-purpose.
     absl::flat_hash_set<std::string> allowed_vary_headers{"accept"};
     return LookupRequest(request_headers_, current_time_, allowed_vary_headers);
   }

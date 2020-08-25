@@ -89,7 +89,7 @@ private:
 
   Key key_;
   Http::ResponseHeaderMapPtr response_headers_;
-  const Http::RequestHeaderMapPtr& entry_vary_headers_;
+  const Http::RequestHeaderMap& entry_vary_headers_;
   SimpleHttpCache& cache_;
   Buffer::OwnedImpl body_;
   bool committed_ = false;
@@ -155,7 +155,7 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
 
 void SimpleHttpCache::varyInsert(const Key& request_key,
                                  Http::ResponseHeaderMapPtr&& response_headers, std::string&& body,
-                                 const Http::RequestHeaderMapPtr& request_vary_headers) {
+                                 const Http::RequestHeaderMap& request_vary_headers) {
   absl::WriterMutexLock lock(&mutex_);
 
   const Http::HeaderEntry* vary_header = response_headers->get(Http::Headers::get().Vary);
@@ -169,8 +169,7 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
 
   // Add a special entry to flag that this request generates varied responses.
   auto iter = map_.find(request_key);
-  const bool first_entry = (iter == map_.end());
-  if (first_entry) {
+  if (iter == map_.end()) {
     Http::ResponseHeaderMapPtr vary_only_map =
         Http::createHeaderMap<Http::ResponseHeaderMapImpl>({});
     vary_only_map->setCopy(Http::Headers::get().Vary, vary_header->value().getStringView());

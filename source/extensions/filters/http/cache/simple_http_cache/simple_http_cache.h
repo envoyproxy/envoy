@@ -38,7 +38,7 @@ public:
 
   // Inserts a response that has been varied on certain headers.
   void varyInsert(const Key& request_key, Http::ResponseHeaderMapPtr&& response_headers,
-                  std::string&& body, const Http::RequestHeaderMapPtr& request_vary_headers);
+                  std::string&& body, const Http::RequestHeaderMap& request_vary_headers);
 
   absl::Mutex mutex_;
   absl::flat_hash_map<Key, Entry, MessageUtil, MessageUtil> map_ ABSL_GUARDED_BY(mutex_);

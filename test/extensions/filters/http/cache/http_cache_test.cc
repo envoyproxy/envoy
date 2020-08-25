@@ -36,6 +36,7 @@ public:
                                                   {"x-forwarded-proto", "https"},
                                                   {":authority", "example.com"}};
 
+  // Using 'accept' as an allowed header to be varied for testing-purpose.
   absl::flat_hash_set<std::string> allowed_vary_headers_{"accept"};
 
   static const SystemTime& currentTime() {
@@ -602,10 +603,10 @@ TEST_P(ParseInvalidRangeHeaderTest, InvalidRangeReturnsEmpty) {
 TEST_F(LookupRequestTest, VariedHeaders) {
   request_headers_.addCopy("accept", "image/*");
   const LookupRequest lookup_request(request_headers_, currentTime(), allowed_vary_headers_);
-  const Http::RequestHeaderMapPtr& result = lookup_request.getVaryHeaders();
+  const Http::RequestHeaderMap& result = lookup_request.getVaryHeaders();
 
-  ASSERT_TRUE(result->get(Http::LowerCaseString("accept")));
-  ASSERT_EQ(result->get(Http::LowerCaseString("accept"))->value().getStringView(), "image/*");
+  ASSERT_TRUE(result.get(Http::LowerCaseString("accept")));
+  ASSERT_EQ(result.get(Http::LowerCaseString("accept"))->value().getStringView(), "image/*");
 }
 
 } // namespace

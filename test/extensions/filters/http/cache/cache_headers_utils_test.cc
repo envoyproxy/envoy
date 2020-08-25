@@ -455,7 +455,7 @@ TEST(CreateVaryKey, EmptyVaryEntry) {
 
   ASSERT_EQ(VaryHeader::createVaryKey(
                 headers.get(Http::Headers::get().Vary),
-                VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
+                *VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
             "vary-key\n\r\n");
 }
 
@@ -465,7 +465,7 @@ TEST(CreateVaryKey, SingleHeaderExists) {
 
   ASSERT_EQ(VaryHeader::createVaryKey(
                 headers.get(Http::Headers::get().Vary),
-                VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
+                *VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
             "vary-key\naccept\r"
             "image/*\n");
 }
@@ -476,7 +476,7 @@ TEST(CreateVaryKey, SingleHeaderMissing) {
 
   ASSERT_EQ(VaryHeader::createVaryKey(
                 headers.get(Http::Headers::get().Vary),
-                VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
+                *VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
             "vary-key\naccept\r\n");
 }
 
@@ -487,7 +487,7 @@ TEST(CreateVaryKey, MultipleHeadersAllExist) {
 
   ASSERT_EQ(VaryHeader::createVaryKey(
                 headers.get(Http::Headers::get().Vary),
-                VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
+                *VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
             "vary-key\naccept\r"
             "image/*\naccept-language\r"
             "en-us\nwidth\r640\n");
@@ -499,7 +499,7 @@ TEST(CreateVaryKey, MultipleHeadersSomeExist) {
 
   ASSERT_EQ(VaryHeader::createVaryKey(
                 headers.get(Http::Headers::get().Vary),
-                VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
+                *VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
             "vary-key\naccept\r"
             "image/*\naccept-language\r\nwidth\r640\n");
 }
@@ -511,7 +511,7 @@ TEST(CreateVaryKey, ExtraRequestHeaders) {
 
   ASSERT_EQ(VaryHeader::createVaryKey(
                 headers.get(Http::Headers::get().Vary),
-                VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
+                *VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
             "vary-key\naccept\r"
             "image/*\nwidth\r640\n");
 }
@@ -522,7 +522,7 @@ TEST(CreateVaryKey, MultipleHeadersNoneExist) {
 
   ASSERT_EQ(VaryHeader::createVaryKey(
                 headers.get(Http::Headers::get().Vary),
-                VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
+                *VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
             "vary-key\naccept\r\naccept-language\r\nwidth\r\n");
 }
 
@@ -533,12 +533,12 @@ TEST(CreateVaryKey, DifferentHeadersSameValue) {
   Http::TestRequestHeaderMapImpl request_headers1{{"accept", "foo"}};
   std::string vary_key1 = VaryHeader::createVaryKey(
       headers.get(Http::Headers::get().Vary),
-      VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers1));
+      *VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers1));
 
   Http::TestRequestHeaderMapImpl request_headers2{{"accept-language", "foo"}};
   std::string vary_key2 = VaryHeader::createVaryKey(
       headers.get(Http::Headers::get().Vary),
-      VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers2));
+      *VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers2));
 
   ASSERT_NE(vary_key1, vary_key2);
 }
@@ -549,7 +549,7 @@ TEST(CreateVaryKey, MultiValueSameHeader) {
 
   ASSERT_EQ(VaryHeader::createVaryKey(
                 headers.get(Http::Headers::get().Vary),
-                VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
+                *VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
             "vary-key\nwidth\r"
             "foo\r"
             "bar\n");
@@ -620,6 +620,13 @@ TEST(PossibleVariedHeaders, MultiValueDifferentHeaders) {
   EXPECT_EQ(values[1], "en-US");
 
   EXPECT_FALSE(result->get(Http::LowerCaseString("width")));
+}
+
+TEST(VaryParseAllowlist, TempValue) {
+  // TODO(cbdm): This test should be expanded when the allowlist parsing is done.
+  absl::flat_hash_set<std::string> allowed = VaryHeader::parseAllowlist();
+  EXPECT_EQ(allowed.size(), 1);
+  EXPECT_TRUE(allowed.contains("x-temporary-standin-header-name"));
 }
 
 } // namespace
