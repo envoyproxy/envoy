@@ -19,7 +19,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -139,8 +139,10 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
 RawConnectionDriver::~RawConnectionDriver() = default;
 
 void RawConnectionDriver::waitForConnection() {
+  // TODO(mattklein123): Add a timeout and switch to events and waitFor().
   while (!callbacks_->connected() && !callbacks_->closed()) {
-    Event::GlobalTimeSystem().timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+    Event::GlobalTimeSystem().timeSystem().realSleepDoNotUseWithoutScrutiny(
+        std::chrono::milliseconds(10));
     dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   }
 }

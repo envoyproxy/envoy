@@ -26,6 +26,7 @@ CAS
 CB
 CDS
 CEL
+LTT
 ceil
 CHACHA
 CHLO
@@ -69,6 +70,7 @@ DRYs
 DS
 DST
 DW
+DWORD
 EADDRINUSE
 EADDRNOTAVAIL
 EAGAIN
@@ -211,6 +213,7 @@ NS
 NUL
 Nilsson
 Nonhashable
+Oauth
 OCSP
 OK
 OOM
@@ -350,6 +353,7 @@ WRONGPASS
 WRR
 WS
 WSA
+WSABUF
 WSS
 Welford's
 Wi
@@ -813,6 +817,7 @@ nullopt
 nullptr
 num
 numkeys
+oauth
 observability
 ocagent
 offsetof
@@ -927,6 +932,7 @@ realloc
 rebalanced
 rebalancing
 rebuffer
+rebuilder
 reconnection
 recurse
 recv

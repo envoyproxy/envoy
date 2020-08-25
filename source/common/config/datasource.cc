@@ -64,8 +64,8 @@ RemoteAsyncDataProvider::RemoteAsyncDataProvider(
     }
   }
 
-  backoff_strategy_ =
-      std::make_unique<JitteredBackOffStrategy>(base_interval_ms, max_interval_ms, random);
+  backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(base_interval_ms,
+                                                                           max_interval_ms, random);
   retry_timer_ = dispatcher.createTimer([this]() -> void { start(); });
 
   manager.add(init_target_);
