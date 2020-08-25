@@ -18,4 +18,7 @@ do
       bazel query "rdeps($SEARCH_FOLDER, $line, 1)" 2>/dev/null
       ;;
   esac
-done | sort -u
+done | sort -u | head -n 10 | tee $TMP_OUTPUT_FILE
+
+export BUILD_TARGETS=$(cat $TMP_OUTPUT_FILE)
+rm $TMP_OUTPUT_FILE

@@ -25,10 +25,6 @@ jobs:
       run: |
        echo "::set-env name=ORIGINAL_HEAD::$(git rev-parse HEAD)"
 
-    - name: Check Environment variable
-      run: |
-       echo $ORIGINAL_HEAD
-
     # If this run was triggered by a pull request event, then checkout
     # the head of the pull request instead of the merge commit.
     - run: git checkout HEAD^2
@@ -56,7 +52,8 @@ jobs:
        echo $ORIGINAL_HEAD
        bazel/setup_clang.sh bin/clang10
        bazelisk shutdown
-       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ $(.github/workflows/get_build_targets.sh)
+       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ $(. .github/workflows/get_build_targets.sh)
+       echo $BUILD_TARGETS
 
     - name: Clean Artifacts
       run: |
