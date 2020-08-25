@@ -444,7 +444,8 @@ public:
 
   // Http::ServerConnectionCallbacks
   Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder, bool) override;
-  void onGoAway(Http::GoAwayErrorCode) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  // Should only be called for HTTP2
+  void onGoAway(Http::GoAwayErrorCode code) override;
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
@@ -473,6 +474,7 @@ private:
     FakeHttpConnection& parent_;
   };
 
+  const Type type_;
   Http::ServerConnectionPtr codec_;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);
 };
