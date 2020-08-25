@@ -175,7 +175,8 @@ public:
    * to fetch throughout the lifetime of the Subscription object.
    * @param resources set of resource names to fetch.
    */
-  virtual void start(const std::set<std::string>& resource_names, const bool use_prefix_matching = false) PURE;
+  virtual void start(const std::set<std::string>& resource_names,
+                     const bool use_prefix_matching = false) PURE;
 
   /**
    * Update the resources to fetch.

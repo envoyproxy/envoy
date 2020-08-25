@@ -45,10 +45,10 @@ public:
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
 
-
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
-                           OpaqueResourceDecoder& resource_decoder, const bool use_prefix_matching = false) override;
+                           OpaqueResourceDecoder& resource_decoder,
+                           const bool use_prefix_matching = false) override;
 
   void handleDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message);
@@ -99,9 +99,7 @@ private:
       parent_.queueDiscoveryRequest(type_url_);
     }
 
-    void add(const std::set<std::string>&) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
+    void add(const std::set<std::string>&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
     std::set<std::string> resources_;
     SubscriptionCallbacks& callbacks_;

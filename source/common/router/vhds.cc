@@ -32,8 +32,9 @@ VhdsSubscription::VhdsSubscription(
       scope_(factory_context.scope().createScope(stat_prefix + "vhds." +
                                                  config_update_info_->routeConfigName() + ".")),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
-      init_target_(fmt::format("VhdsConfigSubscription {}", config_update_info_->routeConfigName()),
-                   [this]() { subscription_->start({config_update_info_->routeConfigName()}, true); }),
+      init_target_(
+          fmt::format("VhdsConfigSubscription {}", config_update_info_->routeConfigName()),
+          [this]() { subscription_->start({config_update_info_->routeConfigName()}, true); }),
       route_config_providers_(route_config_providers) {
   const auto& config_source = config_update_info_->routeConfiguration()
                                   .vhds()

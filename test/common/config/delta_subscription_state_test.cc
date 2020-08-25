@@ -57,7 +57,8 @@ protected:
     *message.mutable_removed_resources() = removed_resources;
     message.set_system_version_info(version_info);
     message.set_nonce(nonce);
-    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _, _)).WillOnce(Throw(EnvoyException(error_message)));
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _, _))
+        .WillOnce(Throw(EnvoyException(error_message)));
     return state_.handleResponse(message);
   }
 

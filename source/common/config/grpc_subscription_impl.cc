@@ -19,7 +19,8 @@ GrpcSubscriptionImpl::GrpcSubscriptionImpl(
       init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated) {}
 
 // Config::Subscription
-void GrpcSubscriptionImpl::start(const std::set<std::string>& resources, const bool use_prefix_matching) {
+void GrpcSubscriptionImpl::start(const std::set<std::string>& resources,
+                                 const bool use_prefix_matching) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
@@ -48,8 +49,7 @@ void GrpcSubscriptionImpl::updateResourceInterest(
   stats_.update_attempt_.inc();
 }
 
-void GrpcSubscriptionImpl::addResourceInterest(
-    const std::set<std::string>& add_these_names) {
+void GrpcSubscriptionImpl::addResourceInterest(const std::set<std::string>& add_these_names) {
   watch_->add(add_these_names);
   stats_.update_attempt_.inc();
 }
