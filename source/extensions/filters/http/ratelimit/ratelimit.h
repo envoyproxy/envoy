@@ -99,16 +99,18 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
-  explicit FilterConfigPerRoute(
+  FilterConfigPerRoute(
       const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute& config)
       : vh_rate_limits_(config.vh_rate_limits()) {}
-  envoy::extensions::filters::http::ratelimit::v3::VhRateLimitsOptions
+
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
   virtualHostRateLimits() const {
     return vh_rate_limits_;
   }
 
 private:
-  envoy::extensions::filters::http::ratelimit::v3::VhRateLimitsOptions vh_rate_limits_;
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
+      vh_rate_limits_;
 };
 
 /**

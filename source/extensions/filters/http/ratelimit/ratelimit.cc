@@ -61,13 +61,11 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
                                  route_entry, headers);
     break;
   case VhRateLimitOptions::Override:
+  default:
     if (route_entry->rateLimitPolicy().empty()) {
       populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
                                    route_entry, headers);
     }
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (!descriptors.empty()) {
@@ -254,15 +252,19 @@ VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteCons
     const auto* specific_per_route_config =
         Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
             HttpFilterNames::get().RateLimit, route);
-    switch (specific_per_route_config->virtualHostRateLimits()) {
-    case envoy::extensions::filters::http::ratelimit::v3::VhRateLimitsOptions::INCLUDE:
-      vh_rate_limits_ = VhRateLimitOptions::Include;
-      break;
-    case envoy::extensions::filters::http::ratelimit::v3::VhRateLimitsOptions::IGNORE:
-      vh_rate_limits_ = VhRateLimitOptions::Ignore;
-      break;
-    case envoy::extensions::filters::http::ratelimit::v3::VhRateLimitsOptions::OVERRIDE:
-    default:
+    if (specific_per_route_config != nullptr) {
+      switch (specific_per_route_config->virtualHostRateLimits()) {
+      case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE:
+        vh_rate_limits_ = VhRateLimitOptions::Include;
+        break;
+      case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::IGNORE:
+        vh_rate_limits_ = VhRateLimitOptions::Ignore;
+        break;
+      case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OVERRIDE:
+      default:
+        vh_rate_limits_ = VhRateLimitOptions::Override;
+      }
+    } else {
       vh_rate_limits_ = VhRateLimitOptions::Override;
     }
   }

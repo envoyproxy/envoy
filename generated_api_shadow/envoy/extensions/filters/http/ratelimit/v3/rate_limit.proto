@@ -19,17 +19,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Rate limit :ref:`configuration overview <config_http_filters_rate_limit>`.
 // [#extension: envoy.filters.http.ratelimit]
 
-enum VhRateLimitsOptions {
-  // Use the virtual host rate limits unless the route has a rate limit policy
-  OVERRIDE = 0;
-
-  // Use the virtual host rate limits even if the route has a rate limit policy
-  INCLUDE = 1;
-
-  // Ignore the virtual host rate limits even if the route does not have a rate limit policy
-  IGNORE = 2;
-}
-
 // [#next-free-field: 9]
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type =
@@ -113,6 +102,17 @@ message RateLimit {
 }
 
 message RateLimitPerRoute {
+  enum VhRateLimitsOptions {
+    // Use the virtual host rate limits unless the route has a rate limit policy
+    OVERRIDE = 0;
+
+    // Use the virtual host rate limits even if the route has a rate limit policy
+    INCLUDE = 1;
+
+    // Ignore the virtual host rate limits even if the route does not have a rate limit policy
+    IGNORE = 2;
+  }
+
   // Specifies if the rate limit filter should include the virtual host rate limits.
   VhRateLimitsOptions vh_rate_limits = 1 [(validate.rules).enum = {defined_only: true}];
 }

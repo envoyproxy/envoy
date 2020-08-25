@@ -927,7 +927,7 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) 
   SetUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
   settings.set_vh_rate_limits(
-      envoy::extensions::filters::http::ratelimit::v3::VhRateLimitsOptions::OVERRIDE);
+      envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OVERRIDE);
   FilterConfigPerRoute per_route_config_(settings);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
@@ -978,7 +978,7 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) 
   SetUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
   settings.set_vh_rate_limits(
-      envoy::extensions::filters::http::ratelimit::v3::VhRateLimitsOptions::OVERRIDE);
+      envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OVERRIDE);
   FilterConfigPerRoute per_route_config_(settings);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
@@ -1030,7 +1030,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) 
   SetUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
   settings.set_vh_rate_limits(
-      envoy::extensions::filters::http::ratelimit::v3::VhRateLimitsOptions::INCLUDE);
+      envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE);
   FilterConfigPerRoute per_route_config_(settings);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
@@ -1079,7 +1079,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitS
   SetUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
   settings.set_vh_rate_limits(
-      envoy::extensions::filters::http::ratelimit::v3::VhRateLimitsOptions::INCLUDE);
+      envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE);
   FilterConfigPerRoute per_route_config_(settings);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
@@ -1130,7 +1130,7 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
   SetUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
   settings.set_vh_rate_limits(
-      envoy::extensions::filters::http::ratelimit::v3::VhRateLimitsOptions::IGNORE);
+      envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::IGNORE);
   FilterConfigPerRoute per_route_config_(settings);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
@@ -1178,7 +1178,7 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
   SetUpTest(filter_config_);
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
   settings.set_vh_rate_limits(
-      envoy::extensions::filters::http::ratelimit::v3::VhRateLimitsOptions::IGNORE);
+      envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::IGNORE);
   FilterConfigPerRoute per_route_config_(settings);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
