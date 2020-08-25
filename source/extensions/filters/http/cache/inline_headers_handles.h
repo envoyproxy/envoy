@@ -9,7 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-// An internal header that represents the time at which a cached response was recevied by the cache.
+// An internal header that represents the time at which a cached response was received by the cache.
 // This header is added to cached responses and removed before they are served.
 // This represents "response_time" in the age header calculations at:
 // https://httpwg.org/specs/rfc7234.html#age.calculations
