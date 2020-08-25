@@ -117,11 +117,6 @@ def envoy_cc_fuzz_test(
             "//conditions:default": [],
         }),
         linkstatic = envoy_linkstatic(),
-        args = select({
-            "@envoy//bazel:libfuzzer_coverage": ["$(locations %s)" % corpus_name],
-            "@envoy//bazel:libfuzzer": [],
-            "//conditions:default": ["$(locations %s)" % corpus_name],
-        }),
         data = [corpus_name],
         # No fuzzing on macOS or Windows
         deps = select({
@@ -145,22 +140,24 @@ def envoy_cc_fuzz_test(
         testonly = True,
     )
 
-    # Target for regression test
-    fuzzing_launcher(
-        name = name,
-        target = name + "_binary",
-        corpus = name + "_corpus_dir" if corpus_name else None,
-        is_regression = True,
-        testonly = True,
-    )
-
     # Target for continuous fuzzing test or regression gUnit test
     fuzzing_launcher(
         name = name + "_run",
         target = name + "_binary",
         corpus = name + "_corpus_dir" if corpus_name else None,
-        is_regression = False,
+        is_regression = select({
+            "@envoy//bazel:libfuzzer": False,
+            "//conditions:default": True,
+        }),
         testonly = True,
+    )
+
+    # Target for regression test
+    native.sh_test(
+        name = name,
+        srcs = ["//bazel:fuzzing_test.sh"],
+        data = [name + "_run"],
+        args = ["$(locations %s)" % (name + "_run")],
     )
 
     # This target exists only for
