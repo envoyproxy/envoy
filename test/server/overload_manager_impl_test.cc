@@ -31,32 +31,49 @@ namespace {
 
 class FakeResourceMonitor : public ResourceMonitor {
 public:
-  FakeResourceMonitor(Event::Dispatcher& dispatcher)
-      : success_(true), pressure_(0), error_("fake error"), dispatcher_(dispatcher) {}
+  FakeResourceMonitor(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher), response_(0.0) {}
 
-  void setPressure(double pressure) {
-    success_ = true;
-    pressure_ = pressure;
+  void setPressure(double pressure) { response_ = pressure; }
+
+  void setError() { response_ = EnvoyException("fake_error"); }
+
+  void setUpdateAsync(bool new_update_async) {
+    callbacks_.reset();
+    update_async_ = new_update_async;
   }
 
-  void setError() { success_ = false; }
-
   void updateResourceUsage(ResourceMonitor::Callbacks& callbacks) override {
-    if (success_) {
-      Server::ResourceUsage usage;
-      usage.resource_pressure_ = pressure_;
-      dispatcher_.post([&, usage]() { callbacks.onSuccess(usage); });
+    if (update_async_) {
+      callbacks_.emplace(callbacks);
     } else {
-      EnvoyException& error = error_;
-      dispatcher_.post([&, error]() { callbacks.onFailure(error); });
+      publishUpdate(callbacks);
+    }
+  }
+
+  void publishUpdate() {
+    if (update_async_) {
+      ASSERT(callbacks_.has_value());
+      publishUpdate(*callbacks_);
+      callbacks_.reset();
     }
   }
 
 private:
-  bool success_;
-  double pressure_;
-  EnvoyException error_;
+  void publishUpdate(ResourceMonitor::Callbacks& callbacks) {
+    if (absl::holds_alternative<double>(response_)) {
+      Server::ResourceUsage usage;
+      usage.resource_pressure_ = absl::get<double>(response_);
+      dispatcher_.post([&, usage]() { callbacks.onSuccess(usage); });
+    } else {
+      EnvoyException& error = absl::get<EnvoyException>(response_);
+      dispatcher_.post([&, error]() { callbacks.onFailure(error); });
+    }
+  }
+
   Event::Dispatcher& dispatcher_;
+  absl::variant<double, EnvoyException> response_;
+  bool update_async_ = false;
+  absl::optional<std::reference_wrapper<ResourceMonitor::Callbacks>> callbacks_;
 };
 
 template <class ConfigType>
@@ -87,8 +104,9 @@ protected:
   OverloadManagerImplTest()
       : factory1_("envoy.resource_monitors.fake_resource1"),
         factory2_("envoy.resource_monitors.fake_resource2"),
-        factory3_("envoy.resource_monitors.fake_resource3"), register_factory1_(factory1_),
-        register_factory2_(factory2_), register_factory3_(factory3_),
+        factory3_("envoy.resource_monitors.fake_resource3"),
+        factory4_("envoy.resource_monitors.fake_resource4"), register_factory1_(factory1_),
+        register_factory2_(factory2_), register_factory3_(factory3_), register_factory4_(factory4_),
         api_(Api::createApiForTest(stats_)) {}
 
   void setDispatcherExpectation() {
@@ -120,6 +138,9 @@ protected:
       resource_monitors {
         name: "envoy.resource_monitors.fake_resource3"
       }
+      resource_monitors {
+        name: "envoy.resource_monitors.fake_resource4"
+      }
       actions {
         name: "envoy.overload_actions.dummy_action"
         triggers {
@@ -141,24 +162,11 @@ protected:
             saturation_threshold: 0.8
           }
         }
-      }
-    )EOF";
-  }
-
-  std::string getConfigSimple() {
-    return R"EOF(
-      refresh_interval {
-        seconds: 1
-      }
-      resource_monitors {
-        name: "envoy.resource_monitors.fake_resource1"
-      }
-      actions {
-        name: "envoy.overload_actions.dummy_action"
         triggers {
-          name: "envoy.resource_monitors.fake_resource1"
-          threshold {
-            value: 0.9
+          name: "envoy.resource_monitors.fake_resource4"
+          scaled {
+            scaling_threshold: 0.5
+            saturation_threshold: 0.8
           }
         }
       }
@@ -173,9 +181,11 @@ protected:
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Struct> factory1_;
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory2_;
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory3_;
+  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory4_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory1_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory2_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory3_;
+  Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory4_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Event::MockTimer>* timer_; // not owned
   Stats::TestUtil::TestStore stats_;
@@ -354,19 +364,89 @@ TEST_F(OverloadManagerImplTest, FailedUpdates) {
   manager->stop();
 }
 
+TEST_F(OverloadManagerImplTest, AggregatesMultipleResourceUpdates) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(getConfig()));
+  manager->start();
+
+  const OverloadActionState& action_state =
+      manager->getThreadLocalOverloadState().getState("envoy.overload_actions.dummy_action");
+
+  factory1_.monitor_->setUpdateAsync(true);
+
+  // Monitor 2 will respond immediately at the timer callback, but that won't push an update to the
+  // thread-local state because monitor 1 hasn't finished its update yet.
+  factory2_.monitor_->setPressure(1.0);
+  timer_cb_();
+
+  EXPECT_FALSE(action_state.isSaturated());
+
+  // Once the last monitor publishes, the change to the action takes effect.
+  factory1_.monitor_->publishUpdate();
+  EXPECT_TRUE(action_state.isSaturated());
+}
+
+TEST_F(OverloadManagerImplTest, DelayedUpdatesAreCoalesced) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(getConfig()));
+  manager->start();
+
+  const OverloadActionState& action_state =
+      manager->getThreadLocalOverloadState().getState("envoy.overload_actions.dummy_action");
+
+  factory3_.monitor_->setUpdateAsync(true);
+  factory4_.monitor_->setUpdateAsync(true);
+
+  timer_cb_();
+  // When monitor 3 publishes its update, the action won't be visible to the thread-local state
+  factory3_.monitor_->setPressure(0.6);
+  factory3_.monitor_->publishUpdate();
+  EXPECT_EQ(action_state.value(), 0.0);
+
+  // Now when monitor 4 publishes a larger value, the update from monitor 3 is skipped.
+  EXPECT_FALSE(action_state.isSaturated());
+  factory4_.monitor_->setPressure(0.65);
+  factory4_.monitor_->publishUpdate();
+  EXPECT_EQ(action_state.value(), 0.5 /* = (0.65 - 0.5) / (0.8 - 0.5) */);
+}
+
+TEST_F(OverloadManagerImplTest, FlushesUpdatesEvenWithOneUnresponsive) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(getConfig()));
+  manager->start();
+
+  const OverloadActionState& action_state =
+      manager->getThreadLocalOverloadState().getState("envoy.overload_actions.dummy_action");
+
+  // Set monitor 1 to async, but never publish updates for it.
+  factory1_.monitor_->setUpdateAsync(true);
+
+  // Monitor 2 will respond immediately at the timer callback, but that won't push an update to the
+  // thread-local state because monitor 1 hasn't finished its update yet.
+  factory2_.monitor_->setPressure(1.0);
+  timer_cb_();
+
+  EXPECT_FALSE(action_state.isSaturated());
+  // A second timer callback will flush the update from monitor 2, even though monitor 1 is
+  // unresponsive.
+  timer_cb_();
+  EXPECT_TRUE(action_state.isSaturated());
+}
+
 TEST_F(OverloadManagerImplTest, SkippedUpdates) {
   setDispatcherExpectation();
 
-  // Save the post callback instead of executing it.
-  // Note that this test works for only one resource. If using the default config,
-  // two events fire, so a list of all post_cb's between timer_cb_'s would need to be invoked.
-  Event::PostCb post_cb;
-  ON_CALL(dispatcher_, post(_)).WillByDefault(Invoke([&](Event::PostCb cb) { post_cb = cb; }));
-
-  auto manager(createOverloadManager(getConfigSimple()));
+  auto manager(createOverloadManager(getConfig()));
   manager->start();
   Stats::Counter& skipped_updates =
       stats_.counter("overload.envoy.resource_monitors.fake_resource1.skipped_updates");
+  Stats::Gauge& pressure_gauge1 =
+      stats_.gauge("overload.envoy.resource_monitors.fake_resource1.pressure",
+                   Stats::Gauge::ImportMode::NeverImport);
+
+  factory1_.monitor_->setUpdateAsync(true);
+  EXPECT_EQ(0, pressure_gauge1.value());
+  factory1_.monitor_->setPressure(0.3);
 
   timer_cb_();
   EXPECT_EQ(0, skipped_updates.value());
@@ -374,7 +454,10 @@ TEST_F(OverloadManagerImplTest, SkippedUpdates) {
   EXPECT_EQ(1, skipped_updates.value());
   timer_cb_();
   EXPECT_EQ(2, skipped_updates.value());
-  post_cb();
+
+  factory1_.monitor_->publishUpdate();
+  EXPECT_EQ(30, pressure_gauge1.value());
+
   timer_cb_();
   EXPECT_EQ(2, skipped_updates.value());
 

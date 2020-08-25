@@ -228,8 +228,16 @@ void OverloadManagerImpl::start() {
   }
 
   timer_ = dispatcher_.createTimer([this]() -> void {
+    // Guarantee that all resource updates get flushed after no more than one refresh_interval_.
+    flushResourceUpdates();
+
+    // Start a new flush epoch. If all resource updates complete before this callback runs, the last
+    // resource update will call flushResourceUpdates to flush the whole batch early.
+    ++flush_epoch_;
+    flush_awaiting_updates_ = resources_.size();
+
     for (auto& resource : resources_) {
-      resource.second.update();
+      resource.second.update(flush_epoch_);
     }
 
     timer_->enableTimer(refresh_interval_);
@@ -266,32 +274,66 @@ ThreadLocalOverloadState& OverloadManagerImpl::getThreadLocalOverloadState() {
   return tls_->getTyped<ThreadLocalOverloadStateImpl>();
 }
 
-void OverloadManagerImpl::updateResourcePressure(const std::string& resource, double pressure) {
-  auto action_range = resource_to_actions_.equal_range(resource);
-  std::for_each(action_range.first, action_range.second,
-                [&](ResourceToActionMap::value_type& entry) {
-                  const std::string& action = entry.second;
-                  auto action_it = actions_.find(action);
-                  ASSERT(action_it != actions_.end());
-                  const OverloadActionState old_state = action_it->second.getState();
-                  if (action_it->second.updateResourcePressure(resource, pressure)) {
-                    const auto state = action_it->second.getState();
+void OverloadManagerImpl::updateResourcePressure(const std::string& resource, double pressure,
+                                                 FlushEpochId flush_epoch) {
+  auto [start, end] = resource_to_actions_.equal_range(resource);
 
-                    if (old_state.isSaturated() != state.isSaturated()) {
-                      ENVOY_LOG(debug, "Overload action {} became {}", action,
-                                (state.isSaturated() ? "saturated" : "scaling"));
-                    }
-                    tls_->runOnAllThreads([this, action, state] {
-                      tls_->getTyped<ThreadLocalOverloadStateImpl>().setState(action, state);
-                    });
-                    auto callback_range = action_to_callbacks_.equal_range(action);
-                    std::for_each(callback_range.first, callback_range.second,
-                                  [&](ActionToCallbackMap::value_type& cb_entry) {
-                                    auto& cb = cb_entry.second;
-                                    cb.dispatcher_.post([&, state]() { cb.callback_(state); });
-                                  });
-                  }
-                });
+  std::for_each(start, end, [&](ResourceToActionMap::value_type& entry) {
+    const std::string& action = entry.second;
+    auto action_it = actions_.find(action);
+    ASSERT(action_it != actions_.end());
+    const OverloadActionState old_state = action_it->second.getState();
+    if (action_it->second.updateResourcePressure(resource, pressure)) {
+      const auto state = action_it->second.getState();
+
+      if (old_state.isSaturated() != state.isSaturated()) {
+        ENVOY_LOG(debug, "Overload action {} became {}", action,
+                  (state.isSaturated() ? "saturated" : "scaling"));
+      }
+
+      // Record the updated value to be sent to workers on the next thread-local-state flush, along
+      // with any update callbacks. This might overwrite a previous action state change caused by a
+      // pressure update for a different resource that hasn't been flushed yet. That's okay because
+      // the state recorded here includes the information from all previous resource updates. So
+      // even if resource 1 causes an action to have value A, and a later update to resource 2
+      // causes the action to have value B, B would have been the result for whichever order the
+      // updates to resources 1 and 2 came in.
+      state_updates_to_flush_.insert_or_assign(action, state);
+      auto [callbacks_start, callbacks_end] = action_to_callbacks_.equal_range(action);
+      std::for_each(callbacks_start, callbacks_end, [&](ActionToCallbackMap::value_type& cb_entry) {
+        callbacks_to_flush_.insert_or_assign(&cb_entry.second, state);
+      });
+    }
+  });
+
+  // Eagerly flush updates if this is the last call to updateResourcePressure expected for the
+  // current epoch. This assert is always valid because flush_awaiting_updates_ is initialized
+  // before each batch of updates, and even if a resource monitor performs a double update, or a
+  // previous update callback is late, the logic in OverloadManager::Resource::update() will prevent
+  // unexpected calls to this function.
+  ASSERT(flush_awaiting_updates_ > 0);
+  --flush_awaiting_updates_;
+  if (flush_epoch == flush_epoch_ && flush_awaiting_updates_ == 0) {
+    flushResourceUpdates();
+  }
+}
+
+void OverloadManagerImpl::flushResourceUpdates() {
+  if (!state_updates_to_flush_.empty()) {
+    auto shared_updates = std::make_shared<absl::flat_hash_map<std::string, OverloadActionState>>();
+    std::swap(*shared_updates, state_updates_to_flush_);
+
+    tls_->runOnAllThreads([this, updates = std::move(shared_updates)] {
+      for (const auto& [action, state] : *updates) {
+        tls_->getTyped<ThreadLocalOverloadStateImpl>().setState(action, state);
+      }
+    });
+  }
+
+  for (const auto& [cb, state] : callbacks_to_flush_) {
+    cb->dispatcher_.post([cb = cb, state = state]() { cb->callback_(state); });
+  }
+  callbacks_to_flush_.clear();
 }
 
 OverloadManagerImpl::Resource::Resource(const std::string& name, ResourceMonitorPtr monitor,
@@ -302,9 +344,10 @@ OverloadManagerImpl::Resource::Resource(const std::string& name, ResourceMonitor
       failed_updates_counter_(makeCounter(stats_scope, name, "failed_updates")),
       skipped_updates_counter_(makeCounter(stats_scope, name, "skipped_updates")) {}
 
-void OverloadManagerImpl::Resource::update() {
+void OverloadManagerImpl::Resource::update(FlushEpochId flush_epoch) {
   if (!pending_update_) {
     pending_update_ = true;
+    flush_epoch_ = flush_epoch;
     monitor_->updateResourceUsage(*this);
     return;
   }
@@ -314,7 +357,7 @@ void OverloadManagerImpl::Resource::update() {
 
 void OverloadManagerImpl::Resource::onSuccess(const ResourceUsage& usage) {
   pending_update_ = false;
-  manager_.updateResourcePressure(name_, usage.resource_pressure_);
+  manager_.updateResourcePressure(name_, usage.resource_pressure_, flush_epoch_);
   pressure_gauge_.set(usage.resource_pressure_ * 100); // convert to percent
 }
 
