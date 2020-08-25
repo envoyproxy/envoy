@@ -75,9 +75,9 @@ public:
     // Wait until alarm processing for the current thread completes when disabling from outside the
     // event loop thread. This helps avoid data races when deleting Alarm objects from outside the
     // event loop thread.
-    if (!not_running_cbs_ && !thread_advancing_time_.isEmpty() &&
+    if (running_cbs_ && !thread_advancing_time_.isEmpty() &&
         thread_advancing_time_ != thread_factory_.currentThreadId()) {
-      mutex_.Await(absl::Condition(&not_running_cbs_));
+      waitForNoRunningCallbacksLockHeld();
     }
   }
 
@@ -90,7 +90,7 @@ public:
       absl::MutexLock lock(&mutex_);
       // Wait until the event loop associated with this scheduler is not executing callbacks so time
       // does not change in the middle of a callback.
-      mutex_.Await(absl::Condition(&not_running_cbs_));
+      waitForNoRunningCallbacksLockHeld();
       monotonic_time_ = monotonic_time;
       system_time_ = system_time;
       if (!pending_dec_ && (!registered_alarms_.empty() || !triggered_alarms_.empty())) {
@@ -117,6 +117,11 @@ public:
   }
 
 private:
+  void waitForNoRunningCallbacksLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+    mutex_.Await(absl::Condition(
+        +[](bool* running_cbs) -> bool { return !*running_cbs; }, &running_cbs_));
+  }
+
   void disableAlarmLockHeld(Alarm& alarm) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Collect expired alarms and execute associated callbacks.
@@ -196,7 +201,7 @@ private:
   SchedulableCallbackPtr run_alarms_cb_;
 
   absl::Mutex mutex_;
-  bool not_running_cbs_ ABSL_GUARDED_BY(mutex_) = true;
+  bool running_cbs_ ABSL_GUARDED_BY(mutex_) = false;
   AlarmSet registered_alarms_ ABSL_GUARDED_BY(mutex_);
   AlarmSet triggered_alarms_ ABSL_GUARDED_BY(mutex_);
 
@@ -319,17 +324,17 @@ void SimulatedTimeSystemHelper::SimulatedScheduler::runReadyAlarms() {
       registered_alarms_.remove(alarm_registration.alarm_);
     }
 
-    ASSERT(not_running_cbs_);
-    not_running_cbs_ = false;
+    ASSERT(!running_cbs_);
+    running_cbs_ = true;
     while (!triggered_alarms_.empty()) {
       Alarm& alarm = triggered_alarms_.next().alarm_;
       triggered_alarms_.remove(alarm);
       UnlockGuard unlocker(mutex_);
       alarm.runAlarm();
     }
-    ASSERT(!not_running_cbs_);
+    ASSERT(running_cbs_);
     ASSERT(monotonic_time == monotonic_time_);
-    not_running_cbs_ = true;
+    running_cbs_ = false;
   }
   if (dec_pending) {
     time_system_.decPending();
