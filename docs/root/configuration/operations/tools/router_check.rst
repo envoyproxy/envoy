@@ -67,10 +67,10 @@ expects a cluster name match of "instant-server".::
       host_rewrite: ...,
       path_rewrite: ...,
       path_redirect: ...,
-      request_header_fields:
+      request_header_matches:
         - key: ...,
           value: ...
-      response_header_fields:
+      response_header_matches:
         - key: ...,
           value: ...
 
@@ -149,16 +149,24 @@ validate
   path_redirect
     *(optional, string)* Match the returned redirect path.
 
-  request_header_fields, response_header_fields
-    *(optional, array)*  Match the listed header fields. Examples header fields include the "path", "cookie",
-    and "date" fields. The header fields are checked after all other test cases. Thus, the header fields checked
-    will be those of the redirected or rewritten routes when applicable.
+  request_header_matches, response_header_matches
+    *(optional, array)*  Matchers for the listed headers. Examples header fields include the "path", "cookie",
+    and "date" fields, as well as custom headers set in the input or by the route. The header fields are checked
+    after all other test cases. Thus, the header fields checked will be those of the redirected or rewritten
+    routes when applicable.
+     - Matchers are specified as :ref:`HeaderMatchers <envoy_api_msg_route.HeaderMatcher>`, but not all options are supported in this tool.
 
-    key
+    name
       *(required, string)* The name of the header field to match.
 
-    value
-      *(required, string)* The value of the header field to match.
+    exact_match
+      *(optional, string)* The exact value of the header field to match.
+
+    present_match
+      *(optional, boolean)* If true, checks only for header presence.
+
+    invert_match
+      *(optional, boolean)* The exact value of the header field to match.
 
 Coverage
 --------

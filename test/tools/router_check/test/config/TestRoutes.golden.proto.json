@@ -289,22 +289,22 @@
       },
       "validate": {
         "host_rewrite": "new_host",
-        "request_header_fields": [
+        "request_header_matches": [
           {
-            "key": ":authority",
-            "value": "new_host"
+            "name": ":authority",
+            "exact_match": "new_host"
           },
           {
-            "key": ":path",
-            "value": "/host/rewrite/me"
+            "name": ":path",
+            "exact_match": "/host/rewrite/me"
           },
           {
-            "key": ":method",
-            "value": "GET"
+            "name": ":method",
+            "exact_match": "GET"
           },
           {
-            "key": ":cookie",
-            "value": ""
+            "name": ":cookie",
+            "exact_match": ""
           }
         ]
       }
@@ -317,10 +317,10 @@
         "method": "GET"
       },
       "validate": {
-        "request_header_fields": [
+        "request_header_matches": [
           {
-            "key": "X-Client-IP",
-            "value": "127.0.0.1"
+            "name": "X-Client-IP",
+            "exact_match": "127.0.0.1"
           }
         ]
       }
@@ -339,10 +339,10 @@
         "path_rewrite": "",
         "virtual_cluster_name": "",
         "virtual_host_name": "",
-        "response_header_fields": [
+        "request_header_matches": [
           {
-            "key": "content-type",
-            "value": "text/plain"
+            "name": "content-type",
+            "exact_match": "text/plain"
           }
         ]
       }

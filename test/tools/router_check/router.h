@@ -128,23 +128,32 @@ private:
   bool compareRedirectPath(ToolConfig& tool_config, const std::string& expected);
   bool compareRedirectPath(ToolConfig& tool_config,
                            const envoy::RouterCheckToolSchema::ValidationAssert& expected);
-  bool compareRequestHeaderField(ToolConfig& tool_config, const std::string& field,
-                                 const std::string& expected);
-  bool compareRequestHeaderField(ToolConfig& tool_config,
-                                 const envoy::RouterCheckToolSchema::ValidationAssert& expected);
-  bool compareResponseHeaderField(ToolConfig& tool_config, const std::string& field,
-                                  const std::string& expected);
-  bool compareResponseHeaderField(ToolConfig& tool_config,
+  bool compareRequestHeaderFields(ToolConfig& tool_config,
                                   const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+  bool compareResponseHeaderFields(ToolConfig& tool_config,
+                                   const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+  template <typename HM>
+  bool matchHeaderField(const HM& header_map, const envoy::config::route::v3::HeaderMatcher& header,
+                        const std::string test_type);
+  template <typename HM>
+  bool compareHeaderField(const HM& header_map, const std::string& field,
+                          const std::string& expected, const std::string& test_type,
+                          const bool expect_match);
+  template <typename HM>
+  bool expectHeaderField(const HM& header_map, const std::string& field,
+                         const std::string& test_type, const bool expected_present);
+
+
   /**
    * Compare the expected and actual route parameter values. Print out match details if details_
    * flag is set.
    * @param actual holds the actual route returned by the router.
    * @param expected holds the expected parameter value of the route.
+   * @param expect_match negates the expectation if false.
    * @return bool if actual and expected match.
    */
   bool compareResults(const std::string& actual, const std::string& expected,
-                      const std::string& test_type);
+                      const std::string& test_type, const bool expect_match = true);
 
   void printResults();
 

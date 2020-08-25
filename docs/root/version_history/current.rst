@@ -29,6 +29,7 @@ Minor Behavior Changes
 * router: added transport failure reason to response body when upstream reset happens. After this change, the response body will be of the form `upstream connect error or disconnect/reset before headers. reset reason:{}, transport failure reason:{}`.This behavior may be reverted by setting runtime feature `envoy.reloadable_features.http_transport_failure_reason_in_body` to false.
 * router: now consumes all retry related headers to prevent them from being propagated to the upstream. This behavior may be reverted by setting runtime feature `envoy.reloadable_features.consume_all_retry_headers` to false.
 * thrift_proxy: special characters {'\0', '\r', '\n'} will be stripped from thrift headers.
+* router_check_tool: The `request_header_fields`, `response_header_fields` config for the route checker tool have been deprecated in favor of `request_header_matches`, `response_header_matches`.
 
 Bug Fixes
 ---------
