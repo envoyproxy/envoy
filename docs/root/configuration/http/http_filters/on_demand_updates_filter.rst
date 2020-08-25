@@ -10,7 +10,7 @@ request to be created, :ref:`VHDS <envoy_v3_api_field_config.route.v3.RouteConfi
 or *:authority* header be present.
 
 The on-demand update filter can also be used to request a :ref:`<envoy_v3_api_msg_config.route.v3.RouteConfiguration>`
-data if RouteConfiguration specified to be loaded on demand in the :ref:`Scoped RouteConfiguration <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>`. The
+data if RouteConfiguration is specified to be loaded on demand in the :ref:`Scoped RouteConfiguration <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>`. The
 contents of the http header is used to find the scope and create the on-demand request. 
 
 On-demand VHDS and on-demand S/RDS can not be used at the same time at this point.
