@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:defs.bzl", "py_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
@@ -24,12 +24,6 @@ envoy_py_test_binary(
     srcs = [
         "socket_passing.py",
     ],
-)
-
-py_binary(
-    name = "make_corpus_dir",
-    srcs = ["make_corpus_dir.py"],
-    visibility = ["//visibility:public"],
 )
 
 py_library(

@@ -145,10 +145,6 @@ def envoy_cc_fuzz_test(
         name = name + "_run",
         target = name + "_binary",
         corpus = name + "_corpus_dir" if corpus_name else None,
-        is_regression = select({
-            "@envoy//bazel:libfuzzer": False,
-            "//conditions:default": True,
-        }),
         testonly = True,
     )
 
