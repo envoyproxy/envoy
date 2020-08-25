@@ -366,7 +366,7 @@ public:
   FilterConfigPerRoute(const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
                        Server::Configuration::ServerFactoryContext& context);
 
-  virtual ~FilterConfigPerRoute() {
+  ~FilterConfigPerRoute() override {
     if (per_lua_code_setup_ptr_ && !main_thread_dispatcher_.isThreadSafe()) {
       main_thread_dispatcher_.post([setup = per_lua_code_setup_ptr_.release()] { delete setup; });
     }
