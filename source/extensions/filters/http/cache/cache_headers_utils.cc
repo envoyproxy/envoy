@@ -173,7 +173,7 @@ absl::flat_hash_set<std::string> VaryHeader::parseAllowlist() {
   // envoy::extensions::filters::http::cache::v3alpha::CacheConfig::allowed_vary_headers.
   // Need to make sure that the headers we add here are valid values (i.e., not malformed). That
   // way, we won't have to check this again in isAllowed.
-  return {"accept-encoding"};
+  return {"accept"};
 }
 
 bool VaryHeader::isAllowed(const absl::flat_hash_set<std::string>& allowed_headers,
@@ -197,12 +197,12 @@ bool VaryHeader::isAllowed(const absl::flat_hash_set<std::string>& allowed_heade
 
 bool VaryHeader::hasVary(const Http::ResponseHeaderMap& headers) {
   const Http::HeaderEntry* vary_header = headers.get(Http::Headers::get().Vary);
-  return ((vary_header) && (!vary_header->value().empty()));
+  return vary_header != nullptr && !vary_header->value().empty();
 }
 
 std::string VaryHeader::createVaryKey(const Http::HeaderEntry* vary_header,
                                       const Http::RequestHeaderMapPtr& entry_headers) {
-  if (!vary_header) {
+  if (vary_header == nullptr) {
     return "";
   }
 
@@ -214,8 +214,10 @@ std::string VaryHeader::createVaryKey(const Http::HeaderEntry* vary_header,
     // TODO(cbdm): Can add some bucketing logic here based on header. For example, we could
     // normalize the values for accept-language by making all of {en-CA, en-GB, en-US} into
     // "en". This way we would not need to store multiple versions of the same payload, and any
-    // of those values would find the payload in the requested language. The config should enable
-    // and control the bucketing wanted.
+    // of those values would find the payload in the requested language. Another example would be to
+    // bucket UserAgent values into android/ios/desktop; UserAgent::initializeFromHeaders tries to
+    // do that normalization and could be used as an inspiration for some bucketing configuration.
+    // The config should enable and control the bucketing wanted.
     std::vector<absl::string_view> header_values;
     Http::HeaderUtility::getAllOfHeader(*entry_headers, header, header_values);
     absl::StrAppend(&vary_key, header, in_value_separator,

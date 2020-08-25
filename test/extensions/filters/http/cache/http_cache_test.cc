@@ -36,7 +36,7 @@ public:
                                                   {"x-forwarded-proto", "https"},
                                                   {":authority", "example.com"}};
 
-  absl::flat_hash_set<std::string> allowed_vary_headers_{"accept-encoding"};
+  absl::flat_hash_set<std::string> allowed_vary_headers_{"accept"};
 
   static const SystemTime& currentTime() {
     CONSTRUCT_ON_FIRST_USE(SystemTime, Event::SimulatedTimeSystem().systemTime());
@@ -600,12 +600,12 @@ TEST_P(ParseInvalidRangeHeaderTest, InvalidRangeReturnsEmpty) {
 }
 
 TEST_F(LookupRequestTest, VariedHeaders) {
-  request_headers_.addCopy("accept-encoding", "gzip");
+  request_headers_.addCopy("accept", "image/*");
   const LookupRequest lookup_request(request_headers_, currentTime(), allowed_vary_headers_);
   const Http::RequestHeaderMapPtr& result = lookup_request.getVaryHeaders();
 
-  ASSERT_TRUE(result->get(Http::LowerCaseString("accept-encoding")));
-  ASSERT_EQ(result->get(Http::LowerCaseString("accept-encoding"))->value().getStringView(), "gzip");
+  ASSERT_TRUE(result->get(Http::LowerCaseString("accept")));
+  ASSERT_EQ(result->get(Http::LowerCaseString("accept"))->value().getStringView(), "image/*");
 }
 
 } // namespace

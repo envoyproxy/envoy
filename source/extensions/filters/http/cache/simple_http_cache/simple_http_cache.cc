@@ -174,10 +174,10 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
     Http::ResponseHeaderMapPtr vary_only_map =
         Http::createHeaderMap<Http::ResponseHeaderMapImpl>({});
     vary_only_map->setCopy(Http::Headers::get().Vary, vary_header->value().getStringView());
-    // TODO(cbdm): In a cache that evict entries, we could maintain a list of the "varykey"s that we
-    // have inserted as the body for this first lookup. This way, we would know which keys we have
-    // inserted for that resource. For the first entry simply use vary_key as the entry_list, for
-    // future entries append vary_key to existing list.
+    // TODO(cbdm): In a cache that evicts entries, we could maintain a list of the "varykey"s that
+    // we have inserted as the body for this first lookup. This way, we would know which keys we
+    // have inserted for that resource. For the first entry simply use vary_key as the entry_list,
+    // for future entries append vary_key to existing list.
     std::string entry_list;
     map_[request_key] = SimpleHttpCache::Entry{std::move(vary_only_map), std::move(entry_list)};
   }

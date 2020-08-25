@@ -360,7 +360,7 @@ TEST(HasVary, Empty) {
 }
 
 TEST(HasVary, NotEmpty) {
-  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding"}};
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept"}};
   ASSERT_TRUE(VaryHeader::hasVary(headers));
 }
 
@@ -382,12 +382,12 @@ TEST(ParseHeaderValue, Empty) {
 }
 
 TEST(ParseHeaderValue, SingleValue) {
-  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding"}};
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept"}};
   std::vector<std::string> result =
       VaryHeader::parseHeaderValue(headers.get(Http::Headers::get().Vary));
 
   EXPECT_EQ(result.size(), 1);
-  EXPECT_EQ(result[0], "accept-encoding");
+  EXPECT_EQ(result[0], "accept");
 }
 
 class ParseHeaderValueMultipleTest : public testing::Test,
@@ -396,23 +396,22 @@ protected:
   Http::TestResponseHeaderMapImpl headers{{"vary", GetParam()}};
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    MultipleValuesMixedSpaces, ParseHeaderValueMultipleTest,
-    testing::Values("accept-encoding,accept-language", " accept-encoding,accept-language",
-                    "accept-encoding ,accept-language", "accept-encoding, accept-language",
-                    "accept-encoding,accept-language ", " accept-encoding, accept-language ",
-                    "  accept-encoding  ,  accept-language  "));
+INSTANTIATE_TEST_SUITE_P(MultipleValuesMixedSpaces, ParseHeaderValueMultipleTest,
+                         testing::Values("accept,accept-language", " accept,accept-language",
+                                         "accept ,accept-language", "accept, accept-language",
+                                         "accept,accept-language ", " accept, accept-language ",
+                                         "  accept  ,  accept-language  "));
 
 TEST_P(ParseHeaderValueMultipleTest, MultipleValuesMixedSpaces) {
   std::vector<std::string> result =
       VaryHeader::parseHeaderValue(headers.get(Http::Headers::get().Vary));
   EXPECT_EQ(result.size(), 2);
-  EXPECT_EQ(result[0], "accept-encoding");
+  EXPECT_EQ(result[0], "accept");
   EXPECT_EQ(result[1], "accept-language");
 }
 
 // Set of allowed headers to be varied on the tests.
-const absl::flat_hash_set<std::string> allowed_vary_headers = {"accept-encoding", "accept-language",
+const absl::flat_hash_set<std::string> allowed_vary_headers = {"accept", "accept-language",
                                                                "width"};
 
 TEST(VaryIsAllowed, Null) {
@@ -426,12 +425,12 @@ TEST(VaryIsAllowed, Empty) {
 }
 
 TEST(VaryIsAllowed, SingleAllowed) {
-  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding"}};
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept"}};
   ASSERT_TRUE(VaryHeader::isAllowed(allowed_vary_headers, headers));
 }
 
 TEST(VaryIsAllowed, MultipleAllowed) {
-  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding, accept-language, width"}};
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept, accept-language, width"}};
   ASSERT_TRUE(VaryHeader::isAllowed(allowed_vary_headers, headers));
 }
 
@@ -446,13 +445,13 @@ TEST(VaryIsAllowed, SingleNotAllowed) {
 }
 
 TEST(VaryIsAllowed, MultipleNotAllowed) {
-  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding, wrong-header"}};
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept, wrong-header"}};
   ASSERT_FALSE(VaryHeader::isAllowed(allowed_vary_headers, headers));
 }
 
 TEST(CreateVaryKey, EmptyVaryEntry) {
   Http::TestResponseHeaderMapImpl headers{{"vary", ""}};
-  Http::TestRequestHeaderMapImpl request_headers{{"accept-encoding", "gzip"}};
+  Http::TestRequestHeaderMapImpl request_headers{{"accept", "image/*"}};
 
   ASSERT_EQ(VaryHeader::createVaryKey(
                 headers.get(Http::Headers::get().Vary),
@@ -461,72 +460,77 @@ TEST(CreateVaryKey, EmptyVaryEntry) {
 }
 
 TEST(CreateVaryKey, SingleHeaderExists) {
-  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding"}};
-  Http::TestRequestHeaderMapImpl request_headers{{"accept-encoding", "gzip"}};
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept"}};
+  Http::TestRequestHeaderMapImpl request_headers{{"accept", "image/*"}};
 
   ASSERT_EQ(VaryHeader::createVaryKey(
                 headers.get(Http::Headers::get().Vary),
                 VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
-            "vary-key\naccept-encoding\rgzip\n");
+            "vary-key\naccept\r"
+            "image/*\n");
 }
 
 TEST(CreateVaryKey, SingleHeaderMissing) {
-  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding"}};
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept"}};
   Http::TestRequestHeaderMapImpl request_headers;
 
   ASSERT_EQ(VaryHeader::createVaryKey(
                 headers.get(Http::Headers::get().Vary),
                 VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
-            "vary-key\naccept-encoding\r\n");
+            "vary-key\naccept\r\n");
 }
 
 TEST(CreateVaryKey, MultipleHeadersAllExist) {
-  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding, accept-language, width"}};
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept, accept-language, width"}};
   Http::TestRequestHeaderMapImpl request_headers{
-      {"accept-encoding", "gzip"}, {"accept-language", "en-us"}, {"width", "640"}};
+      {"accept", "image/*"}, {"accept-language", "en-us"}, {"width", "640"}};
 
   ASSERT_EQ(VaryHeader::createVaryKey(
                 headers.get(Http::Headers::get().Vary),
                 VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
-            "vary-key\naccept-encoding\rgzip\naccept-language\ren-us\nwidth\r640\n");
+            "vary-key\naccept\r"
+            "image/*\naccept-language\r"
+            "en-us\nwidth\r640\n");
 }
 
 TEST(CreateVaryKey, MultipleHeadersSomeExist) {
-  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding, accept-language, width"}};
-  Http::TestRequestHeaderMapImpl request_headers{{"accept-encoding", "gzip"}, {"width", "640"}};
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept, accept-language, width"}};
+  Http::TestRequestHeaderMapImpl request_headers{{"accept", "image/*"}, {"width", "640"}};
 
   ASSERT_EQ(VaryHeader::createVaryKey(
                 headers.get(Http::Headers::get().Vary),
                 VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
-            "vary-key\naccept-encoding\rgzip\naccept-language\r\nwidth\r640\n");
+            "vary-key\naccept\r"
+            "image/*\naccept-language\r\nwidth\r640\n");
 }
 
 TEST(CreateVaryKey, ExtraRequestHeaders) {
-  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding, width"}};
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept, width"}};
   Http::TestRequestHeaderMapImpl request_headers{
-      {"accept-encoding", "gzip"}, {"heigth", "1280"}, {"width", "640"}};
+      {"accept", "image/*"}, {"heigth", "1280"}, {"width", "640"}};
 
   ASSERT_EQ(VaryHeader::createVaryKey(
                 headers.get(Http::Headers::get().Vary),
                 VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
-            "vary-key\naccept-encoding\rgzip\nwidth\r640\n");
+            "vary-key\naccept\r"
+            "image/*\nwidth\r640\n");
 }
 
 TEST(CreateVaryKey, MultipleHeadersNoneExist) {
-  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding, accept-language, width"}};
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept, accept-language, width"}};
   Http::TestRequestHeaderMapImpl request_headers;
 
   ASSERT_EQ(VaryHeader::createVaryKey(
                 headers.get(Http::Headers::get().Vary),
                 VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
-            "vary-key\naccept-encoding\r\naccept-language\r\nwidth\r\n");
+            "vary-key\naccept\r\naccept-language\r\nwidth\r\n");
 }
 
 TEST(CreateVaryKey, DifferentHeadersSameValue) {
   // Two requests with the same value for different headers must have different vary-keys.
-  Http::TestResponseHeaderMapImpl headers{{"vary", "accept-encoding, accept-language"}};
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept, accept-language"}};
 
-  Http::TestRequestHeaderMapImpl request_headers1{{"accept-encoding", "foo"}};
+  Http::TestRequestHeaderMapImpl request_headers1{{"accept", "foo"}};
   std::string vary_key1 = VaryHeader::createVaryKey(
       headers.get(Http::Headers::get().Vary),
       VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers1));
@@ -546,7 +550,9 @@ TEST(CreateVaryKey, MultiValueSameHeader) {
   ASSERT_EQ(VaryHeader::createVaryKey(
                 headers.get(Http::Headers::get().Vary),
                 VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers)),
-            "vary-key\nwidth\rfoo\rbar\n");
+            "vary-key\nwidth\r"
+            "foo\r"
+            "bar\n");
 }
 
 TEST(PossibleVariedHeaders, Empty) {
@@ -554,7 +560,7 @@ TEST(PossibleVariedHeaders, Empty) {
   Http::HeaderMapPtr result =
       VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers);
 
-  EXPECT_FALSE(result->get(Http::LowerCaseString("accept-encoding")));
+  EXPECT_FALSE(result->get(Http::LowerCaseString("accept")));
   EXPECT_FALSE(result->get(Http::LowerCaseString("accept-language")));
   EXPECT_FALSE(result->get(Http::LowerCaseString("width")));
 }
@@ -564,51 +570,50 @@ TEST(PossibleVariedHeaders, NoOverlap) {
   Http::HeaderMapPtr result =
       VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers);
 
-  EXPECT_FALSE(result->get(Http::LowerCaseString("accept-encoding")));
+  EXPECT_FALSE(result->get(Http::LowerCaseString("accept")));
   EXPECT_FALSE(result->get(Http::LowerCaseString("accept-language")));
   EXPECT_FALSE(result->get(Http::LowerCaseString("width")));
 }
 
 TEST(PossibleVariedHeaders, Overlap) {
-  Http::TestRequestHeaderMapImpl request_headers{{"accept-encoding", "gzip"}, {"abc", "123"}};
+  Http::TestRequestHeaderMapImpl request_headers{{"accept", "image/*"}, {"abc", "123"}};
   Http::HeaderMapPtr result =
       VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers);
 
   std::vector<absl::string_view> values;
-  Http::HeaderUtility::getAllOfHeader(*result, "accept-encoding", values);
+  Http::HeaderUtility::getAllOfHeader(*result, "accept", values);
   ASSERT_EQ(values.size(), 1);
-  EXPECT_EQ(values[0], "gzip");
+  EXPECT_EQ(values[0], "image/*");
 
   EXPECT_FALSE(result->get(Http::LowerCaseString("accept-language")));
   EXPECT_FALSE(result->get(Http::LowerCaseString("width")));
 }
 
 TEST(PossibleVariedHeaders, MultiValueSameHeader) {
-  Http::TestRequestHeaderMapImpl request_headers{{"accept-encoding", "gzip"},
-                                                 {"accept-encoding", "deflate"}};
+  Http::TestRequestHeaderMapImpl request_headers{{"accept", "image/*"}, {"accept", "text/html"}};
   Http::HeaderMapPtr result =
       VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers);
 
   std::vector<absl::string_view> values;
-  Http::HeaderUtility::getAllOfHeader(*result, "accept-encoding", values);
+  Http::HeaderUtility::getAllOfHeader(*result, "accept", values);
   ASSERT_EQ(values.size(), 2);
-  EXPECT_EQ(values[0], "gzip");
-  EXPECT_EQ(values[1], "deflate");
+  EXPECT_EQ(values[0], "image/*");
+  EXPECT_EQ(values[1], "text/html");
 
   EXPECT_FALSE(result->get(Http::LowerCaseString("accept-language")));
   EXPECT_FALSE(result->get(Http::LowerCaseString("width")));
 }
 
 TEST(PossibleVariedHeaders, MultiValueDifferentHeaders) {
-  Http::TestRequestHeaderMapImpl request_headers{{"accept-encoding", "gzip"},
+  Http::TestRequestHeaderMapImpl request_headers{{"accept", "image/*"},
                                                  {"accept-language", "en-US"}};
   Http::HeaderMapPtr result =
       VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers);
 
   std::vector<absl::string_view> values;
-  Http::HeaderUtility::getAllOfHeader(*result, "accept-encoding", values);
+  Http::HeaderUtility::getAllOfHeader(*result, "accept", values);
   ASSERT_EQ(values.size(), 1);
-  EXPECT_EQ(values[0], "gzip");
+  EXPECT_EQ(values[0], "image/*");
 
   Http::HeaderUtility::getAllOfHeader(*result, "accept-language", values);
   ASSERT_EQ(values.size(), 2);

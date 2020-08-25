@@ -35,7 +35,7 @@ protected:
   Http::TestResponseHeaderMapImpl response_headers_ = {{":status", "200"},
                                                        {"date", "Sun, 06 Nov 1994 08:49:37 GMT"},
                                                        {"cache-control", cache_control_}};
-  absl::flat_hash_set<std::string> allowed_vary_headers_ = {"accept-encoding"};
+  absl::flat_hash_set<std::string> allowed_vary_headers_ = {"accept"};
 };
 
 TEST_F(IsCacheableRequestTest, CacheableRequest) {
@@ -148,19 +148,19 @@ TEST_F(IsCacheableResponseTest, ResponsePrivate) {
 
 TEST_F(IsCacheableResponseTest, EmptyVary) {
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, allowed_vary_headers_));
-  response_headers_.setCopy(Http::CustomHeaders::get().Vary, "");
+  response_headers_.setCopy(Http::Headers::get().Vary, "");
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, allowed_vary_headers_));
 }
 
 TEST_F(IsCacheableResponseTest, AllowedVary) {
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, allowed_vary_headers_));
-  response_headers_.setCopy(Http::CustomHeaders::get().Vary, "accept-encoding");
+  response_headers_.setCopy(Http::Headers::get().Vary, "accept");
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, allowed_vary_headers_));
 }
 
 TEST_F(IsCacheableResponseTest, NotAllowedVary) {
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, allowed_vary_headers_));
-  response_headers_.setCopy(Http::CustomHeaders::get().Vary, "*");
+  response_headers_.setCopy(Http::Headers::get().Vary, "*");
   EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers_, allowed_vary_headers_));
 }
 
