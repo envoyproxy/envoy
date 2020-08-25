@@ -101,7 +101,8 @@ public:
   virtual GrpcMuxWatchPtr addWatch(const std::string& type_url,
                                    const std::set<std::string>& resources,
                                    SubscriptionCallbacks& callbacks,
-                                   OpaqueResourceDecoder& resource_decoder, const bool use_prefix_matching) PURE;
+                                   OpaqueResourceDecoder& resource_decoder,
+                                   const bool use_prefix_matching) PURE;
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;

@@ -67,14 +67,6 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
 
   const auto prefix = prefixFromName(resource_name);
   const auto resource_key = use_prefix_matching && !prefix.empty() ? prefix : resource_name;
-
-  std::cout << "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCcc watchesInterestedIn -- resource_key: "
-            << resource_key << "\n";
-
-  for (const auto aa : watch_interest_) {
-    std::cout << "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCcc watchesInterestedIn -- watch_interest_: "
-              << aa.first << "\n";
-  }
   const auto watches_interested = watch_interest_.find(resource_key);
   if (watches_interested != watch_interest_.end()) {
     for (const auto& watch : watches_interested->second) {
@@ -152,13 +144,6 @@ AddedRemoved WatchMap::removeAliasWatches(const envoy::service::discovery::v3::R
   for (const auto& watch : watches_to_update) {
     std::set<std::string> without_alias;
 
-    for (const auto rn : watch->resource_names_) {
-      std::cout << "RRRRRRRRRRRRRRRRRRRRRRRRRRRR " << rn << "\n";
-    }
-    for (const auto an : resource.aliases()) {
-      std::cout << "AAAAAAAAAAAAAAAAAAAAAAAAAAAN " << an << "\n";
-    }
-
     std::set_difference(watch->resource_names_.begin(), watch->resource_names_.end(),
                         resource.aliases().begin(), resource.aliases().end(),
                         std::inserter(without_alias, without_alias.begin()));
@@ -180,7 +165,6 @@ void WatchMap::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info, const bool use_prefix_matching) {
-  std::cout << "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa WatchMap::onConfigUpdate\n";
   // Track any removals triggered by earlier watch updates.
   ASSERT(deferred_removed_during_update_ == nullptr);
   deferred_removed_during_update_ = std::make_unique<absl::flat_hash_set<Watch*>>();
@@ -195,10 +179,6 @@ void WatchMap::onConfigUpdate(
         watchesInterestedIn(r.name(), use_prefix_matching);
     // If there are no watches, then we don't need to decode. If there are watches, they should all
     // be for the same resource type, so we can just use the callbacks of the first watch to decode.
-    std::cout << "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa use_prefix_matching: "
-              << use_prefix_matching << "\n";
-    std::cout << "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa watches interested in "
-              << r.name() << ": " << interested_in_r.size() << "\n";
     if (interested_in_r.empty()) {
       continue;
     }
