@@ -110,6 +110,11 @@ private:
    */
   void finalizeHeaders(ToolConfig& tool_config, Envoy::StreamInfo::StreamInfoImpl stream_info);
 
+  /*
+   * Performs direct-response reply actions for a response entry.
+   */
+  void sendLocalReply(ToolConfig& tool_config, const Router::DirectResponseEntry& entry);
+
   bool compareCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareCluster(ToolConfig& tool_config,
                       const envoy::RouterCheckToolSchema::ValidationAssert& expected);

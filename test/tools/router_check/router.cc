@@ -143,6 +143,7 @@ void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
     if (tool_config.route_->directResponseEntry() != nullptr) {
       tool_config.route_->directResponseEntry()->rewritePathHeader(*tool_config.request_headers_,
                                                                    true);
+      sendLocalReply(tool_config, *tool_config.route_->directResponseEntry());
       tool_config.route_->directResponseEntry()->finalizeResponseHeaders(
           *tool_config.response_headers_, stream_info);
     } else if (tool_config.route_->routeEntry() != nullptr) {
@@ -154,6 +155,33 @@ void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
   }
 
   headers_finalized_ = true;
+}
+
+void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
+                                     const Router::DirectResponseEntry& entry) {
+  const auto& encode_headers = [&](Http::ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+    UNREFERENCED_PARAMETER(end_stream);
+    Http::HeaderMapImpl::copyFrom(*tool_config.response_headers_->header_map_, *headers);
+  };
+
+  const auto& encode_data = [&](Buffer::Instance& data, bool end_stream) -> void {
+    UNREFERENCED_PARAMETER(data);
+    UNREFERENCED_PARAMETER(end_stream);
+  };
+
+  Envoy::Http::Utility::EncodeFunctions encode_functions{
+            nullptr,
+            encode_headers,
+            encode_data
+  };
+  
+  bool is_grpc = false;
+  bool is_head_request = false;
+  Envoy::Http::Utility::LocalReplyData local_reply_data {
+    is_grpc, entry.responseCode(), entry.responseBody(), absl::nullopt, is_head_request 
+    };
+
+  Envoy::Http::Utility::sendLocalReply(false, encode_functions, local_reply_data);
 }
 
 RouterCheckTool::RouterCheckTool(
