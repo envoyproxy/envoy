@@ -354,6 +354,7 @@ WRR
 WS
 WSA
 WSABUF
+WSAEINVAL
 WSS
 Welford's
 Wi
