@@ -350,10 +350,6 @@ void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, uint64_t value) 
 }
 
 void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, absl::string_view value) {
-  if (!validHeaderString(value)) {
-    // Reject value if it is an invalid header string
-    return;
-  }
   HeaderString ref_key(key);
   HeaderString new_value;
   new_value.setCopy(value);
@@ -376,10 +372,6 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
 void HeaderMapImpl::addCopy(const LowerCaseString& key, absl::string_view value) {
   // In the case that the header is appended, we will perform a needless copy of the key and value.
   // This is done on purpose to keep the code simple and should be rare.
-  if (!validHeaderString(value)) {
-    // Reject value if it is an invalid header string
-    return;
-  }
   HeaderString new_key;
   new_key.setCopy(key.get());
   HeaderString new_value;
