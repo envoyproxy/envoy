@@ -163,8 +163,8 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::ValueArg<std::string> socket_path("", "socket-path", "Path to hot restart socket file",
                                            false, "@envoy_domain_socket", "string", cmd);
 
-  TCLAP::ValueArg<std::string> socket_mode("", "socket-mode", "Socket file permission", false, "0",
-                                           "string", cmd);
+  TCLAP::ValueArg<std::string> socket_mode("", "socket-mode", "Socket file permission", false,
+                                           "600", "string", cmd);
 
   cmd.setExceptionHandling(false);
   try {
@@ -270,7 +270,14 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   socket_path_ = socket_path.getValue();
-  StringUtil::atoull(socket_mode.getValue().c_str(), reinterpret_cast<uint64_t&>(socket_mode_), 8);
+
+  if (socket_path_.at(0) == '@') {
+    socket_mode_ = 0;
+  } else {
+    uint64_t socket_mode_helper;
+    StringUtil::atoull(socket_mode.getValue().c_str(), socket_mode_helper, 8);
+    socket_mode_ = socket_mode_helper;
+  }
 
   if (drain_strategy.getValue() == "immediate") {
     drain_strategy_ = Server::DrainStrategy::Immediate;
