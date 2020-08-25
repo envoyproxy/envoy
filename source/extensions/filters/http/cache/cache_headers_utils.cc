@@ -204,10 +204,11 @@ namespace {
 // The separator characters are used to create the vary-key, and must be characters that are
 // invalid to be inside values and header names. The chosen characters are invalid per:
 // https://tools.ietf.org/html/rfc2616#section-4.2.
+
 // Used to separate the values of different headers.
-const std::string header_separator = "\n";
+constexpr std::string_view header_separator = "\n";
 // Used to separate multiple values of a same header.
-static const std::string in_value_separator = "\r";
+constexpr std::string_view in_value_separator = "\r";
 }; // namespace
 
 std::string VaryHeader::createVaryKey(const Http::HeaderEntry* vary_header,
