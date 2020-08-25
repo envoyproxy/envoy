@@ -189,7 +189,7 @@ public:
       : SdsApi(
             config_source, "abc.com", subscription_factory, time_source, validation_visitor_,
             server.stats(), []() {}, dispatcher, api) {
-    init_manager.add(init_target_);
+    registerInitTarget(init_manager);
   }
 
   MOCK_METHOD(void, onConfigUpdate,

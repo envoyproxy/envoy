@@ -34,9 +34,6 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
   // can be chained together to behave as one init_manager. In that way, we let
   // two listeners which share same SdsApi to register at separate init managers, and
   // each init manager has a chance to initialize its targets.
-  //
-  // Note that addition of initialization targets to init manager is handled in constructors SdsApi
-  // subclasses
 }
 
 void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,

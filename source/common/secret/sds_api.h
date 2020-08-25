@@ -46,10 +46,18 @@ public:
          Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
          ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
          std::function<void()> destructor_cb, Event::Dispatcher& dispatcher, Api::Api& api);
+  virtual ~SdsApi() {
+    RELEASE_ASSERT(registered_init_target_,
+                   "Init target was not registered with an init manager. registerInitTarget() must "
+                   "be called after Sds api concrete class instantiation.");
+  };
 
   SecretData secretData();
 
-  void registerInitTarget(Init::Manager& init_manager) { init_manager.add(init_target_); }
+  void registerInitTarget(Init::Manager& init_manager) {
+    init_manager.add(init_target_);
+    registered_init_target_ = true;
+  }
 
 protected:
   // Creates new secrets.
@@ -89,6 +97,7 @@ private:
   Event::Dispatcher& dispatcher_;
   Api::Api& api_;
   std::unique_ptr<Filesystem::Watcher> watcher_;
+  bool registered_init_target_{false};
 };
 
 class TlsCertificateSdsApi;
