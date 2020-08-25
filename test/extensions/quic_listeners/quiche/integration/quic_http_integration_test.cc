@@ -215,6 +215,8 @@ public:
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
+          hcm.mutable_drain_timeout()->clear_seconds();
+          hcm.mutable_drain_timeout()->set_nanos(500 * 1000 * 1000);
           EXPECT_EQ(hcm.codec_type(), envoy::extensions::filters::network::http_connection_manager::
                                           v3::HttpConnectionManager::HTTP3);
         });
@@ -518,7 +520,7 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
                   ->disconnected());
 }
 
-TEST_P(QuicHttpIntegrationTest, NoNewStreamswhenOverloaded) {
+TEST_P(QuicHttpIntegrationTest, NoNewStreamsWhenOverloaded) {
   initialize();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   updateResource(file_updater_1_, 0.7);
@@ -534,8 +536,8 @@ TEST_P(QuicHttpIntegrationTest, NoNewStreamswhenOverloaded) {
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
 
-  // Enable the disable-keepalive overload action. This should send a GOAWAY before encoding the
-  // headers.
+  // Enable the disable-keepalive overload action. This should send a shutdown notice before
+  // encoding the headers.
   updateResource(file_updater_2_, 0.9);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.disable_http_keepalive.active", 1);
 
@@ -543,6 +545,8 @@ TEST_P(QuicHttpIntegrationTest, NoNewStreamswhenOverloaded) {
   upstream_request_->encodeData(10, true);
 
   response2->waitForHeaders();
+  EXPECT_TRUE(codec_client_->waitForDisconnect());
+
   EXPECT_TRUE(codec_client_->sawGoAway());
   codec_client_->close();
 }
