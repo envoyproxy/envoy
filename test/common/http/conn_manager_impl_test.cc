@@ -172,6 +172,9 @@ public:
       EXPECT_CALL(filter_factory_, createFilterChain(_))
           .WillOnce(Invoke([num_decoder_filters, num_encoder_filters, req,
                             this](FilterChainFactoryCallbacks& callbacks) -> void {
+            if (log_handler_.get()) {
+              callbacks.addAccessLogHandler(log_handler_);
+            }
             for (int i = 0; i < num_decoder_filters; i++) {
               callbacks.addStreamDecoderFilter(
                   StreamDecoderFilterSharedPtr{decoder_filters_[req * num_decoder_filters + i]});
@@ -434,6 +437,7 @@ public:
   MockResponseEncoder response_encoder_;
   std::vector<MockStreamDecoderFilter*> decoder_filters_;
   std::vector<MockStreamEncoderFilter*> encoder_filters_;
+  std::shared_ptr<AccessLog::MockInstance> log_handler_;
 };
 
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
@@ -4762,6 +4766,8 @@ TEST_F(HttpConnectionManagerImplTest, AlterFilterWatermarkLimits) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
+  log_handler_ = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+
   initial_buffer_limit_ = 1;
   streaming_filter_ = true;
   setup(false, "");
@@ -4807,6 +4813,12 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
   EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
   encoder_filters_[1]->callbacks_->setEncoderBufferLimit((buffer_len + 1) * 2);
+
+  EXPECT_CALL(*log_handler_, log(_, _, _, _))
+      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                          const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_FALSE(stream_info.hasAnyResponseFlag());
+      }));
 }
 
 TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimits) {
