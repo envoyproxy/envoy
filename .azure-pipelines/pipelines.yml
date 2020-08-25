@@ -127,6 +127,8 @@ jobs:
     pool:
       vmImage: "ubuntu-18.04"
     steps:
+      - bash: .azure-pipelines/cleanup.sh
+        displayName: "Removing tools from agent"
       - task: DownloadBuildArtifacts@0
         inputs:
           buildType: current
