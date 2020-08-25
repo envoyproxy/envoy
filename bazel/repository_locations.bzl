@@ -281,9 +281,9 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_lightstep_tracer_cpp = dict(
         project_name = "lightstep-tracer-cpp",
         project_url = "https://github.com/lightstep/lightstep-tracer-cpp",
-        # 2020-08-18
-        version = "839db8b837a3871082420bee80f648dc49365b2d",
-        sha256 = "24aa5ac1aa8ac77d7f0738e9cc07491f976e05b1fe4ba3600e2a2381d0403a35",
+        # 2020-08-24
+        version = "1942b3f142e218ebc143a043f32e3278dafec9aa",
+        sha256 = "3238921a8f578beb26c2215cd277e8f6752f3d29b020b881d60d96a240a38aed",
         strip_prefix = "lightstep-tracer-cpp-{version}",
         urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/{version}.tar.gz"],
         use_category = ["observability"],
