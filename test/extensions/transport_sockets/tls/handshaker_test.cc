@@ -22,8 +22,6 @@ namespace TransportSockets {
 namespace Tls {
 namespace {
 
-using ::testing::AtLeast;
-using ::testing::Invoke;
 using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::StrictMock;
@@ -43,7 +41,7 @@ int pemPasswordCallback(char* buf, int buf_size, int, void* u) {
 
 class MockHandshakeCallbacks : public Ssl::HandshakeCallbacks {
 public:
-  ~MockHandshakeCallbacks() override{};
+  ~MockHandshakeCallbacks() override = default;
   MOCK_METHOD(Network::Connection&, connection, (), (const, override));
   MOCK_METHOD(void, onSuccess, (SSL*), (override));
   MOCK_METHOD(void, onFailure, (), (override));
