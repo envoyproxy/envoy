@@ -34,7 +34,7 @@ void ConnPoolImplBase::destructAllConnections() {
 }
 
 bool ConnPoolImplBase::shouldCreateNewConnection() const {
-  // If the host is unhealthy, don't make it do extra work.
+  // If the host is not healthy, don't make it do extra work.
   if (host_->health() != Upstream::Host::Health::Healthy) {
     return pending_streams_.size() > connecting_stream_capacity_;
   }

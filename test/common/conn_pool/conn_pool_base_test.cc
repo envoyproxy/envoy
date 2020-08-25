@@ -86,6 +86,8 @@ TEST_F(ConnPoolImplBaseTest, BasicPrefetch) {
 }
 
 TEST_F(ConnPoolImplBaseTest, PrefetchOnDisconnect) {
+  testing::InSequence s;
+
   // Create more than one connection per new stream.
   ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
 
@@ -95,10 +97,10 @@ TEST_F(ConnPoolImplBaseTest, PrefetchOnDisconnect) {
 
   // If a connection fails, existing connections are purged. If a retry causes
   // a new stream, make sure we create the correct number of connections.
-  EXPECT_CALL(pool_, instantiateActiveClient).Times(1);
   EXPECT_CALL(pool_, onPoolFailure).WillOnce(InvokeWithoutArgs([&]() -> void {
     pool_.newStream(context_);
   }));
+  EXPECT_CALL(pool_, instantiateActiveClient).Times(1);
   clients_[0]->close();
 
   EXPECT_CALL(pool_, onPoolFailure);
@@ -110,6 +112,7 @@ TEST_F(ConnPoolImplBaseTest, NoPrefetchIfUnhealthy) {
   ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
 
   host_->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_EQ(host_->health(), Upstream::Host::Health::Unhealthy);
 
   // On new stream, create 1 connection.
   EXPECT_CALL(pool_, instantiateActiveClient).Times(1);
@@ -118,6 +121,23 @@ TEST_F(ConnPoolImplBaseTest, NoPrefetchIfUnhealthy) {
   cancelable->cancel(ConnectionPool::CancelPolicy::CloseExcess);
   pool_.destructAllConnections();
 }
+
+TEST_F(ConnPoolImplBaseTest, NoPrefetchIfDegraded) {
+  // Create more than one connection per new stream.
+  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
+
+  EXPECT_EQ(host_->health(), Upstream::Host::Health::Healthy);
+  host_->healthFlagSet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH);
+  EXPECT_EQ(host_->health(), Upstream::Host::Health::Degraded);
+
+  // On new stream, create 1 connection.
+  EXPECT_CALL(pool_, instantiateActiveClient).Times(1);
+  auto cancelable = pool_.newStream(context_);
+
+  cancelable->cancel(ConnectionPool::CancelPolicy::CloseExcess);
+  pool_.destructAllConnections();
+}
+
 
 } // namespace ConnectionPool
 } // namespace Envoy
