@@ -386,8 +386,8 @@ public:
   envoy::config::core::v3::TrafficDirection direction() const override {
     return config().traffic_direction();
   }
-  bool
-  containFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain) override {
+  bool containFilterChain(
+      const envoy::config::listener::v3::FilterChain* const& filter_chain) const override {
     return filter_chains_.find(filter_chain) != filter_chains_.end();
   }
 
@@ -440,6 +440,8 @@ private:
   void buildOriginalDstListenerFilter();
   void buildProxyProtocolListenerFilter();
   void buildTlsInspectorListenerFilter();
+  void storeFilterChains(
+      absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span);
 
   void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
     ensureSocketOptions();
@@ -495,7 +497,7 @@ private:
   // callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
 
-  absl::flat_hash_set<const envoy::config::listener::v3::FilterChain* const> filter_chains_;
+  absl::flat_hash_map<const envoy::config::listener::v3::FilterChain* const, bool> filter_chains_;
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
 };

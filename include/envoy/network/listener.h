@@ -178,8 +178,8 @@ public:
   /**
    * @return true if this listener contains the given filter chain.
    */
-  virtual bool
-  containFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain) PURE;
+  virtual bool containFilterChain(
+      const envoy::config::listener::v3::FilterChain* const& filter_chain) const PURE;
 
   /**
    * @return pending connection backlog for TCP listeners.

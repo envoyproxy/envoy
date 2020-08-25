@@ -84,7 +84,7 @@ public:
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const&,
                           const std::string&) override {}
-  bool containFilterChain(const envoy::config::listener::v3::FilterChain* const&) override {
+  bool containFilterChain(const envoy::config::listener::v3::FilterChain* const&) const override {
     return false;
   }
 

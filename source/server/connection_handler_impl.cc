@@ -37,7 +37,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     if (overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
         if (listener.second.listener_->listenerTag() == overridden_listener) {
-          auto& old_config = *listener.second.tcp_listener_->get().config_;
+          const auto& old_config = *listener.second.tcp_listener_->get().config_;
           closeSocketsOnListenerUpdate(old_config, config);
           listener.second.tcp_listener_->get().updateListenerConfig(config);
           return;
@@ -111,8 +111,8 @@ void ConnectionHandlerImpl::enableListeners() {
   }
 }
 
-void ConnectionHandlerImpl::closeSocketsOnListenerUpdate(Network::ListenerConfig& old_config,
-                                                         Network::ListenerConfig& new_config) {
+void ConnectionHandlerImpl::closeSocketsOnListenerUpdate(
+    const Network::ListenerConfig& old_config, const Network::ListenerConfig& new_config) {
   const std::string& listener_name = new_config.name();
   ENVOY_LOG(debug,
             "close sockets that the old listener {} has stored if the updated listener does not "

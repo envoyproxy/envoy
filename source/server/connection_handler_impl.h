@@ -84,8 +84,8 @@ public:
   const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
 
   // Will close stored sockets that require the filter chains owned by the old listener only.
-  void closeSocketsOnListenerUpdate(Network::ListenerConfig& old_config,
-                                    Network::ListenerConfig& new_config) override;
+  void closeSocketsOnListenerUpdate(const Network::ListenerConfig& old_config,
+                                    const Network::ListenerConfig& new_config) override;
 
   void retryConnections(
       bool success,

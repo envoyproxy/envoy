@@ -365,6 +365,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   buildOriginalDstListenerFilter();
   buildProxyProtocolListenerFilter();
   buildTlsInspectorListenerFilter();
+  storeFilterChains(config_.filter_chains());
   if (!workers_started_) {
     // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
     // NOTE: listener_init_target_ should be added to parent's initManager at the end of the
@@ -421,10 +422,8 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
   buildOriginalDstListenerFilter();
   buildProxyProtocolListenerFilter();
   buildTlsInspectorListenerFilter();
+  storeFilterChains(config_.filter_chains());
   open_connections_ = origin.open_connections_;
-  for (const auto& filter_chain : config.filter_chains()) {
-    filter_chains_.insert(&filter_chain);
-  }
 }
 
 void ListenerImpl::buildAccessLog() {
@@ -699,6 +698,12 @@ void ListenerImpl::buildTlsInspectorListenerFilter() {
     listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
         Envoy::ProtobufWkt::Empty(),
         /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
+  }
+}
+void ListenerImpl::storeFilterChains(
+    absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span) {
+  for (const auto& filter_chain : filter_chain_span) {
+    filter_chains_[filter_chain] = true;
   }
 }
 

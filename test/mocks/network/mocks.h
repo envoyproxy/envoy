@@ -366,7 +366,8 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, rebuildFilterChain,
               (const envoy::config::listener::v3::FilterChain* const&, const std::string&));
-  MOCK_METHOD(bool, containFilterChain, (const envoy::config::listener::v3::FilterChain* const&));
+  MOCK_METHOD(bool, containFilterChain, (const envoy::config::listener::v3::FilterChain* const&),
+              (const));
   MOCK_METHOD(uint32_t, tcpBacklogSize, (), (const));
 
   envoy::config::core::v3::TrafficDirection direction() const override {
@@ -415,7 +416,7 @@ public:
   MOCK_METHOD(void, enableListeners, ());
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
   MOCK_METHOD(void, closeSocketsOnListenerUpdate,
-              (Network::ListenerConfig&, Network::ListenerConfig&));
+              (const Network::ListenerConfig&, const Network::ListenerConfig&));
   MOCK_METHOD(void, retryConnections,
               (bool success,
                const envoy::config::listener::v3::FilterChain* const& filter_chain_message));
