@@ -350,11 +350,10 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "quic_transport_socket_factory_lib",
     srcs = ["quic_transport_socket_factory.cc"],
     hdrs = ["quic_transport_socket_factory.h"],
-    security_posture = "unknown",
     tags = ["nofips"],
     deps = [
         "//include/envoy/network:transport_socket_interface",
@@ -364,6 +363,19 @@ envoy_cc_extension(
         "//source/extensions/transport_sockets:well_known_names",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+    ],
+)
+
+# Create a single target that contains all the libraries that register factories.
+# All of these are needed for this extension to function.
+envoy_cc_extension(
+    name = "quic_factory_lib",
+    security_posture = "unknown",
+    tags = ["nofips"],
+    deps = [
+        ":active_quic_listener_config_lib",
+        ":codec_lib",
+        ":quic_transport_socket_factory_lib",
     ],
 )
 
