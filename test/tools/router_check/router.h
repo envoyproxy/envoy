@@ -148,7 +148,6 @@ private:
   bool expectHeaderField(const HM& header_map, const std::string& field,
                          const std::string& test_type, const bool expected_present);
 
-
   /**
    * Compare the expected and actual route parameter values. Print out match details if details_
    * flag is set.

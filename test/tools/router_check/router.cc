@@ -169,17 +169,12 @@ void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
     UNREFERENCED_PARAMETER(end_stream);
   };
 
-  Envoy::Http::Utility::EncodeFunctions encode_functions{
-            nullptr,
-            encode_headers,
-            encode_data
-  };
-  
+  Envoy::Http::Utility::EncodeFunctions encode_functions{nullptr, encode_headers, encode_data};
+
   bool is_grpc = false;
   bool is_head_request = false;
-  Envoy::Http::Utility::LocalReplyData local_reply_data {
-    is_grpc, entry.responseCode(), entry.responseBody(), absl::nullopt, is_head_request 
-    };
+  Envoy::Http::Utility::LocalReplyData local_reply_data{
+      is_grpc, entry.responseCode(), entry.responseBody(), absl::nullopt, is_head_request};
 
   Envoy::Http::Utility::sendLocalReply(false, encode_functions, local_reply_data);
 }
@@ -401,11 +396,12 @@ bool RouterCheckTool::compareRequestHeaderFields(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
   if (expected.request_header_matches().data()) {
-    for (const envoy::config::route::v3::HeaderMatcher& header : expected.request_header_matches()) {
-      no_failures = no_failures &&
-          matchHeaderField(*tool_config.request_headers_, header, "request_header_matches");
-      }
+    for (const envoy::config::route::v3::HeaderMatcher& header :
+         expected.request_header_matches()) {
+      no_failures = no_failures && matchHeaderField(*tool_config.request_headers_, header,
+                                                    "request_header_matches");
     }
+  }
   return no_failures;
 }
 
@@ -413,9 +409,10 @@ bool RouterCheckTool::compareResponseHeaderFields(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
   if (expected.response_header_matches().data()) {
-    for (const envoy::config::route::v3::HeaderMatcher& header : expected.response_header_matches()) {
-        no_failures = no_failures && 
-          matchHeaderField(*tool_config.response_headers_, header, "response_header_matches");
+    for (const envoy::config::route::v3::HeaderMatcher& header :
+         expected.response_header_matches()) {
+      no_failures = no_failures && matchHeaderField(*tool_config.response_headers_, header,
+                                                    "response_header_matches");
     }
   }
   return no_failures;
@@ -465,7 +462,7 @@ bool RouterCheckTool::expectHeaderField(const HM& header_map, const std::string&
         field + "):" + std::string{!expect_present} + "], test type:" + test_type);
     return false;
   }
-    return true;
+  return true;
 }
 
 bool RouterCheckTool::compareResults(const std::string& actual, const std::string& expected,
