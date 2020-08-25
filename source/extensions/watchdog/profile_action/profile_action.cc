@@ -28,13 +28,14 @@ std::string generateProfileFilePath(const std::string& directory, const SystemTi
 ProfileAction::ProfileAction(
     envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig& config,
     Server::Configuration::GuardDogActionFactoryContext& context)
-    : path_(config.profile_path()), running_profile_(false),
+    : path_(config.profile_path()),
+      duration_(
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, profile_duration, 5000))),
       max_profiles_per_tid_(config.max_profiles_per_thread() == 0
                                 ? DefaultMaxProfilePerTid
                                 : config.max_profiles_per_thread()),
-      profiles_started_(0), duration_(std::chrono::milliseconds(
-                                PROTOBUF_GET_MS_OR_DEFAULT(config, profile_duration, 5000))),
-      context_(context), timer_cb_(context_.dispatcher_.createTimer([this] {
+      running_profile_(false), profiles_started_(0), context_(context),
+      timer_cb_(context_.dispatcher_.createTimer([this] {
         if (Profiler::Cpu::profilerEnabled()) {
           Profiler::Cpu::stopProfiler();
           running_profile_ = false;
@@ -59,13 +60,13 @@ void ProfileAction::run(
   // Check if there's a tid that justifies profiling
   auto trigger_tid = getTidTriggeringProfile(thread_ltt_pairs);
   if (!trigger_tid.has_value()) {
-    ENVOY_LOG_MISC(warn, "None of the provide tids justify profiling");
+    ENVOY_LOG_MISC(warn, "Profile Action: None of the provided tids justify profiling");
     return;
   }
 
   auto& fs = context_.api_.fileSystem();
   if (!fs.directoryExists(path_)) {
-    ENVOY_LOG_MISC(error, "Directory path {} doesn't exist.", path_);
+    ENVOY_LOG_MISC(error, "Profile Action: Directory path {} doesn't exist.", path_);
     return;
   }
 

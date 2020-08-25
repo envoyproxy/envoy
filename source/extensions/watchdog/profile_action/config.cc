@@ -22,7 +22,7 @@ Server::Configuration::GuardDogActionPtr ProfileActionFactory::createGuardDogAct
 }
 
 /**
- * Static registration for the fixed heap resource monitor factory. @see RegistryFactory.
+ * Static registration for the ProfileAction factory. @see RegistryFactory.
  */
 REGISTER_FACTORY(ProfileActionFactory, Server::Configuration::GuardDogActionFactory);
 
