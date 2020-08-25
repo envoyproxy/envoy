@@ -50,11 +50,30 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   // Get all applicable rate limit policy entries for the route.
   populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, route_entry, headers);
 
-  // Get all applicable rate limit policy entries for the virtual host if the route opted to
-  // include the virtual host rate limits.
-  if (route_entry->includeVirtualHostRateLimits()) {
-    populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
-                                 route_entry, headers);
+  if (route_entry->vhRateLimitsOptionsCase() == Router::VhRateLimitOptionsCase::kVhRateLimits) {
+    switch (route_entry->virtualHostRateLimitsOption()) {
+    case Router::VhRateLimitOptions::Ignore:
+      break;
+    case Router::VhRateLimitOptions::Include:
+      populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
+                                   route_entry, headers);
+      break;
+    case Router::VhRateLimitOptions::Override:
+      if (route_entry->rateLimitPolicy().empty()) {
+        populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
+                                     route_entry, headers);
+      }
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  } else {
+    // Get all applicable rate limit policy entries for the virtual host if the route opted to
+    // include the virtual host rate limits.
+    if (route_entry->includeVirtualHostRateLimits()) {
+      populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
+                                   route_entry, headers);
+    }
   }
 
   if (!descriptors.empty()) {

@@ -510,6 +510,12 @@ public:
     return opaque_config_;
   }
   bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
+  Router::VhRateLimitOptions virtualHostRateLimitsOption() const override {
+    return vh_rate_limits_;
+  }
+  Router::VhRateLimitOptionsCase vhRateLimitsOptionsCase() const override {
+    return vh_rate_limits_option_case_;
+  }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
@@ -546,6 +552,8 @@ protected:
   const std::string host_rewrite_;
   bool include_vh_rate_limits_;
   absl::optional<ConnectConfig> connect_config_;
+  Router::VhRateLimitOptions vh_rate_limits_;
+  Router::VhRateLimitOptionsCase vh_rate_limits_option_case_;
 
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
 
@@ -629,6 +637,12 @@ private:
     bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
     bool includeVirtualHostRateLimits() const override {
       return parent_->includeVirtualHostRateLimits();
+    }
+    Router::VhRateLimitOptions virtualHostRateLimitsOption() const override {
+      return parent_->virtualHostRateLimitsOption();
+    }
+    Router::VhRateLimitOptionsCase vhRateLimitsOptionsCase() const override {
+      return parent_->vhRateLimitsOptionsCase();
     }
     const envoy::config::core::v3::Metadata& metadata() const override {
       return parent_->metadata();

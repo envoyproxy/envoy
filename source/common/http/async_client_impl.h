@@ -274,6 +274,12 @@ private:
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
+    Router::VhRateLimitOptions virtualHostRateLimitsOption() const override {
+      return vh_rate_limits_;
+    }
+    Router::VhRateLimitOptionsCase vhRateLimitsOptionsCase() const override {
+      return vh_rate_limits_option_case_;
+    }
     const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
     const Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
     const Router::PathMatchCriterion& pathMatchCriterion() const override {
@@ -309,6 +315,8 @@ private:
     absl::optional<std::chrono::milliseconds> timeout_;
     static const absl::optional<ConnectConfig> connect_config_nullopt_;
     const std::string route_name_;
+    Router::VhRateLimitOptions vh_rate_limits_;
+    Router::VhRateLimitOptionsCase vh_rate_limits_option_case_;
   };
 
   struct RouteImpl : public Router::Route {
