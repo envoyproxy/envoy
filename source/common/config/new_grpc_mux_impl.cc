@@ -64,7 +64,6 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   for (const auto& r : message->resources()) {
     if (r.aliases_size() > 0) {
       AddedRemoved converted = sub->second->watch_map_.removeAliasWatches(r);
-      sub->second->sub_state_.updateSubscriptionInterest(converted.added_, converted.removed_);
     }
   }
 
@@ -113,7 +112,8 @@ void NewGrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
                                          const std::set<std::string>& resources,
                                          SubscriptionCallbacks& callbacks,
-                                         OpaqueResourceDecoder& resource_decoder, const bool use_prefix_matching) {
+                                         OpaqueResourceDecoder& resource_decoder,
+                                         const bool use_prefix_matching) {
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
@@ -123,7 +123,7 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
 
   Watch* watch = entry->second->watch_map_.addWatch(callbacks, resource_decoder);
   // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
-  updateWatch(type_url, watch, resources);
+  updateWatch(type_url, watch, resources, use_prefix_matching);
   return std::make_unique<WatchImpl>(type_url, watch, *this);
 }
 
@@ -131,13 +131,20 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
 // the whole subscription, or if a removed name has no other watch interested in it, then the
 // subscription will enqueue and attempt to send an appropriate discovery request.
 void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
-                                 const std::set<std::string>& resources) {
+                                 const std::set<std::string>& resources,
+                                 bool creating_prefix_watch) {
   ASSERT(watch != nullptr);
   auto sub = subscriptions_.find(type_url);
   RELEASE_ASSERT(sub != subscriptions_.end(),
                  fmt::format("Watch of {} has no subscription to update.", type_url));
   auto added_removed = sub->second->watch_map_.updateWatchInterest(watch, resources);
-  sub->second->sub_state_.updateSubscriptionInterest(added_removed.added_, added_removed.removed_);
+  if (creating_prefix_watch) {
+    // THis is to prevent sending out of requests that contain prefixes instead of resource names
+    sub->second->sub_state_.updateSubscriptionInterest({}, {});
+  } else {
+    sub->second->sub_state_.updateSubscriptionInterest(added_removed.added_,
+                                                       added_removed.removed_);
+  }
   // Tell the server about our change in interest, if any.
   if (sub->second->sub_state_.subscriptionUpdatePending()) {
     trySendDiscoveryRequests();
@@ -145,12 +152,11 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
 }
 
 void NewGrpcMuxImpl::addToWatch(const std::string& type_url, Watch* watch,
-                                 const std::set<std::string>& to_add) {
+                                const std::set<std::string>& to_add) {
   ASSERT(watch != nullptr);
   std::set<std::string> with_added;
-  std::set_union(to_add.begin(), to_add.end(),
-                 watch->resource_names_.begin(), watch->resource_names_.end(),
-                 std::inserter(with_added, with_added.begin()));
+  std::set_union(to_add.begin(), to_add.end(), watch->resource_names_.begin(),
+                 watch->resource_names_.end(), std::inserter(with_added, with_added.begin()));
 
   updateWatch(type_url, watch, with_added);
 }
@@ -164,7 +170,8 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
 }
 
 void NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use_prefix_matching) {
-  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_, use_prefix_matching));
+  subscriptions_.emplace(
+      type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_, use_prefix_matching));
   subscription_ordering_.emplace_back(type_url);
 }
 

@@ -214,7 +214,7 @@ TEST_P(VhdsInitializationTest, InitializeVhdsAfterRdsHasBeenInitialized) {
   vhds_stream_->startGrpcStream();
 
   EXPECT_TRUE(
-      compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {"my_route"}, {}, vhds_stream_));
+      compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
   sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
       Config::TypeUrl::get().VirtualHost,
       {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
@@ -306,7 +306,7 @@ public:
     vhds_stream_->startGrpcStream();
 
     EXPECT_TRUE(
-        compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {"my_route"}, {}, vhds_stream_));
+        compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
     sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
         Config::TypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "1", vhds_stream_);
     EXPECT_TRUE(
@@ -424,7 +424,8 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
 
   // A spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
   sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
-      Config::TypeUrl::get().VirtualHost, {}, {"my_route/vhost_1", "my_route/vhost_2"}, "3", vhds_stream_);
+      Config::TypeUrl::get().VirtualHost, {}, {"my_route/vhost_1", "my_route/vhost_2"}, "3",
+      vhds_stream_);
   EXPECT_TRUE(
       compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
 
@@ -487,7 +488,8 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
 
   // A spontaneous VHDS DiscoveryResponse removes virtual hosts added via vhds
   sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
-      Config::TypeUrl::get().VirtualHost, {}, {"my_route/vhost_1", "my_route/vhost_2"}, "3", vhds_stream_);
+      Config::TypeUrl::get().VirtualHost, {}, {"my_route/vhost_1", "my_route/vhost_2"}, "3",
+      vhds_stream_);
   EXPECT_TRUE(
       compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
 
@@ -636,7 +638,8 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveOneAliasOutOfSeveral)
                                            vhds_stream_));
   // Send an empty response back (the management server isn't aware of vhost.third)
   sendDeltaDiscoveryResponseWithUnresolvedAliases({buildVirtualHost2()}, {}, "4", vhds_stream_,
-                                                  {"my_route/vhost.first"}, {"my_route/vhost.third"});
+                                                  {"my_route/vhost.first"},
+                                                  {"my_route/vhost.third"});
 
   response->waitForHeaders();
   EXPECT_EQ("404", response->headers().getStatusValue());

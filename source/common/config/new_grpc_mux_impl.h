@@ -39,7 +39,8 @@ public:
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
-                           OpaqueResourceDecoder& resource_decoder, const bool use_prefix_matching = false) override;
+                           OpaqueResourceDecoder& resource_decoder,
+                           const bool use_prefix_matching = false) override;
 
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
@@ -60,7 +61,8 @@ public:
   void start() override;
 
   struct SubscriptionStuff {
-    SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info, const bool use_prefix_matching)
+    SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
+                      const bool use_prefix_matching)
         : sub_state_(type_url, watch_map_, local_info, use_prefix_matching) {}
 
     WatchMap watch_map_;
@@ -112,10 +114,10 @@ private:
   // the whole subscription, or if a removed name has no other watch interested in it, then the
   // subscription will enqueue and attempt to send an appropriate discovery request.
   void updateWatch(const std::string& type_url, Watch* watch,
-                   const std::set<std::string>& resources);
+                   const std::set<std::string>& resources,
+                   const bool creating_prefix_watch = false);
 
-  void addToWatch(const std::string& type_url, Watch* watch,
-                                  const std::set<std::string>& to_add);
+  void addToWatch(const std::string& type_url, Watch* watch, const std::set<std::string>& to_add);
 
   void addSubscription(const std::string& type_url, const bool use_prefix_matching);
 
