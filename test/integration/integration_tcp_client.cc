@@ -32,9 +32,7 @@ using ::testing::AssertionResult;
 using ::testing::AssertionSuccess;
 using ::testing::AtLeast;
 using ::testing::Invoke;
-using ::testing::IsSubstring;
 using ::testing::NiceMock;
-using ::testing::ReturnRef;
 
 IntegrationTcpClient::IntegrationTcpClient(
     Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,

@@ -17,17 +17,6 @@
 
 namespace Envoy {
 
-using ::testing::_;
-using ::testing::AnyNumber;
-using ::testing::AssertionFailure;
-using ::testing::AssertionResult;
-using ::testing::AssertionSuccess;
-using ::testing::AtLeast;
-using ::testing::Invoke;
-using ::testing::IsSubstring;
-using ::testing::NiceMock;
-using ::testing::ReturnRef;
-
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
