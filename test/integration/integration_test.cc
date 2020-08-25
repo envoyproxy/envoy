@@ -437,13 +437,16 @@ TEST_P(IntegrationTest, BadFirstline) {
 }
 
 TEST_P(IntegrationTest, MissingDelimiter) {
-  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "GET / HTTP/1.1\r\nHost: host\r\nfoo bar\r\n\r\n", &response);
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http1.codec_error"));
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr("http1.codec_error"));
+  EXPECT_THAT(log, HasSubstr("DPE"));
+  EXPECT_THAT(log, Not(HasSubstr("DC")));
 }
 
 TEST_P(IntegrationTest, InvalidCharacterInFirstline) {
