@@ -248,6 +248,9 @@ elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
 
   echo "Building and testing ${TEST_TARGETS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c fastbuild ${TEST_TARGETS}
+  # TODO(foreseeable): consolidate this and the API tool tests in a dedicated target.
+  bazel_with_collection //tools/envoy_headersplit:headersplit_test LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
+  bazel_with_collection //tools/envoy_headersplit:replace_includes_test LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
   exit 0
 elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
@@ -381,12 +384,6 @@ elif [[ "$CI_TARGET" == "check_spelling_pedantic" ]]; then
 elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
   echo "fix_spelling_pedantic..."
   ./tools/spelling/check_spelling_pedantic.py fix
-  exit 0
-elif [[ "$CI_TARGET" == "headersplit" ]]; then
-  echo "headersplit_test..."
-  bazel_with_collection //tools/envoy_headersplit:headersplit_test LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
-  bazel_with_collection //tools/envoy_headersplit:replace_includes_test LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
-  ./tools/headersplit "$@"
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."
