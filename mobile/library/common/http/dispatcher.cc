@@ -514,12 +514,8 @@ void Dispatcher::cleanup(envoy_stream_t stream_handle) {
   // required because in Dispatcher::resetStream the DirectStream needs to live for as long and
   // the HCM's ActiveStream lives. Hence its deletion needs to live beyond the synchronous code in
   // Dispatcher::resetStream.
-  // TODO: currently upstream Envoy does not have a deferred delete version for shared_ptr. This
-  // means that instead of efficiently queuing the deletes for one event in the event loop, all
-  // deletes here get queued up as individual posts.
-  TS_UNCHECKED_READ(event_dispatcher_)->post([direct_stream]() -> void {
-    ENVOY_LOG(debug, "[S{}] deferred deletion of stream", direct_stream->stream_handle_);
-  });
+  auto direct_stream_wrapper = std::make_unique<DirectStreamWrapper>(std::move(direct_stream));
+  TS_UNCHECKED_READ(event_dispatcher_)->deferredDelete(std::move(direct_stream_wrapper));
   // However, the entry in the map should not exist after cleanup.
   // Hence why it is synchronously erased from the streams map.
   Thread::ReleasableLockGuard lock(streams_lock_);

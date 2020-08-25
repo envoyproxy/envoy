@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/api_listener.h"
 #include "envoy/http/codec.h"
@@ -216,6 +217,20 @@ private:
   };
 
   using DirectStreamSharedPtr = std::shared_ptr<DirectStream>;
+
+  // Used to deferredDelete the ref count of the DirectStream owned by streams_ while still
+  // maintaining a container of DirectStreamSharedPtr. Using deferredDelete is important due to the
+  // necessary ordering of ActiveStream deletion w.r.t DirectStream deletion; the former needs to be
+  // destroyed first. Using post to defer delete the DirectStream provides no ordering guarantee per
+  // envoy/source/common/event/libevent.h Maintaining a container of DirectStreamSharedPtr is
+  // important because Dispatcher::resetStream is initiated by a platform thread.
+  struct DirectStreamWrapper : public Event::DeferredDeletable {
+    DirectStreamWrapper(DirectStreamSharedPtr stream) : stream_(stream) {}
+
+  private:
+    const DirectStreamSharedPtr stream_;
+  };
+  using DirectStreamWrapperPtr = std::unique_ptr<DirectStreamWrapper>;
 
   static DispatcherStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return DispatcherStats{ALL_HTTP_DISPATCHER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
