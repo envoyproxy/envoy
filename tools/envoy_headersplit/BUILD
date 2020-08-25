@@ -9,19 +9,31 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-py_test(
-    name = "headersplit_test",
+py_binary(
+    name = "headersplit",
     srcs = [
-        "headersplit.py",
-        "headersplit_test.py",
+        "headersplit.py"
     ],
-    data = glob(["code_corpus/**"]),
-    main = "headersplit_test.py",
     python_version = "PY3",
     srcs_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
         requirement("clang"),
+    ],
+)
+
+py_test(
+    name = "headersplit_test",
+    srcs = [
+        "headersplit_test.py",
+    ],
+    data = glob(["code_corpus/**"]),
+    python_version = "PY3",
+    srcs_version = "PY3",
+    visibility = ["//visibility:public"],
+    deps = [
+        requirement("clang"),
+        ":headersplit",
     ],
 )
 

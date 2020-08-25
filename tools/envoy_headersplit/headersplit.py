@@ -15,18 +15,6 @@ from typing import Type, List, Tuple, Dict
 import clang.cindex
 from clang.cindex import TranslationUnit, Index, CursorKind, Cursor
 
-# Loading libclang
-if "LLVM_CONFIG" in os.environ:
-  llvm_config_path = os.environ["LLVM_CONFIG"]
-  exec_result = subprocess.check_output([llvm_config_path, "--libdir"])
-  clang_tools_lib_path = exec_result.rstrip()
-  clang.cindex.Config.set_library_path(clang_tools_lib_path.decode("utf-8"))
-else:
-  sys.exit(
-      "llvm-config not found, please set the environment variable:\n" \
-      "export LLVM_CONFIG=<path to clang installation>/bin/llvm-config"
-  )
-
 
 def to_filename(classname: str) -> str:
   """
