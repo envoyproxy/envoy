@@ -3743,7 +3743,9 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAfterHeadersAcc
 
 // Verify that FrameFloodException causes connection to be closed abortively.
 TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
-  InSequence s;
+  std::shared_ptr<AccessLog::MockInstance> log_handler =
+      std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  access_logs_ = {log_handler};
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
@@ -3758,14 +3760,20 @@ TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay));
 
+  EXPECT_CALL(*log_handler, log(_, _, _, _))
+      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                          const StreamInfo::StreamInfo& stream_info) {
+        ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
+        EXPECT_EQ("codec error: too many outbound frames.",
+                  stream_info.responseCodeDetails().value());
+      }));
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
   EXPECT_LOG_NOT_CONTAINS("warning", "downstream HTTP flood",
                           conn_manager_->onData(fake_input, false));
+
   EXPECT_TRUE(filter_callbacks_.connection_.streamInfo().hasResponseFlag(
       StreamInfo::ResponseFlag::DownstreamProtocolError));
-  EXPECT_EQ("codec error: too many outbound frames.",
-            filter_callbacks_.connection_.streamInfo().responseCodeDetails().value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, IdleTimeoutNoCodec) {
