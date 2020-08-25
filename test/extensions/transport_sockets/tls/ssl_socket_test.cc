@@ -4172,6 +4172,14 @@ TEST_P(SslSocketTest, RevokedCertificateCRLInTrustedCA) {
 TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
 
   // This should succeed, since the crl chain is complete.
+  //
+  // Trust chain contains:
+  //  - Root authority certificate (i.e., ca_cert.pem)
+  //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //
+  // Certificate revocation list contains:
+  //  - Root authority certificate revocation list (i.e., ca_cert.crl)
+  //  - Intermediate authority certificate revocation list (i.e., intermediate_ca_cert.crl)
   const std::string complete_server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -4187,6 +4195,16 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
 )EOF";
 
   // This should fail, since the crl chain is incomplete.
+  //
+  // Trust chain contains:
+  //  - Root authority certificate (i.e., ca_cert.pem)
+  //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //
+  // Certificate revocation list contains:
+  //  - Root authority certificate revocation list (i.e., ca_cert.crl)
+  //
+  // Certificate revocation list omits:
+  //  - Root authority certificate revocation list (i.e., ca_cert.crl)
   const std::string incomplete_server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -4245,6 +4263,12 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
 TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
 
   // This should succeed, since the crl chain is complete.
+  //
+  // Trust chain contains:
+  //  - Root authority certificate (i.e., ca_cert.pem)
+  //  - Root authority certificate revocation list (i.e., ca_cert.crl)
+  //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //  - Intermediate authority certificate revocation list (i.e., intermediate_ca_cert.crl)
   const std::string complete_server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -4258,6 +4282,14 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
 )EOF";
 
   // This should fail, since the crl chain is incomplete.
+  //
+  // Trust chain contains:
+  //  - Root authority certificate (i.e., ca_cert.pem)
+  //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //  - Intermediate authority certificate revocation list (i.e., intermediate_ca_cert.crl)
+  //
+  // Trust chain omits:
+  //  - Root authority certificate revocation list (i.e., ca_cert.crl)
   const std::string incomplete_server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
