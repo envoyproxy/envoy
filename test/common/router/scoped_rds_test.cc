@@ -1398,8 +1398,7 @@ TEST_F(ScopedRdsTest, DanglingSubscriptionOnDemandUpdate) {
   setup();
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
   Event::PostCb temp_post_cb;
-  {
-    const std::string config_yaml = R"EOF(
+  const std::string config_yaml = R"EOF(
 name: my_scoped_routes
 scope_key_builder:
   fragments:
@@ -1409,21 +1408,16 @@ scope_key_builder:
           key: x-bar-key
           separator: ;
 )EOF";
-    envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes
-        scoped_routes_config;
-    TestUtility::loadFromYaml(config_yaml, scoped_routes_config);
-    Envoy::Config::ConfigProviderPtr provider = config_provider_manager_->createXdsConfigProvider(
-        scoped_routes_config.scoped_rds(), server_factory_context_, context_init_manager_, "bar.",
-        ScopedRoutesConfigProviderManagerOptArg(scoped_routes_config.name(),
-                                                scoped_routes_config.rds_config_source(),
-                                                scoped_routes_config.scope_key_builder()));
-
-    EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
-        .WillOnce(testing::SaveArg<0>(&temp_post_cb));
-    dynamic_cast<ScopedRdsConfigProvider*>(provider.get())
-        ->onDemandRdsUpdate(666, event_dispatcher_, move(route_config_updated_cb));
-    EXPECT_NO_THROW(temp_post_cb());
-  }
+  envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes
+      scoped_routes_config;
+  TestUtility::loadFromYaml(config_yaml, scoped_routes_config);
+  EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
+      .WillOnce(testing::SaveArg<0>(&temp_post_cb));
+  getScopedRdsProvider()->onDemandRdsUpdate(666, event_dispatcher_, move(route_config_updated_cb));
+  EXPECT_NO_THROW(temp_post_cb());
+  // Destroy the scoped_rds subscription by destroying its only config provider.
+  provider_.reset();
+  EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
   EXPECT_NO_THROW(temp_post_cb());
 }
 

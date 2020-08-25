@@ -1171,6 +1171,7 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
   absl::optional<Router::ConfigConstSharedPtr> route_config = routeConfig();
   Event::Dispatcher& thread_local_dispatcher =
       connection_manager_.read_callbacks_->connection().dispatcher();
+  absl::optional<uint64_t> scope_key_hash;
   if (route_config.has_value() && route_config.value()->usesVhds()) {
     // On demand vhds
     ASSERT(!filter_manager_.requestHeaders()->Host()->value().empty());
@@ -1180,7 +1181,7 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
                                                       std::move(route_config_updated_cb));
     return;
   } else if (snapped_scoped_routes_config_ != nullptr &&
-             (scope_key_hash_ = snapped_scoped_routes_config_->computeKeyHash(
+             (scope_key_hash = snapped_scoped_routes_config_->computeKeyHash(
                   *filter_manager_.requestHeaders()))) {
     // On demand srds
     Http::RouteConfigUpdatedCallback scoped_route_config_updated_cb =
@@ -1195,7 +1196,7 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
                 (*cb)(scope_exist && hasCachedRoute());
               }
             });
-    route_config_update_requester_->requestSrdsUpdate(*scope_key_hash_, thread_local_dispatcher,
+    route_config_update_requester_->requestSrdsUpdate(*scope_key_hash, thread_local_dispatcher,
                                                       move(scoped_route_config_updated_cb));
     return;
   }

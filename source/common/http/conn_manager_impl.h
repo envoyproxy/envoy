@@ -311,7 +311,6 @@ private:
     const std::string* decorated_operation_{nullptr};
     std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
-    absl::optional<uint64_t> scope_key_hash_;
 
     friend FilterManager;
   };

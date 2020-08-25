@@ -175,7 +175,7 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::initRdsConfigPro
 
 void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConfigProvider() {
   // If the route provider have been initialized, return and wait for rds config update.
-  if (route_provider_) {
+  if (route_provider_ != nullptr) {
     return;
   }
   // Create a init_manager to create a rds provider.
@@ -455,6 +455,7 @@ void ScopedRdsConfigSubscription::onDemandRdsUpdate(
       thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
       return;
     }
+
     auto iter = scope_name_by_hash_.find(key_hash);
     // Return to filter chain if we can't find the scope.
     // The scope may have been destroyed when callback reach the main thread.
