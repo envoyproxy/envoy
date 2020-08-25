@@ -4958,7 +4958,7 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimitsIntermediateFilter) 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
-  
+
   EXPECT_CALL(stream_, removeCallbacks(_));
   expectOnDestroy(false);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -5026,11 +5026,11 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsAfterHeaders) {
   const std::string data = "A long enough string to go over watermarks";
   Buffer::OwnedImpl fake_response(data);
   InSequence s;
+  EXPECT_CALL(stream_, removeCallbacks(_));
+  expectOnDestroy(false);
   EXPECT_CALL(*encoder_filters_[1], encodeData(_, false))
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
-  EXPECT_CALL(stream_, removeCallbacks(_));
   EXPECT_CALL(stream_, resetStream(_));
-  expectOnDestroy(false);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
   EXPECT_LOG_CONTAINS(
       "debug",
@@ -6558,7 +6558,6 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
       StreamInfo::FilterState::StateType::ReadOnly);
 
   setup(false, "envoy-custom-server", false);
-
   setupFilterChain(1, 0, /* num_requests = */ 3);
 
   EXPECT_CALL(*codec_, dispatch(_))
