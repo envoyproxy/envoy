@@ -394,11 +394,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "udp_gso_batch_writer_lib",
     srcs = select({
-        "@envoy//bazel:linux": ["udp_gso_batch_writer.cc"],
+        "//bazel:linux": ["udp_gso_batch_writer.cc"],
         "//conditions:default": [],
     }),
     hdrs = select({
-        "@envoy//bazel:linux": ["udp_gso_batch_writer.h"],
+        "//bazel:linux": ["udp_gso_batch_writer.h"],
         "//conditions:default": [],
     }),
     external_deps = ["quiche_quic_platform"],
