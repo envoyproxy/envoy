@@ -504,10 +504,44 @@ If you have clang-5.0 or newer, additional checks are provided with:
 bazel test -c dbg --config=clang-asan //test/...
 ```
 
-Similarly, for [thread sanitizer (TSAN)](https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual) testing:
+[Thread sanitizer (TSAN)](https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual) tests rely on
+a TSAN-instrumented version of libc++ and can be run under the docker sandbox:
 
 ```
-bazel test -c dbg --config=clang-tsan //test/...
+bazel test -c dbg --config=docker-tsan //test/...
+```
+
+Alternatively, you can build a local copy of TSAN-instrumented libc++. Follow the [quick start](#quick-start-bazel-build-for-developers) instruction to setup Clang+LLVM environment. Download LLVM sources from the [LLVM official site](https://github.com/llvm/llvm-project)
+
+```
+curl -sSfL "https://github.com/llvm/llvm-project/archive/llvmorg-10.0.0.tar.gz" | tar zx
+
+```
+
+Configure and build a TSAN-instrumented libc++. Please note that `LLVM_USE_SANITIZER=Thread` preprocessor definition is used to enable TSAN instrumentation, and `CMAKE_INSTALL_PREFIX="/opt/libcxx_tsan"` defines the installation directory path.
+
+```
+mkdir tsan
+pushd tsan
+
+cmake -GNinja -DLLVM_ENABLE_PROJECTS="libcxxabi;libcxx" -DLLVM_USE_LINKER=lld -DLLVM_USE_SANITIZER=Thread -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_INSTALL_PREFIX="/opt/libcxx_tsan" "../llvm-project-llvmorg-10.0.0/llvm"
+ninja install-cxx install-cxxabi
+
+rm -rf /opt/libcxx_tsan/include
+```
+
+Generate local_tsan.bazelrc containing bazel configuration for tsan tests:
+
+```
+bazel/setup_local_tsan.sh </path/to/instrumented/libc++/home>
+
+```
+
+To execute TSAN tests using the local instrumented libc++ library pass `--config=local-tsan` to bazel:
+
+```
+bazel test --config=local-tsan //test/...
 ```
 
 For [memory sanitizer (MSAN)](https://github.com/google/sanitizers/wiki/MemorySanitizer) testing,
