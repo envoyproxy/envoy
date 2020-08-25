@@ -267,6 +267,8 @@ the following statistics:
   lb_zone_no_capacity_left, Counter, Total number of times ended with random zone selection due to rounding error
   original_dst_host_invalid, Counter, Total number of invalid hosts passed to original destination load balancer
 
+.. _config_cluster_manager_cluster_stats_subset_lb:
+
 Load balancer subset statistics
 -------------------------------
 

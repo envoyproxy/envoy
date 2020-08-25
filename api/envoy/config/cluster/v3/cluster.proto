@@ -254,7 +254,8 @@ message Cluster {
       //
       // When this mode is enabled, configurations that contain more than one host with the same metadata value for the single key in `keys`
       // will use only one of the hosts with the given key; no requests will be routed to the others. The cluster gauge
-      // `lb_subsets_single_host_per_subset_duplicate` indicates how many duplicates are present in the current configuration.
+      // :ref:`lb_subsets_single_host_per_subset_duplicate<config_cluster_manager_cluster_stats_subset_lb>` indicates how many duplicates are
+      // present in the current configuration.
       bool single_host_per_subset = 4;
 
       // The behavior used when no endpoint subset matches the selected route's
