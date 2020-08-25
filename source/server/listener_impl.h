@@ -387,7 +387,7 @@ public:
     return config().traffic_direction();
   }
   bool
-  containFilterChain(const envoy::config::listener::v3::FilterChain* const filter_chain) override {
+  containFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain) override {
     return filter_chains_.find(filter_chain) != filter_chains_.end();
   }
 
