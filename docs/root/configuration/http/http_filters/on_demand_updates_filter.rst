@@ -1,7 +1,7 @@
 .. _config_http_filters_on_demand:
 
 On-demand VHDS ans S/RDS Updates
-======================
+================================
 
 The on-demand update filter can be used to request a :ref:`virtual host <envoy_v3_api_msg_config.route.v3.VirtualHost>`
 data if it's not already present in the :ref:`Route Configuration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`. The
