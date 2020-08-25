@@ -292,7 +292,12 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
       }
 
       // Record the updated value to be sent to workers on the next thread-local-state flush, along
-      // with any update callbacks.
+      // with any update callbacks. This might overwrite a previous action state change caused by a
+      // pressure update for a different resource that hasn't been flushed yet. That's okay because
+      // the state recorded here includes the information from all previous resource updates. So
+      // even if resource 1 causes an action to have value A, and a later update to resource 2
+      // causes the action to have value B, B would have been the result for whichever order the
+      // updates to resources 1 and 2 came in.
       state_updates_to_flush_.insert_or_assign(action, state);
       auto [callbacks_start, callbacks_end] = action_to_callbacks_.equal_range(action);
       std::for_each(callbacks_start, callbacks_end, [&](ActionToCallbackMap::value_type& cb_entry) {
@@ -302,7 +307,10 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
   });
 
   // Eagerly flush updates if this is the last call to updateResourcePressure expected for the
-  // current epoch.
+  // current epoch. This assert is always valid because flush_awaiting_updates_ is initialized
+  // before each batch of updates, and even if a resource monitor performs a double update, or a
+  // previous update callback is late, the logic in OverloadManager::Resource::update() will prevent
+  // unexpected calls to this function.
   ASSERT(flush_awaiting_updates_ > 0);
   --flush_awaiting_updates_;
   if (flush_epoch == flush_epoch_ && flush_awaiting_updates_ == 0) {
