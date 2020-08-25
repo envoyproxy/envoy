@@ -624,11 +624,8 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   if (connection_manager_.remote_close_) {
     filter_manager_.streamInfo().setResponseCodeDetails(
         StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect);
-    if (!filter_manager_.streamInfo().hasAnyResponseFlag() &&
-        !filter_manager_.streamInfo().responseCode()) {
-      filter_manager_.streamInfo().setResponseFlag(
-          StreamInfo::ResponseFlag::DownstreamConnectionTermination);
-    }
+    filter_manager_.streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::DownstreamConnectionTermination);
   }
 
   if (connection_manager_.codec_->protocol() < Protocol::Http2) {
