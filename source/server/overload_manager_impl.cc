@@ -275,7 +275,7 @@ ThreadLocalOverloadState& OverloadManagerImpl::getThreadLocalOverloadState() {
 }
 
 void OverloadManagerImpl::updateResourcePressure(const std::string& resource, double pressure,
-                                                 int flush_epoch) {
+                                                 FlushEpochId flush_epoch) {
   auto [start, end] = resource_to_actions_.equal_range(resource);
 
   std::for_each(start, end, [&](ResourceToActionMap::value_type& entry) {
@@ -290,6 +290,9 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
         ENVOY_LOG(debug, "Overload action {} became {}", action,
                   (state.isSaturated() ? "saturated" : "scaling"));
       }
+
+      // Record the updated value to be sent to workers on the next thread-local-state flush, along
+      // with any update callbacks.
       state_updates_to_flush_.insert_or_assign(action, state);
       auto [callbacks_start, callbacks_end] = action_to_callbacks_.equal_range(action);
       std::for_each(callbacks_start, callbacks_end, [&](ActionToCallbackMap::value_type& cb_entry) {
@@ -300,6 +303,7 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
 
   // Eagerly flush updates if this is the last call to updateResourcePressure expected for the
   // current epoch.
+  ASSERT(flush_awaiting_updates_ > 0);
   --flush_awaiting_updates_;
   if (flush_epoch == flush_epoch_ && flush_awaiting_updates_ == 0) {
     flushResourceUpdates();
@@ -332,7 +336,7 @@ OverloadManagerImpl::Resource::Resource(const std::string& name, ResourceMonitor
       failed_updates_counter_(makeCounter(stats_scope, name, "failed_updates")),
       skipped_updates_counter_(makeCounter(stats_scope, name, "skipped_updates")) {}
 
-void OverloadManagerImpl::Resource::update(int flush_epoch) {
+void OverloadManagerImpl::Resource::update(FlushEpochId flush_epoch) {
   if (!pending_update_) {
     pending_update_ = true;
     flush_epoch_ = flush_epoch;
