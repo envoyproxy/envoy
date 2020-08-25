@@ -351,8 +351,9 @@ private:
       std::pair<Network::ConnectionSocketPtr, const envoy::config::core::v3::Metadata>;
 
   // map<filter_chain_message, map<listener_name, list<SocketMetadataPair>>>
-  absl::flat_hash_map<const envoy::config::listener::v3::FilterChain* const,
-                      absl::flat_hash_map<std::string, std::list<SocketMetadataPair>>>
+  absl::flat_hash_map<envoy::config::listener::v3::FilterChain,
+                      absl::flat_hash_map<std::string, std::list<SocketMetadataPair>>, MessageUtil,
+                      MessageUtil>
       pending_sockets_;
 };
 

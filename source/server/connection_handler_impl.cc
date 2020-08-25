@@ -145,11 +145,11 @@ void ConnectionHandlerImpl::retryConnections(
     ENVOY_LOG(debug, "filter chain has been cleared.");
     return;
   }
-  if (pending_sockets_.find(filter_chain_message) == pending_sockets_.end()) {
+  if (pending_sockets_.find(*filter_chain_message) == pending_sockets_.end()) {
     ENVOY_LOG(debug, "filter chain is not found to store any sockets to retry connection.");
     return;
   }
-  auto& listener_sockets_map = pending_sockets_[filter_chain_message];
+  auto& listener_sockets_map = pending_sockets_[*filter_chain_message];
   // Go through all listeners on this worker, if a listener has sent request to rebuild
   // filter_chain, now retry connection with those stored sockets.
   for (auto& listener : listeners_) {
@@ -174,7 +174,7 @@ void ConnectionHandlerImpl::retryConnections(
       }
     }
   }
-  pending_sockets_.erase(filter_chain_message);
+  pending_sockets_.erase(*filter_chain_message);
 }
 
 void ConnectionHandlerImpl::ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
@@ -484,8 +484,8 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     // TODO(ASOPVII): listener update during old filter chain rebuilding sent to master.
     // New/old listeners share the same name. If new listener deletes one filter chain , some
     // sockets stored will be forgotten.
-    parent_.pending_sockets_[filter_chain_message][listener_name].emplace_back(std::move(socket),
-                                                                               dynamic_metadata);
+    parent_.pending_sockets_[*filter_chain_message][listener_name].emplace_back(std::move(socket),
+                                                                                dynamic_metadata);
 
     auto& server_dispatcher = config_->dispatcher();
     server_dispatcher.post([&filter_chain_message, &worker_name, &listener = config_]() {

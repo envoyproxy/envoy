@@ -770,6 +770,7 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
     addListenerToWorker(*worker, listener.listenerTag(), listener, nullptr);
   }
 
+  (*existing_active_listener)->stopUnfinishedFilterChainRebuilding();
   auto previous_listener = std::move(*existing_active_listener);
   *existing_active_listener = std::move(*existing_warming_listener);
   // Finish active_listeners_ transformation before calling `drainFilterChains` as it depends on

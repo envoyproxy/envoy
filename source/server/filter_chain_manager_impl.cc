@@ -271,7 +271,7 @@ void FilterChainManagerImpl::stopRebuildingFilterChain(
   if (filter_chain == nullptr) {
     return;
   }
-  auto rebuilt_placeholder = fc_contexts_[*filter_chain];
+  auto& rebuilt_placeholder = fc_contexts_[*filter_chain];
   if (rebuilt_placeholder != nullptr) {
     rebuilt_placeholder->backToPlaceholder();
   } else {
@@ -615,6 +615,11 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceIpAn
   }
 
   return nullptr;
+}
+
+bool FilterChainManagerImpl::containFilterChain(
+    const envoy::config::listener::v3::FilterChain& filter_chain_message) const {
+  return fc_contexts_.find(filter_chain_message) != fc_contexts_.end();
 }
 
 void FilterChainManagerImpl::convertIPsToTries() {

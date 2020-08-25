@@ -282,6 +282,12 @@ void PerFilterChainRebuilder::startRebuilding() {
   rebuild_init_manager_->initialize(rebuild_watcher_);
 }
 
+void PerFilterChainRebuilder::stopRebuilding() {
+  if (state_ == State::Running) {
+    state_ = State::Failed;
+  }
+}
+
 void PerFilterChainRebuilder::startTimer() { rebuild_timer_->enableTimer(rebuild_timeout_); }
 
 void PerFilterChainRebuilder::onTimeout() {
@@ -365,7 +371,6 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   buildOriginalDstListenerFilter();
   buildProxyProtocolListenerFilter();
   buildTlsInspectorListenerFilter();
-  storeFilterChains(config_.filter_chains());
   if (!workers_started_) {
     // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
     // NOTE: listener_init_target_ should be added to parent's initManager at the end of the
@@ -422,7 +427,6 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
   buildOriginalDstListenerFilter();
   buildProxyProtocolListenerFilter();
   buildTlsInspectorListenerFilter();
-  storeFilterChains(config_.filter_chains());
   open_connections_ = origin.open_connections_;
 }
 
@@ -607,6 +611,8 @@ void ListenerImpl::rebuildFilterChain(
 
   const auto& rebuilder = filter_chain_rebuilder_map_[filter_chain_message];
   rebuilder->storeWorkerInCallbackList(worker_name);
+  // TODO(ASOPVII): if listener update before rebuilding completes, the stored filter chain is not
+  // ready, should be abandoned.
 
   if (should_start_rebuilding) {
     Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
@@ -628,6 +634,15 @@ void ListenerImpl::rebuildFilterChain(
 void ListenerImpl::stopRebuildingFilterChain(
     const envoy::config::listener::v3::FilterChain* const& filter_chain_message) {
   filter_chain_manager_.stopRebuildingFilterChain(filter_chain_message);
+}
+
+void ListenerImpl::stopUnfinishedFilterChainRebuilding() {
+  for (const auto& [filter_chain, rebuilder] : filter_chain_rebuilder_map_) {
+    if (rebuilder->rebuildUnfinished()) {
+      rebuilder->stopRebuilding();
+      stopRebuildingFilterChain(filter_chain);
+    }
+  }
 }
 
 bool ListenerImpl::hasWorker(const std::string& name) { return parent_.hasWorker(name); }
@@ -698,12 +713,6 @@ void ListenerImpl::buildTlsInspectorListenerFilter() {
     listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
         Envoy::ProtobufWkt::Empty(),
         /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
-  }
-}
-void ListenerImpl::storeFilterChains(
-    absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span) {
-  for (const auto& filter_chain : filter_chain_span) {
-    filter_chains_[filter_chain] = true;
   }
 }
 

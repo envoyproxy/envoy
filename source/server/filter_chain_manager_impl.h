@@ -260,6 +260,8 @@ public:
   // Return the current view of filter chains, keyed by filter chain message. Used by the owning
   // listener to calculate the intersection of filter chains with another listener.
   const FcContextMap& filterChainsByMessage() const { return fc_contexts_; }
+  bool
+  containFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain_message) const;
 
 private:
   void convertIPsToTries();

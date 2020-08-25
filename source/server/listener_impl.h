@@ -229,9 +229,11 @@ public:
   void storeWorkerInCallbackList(const std::string& worker_name);
   void callbackToWorkers(bool success);
   bool rebuildingFailed() { return state_ == State::Failed; }
+  bool rebuildUnfinished() { return state_ == State::Running; }
   bool timeoutEnabled() { return timeout_enabled_; }
   Init::Manager& initManager() { return *rebuild_init_manager_; }
   void startRebuilding();
+  void stopRebuilding();
 
 private:
   void startTimer();
@@ -386,15 +388,20 @@ public:
   envoy::config::core::v3::TrafficDirection direction() const override {
     return config().traffic_direction();
   }
-  bool containFilterChain(
-      const envoy::config::listener::v3::FilterChain* const& filter_chain) const override {
-    return filter_chains_.find(filter_chain) != filter_chains_.end();
+  bool
+  containFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain) const override {
+    return filter_chain_manager_.containFilterChain(filter_chain);
   }
 
   // Stop rebuilding filter chain on timeout of rebuilder, make the filter chain back to a
   // placeholder. Will be called by the rebuilder.
   void
   stopRebuildingFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain);
+
+  // Stop all unfinished rebuilding, will be called when listener update. Because it is possible
+  // that old listener is drained and removed before the filter chain has finished rebuilding. We
+  // should remove the rebuilt filter chains that are temporarily stored inside the placeholder.
+  void stopUnfinishedFilterChainRebuilding();
 
   void ensureSocketOptions() {
     if (!listen_socket_options_) {
@@ -440,8 +447,6 @@ private:
   void buildOriginalDstListenerFilter();
   void buildProxyProtocolListenerFilter();
   void buildTlsInspectorListenerFilter();
-  void storeFilterChains(
-      absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span);
 
   void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
     ensureSocketOptions();
