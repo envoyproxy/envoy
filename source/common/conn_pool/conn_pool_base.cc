@@ -34,7 +34,8 @@ void ConnPoolImplBase::destructAllConnections() {
 }
 
 bool ConnPoolImplBase::shouldCreateNewConnection() const {
-  // If the host is not healthy, don't make it do extra work.
+  // If the host is not healthy, don't make it do extra work, especially as
+  // upstream selection logic may result in bypassing this upstream entirely.
   // If an Envoy user wants prefetching for degraded upstreams this could be
   // added later via extending the prefetch config.
   if (host_->health() != Upstream::Host::Health::Healthy) {
