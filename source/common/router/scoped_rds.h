@@ -147,13 +147,6 @@ private:
     }
     ConfigConstSharedPtr routeConfig() { return route_provider_->config(); }
 
-    // When on demand callback is received from main thread, there are 4 cases.
-    // 1. Scope is not found, post a scope not found callback back to worker thread.
-    // 2. Scope is found but route provider has not been initialized, create route provider.
-    // 3. After route provider has been initialized, if RouteConfiguration has been fetched,
-    // post scope found callback to worker thread.
-    // 4. After route provider has been initialized, if RouteConfiguration is null,
-    // cache the callback and wait for RouteConfiguration to come.
     void addOnDemandUpdateCallback(std::function<void()> callback);
 
     // Run all the callback from worker thread to continue filter chain.
@@ -255,7 +248,7 @@ public:
   void onDemandRdsUpdate(uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
                          Http::RouteConfigUpdatedCallback&& route_config_updated_cb) const {
     subscription().onDemandRdsUpdate(
-        key_hash, thread_local_dispatcher, move(route_config_updated_cb),
+        key_hash, thread_local_dispatcher, std::move(route_config_updated_cb),
         std::weak_ptr<Envoy::Config::ConfigSubscriptionCommonBase>(subscription_));
   }
 };

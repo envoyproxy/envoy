@@ -1110,7 +1110,7 @@ key:
   EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
   getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_,
-                                            move(route_config_updated_cb));
+                                            std::move(route_config_updated_cb));
   // After on demand request, push rds update, both scopes should find the route configuration.
   pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
@@ -1200,7 +1200,7 @@ key:
   EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
   getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_,
-                                            move(route_config_updated_cb));
+                                            std::move(route_config_updated_cb));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
@@ -1374,7 +1374,7 @@ key:
   for (int i = 0; i < 5; i++) {
     std::function<void(bool)> route_config_updated_cb = [](bool) {};
     getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_,
-                                              move(route_config_updated_cb));
+                                              std::move(route_config_updated_cb));
   }
   // After on demand request, push rds update.
   pushRdsConfig({"foo_routes"}, "111");
@@ -1413,7 +1413,8 @@ scope_key_builder:
   TestUtility::loadFromYaml(config_yaml, scoped_routes_config);
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
       .WillOnce(testing::SaveArg<0>(&temp_post_cb));
-  getScopedRdsProvider()->onDemandRdsUpdate(666, event_dispatcher_, move(route_config_updated_cb));
+  getScopedRdsProvider()->onDemandRdsUpdate(666, event_dispatcher_,
+                                            std::move(route_config_updated_cb));
   EXPECT_NO_THROW(temp_post_cb());
   // Destroy the scoped_rds subscription by destroying its only config provider.
   provider_.reset();

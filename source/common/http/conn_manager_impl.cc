@@ -493,7 +493,7 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
     return;
   }
   scoped_route_config_provider_->onDemandRdsUpdate(key_hash, thread_local_dispatcher,
-                                                   move(route_config_updated_cb));
+                                                   std::move(route_config_updated_cb));
 }
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager,
@@ -1179,8 +1179,9 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
         Http::RouteConfigUpdatedCallback(
             [this, weak_route_config_updated_cb = std::weak_ptr<Http::RouteConfigUpdatedCallback>(
                        route_config_updated_cb)](bool scope_exist) {
-              // Refresh the route before continue the filter chain.
+              // If the callback can be locked, this ActiveStream is still alive.
               if (auto cb = weak_route_config_updated_cb.lock()) {
+                // Refresh the route before continue the filter chain.
                 if (scope_exist) {
                   refreshCachedRoute();
                 }
@@ -1188,7 +1189,7 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
               }
             });
     route_config_update_requester_->requestSrdsUpdate(*scope_key_hash, thread_local_dispatcher,
-                                                      move(scoped_route_config_updated_cb));
+                                                      std::move(scoped_route_config_updated_cb));
     return;
   }
   // Continue the filter chain if no on demand update is requested.
