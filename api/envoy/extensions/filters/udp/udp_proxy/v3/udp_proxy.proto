@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.udp.udp_proxy.v3;
 
-import "envoy/type/v3/hash_policy.proto";
+import "envoy/type/v3/udp_route_policy.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -38,8 +38,8 @@ message UdpProxyConfig {
   // the session. The default if not specified is 1 minute.
   google.protobuf.Duration idle_timeout = 3;
 
-  // Optional configuration for UDP proxy hash policy. If hash_policy is not set, the hash-based
-  // load balancing algorithms will select a host randomly. Currently the number of hash policies is
-  // limited to 1.
-  repeated type.v3.HashPolicy hash_policy = 4 [(validate.rules).repeated = {max_items: 1}];
+  // Optional configuration for UDP proxy routing policy. It only supports :ref:`hash_policy<envoy_v3_api_msg_type.v3.HashPolicy>` routing policy.
+  // If route_policy is not set and intend to use hash-based load balancing algorithms,
+  // the hash-based load balancing algorithms will select a host randomly.
+  type.v3.UdpRoutePolicy route_policy = 4;
 }

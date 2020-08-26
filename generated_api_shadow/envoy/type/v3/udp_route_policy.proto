@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package envoy.type.v3;
+
+import "envoy/type/v3/hash_policy.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.type.v3";
+option java_outer_classname = "UdpRoutePolicyProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: UDP Route Policy]
+
+// Specifies the udp route policy.
+message UdpRoutePolicy {
+  // This route policy can have other policies but it has only HashPolicy now.
+  oneof policy_specifier {
+    option (validate.required) = true;
+
+    // The packets will be routed by hash policy.
+    // If you select this option, You also select the hash based load balancing algorithm such as
+    // :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>` or :ref:`Maglev<arch_overview_load_balancing_types_maglev>`.
+    HashPolicy hash_policy = 1;
+  }
+}

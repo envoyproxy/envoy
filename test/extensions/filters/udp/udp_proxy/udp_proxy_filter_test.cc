@@ -497,8 +497,9 @@ TEST_F(UdpProxyFilterTest, HashPolicyWithSourceIp) {
   setup(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-hash_policy:
-- source_ip: {}
+route_policy:
+  hash_policy:
+    source_ip: {}
   )EOF");
 
   EXPECT_NE(nullptr, config_->hashPolicy());
@@ -523,8 +524,9 @@ TEST_F(UdpProxyFilterTest, HashWithSourceIp) {
   setup(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-hash_policy:
-- source_ip: {}
+route_policy:
+  hash_policy:
+    source_ip: {}
   )EOF");
 
   auto host = createHost(upstream_address_);
