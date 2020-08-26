@@ -178,20 +178,17 @@ def envoy_dependencies(skip_targets = []):
         actual = "@envoy//bazel:boringssl",
     )
 
-    # Binding to an alias pointing to the selected version of zlib:
-    # - zlib-ng from @envoy//bazel/foreign_cc:zlib_ng,
-    # - zlib from @envoy//bazel/foreign_cc:zlib.
     _net_zlib()
     _com_github_zlib_ng_zlib_ng()
     native.bind(
         name = "zlib",
-        actual = "@envoy//bazel:zlib",
+        actual = "@envoy//bazel/foreign_cc:zlib",
     )
 
     # Bind for gRPC.
     native.bind(
         name = "madler_zlib",
-        actual = "@envoy//bazel:zlib",
+        actual = "@envoy//bazel/foreign_cc:zlib",
     )
 
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are

@@ -267,11 +267,6 @@ alias(
     }),
 )
 
-alias(
-    name = "zlib",
-    actual = "//bazel/foreign_cc:zlib",
-)
-
 config_setting(
     name = "linux_x86_64",
     values = {"cpu": "k8"},
