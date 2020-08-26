@@ -68,6 +68,11 @@ The fuzz test will be executed in three environments:
    
 5. Run the `*_fuzz_test` target against libFuzzer. E.g. `bazel run
    //test/common/common:base64_fuzz_test_run --config asan-fuzzer`.
+   The fuzzing target will use `corpus` specified in `envoy_cc_fuzz_test` as the seed corpus and 
+   run with the dictionaries specified in `dictionaries` in `envoy_cc_fuzz_test`.
+   There are optional command line arguments, e.g., `--timeout_secs`, `--regression`, provided by 
+   [bazel-rules-fuzzing](https://github.com/googleinterns/bazel-rules-fuzzing#examples).
+
    
 ## Protobuf fuzz tests
 

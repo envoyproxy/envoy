@@ -1,6 +1,6 @@
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
-load("@rules_fuzzing//fuzzing:common.bzl", "fuzzing_corpus", "fuzzing_launcher")
+load("@rules_fuzzing//fuzzing:common.bzl", "fuzzing_corpus", "fuzzing_dictionary", "fuzzing_launcher")
 
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy test targets. This includes both test library and test binary targets.
@@ -109,7 +109,7 @@ def envoy_cc_fuzz_test(
         tags = tags,
         **kwargs
     )
-    cc_test(
+    cc_binary(
         name = name + "_binary",
         copts = fuzz_copts + envoy_copts("@envoy", test = True),
         linkopts = _envoy_test_linkopts() + select({
@@ -130,8 +130,8 @@ def envoy_cc_fuzz_test(
                 repository + "//test/fuzz:main",
             ],
         }),
-        size = size,
         tags = ["fuzz_target"] + tags,
+        testonly = True,
     )
 
     fuzzing_corpus(
@@ -140,11 +140,18 @@ def envoy_cc_fuzz_test(
         testonly = True,
     )
 
+    fuzzing_dictionary(
+        name = name + "_dict",
+        dicts = dictionaries,
+        output = name + ".dict",
+    )
+
     # Target for continuous fuzzing test or regression gUnit test
     fuzzing_launcher(
         name = name + "_run",
         target = name + "_binary",
         corpus = name + "_corpus_dir" if corpus_name else None,
+        dict = name + "_dict" if dictionaries else None,
         testonly = True,
     )
 
