@@ -77,13 +77,13 @@ TEST(ConnectionImplUtility, updateBufferStats) {
 
 TEST(ConnectionImplBaseUtility, addIdToHashKey) {
   uint64_t connection_id = 0x0123456789abcdef;
-  std::vector<uint8_t> hash{{255, 254, 253, 252}};
-  ConnectionImplBaseUtility::addIdToHashKey(hash, connection_id);
+  std::vector<uint8_t> hash{{0xff, 0xfe, 0xfd, 0xfc}};
+  ConnectionImplBase::addIdToHashKey(hash, connection_id);
   ASSERT_EQ(12, hash.size());
-  EXPECT_EQ(255, hash[0]);
-  EXPECT_EQ(254, hash[1]);
-  EXPECT_EQ(253, hash[2]);
-  EXPECT_EQ(252, hash[3]);
+  EXPECT_EQ(0xff, hash[0]);
+  EXPECT_EQ(0xfe, hash[1]);
+  EXPECT_EQ(0xfd, hash[2]);
+  EXPECT_EQ(0xfc, hash[3]);
   EXPECT_EQ(0xef, hash[4]);
   EXPECT_EQ(0xcd, hash[5]);
   EXPECT_EQ(0xab, hash[6]);
