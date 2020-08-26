@@ -573,7 +573,7 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   // restart. Same below inside the lambda.
   stats_.total_listeners_draining_.set(draining_listeners_.size());
 
-  // Stop all unfinished rebuildings on this listener.
+  // Stop all unfinished rebuilding on this listener.
   draining_it->listener_->stopUnfinishedFilterChainRebuilding();
 
   // Tell all workers to stop accepting new connections on this listener.
