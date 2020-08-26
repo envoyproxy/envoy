@@ -403,8 +403,8 @@ protected:
 #define ENVOY_LOG_ONCE(LEVEL, ...)                                                                 \
   do {                                                                                             \
     static std::atomic<bool>* logged = new std::atomic<bool>(false);                               \
-    bool kExpected = false;                                                                        \
-    if (logged->compare_exchange_strong(kExpected /*expected value*/, true /*new value*/)) {       \
+    bool expected = false;                                                                         \
+    if (logged->compare_exchange_strong(expected /*expected value*/, true /*new value*/)) {        \
       ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
     }                                                                                              \
   } while (0)
