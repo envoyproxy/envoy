@@ -123,6 +123,7 @@ if __name__ == "__main__":
       output_msg += parseXML(problematic_files[k], visited)
 
   output_msg += "``` \n"
+  print(output_msg)
   if has_flaky_test:
     print(output_msg)
     if os.getenv("SLACK_TOKEN"):

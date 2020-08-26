@@ -18,6 +18,9 @@ python_venv() {
   VENV_DIR="${BUILD_DIR}/${PY_NAME}"
 
   source_venv "${VENV_DIR}"
+
+  MULTIDICT_NO_EXTENSIONS=1
+  YARL_NO_EXTENSIONS=1 
   
   pip install -r "${SCRIPT_DIR}"/requirements.txt
 
