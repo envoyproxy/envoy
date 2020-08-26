@@ -1379,14 +1379,14 @@ bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_
   return false;
 }
 
-OcspStapleAction ServerContextImpl::passesOcspPolicy(const ContextImpl::TlsContext& ctx) {
+OcspStapleAction ServerContextImpl::ocspStapleAction(const ContextImpl::TlsContext& ctx) {
   auto& response = ctx.ocsp_response_;
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.validate_ocsp_expiration_on_connection")) {
     return response ? OcspStapleAction::Staple : OcspStapleAction::NoStaple;
   }
 
-  if (ctx.is_must_staple_ && response && response->isExpired()) {
+  if (ctx.is_must_staple_ && (!response || response->isExpired())) {
     return OcspStapleAction::Fail;
   }
 
@@ -1413,19 +1413,19 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
   // Fallback on first certificate.
   const TlsContext* selected_ctx = &tls_contexts_[0];
   for (const auto& ctx : tls_contexts_) {
-    if (client_ecdsa_capable == ctx.is_ecdsa_ && passesOcspPolicy(ctx) != OcspStapleAction::Fail) {
+    if (client_ecdsa_capable == ctx.is_ecdsa_ && ocspStapleAction(ctx) != OcspStapleAction::Fail) {
       selected_ctx = &ctx;
       break;
     }
   }
 
-  switch (passesOcspPolicy(*selected_ctx)) {
+  switch (ocspStapleAction(*selected_ctx)) {
   case OcspStapleAction::Staple: {
     RELEASE_ASSERT(selected_ctx->ocsp_response_,
                    "OCSP response must be present under OcspStapleAction::Staple");
     auto& resp_bytes = selected_ctx->ocsp_response_->rawBytes();
-    RELEASE_ASSERT(
-        SSL_set_ocsp_response(ssl_client_hello->ssl, resp_bytes.data(), resp_bytes.size()), "");
+    int rc = SSL_set_ocsp_response(ssl_client_hello->ssl, resp_bytes.data(), resp_bytes.size());
+    RELEASE_ASSERT(rc != 0, "");
     stats_.ocsp_staple_responses_.inc();
   } break;
   case OcspStapleAction::NoStaple:

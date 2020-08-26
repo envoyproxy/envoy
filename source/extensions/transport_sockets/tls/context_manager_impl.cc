@@ -1,6 +1,8 @@
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
+#include <algorithm>
 #include <functional>
+#include <limits>
 
 #include "envoy/stats/scope.h"
 
@@ -68,10 +70,9 @@ absl::optional<uint64_t> ContextManagerImpl::secondsUntilFirstOcspResponseExpire
     Envoy::Ssl::ContextSharedPtr context = ctx_weak_ptr.lock();
     if (context) {
       auto next_expiration = context->secondsUntilFirstOcspResponseExpires();
-      if (ret && next_expiration) {
-        ret = std::min<uint64_t>(ret.value(), next_expiration.value());
-      } else if (next_expiration) {
-        ret = next_expiration;
+      if (next_expiration) {
+        ret = std::min<uint64_t>(next_expiration.value(),
+                                 ret.value_or(std::numeric_limits<uint64_t>::max()));
       }
     }
   }

@@ -260,7 +260,7 @@ private:
   // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
   // ClientHello details.
   enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
-  OcspStapleAction passesOcspPolicy(const ServerContextImpl::TlsContext& ctx);
+  OcspStapleAction ocspStapleAction(const ServerContextImpl::TlsContext& ctx);
 
   SessionContextID generateHashForSessionContextId(const std::vector<std::string>& server_names);
 
