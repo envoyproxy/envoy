@@ -124,9 +124,13 @@ TEST_P(SimulatedTimeSystemTest, TimerPartialOrdering) {
     timers_.clear();
   }
 
-  // Execution order of timers 1 and 2 is non-deterministic because the two timers were scheduled
-  // for the same time. Verify that both orderings were observed.
-  EXPECT_THAT(outputs, testing::ElementsAre("p0123", "p0213"));
+  if (activateMode() == ActivateMode::DelayActivateTimers) {
+    // Execution order of timers 1 and 2 is non-deterministic because the two timers were scheduled
+    // for the same time. Verify that both orderings were observed.
+    EXPECT_THAT(outputs, testing::ElementsAre("p0123", "p0213"));
+  } else {
+    EXPECT_THAT(outputs, testing::ElementsAre("p0123"));
+  }
 }
 
 TEST_P(SimulatedTimeSystemTest, TimerPartialOrdering2) {
@@ -150,9 +154,13 @@ TEST_P(SimulatedTimeSystemTest, TimerPartialOrdering2) {
     timers_.clear();
   }
 
-  // Execution order of timers 1 and 2 is non-deterministic because the two timers were scheduled
-  // for the same time. Verify that both orderings were observed.
-  EXPECT_THAT(outputs, testing::ElementsAre("p0p123", "p0p213"));
+  if (activateMode() == ActivateMode::DelayActivateTimers) {
+    // Execution order of timers 1 and 2 is non-deterministic because the two timers were scheduled
+    // for the same time. Verify that both orderings were observed.
+    EXPECT_THAT(outputs, testing::ElementsAre("p0p123", "p0p213"));
+  } else {
+    EXPECT_THAT(outputs, testing::ElementsAre("p0p123"));
+  }
 }
 
 // Timers that are scheduled to execute and but are disabled first do not trigger.
@@ -437,8 +445,12 @@ TEST_P(SimulatedTimeSystemTest, DuplicateTimer) {
   zero_timer->enableTimer(delay);
   advanceMsAndLoop(1);
   EXPECT_EQ("2", output_);
+}
 
-  // Now set an alarm which requires 10ms of progress and make sure waitFor works.
+// Regression test for issues documented in https://github.com/envoyproxy/envoy/pull/6956
+TEST_P(SimulatedTimeSystemTest, DuplicateTimer2) {
+  // Now set an alarm which requires 10s of progress and make sure advanceTimeWait and waitFor
+  // works.
   absl::Mutex mutex;
   bool done(false);
   auto thread = Thread::threadFactoryForTest().createThread([this, &mutex, &done]() {
@@ -482,6 +494,22 @@ TEST_P(SimulatedTimeSystemTest, Enabled) {
   TimerPtr timer = scheduler_->createTimer({}, dispatcher_);
   timer->enableTimer(std::chrono::milliseconds(0));
   EXPECT_TRUE(timer->enabled());
+}
+
+TEST_P(SimulatedTimeSystemTest, DeleteTimerFromThread) {
+  TimerPtr timer = scheduler_->createTimer([]() {}, dispatcher_);
+  timer->enableTimer(std::chrono::milliseconds(0));
+  auto thread = Thread::threadFactoryForTest().createThread([&timer]() { timer.reset(); });
+  advanceMsAndLoop(1);
+  thread->join();
+}
+
+TEST_P(SimulatedTimeSystemTest, DeleteTimerFromThread2) {
+  TimerPtr timer = scheduler_->createTimer([]() {}, dispatcher_);
+  timer->enableTimer(std::chrono::milliseconds(1));
+  auto thread = Thread::threadFactoryForTest().createThread([&timer]() { timer.reset(); });
+  advanceMsAndLoop(1);
+  thread->join();
 }
 
 } // namespace
