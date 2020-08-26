@@ -44,7 +44,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
         options, listen_socket_, envoy::config::core::v3::SocketOption::STATE_BOUND);
     if (!ok) {
       ENVOY_LOG(warn, "Failed to apply socket options to socket {} on listener {} after binding",
-                listen_socket_.ioHandle().fd(), listener_config.name());
+                listen_socket_.ioHandle()._fd(), listener_config.name());
       throw Network::CreateListenerException("Failed to apply socket options.");
     }
     listen_socket_.addOptions(options);

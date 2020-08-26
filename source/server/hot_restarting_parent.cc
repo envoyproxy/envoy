@@ -110,7 +110,7 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
       if (socket_factory.sharedSocket().has_value()) {
         // Pass the socket to the new process iff it is already shared across workers.
         wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(
-            socket_factory.sharedSocket()->get().ioHandle().fd());
+            socket_factory.sharedSocket()->get().ioHandle()._fd());
       }
       break;
     }
