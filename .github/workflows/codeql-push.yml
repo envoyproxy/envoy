@@ -62,5 +62,5 @@ jobs:
         git clean -xdf
        
     - name: Perform CodeQL Analysis
-      if: ${{ BUILD_TARGETS != "" }}
+      if: ${{ $BUILD_TARGETS != "" }}
       uses: github/codeql-action/analyze@v1
