@@ -385,7 +385,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         version = "4f15b7d510dc7c6361a26a7c6d2f7c3a17f8d878",
         sha256 = "6a12896313ce1ca630cf516a0ee43a79b5f13f5a5d8143f56560ac0b21c98fac",
         strip_prefix = "http-parser-{version}",
-        urls = ["https://github.com/nodejs/http-parser/archive/v{version}.tar.gz"],
+        urls = ["https://github.com/nodejs/http-parser/archive/{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:nodejs:node.js:*",
     ),
