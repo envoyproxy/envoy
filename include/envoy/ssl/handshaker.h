@@ -83,7 +83,7 @@ struct HandshakerCapabilities {
   // and curves.
   bool provides_ciphers_and_curves = false;
 
-  // Whether or not a handshaker implementaiton handles ALPN selection.
+  // Whether or not a handshaker implementation handles ALPN selection.
   bool handles_alpn_selection = false;
 
   // Whether or not a handshaker implementation sets a timeout.
