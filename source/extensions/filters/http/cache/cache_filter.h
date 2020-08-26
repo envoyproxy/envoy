@@ -8,7 +8,6 @@
 #include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
 
 #include "common/common/logger.h"
-#include "common/common/utility.h"
 
 #include "extensions/filters/http/cache/cache_headers_utils.h"
 #include "extensions/filters/http/cache/http_cache.h"

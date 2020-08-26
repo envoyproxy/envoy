@@ -7,7 +7,6 @@
 #include "common/http/utility.h"
 
 #include "extensions/filters/http/cache/cacheability_utils.h"
-#include "extensions/filters/http/cache/http_cache.h"
 #include "extensions/filters/http/cache/inline_headers_handles.h"
 
 #include "absl/memory/memory.h"
