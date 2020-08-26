@@ -30,6 +30,13 @@ TEST(Context, EmptyHeadersAttributes) {
   EXPECT_TRUE(headers.empty());
 }
 
+TEST(Context, InvalidRequest) {
+  Http::TestRequestHeaderMapImpl header_map{{"referer", "dogs.com"}};
+  HeadersWrapper<Http::RequestHeaderMap> headers(&header_map);
+  auto header = headers[CelValue::CreateStringView("dogs.com\n")];
+  EXPECT_FALSE(header.has_value());
+}
+
 TEST(Context, RequestAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   NiceMock<StreamInfo::MockStreamInfo> empty_info;
