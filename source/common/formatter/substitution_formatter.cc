@@ -74,6 +74,14 @@ SubstitutionFormatUtils::protocolToString(const absl::optional<Http::Protocol>& 
   return result;
 }
 
+const std::string
+SubstitutionFormatUtils::protocolToStringOrDefault(const absl::optional<Http::Protocol>& protocol) {
+  if (protocol) {
+    return Http::Utility::getProtocolString(protocol.value());
+  }
+  return DefaultUnspecifiedValueString;
+}
+
 const absl::optional<std::string> SubstitutionFormatUtils::getHostname() {
 #ifdef HOST_NAME_MAX
   const size_t len = HOST_NAME_MAX;
@@ -91,6 +99,14 @@ const absl::optional<std::string> SubstitutionFormatUtils::getHostname() {
   }
 
   return hostname;
+}
+
+const std::string SubstitutionFormatUtils::getHostnameOrDefault() {
+    absl::optional<std::string> hostname = getHostname();
+    if (hostname.has_value()) {
+        return hostname.value();
+    }
+    return DefaultUnspecifiedValueString;
 }
 
 FormatterImpl::FormatterImpl(const std::string& format, bool omit_empty_values)

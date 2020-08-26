@@ -99,6 +99,13 @@ TEST(SubstitutionFormatUtilsTest, protocolToString) {
   EXPECT_EQ(absl::nullopt, SubstitutionFormatUtils::protocolToString({}));
 }
 
+TEST(SubstitutionFormatUtilsTest, protocolToStringOrDefault) {
+  EXPECT_EQ("HTTP/1.0", SubstitutionFormatUtils::protocolToStringOrDefault(Http::Protocol::Http10));
+  EXPECT_EQ("HTTP/1.1", SubstitutionFormatUtils::protocolToStringOrDefault(Http::Protocol::Http11));
+  EXPECT_EQ("HTTP/2", SubstitutionFormatUtils::protocolToStringOrDefault(Http::Protocol::Http2));
+  EXPECT_EQ("-", SubstitutionFormatUtils::protocolToStringOrDefault({}));
+}
+
 TEST(SubstitutionFormatterTest, plainStringFormatter) {
   PlainStringFormatter formatter("plain");
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
@@ -2146,6 +2153,87 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     FormatterImpl formatter(format, false);
     EXPECT_EQ(
         "%%|%%123456000|1522796769%%123|1%%1522796769",
+        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+  }
+}
+
+TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{};
+  Http::TestResponseHeaderMapImpl response_header{};
+  Http::TestResponseTrailerMapImpl response_trailer{};
+  std::string body;
+
+  {
+    const std::string format = "%PROTOCOL%|%RESP(not exist)%|"
+                               "%REQ(FIRST?SECOND)%|%RESP(FIRST?SECOND)%|"
+                               "%TRAILER(THIRD)%|%TRAILER(TEST?TEST-2)%";
+    FormatterImpl formatter(format, false);
+
+    EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(absl::nullopt));
+
+    EXPECT_EQ(
+        "-|-|-|-|-|-",
+        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+  }
+
+ {
+    const std::string format = "%PROTOCOL%|%RESP(not exist)%|"
+                               "%REQ(FIRST?SECOND)%%RESP(FIRST?SECOND)%|"
+                               "%TRAILER(THIRD)%|%TRAILER(TEST?TEST-2)%";
+    FormatterImpl formatter(format, true);
+
+    EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(absl::nullopt));
+
+    EXPECT_EQ(
+        "||||",
+        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+  }
+
+  {
+    envoy::config::core::v3::Metadata metadata;
+    EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+    EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+    const std::string format = "%DYNAMIC_METADATA(com.test:test_key)%|%DYNAMIC_METADATA(com.test:"
+                               "test_obj)%|%DYNAMIC_METADATA(com.test:test_obj:inner_key)%";
+    FormatterImpl formatter(format, false);
+
+    EXPECT_EQ("-|-|-",
+        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+  }
+
+  {
+    envoy::config::core::v3::Metadata metadata;
+    EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+    EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+    const std::string format = "%DYNAMIC_METADATA(com.test:test_key)%|%DYNAMIC_METADATA(com.test:"
+                               "test_obj)%|%DYNAMIC_METADATA(com.test:test_obj:inner_key)%";
+    FormatterImpl formatter(format, true);
+
+    EXPECT_EQ("||",
+        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+  }
+
+  {
+    EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
+    const std::string format = "%FILTER_STATE(testing)%|%FILTER_STATE(serialized)%|"
+                               "%FILTER_STATE(testing):8%|%FILTER_STATE(nonexisting)%";
+    FormatterImpl formatter(format, false);
+
+    EXPECT_EQ(
+        "-|-|-|-",
+        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+  }
+
+
+  {
+    EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
+    const std::string format = "%FILTER_STATE(testing)%|%FILTER_STATE(serialized)%|"
+                               "%FILTER_STATE(testing):8%|%FILTER_STATE(nonexisting)%";
+    FormatterImpl formatter(format, true);
+
+    EXPECT_EQ(
+        "|||",
         formatter.format(request_header, response_header, response_trailer, stream_info, body));
   }
 }
