@@ -390,12 +390,6 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  if (config_->maxDownstreamConnectionDuration()) {
-    connection_duration_timer_ = read_callbacks_->connection().dispatcher().createTimer(
-        [this]() -> void { onMaxDownstreamConnectionDuration(); });
-    connection_duration_timer_->enableTimer(config_->maxDownstreamConnectionDuration().value());
-  }
-
   Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
   getStreamInfo().setUpstreamClusterInfo(cluster);
 
@@ -590,6 +584,15 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
   return Network::FilterStatus::StopIteration;
+}
+
+Network::FilterStatus Filter::onNewConnection() {
+  if (config_->maxDownstreamConnectionDuration()) {
+    connection_duration_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onMaxDownstreamConnectionDuration(); });
+    connection_duration_timer_->enableTimer(config_->maxDownstreamConnectionDuration().value());
+  }
+  return initializeUpstreamConnection();
 }
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
