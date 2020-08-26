@@ -1421,6 +1421,9 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
 
   switch (ocspStapleAction(*selected_ctx)) {
   case OcspStapleAction::Staple: {
+    // Set the OCSP response sent to clients that request it.
+    // TODO(zuercher): Consider inspecting ssl_client_hello->extensions to see if the client has
+    // requested OCSP.
     RELEASE_ASSERT(selected_ctx->ocsp_response_,
                    "OCSP response must be present under OcspStapleAction::Staple");
     auto& resp_bytes = selected_ctx->ocsp_response_->rawBytes();
