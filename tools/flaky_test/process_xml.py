@@ -69,16 +69,16 @@ def getGitInfo(CI_TARGET):
   os.system("git describe --all >> ${TMP_OUTPUT_PROCESS_XML}")
   os.system("git show >> ${TMP_OUTPUT_PROCESS_XML}")
   f = open(os.environ['TMP_OUTPUT_PROCESS_XML'], 'r+')
-  # The link should not change.
-  envoy_link = "https://github.com/envoyproxy/envoy"
+  # Fetching the URL from predefined env variable
+  envoy_link = os.environ["REPO_URI"]
   for line in [next(f) for x in range(6)]:
     if line.split('/')[0] == 'remotes':
       for token in line.split('/')[1:-1]:
         envoy_link += '/' + token
     ret += line
 
-  ret += "link for additional content: " + os.environ["REPO_URI"] + " \n"
-  ret += "link for azure build URI: " + os.environ["BUILD_URI"] + " \n"
+  ret += "link for additional content: " + envoy_link + " \n"
+  ret += "azure build URI: " + os.environ["BUILD_URI"] + " \n"
   if CI_TARGET != "":
     ret += "In " + CI_TARGET + " build\n"
   return ret
