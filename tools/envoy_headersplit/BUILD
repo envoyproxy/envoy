@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_test")
+load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 load("@headersplit_pip3//:requirements.bzl", "requirement")
 load(
     "//bazel:envoy_build_system.bzl",
@@ -12,7 +12,7 @@ envoy_package()
 py_binary(
     name = "headersplit",
     srcs = [
-        "headersplit.py"
+        "headersplit.py",
     ],
     python_version = "PY3",
     srcs_version = "PY3",
@@ -25,7 +25,7 @@ py_binary(
 py_binary(
     name = "replace_includes",
     srcs = [
-        "replace_includes.py"
+        "replace_includes.py",
     ],
     python_version = "PY3",
     srcs_version = "PY3",
@@ -43,12 +43,12 @@ py_test(
     data = glob(["code_corpus/**"]),
     python_version = "PY3",
     srcs_version = "PY3",
+    tags = ["no-sandbox"],
     visibility = ["//visibility:public"],
     deps = [
         requirement("clang"),
         ":headersplit",
     ],
-    tags = ["no-sandbox"]
 )
 
 py_test(
@@ -59,9 +59,9 @@ py_test(
     data = glob(["code_corpus/**"]),
     python_version = "PY3",
     srcs_version = "PY3",
+    tags = ["no-sandbox"],
     visibility = ["//visibility:public"],
     deps = [
         ":replace_includes",
     ],
-    tags = ["no-sandbox"]
 )
