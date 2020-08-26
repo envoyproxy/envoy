@@ -125,6 +125,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "guarddog_impl_test",
+    size = "small",
     srcs = ["guarddog_impl_test.cc"],
     tags = ["flaky_on_windows"],
     deps = [
@@ -235,7 +236,6 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         ":listener_manager_impl_test_lib",
         ":utility_lib",
