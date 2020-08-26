@@ -94,7 +94,7 @@ FuzzedInputStream::FuzzedInputStream(
 
 FuzzedInputStream::FuzzedInputStream(const std::vector<uint8_t> buffer,
                                      const std::vector<size_t> indices)
-    : nreads_(indices.size()), data_(buffer), indices_(indices) { }
+    : nreads_(indices.size()), data_(buffer), indices_(indices) {}
 
 void FuzzedInputStream::next() {
   if (!done()) {
