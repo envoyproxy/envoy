@@ -39,6 +39,8 @@ class FuzzedInputStream {
 public:
   FuzzedInputStream(const test::extensions::filters::listener::FilterFuzzTestCase& input);
 
+  FuzzedInputStream(const std::vector<uint8_t> buffer, const std::vector<size_t> indices);
+
   // Makes data from the next read available to read()
   void next();
 

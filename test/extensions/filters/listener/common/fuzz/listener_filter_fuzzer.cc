@@ -18,9 +18,9 @@ void ListenerFilterFuzzer::fuzz(
     socket_.setRemoteAddress(Network::Utility::resolveUrl("tcp://0.0.0.0:0"));
   }
 
-  FuzzedInputStream header(input);
+  FuzzedInputStream data(input);
 
-  if (!header.empty()) {
+  if (!data.empty()) {
     ON_CALL(os_sys_calls_, recv(kFakeSocketFd, _, _, _))
         .WillByDefault(testing::Return(Api::SysCallSizeResult{static_cast<ssize_t>(0), 0}));
 
@@ -37,11 +37,11 @@ void ListenerFilterFuzzer::fuzz(
     return;
   }
 
-  if (!header.empty()) {
+  if (!data.empty()) {
     ON_CALL(os_sys_calls_, ioctl(kFakeSocketFd, FIONREAD, _))
         .WillByDefault(
-            Invoke([&header](os_fd_t, unsigned long int, void* argp) -> Api::SysCallIntResult {
-              int bytes_avail = static_cast<int>(header.size());
+            Invoke([&data](os_fd_t, unsigned long int, void* argp) -> Api::SysCallIntResult {
+              int bytes_avail = static_cast<int>(data.size());
               memcpy(argp, &bytes_avail, sizeof(int));
               return Api::SysCallIntResult{bytes_avail, 0};
             }));
@@ -51,8 +51,8 @@ void ListenerFilterFuzzer::fuzz(
       EXPECT_CALL(os_sys_calls_, recv(kFakeSocketFd, _, _, _))
           .Times(testing::AnyNumber())
           .WillRepeatedly(Invoke(
-              [&header](os_fd_t, void* buffer, size_t length, int flags) -> Api::SysCallSizeResult {
-                return header.read(buffer, length, flags == MSG_PEEK);
+              [&data](os_fd_t, void* buffer, size_t length, int flags) -> Api::SysCallSizeResult {
+                return data.read(buffer, length, flags == MSG_PEEK);
               }));
     }
 
@@ -62,7 +62,7 @@ void ListenerFilterFuzzer::fuzz(
         .WillByDefault(testing::InvokeWithoutArgs([&got_continue]() { got_continue = true; }));
 
     while (!got_continue) {
-      if (header.done()) { // End of stream reached but not done
+      if (data.done()) { // End of stream reached but not done
         if (events_ & Event::FileReadyType::Closed) {
           file_event_callback_(Event::FileReadyType::Closed);
         }
@@ -71,12 +71,13 @@ void ListenerFilterFuzzer::fuzz(
         file_event_callback_(Event::FileReadyType::Read);
       }
 
-      header.next();
+      data.next();
     }
   }
 }
 
-FuzzedInputStream::FuzzedInputStream(const test::extensions::filters::listener::FilterFuzzTestCase& input)
+FuzzedInputStream::FuzzedInputStream(
+    const test::extensions::filters::listener::FilterFuzzTestCase& input)
     : nreads_(input.data_size()) {
   size_t len = 0;
   for (int i = 0; i < nreads_; i++) {
@@ -90,6 +91,10 @@ FuzzedInputStream::FuzzedInputStream(const test::extensions::filters::listener::
     indices_.push_back(data_.size() - 1);
   }
 }
+
+FuzzedInputStream::FuzzedInputStream(
+    const std::vector<uint8_t> buffer, const std::vector<size_t> indices)
+    : nreads_(indices.size()), data_(buffer), indices_(indices) { }
 
 void FuzzedInputStream::next() {
   if (!done()) {
