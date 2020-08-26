@@ -65,7 +65,7 @@ envoy_directory_genrule = rule(
 )
 
 # External CMake C++ library targets should be specified with this function. This defaults
-# to building the dependencies with ninja
+# to building the dependencies with ninja.
 def envoy_cmake_external(
         name,
         cache_entries = {},
@@ -80,15 +80,9 @@ def envoy_cmake_external(
         cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles",
         generate_crosstool_file = False,
         **kwargs):
-    if type(cache_entries) == "dict":
-        cache_entries.update({"CMAKE_BUILD_TYPE": "Bazel"})
-        cache_entries_debug = dict(cache_entries)
-        cache_entries_debug.update(debug_cache_entries)
-
-        cache_entries = select({
-            "@envoy//bazel:dbg_build": cache_entries_debug,
-            "//conditions:default": cache_entries,
-        })
+    cache_entries.update({"CMAKE_BUILD_TYPE": "Bazel"})
+    cache_entries_debug = dict(cache_entries)
+    cache_entries_debug.update(debug_cache_entries)
 
     pf = ""
     if copy_pdb:
@@ -110,7 +104,10 @@ def envoy_cmake_external(
 
     cmake_external(
         name = name,
-        cache_entries = cache_entries,
+        cache_entries = select({
+            "@envoy//bazel:dbg_build": cache_entries_debug,
+            "//conditions:default": cache_entries,
+        }),
         cmake_options = cmake_options,
         # TODO(lizan): Make this always true
         generate_crosstool_file = select({
