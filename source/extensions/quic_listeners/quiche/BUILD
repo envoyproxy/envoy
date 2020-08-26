@@ -371,12 +371,24 @@ envoy_cc_extension(
     name = "quic_factory_lib",
     security_posture = "unknown",
     tags = ["nofips"],
-    deps = [
-        ":active_quic_listener_config_lib",
-        ":codec_lib",
-        ":quic_transport_socket_factory_lib",
-        ":udp_gso_batch_writer_config_lib",
-    ],
+
+    # QUICHE can't build against FIPS BoringSSL until the FIPS build
+    # is on a new enough version to have QUIC support. Remove it from
+    # the build until then. Re-enable as part of #7433.
+    #
+    # QUICHE doesn't compile on Windows right now. Disable until it
+    # is fixed.
+    deps = select({
+        "@envoy//bazel:boringssl_fips": [],
+        "@envoy//bazel:boringssl_disabled": [],
+        "@envoy//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            ":active_quic_listener_config_lib",
+            ":codec_lib",
+            ":quic_transport_socket_factory_lib",
+            ":udp_gso_batch_writer_config_lib",
+        ],
+    }),
 )
 
 envoy_cc_library(
