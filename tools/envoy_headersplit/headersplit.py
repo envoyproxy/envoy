@@ -231,7 +231,7 @@ def extract_implementations(impl_cursors: List[Cursor], source_code: str) -> Dic
     if i + 1 < len(impl_cursors):
       # i is not the last method, get the start line for the next method
       # as the last line of i
-      _, impl_end = get_implline(impl_cursors[i + 1])
+      impl_end = get_implline(impl_cursors[i + 1])
       impl = "".join(source_code[implline:impl_end])
     else:
       # i is the last method, after removing the lines containing close brackets
