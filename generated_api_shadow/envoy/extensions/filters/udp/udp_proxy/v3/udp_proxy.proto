@@ -38,7 +38,7 @@ message UdpProxyConfig {
 
   // Use the remote downstream IP address as the sender IP address when sending packets to upstream hosts.
   // This option requires Envoy to be run with the *CAP_NET_ADMIN* capability on Linux.
-  // And the IPv6 stack should be enabled on Linux kernel.
+  // And the IPv6 stack must be enabled on Linux kernel.
   // This option does not preserve the remote downstream port.
   // If this option is enabled, the IP address of sent datagrams will be changed to the remote downstream IP address.
   // This means that Envoy will not receive packets that are sent by upstream hosts because the upstream hosts
