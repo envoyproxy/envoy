@@ -6,6 +6,7 @@
 
 namespace Envoy {
 namespace ConnectionPool {
+
 /**
  * Controls the behavior of a canceled request.
  */
