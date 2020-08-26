@@ -32,16 +32,17 @@ public:
   virtual ~IoHandle() = default;
 
   /**
-   * NOTE: This is most probably NOT the function you are looking for. IoHandle has wrappers for
-   * most of the POSIX socket api functions so there should be no need to interact with the
-   * internal fd by means of syscalls. Moreover, depending on the IoHandle implementation,
-   * the fd might not be an underlying OS file descriptor. If any api function is missing, a
-   * wrapper for it should be added to the IoHandle interface.
+   * NOTE: Must NOT be used for new use cases!
+   *
+   * This is most probably not the function you are looking for. IoHandle has wrappers for most of
+   * the POSIX socket api functions so there should be no need to interact with the internal fd by
+   * means of syscalls. Moreover, depending on the IoHandle implementation, the fd might not be an
+   * underlying OS file descriptor. If any api function is missing, a wrapper for it should be added
+   * to the IoHandle interface.
    *
    * Return data associated with IoHandle. It is not necessarily a file descriptor.
-   *
    */
-  virtual os_fd_t fdInternal() const PURE;
+  virtual os_fd_t fdDoNotUse() const PURE;
 
   /**
    * Clean up IoHandle resources
