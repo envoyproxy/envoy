@@ -453,7 +453,7 @@ TEST_P(IntegrationTest, TestServerAllowChunkedLength) {
 
   ASSERT_THAT(data, HasSubstr("POST / HTTP/1.1"));
   ASSERT_THAT(data, HasSubstr("transfer-encoding: chunked"));
-  // verify no {Cc}ontent-length header
+  // verify no 'content-length' header
   ASSERT_THAT(data, Not(HasSubstr("ontent-length")));
 
   ASSERT_TRUE(
