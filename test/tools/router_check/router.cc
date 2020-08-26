@@ -18,8 +18,8 @@
 
 namespace {
 const std::string
-to_string(envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase kCase) {
-  switch (kCase) {
+toString(envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase specifierCase) {
+  switch (specifierCase) {
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
     return "exact_match";
     break;
@@ -438,7 +438,7 @@ bool RouterCheckTool::matchHeaderField(const HM& header_map,
   default:
     // Not implemented!
     tests_.back().second.emplace_back("HeaderMatcher option " +
-                                      ::to_string(header.header_match_specifier_case()) +
+                                      ::toString(header.header_match_specifier_case()) +
                                       " not supported.");
     break;
   }
