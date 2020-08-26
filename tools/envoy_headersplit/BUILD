@@ -22,6 +22,19 @@ py_binary(
     ],
 )
 
+py_binary(
+    name = "replace_includes",
+    srcs = [
+        "replace_includes.py"
+    ],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":headersplit",
+    ],
+)
+
 py_test(
     name = "headersplit_test",
     srcs = [
@@ -35,22 +48,20 @@ py_test(
         requirement("clang"),
         ":headersplit",
     ],
+    tags = ["no-sandbox"]
 )
 
 py_test(
     name = "replace_includes_test",
     srcs = [
-        "headersplit.py",
-        "headersplit_test.py",
-        "replace_includes.py",
         "replace_includes_test.py",
     ],
     data = glob(["code_corpus/**"]),
-    main = "replace_includes_test.py",
     python_version = "PY3",
     srcs_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
-        requirement("clang"),
+        ":replace_includes",
     ],
+    tags = ["no-sandbox"]
 )
