@@ -263,6 +263,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define path_normalization_by_default=true \
     --define deprecated_features=disabled \
     --define use_new_codecs_in_integration_tests=true \
+    --define zlib=ng \
   "
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
   setup_clang_toolchain

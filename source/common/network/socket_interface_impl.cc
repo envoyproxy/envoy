@@ -67,9 +67,8 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
       SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version, v6only);
   if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6) {
     // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
-    const Api::SysCallIntResult result = Api::OsSysCallsSingleton::get().setsockopt(
-        io_handle->fd(), IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<const char*>(&v6only),
-        sizeof(v6only));
+    const Api::SysCallIntResult result = io_handle->setOption(
+        IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<const char*>(&v6only), sizeof(v6only));
     RELEASE_ASSERT(!SOCKET_FAILURE(result.rc_), "");
   }
   return io_handle;
