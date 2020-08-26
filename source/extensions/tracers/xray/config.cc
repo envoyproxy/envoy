@@ -43,7 +43,14 @@ XRayTracerFactory::createHttpTracerTyped(const envoy::config::trace::v3::XRayCon
   const std::string endpoint = fmt::format("{}:{}", proto_config.daemon_endpoint().address(),
                                            proto_config.daemon_endpoint().port_value());
 
-  XRayConfiguration xconfig{endpoint, proto_config.segment_name(), sampling_rules_json};
+  auto aws = absl::flat_hash_map<std::string, ProtobufWkt::Value>{};
+  for (const auto& field : proto_config.segment_fields().aws().fields()) {
+    aws.emplace(field.first, field.second);
+  }
+  const auto& origin = proto_config.segment_fields().origin();
+  XRayConfiguration xconfig{endpoint, proto_config.segment_name(), sampling_rules_json, origin,
+                            std::move(aws)};
+
   auto xray_driver = std::make_unique<XRay::Driver>(xconfig, context);
 
   return std::make_shared<Tracing::HttpTracerImpl>(std::move(xray_driver),
