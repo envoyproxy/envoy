@@ -127,40 +127,6 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
   }
 }
 
-// For responses to on-demand requests, replace the original watch for an alias
-// with one for the resource's name
-AddedRemoved WatchMap::removeAliasWatches(const envoy::service::discovery::v3::Resource& resource) {
-  absl::flat_hash_set<Watch*> watches_to_update;
-  for (const auto& alias : resource.aliases()) {
-    const auto interested_watches = watch_interest_.find(alias);
-    if (interested_watches != watch_interest_.end()) {
-      for (const auto& interested_watch : interested_watches->second) {
-        watches_to_update.insert(interested_watch);
-      }
-    }
-  }
-
-  auto ret = AddedRemoved({}, {});
-  for (const auto& watch : watches_to_update) {
-    std::set<std::string> without_alias;
-
-    std::set_difference(watch->resource_names_.begin(), watch->resource_names_.end(),
-                        resource.aliases().begin(), resource.aliases().end(),
-                        std::inserter(without_alias, without_alias.begin()));
-
-    RELEASE_ASSERT(!without_alias.empty(),
-                   fmt::format("WatchMap: prefix watch cannot be converted to a wildcard one."));
-
-    const auto& converted_watches = updateWatchInterest(watch, without_alias);
-    std::copy(converted_watches.added_.begin(), converted_watches.added_.end(),
-              std::inserter(ret.added_, ret.added_.end()));
-    std::copy(converted_watches.removed_.begin(), converted_watches.removed_.end(),
-              std::inserter(ret.removed_, ret.removed_.end()));
-  }
-
-  return ret;
-}
-
 void WatchMap::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,

@@ -500,50 +500,6 @@ TEST(WatchMapTest, OnConfigUpdateFailed) {
   watch_map.onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr);
 }
 
-// verifies that a watch for an alias is removed, while the watch for the prefix is kept
-TEST(WatchMapTest, RemoveAliasWatches) {
-  MockSubscriptionCallbacks callbacks;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
-  WatchMap watch_map;
-  Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
-  watch_map.updateWatchInterest(watch, {"prefix", "prefix/alias"});
-
-  envoy::service::discovery::v3::Resource resource;
-  resource.set_name("prefix/resource");
-  resource.set_version("version");
-  for (const auto alias : {"prefix/alias", "prefix/alias1", "prefix/alias2"}) {
-    resource.add_aliases(alias);
-  }
-
-  AddedRemoved converted = watch_map.removeAliasWatches(resource);
-
-  EXPECT_EQ(std::set<std::string>{"prefix/alias"}, converted.removed_);
-}
-
-// verifies that a watch for an alias is removed, while the watch for the prefix is kept, even
-// if the alias is the same as the resource name
-TEST(WatchMapTest, RemoveAliasWatchesAliasIsSameAsName) {
-  MockSubscriptionCallbacks callbacks;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
-  WatchMap watch_map;
-  Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
-  watch_map.updateWatchInterest(watch, {"prefix", "prefix/name-and-alias"});
-
-  envoy::service::discovery::v3::Resource resource;
-  resource.set_name("prefix/name-and-alias");
-  resource.set_version("version");
-  for (const auto alias : {"prefix/name-and-alias", "prefix/alias1", "prefix/alias2"}) {
-    resource.add_aliases(alias);
-  }
-
-  AddedRemoved converted = watch_map.removeAliasWatches(resource);
-
-  EXPECT_TRUE(converted.added_.empty());
-  EXPECT_EQ(std::set<std::string>{"prefix/name-and-alias"}, converted.removed_);
-}
-
 } // namespace
 } // namespace Config
 } // namespace Envoy

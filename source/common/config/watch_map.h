@@ -79,9 +79,6 @@ public:
   // updateWatchInterest().
   void removeWatch(Watch* watch);
 
-  // checks is a watch for an alias exists and replaces it with the resource's name
-  AddedRemoved removeAliasWatches(const envoy::service::discovery::v3::Resource& resource);
-
   // UntypedConfigUpdateCallbacks.
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
