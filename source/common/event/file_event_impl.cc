@@ -24,6 +24,9 @@ FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb
               ? Runtime::runtimeFeatureEnabled(
                     "envoy.reloadable_features.activate_fds_next_event_loop")
               : true) {
+  // Treat the lack of a valid fd (which in practice should only happen if we run out of FDs) as
+  // an OOM condition and just crash.
+  RELEASE_ASSERT(SOCKET_VALID(fd), "");
 #ifdef WIN32
   RELEASE_ASSERT(trigger_ == FileTriggerType::Level,
                  "libevent does not support edge triggers on Windows");

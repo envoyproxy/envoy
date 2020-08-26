@@ -91,16 +91,16 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     boringssl = dict(
         project_name = "BoringSSL",
         project_url = "https://github.com/google/boringssl",
-        version = "a0899df79b3a63e606448c72d63a090d86bdb75b",
-        sha256 = "07f1524766b9ed1543674b48e7fce7e3569b6e2b6c0c43ec124dedee9b60f641",
+        version = "597b810379e126ae05d32c1d94b1a9464385acd0",
+        sha256 = "1ea42456c020daf0a9b0f9e8d8bc3a403c9314f4f54230c617257af996cd5fa6",
         strip_prefix = "boringssl-{version}",
         # To update BoringSSL, which tracks Chromium releases:
         # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/stable release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-84.0.4147.45(beta)
-        # 2020-05-14
+        # chromium-85.0.4183.83
+        # 2020-06-23
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
@@ -189,19 +189,18 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_github_fmtlib_fmt = dict(
         project_name = "fmt",
         project_url = "https://fmt.dev",
-        # 2020-04-29
-        version = "e2ff910675c7800e5c4e28e1509ca6a50bdceafa",
-        sha256 = "5014aacf55285bf79654539791de0d6925063fddf4dfdd597ef76b53eb994f86",
+        version = "7.0.3",
+        sha256 = "decfdf9ad274070fa85f26407b816f5a4d82205ae86bac1990be658d0795ea4d",
         strip_prefix = "fmt-{version}",
-        urls = ["https://github.com/fmtlib/fmt/archive/{version}.tar.gz"],
+        urls = ["https://github.com/fmtlib/fmt/releases/download/{version}/fmt-{version}.zip"],
         use_category = ["observability"],
         cpe = "N/A",
     ),
     com_github_gabime_spdlog = dict(
         project_name = "spdlog",
         project_url = "https://github.com/gabime/spdlog",
-        version = "1.6.1",
-        sha256 = "378a040d91f787aec96d269b0c39189f58a6b852e4cbf9150ccfacbe85ebbbfc",
+        version = "1.7.0",
+        sha256 = "f0114a4d3c88be9e696762f37a7c379619443ce9d668546c61b21d41affe5b62",
         strip_prefix = "spdlog-{version}",
         urls = ["https://github.com/gabime/spdlog/archive/v{version}.tar.gz"],
         use_category = ["observability"],
@@ -282,9 +281,9 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_lightstep_tracer_cpp = dict(
         project_name = "lightstep-tracer-cpp",
         project_url = "https://github.com/lightstep/lightstep-tracer-cpp",
-        # 2020-03-24
-        version = "3efe2372ee3d7c2138d6b26e542d757494a7938d",
-        sha256 = "0e99716598c010e56bc427ea3482be5ad2c534be8b039d172564deec1264a213",
+        # 2020-08-24
+        version = "1942b3f142e218ebc143a043f32e3278dafec9aa",
+        sha256 = "3238921a8f578beb26c2215cd277e8f6752f3d29b020b881d60d96a240a38aed",
         strip_prefix = "lightstep-tracer-cpp-{version}",
         urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/{version}.tar.gz"],
         use_category = ["observability"],
@@ -344,6 +343,17 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:gnu:zlib:*",
     ),
+    com_github_zlib_ng_zlib_ng = dict(
+        project_name = "zlib-ng",
+        project_url = "https://github.com/zlib-ng/zlib-ng",
+        version = "193d8fd7dfb7927facab7a3034daa27ad5b9df1c",
+        sha256 = "5fe543e8d007b9e7b729f3d6b3a5ee1f9b68d0eef5f6af1393745a4dcd472a98",
+        strip_prefix = "zlib-ng-193d8fd7dfb7927facab7a3034daa27ad5b9df1c",
+        # 2020-08-16 develop branch.
+        urls = ["https://github.com/zlib-ng/zlib-ng/archive/193d8fd7dfb7927facab7a3034daa27ad5b9df1c.tar.gz"],
+        use_category = ["dataplane"],
+        cpe = "N/A",
+    ),
     com_github_jbeder_yaml_cpp = dict(
         project_name = "yaml-cpp",
         project_url = "https://github.com/jbeder/yaml-cpp",
@@ -358,8 +368,8 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_github_msgpack_msgpack_c = dict(
         project_name = "msgpack for C/C++",
         project_url = "https://github.com/msgpack/msgpack-c",
-        version = "3.2.1",
-        sha256 = "433cbcd741e1813db9ae4b2e192b83ac7b1d2dd7968a3e11470eacc6f4ab58d2",
+        version = "3.3.0",
+        sha256 = "6e114d12a5ddb8cb11f669f83f32246e484a8addd0ce93f274996f1941c1f07b",
         strip_prefix = "msgpack-{version}",
         urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-{version}/msgpack-{version}.tar.gz"],
         use_category = ["observability"],
