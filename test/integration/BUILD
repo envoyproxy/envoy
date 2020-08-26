@@ -670,6 +670,10 @@ envoy_cc_test_library(
     hdrs = [
         "base_integration_test.h",
     ],
+    copts = envoy_select_new_codecs_in_integration_tests(
+        ["-DENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS"],
+        "@envoy",
+    ),
     deps = [
         ":autonomous_upstream_lib",
         ":fake_upstream_lib",
