@@ -12,7 +12,7 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
   try {
     TestUtility::validate(input);
     std::vector<Formatter::FormatterProviderPtr> formatters =
-        Formatter::SubstitutionFormatParser::parse(input.format(), false);
+        Formatter::SubstitutionFormatParser::parse(input.format());
     const auto& request_headers =
         Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(input.request_headers());
     const auto& response_headers =
