@@ -41,7 +41,7 @@ public:
    * Return data associated with IoHandle. It is not necessarily a file descriptor.
    *
    */
-  virtual os_fd_t _fd() const PURE;
+  virtual os_fd_t fdInternal() const PURE;
 
   /**
    * Clean up IoHandle resources

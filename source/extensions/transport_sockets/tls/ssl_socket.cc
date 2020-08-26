@@ -67,7 +67,7 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
     provider->registerPrivateKeyMethod(rawSsl(), *this, callbacks_->connection().dispatcher());
   }
 
-  BIO* bio = BIO_new_socket(callbacks_->ioHandle()._fd(), 0);
+  BIO* bio = BIO_new_socket(callbacks_->ioHandle().fdInternal(), 0);
   SSL_set_bio(rawSsl(), bio, bio);
 }
 
