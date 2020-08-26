@@ -44,8 +44,9 @@
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/cluster_info.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/host.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
@@ -173,6 +174,9 @@ public:
       EXPECT_CALL(filter_factory_, createFilterChain(_))
           .WillOnce(Invoke([num_decoder_filters, num_encoder_filters, req,
                             this](FilterChainFactoryCallbacks& callbacks) -> void {
+            if (log_handler_.get()) {
+              callbacks.addAccessLogHandler(log_handler_);
+            }
             for (int i = 0; i < num_decoder_filters; i++) {
               callbacks.addStreamDecoderFilter(
                   StreamDecoderFilterSharedPtr{decoder_filters_[req * num_decoder_filters + i]});
@@ -435,6 +439,7 @@ public:
   MockResponseEncoder response_encoder_;
   std::vector<MockStreamDecoderFilter*> decoder_filters_;
   std::vector<MockStreamEncoderFilter*> encoder_filters_;
+  std::shared_ptr<AccessLog::MockInstance> log_handler_;
 };
 
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
@@ -3666,7 +3671,9 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAfterHeadersAcc
 
 // Verify that FrameFloodException causes connection to be closed abortively.
 TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
-  InSequence s;
+  std::shared_ptr<AccessLog::MockInstance> log_handler =
+      std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  access_logs_ = {log_handler};
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
@@ -3681,14 +3688,20 @@ TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay));
 
+  EXPECT_CALL(*log_handler, log(_, _, _, _))
+      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                          const StreamInfo::StreamInfo& stream_info) {
+        ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
+        EXPECT_EQ("codec error: too many outbound frames.",
+                  stream_info.responseCodeDetails().value());
+      }));
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
   EXPECT_LOG_NOT_CONTAINS("warning", "downstream HTTP flood",
                           conn_manager_->onData(fake_input, false));
+
   EXPECT_TRUE(filter_callbacks_.connection_.streamInfo().hasResponseFlag(
       StreamInfo::ResponseFlag::DownstreamProtocolError));
-  EXPECT_EQ("codec error: too many outbound frames.",
-            filter_callbacks_.connection_.streamInfo().responseCodeDetails().value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, IdleTimeoutNoCodec) {
@@ -4755,6 +4768,8 @@ TEST_F(HttpConnectionManagerImplTest, AlterFilterWatermarkLimits) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
+  log_handler_ = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+
   initial_buffer_limit_ = 1;
   streaming_filter_ = true;
   setup(false, "");
@@ -4800,6 +4815,12 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
   EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
   encoder_filters_[1]->callbacks_->setEncoderBufferLimit((buffer_len + 1) * 2);
+
+  EXPECT_CALL(*log_handler_, log(_, _, _, _))
+      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                          const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_FALSE(stream_info.hasAnyResponseFlag());
+      }));
 }
 
 TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimits) {

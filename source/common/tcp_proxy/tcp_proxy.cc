@@ -538,6 +538,25 @@ void Filter::onPoolReady(Http::RequestEncoder& request_encoder,
                   info.downstreamSslConnection());
 }
 
+const Router::MetadataMatchCriteria* Filter::metadataMatchCriteria() {
+  const Router::MetadataMatchCriteria* route_criteria =
+      (route_ != nullptr) ? route_->metadataMatchCriteria() : nullptr;
+
+  const auto& request_metadata = getStreamInfo().dynamicMetadata().filter_metadata();
+  const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+
+  if (filter_it != request_metadata.end() && route_criteria != nullptr) {
+    metadata_match_criteria_ = route_criteria->mergeMatchCriteria(filter_it->second);
+    return metadata_match_criteria_.get();
+  } else if (filter_it != request_metadata.end()) {
+    metadata_match_criteria_ =
+        std::make_unique<Router::MetadataMatchCriteriaImpl>(filter_it->second);
+    return metadata_match_criteria_.get();
+  } else {
+    return route_criteria;
+  }
+}
+
 void Filter::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->outlierDetector().putResult(

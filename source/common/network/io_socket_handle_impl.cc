@@ -99,15 +99,16 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     return sysCallResultToIoCallResult(result);
   } else {
     const size_t space_v6 = CMSG_SPACE(sizeof(in6_pktinfo));
-    // FreeBSD only needs in_addr size, but allocates more to unify code in two platforms.
     const size_t space_v4 = CMSG_SPACE(sizeof(in_pktinfo));
-    const size_t cmsg_space = (space_v4 < space_v6) ? space_v6 : space_v4;
+
+    // FreeBSD only needs in_addr size, but allocates more to unify code in two platforms.
+    const size_t cmsg_space = (self_ip->version() == Address::IpVersion::v4) ? space_v4 : space_v6;
     // kSpaceForIp should be big enough to hold both IPv4 and IPv6 packet info.
     absl::FixedArray<char> cbuf(cmsg_space);
     memset(cbuf.begin(), 0, cmsg_space);
 
     message.msg_control = cbuf.begin();
-    message.msg_controllen = cmsg_space * sizeof(char);
+    message.msg_controllen = cmsg_space;
     cmsghdr* const cmsg = CMSG_FIRSTHDR(&message);
     RELEASE_ASSERT(cmsg != nullptr, fmt::format("cbuf with size {} is not enough, cmsghdr size {}",
                                                 sizeof(cbuf), sizeof(cmsghdr)));
@@ -371,6 +372,12 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
   return sysCallResultToIoCallResult(result);
 }
 
+Api::IoCallUint64Result IoSocketHandleImpl::recv(void* buffer, size_t length, int flags) {
+  const Api::SysCallSizeResult result =
+      Api::OsSysCallsSingleton::get().recv(fd_, buffer, length, flags);
+  return sysCallResultToIoCallResult(result);
+}
+
 bool IoSocketHandleImpl::supportsMmsg() const {
   return Api::OsSysCallsSingleton::get().supportsMmsg();
 }
@@ -469,6 +476,17 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
     }
   }
   return Address::addressFromSockAddr(ss, ss_len);
+}
+
+Event::FileEventPtr IoSocketHandleImpl::createFileEvent(Event::Dispatcher& dispatcher,
+                                                        Event::FileReadyCb cb,
+                                                        Event::FileTriggerType trigger,
+                                                        uint32_t events) {
+  return dispatcher.createFileEvent(fd_, cb, trigger, events);
+}
+
+Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {
+  return Api::OsSysCallsSingleton::get().shutdown(fd_, how);
 }
 
 } // namespace Network
