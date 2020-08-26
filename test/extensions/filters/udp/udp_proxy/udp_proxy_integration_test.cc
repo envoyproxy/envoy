@@ -112,10 +112,10 @@ TEST_P(UdpProxyIntegrationTest, HelloWorldOnNonLocalAddress) {
   if (version_ == Network::Address::IpVersion::v4) {
     // Kernel regards any 127.x.x.x as local address.
     listener_address = std::make_shared<Network::Address::Ipv4Instance>(
-#ifndef __APPLE__
-        "127.0.0.3",
-#else
+#if defined(__APPLE__) || defined(WIN32)
         "127.0.0.1",
+#else
+        "127.0.0.3",
 #endif
         port);
   } else {
