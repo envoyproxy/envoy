@@ -392,7 +392,7 @@ protected:
     RequestDecoder* request_decoder_{};
     absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
 
-    absl::optional<bool> streamErrorOnInvalidHttpMessage() const override {
+    bool streamErrorOnInvalidHttpMessage() const override {
       return parent_.stream_error_on_invalid_http_messaging_;
     }
   };

@@ -127,7 +127,7 @@ class ResponseEncoderImpl : public StreamEncoderImpl, public ResponseEncoder {
 public:
   ResponseEncoderImpl(ConnectionImpl& connection,
                       Http::Http1::HeaderKeyFormatter* header_key_formatter,
-                      absl::optional<bool>& stream_error_on_invalid_http_message)
+                      bool stream_error_on_invalid_http_message)
       : StreamEncoderImpl(connection, header_key_formatter),
         stream_error_on_invalid_http_message_(stream_error_on_invalid_http_message) {}
 
@@ -138,13 +138,13 @@ public:
   void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const ResponseTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
-  absl::optional<bool> streamErrorOnInvalidHttpMessage() const override {
+  bool streamErrorOnInvalidHttpMessage() const override {
     return stream_error_on_invalid_http_message_;
   }
 
 private:
   bool started_response_{};
-  const absl::optional<bool> stream_error_on_invalid_http_message_;
+  const bool stream_error_on_invalid_http_message_;
 };
 
 /**

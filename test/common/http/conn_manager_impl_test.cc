@@ -817,8 +817,7 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
     data.drain(4);
     return Http::okStatus();
   }));
-  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
-      .WillOnce(Return(absl::optional<bool>(true)));
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(true));
 
   // This test also verifies that decoder/encoder filters have onDestroy() called only once.
   auto* filter = new MockStreamFilter();
@@ -2134,12 +2133,9 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
 
 class StreamErrorOnInvalidHttpMessageTest : public HttpConnectionManagerImplTest {
 public:
-  void sendInvalidRequestAndVerifyConnectionState(
-      bool hcm_stream_error_on_invalid_http_message,
-      absl::optional<bool> stream_error_on_invalid_http_message, bool is_connection_terminated) {
+  void sendInvalidRequestAndVerifyConnectionState(bool codec_stream_error,
+                                                  bool is_connection_terminated) {
     setup(false, "");
-    // HCM stream error
-    stream_error_on_invalid_http_messaging_ = hcm_stream_error_on_invalid_http_message;
 
     EXPECT_CALL(*codec_, dispatch(_))
         .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
@@ -2163,7 +2159,7 @@ public:
 
     // codec stream error
     EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
-        .WillOnce(Return(stream_error_on_invalid_http_message));
+        .WillOnce(Return(codec_stream_error));
     EXPECT_CALL(*filter, encodeHeaders(_, true));
     EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
         .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
@@ -2184,24 +2180,12 @@ public:
   }
 };
 
-TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionTerminatedIfCodecOverridesStreamError) {
-  // codec stream error, if set, drives behavior (irrespective of HCM stream error)
-  sendInvalidRequestAndVerifyConnectionState(false, false, true);
+TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionTerminatedIfCodecStreamErrorIsFalse) {
+  sendInvalidRequestAndVerifyConnectionState(false, true);
 }
 
-TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionOpenIfCodecOverridesStreamError) {
-  // codec stream error, if set, drives behavior (irrespective of HCM stream error)
-  sendInvalidRequestAndVerifyConnectionState(false, true, false);
-}
-
-TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionTerminatedIfCodecDoesntOverrideStreamError) {
-  // codec stream error not set, so fall back to HCM stream error
-  sendInvalidRequestAndVerifyConnectionState(false, absl::nullopt, true);
-}
-
-TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionLeftOpenIfCodecDoesntOverrideStreamError) {
-  // codec stream error not set, so fall back to HCM stream error
-  sendInvalidRequestAndVerifyConnectionState(true, absl::nullopt, false);
+TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionOpenIfCodecStreamErrorIsTrue) {
+  sendInvalidRequestAndVerifyConnectionState(true, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
@@ -5042,8 +5026,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
         return FilterHeadersStatus::Continue;
       }));
 
-  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
-      .WillOnce(Return(absl::optional<bool>(true)));
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(true));
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
       .WillOnce(Invoke([&](ResponseHeaderMap& headers, bool) -> FilterHeadersStatus {
         EXPECT_EQ("11", headers.getContentLengthValue());
@@ -5085,8 +5068,7 @@ TEST_F(HttpConnectionManagerImplTest, ResetWithStoppedFilter) {
         return FilterHeadersStatus::Continue;
       }));
 
-  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
-      .WillOnce(Return(absl::optional<bool>(true)));
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(true));
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
       .WillOnce(Invoke([&](ResponseHeaderMap& headers, bool) -> FilterHeadersStatus {
         EXPECT_EQ("11", headers.getContentLengthValue());
