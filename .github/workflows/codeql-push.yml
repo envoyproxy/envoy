@@ -24,6 +24,7 @@ jobs:
     - name: Get the current HEAD hash
       run: |
        echo "::set-env name=ORIGINAL_HEAD::$(git rev-parse HEAD)"
+       echo "::set-env name=BUILD_TARGETS::$(.github/workflows/get_build_targets.sh)"
 
     # If this run was triggered by a pull request event, then checkout
     # the head of the pull request instead of the merge commit.
@@ -48,17 +49,18 @@ jobs:
        export PATH=bin/clang10/bin:$PATH
 
     - name: Build
-      run: |
-       echo "Hash of revision: $ORIGINAL_HEAD"
+      run: 
        echo "Building targets..."
-       . .github/workflows/get_build_targets.sh
+       echo "$BUILD_TARGETS"
        bazel/setup_clang.sh bin/clang10
        bazelisk shutdown
        bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ $BUILD_TARGETS
+      
 
     - name: Clean Artifacts
       run: |
         git clean -xdf
        
     - name: Perform CodeQL Analysis
+      if: ${{ BUILD_TARGETS != "" }}
       uses: github/codeql-action/analyze@v1
