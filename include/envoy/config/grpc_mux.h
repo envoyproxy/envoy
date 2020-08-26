@@ -43,8 +43,6 @@ public:
    * @param resources set of resource names to watch for
    */
   virtual void update(const std::set<std::string>& resources) PURE;
-
-  virtual void add(const std::set<std::string>& resources) PURE;
 };
 
 using GrpcMuxWatchPtr = std::unique_ptr<GrpcMuxWatch>;
@@ -103,6 +101,9 @@ public:
                                    SubscriptionCallbacks& callbacks,
                                    OpaqueResourceDecoder& resource_decoder,
                                    const bool use_prefix_matching) PURE;
+
+  virtual void requestOnDemandUpdate(const std::string& type_url,
+                                     const std::set<std::string>& for_update) PURE;
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;

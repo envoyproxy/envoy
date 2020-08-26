@@ -185,7 +185,7 @@ public:
    */
   virtual void updateResourceInterest(const std::set<std::string>& update_to_these_names) PURE;
 
-  virtual void addResourceInterest(const std::set<std::string>& add_these_names) PURE;
+  virtual void requestOnDemandUpdate(const std::set<std::string>& add_these_names) PURE;
 };
 
 using SubscriptionPtr = std::unique_ptr<Subscription>;

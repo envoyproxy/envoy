@@ -151,14 +151,16 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
   }
 }
 
-void NewGrpcMuxImpl::addToWatch(const std::string& type_url, Watch* watch,
-                                const std::set<std::string>& to_add) {
-  ASSERT(watch != nullptr);
-  std::set<std::string> with_added;
-  std::set_union(to_add.begin(), to_add.end(), watch->resource_names_.begin(),
-                 watch->resource_names_.end(), std::inserter(with_added, with_added.begin()));
-
-  updateWatch(type_url, watch, with_added);
+void NewGrpcMuxImpl::requestOnDemandUpdate(const std::string& type_url,
+                                           const std::set<std::string>& for_update) {
+  auto sub = subscriptions_.find(type_url);
+  RELEASE_ASSERT(sub != subscriptions_.end(),
+                 fmt::format("Watch of {} has no subscription to update.", type_url));
+  sub->second->sub_state_.updateSubscriptionInterest(for_update, {});
+  // Tell the server about our change in interest, if any.
+  if (sub->second->sub_state_.subscriptionUpdatePending()) {
+    trySendDiscoveryRequests();
+  }
 }
 
 void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {

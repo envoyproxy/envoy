@@ -49,8 +49,8 @@ void GrpcSubscriptionImpl::updateResourceInterest(
   stats_.update_attempt_.inc();
 }
 
-void GrpcSubscriptionImpl::addResourceInterest(const std::set<std::string>& add_these_names) {
-  watch_->add(add_these_names);
+void GrpcSubscriptionImpl::requestOnDemandUpdate(const std::set<std::string>& for_update) {
+  grpc_mux_->requestOnDemandUpdate(type_url_, for_update);
   stats_.update_attempt_.inc();
 }
 

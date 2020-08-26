@@ -42,6 +42,9 @@ public:
                            OpaqueResourceDecoder& resource_decoder,
                            const bool use_prefix_matching = false) override;
 
+  void requestOnDemandUpdate(const std::string& type_url,
+                             const std::set<std::string>& for_update) override;
+
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
 
@@ -98,10 +101,6 @@ private:
       parent_.updateWatch(type_url_, watch_, resources);
     }
 
-    void add(const std::set<std::string>& resources) override {
-      parent_.addToWatch(type_url_, watch_, resources);
-    }
-
   private:
     const std::string type_url_;
     Watch* watch_;
@@ -116,8 +115,6 @@ private:
   void updateWatch(const std::string& type_url, Watch* watch,
                    const std::set<std::string>& resources,
                    const bool creating_prefix_watch = false);
-
-  void addToWatch(const std::string& type_url, Watch* watch, const std::set<std::string>& to_add);
 
   void addSubscription(const std::string& type_url, const bool use_prefix_matching);
 

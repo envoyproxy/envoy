@@ -65,7 +65,7 @@ public:
   MOCK_METHOD(void, start,
               (const std::set<std::string>& resources, const bool use_prefix_matching));
   MOCK_METHOD(void, updateResourceInterest, (const std::set<std::string>& update_to_these_names));
-  MOCK_METHOD(void, addResourceInterest, (const std::set<std::string>& add_these_names));
+  MOCK_METHOD(void, requestOnDemandUpdate, (const std::set<std::string>& add_these_names));
 };
 
 class MockSubscriptionFactory : public SubscriptionFactory {
@@ -111,6 +111,9 @@ public:
               (const std::string& type_url, const std::set<std::string>& resources,
                SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
                const bool use_prefix_matching));
+
+  MOCK_METHOD(void, requestOnDemandUpdate,
+              (const std::string& type_url, const std::set<std::string>& add_these_names));
 };
 
 class MockGrpcStreamCallbacks

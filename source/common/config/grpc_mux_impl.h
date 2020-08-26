@@ -50,6 +50,10 @@ public:
                            OpaqueResourceDecoder& resource_decoder,
                            const bool use_prefix_matching = false) override;
 
+  void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
   void handleDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message);
 
@@ -98,8 +102,6 @@ private:
       watches_.emplace(watches_.begin(), this);
       parent_.queueDiscoveryRequest(type_url_);
     }
-
-    void add(const std::set<std::string>&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
     std::set<std::string> resources_;
     SubscriptionCallbacks& callbacks_;
@@ -164,6 +166,10 @@ public:
   GrpcMuxWatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
                            OpaqueResourceDecoder&, const bool) override {
     ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
+  }
+
+  void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   void onWriteable() override {}
