@@ -379,9 +379,9 @@ envoy_cc_extension(
     # QUICHE doesn't compile on Windows right now. Disable until it
     # is fixed.
     deps = select({
-        "@envoy//bazel:boringssl_fips": [],
-        "@envoy//bazel:boringssl_disabled": [],
-        "@envoy//bazel:windows_x86_64": [],
+        "//bazel:boringssl_fips": [],
+        "//bazel:boringssl_disabled": [],
+        "//bazel:windows_x86_64": [],
         "//conditions:default": [
             ":active_quic_listener_config_lib",
             ":codec_lib",
