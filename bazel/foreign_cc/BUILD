@@ -241,7 +241,7 @@ envoy_cmake_external(
         "UNALIGNED_OK": "off",
     },
     lib_source = select({
-        "@envoy//bazel:zlib_ng": "@com_github_zlib_ng_zlib_ng//:all",
+        "//bazel:zlib_ng": "@com_github_zlib_ng_zlib_ng//:all",
         "//conditions:default": "@net_zlib//:all",
     }),
     static_libraries = select({
