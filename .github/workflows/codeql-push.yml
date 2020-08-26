@@ -21,7 +21,7 @@ jobs:
         # a pull request then we can checkout the head.
         fetch-depth: 2
     
-    - name: Get the current HEAD hash
+    - name: Get build targets
       run: |
        echo "::set-env name=ORIGINAL_HEAD::$(git rev-parse HEAD)"
        echo "::set-env name=BUILD_TARGETS::$(.github/workflows/get_build_targets.sh)"
@@ -56,7 +56,6 @@ jobs:
        bazelisk shutdown
        bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ $BUILD_TARGETS
       
-
     - name: Clean Artifacts
       run: |
         git clean -xdf
