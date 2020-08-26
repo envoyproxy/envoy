@@ -88,7 +88,7 @@ public:
   MOCK_METHOD(void, setSecretUpdateCallback, (std::function<void()> callback));
 
   MOCK_METHOD(Ssl::HandshakerFactoryCb, createHandshaker, (), (const, override));
-  MOCK_METHOD(Ssl::HandshakerRequirements, requirements, (), (const, override));
+  MOCK_METHOD(Ssl::HandshakerCapabilities, capabilities, (), (const, override));
 
   MOCK_METHOD(const std::string&, serverNameIndication, (), (const));
   MOCK_METHOD(bool, allowRenegotiation, (), (const));
@@ -114,7 +114,7 @@ public:
   MOCK_METHOD(void, setSecretUpdateCallback, (std::function<void()> callback));
 
   MOCK_METHOD(Ssl::HandshakerFactoryCb, createHandshaker, (), (const, override));
-  MOCK_METHOD(Ssl::HandshakerRequirements, requirements, (), (const, override));
+  MOCK_METHOD(Ssl::HandshakerCapabilities, capabilities, (), (const, override));
 
   MOCK_METHOD(bool, requireClientCertificate, (), (const));
   MOCK_METHOD(const std::vector<SessionTicketKey>&, sessionTicketKeys, (), (const));

@@ -65,36 +65,29 @@ public:
   virtual absl::string_view alpnProtocols() const PURE;
 };
 
-struct HandshakerRequirements {
-  // Should be true if a handshaker requires certificates in the config.
-  bool require_certificates = true;
+struct HandshakerCapabilities {
+  // Whether or not a handshaker implementation provides certificates itself.
+  bool provides_certificates = false;
 
-  // Should be true if a handshaker requires that Envoy sets the session
-  // resumption callback described by `SSL_CTX_set_select_certificate_cb`.
-  bool should_set_select_certificate_cb = true;
+  // Whether or not a handshaker implementation verifies certificates itself.
+  bool verifies_certificates = false;
 
-  // Should be true if a handshaker requires that Envoy sets the ALPN selection
-  // callback described by `SSL_CTX_set_alpn_select_cb`.
-  bool should_set_alpn_select_cb = true;
+  // Whether or not a handshaker implementation handles session resumption
+  // itself.
+  bool handles_session_resumption = false;
 
-  // Should be true if a handshaker requires that Envoy sets the TLS extension
-  // ticket key callback described by `SSL_CTX_set_tlsext_ticket_key_cb`.
-  bool should_set_tlsext_ticket_key_cb = true;
+  // Whether or not a handshaker implementation handles session tickets.
+  bool handles_session_tickets = false;
 
-  // Should be true if a handshaker requires that Envoy sets the SSL timeout as
-  // described by `SSL_CTX_set_timeout`.
-  bool should_set_timeout = true;
+  // Whether or not a handshaker implementation provides its own list of ciphers
+  // and curves.
+  bool provides_ciphers_and_curves = false;
 
-  // Should be true if a handshaker requires that Envoy set the list of ciphers,
-  // as described by `SSL_CTX_set_strict_cipher_list`.
-  bool should_set_strict_cipher_list = true;
+  // Whether or not a handshaker implementaiton handles ALPN selection.
+  bool handles_alpn_selection = false;
 
-  // Should be true if a handshaker requires that Envoy set the list of curves,
-  // as described by `SSL_CTX_set1_curves_list`.
-  bool should_set1_curves_list = true;
-
-  // Should be true if a handshaker requires that Envoy verify certificates.
-  bool should_verify_certificates = true;
+  // Whether or not a handshaker implementation sets a timeout.
+  bool sets_timeout = false;
 
   // Should return true if this handshaker is FIPS-compliant.
   // Envoy will fail to compile if this returns true and `--define=boringssl=fips`.
@@ -116,10 +109,12 @@ public:
   std::string category() const override { return "envoy.tls_handshakers"; }
 
   /**
-   * Implementations should return a struct with their requirements; see
-   * HandshakerRequirements above.
+   * Implementations should return a struct with their capabilities. See
+   * HandshakerCapabilities above. For any capability a Handshaker
+   * implementation explicitly declares, Envoy will not also configure that SSL
+   * capability.
    */
-  virtual HandshakerRequirements requirements() const PURE;
+  virtual HandshakerCapabilities capabilities() const PURE;
 };
 
 } // namespace Ssl

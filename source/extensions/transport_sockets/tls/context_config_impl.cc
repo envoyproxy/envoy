@@ -216,7 +216,7 @@ ContextConfigImpl::ContextConfigImpl(
     }
   }
 
-  HandshakerFactoryContextImpl handshaker_factory_context(api_, alpnProtocols());
+  HandshakerFactoryContextImpl handshaker_factory_context(api_, alpn_protocols_);
   Ssl::HandshakerFactory* handshaker_factory;
   if (config.has_custom_handshaker()) {
     // If a custom handshaker is configured, derive the factory from the config.
@@ -233,7 +233,7 @@ ContextConfigImpl::ContextConfigImpl(
         *handshaker_factory->createEmptyConfigProto(), handshaker_factory_context,
         factory_context.messageValidationVisitor());
   }
-  requirements_ = handshaker_factory->requirements();
+  capabilities_ = handshaker_factory->capabilities();
 }
 
 Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(
@@ -427,7 +427,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
     }
   }
 
-  if (requirements().require_certificates) {
+  if (!capabilities().provides_certificates) {
     if ((config.common_tls_context().tls_certificates().size() +
          config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0) {
       throw EnvoyException("No TLS certificates found for server context");

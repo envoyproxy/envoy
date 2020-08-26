@@ -82,6 +82,7 @@ envoy_cc_library(
     hdrs = ["handshaker.h"],
     external_deps = ["ssl"],
     deps = [
+        "//include/envoy/api:api_interface",
         "//include/envoy/config:typed_config_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:post_io_action_interface",

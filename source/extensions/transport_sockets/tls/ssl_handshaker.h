@@ -131,9 +131,9 @@ public:
     };
   }
 
-  Ssl::HandshakerRequirements requirements() const override {
+  Ssl::HandshakerCapabilities capabilities() const override {
     // The default handshaker impl requires Envoy to handle all enumerated behaviors.
-    return Ssl::HandshakerRequirements{};
+    return Ssl::HandshakerCapabilities{};
   }
 
   static HandshakerFactory* getDefaultHandshakerFactory() {

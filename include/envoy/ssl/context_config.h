@@ -81,9 +81,9 @@ public:
   virtual HandshakerFactoryCb createHandshaker() const PURE;
 
   /**
-   * @return the set of requirements for handshaker instances created by this context.
+   * @return the set of capabilities for handshaker instances created by this context.
    */
-  virtual HandshakerRequirements requirements() const PURE;
+  virtual HandshakerCapabilities capabilities() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {

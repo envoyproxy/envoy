@@ -74,7 +74,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       ssl_ciphers_(stat_name_set_->add("ssl.ciphers")),
       ssl_versions_(stat_name_set_->add("ssl.versions")),
       ssl_curves_(stat_name_set_->add("ssl.curves")),
-      ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")), requirements_(config.requirements()) {
+      ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")), capabilities_(config.capabilities()) {
   const auto tls_certificates = config.tlsCertificates();
   tls_contexts_.resize(std::max(static_cast<size_t>(1), tls_certificates.size()));
 
@@ -90,7 +90,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     rc = SSL_CTX_set_max_proto_version(ctx.ssl_ctx_.get(), config.maxProtocolVersion());
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
 
-    if (requirements_.should_set_strict_cipher_list &&
+    if (!capabilities_.provides_ciphers_and_curves &&
         !SSL_CTX_set_strict_cipher_list(ctx.ssl_ctx_.get(), config.cipherSuites().c_str())) {
       // Break up a set of ciphers into each individual cipher and try them each individually in
       // order to attempt to log which specific one failed. Example of config.cipherSuites():
@@ -119,7 +119,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
                                        config.cipherSuites(), absl::StrJoin(bad_ciphers, ", ")));
     }
 
-    if (requirements_.should_set1_curves_list &&
+    if (!capabilities_.provides_ciphers_and_curves &&
         !SSL_CTX_set1_curves_list(ctx.ssl_ctx_.get(), config.ecdhCurves().c_str())) {
       throw EnvoyException(absl::StrCat("Failed to initialize ECDH curves ", config.ecdhCurves()));
     }
@@ -141,7 +141,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
 #ifndef BORINGSSL_FIPS
-  if (!requirements_.is_fips_compliant) {
+  if (!capabilities_.is_fips_compliant) {
     throw EnvoyException(
         "Can't load a FIPS noncompliant custom handshaker while running in FIPS compliant mode.");
   }
@@ -272,7 +272,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   for (auto& ctx : tls_contexts_) {
-    if (verify_mode != SSL_VERIFY_NONE && requirements_.should_verify_certificates) {
+    if (verify_mode != SSL_VERIFY_NONE && !capabilities_.verifies_certificates) {
       SSL_CTX_set_verify(ctx.ssl_ctx_.get(), verify_mode, nullptr);
       SSL_CTX_set_cert_verify_callback(ctx.ssl_ctx_.get(), ContextImpl::verifyCallback, this);
     }
@@ -995,7 +995,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      const std::vector<std::string>& server_names,
                                      TimeSource& time_source)
     : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()) {
-  if (config.tlsCertificates().empty() && config.requirements().require_certificates) {
+  if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
 
@@ -1007,7 +1007,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   // First, configure the base context for ClientHello interception.
   // TODO(htuch): replace with SSL_IDENTITY when we have this as a means to do multi-cert in
   // BoringSSL.
-  if (config.requirements().should_set_select_certificate_cb) {
+  if (!config.capabilities().handles_session_resumption) {
     SSL_CTX_set_select_certificate_cb(
         tls_contexts_[0].ssl_ctx_.get(),
         [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
@@ -1018,14 +1018,14 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   }
 
   for (auto& ctx : tls_contexts_) {
-    if (config.requirements().should_verify_certificates &&
+    if (!config.capabilities().verifies_certificates &&
         config.certificateValidationContext() != nullptr &&
         !config.certificateValidationContext()->caCert().empty()) {
       ctx.addClientValidationContext(*config.certificateValidationContext(),
                                      config.requireClientCertificate());
     }
 
-    if (!parsed_alpn_protocols_.empty() && config.requirements().should_set_alpn_select_cb) {
+    if (!parsed_alpn_protocols_.empty() && !config.capabilities().handles_alpn_selection) {
       SSL_CTX_set_alpn_select_cb(
           ctx.ssl_ctx_.get(),
           [](SSL*, const unsigned char** out, unsigned char* outlen, const unsigned char* in,
@@ -1035,8 +1035,10 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
           this);
     }
 
+    // If the handshaker handles session tickets natively, don't call
+    // `SSL_CTX_set_tlsext_ticket_key_cb`.
     if (config.disableStatelessSessionResumption() ||
-        !config.requirements().should_set_tlsext_ticket_key_cb) {
+        config.capabilities().handles_session_tickets) {
       SSL_CTX_set_options(ctx.ssl_ctx_.get(), SSL_OP_NO_TICKET);
     } else if (!session_ticket_keys_.empty()) {
       SSL_CTX_set_tlsext_ticket_key_cb(
@@ -1052,7 +1054,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
           });
     }
 
-    if (config.sessionTimeout() && config.requirements().should_set_timeout) {
+    if (config.sessionTimeout() && !config.capabilities().sets_timeout) {
       auto timeout = config.sessionTimeout().value().count();
       SSL_CTX_set_timeout(ctx.ssl_ctx_.get(), uint32_t(timeout));
     }
@@ -1078,7 +1080,7 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
   // case that different Envoy instances each have their own certs. All certificates in a
   // ServerContextImpl context are hashed together, since they all constitute a match on a filter
   // chain for resumption purposes.
-  if (requirements_.require_certificates) {
+  if (!capabilities_.provides_certificates) {
     for (const auto& ctx : tls_contexts_) {
       X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
       RELEASE_ASSERT(cert != nullptr, "TLS context should have an active certificate");
