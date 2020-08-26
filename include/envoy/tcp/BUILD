@@ -9,6 +9,11 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "conn_info",
+    hdrs = ["conn_info.h"],
+)
+
+envoy_cc_library(
     name = "conn_pool_interface",
     hdrs = ["conn_pool.h"],
     deps = [
