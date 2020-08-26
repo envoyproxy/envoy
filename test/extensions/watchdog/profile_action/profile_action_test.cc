@@ -31,27 +31,20 @@ namespace Watchdog {
 namespace ProfileAction {
 namespace {
 
-// We want to make sure the action is tested with both simulated time and real
-// time, to ensure that it works in production, and that it works in the context
-// of integration tests which are much easier to control with simulated time.
-enum class TimeSystemType { Real, Simulated };
-
-class ProfileActionTest : public testing::TestWithParam<TimeSystemType> {
+class ProfileActionTest : public testing::Test {
 protected:
   ProfileActionTest()
-      : time_system_(makeTimeSystem()), api_(Api::createApiForTest(*time_system_)),
-        dispatcher_(api_->allocateDispatcher("test")), context_({*api_, *dispatcher_}),
-        test_path_(generateTestPath()) {}
+      : time_system_(std::make_unique<Event::SimulatedTimeSystem>()),
+        api_(Api::createApiForTest(*time_system_)), dispatcher_(api_->allocateDispatcher("test")),
+        context_({*api_, *dispatcher_}), test_path_(generateTestPath()) {}
 
   // Generates a unique path for a testcase.
   static std::string generateTestPath() {
     const ::testing::TestInfo* const test_info =
         ::testing::UnitTest::GetInstance()->current_test_info();
-    const std::string test_param =
-        GetParam() == TimeSystemType::Real ? "TestRealTimeSystem" : "SimulatedTimeSystem";
 
-    std::string test_path = TestEnvironment::temporaryPath(absl::StrJoin(
-        {test_info->test_suite_name(), test_info->name(), (test_param.c_str())}, "/"));
+    std::string test_path = TestEnvironment::temporaryPath(
+        absl::StrJoin({test_info->test_suite_name(), test_info->name()}, "/"));
     TestEnvironment::createPath(test_path);
 
     return test_path;
@@ -76,17 +69,6 @@ protected:
     return nonempty_profiles_found;
   }
 
-  static std::unique_ptr<Event::TestTimeSystem> makeTimeSystem() {
-    switch (GetParam()) {
-    case TimeSystemType::Real:
-      return std::make_unique<Event::GlobalTimeSystem>();
-    case TimeSystemType::Simulated:
-      return std::make_unique<Event::SimulatedTimeSystem>();
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-  }
-
   void waitForOutstandingNotify() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
     mutex_.Await(absl::Condition(
         +[](int* outstanding_notifies) -> bool { return *outstanding_notifies > 0; },
@@ -106,10 +88,7 @@ protected:
   int outstanding_notifies_ ABSL_GUARDED_BY(mutex_) = 0;
 };
 
-INSTANTIATE_TEST_SUITE_P(TimeSystemType, ProfileActionTest,
-                         testing::ValuesIn({TimeSystemType::Real, TimeSystemType::Simulated}));
-
-TEST_P(ProfileActionTest, CanDoSingleProfile) {
+TEST_F(ProfileActionTest, CanDoSingleProfile) {
   // Create configuration.
   envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
   config.set_profile_path(test_path_);
@@ -149,7 +128,7 @@ TEST_P(ProfileActionTest, CanDoSingleProfile) {
 #endif
 }
 
-TEST_P(ProfileActionTest, CanDoMultipleProfiles) {
+TEST_F(ProfileActionTest, CanDoMultipleProfiles) {
   // Create configuration.
   envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
   config.set_profile_path(test_path_);
@@ -205,7 +184,7 @@ TEST_P(ProfileActionTest, CanDoMultipleProfiles) {
 #endif
 }
 
-TEST_P(ProfileActionTest, CannotTriggerConcurrentProfiles) {
+TEST_F(ProfileActionTest, CannotTriggerConcurrentProfiles) {
   // Create configuration.
   envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
   TestUtility::loadFromJson(absl::Substitute(R"EOF({ "profile_path": "$0", })EOF", test_path_),
@@ -246,7 +225,7 @@ TEST_P(ProfileActionTest, CannotTriggerConcurrentProfiles) {
 #endif
 }
 
-TEST_P(ProfileActionTest, ShouldNotProfileIfDirectoryDoesNotExist) {
+TEST_F(ProfileActionTest, ShouldNotProfileIfDirectoryDoesNotExist) {
   // Create configuration.
   envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
   const std::string nonexistant_path = test_path_ + "/nonexistant_dir/";
@@ -281,7 +260,7 @@ TEST_P(ProfileActionTest, ShouldNotProfileIfDirectoryDoesNotExist) {
   EXPECT_FALSE(api_->fileSystem().directoryExists(nonexistant_path));
 }
 
-TEST_P(ProfileActionTest, ShouldNotProfileIfNoTids) {
+TEST_F(ProfileActionTest, ShouldNotProfileIfNoTids) {
   // Create configuration.
   envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
   TestUtility::loadFromJson(absl::Substitute(R"EOF({ "profile_path": "$0"})EOF", test_path_),
@@ -313,7 +292,7 @@ TEST_P(ProfileActionTest, ShouldNotProfileIfNoTids) {
   EXPECT_EQ(countNumberOfProfileInPath(test_path_), 0);
 }
 
-TEST_P(ProfileActionTest, ShouldSaturateTids) {
+TEST_F(ProfileActionTest, ShouldSaturateTids) {
   // Create configuration that we'll run until it saturates.
   envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
   config.set_profile_path(test_path_);
