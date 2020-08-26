@@ -164,7 +164,7 @@ message Http1ProtocolOptions {
   // open where possible.
   // If set, this overrides any HCM :ref:`stream_error_on_invalid_http_messaging
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`;
-  // if not set, this is overridden by any HCM :ref:`stream_error_on_invalid_http_messaging
+  // this is overridden by any HCM :ref:`stream_error_on_invalid_http_messaging
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`, which defaults to false.
   google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 6;
 }
