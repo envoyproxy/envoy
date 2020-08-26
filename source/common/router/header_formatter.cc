@@ -228,7 +228,8 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     : append_(append) {
   if (field_name == "PROTOCOL") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-      return Envoy::Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol());
+      return Envoy::Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(
+          stream_info.protocol());
     };
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
@@ -356,9 +357,7 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     field_extractor_ = parseRequestHeader(field_name.substr(STATIC_STRLEN("REQ")));
   } else if (field_name == "HOSTNAME") {
     std::string hostname = Envoy::Formatter::SubstitutionFormatUtils::getHostnameOrDefault();
-    field_extractor_ = [hostname](const StreamInfo::StreamInfo&) {
-      return hostname;
-    };
+    field_extractor_ = [hostname](const StreamInfo::StreamInfo&) { return hostname; };
   } else if (field_name == "RESPONSE_FLAGS") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
       return StreamInfo::ResponseFlagUtils::toShortString(stream_info);

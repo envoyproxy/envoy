@@ -101,11 +101,11 @@ const absl::optional<std::string> SubstitutionFormatUtils::getHostname() {
 }
 
 const std::string SubstitutionFormatUtils::getHostnameOrDefault() {
-    absl::optional<std::string> hostname = getHostname();
-    if (hostname.has_value()) {
-        return hostname.value();
-    }
-    return DefaultUnspecifiedValueString;
+  absl::optional<std::string> hostname = getHostname();
+  if (hostname.has_value()) {
+    return hostname.value();
+  }
+  return DefaultUnspecifiedValueString;
 }
 
 FormatterImpl::FormatterImpl(const std::string& format, bool omit_empty_values)
@@ -184,12 +184,13 @@ ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& re
           }
 
           const auto str = provider->format(request_headers, response_headers, response_trailers,
-                                              stream_info, local_reply_body);
+                                            stream_info, local_reply_body);
           return ValueUtil::stringValue(str.value_or(DefaultUnspecifiedValueString));
         }
         // Multiple providers forces string output.
         std::string str;
-        const std::string empty_value = omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString;
+        const std::string empty_value =
+            omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString;
         for (const auto& provider : providers) {
           const auto& bit = provider->format(request_headers, response_headers, response_trailers,
                                              stream_info, local_reply_body);
