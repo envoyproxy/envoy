@@ -48,6 +48,11 @@ void setAllowHttp10WithDefaultHost(
   hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
 }
 
+void setAllowChunkedLength(
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) {
+  hcm.mutable_http_protocol_options()->set_allow_chunked_length(true);
+}
+
 } // namespace
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
@@ -426,6 +431,33 @@ TEST_P(IntegrationTest, TestSmuggling) {
                                 smuggled_request;
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
     EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+  }
+}
+
+TEST_P(IntegrationTest, TestAllowChunkedLength) {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(&setAllowChunkedLength);
+  initialize();
+  const std::string smuggled_request = "GET / HTTP/1.1\r\nHost: disallowed\r\n\r\n";
+  ASSERT_EQ(smuggled_request.length(), 36);
+
+  {
+    std::string response;
+    const std::string full_request =
+        "POST / HTTP/1.1\r\n"
+        "Host: host\r\n"
+        "Content-length: 36\r\n"
+        "Transfer-Encoding: chunked\r\n\r\n"
+        "4\r\nbody\r\n"
+        "0\r\n\r\n" +
+        smuggled_request;
+    sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, true);
+    EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+
+    std::unique_ptr<Http::TestRequestHeaderMapImpl> upstream_headers =
+    reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+    EXPECT_EQ(upstream_headers->Host()->value(), "host");
+    EXPECT_EQ(upstream_headers->ContentLength(), nullptr);
   }
 }
 
