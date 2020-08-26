@@ -187,6 +187,8 @@ jobs:
           TEST_TMPDIR: $(Build.SourcesDirectory)
           SLACK_TOKEN: $(SLACK_TOKEN)
           CI_TARGET: "MacOS"
+          REPO_URI: $(Build.Repository.Uri)
+          BUILD_URI: $(Build.BuildUri)
 
   - job: Windows
     dependsOn: ["format"]

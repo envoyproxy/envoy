@@ -77,8 +77,8 @@ def getGitInfo(CI_TARGET):
         envoy_link += '/' + token
     ret += line
 
-  ret += "link for additional content: " + os.environ["Build.Repository.Uri"] + " \n"
-  ret += "link for azure build URI: " + os.environ["Build.BuildUri"] + " \n"
+  ret += "link for additional content: " + os.environ["REPO_URI"] + " \n"
+  ret += "link for azure build URI: " + os.environ["BUILD_URI"] + " \n"
   if CI_TARGET != "":
     ret += "In " + CI_TARGET + " build\n"
   return ret
