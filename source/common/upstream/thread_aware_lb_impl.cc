@@ -185,8 +185,11 @@ LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
   return lb;
 }
 
-bool ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::isHostOverloaded(
+double ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::hostOverloadFactor(
     const Host& host, double weight) const {
+  // TODO(scheler): This will not work if rq_active cluster stat is disabled, need to detect
+  // and alert the user if that's the case.
+
   const uint32_t overall_active = host.cluster().stats().upstream_rq_active_.value();
   const uint32_t host_active = host.stats().rq_active_.value();
 
@@ -200,9 +203,8 @@ bool ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::isHostOverload
         "ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost: "
         "host {} overloaded; overall_active {}, host_weight {}, host_active {} > slots {}",
         host.address()->asString(), overall_active, weight, host_active, slots);
-    return true;
   }
-  return false;
+  return static_cast<double>(host.stats().rq_active_.value()) / slots;
 }
 
 HostConstSharedPtr
@@ -214,9 +216,9 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
   // upstream host are capped at `hash_balance_factor/100` times the average number of requests
   // across the cluster. When a request arrives for an upstream host that is currently serving at
   // its max capacity, linear probing is used to identify an eligible host. Further, the linear
-  // probe is implemented using a random jump on hosts ring to identify the eligible host (this
-  // technique is as described in the paper https://arxiv.org/abs/1908.08762 - the random jump
-  // avoids the cascading overflow effect when choosing the next host on the ring).
+  // probe is implemented using a random jump on hosts ring/table to identify the eligible host
+  // (this technique is as described in the paper https://arxiv.org/abs/1908.08762 - the random jump
+  // avoids the cascading overflow effect when choosing the next host on the ring/table).
   //
   // If weights are specified on the hosts, they are respected.
   //
@@ -232,7 +234,8 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
     return nullptr;
   }
   const double weight = normalized_host_weights_map_.at(host);
-  if (!isHostOverloaded(*host, weight)) {
+  double overload_factor = hostOverloadFactor(*host, weight);
+  if (overload_factor <= 1.0) {
     ENVOY_LOG_MISC(debug,
                    "ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost: "
                    "selected host #{} (attempt:1)",
@@ -265,8 +268,8 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
     return x;
   };
 
-  HostConstSharedPtr alt_host, max_weight_host = host;
-  double max_weight = hostWeight(max_weight_host);
+  HostConstSharedPtr alt_host, least_overloaded_host = host;
+  double least_overload_factor = overload_factor;
   for (uint32_t i = 0; i < num_hosts; i++) {
     // The random shuffle algorithm
     const uint32_t j = uniform_int(random, num_hosts - i);
@@ -279,7 +282,9 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
     }
 
     const double alt_host_weight = normalized_host_weights_[k].second;
-    if (!isHostOverloaded(*alt_host, alt_host_weight)) {
+    overload_factor = hostOverloadFactor(*alt_host, alt_host_weight);
+
+    if (overload_factor <= 1.0) {
       ENVOY_LOG_MISC(debug,
                      "ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost: "
                      "selected host #{}:{} (attempt:{})",
@@ -287,14 +292,13 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
       return alt_host;
     }
 
-    const double alt_max_weight = hostWeight(alt_host);
-    if (alt_max_weight > max_weight) {
-      max_weight_host = alt_host;
-      max_weight = alt_max_weight;
+    if (least_overload_factor > overload_factor) {
+      least_overloaded_host = alt_host;
+      least_overload_factor = overload_factor;
     }
   }
 
-  return max_weight_host;
+  return least_overloaded_host;
 }
 
 } // namespace Upstream

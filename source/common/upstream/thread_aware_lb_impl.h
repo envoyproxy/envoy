@@ -50,11 +50,7 @@ public:
     HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
 
   protected:
-    virtual bool isHostOverloaded(const Host& host, double weight) const;
-    virtual double hostWeight(HostConstSharedPtr host) const {
-      const double weight = normalized_host_weights_map_.at(host);
-      return weight / (host->stats().rq_active_.value() + 1);
-    }
+    virtual double hostOverloadFactor(const Host& host, double weight) const;
     const NormalizedHostWeightMap normalized_host_weights_map_;
 
   private:

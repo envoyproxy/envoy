@@ -26,38 +26,39 @@ private:
   const NormalizedHostWeightVector ring_{};
 };
 
-using HostOverloadedPredicate = std::function<bool(const Host& host, double weight)>;
+using HostOverloadFactorPredicate = std::function<double(const Host& host, double weight)>;
 class TestBoundedLoadHashingLoadBalancer
     : public ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer {
 public:
   TestBoundedLoadHashingLoadBalancer(
       ThreadAwareLoadBalancerBase::HashingLoadBalancerSharedPtr hlb_ptr,
       const NormalizedHostWeightVector& normalized_host_weights, uint32_t hash_balance_factor,
-      HostOverloadedPredicate is_host_overloaded)
+      HostOverloadFactorPredicate host_overload_factor)
       : ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer(
             hlb_ptr, normalized_host_weights, hash_balance_factor),
-        is_host_overloaded_(is_host_overloaded) {}
+        host_overload_factor_(host_overload_factor) {}
 
 private:
-  HostOverloadedPredicate is_host_overloaded_;
-  bool isHostOverloaded(const Host& host, double weight) const override {
-    return is_host_overloaded_(host, weight);
-  }
-  double hostWeight(HostConstSharedPtr host) const override {
-    return normalized_host_weights_map_.at(host);
+  HostOverloadFactorPredicate host_overload_factor_;
+  double hostOverloadFactor(const Host& host, double weight) const override {
+    return host_overload_factor_(host, weight);
   }
 };
 
 class BoundedLoadHashingLoadBalancerTest : public testing::Test {
 public:
-  HostOverloadedPredicate getHostOverloadedPredicate(const std::vector<std::string>& addresses) {
-    return [addresses](const Host& h, double) -> bool {
+  HostOverloadFactorPredicate
+  getHostOverloadFactorPredicate(const std::vector<std::string>& addresses) {
+    return [addresses](const Host& h, double) -> double {
+      // Each host in the vector gets an increasing overload factor.
+      int index = 1;
       for (const std::string& host : addresses) {
+        index = index + 1;
         if (host == h.address()->asString()) {
-          return true;
+          return (100.0 + index) / 100;
         }
       }
-      return false;
+      return 0.5;
     };
   }
 
@@ -84,7 +85,7 @@ public:
   std::unique_ptr<ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer> lb_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
 
-  HostOverloadedPredicate host_overloaded_predicate_;
+  HostOverloadFactorPredicate host_overload_factor_predicate_;
 };
 
 #if !defined(NDEBUG)
@@ -119,7 +120,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, NoHosts) {
 TEST_F(BoundedLoadHashingLoadBalancerTest, NoHostEverOverloaded) {
   // setup: 5 hosts, none ever overloaded.
   std::vector<std::string> addresses;
-  host_overloaded_predicate_ = getHostOverloadedPredicate(addresses);
+  host_overload_factor_predicate_ = getHostOverloadFactorPredicate(addresses);
 
   NormalizedHostWeightVector normalized_host_weights;
   createHosts(5, normalized_host_weights);
@@ -128,7 +129,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, NoHostEverOverloaded) {
   hlb_ = std::make_shared<TestHashingLoadBalancer>(ring);
 
   lb_ = std::make_unique<TestBoundedLoadHashingLoadBalancer>(hlb_, normalized_host_weights, 1,
-                                                             host_overloaded_predicate_);
+                                                             host_overload_factor_predicate_);
 
   for (uint32_t i = 0; i < 5; i++) {
     HostConstSharedPtr host = lb_->chooseHost(i, 1);
@@ -147,7 +148,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, OneHostOverloaded) {
   // setup: 5 hosts, one of them is overloaded.
   std::vector<std::string> addresses;
   addresses.push_back("127.0.0.12:90");
-  host_overloaded_predicate_ = getHostOverloadedPredicate(addresses);
+  host_overload_factor_predicate_ = getHostOverloadFactorPredicate(addresses);
 
   NormalizedHostWeightVector normalized_host_weights;
   createHosts(5, normalized_host_weights);
@@ -156,7 +157,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, OneHostOverloaded) {
   hlb_ = std::make_shared<TestHashingLoadBalancer>(ring);
 
   lb_ = std::make_unique<TestBoundedLoadHashingLoadBalancer>(hlb_, normalized_host_weights, 1,
-                                                             host_overloaded_predicate_);
+                                                             host_overload_factor_predicate_);
 
   HostConstSharedPtr host = lb_->chooseHost(2, 1);
   EXPECT_NE(host, nullptr);
@@ -175,7 +176,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHostOverloaded) {
   addresses.push_back("127.0.0.10:90");
   addresses.push_back("127.0.0.11:90");
   addresses.push_back("127.0.0.12:90");
-  host_overloaded_predicate_ = getHostOverloadedPredicate(addresses);
+  host_overload_factor_predicate_ = getHostOverloadFactorPredicate(addresses);
 
   NormalizedHostWeightVector normalized_host_weights;
   createHosts(5, normalized_host_weights);
@@ -184,7 +185,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHostOverloaded) {
   hlb_ = std::make_shared<TestHashingLoadBalancer>(ring);
 
   lb_ = std::make_unique<TestBoundedLoadHashingLoadBalancer>(hlb_, normalized_host_weights, 1,
-                                                             host_overloaded_predicate_);
+                                                             host_overload_factor_predicate_);
 
   HostConstSharedPtr host = lb_->chooseHost(2, 1);
   EXPECT_NE(host, nullptr);
@@ -203,7 +204,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHashSameHostOverloaded) {
   // setup: 5 hosts, one of them is overloaded.
   std::vector<std::string> addresses;
   addresses.push_back("127.0.0.13:90");
-  host_overloaded_predicate_ = getHostOverloadedPredicate(addresses);
+  host_overload_factor_predicate_ = getHostOverloadFactorPredicate(addresses);
 
   NormalizedHostWeightVector normalized_host_weights, hosts_on_ring;
   createHostsMappedByMultipleHosts(5, normalized_host_weights, hosts_on_ring);
@@ -211,7 +212,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHashSameHostOverloaded) {
   hlb_ = std::make_shared<TestHashingLoadBalancer>(hosts_on_ring);
 
   lb_ = std::make_unique<TestBoundedLoadHashingLoadBalancer>(hlb_, normalized_host_weights, 1,
-                                                             host_overloaded_predicate_);
+                                                             host_overload_factor_predicate_);
 
   HostConstSharedPtr host1 = lb_->chooseHost(6, 1);
   EXPECT_NE(host1, nullptr);
@@ -229,21 +230,19 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHashSameHostOverloaded) {
 // Works correctly for the case when all hosts are overloaded
 TEST_F(BoundedLoadHashingLoadBalancerTest, AllHostsOverloaded) {
   std::vector<std::string> addresses;
-  addresses.push_back("127.0.0.10:90");
   addresses.push_back("127.0.0.11:90");
+  addresses.push_back("127.0.0.10:90");
   addresses.push_back("127.0.0.12:90");
-  host_overloaded_predicate_ = getHostOverloadedPredicate(addresses);
+  host_overload_factor_predicate_ = getHostOverloadFactorPredicate(addresses);
 
   NormalizedHostWeightVector normalized_host_weights;
-  normalized_host_weights.push_back({makeTestHost(info_, "tcp://127.0.0.10:90"), 0.2});
-  normalized_host_weights.push_back({makeTestHost(info_, "tcp://127.0.0.11:90"), 0.5});
-  normalized_host_weights.push_back({makeTestHost(info_, "tcp://127.0.0.12:90"), 0.3});
+  createHosts(3, normalized_host_weights);
 
   NormalizedHostWeightVector ring(normalized_host_weights);
   hlb_ = std::make_shared<TestHashingLoadBalancer>(ring);
 
   lb_ = std::make_unique<TestBoundedLoadHashingLoadBalancer>(hlb_, normalized_host_weights, 1,
-                                                             host_overloaded_predicate_);
+                                                             host_overload_factor_predicate_);
 
   HostConstSharedPtr host = lb_->chooseHost(0, 1);
   EXPECT_NE(host, nullptr);
