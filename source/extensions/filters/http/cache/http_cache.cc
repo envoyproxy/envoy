@@ -132,7 +132,7 @@ LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& respon
   LookupResult result;
 
   // Assumption: Cache lookup time is negligible. Therefore, now == timestamp_
-  const std::chrono::seconds age =
+  const Seconds age =
       CacheHeadersUtils::calculateAge(*response_headers, metadata.response_time_, timestamp_);
   response_headers->setInline(age_handle.handle(), std::to_string(age.count()));
 

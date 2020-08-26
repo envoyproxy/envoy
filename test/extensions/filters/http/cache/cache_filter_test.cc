@@ -129,7 +129,7 @@ protected:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Api::ApiPtr api_ = Api::createApiForTest();
   Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
-  const std::chrono::seconds delay_ = std::chrono::seconds(10);
+  const Seconds delay_ = Seconds(10);
   const std::string age = std::to_string(delay_.count());
 };
 

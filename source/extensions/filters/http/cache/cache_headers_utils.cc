@@ -31,7 +31,7 @@ OptionalDuration parseDuration(absl::string_view s) {
   long num;
   if (absl::SimpleAtoi(s, &num) && num >= 0) {
     // s is a valid string of digits representing a positive number.
-    duration = std::chrono::seconds(num);
+    duration = Seconds(num);
   }
   return duration;
 }
@@ -146,9 +146,8 @@ SystemTime CacheHeadersUtils::httpTime(const Http::HeaderEntry* header_entry) {
   return {};
 }
 
-std::chrono::seconds
-CacheHeadersUtils::calculateAge(const Http::ResponseHeaderMap& response_headers,
-                                const SystemTime response_time, const SystemTime now) {
+Seconds CacheHeadersUtils::calculateAge(const Http::ResponseHeaderMap& response_headers,
+                                        const SystemTime response_time, const SystemTime now) {
   // Age headers calculations follow: https://httpwg.org/specs/rfc7234.html#age.calculations
   const SystemTime date_value = CacheHeadersUtils::httpTime(response_headers.Date());
 
@@ -162,14 +161,14 @@ CacheHeadersUtils::calculateAge(const Http::ResponseHeaderMap& response_headers,
       std::max(SystemTime::duration(0), response_time - date_value);
 
   // Assumption: response_delay is negligible -> correct_age_value = age_value.
-  const SystemTime::duration corrected_age_value = std::chrono::seconds(age_value);
+  const SystemTime::duration corrected_age_value = Seconds(age_value);
   const SystemTime::duration corrected_initial_age = std::max(apparent_age, corrected_age_value);
 
   // Calculate current_age:
   const SystemTime::duration resident_time = now - response_time;
   const SystemTime::duration current_age = corrected_initial_age + resident_time;
 
-  return std::chrono::duration_cast<std::chrono::seconds>(current_age);
+  return std::chrono::duration_cast<Seconds>(current_age);
 }
 
 absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::string_view& str) {

@@ -147,7 +147,7 @@ TEST_F(SimpleHttpCacheTest, Fresh) {
       {"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}};
   // TODO(toddmgreer): Test with various date headers.
   insert("/", response_headers, "");
-  time_source_.advanceTimeWait(std::chrono::seconds(3600));
+  time_source_.advanceTimeWait(Seconds(3600));
   lookup("/");
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
 }
@@ -157,7 +157,7 @@ TEST_F(SimpleHttpCacheTest, Stale) {
       {"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}};
   // TODO(toddmgreer): Test with various date headers.
   insert("/", response_headers, "");
-  time_source_.advanceTimeWait(std::chrono::seconds(3601));
+  time_source_.advanceTimeWait(Seconds(3601));
   lookup("/");
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
 }

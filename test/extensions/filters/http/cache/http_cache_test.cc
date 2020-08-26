@@ -22,8 +22,6 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
-using Seconds = std::chrono::seconds;
-
 struct LookupRequestTestCase {
   std::string test_name, request_cache_control, response_cache_control;
   SystemTime request_time, response_date;
@@ -263,7 +261,7 @@ TEST_F(LookupRequestTest, PragmaNoCacheFallbackExtraDirectivesIgnored) {
 
 TEST_F(LookupRequestTest, PragmaFallbackOtherValuesIgnored) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma, "max-age=0");
-  const LookupRequest lookup_request(request_headers_, currentTime() + std::chrono::seconds(5));
+  const LookupRequest lookup_request(request_headers_, currentTime() + Seconds(5));
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
@@ -274,7 +272,7 @@ TEST_F(LookupRequestTest, PragmaFallbackOtherValuesIgnored) {
 TEST_F(LookupRequestTest, PragmaNoFallback) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma, "no-cache");
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "max-age=10");
-  const LookupRequest lookup_request(request_headers_, currentTime() + std::chrono::seconds(5));
+  const LookupRequest lookup_request(request_headers_, currentTime() + Seconds(5));
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);

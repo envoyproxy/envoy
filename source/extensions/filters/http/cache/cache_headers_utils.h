@@ -93,8 +93,8 @@ public:
   static SystemTime httpTime(const Http::HeaderEntry* header_entry);
 
   // Calculates the age of a cached response
-  static std::chrono::seconds calculateAge(const Http::ResponseHeaderMap& response_headers,
-                                           const SystemTime response_time, const SystemTime now);
+  static Seconds calculateAge(const Http::ResponseHeaderMap& response_headers,
+                              const SystemTime response_time, const SystemTime now);
 
   /**
    * Read a leading positive decimal integer value and advance "*str" past the
