@@ -211,6 +211,15 @@ TEST_P(EnvoyQuicClientSessionTest, OnResetFrame) {
   stream.OnStreamReset(rst1);
 }
 
+TEST_P(EnvoyQuicClientSessionTest, OnGoAwayFrame) {
+  Http::MockResponseDecoder response_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+
+  quic::QuicGoAwayFrame goaway;
+  EXPECT_CALL(http_connection_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
+  quic_connection_->OnGoAwayFrame(goaway);
+}
+
 TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {
   std::string error_details("dummy details");
   quic::QuicErrorCode error(quic::QUIC_INVALID_FRAME_DATA);

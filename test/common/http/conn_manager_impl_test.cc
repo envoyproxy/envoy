@@ -64,6 +64,7 @@ using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::Mock;
 using testing::NiceMock;
 using testing::Property;
 using testing::Ref;
@@ -5774,12 +5775,13 @@ TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
   EXPECT_EQ(1U, stats_.named_.downstream_rq_overload_close_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenOverloaded) {
+TEST_F(HttpConnectionManagerImplTest, DisableHttp1KeepAliveWhenOverloaded) {
   Server::OverloadActionState disable_http_keep_alive = Server::OverloadActionState::saturated();
   ON_CALL(overload_manager_.overload_state_,
           getState(Server::OverloadActionNames::get().DisableHttpKeepAlive))
       .WillByDefault(ReturnRef(disable_http_keep_alive));
 
+  codec_->protocol_ = Protocol::Http11;
   setup(false, "");
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -5814,6 +5816,66 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenOverloaded) {
   conn_manager_->onData(fake_input, false);
   EXPECT_EQ(1U, stats_.named_.downstream_cx_overload_disable_keepalive_.value());
 }
+
+class DrainH2HttpConnectionManagerImplTest : public HttpConnectionManagerImplTest,
+                                             public testing::WithParamInterface<bool> {
+public:
+  DrainH2HttpConnectionManagerImplTest() {
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2", "true"}});
+  }
+
+private:
+  TestScopedRuntime runtime_;
+};
+
+// Verify that, if the runtime option is enabled, HTTP2 connections will receive
+// a GOAWAY message when the overload action is triggered.
+TEST_P(DrainH2HttpConnectionManagerImplTest, DisableHttp2KeepAliveWhenOverloaded) {
+  Server::OverloadActionState disable_http_keep_alive = Server::OverloadActionState::saturated();
+  ON_CALL(overload_manager_.overload_state_,
+          getState(Server::OverloadActionNames::get().DisableHttpKeepAlive))
+      .WillByDefault(ReturnRef(disable_http_keep_alive));
+
+  codec_->protocol_ = Protocol::Http2;
+  setup(false, "");
+  if (GetParam()) {
+    EXPECT_CALL(*codec_, shutdownNotice);
+  }
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "host"},
+                                                                 {":path", "/"},
+                                                                 {":method", "GET"},
+                                                                 {"connection", "keep-alive"}}};
+        decoder->decodeHeaders(std::move(headers), true);
+
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->streamInfo().setResponseCodeDetails("");
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+
+        data.drain(4);
+        return Http::okStatus();
+      }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+  Mock::VerifyAndClearExpectations(codec_);
+  EXPECT_EQ(1, stats_.named_.downstream_cx_overload_disable_keepalive_.value());
+}
+
+INSTANTIATE_TEST_SUITE_P(WithRuntimeOverride, DrainH2HttpConnectionManagerImplTest,
+                         testing::Bool());
 
 TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPathFirstFilter) {
   setup(false, "envoy-custom-server", false);
