@@ -26,6 +26,7 @@ CAS
 CB
 CDS
 CEL
+DSR
 LTT
 ceil
 CHACHA
@@ -627,6 +628,7 @@ func
 functor
 functors
 gRPC
+gateway
 gcov
 genrule
 getaddrinfo
@@ -964,6 +966,7 @@ repeatability
 reperform
 repicked
 repo
+reproducibility
 requirepass
 reselecting
 reserialize
