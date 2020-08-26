@@ -310,8 +310,10 @@ envoy_cc_mock(
   ]
 )
 """.format(to_filename(class_name), to_filename(class_name), to_filename(class_name))
-  with open("BUILD", "a") as bazel_file:
-    bazel_file.write(bazel_text)
+  with open("BUILD", "r+") as bazel_file:
+    contents = bazel_file.read()
+    if 'name = "{}_mocks"'.format(to_filename(class_name)) not in contents:
+      bazel_file.write(bazel_text)
 
 
 def main(args):
