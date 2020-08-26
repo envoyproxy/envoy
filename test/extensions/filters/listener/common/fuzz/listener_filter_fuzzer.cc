@@ -18,7 +18,7 @@ void ListenerFilterFuzzer::fuzz(
     socket_.setRemoteAddress(Network::Utility::resolveUrl("tcp://0.0.0.0:0"));
   }
 
-  FuzzedHeader header(input);
+  FuzzedInputStream header(input);
 
   if (!header.empty()) {
     ON_CALL(os_sys_calls_, recv(kFakeSocketFd, _, _, _))
@@ -76,7 +76,7 @@ void ListenerFilterFuzzer::fuzz(
   }
 }
 
-FuzzedHeader::FuzzedHeader(const test::extensions::filters::listener::FilterFuzzTestCase& input)
+FuzzedInputStream::FuzzedInputStream(const test::extensions::filters::listener::FilterFuzzTestCase& input)
     : nreads_(input.data_size()) {
   size_t len = 0;
   for (int i = 0; i < nreads_; i++) {
@@ -91,13 +91,13 @@ FuzzedHeader::FuzzedHeader(const test::extensions::filters::listener::FilterFuzz
   }
 }
 
-void FuzzedHeader::next() {
+void FuzzedInputStream::next() {
   if (!done()) {
     nread_++;
   }
 }
 
-Api::SysCallSizeResult FuzzedHeader::read(void* buffer, size_t length, bool peek) {
+Api::SysCallSizeResult FuzzedInputStream::read(void* buffer, size_t length, bool peek) {
   const size_t len = std::min(size(), length); // Number of bytes to write
   memcpy(buffer, data_.data() + index_, len);
 
@@ -109,11 +109,11 @@ Api::SysCallSizeResult FuzzedHeader::read(void* buffer, size_t length, bool peek
   return Api::SysCallSizeResult{static_cast<ssize_t>(len), 0};
 }
 
-size_t FuzzedHeader::size() { return indices_[nread_] - index_ + 1; }
+size_t FuzzedInputStream::size() { return indices_[nread_] - index_ + 1; }
 
-bool FuzzedHeader::done() { return nread_ >= nreads_ - 1; }
+bool FuzzedInputStream::done() { return nread_ >= nreads_ - 1; }
 
-bool FuzzedHeader::empty() { return nreads_ == 0 || data_.empty(); }
+bool FuzzedInputStream::empty() { return nreads_ == 0 || data_.empty(); }
 
 } // namespace ListenerFilters
 } // namespace Extensions

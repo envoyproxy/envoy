@@ -35,9 +35,9 @@ private:
   envoy::config::core::v3::Metadata metadata_;
 };
 
-class FuzzedHeader {
+class FuzzedInputStream {
 public:
-  FuzzedHeader(const test::extensions::filters::listener::FilterFuzzTestCase& input);
+  FuzzedInputStream(const test::extensions::filters::listener::FilterFuzzTestCase& input);
 
   // Makes data from the next read available to read()
   void next();
