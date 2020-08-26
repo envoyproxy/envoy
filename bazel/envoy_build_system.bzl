@@ -64,7 +64,7 @@ envoy_directory_genrule = rule(
 )
 
 # External CMake C++ library targets should be specified with this function. This defaults
-# to building the dependencies with ninja.
+# to building the dependencies with ninja
 def envoy_cmake_external(
         name,
         cache_entries = {},
