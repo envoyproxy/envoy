@@ -46,7 +46,7 @@ public:
          Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
          ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
          std::function<void()> destructor_cb, Event::Dispatcher& dispatcher, Api::Api& api);
-  ~SdsApi() {
+  ~SdsApi() override {
     RELEASE_ASSERT(registered_init_target_,
                    "Init target was not registered with an init manager. registerInitTarget() must "
                    "be called after Sds api concrete class instantiation.");
