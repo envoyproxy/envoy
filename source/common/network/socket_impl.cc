@@ -23,7 +23,7 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
   }
 
   // Should not happen but some tests inject -1 fds
-  if (SOCKET_INVALID(io_handle_->fd())) {
+  if (!io_handle_->isOpen()) {
     return;
   }
 

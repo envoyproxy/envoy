@@ -56,7 +56,7 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
       if (end_stream && !shutdown_) {
         // Ignore the result. This can only fail if the connection failed. In that case, the
         // error will be detected on the next read, and dealt with appropriately.
-        Api::OsSysCallsSingleton::get().shutdown(callbacks_->ioHandle().fd(), ENVOY_SHUT_WR);
+        callbacks_->ioHandle().shutdown(ENVOY_SHUT_WR);
         shutdown_ = true;
       }
       action = PostIoAction::KeepOpen;

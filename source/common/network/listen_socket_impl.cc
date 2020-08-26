@@ -63,7 +63,7 @@ void NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::setPrebind
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
     : ListenSocketImpl(ioHandleForAddr(Socket::Type::Stream, address), address) {
-  RELEASE_ASSERT(io_handle_->fd() != -1, "");
+  RELEASE_ASSERT(io_handle_->isOpen(), "");
   bind(local_address_);
 }
 

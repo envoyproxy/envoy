@@ -166,14 +166,13 @@ ParseState Filter::onRead() {
   //
   // TODO(ggreenway): write an integration test to ensure the events work as expected on all
   // platforms.
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result = os_syscalls.recv(cb_->socket().ioHandle().fd(), buf_,
-                                                         config_->maxClientHelloSize(), MSG_PEEK);
+  const auto result = cb_->socket().ioHandle().recv(buf_, config_->maxClientHelloSize(), MSG_PEEK);
   ENVOY_LOG(trace, "tls inspector: recv: {}", result.rc_);
 
-  if (SOCKET_FAILURE(result.rc_) && result.errno_ == SOCKET_ERROR_AGAIN) {
-    return ParseState::Continue;
-  } else if (result.rc_ < 0) {
+  if (!result.ok()) {
+    if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+      return ParseState::Continue;
+    }
     config_->stats().read_error_.inc();
     return ParseState::Error;
   }

@@ -48,7 +48,7 @@ protected:
       auto addr_fd = Network::Test::bindFreeLoopbackPort(version_, Socket::Type::Stream);
       auto addr = addr_fd.first;
       SocketPtr& sock = addr_fd.second;
-      EXPECT_TRUE(SOCKET_VALID(sock->ioHandle().fd()));
+      EXPECT_TRUE(sock->ioHandle().isOpen());
 
       // Confirm that we got a reasonable address and port.
       ASSERT_EQ(Address::Type::Ip, addr->type());

@@ -104,6 +104,7 @@ public:
                                       Event::FileTriggerType trigger, uint32_t events) override {
     return io_handle_.createFileEvent(dispatcher, cb, trigger, events);
   }
+  Api::SysCallIntResult shutdown(int how) override { return io_handle_.shutdown(how); }
 
 private:
   Network::IoHandle& io_handle_;
