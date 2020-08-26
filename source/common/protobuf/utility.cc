@@ -885,9 +885,8 @@ ProtobufWkt::Value ValueUtil::stringValue(const std::string& str) {
 ProtobufWkt::Value ValueUtil::optionalStringValue(const absl::optional<std::string>& str) {
   if (str.has_value()) {
     return ValueUtil::stringValue(str.value());
-  } else {
-    return ValueUtil::nullValue();
   }
+  return ValueUtil::nullValue();
 }
 
 ProtobufWkt::Value ValueUtil::boolValue(bool b) {

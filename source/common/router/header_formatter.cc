@@ -340,7 +340,7 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
                                             *Http::StaticEmptyHeaders::get().response_headers,
                                             *Http::StaticEmptyHeaders::get().response_trailers,
                                             stream_info, absl::string_view());
-        absl::StrAppend(&formatted, bit ? bit.value() : "-");
+        absl::StrAppend(&formatted, bit.value_or("-"));
       }
       return formatted;
     };

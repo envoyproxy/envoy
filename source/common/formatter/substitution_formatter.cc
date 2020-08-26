@@ -67,11 +67,10 @@ FormatterPtr SubstitutionFormatUtils::defaultSubstitutionFormatter() {
 
 const absl::optional<std::string>
 SubstitutionFormatUtils::protocolToString(const absl::optional<Http::Protocol>& protocol) {
-  absl::optional<std::string> result;
   if (protocol) {
-    result = Http::Utility::getProtocolString(protocol.value());
+    return Http::Utility::getProtocolString(protocol.value());
   }
-  return result;
+  return absl::nullopt;
 }
 
 const std::string
@@ -122,11 +121,11 @@ std::string FormatterImpl::format(const Http::RequestHeaderMap& request_headers,
   std::string log_line;
   log_line.reserve(256);
 
+  const std::string empty_value = omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString;
   for (const FormatterProviderPtr& provider : providers_) {
     const auto& bit = provider->format(request_headers, response_headers, response_trailers,
                                        stream_info, local_reply_body);
-    log_line +=
-        bit ? bit.value() : (omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString);
+    log_line += bit.value_or(empty_value);
   }
 
   return log_line;
@@ -176,27 +175,25 @@ ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& re
           if (preserve_types_) {
             return provider->formatValue(request_headers, response_headers, response_trailers,
                                          stream_info, local_reply_body);
-          } else if (omit_empty_values_) {
+          }
+
+          if (omit_empty_values_) {
             return ValueUtil::optionalStringValue(
                 provider->format(request_headers, response_headers, response_trailers, stream_info,
                                  local_reply_body));
-          } else {
-            const auto str = provider->format(request_headers, response_headers, response_trailers,
-                                              stream_info, local_reply_body);
-            if (str.has_value()) {
-              return ValueUtil::stringValue(str.value());
-            } else {
-              return ValueUtil::stringValue(DefaultUnspecifiedValueString);
-            }
           }
+
+          const auto str = provider->format(request_headers, response_headers, response_trailers,
+                                              stream_info, local_reply_body);
+          return ValueUtil::stringValue(str.value_or(DefaultUnspecifiedValueString));
         }
         // Multiple providers forces string output.
         std::string str;
+        const std::string empty_value = omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString;
         for (const auto& provider : providers) {
           const auto& bit = provider->format(request_headers, response_headers, response_trailers,
                                              stream_info, local_reply_body);
-          str += bit ? bit.value()
-                     : (omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString);
+          str += bit.value_or(empty_value);
         }
         return ValueUtil::stringValue(str);
       };
@@ -554,7 +551,7 @@ public:
     }
 
     const auto value = field_extractor_(*stream_info.downstreamSslConnection());
-    if (value.has_value() && value.value().empty()) {
+    if (value && value->empty()) {
       return absl::nullopt;
     }
 
@@ -567,7 +564,7 @@ public:
     }
 
     const auto value = field_extractor_(*stream_info.downstreamSslConnection());
-    if (value.has_value() && value.value().empty()) {
+    if (value && value->empty()) {
       return unspecifiedValue();
     }
 
@@ -613,7 +610,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "RESPONSE_CODE") {
     field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.responseCode() ? stream_info.responseCode().value() : 0;
+          return stream_info.responseCode().value_or(0);
         });
   } else if (field_name == "RESPONSE_CODE_DETAILS") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
@@ -1131,9 +1128,8 @@ absl::optional<std::string> StartTimeFormatter::format(const Http::RequestHeader
                                                        absl::string_view) const {
   if (date_formatter_.formatString().empty()) {
     return AccessLogDateTimeFormatter::fromTime(stream_info.startTime());
-  } else {
-    return date_formatter_.fromTime(stream_info.startTime());
   }
+  return date_formatter_.fromTime(stream_info.startTime());
 }
 
 ProtobufWkt::Value StartTimeFormatter::formatValue(

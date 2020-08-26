@@ -2172,12 +2172,11 @@ TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
 
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(absl::nullopt));
 
-    EXPECT_EQ(
-        "-|-|-|-|-|-",
-        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+    EXPECT_EQ("-|-|-|-|-|-", formatter.format(request_header, response_header, response_trailer,
+                                              stream_info, body));
   }
 
- {
+  {
     const std::string format = "%PROTOCOL%|%RESP(not exist)%|"
                                "%REQ(FIRST?SECOND)%%RESP(FIRST?SECOND)%|"
                                "%TRAILER(THIRD)%|%TRAILER(TEST?TEST-2)%";
@@ -2185,9 +2184,8 @@ TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
 
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(absl::nullopt));
 
-    EXPECT_EQ(
-        "||||",
-        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+    EXPECT_EQ("||||", formatter.format(request_header, response_header, response_trailer,
+                                       stream_info, body));
   }
 
   {
@@ -2198,8 +2196,8 @@ TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
                                "test_obj)%|%DYNAMIC_METADATA(com.test:test_obj:inner_key)%";
     FormatterImpl formatter(format, false);
 
-    EXPECT_EQ("-|-|-",
-        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+    EXPECT_EQ("-|-|-", formatter.format(request_header, response_header, response_trailer,
+                                        stream_info, body));
   }
 
   {
@@ -2210,8 +2208,8 @@ TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
                                "test_obj)%|%DYNAMIC_METADATA(com.test:test_obj:inner_key)%";
     FormatterImpl formatter(format, true);
 
-    EXPECT_EQ("||",
-        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+    EXPECT_EQ("||", formatter.format(request_header, response_header, response_trailer, stream_info,
+                                     body));
   }
 
   {
@@ -2220,11 +2218,9 @@ TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
                                "%FILTER_STATE(testing):8%|%FILTER_STATE(nonexisting)%";
     FormatterImpl formatter(format, false);
 
-    EXPECT_EQ(
-        "-|-|-|-",
-        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+    EXPECT_EQ("-|-|-|-", formatter.format(request_header, response_header, response_trailer,
+                                          stream_info, body));
   }
-
 
   {
     EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
@@ -2232,9 +2228,8 @@ TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
                                "%FILTER_STATE(testing):8%|%FILTER_STATE(nonexisting)%";
     FormatterImpl formatter(format, true);
 
-    EXPECT_EQ(
-        "|||",
-        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+    EXPECT_EQ("|||", formatter.format(request_header, response_header, response_trailer,
+                                      stream_info, body));
   }
 }
 
