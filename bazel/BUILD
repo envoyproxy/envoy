@@ -267,26 +267,9 @@ alias(
     }),
 )
 
-# Alias pointing to the selected version of zlib:
-# - zlib-ng from //bazel/foreign_cc:zlib_ng,
-# - zlib from //bazel/foreign_cc:zlib.
 alias(
     name = "zlib",
-    actual = select({
-        "//bazel:zlib_ng": "//bazel/foreign_cc:zlib_ng",
-        "//conditions:default": "//bazel/foreign_cc:zlib",
-    }),
-)
-
-# Alias pointing to the selected version of curl:
-# - curl with zlib-ng from //bazel/foreign_cc:curl_with_zlib_ng,
-# - curl from //bazel/foreign_cc:curl.
-alias(
-    name = "curl",
-    actual = select({
-        "//bazel:zlib_ng": "//bazel/foreign_cc:curl_with_zlib_ng",
-        "//conditions:default": "//bazel/foreign_cc:curl",
-    }),
+    actual = "//bazel/foreign_cc:zlib",
 )
 
 config_setting(

@@ -695,7 +695,7 @@ def _com_github_curl():
     http_archive(
         name = "com_github_curl",
         build_file_content = BUILD_ALL_CONTENT + """
-cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel:curl"])
+cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
 """,
         patches = ["@envoy//bazel/foreign_cc:curl-revert-cmake-minreqver.patch"],
         patch_args = ["-p1"],
@@ -703,7 +703,7 @@ cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy/
     )
     native.bind(
         name = "curl",
-        actual = "@envoy//bazel:curl",
+        actual = "@envoy//bazel/foreign_cc:curl",
     )
 
 def _com_googlesource_chromium_v8():

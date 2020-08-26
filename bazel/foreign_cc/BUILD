@@ -1,5 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("//bazel:envoy_build_system.bzl", "envoy_cmake_external", "envoy_package")
+load("//bazel:envoy_build_system.bzl", "envoy_cmake_external", "envoy_package", "envoy_select_zlib_ng")
 load("@rules_foreign_cc//tools/build_defs:configure.bzl", "configure_make")
 
 licenses(["notice"])  # Apache 2
@@ -146,15 +146,6 @@ envoy_cmake_external(
         "//bazel:windows_x86_64": ["libcurl.lib"],
         "//conditions:default": ["libcurl.a"],
     }),
-    variants = [
-        {
-            "name": "curl_with_zlib_ng",
-            "cache_entries": {
-                "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/zlib_ng",
-                "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib_ng/include",
-            },
-        },
-    ],
     deps = [
         ":ares",
         ":nghttp2",
@@ -222,39 +213,40 @@ envoy_cmake_external(
 
 envoy_cmake_external(
     name = "zlib",
-    cache_entries = {
-        "BUILD_SHARED_LIBS": "off",
-        "CMAKE_CXX_COMPILER_FORCED": "on",
-        "CMAKE_C_COMPILER_FORCED": "on",
-        "SKIP_BUILD_EXAMPLES": "on",
-    },
-    lib_source = "@net_zlib//:all",
+    cache_entries = envoy_select_zlib_ng(
+        {
+            "BUILD_SHARED_LIBS": "off",
+            "CMAKE_CXX_COMPILER_FORCED": "on",
+            "CMAKE_C_COMPILER_FORCED": "on",
+            "SKIP_BUILD_EXAMPLES": "on",
+
+            # zlib-ng build options. Reference: https://github.com/zlib-ng/zlib-ng#build-options.
+            "ZLIB_COMPAT": "on",
+            "ZLIB_ENABLE_TESTS": "off",
+
+            # Warning: Turning WITH_OPTIM to "on" doesn't pass ZlibCompressorImplTest.CallingChecksum.
+            "WITH_OPTIM": "on",
+            # However turning off SSE4 fixes it.
+            "WITH_SSE4": "off",
+
+            # Warning: Turning WITH_NEW_STRATEGIES to "on" doesn't pass gzip compressor fuzz test.
+            # Turning this off means falling into NO_QUICK_STRATEGY route.
+            "WITH_NEW_STRATEGIES": "off",
+
+            # zlib-ng advance build options. Reference: https://github.com/zlib-ng/zlib-ng#advanced-build-options.
+            # Only allow aligned address.
+            "UNALIGNED_OK": "off",
+        },
+        {
+            "BUILD_SHARED_LIBS": "off",
+            "CMAKE_CXX_COMPILER_FORCED": "on",
+            "CMAKE_C_COMPILER_FORCED": "on",
+            "SKIP_BUILD_EXAMPLES": "on",
+        },
+    ),
+    lib_source = envoy_select_zlib_ng("@com_github_zlib_ng_zlib_ng//:all", "@net_zlib//:all"),
     static_libraries = select({
         "//bazel:windows_x86_64": ["zlibstatic.lib"],
         "//conditions:default": ["libz.a"],
     }),
-    variants = [
-        {
-            "name": "zlib_ng",
-            "cache_entries": {
-                # zlib-ng build options. Reference: https://github.com/zlib-ng/zlib-ng#build-options.
-                "ZLIB_COMPAT": "on",
-                "ZLIB_ENABLE_TESTS": "off",
-
-                # Warning: Turning WITH_OPTIM to "on" doesn't pass ZlibCompressorImplTest.CallingChecksum.
-                "WITH_OPTIM": "on",
-                # However turning off SSE4 fixes it.
-                "WITH_SSE4": "off",
-
-                # Warning: Turning WITH_NEW_STRATEGIES to "on" doesn't pass gzip compressor fuzz test.
-                # Turning this off means falling into NO_QUICK_STRATEGY route.
-                "WITH_NEW_STRATEGIES": "off",
-
-                # zlib-ng advance build options. Reference: https://github.com/zlib-ng/zlib-ng#advanced-build-options.
-                # Only allow aligned address.
-                "UNALIGNED_OK": "off",
-            },
-            "lib_source": "@com_github_zlib_ng_zlib_ng//:all",
-        },
-    ],
 )
