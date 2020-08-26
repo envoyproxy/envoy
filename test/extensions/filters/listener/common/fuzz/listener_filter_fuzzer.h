@@ -50,7 +50,7 @@ public:
   // Returns the number of bytes currently available to read()
   size_t size();
 
-  // Returns true if end of stream reached
+  // Returns true if end of stream reached (no more reads)
   bool done();
 
   // Returns true if data field in proto is empty
