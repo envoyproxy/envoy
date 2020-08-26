@@ -152,9 +152,8 @@ message TlsCertificate {
 
   // The OCSP response to be stapled with this certificate during the handshake.
   // The response must be DER-encoded if provided as a ``filename`` or
-  // ``inline_bytes``, and PEM-encoded if provided through ``inline_string``.
-  // The response must be unexpired as of configuration time and pertain to
-  // only one certificate.
+  // ``inline_bytes``, and base64-encoded if provided through ``inline_string``.
+  // The response may pertain to only one certificate.
   config.core.v3.DataSource ocsp_staple = 4;
 
   // [#not-implemented-hide:]
