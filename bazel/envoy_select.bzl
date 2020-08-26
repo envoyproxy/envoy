@@ -38,10 +38,3 @@ def envoy_select_new_codecs_in_integration_tests(xs, repository = ""):
         repository + "//bazel:enable_new_codecs_in_integration_tests": xs,
         "//conditions:default": [],
     })
-
-# Select the given values if zlib-ng is linked in the current build.
-def envoy_select_zlib_ng(xs, default = None):
-    return select({
-        "@envoy//bazel:zlib_ng": xs,
-        "//conditions:default": default or "",
-    })

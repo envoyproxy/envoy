@@ -1,5 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("//bazel:envoy_build_system.bzl", "envoy_cmake_external", "envoy_package", "envoy_select_zlib_ng")
+load("//bazel:envoy_build_system.bzl", "envoy_cmake_external", "envoy_package")
 load("@rules_foreign_cc//tools/build_defs:configure.bzl", "configure_make")
 
 licenses(["notice"])  # Apache 2
@@ -240,7 +240,10 @@ envoy_cmake_external(
         # Reference: https://github.com/zlib-ng/zlib-ng#advanced-build-options.
         "UNALIGNED_OK": "off",
     },
-    lib_source = envoy_select_zlib_ng("@com_github_zlib_ng_zlib_ng//:all", "@net_zlib//:all"),
+    lib_source = select({
+        "@envoy//bazel:zlib_ng": "@com_github_zlib_ng_zlib_ng//:all",
+        "//conditions:default": "@net_zlib//:all",
+    }),
     static_libraries = select({
         "//bazel:windows_x86_64": ["zlibstatic.lib"],
         "//conditions:default": ["libz.a"],

@@ -19,7 +19,6 @@ load(
     _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
     _envoy_select_new_codecs_in_integration_tests = "envoy_select_new_codecs_in_integration_tests",
-    _envoy_select_zlib_ng = "envoy_select_zlib_ng",
 )
 load(
     ":envoy_test.bzl",
@@ -176,7 +175,6 @@ envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_google_grpc = _envoy_select_google_grpc
 envoy_select_hot_restart = _envoy_select_hot_restart
 envoy_select_new_codecs_in_integration_tests = _envoy_select_new_codecs_in_integration_tests
-envoy_select_zlib_ng = _envoy_select_zlib_ng
 
 # Binary wrappers (from envoy_binary.bzl)
 envoy_cc_binary = _envoy_cc_binary
