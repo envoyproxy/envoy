@@ -73,6 +73,11 @@ SubsetLoadBalancer::SubsetLoadBalancer(
   // Configure future updates.
   original_priority_set_callback_handle_ = priority_set.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
+        // TODO(ggreenway) PERF: This is currently an O(n^2) operation in the edge case of
+        // many priorities and only one host per priority. This could be improved by either
+        // updating in a single pass across all priorities, or by having the callback give a
+        // list of modified hosts so that an incremental update of the data structure can be
+        // performed.
         rebuildSingle();
 
         if (hosts_added.empty() && hosts_removed.empty()) {
@@ -142,14 +147,16 @@ void SubsetLoadBalancer::rebuildSingle() {
   // This stat isn't added to `ClusterStats` because it wouldn't be used
   // for nearly all clusters, and is only set during configuration updates,
   // not in the data path, so performance of looking up the stat isn't critical.
-  Stats::Utility::gaugeFromElements(
-      scope_, {Stats::DynamicName("lb_subsets_single_host_per_subset_duplicate")},
-      Stats::Gauge::ImportMode::Accumulate)
+  Stats::StatNameManagedStorage name_storage("lb_subsets_single_host_per_subset_duplicate",
+                                             scope_.symbolTable());
+
+  Stats::Utility::gaugeFromElements(scope_, {name_storage.statName()},
+                                    Stats::Gauge::ImportMode::Accumulate)
       .set(collision_count);
 }
 
 // When in `single_host_per_subset` mode, select a host based on the provided match_criteria.
-// Set `host_chosen` to
+// Set `host_chosen` to false if there is not a match.
 HostConstSharedPtr SubsetLoadBalancer::tryChooseHostFromMetadataMatchCriteriaSingle(
     const Router::MetadataMatchCriteria& match_criteria, bool& host_chosen) {
   ASSERT(!single_key_.empty());
