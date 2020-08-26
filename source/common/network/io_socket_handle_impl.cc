@@ -485,5 +485,9 @@ Event::FileEventPtr IoSocketHandleImpl::createFileEvent(Event::Dispatcher& dispa
   return dispatcher.createFileEvent(fd_, cb, trigger, events);
 }
 
+Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {
+  return Api::OsSysCallsSingleton::get().shutdown(fd_, how);
+}
+
 } // namespace Network
 } // namespace Envoy
