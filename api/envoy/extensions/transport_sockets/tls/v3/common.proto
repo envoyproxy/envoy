@@ -224,7 +224,10 @@ message CertificateValidationContext {
   // specified.
   //
   // It can optionally contain certificate revocation lists, in which case Envoy will verify
-  // that the presented peer certificate has not been revoked by one of the included CRLs.
+  // that the presented peer certificate has not been revoked by one of the included CRLs. Note
+  // that if a CRL is provided for any certificate authority in a trust chain, a CRL must be
+  // provided for all certificate authorities in that chain. Failure to do so will result in
+  // verification failure for both revoked and unrevoked certificates from that chain.
   //
   // See :ref:`the TLS overview <arch_overview_ssl_enabling_verification>` for a list of common
   // system CA locations.
@@ -322,7 +325,11 @@ message CertificateValidationContext {
   // <https://en.wikipedia.org/wiki/Certificate_revocation_list>`_
   // (in PEM format). If specified, Envoy will verify that the presented peer
   // certificate has not been revoked by this CRL. If this DataSource contains
-  // multiple CRLs, all of them will be used.
+  // multiple CRLs, all of them will be used. Note that if a CRL is provided
+  // for any certificate authority in a trust chain, a CRL must be provided
+  // for all certificate authorities in that chain. Failure to do so will
+  // result in verification failure for both revoked and unrevoked certificates
+  // from that chain.
   config.core.v3.DataSource crl = 7;
 
   // If specified, Envoy will not reject expired certificates.

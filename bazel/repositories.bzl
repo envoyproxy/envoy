@@ -213,6 +213,7 @@ def envoy_dependencies(skip_targets = []):
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
+    _com_github_zlib_ng_zlib_ng()
     _upb()
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
@@ -400,6 +401,12 @@ def _net_zlib():
     native.bind(
         name = "madler_zlib",
         actual = "@envoy//bazel/foreign_cc:zlib",
+    )
+
+def _com_github_zlib_ng_zlib_ng():
+    _repository_impl(
+        name = "com_github_zlib_ng_zlib_ng",
+        build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _com_google_cel_cpp():
