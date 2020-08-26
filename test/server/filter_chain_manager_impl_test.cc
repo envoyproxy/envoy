@@ -166,8 +166,6 @@ TEST_F(FilterChainManagerImplTest, AddOnDemandFilterChain) {
   auto* on_demand_filter_chain =
       findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_TRUE(on_demand_filter_chain->isPlaceholder());
-  // The placeholder will store the filter chain message inside.
-  EXPECT_NE(on_demand_filter_chain->getFilterChainMessage(), nullptr);
 }
 
 TEST_F(FilterChainManagerImplTest, RebuildOnDemandFilterChain) {

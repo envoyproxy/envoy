@@ -169,7 +169,7 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
-   * This function will be called by a worker to rebuild a filter chain placeholder.
+   * This function will be called by a worker to rebuild a placeholder.
    */
   virtual void
   rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,

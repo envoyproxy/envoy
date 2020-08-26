@@ -83,7 +83,8 @@ public:
   void enableListeners() override;
   const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
 
-  // Will close stored sockets that require the filter chains owned by the old listener only.
+  // On listener update, close stored sockets that are waiting for filter chains owned only by the
+  // old listener.
   void closeSocketsOnListenerUpdate(const Network::ListenerConfig& old_config,
                                     const Network::ListenerConfig& new_config) override;
 
@@ -350,7 +351,8 @@ private:
   using SocketMetadataPair =
       std::pair<Network::ConnectionSocketPtr, const envoy::config::core::v3::Metadata>;
 
-  // map<filter_chain_message, map<listener_name, list<SocketMetadataPair>>>
+  // The pending sockets waiting for filter chains to be rebuilt. Multiple listeners might request
+  // rebuilding the same filter chain.
   absl::flat_hash_map<envoy::config::listener::v3::FilterChain,
                       absl::flat_hash_map<std::string, std::list<SocketMetadataPair>>, MessageUtil,
                       MessageUtil>

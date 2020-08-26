@@ -258,7 +258,7 @@ void FilterChainManagerImpl::rebuildFilterChain(
       filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
 
   // Store the rebuilt filter chain inside the placeholder, which is inserted into the match trie.
-  auto placeholder = fc_contexts_[*filter_chain];
+  auto& placeholder = fc_contexts_[*filter_chain];
   if (placeholder != nullptr) {
     placeholder->storeRebuiltFilterChain(std::move(filter_chain_impl));
   } else {

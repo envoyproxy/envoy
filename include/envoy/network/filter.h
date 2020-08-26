@@ -348,15 +348,15 @@ using ListenerFilterFactoryCb = std::function<void(ListenerFilterManager& filter
 /**
  * Interface representing a single filter chain.
  */
-class FilterChain;
-using FilterChainSharedPtr = std::shared_ptr<FilterChain>;
-
 class FilterChain {
 public:
   virtual ~FilterChain() = default;
 
   /**
    * @return TRUE if this filter chain is a place holder. FALSE if it is not.
+   * On-demand filter chains will be first built as placeholders. Then the placeholder will be
+   * rebuilt on arrival of new connections that require this filter chain. After filter chain
+   * placeholder is rebuilt successfully, it will not be placeholder anymore.
    */
   virtual bool isPlaceholder() const PURE;
 
@@ -375,13 +375,16 @@ public:
    * @return the filter chain protobuf message stored inside filter chain placeholder. This will
    * help to provide config information when rebuilding is requested.
    */
-  virtual const envoy::config::listener::v3::FilterChain* const& getFilterChainMessage() const PURE;
+  virtual const envoy::config::listener::v3::FilterChain& getFilterChainMessage() const PURE;
 
   /**
-   * After a filter chain placeholder is rebuilt, this function will store the real filter chain
-   * inside the placeholder to provide transportSocketFactory and networkFilterFactories.
+   * This function will temporarily store the rebuilt filter chain inside the placeholder.
+   * If the rebuilding completes successfully, the filter chain is not a placeholder any more, and
+   * the stored filter chain will provide transportSocketFactory and networkFilterFactories. If
+   * requests for filter chain dependencies failed or timeout, rebuilding will fail and the stored
+   * filter chain will be removed.
    */
-  virtual void storeRebuiltFilterChain(Network::FilterChainSharedPtr real_filter_chain) PURE;
+  virtual void storeRebuiltFilterChain(std::shared_ptr<FilterChain> real_filter_chain) PURE;
 
   /**
    * If the filter chain rebuilding fails or timeout, the rebuilt filter chain will be deleted. And
@@ -389,6 +392,8 @@ public:
    */
   virtual void backToPlaceholder() PURE;
 };
+
+using FilterChainSharedPtr = std::shared_ptr<FilterChain>;
 
 /**
  * A filter chain that can be drained.

@@ -162,8 +162,8 @@ public:
       return empty_network_filter_factory_;
     }
   }
-  const envoy::config::listener::v3::FilterChain* const& getFilterChainMessage() const override {
-    return filter_chain_message_;
+  const envoy::config::listener::v3::FilterChain& getFilterChainMessage() const override {
+    return *filter_chain_message_;
   }
   void storeRebuiltFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
     is_placeholder_ = false;

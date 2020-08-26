@@ -104,6 +104,10 @@ public:
 
   /**
    * Retry all stored sockets that require a filter chain after it is rebuilt successfully or not.
+   * @param success indicates whether the rebuilding has completed successfully. If true, the worker
+   * will retry all pending sockets that require the filter chain. Otherwise, it will close all
+   * sockets related to this filter chain.
+   * @param filter_chain_message the filter chain of this message has just stopped rebuilding.
    */
   virtual void retryConnections(
       bool success,

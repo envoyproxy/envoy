@@ -37,6 +37,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     if (overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
         if (listener.second.listener_->listenerTag() == overridden_listener) {
+          // TODO(ASOPVII): delay this to the drain timeout.
           const auto& old_config = *listener.second.tcp_listener_->get().config_;
           closeSocketsOnListenerUpdate(old_config, config);
           listener.second.tcp_listener_->get().updateListenerConfig(config);
@@ -138,29 +139,24 @@ void ConnectionHandlerImpl::closeSocketsOnListenerUpdate(
 
 void ConnectionHandlerImpl::retryConnections(
     bool success, const envoy::config::listener::v3::FilterChain* const& filter_chain_message) {
-  // If the filter_chain_message has been cleared, we have no connections to retry.
-  // TODO(ASOPVII): the sockets stored are still there, even though the listener has been updated.
-  // They should be carefully closed.
   if (filter_chain_message == nullptr) {
     ENVOY_LOG(debug, "filter chain has been cleared.");
     return;
   }
-  if (pending_sockets_.find(*filter_chain_message) == pending_sockets_.end()) {
-    ENVOY_LOG(debug, "filter chain is not found to store any sockets to retry connection.");
-    return;
-  }
+  // TODO(ASOPVII): bind look up.
   auto& listener_sockets_map = pending_sockets_[*filter_chain_message];
-  // Go through all listeners on this worker, if a listener has sent request to rebuild
-  // filter_chain, now retry connection with those stored sockets.
+  // Go through all listeners on this worker, if a listener has sent request to rebuild the
+  // filter chain, now retry connection with those stored sockets.
   for (auto& listener : listeners_) {
     if (listener.second.tcp_listener_.has_value()) {
       auto& active_tcp_listener = listener.second.tcp_listener_->get();
       const auto& listener_name = active_tcp_listener.config_->name();
       ENVOY_LOG(debug, "connection handler has active tcp listener with name: {}.", listener_name);
       // Find all SocketMetadataPair of this active tcp listener.
-      if (listener_sockets_map.find(listener_name) != listener_sockets_map.end()) {
+      auto sockets_metadata_list_it = listener_sockets_map.find(listener_name);
+      if (sockets_metadata_list_it != listener_sockets_map.end()) {
         ENVOY_LOG(debug, "found listener: {} that has sockets to retry.", listener_name);
-        for (auto& [socket, metadata] : listener_sockets_map[listener_name]) {
+        for (auto& [socket, metadata] : sockets_metadata_list_it->second) {
           // Retry connection with that socket on this active tcp listener.
           if (success) {
             active_tcp_listener.incNumConnections();
@@ -169,8 +165,7 @@ void ConnectionHandlerImpl::retryConnections(
             socket->close();
           }
         }
-        // Clear this listener from the retry connection list.
-        listener_sockets_map.erase(listener_name);
+        listener_sockets_map.erase(sockets_metadata_list_it);
       }
     }
   }
@@ -481,15 +476,13 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     const auto& filter_chain_message = filter_chain->getFilterChainMessage();
 
     // Store the socket and dynamic_metadata for later connection retry.
-    // TODO(ASOPVII): listener update during old filter chain rebuilding sent to master.
-    // New/old listeners share the same name. If new listener deletes one filter chain , some
-    // sockets stored will be forgotten.
-    parent_.pending_sockets_[*filter_chain_message][listener_name].emplace_back(std::move(socket),
-                                                                                dynamic_metadata);
 
+    parent_.pending_sockets_[filter_chain_message][listener_name].emplace_back(std::move(socket),
+                                                                               dynamic_metadata);
+    // Post rebuilding request to the master thread.
     auto& server_dispatcher = config_->dispatcher();
     server_dispatcher.post([&filter_chain_message, &worker_name, &listener = config_]() {
-      listener->rebuildFilterChain(filter_chain_message, worker_name);
+      listener->rebuildFilterChain(&filter_chain_message, worker_name);
     });
     // Temporarily decrease num_listener_connections_, will increase when retry this connection. To
     // avoid assert inside listener destructor.

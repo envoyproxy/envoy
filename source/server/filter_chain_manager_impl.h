@@ -118,8 +118,8 @@ public:
     }
   }
 
-  const envoy::config::listener::v3::FilterChain* const& getFilterChainMessage() const override {
-    return filter_chain_message_;
+  const envoy::config::listener::v3::FilterChain& getFilterChainMessage() const override {
+    return *filter_chain_message_;
   }
 
   void storeRebuiltFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
@@ -151,18 +151,18 @@ private:
   Configuration::FilterChainFactoryContextPtr factory_context_;
   const Network::TransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<Network::FilterFactoryCb> filters_factory_;
-
   const envoy::config::listener::v3::FilterChain* const filter_chain_message_{nullptr};
 
-  // pthread_mutex_t lock_;
   mutable absl::Mutex lock_;
 
   // On-demand filter chain is built with a placeholder, set this to true. After it is rebuilt, flip
   // this to false.
   bool is_placeholder_;
-  // After a filter chain placeholder is rebuilt, set this to true.
+  // After a placeholder is rebuilt, set this to true to indicate rebuilt filter chain is stored
+  // inside the placeholder.
   bool has_rebuilt_filter_chain_{false};
   // The rebuilt filter chain.
+  // TODO(ASOPVII): add invariance.
   Network::FilterChainSharedPtr rebuilt_filter_chain_{nullptr};
 };
 
@@ -245,13 +245,14 @@ public:
       absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
       FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& context_creator);
 
-  // If a filter chain is initially built as a placeholder, it will need to be rebuilt on demand.
+  // Rebuild the filter chain. Invoked only if the filter chain is on-demand.
   void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
                           FilterChainFactoryBuilder& b,
                           FilterChainFactoryContextCreator& context_creator);
 
-  // If a filter chain rebuilding reaches timeout, we will stop the rebuilding, make the filter
-  // chain back to a placeholder.
+  // Stop rebuilding the filter chain. Invoked only if the filter chain is on-demand.
+  // If a filter chain rebuilding reaches timeout, or the listener is updated, we will stop the
+  // rebuilding, and make the filter chain back to a placeholder.
   void
   stopRebuildingFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain);
 

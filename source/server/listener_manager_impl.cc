@@ -573,6 +573,9 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   // restart. Same below inside the lambda.
   stats_.total_listeners_draining_.set(draining_listeners_.size());
 
+  // Stop all unfinished rebuildings on this listener.
+  draining_it->listener_->stopUnfinishedFilterChainRebuilding();
+
   // Tell all workers to stop accepting new connections on this listener.
   draining_it->listener_->debugLog("draining listener");
   const uint64_t listener_tag = draining_it->listener_->listenerTag();
@@ -770,7 +773,6 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
     addListenerToWorker(*worker, listener.listenerTag(), listener, nullptr);
   }
 
-  (*existing_active_listener)->stopUnfinishedFilterChainRebuilding();
   auto previous_listener = std::move(*existing_active_listener);
   *existing_active_listener = std::move(*existing_warming_listener);
   // Finish active_listeners_ transformation before calling `drainFilterChains` as it depends on
@@ -787,6 +789,7 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
   std::list<DrainingFilterChainsManager>::iterator draining_group =
       draining_filter_chains_manager_.emplace(draining_filter_chains_manager_.begin(),
                                               std::move(draining_listener), workers_.size());
+  draining_group->getDrainingListener().stopUnfinishedFilterChainRebuilding();
   draining_group->getDrainingListener().diffFilterChain(
       new_listener, [&draining_group](Network::DrainableFilterChain& filter_chain) mutable {
         filter_chain.startDraining();
@@ -1045,8 +1048,8 @@ bool ListenerManagerImpl::hasWorker(const std::string& name) {
   return worker_by_name_.find(name) != worker_by_name_.end();
 }
 
-WorkerPtr& ListenerManagerImpl::getWorkerByName(const std::string& name) {
-  return *worker_by_name_[name];
+Worker& ListenerManagerImpl::getWorkerByName(const std::string& name) {
+  return **worker_by_name_[name];
 }
 
 } // namespace Server

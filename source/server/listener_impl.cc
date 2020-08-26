@@ -264,7 +264,7 @@ void PerFilterChainRebuilder::callbackToWorkers(bool success) {
     ENVOY_LOG(debug, "rebuilding completed, callback to worker: {}", worker_name);
     if (listener_.hasWorker(worker_name)) {
       auto& worker = listener_.getWorkerByName(worker_name);
-      worker->onFilterChainRebuilt(success, filter_chain_);
+      worker.onFilterChainRebuilt(success, filter_chain_);
     } else {
       ENVOY_LOG(debug, "worker with name: {} does not exists", worker_name);
     }
@@ -647,7 +647,7 @@ void ListenerImpl::stopUnfinishedFilterChainRebuilding() {
 
 bool ListenerImpl::hasWorker(const std::string& name) { return parent_.hasWorker(name); }
 
-WorkerPtr& ListenerImpl::getWorkerByName(const std::string& name) {
+Worker& ListenerImpl::getWorkerByName(const std::string& name) {
   return parent_.getWorkerByName(name);
 }
 
@@ -898,12 +898,11 @@ ListenerImpl::newListenerWithFilterChain(const envoy::config::listener::v3::List
 
 void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
                                    std::function<void(Network::DrainableFilterChain&)> callback) {
-  for (const auto& message_and_filter_chain : filter_chain_manager_.filterChainsByMessage()) {
-    if (another_listener.filter_chain_manager_.filterChainsByMessage().find(
-            message_and_filter_chain.first) ==
+  for (const auto& [message, filter_chain] : filter_chain_manager_.filterChainsByMessage()) {
+    if (another_listener.filter_chain_manager_.filterChainsByMessage().find(message) ==
         another_listener.filter_chain_manager_.filterChainsByMessage().end()) {
       // The filter chain exists in `this` listener but not in the listener passed in.
-      callback(*message_and_filter_chain.second);
+      callback(*filter_chain);
     }
   }
 }
