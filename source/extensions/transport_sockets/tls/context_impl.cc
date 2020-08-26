@@ -314,11 +314,11 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
     // The must staple extension means the certificate promises to carry
     // with it an OCSP staple. https://tools.ietf.org/html/rfc7633#section-6
-    absl::string_view tls_feature_ext = "1.3.6.1.5.5.7.1.24";
-    absl::string_view must_staple_ext_value = "\x02\x01\x05";
+    constexpr absl::string_view tls_feature_ext = "1.3.6.1.5.5.7.1.24";
+    constexpr absl::string_view must_staple_ext_value = "\x02\x01\x05";
     auto must_staple = Utility::getX509ExtensionValue(*ctx.cert_chain_, tls_feature_ext);
     if (must_staple.has_value() && must_staple.value() == must_staple_ext_value) {
-      ctx.is_must_staple_ = must_staple.has_value();
+      ctx.is_must_staple_ = true;
     }
 
     bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
