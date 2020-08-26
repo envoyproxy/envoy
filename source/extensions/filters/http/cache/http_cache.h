@@ -170,6 +170,16 @@ using LookupResultPtr = std::unique_ptr<LookupResult>;
 // TODO(toddmgreer): Ensure that stability guarantees above are accurate.
 size_t stableHashKey(const Key& key);
 
+// The metadata associated with a cached response.
+// TODO(yosrym93): This could be changed to a proto if a need arises.
+struct ResponseMetadata {
+  // The time at which a response was inserted into the cache.
+  // This represents "response_time" in the age header calculations at:
+  // https://httpwg.org/specs/rfc7234.html#age.calculations
+  SystemTime response_time_;
+};
+using ResponseMetadataPtr = std::unique_ptr<ResponseMetadata>;
+
 // LookupRequest holds everything about a request that's needed to look for a
 // response in a cache, to evaluate whether an entry from a cache is usable, and
 // to determine what ranges are needed.
@@ -191,12 +201,12 @@ public:
   // LookupHeadersCallback. Specifically,
   // - LookupResult::cache_entry_status_ is set according to HTTP cache
   // validation logic.
-  // - LookupResult::headers takes ownership of response_headers.
-  // - LookupResult::content_length == content_length.
-  // - LookupResult::response_ranges entries are satisfiable (as documented
+  // - LookupResult::headers_ takes ownership of response_headers.
+  // - LookupResult::content_length_ == content_length.
+  // - LookupResult::response_ranges_ entries are satisfiable (as documented
   // there).
   LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
-                                uint64_t content_length) const;
+                                ResponseMetadata&& metadata, uint64_t content_length) const;
 
 private:
   void initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers);
@@ -232,7 +242,8 @@ using InsertCallback = std::function<void(bool success_ready_for_more)>;
 class InsertContext {
 public:
   // Accepts response_headers for caching. Only called once.
-  virtual void insertHeaders(const Http::ResponseHeaderMap& response_headers, bool end_stream) PURE;
+  virtual void insertHeaders(const Http::ResponseHeaderMap& response_headers,
+                             const ResponseMetadata& metadata, bool end_stream) PURE;
 
   // The insertion is streamed into the cache in chunks whose size is determined
   // by the client, but with a pace determined by the cache. To avoid streaming
@@ -344,7 +355,8 @@ public:
   // This is called when an expired cache entry is successfully validated, to
   // update the cache entry.
   virtual void updateHeaders(const LookupContext& lookup_context,
-                             const Http::ResponseHeaderMap& response_headers) PURE;
+                             const Http::ResponseHeaderMap& response_headers,
+                             const ResponseMetadata& metadata) PURE;
 
   // Returns statically known information about a cache.
   virtual CacheInfo cacheInfo() const PURE;

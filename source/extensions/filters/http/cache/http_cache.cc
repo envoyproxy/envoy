@@ -125,25 +125,16 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
 }
 
 LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
+                                             ResponseMetadata&& metadata,
                                              uint64_t content_length) const {
   // TODO(toddmgreer): Implement all HTTP caching semantics.
   ASSERT(response_headers);
   LookupResult result;
 
-  // If the response_time internal header does not exist, set it to the Date header value.
-  const Http::HeaderEntry* response_time_header =
-      response_headers->getInline(response_time_handle.handle());
-  const SystemTime response_time = response_time_header
-                                       ? CacheHeadersUtils::httpTime(response_time_header)
-                                       : CacheHeadersUtils::httpTime(response_headers->Date());
-
   // Assumption: Cache lookup time is negligible. Therefore, now == timestamp_
   const std::chrono::seconds age =
-      CacheHeadersUtils::calculateAge(*response_headers, response_time, timestamp_);
-
-  // Add the Age header and remove the response_time header before serving the cached response.
+      CacheHeadersUtils::calculateAge(*response_headers, metadata.response_time_, timestamp_);
   response_headers->setInline(age_handle.handle(), std::to_string(age.count()));
-  response_headers->removeInline(response_time_handle.handle());
 
   result.cache_entry_status_ = requiresValidation(*response_headers, age)
                                    ? CacheEntryStatus::RequiresValidation

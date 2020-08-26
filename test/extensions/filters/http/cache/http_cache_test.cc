@@ -165,8 +165,11 @@ public:
 LookupResult makeLookupResult(const LookupRequest& lookup_request,
                               const Http::TestResponseHeaderMapImpl& response_headers,
                               uint64_t content_length = 0) {
+  // For the purpose of the test, set the response_time to the date header value.
+  ResponseMetadata metadata = {CacheHeadersUtils::httpTime(response_headers.Date())};
   return lookup_request.makeLookupResult(
-      std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers), content_length);
+      std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers), std::move(metadata),
+      content_length);
 }
 
 INSTANTIATE_TEST_SUITE_P(ResultMatchesExpectation, LookupRequestTest,

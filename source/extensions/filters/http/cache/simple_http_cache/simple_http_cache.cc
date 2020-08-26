@@ -21,9 +21,9 @@ public:
   void getHeaders(LookupHeadersCallback&& cb) override {
     auto entry = cache_.lookup(request_);
     body_ = std::move(entry.body_);
-    cb(entry.response_headers_
-           ? request_.makeLookupResult(std::move(entry.response_headers_), body_.size())
-           : LookupResult{});
+    cb(entry.response_headers_ ? request_.makeLookupResult(std::move(entry.response_headers_),
+                                                           std::move(entry.metadata_), body_.size())
+                               : LookupResult{});
   }
 
   void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override {
@@ -50,9 +50,11 @@ public:
   SimpleInsertContext(LookupContext& lookup_context, SimpleHttpCache& cache)
       : key_(dynamic_cast<SimpleLookupContext&>(lookup_context).request().key()), cache_(cache) {}
 
-  void insertHeaders(const Http::ResponseHeaderMap& response_headers, bool end_stream) override {
+  void insertHeaders(const Http::ResponseHeaderMap& response_headers,
+                     const ResponseMetadata& metadata, bool end_stream) override {
     ASSERT(!committed_);
     response_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers);
+    metadata_ = metadata;
     if (end_stream) {
       commit();
     }
@@ -80,11 +82,12 @@ public:
 private:
   void commit() {
     committed_ = true;
-    cache_.insert(key_, std::move(response_headers_), body_.toString());
+    cache_.insert(key_, std::move(response_headers_), std::move(metadata_), body_.toString());
   }
 
   Key key_;
   Http::ResponseHeaderMapPtr response_headers_;
+  ResponseMetadata metadata_;
   SimpleHttpCache& cache_;
   Buffer::OwnedImpl body_;
   bool committed_ = false;
@@ -95,7 +98,8 @@ LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request) {
   return std::make_unique<SimpleLookupContext>(*this, std::move(request));
 }
 
-void SimpleHttpCache::updateHeaders(const LookupContext&, const Http::ResponseHeaderMap&) {
+void SimpleHttpCache::updateHeaders(const LookupContext&, const Http::ResponseHeaderMap&,
+                                    const ResponseMetadata&) {
   // TODO(toddmgreer): Support updating headers.
   // Not implemented yet, however this is called during tests
   // NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -110,13 +114,14 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
   ASSERT(iter->second.response_headers_);
   return SimpleHttpCache::Entry{
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*iter->second.response_headers_),
-      iter->second.body_};
+      iter->second.metadata_, iter->second.body_};
 }
 
 void SimpleHttpCache::insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers,
-                             std::string&& body) {
+                             ResponseMetadata&& metadata, std::string&& body) {
   absl::WriterMutexLock lock(&mutex_);
-  map_[key] = SimpleHttpCache::Entry{std::move(response_headers), std::move(body)};
+  map_[key] =
+      SimpleHttpCache::Entry{std::move(response_headers), std::move(metadata), std::move(body)};
 }
 
 InsertContextPtr SimpleHttpCache::makeInsertContext(LookupContextPtr&& lookup_context) {

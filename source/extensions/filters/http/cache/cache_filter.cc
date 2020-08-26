@@ -99,11 +99,9 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
   if (request_allows_inserts_ && CacheabilityUtils::isCacheableResponse(headers)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
-    // Add the response time internal header to be copied into the cache
-    headers.setInline(response_time_handle.handle(), date_formatter_.now(time_source_));
-    insert_->insertHeaders(headers, end_stream);
-    // Then remove the internal header from the response served to the client
-    headers.removeInline(response_time_handle.handle());
+    // Add metadata associated with the cached response. Right now this is only response_time;
+    const ResponseMetadata metadata = {time_source_.systemTime()};
+    insert_->insertHeaders(headers, metadata, end_stream);
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -382,11 +380,9 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
 
   if (should_update_cached_entry) {
     // TODO(yosrym93): else the cached entry should be deleted.
-    // Add the response time internal header to be copied into the cache
-    response_headers.setInline(response_time_handle.handle(), date_formatter_.now(time_source_));
-    cache_.updateHeaders(*lookup_, response_headers);
-    // Then remove the internal header from the response served to the client
-    response_headers.removeInline(response_time_handle.handle());
+    // Update metadata associated with the cached response. Right now this is only response_time;
+    const ResponseMetadata metadata = {time_source_.systemTime()};
+    cache_.updateHeaders(*lookup_, response_headers, metadata);
   }
 
   // A cache entry was successfully validated -> encode cached body and trailers.

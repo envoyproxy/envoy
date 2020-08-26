@@ -41,7 +41,8 @@ protected:
   void insert(LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& response_headers,
               const absl::string_view response_body) {
     InsertContextPtr inserter = cache_.makeInsertContext(move(lookup));
-    inserter->insertHeaders(response_headers, false);
+    const ResponseMetadata metadata = {current_time_};
+    inserter->insertHeaders(response_headers, metadata, false);
     inserter->insertBody(Buffer::OwnedImpl(response_body), nullptr, true);
   }
 
@@ -196,7 +197,8 @@ TEST_F(SimpleHttpCacheTest, StreamingPut) {
                                                    {"age", "2"},
                                                    {"cache-control", "public, max-age=3600"}};
   InsertContextPtr inserter = cache_.makeInsertContext(lookup("request_path"));
-  inserter->insertHeaders(response_headers, false);
+  const ResponseMetadata metadata = {current_time_};
+  inserter->insertHeaders(response_headers, metadata, false);
   inserter->insertBody(
       Buffer::OwnedImpl("Hello, "), [](bool ready) { EXPECT_TRUE(ready); }, false);
   inserter->insertBody(Buffer::OwnedImpl("World!"), nullptr, true);
