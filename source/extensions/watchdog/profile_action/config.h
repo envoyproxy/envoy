@@ -5,8 +5,6 @@
 
 #include "common/protobuf/protobuf.h"
 
-#include "extensions/watchdog/well_known_names.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Watchdog {
@@ -14,7 +12,7 @@ namespace ProfileAction {
 
 class ProfileActionFactory : public Server::Configuration::GuardDogActionFactory {
 public:
-  ProfileActionFactory() : name_(WatchdogActionNames::get().ProfileAction){};
+  ProfileActionFactory() : name_("envoy.watchdog.profile_action"){};
 
   Server::Configuration::GuardDogActionPtr createGuardDogActionFromProto(
       const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& config,
