@@ -475,13 +475,11 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
   if (!body_text.empty()) {
     response_headers->setContentLength(body_text.size());
     // If the `rewrite` function has changed body_text or content-type is not set, set it.
+    // This allows `modify_headers` function to set content-type for the body. For example,
+    // router.direct_response is calling sendLocalReply and wants to set conent-type for the body.
     if (body_text != local_reply_data.body_text_ || response_headers->ContentType() == nullptr) {
       response_headers->setReferenceContentType(content_type);
     }
-  } else {
-    // The `modify_headers` function may have added content-length and content-type, remove them.
-    response_headers->removeContentLength();
-    response_headers->removeContentType();
   }
 
   if (local_reply_data.is_head_request_) {
