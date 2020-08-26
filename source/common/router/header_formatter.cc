@@ -228,7 +228,8 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     : append_(append) {
   if (field_name == "PROTOCOL") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-      auto& protocol = Envoy::Formatter::SubstitutionFormatUtils::protocolToString(stream_info.protocol());
+      auto& protocol =
+          Envoy::Formatter::SubstitutionFormatUtils::protocolToString(stream_info.protocol());
       return protocol ? protocol.value() : "-";
     };
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
@@ -338,9 +339,9 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
       std::string formatted;
       for (const auto& formatter : formatters) {
         const auto& bit = formatter->format(*Http::StaticEmptyHeaders::get().request_headers,
-                                      *Http::StaticEmptyHeaders::get().response_headers,
-                                      *Http::StaticEmptyHeaders::get().response_trailers,
-                                      stream_info, absl::string_view());
+                                            *Http::StaticEmptyHeaders::get().response_headers,
+                                            *Http::StaticEmptyHeaders::get().response_trailers,
+                                            stream_info, absl::string_view());
         absl::StrAppend(&formatted, bit ? bit.value() : "-");
       }
       return formatted;
@@ -357,7 +358,9 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     field_extractor_ = parseRequestHeader(field_name.substr(STATIC_STRLEN("REQ")));
   } else if (field_name == "HOSTNAME") {
     absl::optional<std::string> hostname = Envoy::Formatter::SubstitutionFormatUtils::getHostname();
-    field_extractor_ = [hostname](const StreamInfo::StreamInfo&) { return hostname ? hostname.value() : "-"; };
+    field_extractor_ = [hostname](const StreamInfo::StreamInfo&) {
+      return hostname ? hostname.value() : "-";
+    };
   } else if (field_name == "RESPONSE_FLAGS") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
       return StreamInfo::ResponseFlagUtils::toShortString(stream_info);
