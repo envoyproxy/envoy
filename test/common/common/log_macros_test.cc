@@ -118,6 +118,27 @@ TEST(Logger, checkLoggerLevel) {
   EXPECT_THAT(test_obj.executeAtTraceLevel(), testing::Eq(2));
 }
 
+TEST(Logger, LogOnceMacro) {
+  class LogOnceTestHelper : public Logger::Loggable<Logger::Id::filter> {
+  public:
+    void logSomething() { ENVOY_LOG_ONCE(error, "foo1 '{}'", evaluations_++); }
+    void logSomethingElse() { ENVOY_LOG_ONCE(error, "foo2 '{}'", evaluations_++); }
+    void logSomethingBelowLogLevel() { ENVOY_LOG_ONCE(debug, "foo3 '{}'", evaluations_++); }
+    uint32_t evaluations_{0};
+  };
+  // Two distinct log lines ought to result in two evaluations, and no more.
+  LogOnceTestHelper helper;
+  helper.logSomething();
+  helper.logSomething();
+  EXPECT_EQ(1, helper.evaluations_);
+  helper.logSomethingElse();
+  helper.logSomethingElse();
+  EXPECT_EQ(2, helper.evaluations_);
+  // We don't expect log statements of a severity that gets filtered to add.
+  helper.logSomethingBelowLogLevel();
+  EXPECT_EQ(2, helper.evaluations_);
+}
+
 TEST(RegistryTest, LoggerWithName) {
   EXPECT_EQ(nullptr, Logger::Registry::logger("blah"));
   EXPECT_EQ("upstream", Logger::Registry::logger("upstream")->name());
