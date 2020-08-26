@@ -28,7 +28,6 @@ Minor Behavior Changes
   in the environment.
 * router: added transport failure reason to response body when upstream reset happens. After this change, the response body will be of the form `upstream connect error or disconnect/reset before headers. reset reason:{}, transport failure reason:{}`.This behavior may be reverted by setting runtime feature `envoy.reloadable_features.http_transport_failure_reason_in_body` to false.
 * router: now consumes all retry related headers to prevent them from being propagated to the upstream. This behavior may be reverted by setting runtime feature `envoy.reloadable_features.consume_all_retry_headers` to false.
-* router_check_tool: `request_header_fields`, `response_header_fields` config deprecated in favor of `request_header_matches`, `response_header_matches`.
 * thrift_proxy: special characters {'\0', '\r', '\n'} will be stripped from thrift headers.
 
 Bug Fixes
@@ -101,3 +100,4 @@ Deprecated
   :ref:`match <envoy_v3_api_field_config.tap.v3.TapConfig.match>` field.
 * ext_authz: the :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.OkHttpResponse.dynamic_metadata>` field in :ref:`OkHttpResponse <envoy_v3_api_msg_service.auth.v3.OkHttpResponse>`
   has been deprecated in favor of :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` field in :ref:`CheckResponse <envoy_v3_api_msg_service.auth.v3.CheckResponse>`.
+* router_check_tool: `request_header_fields`, `response_header_fields` config deprecated in favor of `request_header_matches`, `response_header_matches`.

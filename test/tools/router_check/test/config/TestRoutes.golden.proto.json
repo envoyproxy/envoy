@@ -281,7 +281,58 @@
       "validate": {"virtual_cluster_name": "other"}
     },
     {
-      "test_name": "RequestHeaderFields 1",
+      "test_name": "RequestHeaderFields Deprecated",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/host/rewrite/me",
+        "method": "GET"
+      },
+      "validate": {
+        "host_rewrite": "new_host",
+        "request_header_fields": [
+          {
+            "key": ":authority",
+            "value": "new_host"
+          },
+          {
+            "key": ":path",
+            "value": "/host/rewrite/me"
+          },
+          {
+            "key": ":method",
+            "value": "GET"
+          },
+          {
+            "key": ":cookie",
+            "value": ""
+          }
+        ]
+      }
+    },
+    {
+      "test_name": "ResponseHeaderFields Deprecated",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/ping",
+        "method": "GET"
+      },
+      "validate": {
+        "cluster_name": "",
+        "host_rewrite": "",
+        "path_redirect": "http://www.lyft.com/ping",
+        "path_rewrite": "",
+        "virtual_cluster_name": "",
+        "virtual_host_name": "",
+        "response_header_fields": [
+          {
+            "key": "content-type",
+            "value": "text/plain"
+          }
+        ]
+      }
+    },
+    {
+      "test_name": "RequestHeaderMatches 1",
       "input": {
         "authority": "api.lyft.com",
         "path": "/host/rewrite/me",
@@ -310,7 +361,7 @@
       }
     },
     {
-      "test_name": "RequestHeaderFields 2",
+      "test_name": "RequestHeaderMatches 2",
       "input": {
         "authority": "api.lyft.com",
         "path": "/customheaders",
@@ -326,7 +377,7 @@
       }
     },
     {
-      "test_name": "ResponseHeaderFields",
+      "test_name": "ResponseHeaderMatches",
       "input": {
         "authority": "www.lyft.com",
         "path": "/ping",

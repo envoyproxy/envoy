@@ -81,7 +81,7 @@ message ValidationInput {
 // Use “” (empty string) to indicate that no return value is expected.
 // For example, to test that no cluster match is expected use {“cluster_name”: “”}.
 message ValidationAssert {
-  reserved 7, 8, 9, 10;
+  reserved 7, 8;
   // Match the cluster name.
   google.protobuf.StringValue cluster_name = 1;
 
@@ -99,6 +99,10 @@ message ValidationAssert {
 
   // Match the returned redirect path.
   google.protobuf.StringValue path_redirect = 6;
+
+  // Match the listed request or response header fields. (Deprecated, use *_header_matches)
+  repeated envoy.config.core.v3.HeaderValue request_header_fields = 9 [deprecated=true];
+  repeated envoy.config.core.v3.HeaderValue response_header_fields = 10 [deprecated=true];
 
   // Match the listed request or response headers.
   // Example header fields include the “:path”, “cookie”, and “date” fields.

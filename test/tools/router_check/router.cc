@@ -398,8 +398,18 @@ bool RouterCheckTool::compareRequestHeaderFields(
   if (expected.request_header_matches().data()) {
     for (const envoy::config::route::v3::HeaderMatcher& header :
          expected.request_header_matches()) {
-      no_failures = no_failures && matchHeaderField(*tool_config.request_headers_, header,
-                                                    "request_header_matches");
+      if (!matchHeaderField(*tool_config.request_headers_, header, "request_header_matches")) {
+        no_failures = false;
+      }
+    }
+  }
+  // TODO(kb000) : Remove deprecated request_header_fields.
+  if (expected.request_header_fields().data()) {
+    for (const envoy::config::core::v3::HeaderValue& header : expected.request_header_fields()) {
+      if (!compareHeaderField(*tool_config.request_headers_, header.key(), header.value(),
+                              "request_header_fields", true)) {
+        no_failures = false;
+      }
     }
   }
   return no_failures;
@@ -411,8 +421,18 @@ bool RouterCheckTool::compareResponseHeaderFields(
   if (expected.response_header_matches().data()) {
     for (const envoy::config::route::v3::HeaderMatcher& header :
          expected.response_header_matches()) {
-      no_failures = no_failures && matchHeaderField(*tool_config.response_headers_, header,
-                                                    "response_header_matches");
+      if (!matchHeaderField(*tool_config.response_headers_, header, "response_header_matches")) {
+        no_failures = false;
+      }
+    }
+  }
+  // TODO(kb000) : Remove deprecated response_header_fields.
+  if (expected.response_header_fields().data()) {
+    for (const envoy::config::core::v3::HeaderValue& header : expected.response_header_fields()) {
+      if (!compareHeaderField(*tool_config.response_headers_, header.key(), header.value(),
+                              "response_header_fields", true)) {
+        no_failures = false;
+      }
     }
   }
   return no_failures;
@@ -482,8 +502,8 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
 void RouterCheckTool::printResults() {
   // Output failure details to stdout if details_ flag is set to true
   for (const auto& test_result : tests_) {
-    // All test names are printed if the details_ flag is true unless only_show_failures_ is also
-    // true.
+    // All test names are printed if the details_ flag is true unless only_show_failures_ is
+    // also true.
     if ((details_ && !only_show_failures_) ||
         (only_show_failures_ && !test_result.second.empty())) {
       std::cout << test_result.first << std::endl;
