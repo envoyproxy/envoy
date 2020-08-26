@@ -302,24 +302,24 @@ std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::str
 
         parseCommandHeader(token, ReqParamStart, main_header, alternative_header, max_length);
 
-        formatters.emplace_back(FormatterProviderPtr{new RequestHeaderFormatter(
-            main_header, alternative_header, max_length)});
+        formatters.emplace_back(FormatterProviderPtr{
+            new RequestHeaderFormatter(main_header, alternative_header, max_length)});
       } else if (absl::StartsWith(token, "RESP(")) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
 
         parseCommandHeader(token, RespParamStart, main_header, alternative_header, max_length);
 
-        formatters.emplace_back(FormatterProviderPtr{new ResponseHeaderFormatter(
-            main_header, alternative_header, max_length)});
+        formatters.emplace_back(FormatterProviderPtr{
+            new ResponseHeaderFormatter(main_header, alternative_header, max_length)});
       } else if (absl::StartsWith(token, "TRAILER(")) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
 
         parseCommandHeader(token, TrailParamStart, main_header, alternative_header, max_length);
 
-        formatters.emplace_back(FormatterProviderPtr{new ResponseTrailerFormatter(
-            main_header, alternative_header, max_length)});
+        formatters.emplace_back(FormatterProviderPtr{
+            new ResponseTrailerFormatter(main_header, alternative_header, max_length)});
       } else if (absl::StartsWith(token, "LOCAL_REPLY_BODY")) {
         formatters.emplace_back(std::make_unique<LocalReplyBodyFormatter>());
       } else if (absl::StartsWith(token, DYNAMIC_META_TOKEN)) {
@@ -329,8 +329,8 @@ std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::str
         const size_t start = DYNAMIC_META_TOKEN.size();
 
         parseCommand(token, start, ":", filter_namespace, path, max_length);
-        formatters.emplace_back(FormatterProviderPtr{
-            new DynamicMetadataFormatter(filter_namespace, path, max_length)});
+        formatters.emplace_back(
+            FormatterProviderPtr{new DynamicMetadataFormatter(filter_namespace, path, max_length)});
       } else if (absl::StartsWith(token, FILTER_STATE_TOKEN)) {
         std::string key;
         absl::optional<size_t> max_length;
@@ -350,8 +350,8 @@ std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::str
         }
         const bool serialize_as_string = serialize_type == PLAIN_SERIALIZATION;
 
-        formatters.push_back(std::make_unique<FilterStateFormatter>(
-            key, max_length, serialize_as_string));
+        formatters.push_back(
+            std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string));
       } else if (absl::StartsWith(token, "START_TIME")) {
         const size_t parameters_length = pos + StartTimeParamStart + 1;
         const size_t parameters_end = command_end_position - parameters_length;
@@ -366,11 +366,10 @@ std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::str
         }
         formatters.emplace_back(FormatterProviderPtr{new StartTimeFormatter(args)});
       } else if (absl::StartsWith(token, "GRPC_STATUS")) {
-        formatters.emplace_back(FormatterProviderPtr{new GrpcStatusFormatter(
-            "grpc-status", "", absl::optional<size_t>())});
+        formatters.emplace_back(FormatterProviderPtr{
+            new GrpcStatusFormatter("grpc-status", "", absl::optional<size_t>())});
       } else {
-        formatters.emplace_back(
-            FormatterProviderPtr{new StreamInfoFormatter(token)});
+        formatters.emplace_back(FormatterProviderPtr{new StreamInfoFormatter(token)});
       }
       pos = command_end_position;
     } else {
@@ -410,8 +409,7 @@ public:
   using FieldExtractor =
       std::function<absl::optional<std::chrono::nanoseconds>(const StreamInfo::StreamInfo&)>;
 
-  StreamInfoDurationFieldExtractor(FieldExtractor f)
-      : field_extractor_(f) {}
+  StreamInfoDurationFieldExtractor(FieldExtractor f) : field_extractor_(f) {}
 
   // StreamInfoFormatter::FieldExtractor
   absl::optional<std::string> extract(const StreamInfo::StreamInfo& stream_info) const override {
@@ -612,8 +610,8 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
           return StreamInfo::ResponseFlagUtils::toShortString(stream_info);
         });
   } else if (field_name == "UPSTREAM_HOST") {
-    field_extractor_ = StreamInfoAddressFieldExtractor::withPort(
-        [](const StreamInfo::StreamInfo& stream_info) {
+    field_extractor_ =
+        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
           return stream_info.upstreamHost() ? stream_info.upstreamHost()->address() : nullptr;
         });
   } else if (field_name == "UPSTREAM_CLUSTER") {
@@ -629,13 +627,13 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
                      : absl::make_optional<std::string>(upstream_cluster_name);
         });
   } else if (field_name == "UPSTREAM_LOCAL_ADDRESS") {
-    field_extractor_ = StreamInfoAddressFieldExtractor::withPort(
-        [](const StreamInfo::StreamInfo& stream_info) {
+    field_extractor_ =
+        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
           return stream_info.upstreamLocalAddress();
         });
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
-    field_extractor_ = StreamInfoAddressFieldExtractor::withPort(
-        [](const StreamInfo::StreamInfo& stream_info) {
+    field_extractor_ =
+        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
           return stream_info.downstreamLocalAddress();
         });
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT") {
@@ -649,23 +647,23 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
           return stream_info.downstreamLocalAddress();
         });
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
-    field_extractor_ = StreamInfoAddressFieldExtractor::withPort(
-        [](const StreamInfo::StreamInfo& stream_info) {
+    field_extractor_ =
+        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
           return stream_info.downstreamRemoteAddress();
         });
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
-    field_extractor_ = StreamInfoAddressFieldExtractor::withoutPort(
-        [](const StreamInfo::StreamInfo& stream_info) {
+    field_extractor_ =
+        StreamInfoAddressFieldExtractor::withoutPort([](const StreamInfo::StreamInfo& stream_info) {
           return stream_info.downstreamRemoteAddress();
         });
   } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS") {
-    field_extractor_ = StreamInfoAddressFieldExtractor::withPort(
-        [](const StreamInfo::StreamInfo& stream_info) {
+    field_extractor_ =
+        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
           return stream_info.downstreamDirectRemoteAddress();
         });
   } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT") {
-    field_extractor_ = StreamInfoAddressFieldExtractor::withoutPort(
-        [](const StreamInfo::StreamInfo& stream_info) {
+    field_extractor_ =
+        StreamInfoAddressFieldExtractor::withoutPort([](const StreamInfo::StreamInfo& stream_info) {
           return stream_info.downstreamDirectRemoteAddress();
         });
   } else if (field_name == "REQUESTED_SERVER_NAME") {

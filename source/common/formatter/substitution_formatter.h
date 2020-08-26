@@ -348,7 +348,6 @@ private:
   std::string key_;
   absl::optional<size_t> max_length_;
 
-  const std::string unspecified_value_str_;
   bool serialize_as_string_;
 };
 
