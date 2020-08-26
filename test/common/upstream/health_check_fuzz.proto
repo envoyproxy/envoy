@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package test.common.upstream;
+
+
+message Action {
+    oneof action_selector
+}
+
+message Config {
+    
+}
+
+message HealthCheckTestCase {
+    Config config = 1;
+    repeated Action actions = 2;
+}

@@ -480,7 +480,8 @@ envoy_cc_test(
 
 envoy_cc_test_library(
     name = "utility_lib",
-    hdrs = ["utility.h"],
+    hdrs = ["utility.h",
+    "health_checker_impl_test.h"],
     deps = [
         "//include/envoy/stats:stats_interface",
         "//source/common/json:json_loader_lib",
@@ -574,3 +575,10 @@ envoy_cc_test(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
+
+
+#envoy_cc_fuzz_test(
+#    name = "health_check_fuzz_test",
+#    srcs = ["health_check_fuzz_test.cc"],
+#    corpus = ["//test/common/upstream:health_check_corpus"],
+#)
