@@ -120,7 +120,7 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
 
   EXPECT_CALL(listener_callbacks_, onWriteReady(_))
       .WillRepeatedly(Invoke([&](const Socket& socket) {
-        EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
+        EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
       }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -166,7 +166,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
       }));
 
   EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {
-    EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
+    EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
     ASSERT_NE(test_peer_address, nullptr);
 
     for (const auto& data : server_received_data) {
@@ -242,7 +242,7 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
 
   EXPECT_CALL(listener_callbacks_, onWriteReady(_))
       .WillRepeatedly(Invoke([&](const Socket& socket) {
-        EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
+        EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
       }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -263,7 +263,7 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
   EXPECT_CALL(listener_callbacks_, onData(_)).Times(0);
 
   EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {
-    EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
+    EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
   }));
 
   EXPECT_CALL(listener_callbacks_, onReadReady());
@@ -476,7 +476,7 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
       }));
 
   EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {
-    EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
+    EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
     dispatcher_->exit();
   }));
 
