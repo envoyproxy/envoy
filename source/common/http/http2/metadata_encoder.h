@@ -55,7 +55,7 @@ public:
    */
   std::vector<uint8_t> payloadFrameFlagBytes();
 
-  const std::string payload();
+  std::string payload() const;
 
 private:
   /**

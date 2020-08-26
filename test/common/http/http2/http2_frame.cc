@@ -225,7 +225,7 @@ Http2Frame Http2Frame::makeMetadataFrameFromMetadataMap(uint32_t stream_index,
     *iterator = {const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(metadata.first.data())),
                  const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(metadata.second.data())),
                  metadata.first.size(), metadata.second.size(), NGHTTP2_NV_FLAG_NO_INDEX};
-    iterator = std::next(iterator, 1);
+    ++iterator;
   }
 
   nghttp2_hd_deflater* deflater;

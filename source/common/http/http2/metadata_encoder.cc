@@ -127,7 +127,7 @@ std::vector<uint8_t> MetadataEncoder::payloadFrameFlagBytes() {
   return flags;
 }
 
-const std::string MetadataEncoder::payload() { return payload_.toString(); }
+std::string MetadataEncoder::payload() const { return payload_.toString(); }
 
 } // namespace Http2
 } // namespace Http

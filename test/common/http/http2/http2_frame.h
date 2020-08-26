@@ -172,11 +172,7 @@ private:
     data_.insert(data_.end(), data.begin(), data.end());
   }
   void appendDataAfterHeaders(std::vector<uint8_t> data) {
-    int index = 9;
-    for (uint8_t value : data) {
-      data_.at(index) = value;
-      index++;
-    }
+    std::copy(data.begin(), data.end(), data_.begin() + 9);
   }
 
   // Headers are directly encoded
