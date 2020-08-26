@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <string>
 
@@ -10,7 +11,9 @@
 #include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/conn_pool.h"
+#include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -50,7 +53,12 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       encode_complete_(false), encode_trailers_(false), retried_(false), awaiting_headers_(true),
       outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
-      record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()) {
+      record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
+      filter_manager_(*this, parent_.callbacks()->dispatcher(), *parent_.callbacks()->connection(), parent_.callbacks()->streamId(),
+                      false, parent_.callbacks()->decoderBufferLimit(), filter_factory_,
+                      noop_local_reply_, conn_pool_->protocol().value(),
+                      parent_.callbacks()->dispatcher().timeSource(), nullptr,
+                      StreamInfo::FilterState::FilterChain) {
   if (parent_.config().start_child_span_) {
     span_ = parent_.callbacks()->activeSpan().spawnChild(
         parent_.callbacks()->tracingConfig(), "router " + parent.cluster()->name() + " egress",
@@ -109,14 +117,14 @@ UpstreamRequest::~UpstreamRequest() {
   }
 }
 
-void UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
+void UpstreamRequest::encode100ContinueHeaders(Http::ResponseHeaderMap& headers) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
-  ASSERT(100 == Http::Utility::getResponseStatus(*headers));
+  ASSERT(100 == Http::Utility::getResponseStatus(headers));
   parent_.onUpstream100ContinueHeaders(std::move(headers), *this);
 }
 
-void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
+void UpstreamRequest::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
   // We drop 1xx other than 101 on the floor; 101 upgrade headers need to be passed to the client as
@@ -196,41 +204,44 @@ void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstShare
   parent_.onUpstreamHostSelected(host);
 }
 
-void UpstreamRequest::encodeHeaders(bool end_stream) {
+void UpstreamRequest::encodeUpstreamHeaders(bool end_stream) {
   ASSERT(!encode_complete_);
   encode_complete_ = end_stream;
+
+  filter_manager_.encodeHeaders(parent_.downstreamHeaders(), end_stream;)
 
   conn_pool_->newStream(this);
 }
 
-void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
+void UpstreamRequest::encodeUpstreamData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!encode_complete_);
   encode_complete_ = end_stream;
 
-  if (!upstream_ || paused_for_connect_) {
-    ENVOY_STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks(), data.length());
-    if (!buffered_request_body_) {
-      buffered_request_body_ = std::make_unique<Buffer::WatermarkBuffer>(
-          [this]() -> void { this->enableDataFromDownstreamForFlowControl(); },
-          [this]() -> void { this->disableDataFromDownstreamForFlowControl(); },
-          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
-      buffered_request_body_->setWatermarks(parent_.callbacks()->decoderBufferLimit());
-    }
+  filter_manager_.encodeData(data, end_stream);
+  // if (!upstream_ || paused_for_connect_) {
+  //   ENVOY_STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks(), data.length());
+  //   if (!buffered_request_body_) {
+  //     buffered_request_body_ = std::make_unique<Buffer::WatermarkBuffer>(
+  //         [this]() -> void { this->enableDataFromDownstreamForFlowControl(); },
+  //         [this]() -> void { this->disableDataFromDownstreamForFlowControl(); },
+  //         []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
+  //     buffered_request_body_->setWatermarks(parent_.callbacks()->decoderBufferLimit());
+  //   }
 
-    buffered_request_body_->move(data);
-  } else {
-    ASSERT(downstream_metadata_map_vector_.empty());
+  //   buffered_request_body_->move(data);
+  // } else {
+  //   ASSERT(downstream_metadata_map_vector_.empty());
 
-    ENVOY_STREAM_LOG(trace, "proxying {} bytes", *parent_.callbacks(), data.length());
-    stream_info_.addBytesSent(data.length());
-    upstream_->encodeData(data, end_stream);
-    if (end_stream) {
-      upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
-    }
-  }
+  //   ENVOY_STREAM_LOG(trace, "proxying {} bytes", *parent_.callbacks(), data.length());
+  //   stream_info_.addBytesSent(data.length());
+  //   upstream_->encodeData(data, end_stream);
+  //   if (end_stream) {
+  //     upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
+  //   }
+  // }
 }
 
-void UpstreamRequest::encodeTrailers(const Http::RequestTrailerMap& trailers) {
+void UpstreamRequest::encodeUpstreamTrailers(const Http::RequestTrailerMap& trailers) {
   ASSERT(!encode_complete_);
   encode_complete_ = true;
   encode_trailers_ = true;
@@ -246,7 +257,7 @@ void UpstreamRequest::encodeTrailers(const Http::RequestTrailerMap& trailers) {
   }
 }
 
-void UpstreamRequest::encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
+void UpstreamRequest::encodeUpstreamMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
   if (!upstream_) {
     ENVOY_STREAM_LOG(trace, "upstream_ not ready. Store metadata_map to encode later: {}",
                      *parent_.callbacks(), *metadata_map_ptr);
@@ -326,7 +337,7 @@ void UpstreamRequest::onPerTryTimeout() {
   }
 }
 
-void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+void UpstreamRequestFilter::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                                     absl::string_view transport_failure_reason,
                                     Upstream::HostDescriptionConstSharedPtr host) {
   Http::StreamResetReason reset_reason = Http::StreamResetReason::ConnectionFailure;
@@ -348,13 +359,13 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
   onResetStream(reset_reason, transport_failure_reason);
 }
 
-void UpstreamRequest::onPoolReady(
+void UpstreamRequestFilter::onPoolReady(
     std::unique_ptr<GenericUpstream>&& upstream, Upstream::HostDescriptionConstSharedPtr host,
     const Network::Address::InstanceConstSharedPtr& upstream_local_address,
     const StreamInfo::StreamInfo& info) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
-  ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
-  ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
+  ScopeTrackerScopeState scope(&decoder_callbacks_.scope(), decoder_callbacks_->dispatcher());
+  ENVOY_STREAM_LOG(debug, "pool ready", *decoder_callbacks_));
   upstream_ = std::move(upstream);
 
   if (parent_.requestVcluster()) {
@@ -421,7 +432,7 @@ void UpstreamRequest::onPoolReady(
   calling_encode_headers_ = false;
 
   if (!paused_for_connect_) {
-    encodeBodyAndTrailers();
+    decoder_callbacks_->continueDecoding();
   }
 }
 

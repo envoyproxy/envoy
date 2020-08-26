@@ -6,10 +6,12 @@
 #include <memory>
 #include <string>
 
+#include "common/common/assert.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/filter.h"
+#include "envoy/router/router.h"
 #include "envoy/stats/scope.h"
 #include "envoy/tcp/conn_pool.h"
 
@@ -17,6 +19,7 @@
 #include "common/common/cleanup.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
+#include "common/http/filter_manager.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/config/well_known_names.h"
@@ -30,45 +33,39 @@ class GenericConnectionPoolCallbacks;
 class RouterFilterInterface;
 class UpstreamRequest;
 
-// The base request for Upstream.
-class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
-                        public UpstreamToDownstream,
-                        public LinkedObject<UpstreamRequest>,
+struct UpstreamFilterFactory : public Http::FilterChainFactory {
+  void createFilterChain(Http::FilterChainFactoryCallbacks&) override {}
+
+  bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                                Http::FilterChainFactoryCallbacks&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+};
+
+struct UpstreamRequestFilter : public Http::StreamDecoderFilter,
                         public GenericConnectionPoolCallbacks {
-public:
-  UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool);
-  ~UpstreamRequest() override;
-
-  void encodeHeaders(bool end_stream);
-  void encodeData(Buffer::Instance& data, bool end_stream);
-  void encodeTrailers(const Http::RequestTrailerMap& trailers);
-  void encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr);
-
-  void resetStream();
-  void setupPerTryTimeout();
-  void onPerTryTimeout();
-  void maybeEndDecode(bool end_stream);
-  void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
-
-  // Http::StreamDecoder
-  void decodeData(Buffer::Instance& data, bool end_stream) override;
-  void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
-
-  // UpstreamToDownstream (Http::ResponseDecoder)
-  void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) override;
-  void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
-  void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
-  // UpstreamToDownstream (Http::StreamCallbacks)
-  void onResetStream(Http::StreamResetReason reason,
-                     absl::string_view transport_failure_reason) override;
-  void onAboveWriteBufferHighWatermark() override { disableDataFromDownstreamForFlowControl(); }
-  void onBelowWriteBufferLowWatermark() override { enableDataFromDownstreamForFlowControl(); }
-  // UpstreamToDownstream
-  const RouteEntry& routeEntry() const override;
-  const Network::Connection& connection() const override;
+  UpstreamRequestFilter(GenericConnPool& conn_pool) : conn_pool_(conn_pool) {}
 
   void disableDataFromDownstreamForFlowControl();
   void enableDataFromDownstreamForFlowControl();
+
+  // Http::StreamFilterBase
+  void onDestroy() override {}
+
+  // Http::StreamDecoderFilter
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    conn_pool_.newStream(this);
+    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+  }
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
+    return Http::FilterDataStatus::Continue;
+  }
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
+    return Http::FilterTrailersStatus::Continue;
+  }
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    decoder_callbacks_ = &callbacks;
+  }
 
   // GenericConnPool
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -78,7 +75,93 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host,
                    const Network::Address::InstanceConstSharedPtr& upstream_local_address,
                    const StreamInfo::StreamInfo& info) override;
-  UpstreamToDownstream& upstreamToDownstream() override { return *this; }
+  UpstreamToDownstream& upstreamToDownstream() override { return active_request_; }
+
+
+struct ActiveUpstreamRequest : public UpstreamToDownstream {
+  explicit ActiveUpstreamRequest(UpstreamRequestFilter& parent) : parent_(parent) {}
+
+  // UpstreamToDownstream (Http::ResponseDecoder)
+  void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) override;
+  void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
+  void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
+  // UpstreamToDownstream (Http::StreamCallbacks)
+  void onResetStream(Http::StreamResetReason reason,
+                     absl::string_view transport_failure_reason) override;
+  void onAboveWriteBufferHighWatermark() override { parent_.disableDataFromDownstreamForFlowControl(); }
+  void onBelowWriteBufferLowWatermark() override { parent_.enableDataFromDownstreamForFlowControl(); }
+  // UpstreamToDownstream
+  const RouteEntry& routeEntry() const override;
+  const Network::Connection& connection() const override;
+
+  // Http::StreamDecoder
+  void decodeData(Buffer::Instance& data, bool end_stream) override;
+  void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
+
+  UpstreamRequestFilter& parent_;
+};
+
+private:
+  ActiveUpstreamRequest active_request_{*this};
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  std::unique_ptr<GenericUpstream> upstream_;
+  bool paused_for_connect_{false};
+  GenericConnPool& conn_pool_;
+};
+
+// The base request for Upstream.
+class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
+                        public LinkedObject<UpstreamRequest>,
+                        public Http::FilterManagerCallbacks {
+public:
+  UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool);
+  ~UpstreamRequest() override;
+
+  void encodeUpstreamHeaders(bool end_stream);
+  void encodeUpstreamData(Buffer::Instance& data, bool end_stream);
+  void encodeUpstreamTrailers(const Http::RequestTrailerMap& trailers);
+  void encodeUpstreamMetadata(Http::MetadataMapPtr&& metadata_map_ptr);
+
+  void setupPerTryTimeout();
+  void onPerTryTimeout();
+  void maybeEndDecode(bool end_stream);
+  void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
+
+  void encodeHeaders(Http::ResponseHeaderMap& response_headers, bool end_stream) override;
+  void encode100ContinueHeaders(Http::ResponseHeaderMap& response_headers) override;
+  void encodeData(Buffer::Instance& data, bool end_stream) override;
+  void encodeTrailers(Http::ResponseTrailerMap& trailers) override;
+  void encodeMetadata(Http::MetadataMapVector& metadata) override;
+  void endStream() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void onDecoderFilterBelowWriteBufferLowWatermark() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void onDecoderFilterAboveWriteBufferHighWatermark() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void upgradeFilterChainCreated() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  void disarmRequestTimeout() override { }
+  void resetIdleTimer() override { }
+  void recreateStream(Http::RequestHeaderMapPtr&&,
+                              StreamInfo::FilterStateSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void resetStream() override;
+  const Router::RouteEntry::UpgradeMap* upgradeMap() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  Upstream::ClusterInfoConstSharedPtr clusterInfo() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  Router::RouteConstSharedPtr route(const Router::RouteCallback&) override{
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  void clearRouteCache() override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  absl::optional<Router::ConfigConstSharedPtr> routeConfig() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void
+  requestRouteConfigUpdate(Event::Dispatcher&,
+                           Http::RouteConfigUpdatedCallbackSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  Tracing::Span& activeSpan() override { return *span_; }
+  void onResponseDataTooLarge() override {}
+  void onRequestDataTooLarge() override {}
+  Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions()  override{
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  void onLocalReply(Http::Code) override {}
+  Tracing::Config& tracingConfig() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  const ScopeTrackedObject& scope() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   void clearRequestEncoder();
   void onStreamMaxDurationReached();
@@ -129,7 +212,6 @@ private:
   std::unique_ptr<GenericConnPool> conn_pool_;
   bool grpc_rq_success_deferred_;
   Event::TimerPtr per_try_timeout_;
-  std::unique_ptr<GenericUpstream> upstream_;
   absl::optional<Http::StreamResetReason> deferred_reset_reason_;
   Buffer::WatermarkBufferPtr buffered_request_body_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
@@ -166,6 +248,16 @@ private:
   bool record_timeout_budget_ : 1;
 
   Event::TimerPtr max_stream_duration_timer_;
+
+  class NoopLocalReply : public LocalReply::LocalReply {
+    void rewrite(const Http::RequestHeaderMap*, Http::ResponseHeaderMap&,
+                 StreamInfo::StreamInfoImpl&, Http::Code&, std::string&,
+                 absl::string_view&) const override {}
+  };
+
+  static NoopLocalReply noop_local_reply_;
+  UpstreamFilterFactory filter_factory_;
+  Http::FilterManager filter_manager_;
 };
 
 } // namespace Router
