@@ -35,4 +35,20 @@ message UdpProxyConfig {
   // The idle timeout for sessions. Idle is defined as no datagrams between received or sent by
   // the session. The default if not specified is 1 minute.
   google.protobuf.Duration idle_timeout = 3;
+
+  // Use the remote downstream IP address as the sender IP address when sending packets to upstream hosts.
+  // This option requires Envoy to be run with the *CAP_NET_ADMIN* capability on Linux.
+  // And the IPv6 stack must be enabled on Linux kernel.
+  // This option does not preserve the remote downstream port.
+  // If this option is enabled, the IP address of sent datagrams will be changed to the remote downstream IP address.
+  // This means that Envoy will not receive packets that are sent by upstream hosts because the upstream hosts
+  // will send the packets with the remote downstream IP address as the destination. All packets will be routed
+  // to the remote downstream directly if there are route rules on the upstream host side.
+  // There are two options to return the packets back to the remote downstream.
+  // The first one is to use DSR (Direct Server Return).
+  // The other one is to configure routing rules on the upstream hosts to forward
+  // all packets back to Envoy and configure iptables rules on the host running Envoy to
+  // forward all packets from upstream hosts to the Envoy process so that Envoy can forward the packets to the downstream.
+  // If the platform does not support this option, Envoy will raise a configuration error.
+  bool use_original_src_ip = 4;
 }

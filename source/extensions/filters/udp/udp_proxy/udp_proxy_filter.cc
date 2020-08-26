@@ -2,6 +2,8 @@
 
 #include "envoy/network/listener.h"
 
+#include "common/network/socket_option_factory.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
@@ -152,13 +154,14 @@ void UdpProxyFilter::ClusterInfo::removeSession(const ActiveSession* session) {
 UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
                                              Network::UdpRecvData::LocalPeerAddresses&& addresses,
                                              const Upstream::HostConstSharedPtr& host)
-    : cluster_(cluster), addresses_(std::move(addresses)), host_(host),
+    : cluster_(cluster), use_original_src_ip_(cluster_.filter_.config_->usingOriginalSrcIp()),
+      addresses_(std::move(addresses)), host_(host),
       idle_timer_(cluster.filter_.read_callbacks_->udpListener().dispatcher().createTimer(
           [this] { onIdleTimer(); })),
       // NOTE: The socket call can only fail due to memory/fd exhaustion. No local ephemeral port
       //       is bound until the first packet is sent to the upstream host.
-      io_handle_(cluster.filter_.createIoHandle(host)),
-      socket_event_(io_handle_->createFileEvent(
+      socket_(cluster.filter_.createSocket(host)),
+      socket_event_(socket_->ioHandle().createFileEvent(
           cluster.filter_.read_callbacks_->udpListener().dispatcher(),
           [this](uint32_t) { onReadReady(); }, Event::PlatformDefaultTriggerType,
           Event::FileReadyType::Read)) {
@@ -171,6 +174,17 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
       ->resourceManager(Upstream::ResourcePriority::Default)
       .connections()
       .inc();
+
+  if (use_original_src_ip_) {
+    const Network::Socket::OptionsSharedPtr socket_options =
+        Network::SocketOptionFactory::buildIpTransparentOptions();
+    const bool ok = Network::Socket::applyOptions(
+        socket_options, *socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND);
+
+    RELEASE_ASSERT(ok, "Should never occur!");
+    ENVOY_LOG(debug, "The original src is enabled for address {}.",
+              addresses_.peer_->asStringView());
+  }
 
   // TODO(mattklein123): Enable dropped packets socket option. In general the Socket abstraction
   // does not work well right now for client sockets. It's too heavy weight and is aimed at listener
@@ -204,7 +218,7 @@ void UdpProxyFilter::ActiveSession::onReadReady() {
   //                     not trying to populate the local address for received packets.
   uint32_t packets_dropped = 0;
   const Api::IoErrorPtr result = Network::Utility::readPacketsFromSocket(
-      *io_handle_, *addresses_.local_, *this, cluster_.filter_.config_->timeSource(),
+      socket_->ioHandle(), *addresses_.local_, *this, cluster_.filter_.config_->timeSource(),
       packets_dropped);
   // TODO(mattklein123): Handle no error when we limit the number of packets read.
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
@@ -226,10 +240,12 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
 
   // NOTE: On the first write, a local ephemeral port is bound, and thus this write can fail due to
   //       port exhaustion.
-  // NOTE: We do not specify the local IP to use for the sendmsg call. We allow the OS to select
-  //       the right IP based on outbound routing rules.
+  // NOTE: We do not specify the local IP to use for the sendmsg call if use_original_src_ip_ is not
+  //       set. We allow the OS to select the right IP based on outbound routing rules if
+  //       use_original_src_ip_ is not set, else use downstream peer IP as local IP.
+  const Network::Address::Ip* local_ip = use_original_src_ip_ ? addresses_.peer_->ip() : nullptr;
   Api::IoCallUint64Result rc =
-      Network::Utility::writeToSocket(*io_handle_, buffer, nullptr, *host_->address());
+      Network::Utility::writeToSocket(socket_->ioHandle(), buffer, local_ip, *host_->address());
   if (!rc.ok()) {
     cluster_.cluster_stats_.sess_tx_errors_.inc();
   } else {

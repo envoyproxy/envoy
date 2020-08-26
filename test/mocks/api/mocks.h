@@ -91,6 +91,7 @@ public:
   MOCK_METHOD(SysCallSizeResult, write, (os_fd_t sockfd, const void* buffer, size_t length));
   MOCK_METHOD(bool, supportsMmsg, (), (const));
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
+  MOCK_METHOD(bool, supportsIpTransparent, (), (const));
 
   // Map from (sockfd,level,optname) to boolean socket option.
   using SockOptKey = std::tuple<os_fd_t, int, int>;
