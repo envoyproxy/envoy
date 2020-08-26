@@ -18,8 +18,8 @@
 
 namespace {
 const std::string
-toString(envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase specifierCase) {
-  switch (specifierCase) {
+toString(envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase specifier) {
+  switch (specifier) {
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
     return "exact_match";
     break;
