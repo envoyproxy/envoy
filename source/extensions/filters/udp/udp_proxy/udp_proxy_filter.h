@@ -66,11 +66,9 @@ public:
       : cluster_manager_(cluster_manager), time_source_(time_source), cluster_(config.cluster()),
         session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
         stats_(generateStats(config.stat_prefix(), root_scope)) {
-    if (config.has_route_policy() &&
-        config.route_policy().policy_specifier_case() ==
-            envoy::type::v3::UdpRoutePolicy::PolicySpecifierCase::kHashPolicy) {
+    if (config.has_route_policy() && config.route_policy().has_hash_policy()) {
       // Only one hash policy is supported.
-      const absl::Span<const envoy::type::v3::HashPolicy* const> hash_policies = {
+      const envoy::type::v3::HashPolicy* const hash_policies[] = {
           &config.route_policy().hash_policy()};
       hash_policy_ = std::make_unique<Network::HashPolicyImpl>(hash_policies);
     }

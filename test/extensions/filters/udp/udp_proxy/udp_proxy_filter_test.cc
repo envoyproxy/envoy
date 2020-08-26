@@ -65,7 +65,13 @@ public:
                 EXPECT_EQ(data, absl::string_view(static_cast<const char*>(slices[0].mem_),
                                                   slices[0].len_));
                 EXPECT_EQ(peer_address, *upstream_address_);
-                return sys_errno == 0 ? makeNoError(data.size()) : makeError(sys_errno);
+                // For suppression of clang-tidy NewDeleteLeaks rule, don't use the ternary
+                // operator.
+                if (sys_errno == 0) {
+                  return makeNoError(data.size());
+                } else {
+                  return makeError(sys_errno);
+                }
               }));
     }
 
