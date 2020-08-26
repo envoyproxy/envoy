@@ -1833,7 +1833,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
     if (connection_manager_.codec_->protocol() < Protocol::Http2 ||
         Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.connection_manager_drain_http2")) {
+            "envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2")) {
       drain_connection_due_to_overload = true;
     }
     connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();

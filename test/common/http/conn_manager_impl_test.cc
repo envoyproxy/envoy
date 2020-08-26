@@ -5801,7 +5801,7 @@ class DrainH2HttpConnectionManagerImplTest : public HttpConnectionManagerImplTes
 public:
   DrainH2HttpConnectionManagerImplTest() {
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.connection_manager_drain_http2", "true"}});
+        {{"envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2", "true"}});
   }
 
 private:
