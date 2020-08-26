@@ -108,6 +108,7 @@ bool ActiveStreamFilterBase::commonHandleAfter100ContinueHeadersCallback(
 }
 
 bool ActiveStreamFilterBase::commonHandleAfterHeadersCallback(FilterHeadersStatus status,
+                                                              bool& end_stream,
                                                               bool& headers_only) {
   ASSERT(!headers_continued_);
   ASSERT(canIterate());
@@ -123,6 +124,11 @@ bool ActiveStreamFilterBase::commonHandleAfterHeadersCallback(FilterHeadersStatu
     // but continue filter iteration so we actually write the headers/run the cleanup code.
     headers_only = true;
     ENVOY_STREAM_LOG(debug, "converting to headers only", parent_);
+  } else if (status == FilterHeadersStatus::ContinueAndDontEndStream) {
+    headers_only = false;
+    end_stream = false;
+    headers_continued_ = true;
+    ENVOY_STREAM_LOG(debug, "converting to headers and body (body not available yet)", parent_);
   } else {
     ASSERT(status == FilterHeadersStatus::Continue);
     headers_continued_ = true;
@@ -453,7 +459,8 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     }
 
     (*entry)->decode_headers_called_ = true;
-    if (!(*entry)->commonHandleAfterHeadersCallback(status, state_.decoding_headers_only_) &&
+    if (!(*entry)->commonHandleAfterHeadersCallback(status, end_stream,
+                                                    state_.decoding_headers_only_) &&
         std::next(entry) != decoder_filters_.end()) {
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
       // processing since we need to handle the case where a terminal filter wants to buffer, but
@@ -910,8 +917,8 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
     (*entry)->encode_headers_called_ = true;
-    const auto continue_iteration =
-        (*entry)->commonHandleAfterHeadersCallback(status, state_.encoding_headers_only_);
+    const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(
+        status, end_stream, state_.encoding_headers_only_);
 
     // If we're encoding a headers only response, then mark the local as complete. This ensures
     // that we don't attempt to reset the downstream request in doEndStream.
@@ -1331,6 +1338,8 @@ void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool stre
 
 void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
+  // TODO(yosrym93): Check if this filter had previously stopped headers iteration.
+  // If so, it should be continued before injecting data.
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }

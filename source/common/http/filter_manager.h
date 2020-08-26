@@ -29,7 +29,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // corresponding data. Those functions handle state updates and data storage (if needed)
   // according to the status returned by filter's callback functions.
   bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
-  bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& headers_only);
+  bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& end_stream,
+                                        bool& headers_only);
   bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
                                      bool& buffer_was_streaming);
   bool commonHandleAfterTrailersCallback(FilterTrailersStatus status);

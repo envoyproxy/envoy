@@ -36,6 +36,15 @@ enum class FilterHeadersStatus {
   // results in creating a header only request/response.
   // This status MUST NOT be returned by decodeHeaders() when end_stream is set to true.
   ContinueAndEndStream,
+  // Continue iteration to remaining filters, but do not end the stream.
+  //
+  // Used when a filter wants to add a body to headers-only request/response, but this body is not
+  // readily available.
+  // This causes the headers iteration to continue, but the stream does not end.
+  // The filter is responsible to continue the stream by providing a body through
+  // injectEncodedDataToFilterChain()/injectDecodedDataToFilterChain().
+  // If the filter cannot provide a body the stream should be reset.
+  ContinueAndDontEndStream,
   // Do not iterate for headers as well as data and trailers for the current filter and the filters
   // following, and buffer body data for later dispatching. ContinueDecoding() MUST
   // be called if continued filter iteration is desired.
