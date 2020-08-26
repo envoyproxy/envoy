@@ -86,8 +86,8 @@ function cp_binary_for_image_build() {
 
   # Remove binaries to save space, only if BUILD_REASON exists (running in AZP)
   [[ -z "${BUILD_REASON}" ]] || \
-    rm -rf "${BASE_TARGET_DIR}"/build_"$1" "${BASE_TARGET_DIR}"/build_"$1"_stripped "${ENVOY_DELIVERY_DIR}"/envoy \
-      bazel-bin/"${ENVOY_BIN}"
+    rm -rf "${BASE_TARGET_DIR}"/build_"$1" "${BASE_TARGET_DIR}"/build_"$1"_stripped "${ENVOY_DELIVERY_DIR}"/envoy{,.dwp} \
+      bazel-bin/"${ENVOY_BIN}"{,.dwp}
 }
 
 function bazel_binary_build() {
@@ -263,6 +263,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define path_normalization_by_default=true \
     --define deprecated_features=disabled \
     --define use_new_codecs_in_integration_tests=true \
+    --define zlib=ng \
   "
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
   setup_clang_toolchain

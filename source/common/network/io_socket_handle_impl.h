@@ -44,6 +44,7 @@ public:
 
   Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
                                    RecvMsgOutput& output) override;
+  Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override;
 
   bool supportsMmsg() const override;
   bool supportsUdpGro() const override;
@@ -61,6 +62,7 @@ public:
   Address::InstanceConstSharedPtr peerAddress() override;
   Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                                       Event::FileTriggerType trigger, uint32_t events) override;
+  Api::SysCallIntResult shutdown(int how) override;
 
 protected:
   // Converts a SysCallSizeResult to IoCallUint64Result.

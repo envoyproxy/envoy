@@ -86,7 +86,7 @@ public:
   struct RecvMsgPerPacketInfo {
     // The destination address from transport header.
     Address::InstanceConstSharedPtr local_address_;
-    // The the source address from transport header.
+    // The source address from transport header.
     Address::InstanceConstSharedPtr peer_address_;
     // The payload length of this packet.
     unsigned int msg_len_{0};
@@ -142,6 +142,14 @@ public:
    */
   virtual Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
                                            RecvMsgOutput& output) PURE;
+
+  /**
+   * Read data into given buffer for connected handles
+   * @param buffer buffer to read the data into
+   * @param length buffer length
+   * @param flags flags to pass to the underlying recv function (see man 2 recv)
+   */
+  virtual Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) PURE;
 
   /**
    * return true if the platform supports recvmmsg() and sendmmsg().
@@ -240,6 +248,11 @@ public:
    */
   virtual Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                                               Event::FileTriggerType trigger, uint32_t events) PURE;
+
+  /**
+   * Shut down part of a full-duplex connection (see man 2 shutdown)
+   */
+  virtual Api::SysCallIntResult shutdown(int how) PURE;
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;

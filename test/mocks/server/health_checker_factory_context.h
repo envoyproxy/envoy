@@ -3,11 +3,14 @@
 #include "envoy/server/health_checker_config.h"
 
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/mocks/upstream/health_check_event_logger.h"
+#include "test/mocks/upstream/health_checker.h"
 
 #include "gmock/gmock.h"
 
