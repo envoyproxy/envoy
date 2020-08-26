@@ -339,10 +339,23 @@
         "path_rewrite": "",
         "virtual_cluster_name": "",
         "virtual_host_name": "",
-        "request_header_matches": [
+        "response_header_matches": [
           {
             "name": "content-type",
             "exact_match": "text/plain"
+          },
+          {
+            "name": "x-ping-response",
+            "exact_match": "yes"
+          },
+          {
+            "name": "x-ping-response",
+            "present_match": true
+          },
+          {
+            "name": "x-ping-response",
+            "present_match": false,
+            "invert_match": true
           }
         ]
       }

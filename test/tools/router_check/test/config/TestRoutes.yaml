@@ -21,7 +21,7 @@ virtual_hosts:
         response_headers_to_add:
           - header:
               key: "x-ping-response"
-              value: "true"
+              value: "yes"
       - match:
           path: /
         route:

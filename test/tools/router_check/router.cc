@@ -430,7 +430,8 @@ bool RouterCheckTool::matchHeaderField(const HM& header_map,
     }
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPresentMatch:
-    if (expectHeaderField(header_map, header.name(), test_type, !header.invert_match())) {
+    if (expectHeaderField(header_map, header.name(), test_type,
+                          header.present_match() ^ header.invert_match())) {
       return true;
     }
     break;
@@ -457,9 +458,11 @@ template <typename HM>
 bool RouterCheckTool::expectHeaderField(const HM& header_map, const std::string& field,
                                         const std::string& test_type, const bool expect_present) {
   if (header_map.has(field) != expect_present) {
-    tests_.back().second.emplace_back(
-        "expected: [has(" + field + "):" + std::string{expect_present} + "], " + "actual: [has(" +
-        field + "):" + std::string{!expect_present} + "], test type:" + test_type);
+    std::string expected{expect_present ? "true" : "false"};
+    std::string actual{expect_present ? "false" : "true"};
+    tests_.back().second.emplace_back("expected: [has(" + field + "):" + expected + "], " +
+                                      "actual: [has(" + field + "):" + actual +
+                                      "], test type:" + test_type);
     return false;
   }
   return true;
