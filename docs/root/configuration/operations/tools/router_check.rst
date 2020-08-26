@@ -68,11 +68,13 @@ expects a cluster name match of "instant-server".::
       path_rewrite: ...,
       path_redirect: ...,
       request_header_matches:
-        - key: ...,
-          value: ...
+        - name: ...,
+          exact_match: ...
       response_header_matches:
-        - key: ...,
-          value: ...
+        - name: ...,
+          exact_match: ...
+        - name: ...,
+          presence_match: ...
 
 test_name
   *(required, string)* The name of a test object.
@@ -166,7 +168,7 @@ validate
       *(optional, boolean)* If true, checks only for header presence.
 
     invert_match
-      *(optional, boolean)* The exact value of the header field to match.
+      *(optional, boolean)* If true, the match will pass when it would fail, and fail when it would pass.
 
 Coverage
 --------
