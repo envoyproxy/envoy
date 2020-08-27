@@ -1,10 +1,9 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 
+#include "common/common/hash.h"
 #include "common/network/socket_impl.h"
 #include "common/network/socket_option_impl.h"
-
-#include "common/common/hash.h"
 
 #include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
@@ -747,7 +746,7 @@ route_policy:
         return host;
       }));
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   test_sessions_[0].recvDataFromUpstream("world");
 }
@@ -770,7 +769,7 @@ cluster: fake_cluster
             return host;
           }));
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   test_sessions_[0].recvDataFromUpstream("world");
 }

@@ -7,8 +7,8 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/api/os_sys_calls_impl.h"
-#include "common/network/socket_impl.h"
 #include "common/network/hash_policy.h"
+#include "common/network/socket_impl.h"
 #include "common/network/socket_interface.h"
 #include "common/network/utility.h"
 #include "common/upstream/load_balancer_impl.h"
