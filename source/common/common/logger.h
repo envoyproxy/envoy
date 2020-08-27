@@ -369,7 +369,7 @@ protected:
  * Convenience macro to log to the misc logger, which allows for logging without of direct access to
  * a logger.
  */
-#define GET_MISC_LOGGER() Logger::Registry::getLog(Logger::Id::misc)
+#define GET_MISC_LOGGER() ::Envoy::Logger::Registry::getLog(::Envoy::Logger::Id::misc)
 #define ENVOY_LOG_MISC(LEVEL, ...) ENVOY_LOG_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, ##__VA_ARGS__)
 
 /**
