@@ -133,7 +133,8 @@ function bazel_binary_build() {
 
 function run_process_test_result() {
   echo "running flaky test reporting script"
-  flaky_test/run_process_xml.sh "$CI_TARGET" || echo "not able to locate the script needed to process test results"
+  "${ENVOY_SRCDIR}"/flaky_test/run_process_xml.sh "$CI_TARGET"
+  #|| echo "not able to locate the script needed to process test results"
 }
 
 CI_TARGET=$1
@@ -216,7 +217,6 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
     pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
     bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${ENVOY_FILTER_EXAMPLE_TESTS}
     popd
-    run_process_test_result
   fi
   # Also validate that integration test traffic tapping (useful when debugging etc.)
   # works. This requires that we set TAP_PATH. We do this under bazel.asan to
@@ -236,7 +236,6 @@ elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
     pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
     bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan ${ENVOY_FILTER_EXAMPLE_TESTS}
     popd
-    run_process_test_result
   fi
   exit 0
 elif [[ "$CI_TARGET" == "bazel.msan" ]]; then
