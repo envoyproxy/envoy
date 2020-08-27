@@ -1,3 +1,2 @@
-Network level filters need to be hardened to be able to handle untrusted inputs. 
-Generic network level filter fuzzers can help find bugs in the filters.
-To add a new filter into generic network level filter fuzz tests, see the [doc](https://github.com/envoyproxy/envoy/blob/master/source/docs/network_filter_fuzzing.md) here
+Network filters need to be fuzzed. Filters come in two flavors, each with their own fuzzer. Read filters should be added into the Generic ReadFilter Fuzzer. Write Filters should added into the Generic WriteFilter Fuzzer. Some filters are both raed and write filters: They should be added into both fuzzers.
+To add a new filter into generic network level filter fuzzers, see the [doc](https://github.com/envoyproxy/envoy/blob/master/source/docs/network_filter_fuzzing.md) here
