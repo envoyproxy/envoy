@@ -436,6 +436,7 @@ public:
         local_reply_(local_reply),
         stream_info_(protocol, time_source, parent_filter_state, filter_state_life_span) {}
   ~FilterManager() override {
+    ASSERT(state_.destroyed_);
     for (const auto& log_handler : access_log_handlers_) {
       log_handler->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
                        stream_info_);

@@ -616,6 +616,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
     }
   }
 
+  filter_callbacks.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
   filter_callbacks.connection_.dispatcher_.clearDeferredDeleteList();
 }
 
