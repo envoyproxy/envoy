@@ -583,8 +583,6 @@ private:
     // of this by updating the calls to sendLocalReply to pass ownership over the headers + adding
     // asserts that we don't call the overload that doesn't pass ownership unless decodeData has
     // been called.
-    // TODO(snowp): This is no good since create FC moves the ptr as well, fix
-    // ASSERT(request_headers_ == nullptr);
     request_headers_ = request_headers;
   }
 
