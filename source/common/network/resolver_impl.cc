@@ -48,23 +48,9 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Addres
   case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
     return resolveProtoSocketAddress(address.socket_address());
   case envoy::config::core::v3::Address::AddressCase::kPipe:
-    return std::make_shared<PipeInstance>(address.pipe().path());
-  case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
-    switch (address.envoy_internal_address().address_name_specifier_case()) {
-    case envoy::config::core::v3::EnvoyInternalAddress::AddressNameSpecifierCase::
-        kServerListenerName:
-      return std::make_shared<EnvoyInternalInstance>(
-          address.envoy_internal_address().server_listener_name());
-    case envoy::config::core::v3::EnvoyInternalAddress::AddressNameSpecifierCase::kClientAddressId:
-      return std::make_shared<EnvoyInternalInstance>(
-          address.envoy_internal_address().client_address_id());
-    default:
-      throw EnvoyException("Internal address must be a server listener name or client address id" +
-                           address.DebugString());
-    }
+    return InstanceConstSharedPtr{new PipeInstance(address.pipe().path())};
   default:
-    throw EnvoyException("Address must be a socket, pipe or envoy internal: " +
-                         address.DebugString());
+    throw EnvoyException("Address must be a socket or pipe: " + address.DebugString());
   }
 }
 

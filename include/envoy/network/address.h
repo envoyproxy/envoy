@@ -118,18 +118,7 @@ public:
   virtual mode_t mode() const PURE;
 };
 
-class EnvoyInternalAddress {
-public:
-  virtual ~EnvoyInternalAddress() = default;
-
-  /**
-   * @return The unique id of the internal address. If the address represents the destination
-   * internal listener, the address id is that listener name.
-   */
-  virtual const std::string& addressId() const PURE;
-};
-
-enum class Type { Ip, Pipe, EnvoyInternal };
+enum class Type { Ip, Pipe };
 
 /**
  * Interface for all network addresses.
@@ -176,12 +165,6 @@ public:
    * @return the pipe address information IFF type() == Type::Pipe, otherwise nullptr.
    */
   virtual const Pipe* pipe() const PURE;
-
-  /**
-   * @return the envoy internal address information IFF type() ==
-   * Type::EnvoyInternal, otherwise nullptr.
-   */
-  virtual const EnvoyInternalAddress* envoyInternalAddress() const PURE;
 
   /**
    * @return the underlying structure wherein the address is stored

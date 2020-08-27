@@ -436,7 +436,6 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, connect, (os_fd_t), (const));
   MOCK_METHOD(const Address::Ip*, ip, (), (const));
   MOCK_METHOD(const Address::Pipe*, pipe, (), (const));
-  MOCK_METHOD(Address::EnvoyInternalAddress*, envoyInternalAddress, (), (const));
   MOCK_METHOD(IoHandlePtr, socket, (Socket::Type), (const));
   MOCK_METHOD(Address::Type, type, (), (const));
   MOCK_METHOD(const sockaddr*, sockAddr, (), (const));

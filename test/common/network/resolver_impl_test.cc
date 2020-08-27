@@ -157,7 +157,7 @@ TEST(ResolverTest, NonStandardResolver) {
 TEST(ResolverTest, UninitializedAddress) {
   envoy::config::core::v3::Address address;
   EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(address), EnvoyException,
-                            "Address must be a socket, pipe or envoy internal: ");
+                            "Address must be a socket or pipe: ");
 }
 
 TEST(ResolverTest, NoSuchResolver) {
