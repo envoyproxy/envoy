@@ -48,7 +48,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 
 #if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
-  const int rc = Api::OsSysCallsSingleton::get().setsocketblocking(io_handle->fd(), false).rc_;
+  const int rc = io_handle->setBlocking(false).rc_;
   RELEASE_ASSERT(!SOCKET_FAILURE(rc), "");
 #endif
 

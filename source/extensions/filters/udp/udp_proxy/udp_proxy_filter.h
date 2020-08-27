@@ -6,6 +6,8 @@
 #include "envoy/network/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/api/os_sys_calls_impl.h"
+#include "common/network/socket_impl.h"
 #include "common/network/hash_policy.h"
 #include "common/network/socket_interface.h"
 #include "common/network/utility.h"
@@ -65,7 +67,13 @@ public:
                        const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config)
       : cluster_manager_(cluster_manager), time_source_(time_source), cluster_(config.cluster()),
         session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
+        use_original_src_ip_(config.use_original_src_ip()),
         stats_(generateStats(config.stat_prefix(), root_scope)) {
+    if (use_original_src_ip_ && !Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
+      ExceptionUtil::throwEnvoyException(
+          "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
+          "is not running with the CAP_NET_ADMIN capability.");
+    }
     if (config.has_route_policy() && config.route_policy().has_hash_policy()) {
       // Only one hash policy is supported.
       const envoy::type::v3::HashPolicy* const hash_policies[] = {
@@ -77,6 +85,7 @@ public:
   const std::string& cluster() const { return cluster_; }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   std::chrono::milliseconds sessionTimeout() const { return session_timeout_; }
+  bool usingOriginalSrcIp() const { return use_original_src_ip_; }
   const Network::HashPolicy* hashPolicy() const { return hash_policy_.get(); }
   UdpProxyDownstreamStats& stats() const { return stats_; }
   TimeSource& timeSource() const { return time_source_; }
@@ -93,6 +102,7 @@ private:
   TimeSource& time_source_;
   const std::string cluster_;
   const std::chrono::milliseconds session_timeout_;
+  const bool use_original_src_ip_;
   std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
   mutable UdpProxyDownstreamStats stats_;
 };
@@ -165,6 +175,7 @@ private:
     }
 
     ClusterInfo& cluster_;
+    const bool use_original_src_ip_;
     const Network::UdpRecvData::LocalPeerAddresses addresses_;
     const Upstream::HostConstSharedPtr host_;
     // TODO(mattklein123): Consider replacing an idle timer for each session with a last used
@@ -173,10 +184,10 @@ private:
     // idle timeouts work so we should consider unifying the implementation if we move to a time
     // stamp and scan approach.
     const Event::TimerPtr idle_timer_;
-    // The IO handle is used for writing packets to the selected upstream host as well as receiving
+    // The socket is used for writing packets to the selected upstream host as well as receiving
     // packets from the upstream host. Note that a a local ephemeral port is bound on the first
     // write to the upstream host.
-    const Network::IoHandlePtr io_handle_;
+    const Network::SocketPtr socket_;
     const Event::FileEventPtr socket_event_;
   };
 
@@ -250,9 +261,9 @@ private:
         host_to_sessions_;
   };
 
-  virtual Network::IoHandlePtr createIoHandle(const Upstream::HostConstSharedPtr& host) {
+  virtual Network::SocketPtr createSocket(const Upstream::HostConstSharedPtr& host) {
     // Virtual so this can be overridden in unit tests.
-    return Network::ioHandleForAddr(Network::Socket::Type::Datagram, host->address());
+    return std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, host->address());
   }
 
   // Upstream::ClusterUpdateCallbacks
