@@ -198,6 +198,14 @@ private:
     // connection balancing across per-handler listeners.
     std::atomic<uint64_t> num_listener_connections_{};
     bool is_deleting_{false};
+
+    using SocketMetadataPair =
+        std::pair<Network::ConnectionSocketPtr, const envoy::config::core::v3::Metadata>;
+
+    // The pending sockets waiting for filter chains to be rebuilt.
+    absl::flat_hash_map<envoy::config::listener::v3::FilterChain, std::list<SocketMetadataPair>,
+                        MessageUtil, MessageUtil>
+        pending_sockets_;
   };
 
   /**
@@ -347,16 +355,6 @@ private:
   std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerDetails>> listeners_;
   std::atomic<uint64_t> num_handler_connections_{};
   bool disable_listeners_;
-
-  using SocketMetadataPair =
-      std::pair<Network::ConnectionSocketPtr, const envoy::config::core::v3::Metadata>;
-
-  // The pending sockets waiting for filter chains to be rebuilt. Multiple listeners might request
-  // rebuilding the same filter chain.
-  absl::flat_hash_map<envoy::config::listener::v3::FilterChain,
-                      absl::flat_hash_map<std::string, std::list<SocketMetadataPair>>, MessageUtil,
-                      MessageUtil>
-      pending_sockets_;
 };
 
 /**

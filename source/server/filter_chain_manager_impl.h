@@ -122,6 +122,8 @@ public:
     return *filter_chain_message_;
   }
 
+  // This function helps on-demand filter chain to store the rebuilt filter chain, which will act as
+  // the provider of transportSocketFactory and networkFilterFactories.
   void storeRebuiltFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
     absl::MutexLock lock(&lock_);
 
@@ -130,6 +132,11 @@ public:
     rebuilt_filter_chain_ = std::move(rebuilt_filter_chain);
   }
 
+  // This function helps on-demand filter chain to change the status of a rebuilt placeholder to
+  // become back to a placeholder. After a place holder stores the rebuilt filter chain, we first
+  // set the filter chain as not a placeholder. If the rebuilding succeeds in time, we will not
+  // change it back to a placeholder. Otherwise, if the rebuilding reaches timeout without getting
+  // dependencies ready, the filter chain will become back to a placeholder.
   void backToPlaceholder() override {
     absl::MutexLock lock(&lock_);
 
@@ -155,14 +162,20 @@ private:
 
   mutable absl::Mutex lock_;
 
-  // On-demand filter chain is built with a placeholder, set this to true. After it is rebuilt, flip
-  // this to false.
+  // Normal filter chain is built during listener warming instead of on-demand, set this to false.
+  // On-demand filter chain is initialized as a placeholder, set this to true.
+  // After a placeholder is rebuilt successfully, set this to false.
   bool is_placeholder_;
-  // After a placeholder is rebuilt, set this to true to indicate rebuilt filter chain is stored
-  // inside the placeholder.
+
+  // Normal filter chain will never have a rebuilt filter chain, set this to false.
+  // On-demand filter chain is initialized as a placeholder, set this to false.
+  // After a placeholder is rebuilt successfully, the rebuilt filter chain has been stored. Set this
+  // to true.
   bool has_rebuilt_filter_chain_{false};
-  // The rebuilt filter chain.
-  // TODO(ASOPVII): add invariance.
+
+  // Normal filter chain does not need a rebuilt filter chain.
+  // For on-demand filter chain, the rebuilt filter chain will be stored to provide the
+  // transportSocketFactory and networkFilterFactories
   Network::FilterChainSharedPtr rebuilt_filter_chain_{nullptr};
 };
 

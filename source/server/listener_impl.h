@@ -226,14 +226,15 @@ public:
   Configuration::FilterChainFactoryContextPtr createFilterChainFactoryContext(
       const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
 
-  void storeWorkerInCallbackList(const std::string& worker_name);
+  void storeWorkerCallback(Event::Dispatcher& worker_dispatcher,
+                                 Network::FilterChainRebuildCallback callback);
   void callbackToWorkers(bool success);
   bool rebuildingFailed() { return state_ == State::Failed; }
   bool rebuildUnfinished() { return state_ == State::Running; }
   bool timeoutEnabled() { return timeout_enabled_; }
   Init::Manager& initManager() { return *rebuild_init_manager_; }
   void startRebuilding();
-  void stopRebuilding();
+  void cancelRebuilding();
 
 private:
   void startTimer();
@@ -267,7 +268,7 @@ private:
   const std::chrono::milliseconds rebuild_timeout_;
 
   // workers to callback to retry connection.
-  absl::flat_hash_set<std::string> workers_to_callback_;
+  absl::flat_hash_map<Event::Dispatcher*, Network::FilterChainRebuildCallback> workers_to_callback_;
 };
 
 using PerFilterChainRebuilderPtr = std::unique_ptr<PerFilterChainRebuilder>;
@@ -381,7 +382,8 @@ public:
   }
   Event::Dispatcher& dispatcher() override;
   void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
-                          const std::string& worker_name) override;
+                          Event::Dispatcher& worker_dispatcher,
+                          Network::FilterChainRebuildCallback callback) override;
 
   uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
   Init::Manager& initManager();
@@ -401,7 +403,7 @@ public:
   // Stop all unfinished rebuilding, will be called when listener update. Because it is possible
   // that old listener is drained and removed before the filter chain has finished rebuilding. We
   // should remove the rebuilt filter chains that are temporarily stored inside the placeholder.
-  void stopUnfinishedFilterChainRebuilding();
+  void cancelAllFilterChainRebuilding();
 
   void ensureSocketOptions() {
     if (!listen_socket_options_) {

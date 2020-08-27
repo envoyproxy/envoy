@@ -230,9 +230,6 @@ void FilterChainManagerImpl::rebuildFilterChain(
     const envoy::config::listener::v3::FilterChain* const& filter_chain,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
-  if (filter_chain == nullptr) {
-    return;
-  }
 
   const auto& filter_chain_match = filter_chain->filter_chain_match();
   if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
@@ -259,11 +256,8 @@ void FilterChainManagerImpl::rebuildFilterChain(
 
   // Store the rebuilt filter chain inside the placeholder, which is inserted into the match trie.
   auto& placeholder = fc_contexts_[*filter_chain];
-  if (placeholder != nullptr) {
-    placeholder->storeRebuiltFilterChain(std::move(filter_chain_impl));
-  } else {
-    ENVOY_LOG(debug, "filter chain placeholder is not found.");
-  }
+  ASSERT(placeholder != nullptr);
+  placeholder->storeRebuiltFilterChain(std::move(filter_chain_impl));
 }
 
 void FilterChainManagerImpl::stopRebuildingFilterChain(
@@ -272,11 +266,8 @@ void FilterChainManagerImpl::stopRebuildingFilterChain(
     return;
   }
   auto& rebuilt_placeholder = fc_contexts_[*filter_chain];
-  if (rebuilt_placeholder != nullptr) {
-    rebuilt_placeholder->backToPlaceholder();
-  } else {
-    ENVOY_LOG(debug, "filter chain placeholder is not found.");
-  }
+  ASSERT(rebuilt_placeholder != nullptr);
+  rebuilt_placeholder->backToPlaceholder();
 }
 
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(

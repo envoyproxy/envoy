@@ -392,7 +392,7 @@ private:
     }
     Event::Dispatcher& dispatcher() override { return parent_.server_.dispatcher(); }
     void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const&,
-                            const std::string&) override {}
+                            Event::Dispatcher&, Network::FilterChainRebuildCallback) override {}
     bool containFilterChain(const envoy::config::listener::v3::FilterChain&) const override {
       return false;
     }

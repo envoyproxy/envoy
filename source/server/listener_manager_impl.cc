@@ -574,7 +574,7 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   stats_.total_listeners_draining_.set(draining_listeners_.size());
 
   // Stop all unfinished rebuilding on this listener.
-  draining_it->listener_->stopUnfinishedFilterChainRebuilding();
+  draining_it->listener_->cancelAllFilterChainRebuilding();
 
   // Tell all workers to stop accepting new connections on this listener.
   draining_it->listener_->debugLog("draining listener");
@@ -789,7 +789,7 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
   std::list<DrainingFilterChainsManager>::iterator draining_group =
       draining_filter_chains_manager_.emplace(draining_filter_chains_manager_.begin(),
                                               std::move(draining_listener), workers_.size());
-  draining_group->getDrainingListener().stopUnfinishedFilterChainRebuilding();
+  draining_group->getDrainingListener().cancelAllFilterChainRebuilding();
   draining_group->getDrainingListener().diffFilterChain(
       new_listener, [&draining_group](Network::DrainableFilterChain& filter_chain) mutable {
         filter_chain.startDraining();

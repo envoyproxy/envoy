@@ -4269,7 +4269,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OnDemandFilterChainSingleRebuildi
 
   // Rebuild the filter chain placeholder.
   auto& listener = manager_->listeners().back().get();
-  listener.rebuildFilterChain(&filter_chain_message, "test_worker");
+  Event::MockDispatcher worker_dispatcher;
+  EXPECT_CALL(worker_dispatcher, post(_)).Times(1);
+  listener.rebuildFilterChain(&filter_chain_message, worker_dispatcher, nullptr);
 
   // After rebuilding, the filter chain is not placeholder anymore.
   // Workers will retry all connections and find the filter chain is not placeholder.
@@ -4317,10 +4319,13 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
 
   // Two rebuilding requests for the same filter chain from the same listener.
   auto& listener = manager_->listeners().back().get();
-  listener.rebuildFilterChain(&filter_chain_message, "test_worker");
+  Event::MockDispatcher worker_dispatcher;
+  EXPECT_CALL(worker_dispatcher, post(_)).Times(1);
+  listener.rebuildFilterChain(&filter_chain_message, worker_dispatcher, nullptr);
   // After the first rebuilding completes. The same listener will post request again only when the
   // first rebuilding failed.
-  listener.rebuildFilterChain(&filter_chain_message, "test_worker");
+  // TODO(ASOPVII): add rebuilder cancel rebuilding.
+  listener.rebuildFilterChain(&filter_chain_message, worker_dispatcher, nullptr);
 
   // After rebuilding, the filter chain is not placeholder anymore.
   // Workers will retry all connections and find the filter chain is not placeholder.
@@ -4372,14 +4377,20 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
 
   // Several rebuilding requests for the same filter chain from the same listener.
   auto& listener = manager_->listeners().back().get();
-  listener.rebuildFilterChain(&filter_chain_message, "test_worker1");
+  Event::MockDispatcher worker_dispatcher, worker_dispatcher2, worker_dispatcher3,
+      worker_dispatcher4;
+  EXPECT_CALL(worker_dispatcher, post(_)).Times(1);
+  EXPECT_CALL(worker_dispatcher2, post(_)).Times(1);
+  EXPECT_CALL(worker_dispatcher3, post(_)).Times(1);
+  EXPECT_CALL(worker_dispatcher4, post(_)).Times(1);
+  listener.rebuildFilterChain(&filter_chain_message, worker_dispatcher, nullptr);
   // On the first request, a rebuilder will be created to start rebuilding.
   // If multiple requests arrive for the same filter chain before the first rebuilding has
   // completed, the later requests will not trigger rebuilder creation, only the worker name will be
   // stored into the callback list.
-  listener.rebuildFilterChain(&filter_chain_message, "test_worker2");
-  listener.rebuildFilterChain(&filter_chain_message, "test_worker3");
-  listener.rebuildFilterChain(&filter_chain_message, "test_worker4");
+  listener.rebuildFilterChain(&filter_chain_message, worker_dispatcher2, nullptr);
+  listener.rebuildFilterChain(&filter_chain_message, worker_dispatcher3, nullptr);
+  listener.rebuildFilterChain(&filter_chain_message, worker_dispatcher4, nullptr);
 
   rebuilder_foo->target_.ready();
 
@@ -4477,7 +4488,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
 
   // Rebuild the filter chain placeholder.
   auto& listener = manager_->listeners().back().get();
-  listener.rebuildFilterChain(&filter_chain_message, "test_worker");
+  Event::MockDispatcher worker_dispatcher;
+  EXPECT_CALL(worker_dispatcher, post(_)).Times(1);
+  listener.rebuildFilterChain(&filter_chain_message, worker_dispatcher, nullptr);
 
   EXPECT_CALL(*worker_, addListener(_, _, _));
   manager_->addOrUpdateListener(update_listener_config, "", true);

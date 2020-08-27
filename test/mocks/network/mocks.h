@@ -364,7 +364,8 @@ public:
   MOCK_METHOD(ResourceLimit&, openConnections, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, rebuildFilterChain,
-              (const envoy::config::listener::v3::FilterChain* const&, const std::string&));
+              (const envoy::config::listener::v3::FilterChain* const&, Event::Dispatcher&,
+               Network::FilterChainRebuildCallback));
   MOCK_METHOD(bool, containFilterChain, (const envoy::config::listener::v3::FilterChain&), (const));
   MOCK_METHOD(uint32_t, tcpBacklogSize, (), (const));
 

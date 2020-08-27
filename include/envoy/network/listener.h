@@ -55,7 +55,8 @@ public:
 };
 
 using ListenSocketFactorySharedPtr = std::shared_ptr<ListenSocketFactory>;
-
+using FilterChainRebuildCallback =
+    std::function<void(bool success, const envoy::config::listener::v3::FilterChain& filter_chain)>;
 /**
  * A configuration for an individual listener.
  */
@@ -173,7 +174,8 @@ public:
    */
   virtual void
   rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
-                     const std::string& worker_name) PURE;
+                     Event::Dispatcher& worker_dispatcher,
+                     FilterChainRebuildCallback callback) PURE;
 
   /**
    * @return true if this listener contains the given filter chain.

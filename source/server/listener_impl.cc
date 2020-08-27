@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/network/exception.h"
 #include "envoy/network/udp_packet_writer_config.h"
@@ -246,8 +247,11 @@ PerFilterChainRebuilder::PerFilterChainRebuilder(
       rebuild_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(filter_chain->on_demand_configuration(),
                                                   rebuild_timeout, 15000)) {}
 
-void PerFilterChainRebuilder::storeWorkerInCallbackList(const std::string& worker_name) {
-  workers_to_callback_.insert(worker_name);
+void PerFilterChainRebuilder::storeWorkerCallback(Event::Dispatcher& worker_dispatcher,
+                                                  Network::FilterChainRebuildCallback callback) {
+  if (workers_to_callback_.find(&worker_dispatcher) == workers_to_callback_.end()) {
+    workers_to_callback_[&worker_dispatcher] = callback;
+  }
 }
 
 Configuration::FilterChainFactoryContextPtr
@@ -260,14 +264,13 @@ PerFilterChainRebuilder::createFilterChainFactoryContext(
 void PerFilterChainRebuilder::callbackToWorkers(bool success) {
   // Send callbacks to all stored workers.
   // Possible optimization: send callback to all workers.
-  for (const auto& worker_name : workers_to_callback_) {
-    ENVOY_LOG(debug, "rebuilding completed, callback to worker: {}", worker_name);
-    if (listener_.hasWorker(worker_name)) {
-      auto& worker = listener_.getWorkerByName(worker_name);
-      worker.onFilterChainRebuilt(success, filter_chain_);
-    } else {
-      ENVOY_LOG(debug, "worker with name: {} does not exists", worker_name);
-    }
+  for (const auto& [worker_dispatcher, callback] : workers_to_callback_) {
+    ENVOY_LOG(debug, "rebuilding completed, callback to worker: {}", worker_dispatcher->name());
+    worker_dispatcher->post([this, &success, &retry = callback]() {
+      if (retry != nullptr) {
+        retry(success, *this->filter_chain_);
+      }
+    });
   }
   workers_to_callback_.clear();
 }
@@ -282,7 +285,7 @@ void PerFilterChainRebuilder::startRebuilding() {
   rebuild_init_manager_->initialize(rebuild_watcher_);
 }
 
-void PerFilterChainRebuilder::stopRebuilding() {
+void PerFilterChainRebuilder::cancelRebuilding() {
   if (state_ == State::Running) {
     state_ = State::Failed;
   }
@@ -291,10 +294,7 @@ void PerFilterChainRebuilder::stopRebuilding() {
 void PerFilterChainRebuilder::startTimer() { rebuild_timer_->enableTimer(rebuild_timeout_); }
 
 void PerFilterChainRebuilder::onTimeout() {
-  if (state_ != State::Running) {
-    // If rebuilding has stopped, just stop this timer.
-    rebuild_timer_->disableTimer();
-  } else {
+  if (state_ == State::Running) {
     // If timeout before getting response from dependencies, rebuilding fails.
     state_ = State::Failed;
     listener_.stopRebuildingFilterChain(filter_chain_);
@@ -571,8 +571,8 @@ Event::Dispatcher& ListenerImpl::dispatcher() { return parent_.server_.dispatche
 
 void ListenerImpl::rebuildFilterChain(
     const envoy::config::listener::v3::FilterChain* const& filter_chain_message,
-    const std::string& worker_name) {
-  ENVOY_LOG(debug, "receive rebuilding request from worker: {}", worker_name);
+    Event::Dispatcher& worker_dispatcher, Network::FilterChainRebuildCallback callback) {
+  ENVOY_LOG(debug, "receive rebuilding request from worker: {}", worker_dispatcher.name());
   if (filter_chain_message == nullptr) {
     ENVOY_LOG(debug, "filter chain message is empty");
     return;
@@ -610,9 +610,7 @@ void ListenerImpl::rebuildFilterChain(
   }
 
   const auto& rebuilder = filter_chain_rebuilder_map_[filter_chain_message];
-  rebuilder->storeWorkerInCallbackList(worker_name);
-  // TODO(ASOPVII): if listener update before rebuilding completes, the stored filter chain is not
-  // ready, should be abandoned.
+  rebuilder->storeWorkerCallback(worker_dispatcher, callback);
 
   if (should_start_rebuilding) {
     Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
@@ -636,13 +634,14 @@ void ListenerImpl::stopRebuildingFilterChain(
   filter_chain_manager_.stopRebuildingFilterChain(filter_chain_message);
 }
 
-void ListenerImpl::stopUnfinishedFilterChainRebuilding() {
+void ListenerImpl::cancelAllFilterChainRebuilding() {
   for (const auto& [filter_chain, rebuilder] : filter_chain_rebuilder_map_) {
     if (rebuilder->rebuildUnfinished()) {
-      rebuilder->stopRebuilding();
+      rebuilder->cancelRebuilding();
       stopRebuildingFilterChain(filter_chain);
     }
   }
+  filter_chain_rebuilder_map_.clear();
 }
 
 bool ListenerImpl::hasWorker(const std::string& name) { return parent_.hasWorker(name); }

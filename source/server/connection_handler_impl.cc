@@ -115,21 +115,37 @@ void ConnectionHandlerImpl::enableListeners() {
 void ConnectionHandlerImpl::closeSocketsOnListenerUpdate(
     const Network::ListenerConfig& old_config, const Network::ListenerConfig& new_config) {
   const std::string& listener_name = new_config.name();
+  const std::string& old_listener_name = old_config.name();
   ENVOY_LOG(debug,
-            "close sockets that the old listener {} has stored if the updated listener does not "
+            "close sockets that the old listener {} has stored if the updated listener {} does not "
             "contain the same filter chain.",
-            listener_name);
-  for (auto& [filter_chain_message, listener_sockets_map] : pending_sockets_) {
-    for (auto& [name, socket_metadata_pairs] : listener_sockets_map) {
-      if (name == listener_name) {
-        if (old_config.containFilterChain(filter_chain_message) &&
-            !new_config.containFilterChain(filter_chain_message)) {
-          ENVOY_LOG(debug, "close sockets because the updated listener does not have the filter "
-                           "chain that the old one had.");
-          for (auto& [socket, metadata] : socket_metadata_pairs) {
-            socket->close();
+            listener_name, old_listener_name);
+  for (auto& listener : listeners_) {
+    if (listener.second.tcp_listener_.has_value()) {
+      auto& active_tcp_listener = listener.second.tcp_listener_->get();
+      const auto& name = active_tcp_listener.config_->name();
+      // Find the listener that is updated.
+      if (listener_name == name) {
+        // Go through the pending_sockets to check if the updated listener does not have a filter
+        // chain any more.
+        auto& pending_sockets = active_tcp_listener.pending_sockets_;
+
+        auto pending_sockets_it = pending_sockets.begin();
+        while (pending_sockets_it != pending_sockets.end()) {
+          auto cur_pending_sockets_it = pending_sockets_it++;
+          // If the updated listener does not have a filter chain that the old listener had
+          // requested rebuilding, we close those sockets.
+          auto& [filter_chain_message, socket_metadata_pairs] = *cur_pending_sockets_it;
+          if (old_config.containFilterChain(filter_chain_message) &&
+              !new_config.containFilterChain(filter_chain_message)) {
+            ENVOY_LOG(debug, "close sockets because the updated listener does not have the filter "
+                             "chain that the old listener had.");
+            for (auto& [socket, metadata] : socket_metadata_pairs) {
+              ENVOY_LOG(debug, "close sockets");
+              socket->close();
+            }
+            pending_sockets.erase(cur_pending_sockets_it);
           }
-          listener_sockets_map.erase(name);
         }
         break;
       }
@@ -143,20 +159,19 @@ void ConnectionHandlerImpl::retryConnections(
     ENVOY_LOG(debug, "filter chain has been cleared.");
     return;
   }
-  // TODO(ASOPVII): bind look up.
-  auto& listener_sockets_map = pending_sockets_[*filter_chain_message];
   // Go through all listeners on this worker, if a listener has sent request to rebuild the
   // filter chain, now retry connection with those stored sockets.
   for (auto& listener : listeners_) {
     if (listener.second.tcp_listener_.has_value()) {
       auto& active_tcp_listener = listener.second.tcp_listener_->get();
       const auto& listener_name = active_tcp_listener.config_->name();
-      ENVOY_LOG(debug, "connection handler has active tcp listener with name: {}.", listener_name);
-      // Find all SocketMetadataPair of this active tcp listener.
-      auto sockets_metadata_list_it = listener_sockets_map.find(listener_name);
-      if (sockets_metadata_list_it != listener_sockets_map.end()) {
-        ENVOY_LOG(debug, "found listener: {} that has sockets to retry.", listener_name);
-        for (auto& [socket, metadata] : sockets_metadata_list_it->second) {
+      auto& pending_sockets = active_tcp_listener.pending_sockets_;
+      // If this listener has requested rebuilding this filter chain, we retry all stored sockets
+      // waiting for this filter chain.
+      auto listener_sockets_map_it = pending_sockets.find(*filter_chain_message);
+      if (listener_sockets_map_it != pending_sockets.end()) {
+        ENVOY_LOG(debug, "found listener: {} that has stored sockets to retry.", listener_name);
+        for (auto& [socket, metadata] : listener_sockets_map_it->second) {
           // Retry connection with that socket on this active tcp listener.
           if (success) {
             active_tcp_listener.incNumConnections();
@@ -165,11 +180,10 @@ void ConnectionHandlerImpl::retryConnections(
             socket->close();
           }
         }
-        listener_sockets_map.erase(sockets_metadata_list_it);
+        pending_sockets.erase(listener_sockets_map_it);
       }
     }
   }
-  pending_sockets_.erase(*filter_chain_message);
 }
 
 void ConnectionHandlerImpl::ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
@@ -476,13 +490,17 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     const auto& filter_chain_message = filter_chain->getFilterChainMessage();
 
     // Store the socket and dynamic_metadata for later connection retry.
-
-    parent_.pending_sockets_[filter_chain_message][listener_name].emplace_back(std::move(socket),
-                                                                               dynamic_metadata);
+    pending_sockets_[filter_chain_message].emplace_back(std::move(socket), dynamic_metadata);
     // Post rebuilding request to the master thread.
     auto& server_dispatcher = config_->dispatcher();
-    server_dispatcher.post([&filter_chain_message, &worker_name, &listener = config_]() {
-      listener->rebuildFilterChain(&filter_chain_message, worker_name);
+    auto& worker_dispatcher = parent_.dispatcher_;
+    server_dispatcher.post([&listener = *config_, &filter_chain_message, &worker_dispatcher,
+                            &handler = parent_]() {
+      listener.rebuildFilterChain(
+          &filter_chain_message, worker_dispatcher,
+          [&handler](bool success, const envoy::config::listener::v3::FilterChain& filter_chain) {
+            handler.retryConnections(success, &filter_chain);
+          });
     });
     // Temporarily decrease num_listener_connections_, will increase when retry this connection. To
     // avoid assert inside listener destructor.

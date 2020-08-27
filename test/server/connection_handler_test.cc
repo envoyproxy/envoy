@@ -120,7 +120,8 @@ public:
     }
     Event::Dispatcher& dispatcher() override { return parent_.master_dispatcher_; }
     void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const&,
-                            const std::string&) override {}
+                            Event::Dispatcher&, Network::FilterChainRebuildCallback) override {}
+
     bool containFilterChain(const envoy::config::listener::v3::FilterChain&) const override {
       // for testing listener update with new listener remove old filter chain. We set old listener
       // contain the filter chain, while updated listener not.
