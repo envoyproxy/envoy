@@ -1,4 +1,5 @@
 #include "envoy/api/v2/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
@@ -82,6 +83,7 @@ protected:
       auto* lds_api_config_source =
           bootstrap.mutable_dynamic_resources()->mutable_lds_config()->mutable_api_config_source();
       lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+      lds_api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
       envoy::config::core::v3::GrpcService* grpc_service =
           lds_api_config_source->add_grpc_services();
       setGrpcService(*grpc_service, "lds_cluster", getLdsFakeUpstream().localAddress());
@@ -177,7 +179,7 @@ protected:
 
   void sendLdsResponseV3(const std::vector<std::string>& listener_configs,
                          const std::string& version) {
-    envoy::service::discovery::v3::DiscoveryResponse response;
+    API_NO_BOOST(envoy::service::discovery::v3::DiscoveryResponse) response;
     response.set_version_info(version);
     response.set_type_url("type.googleapis.com/envoy.config.listener.v3.Listener");
     for (const auto& listener_blob : listener_configs) {
@@ -190,7 +192,7 @@ protected:
   }
 
   void sendRdsResponseV3(const std::string& route_config, const std::string& version) {
-    envoy::service::discovery::v3::DiscoveryResponse response;
+    API_NO_BOOST(envoy::service::discovery::v3::DiscoveryResponse) response;
     response.set_version_info(version);
     response.set_type_url("type.googleapis.com/envoy.config.route.v3.RouteConfiguration");
     const auto route_configuration =
@@ -284,21 +286,15 @@ TEST_P(ListenerIntegrationTest, BasicSuccess) {
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
 }
 
-TEST_P(ListenerIntegrationTest, BasicSuccessWithOnDemandFilterChain) {
+TEST_P(ListenerIntegrationTest, BasicSuccessV3) {
   on_server_init_function_ = [&]() {
     createLdsStream();
-    // Make all filter chains of this listener to be built on-demand.
-    // for (auto i = 0; i < listener_config_.filter_chains().size(); i++) {
-    //   auto* filter_chain = listener_config_.mutable_filter_chains(i);
-    //   auto* on_demand_configuration = filter_chain->mutable_on_demand_configuration();
-    //   on_demand_configuration->mutable_rebuild_timeout()->CopyFrom(
-    //   Protobuf::util::TimeUtil::MillisecondsToDuration(15000));
-    // }
-    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+    // using v3.
+    sendLdsResponseV3({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+    // TODO next, mutate listener config, add on-demand filter chain.
     createRdsStream(route_table_name_);
   };
   initialize();
-  ENVOY_LOG_MISC(error, "listener config: {}", listener_config_.DebugString());
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
@@ -315,6 +311,7 @@ TEST_P(ListenerIntegrationTest, BasicSuccessWithOnDemandFilterChain) {
         - match: {{ prefix: "/" }}
           route: {{ cluster: {} }}
 )EOF";
+  // without using v3.
   sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
   test_server_->waitForCounterGe(
       fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
@@ -339,5 +336,61 @@ TEST_P(ListenerIntegrationTest, BasicSuccessWithOnDemandFilterChain) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
 }
+
+// TEST_P(ListenerIntegrationTest, BasicSuccessWithOnDemandFilterChain) {
+//   on_server_init_function_ = [&]() {
+//     createLdsStream();
+//     // Make all filter chains of this listener to be built on-demand.
+//     // for (auto i = 0; i < listener_config_.filter_chains().size(); i++) {
+//     //   auto* filter_chain = listener_config_.mutable_filter_chains(i);
+//     //   auto* on_demand_configuration = filter_chain->mutable_on_demand_configuration();
+//     //   on_demand_configuration->mutable_rebuild_timeout()->CopyFrom(
+//     //   Protobuf::util::TimeUtil::MillisecondsToDuration(15000));
+//     // }
+//     sendLdsResponseV3({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+//     createRdsStream(route_table_name_);
+//   };
+//   initialize();
+//   ENVOY_LOG_MISC(error, "listener config: {}", listener_config_.DebugString());
+//   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+//   // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
+//   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+//   // Workers not started, the LDS added listener 0 is in active_listeners_ list.
+//   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+//   registerTestServerPorts({listener_name_});
+
+//   const std::string route_config_tmpl = R"EOF(
+//       name: {}
+//       virtual_hosts:
+//       - name: integration
+//         domains: ["*"]
+//         routes:
+//         - match: {{ prefix: "/" }}
+//           route: {{ cluster: {} }}
+// )EOF";
+//   sendRdsResponseV3(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
+//   test_server_->waitForCounterGe(
+//       fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+//   // Now testing-listener-0 finishes initialization, Server initManager will be ready.
+//   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+
+//   test_server_->waitUntilListenersReady();
+//   // NOTE: The line above doesn't tell you if listener is up and listening.
+//   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+//   // Request is sent to cluster_0.
+
+//   codec_client_ = makeHttpConnection(lookupPort(listener_name_));
+//   int response_size = 800;
+//   int request_size = 10;
+//   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+//                                                    {"server_id", "cluster_0, backend_0"}};
+//   auto response = sendRequestAndWaitForResponse(
+//       Http::TestResponseHeaderMapImpl{
+//           {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
+//       request_size, response_headers, response_size, /*cluster_0*/ 0);
+//   verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+//   EXPECT_TRUE(upstream_request_->complete());
+//   EXPECT_EQ(request_size, upstream_request_->bodyLength());
+// }
 } // namespace
 } // namespace Envoy
