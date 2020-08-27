@@ -477,6 +477,45 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
   }
 }
 
+// TODO(chaoqin-li1123): Make on demand vhds and on demand srds works at the same time.
+void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
+    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+  absl::optional<Router::ConfigConstSharedPtr> route_config = parent_.routeConfig();
+  Event::Dispatcher& thread_local_dispatcher =
+      parent_.connection_manager_.read_callbacks_->connection().dispatcher();
+  absl::optional<uint64_t> scope_key_hash;
+  if (route_config.has_value() && route_config.value()->usesVhds()) {
+    // On demand vhds
+    ASSERT(!parent_.filter_manager_.requestHeaders()->Host()->value().empty());
+    const auto& host_header =
+        absl::AsciiStrToLower(parent_.filter_manager_.requestHeaders()->getHostValue());
+    requestVhdsUpdate(host_header, thread_local_dispatcher, std::move(route_config_updated_cb));
+    return;
+  } else if (parent_.snapped_scoped_routes_config_ != nullptr &&
+             (scope_key_hash = parent_.snapped_scoped_routes_config_->computeKeyHash(
+                  *parent_.filter_manager_.requestHeaders()))) {
+    // On demand srds
+    Http::RouteConfigUpdatedCallback scoped_route_config_updated_cb =
+        Http::RouteConfigUpdatedCallback(
+            [this, weak_route_config_updated_cb = std::weak_ptr<Http::RouteConfigUpdatedCallback>(
+                       route_config_updated_cb)](bool scope_exist) {
+              // If the callback can be locked, this ActiveStream is still alive.
+              if (auto cb = weak_route_config_updated_cb.lock()) {
+                // Refresh the route before continue the filter chain.
+                if (scope_exist) {
+                  parent_.refreshCachedRoute();
+                }
+                (*cb)(scope_exist && parent_.hasCachedRoute());
+              }
+            });
+    requestSrdsUpdate(*scope_key_hash, thread_local_dispatcher,
+                      std::move(scoped_route_config_updated_cb));
+    return;
+  }
+  // Continue the filter chain if no on demand update is requested.
+  (*route_config_updated_cb)(false);
+}
+
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestVhdsUpdate(
     const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
@@ -529,12 +568,12 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       connection_manager.config_.routeConfigProvider() != nullptr) {
     route_config_update_requester_ =
         std::make_unique<ConnectionManagerImpl::RdsRouteConfigUpdateRequester>(
-            connection_manager.config_.routeConfigProvider());
+            connection_manager.config_.routeConfigProvider(), *this);
   } else if (connection_manager_.config_.isRoutable() &&
              connection_manager.config_.scopedRouteConfigProvider() != nullptr) {
     route_config_update_requester_ =
         std::make_unique<ConnectionManagerImpl::RdsRouteConfigUpdateRequester>(
-            connection_manager.config_.scopedRouteConfigProvider());
+            connection_manager.config_.scopedRouteConfigProvider(), *this);
   }
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
@@ -1159,41 +1198,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
 // TODO(chaoqin-li1123): Make on demand vhds and on demand srds works at the same time.
 void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  absl::optional<Router::ConfigConstSharedPtr> route_config = routeConfig();
-  Event::Dispatcher& thread_local_dispatcher =
-      connection_manager_.read_callbacks_->connection().dispatcher();
-  absl::optional<uint64_t> scope_key_hash;
-  if (route_config.has_value() && route_config.value()->usesVhds()) {
-    // On demand vhds
-    ASSERT(!filter_manager_.requestHeaders()->Host()->value().empty());
-    const auto& host_header =
-        absl::AsciiStrToLower(filter_manager_.requestHeaders()->getHostValue());
-    route_config_update_requester_->requestVhdsUpdate(host_header, thread_local_dispatcher,
-                                                      std::move(route_config_updated_cb));
-    return;
-  } else if (snapped_scoped_routes_config_ != nullptr &&
-             (scope_key_hash = snapped_scoped_routes_config_->computeKeyHash(
-                  *filter_manager_.requestHeaders()))) {
-    // On demand srds
-    Http::RouteConfigUpdatedCallback scoped_route_config_updated_cb =
-        Http::RouteConfigUpdatedCallback(
-            [this, weak_route_config_updated_cb = std::weak_ptr<Http::RouteConfigUpdatedCallback>(
-                       route_config_updated_cb)](bool scope_exist) {
-              // If the callback can be locked, this ActiveStream is still alive.
-              if (auto cb = weak_route_config_updated_cb.lock()) {
-                // Refresh the route before continue the filter chain.
-                if (scope_exist) {
-                  refreshCachedRoute();
-                }
-                (*cb)(scope_exist && hasCachedRoute());
-              }
-            });
-    route_config_update_requester_->requestSrdsUpdate(*scope_key_hash, thread_local_dispatcher,
-                                                      std::move(scoped_route_config_updated_cb));
-    return;
-  }
-  // Continue the filter chain if no on demand update is requested.
-  (*route_config_updated_cb)(false);
+  route_config_update_requester_->requestRouteConfigUpdate(route_config_updated_cb);
 }
 
 absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
