@@ -138,6 +138,5 @@ TEST_F(ConnPoolImplBaseTest, NoPrefetchIfDegraded) {
   pool_.destructAllConnections();
 }
 
-
 } // namespace ConnectionPool
 } // namespace Envoy
