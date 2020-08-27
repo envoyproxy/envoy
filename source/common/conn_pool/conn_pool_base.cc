@@ -389,7 +389,6 @@ void ConnPoolImplBase::purgePendingRequests(
     host_->cluster().stats().upstream_rq_pending_failure_eject_.inc();
     onPoolFailure(host_description, failure_reason, reason, stream->context());
   }
-  std::cerr << "pending_streams: " << pending_streams_.size() << std::endl;
 }
 
 bool ConnPoolImplBase::connectingConnectionIsExcess() const {
