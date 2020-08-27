@@ -18,7 +18,6 @@ python_venv() {
   VENV_DIR="${BUILD_DIR}/${PY_NAME}"
 
   source_venv "${VENV_DIR}"
-
   pip install -r "${SCRIPT_DIR}"/requirements.txt
 
   shift
