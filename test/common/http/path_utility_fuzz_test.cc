@@ -22,6 +22,11 @@ DEFINE_PROTO_FUZZER(const test::common::http::PathUtilityTestCase& input) {
     Http::PathUtil::mergeSlashes(request_headers);
     break;
   }
+  case test::common::http::PathUtilityTestCase::kRemoveQueryAndFragment: {
+    auto path = input.remove_query_and_fragment().path();
+    Http::PathUtil::removeQueryAndFragment(path);
+    break;
+  }
   default:
     break;
   }
