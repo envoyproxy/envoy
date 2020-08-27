@@ -121,6 +121,7 @@ TEST(Logger, checkLoggerLevel) {
 TEST(Logger, LogOnceMacro) {
   class LogOnceTestHelper : public Logger::Loggable<Logger::Id::filter> {
   public:
+    LogOnceTestHelper() { ENVOY_LOGGER().set_level(spdlog::level::info); }
     void logSomething() { ENVOY_LOG_ONCE(error, "foo1 '{}'", evaluations_++); }
     void logSomethingElse() { ENVOY_LOG_ONCE(error, "foo2 '{}'", evaluations_++); }
     void logSomethingBelowLogLevel() { ENVOY_LOG_ONCE(debug, "foo3 '{}'", evaluations_++); }
