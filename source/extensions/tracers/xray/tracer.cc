@@ -111,9 +111,8 @@ void Span::injectContext(Http::RequestHeaderMap& request_headers) {
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& operation_name,
                                   Envoy::SystemTime start_time) {
-  auto child_span = std::make_unique<XRay::Span>(time_source_, broker_);
-  const auto ticks = time_source_.monotonicTime().time_since_epoch().count();
-  child_span->setId(ticks);
+  auto child_span = std::make_unique<XRay::Span>(time_source_, span_id_counter_, broker_);
+  child_span->setId(span_id_counter_++);
   child_span->setName(name());
   child_span->setOperation(operation_name);
   child_span->setStartTime(start_time);
@@ -126,9 +125,8 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& ope
 Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name, Envoy::SystemTime start_time,
                                    const absl::optional<XRayHeader>& xray_header) {
 
-  const auto ticks = time_source_.monotonicTime().time_since_epoch().count();
-  auto span_ptr = std::make_unique<XRay::Span>(time_source_, *daemon_broker_);
-  span_ptr->setId(ticks);
+  auto span_ptr = std::make_unique<XRay::Span>(time_source_, span_id_counter_, *daemon_broker_);
+  span_ptr->setId(span_id_counter_++);
   span_ptr->setName(segment_name_);
   span_ptr->setOperation(operation_name);
   // Even though we have a TimeSource member in the tracer, we assume the start_time argument has a
@@ -156,10 +154,9 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name, Envoy::Sys
   return span_ptr;
 }
 
-XRay::SpanPtr Tracer::createNonSampledSpan() const {
-  auto span_ptr = std::make_unique<XRay::Span>(time_source_, *daemon_broker_);
-  const auto ticks = time_source_.monotonicTime().time_since_epoch().count();
-  span_ptr->setId(ticks);
+XRay::SpanPtr Tracer::createNonSampledSpan() {
+  auto span_ptr = std::make_unique<XRay::Span>(time_source_, span_id_counter_, *daemon_broker_);
+  span_ptr->setId(span_id_counter_++);
   span_ptr->setName(segment_name_);
   span_ptr->setOrigin(origin_);
   span_ptr->setTraceId(generateTraceId(time_source_.systemTime()));

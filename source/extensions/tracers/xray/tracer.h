@@ -29,11 +29,13 @@ public:
   /**
    * Creates a new Span.
    *
-   * @param time_source A time source to create Span IDs using the monotonic clock.
+   * @param time_source A time source to get the span end time
+   * @param span_id_counter to set span id of child spans
    * @param broker Facilitates communication with the X-Ray daemon.
    */
-  Span(TimeSource& time_source, DaemonBroker& broker)
-      : time_source_(time_source), broker_(broker), sampled_(true) {}
+  Span(TimeSource& time_source, std::atomic<uint64_t>& span_id_counter, DaemonBroker& broker)
+      : time_source_(time_source), span_id_counter_(span_id_counter), broker_(broker),
+        sampled_(true) {}
 
   /**
    * Sets the Span's trace ID.
@@ -183,6 +185,7 @@ private:
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_response_annotations_;
   absl::flat_hash_map<std::string, std::string> custom_annotations_;
   Envoy::TimeSource& time_source_;
+  std::atomic<uint64_t>& span_id_counter_;
   DaemonBroker& broker_;
   bool sampled_;
 };
@@ -195,7 +198,8 @@ public:
          const absl::flat_hash_map<std::string, ProtobufWkt::Value>& aws_metadata,
          DaemonBrokerPtr daemon_broker, TimeSource& time_source)
       : segment_name_(segment_name), origin_(origin), aws_metadata_(aws_metadata),
-        daemon_broker_(std::move(daemon_broker)), time_source_(time_source) {}
+        daemon_broker_(std::move(daemon_broker)), time_source_(time_source),
+        span_id_counter_(std::atomic<uint64_t>(0)) {}
   /**
    * Starts a tracing span for X-Ray
    */
@@ -207,7 +211,7 @@ public:
    * overruling that decision in the upstream service in case that service itself uses X-Ray for
    * tracing.
    */
-  XRay::SpanPtr createNonSampledSpan() const;
+  XRay::SpanPtr createNonSampledSpan();
 
 private:
   const std::string segment_name_;
@@ -215,6 +219,7 @@ private:
   const absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
   const DaemonBrokerPtr daemon_broker_;
   Envoy::TimeSource& time_source_;
+  std::atomic<uint64_t> span_id_counter_;
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;
