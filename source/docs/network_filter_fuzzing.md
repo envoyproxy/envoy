@@ -1,7 +1,7 @@
 # Generic network-level filter fuzzers overview
 
-[Generic ReadFilter Fuzzer](https://github.com/envoyproxy/envoy/blob/master/test/extensions/filters/network/common/fuzz/network_readfilter_fuzz_test.cc) and [Generic WriteFilter Fuzzer](https://github.com/envoyproxy/envoy/blob/master/test/extensions/filters/network/common/fuzz/network_writefilter_fuzz_test.cc) can be used to do fuzz tests on network-level filters. For a new network-level filter which we want to harden, we may consider adding it to these one or two of these fuzzers depending on the [filter type](https://github.com/envoyproxy/envoy/blob/master/include/envoy/network/filter.h). 
-For ReadFilter, add it to Generic ReadFilter Fuzzer. For WriteFilter, add it to Generic ReadFilter Fuzzer. For Filter, please add it to both.
+Network filters need to be fuzzed. Filters come in two flavors, each with their own fuzzer. Read filters should be added into the [Generic ReadFilter Fuzzer](https://github.com/envoyproxy/envoy/blob/master/test/extensions/filters/network/common/fuzz/network_readfilter_fuzz_test.cc). Write Filters should added into the [Generic WriteFilter Fuzzer](https://github.com/envoyproxy/envoy/blob/master/test/extensions/filters/network/common/fuzz/network_writefilter_fuzz_test.cc). Some filters are both raed and write filters: They should be added into both fuzzers.
+
 Before adding the new filter into the fuzzers, please make sure the filter is designed to accept untrusted inputs, or ready to be hardened to accept untrusted inputs.
 
 # Add a new ReadFilter into Generic Readfilter Fuzzer
