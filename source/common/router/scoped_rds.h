@@ -246,7 +246,8 @@ public:
   ScopedRdsConfigSubscription& subscription() const {
     return *static_cast<ScopedRdsConfigSubscription*>(subscription_.get());
   }
-  void onDemandRdsUpdate(std::shared_ptr<Router::ScopeKey> scope_key, Event::Dispatcher& thread_local_dispatcher,
+  void onDemandRdsUpdate(std::shared_ptr<Router::ScopeKey> scope_key,
+                         Event::Dispatcher& thread_local_dispatcher,
                          Http::RouteConfigUpdatedCallback&& route_config_updated_cb) const {
     subscription().onDemandRdsUpdate(
         std::move(scope_key), thread_local_dispatcher, std::move(route_config_updated_cb),
