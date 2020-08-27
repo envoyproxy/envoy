@@ -268,7 +268,7 @@ private:
   bool refused_{};
 };
 
-class TestDnsServer : public ListenerCallbacks {
+class TestDnsServer : public TcpListenerCallbacks {
 public:
   TestDnsServer(Event::Dispatcher& dispatcher)
       : dispatcher_(dispatcher), record_ttl_(0), stream_info_(dispatcher.timeSource()) {}

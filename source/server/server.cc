@@ -542,11 +542,11 @@ void InstanceImpl::onRuntimeReady() {
 
   // If there is no global limit to the number of active connections, warn on startup.
   // TODO (tonya11en): Move this functionality into the overload manager.
-  if (!runtime().snapshot().get(Network::ListenerImpl::GlobalMaxCxRuntimeKey)) {
+  if (!runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
     ENVOY_LOG(warn,
               "there is no configured limit to the number of allowed active connections. Set a "
               "limit via the runtime key {}",
-              Network::ListenerImpl::GlobalMaxCxRuntimeKey);
+              Network::TcpListenerImpl::GlobalMaxCxRuntimeKey);
   }
 }
 
