@@ -186,6 +186,8 @@ UNOWNED_EXTENSIONS = {
 # Map a line transformation function across each line of a file,
 # writing the result lines as requested.
 # If there is a clang format nesting or mismatch error, return the first occurrence
+
+
 def evaluateLines(path, line_xform, write=True):
   error_message = None
   format_flag = True
@@ -860,12 +862,15 @@ def checkSourcePath(file_path):
       error_messages += executeCommand(command, "header_order.py check failed", file_path)
     command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
     error_messages += executeCommand(command, "clang-format check failed", file_path)
-
+  
   if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path):
     package_name, error_message = packageNameForProto(file_path)
     if package_name is None:
       error_messages += error_message
-  return error_messages
+
+  if file_path.endswith(PROTO_SUFFIX):
+      error_messages += checkProtoValidation(file_path)
+  return error_messages  
 
 
 # Example target outputs are:
@@ -906,14 +911,16 @@ def clangFormat(file_path):
     return ["clang-format rewrite error: %s" % (file_path)]
   return []
 
+
 # Fix for https://github.com/envoyproxy/envoy/issues/10535
-def checkProtoiValidation(file_path):
+def checkProtoValidation(file_path):
   exclude_path = ['v1', 'v2']
   result = PROTO_VALIDATION_STRING.search(readFile(file_path))
   if result is not None:
       if not any(x in file_path for x in exclude_path):
           return ["Proto validation Error in file: %s. 'min_bytes' is DEPRECATED, Use 'min_len'."  % (file_path)]
   return []
+
 
 def checkFormat(file_path):
   if file_path.startswith(EXCLUDED_PREFIXES):
@@ -934,14 +941,9 @@ def checkFormat(file_path):
     if try_to_fix:
       error_messages += fixSourcePath(file_path)
     error_messages += checkSourcePath(file_path)
-
   if error_messages:
     return ["From %s" % file_path] + error_messages
-
-  if file_path.endswith(PROTO_SUFFIX): 
-      error_messages += checkProtoiValidation(file_path)
   return error_messages
-
 
 def checkFormatReturnTraceOnError(file_path):
   """Run checkFormat and return the traceback of any exception."""
@@ -1160,12 +1162,11 @@ if __name__ == "__main__":
     # to be rewritten by other multiprocessing pooled processes.
     PooledCheckFormat(lambda f: not isBuildFile(f))
     PooledCheckFormat(lambda f: isBuildFile(f))
-
     error_messages += sum((r.get() for r in results), [])
 
   if checkErrorMessages(error_messages):
-    print("ERROR: check format failed. run 'tools/code_format/check_format.py fix'")
-    sys.exit(1)
+      print("ERROR: check format failed. run 'tools/code_format/check_format.py fix'")
+      sys.exit(1)
 
   if operation_type == "check":
-    print("PASS")
+      print("PASS")
