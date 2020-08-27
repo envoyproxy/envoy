@@ -38,6 +38,20 @@ message Certificate {
 message CertificateDetails {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v3.CertificateDetails";
 
+  message OcspDetails {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.admin.v3.CertificateDetails.OcspDetails";
+
+    // Seconds until expiration of the certificate's OCSP response.
+    uint64 seconds_until_expiration = 1;
+
+    // Indicates the time from which the OCSP response is valid.
+    google.protobuf.Timestamp valid_from = 2;
+
+    // Indicates the time at which the OCSP response expires.
+    google.protobuf.Timestamp expiration_time = 3;
+  }
+
   // Path of the certificate.
   string path = 1;
 
@@ -56,8 +70,8 @@ message CertificateDetails {
   // Indicates the time at which the certificate expires.
   google.protobuf.Timestamp expiration_time = 6;
 
-  // Seconds until expiration of the certificate's OCSP response.
-  uint64 seconds_until_ocsp_response_expiration = 7;
+  // Details related to the OCSP response associated with this certificate, if any.
+  OcspDetails ocsp_details = 7;
 }
 
 message SubjectAlternateName {

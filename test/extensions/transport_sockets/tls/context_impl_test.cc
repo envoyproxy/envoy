@@ -732,6 +732,63 @@ TEST_F(SslServerContextImplOcspTest, TestMustStapleCertWithoutStapleFeatureFlagO
   loadConfigYaml(tls_context_yaml);
 }
 
+TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/good_cert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
+      ocsp_staple:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp.der"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto context = loadConfigYaml(yaml);
+
+  constexpr absl::string_view this_update = "This Update: ";
+  constexpr absl::string_view next_update = "Next Update: ";
+
+  auto ocsp_text_details =
+      absl::StrSplit(TestEnvironment::readFileToStringForTest(
+                         TestEnvironment::substitute(
+                             "{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp_details.txt"),
+                         true),
+                     "\n");
+  std::string valid_from, expiration_time;
+  for (const auto& detail : ocsp_text_details) {
+    std::string::size_type pos = detail.find(this_update);
+    if (pos != std::string::npos) {
+      valid_from = detail.substr(pos + this_update.size());
+      continue;
+    }
+
+    pos = detail.find(next_update);
+    if (pos != std::string::npos) {
+      expiration_time = detail.substr(pos + next_update.size());
+      continue;
+    }
+  }
+
+  std::string ocsp_json = absl::StrCat(R"EOF({
+"valid_from": ")EOF",
+                                       convertTimeCertInfoToCertDetails(valid_from), R"EOF(",
+"expiration_time": ")EOF",
+                                       convertTimeCertInfoToCertDetails(expiration_time), R"EOF("
+}
+)EOF");
+
+  envoy::admin::v3::CertificateDetails::OcspDetails ocsp_details;
+  TestUtility::loadFromJson(ocsp_json, ocsp_details);
+
+  MessageDifferencer message_differencer;
+  message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
+  EXPECT_TRUE(message_differencer.Compare(ocsp_details,
+                                          context->getCertChainInformation()[0]->ocsp_details()));
+}
+
 class SslServerContextImplTicketTest : public SslContextImplTest {
 public:
   void loadConfig(ServerContextConfigImpl& cfg) {

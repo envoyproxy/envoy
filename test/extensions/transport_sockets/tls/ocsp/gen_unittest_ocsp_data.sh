@@ -132,6 +132,12 @@ revoke_certificate() {
   openssl ca -revoke $1_cert.pem -keyfile $2_key.pem -cert $2_cert.pem -config $2.cnf
 }
 
+# $1=<test name> $2=<CA name>
+dump_ocsp_details() {
+  openssl ocsp -respin $1_ocsp_resp.der -issuer $2_cert.pem -resp_text \
+    -out $1_ocsp_resp_details.txt
+}
+
 # Set up the CA
 generate_config ca ca
 generate_ca ca
@@ -144,6 +150,7 @@ generate_ca intermediate_ca ca
 generate_config good ca
 generate_rsa_cert good ca
 generate_ocsp_response good ca good "-ndays 7"
+dump_ocsp_details good ca
 
 # Generate OCSP response with the responder key hash instead of name
 generate_ocsp_response good ca responder_key_hash -resp_key_id

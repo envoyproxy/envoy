@@ -140,6 +140,19 @@ uint64_t OcspResponseWrapper::secondsUntilExpiration() const {
   return std::chrono::duration_cast<std::chrono::seconds>(next_update.value() - now).count();
 }
 
+const Envoy::SystemTime OcspResponseWrapper::getThisUpdate() const {
+  return response_->response_->getThisUpdate();
+}
+
+const Envoy::SystemTime OcspResponseWrapper::getNextUpdate() const {
+  auto& next_update = response_->response_->getNextUpdate();
+  if (next_update) {
+    return *next_update;
+  }
+
+  return time_source_.systemTime();
+}
+
 std::unique_ptr<OcspResponse> Asn1OcspUtility::parseOcspResponse(CBS& cbs) {
   // OCSPResponse ::= SEQUENCE {
   //    responseStatus         OCSPResponseStatus,

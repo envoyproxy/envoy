@@ -215,6 +215,20 @@ public:
    */
   uint64_t secondsUntilExpiration() const;
 
+  /**
+   * @return The beginning of the validity window for this response.
+   */
+  const Envoy::SystemTime getThisUpdate() const;
+
+  /**
+   * The time at which this response is considered to expire. If
+   * the underlying response does not have a value, then the current
+   * time is returned.
+   *
+   * @return The end of the validity window for this response.
+   */
+  const Envoy::SystemTime getNextUpdate() const;
+
 private:
   const std::vector<uint8_t> raw_bytes_;
   const std::unique_ptr<OcspResponse> response_;
