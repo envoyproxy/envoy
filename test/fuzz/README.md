@@ -72,6 +72,8 @@ The fuzz test will be executed in three environments:
    run with the dictionaries specified in `dictionaries` in `envoy_cc_fuzz_test`.
    There are optional command line arguments, e.g., `--timeout_secs`, `--regression`, provided by 
    [bazel-rules-fuzzing](https://github.com/googleinterns/bazel-rules-fuzzing#examples).
+   For any extra arguments, just pass them through `--fuzzer_extra_args`, 
+   e.g., `--fuzzer_extra_args=-jobs=1,-reload=1`.
 
    
 ## Protobuf fuzz tests
