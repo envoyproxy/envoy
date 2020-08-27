@@ -97,13 +97,12 @@ envoy_cc_extension(
     name = "http_config",
     srcs = ["http_config.cc"],
     hdrs = ["http_config.h"],
-    security_posture = "robust_to_untrusted_downstream",
     # TODO(#9953) clean up.
-    visibility = [
-        "//:extension_config",
+    extra_visibility = [
         "//test/common/access_log:__subpackages__",
         "//test/integration:__subpackages__",
     ],
+    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":config_utils",
         "//include/envoy/server:access_log_config_interface",
@@ -120,13 +119,12 @@ envoy_cc_extension(
     name = "tcp_config",
     srcs = ["tcp_config.cc"],
     hdrs = ["tcp_config.h"],
-    security_posture = "robust_to_untrusted_downstream",
     # TODO(#9953) clean up.
-    visibility = [
-        "//:extension_config",
+    extra_visibility = [
         "//test/common/access_log:__subpackages__",
         "//test/integration:__subpackages__",
     ],
+    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":config_utils",
         "//include/envoy/server:access_log_config_interface",
