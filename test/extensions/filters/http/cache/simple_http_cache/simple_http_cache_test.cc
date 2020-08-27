@@ -65,9 +65,7 @@ protected:
 
   LookupRequest makeLookupRequest(absl::string_view request_path) {
     request_headers_.setPath(request_path);
-    // Using 'accept' as an allowed header to be varied for testing-purpose.
-    absl::flat_hash_set<std::string> allowed_vary_headers{"accept"};
-    return LookupRequest(request_headers_, current_time_, allowed_vary_headers);
+    return LookupRequest(request_headers_, current_time_, vary_allowlist_);
   }
 
   AssertionResult expectLookupSuccessWithBody(LookupContext* lookup_context,
@@ -96,6 +94,7 @@ protected:
   Event::SimulatedTimeSystem time_source_;
   SystemTime current_time_ = time_source_.systemTime();
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
+  std::vector<Matchers::StringMatcherPtr> vary_allowlist_;
 };
 
 // Simple flow of putting in an item, getting it, deleting it.
@@ -219,7 +218,11 @@ TEST(Registration, GetFactory) {
 }
 
 TEST_F(SimpleHttpCacheTest, VaryResponses) {
-  // Responses will vary on accept.
+  // Responses will vary on accept, so we add a rule to the allowlist that accepts that header.
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact("accept");
+  vary_allowlist_.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
+
   const std::string RequestPath("some-resource");
   Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
                                                    {"cache-control", "public,max-age=3600"},

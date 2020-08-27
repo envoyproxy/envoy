@@ -168,15 +168,32 @@ absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::str
   return absl::nullopt;
 }
 
-absl::flat_hash_set<std::string> VaryHeader::parseAllowlist() {
-  // TODO(cbdm): Populate the hash_set from
-  // envoy::extensions::filters::http::cache::v3alpha::CacheConfig::allowed_vary_headers.
-  // Need to make sure that the headers we add here are valid values (i.e., not malformed). That
-  // way, we won't have to check this again in isAllowed.
-  return {"x-temporary-standin-header-name"};
+void CacheHeadersUtils::getAllMatchingHeaderNames(
+    const Http::HeaderMap& headers, const std::vector<Matchers::StringMatcherPtr>& ruleset,
+    absl::flat_hash_set<absl::string_view>& out) {
+  headers.iterate([&ruleset, &out](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    for (const auto& rule : ruleset) {
+      absl::string_view header_name = header.key().getStringView();
+      if (rule->match(header_name)) {
+        out.emplace(header_name);
+      }
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
 }
 
-bool VaryHeader::isAllowed(const absl::flat_hash_set<std::string>& allowed_headers,
+std::vector<Matchers::StringMatcherPtr> VaryHeader::parseAllowlist(
+    const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allowlist) {
+  std::vector<Matchers::StringMatcherPtr> ruleset;
+
+  for (const auto& rule : allowlist) {
+    ruleset.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(rule));
+  }
+
+  return ruleset;
+}
+
+bool VaryHeader::isAllowed(const std::vector<Matchers::StringMatcherPtr>& allowlist,
                            const Http::ResponseHeaderMap& headers) {
   if (!hasVary(headers)) {
     return true;
@@ -185,9 +202,23 @@ bool VaryHeader::isAllowed(const absl::flat_hash_set<std::string>& allowed_heade
   std::vector<std::string> varied_headers =
       parseHeaderValue(headers.get(Http::Headers::get().Vary));
 
-  // If the vary value was malformed, it will not be contained in allowed_headers.
   for (const std::string& header : varied_headers) {
-    if (!allowed_headers.contains(header)) {
+    bool valid = false;
+
+    // "Vary: *" should never be cached per:
+    // https://tools.ietf.org/html/rfc7231#section-7.1.4
+    if (header == "*") {
+      return false;
+    }
+
+    for (const auto& rule : allowlist) {
+      if (rule->match(header)) {
+        valid = true;
+        break;
+      }
+    }
+
+    if (!valid) {
       return false;
     }
   }
@@ -262,16 +293,19 @@ std::vector<std::string> VaryHeader::parseHeaderValue(const Http::HeaderEntry* v
 }
 
 Http::RequestHeaderMapPtr
-VaryHeader::possibleVariedHeaders(const absl::flat_hash_set<std::string>& allowed_headers,
+VaryHeader::possibleVariedHeaders(const std::vector<Matchers::StringMatcherPtr>& allowlist,
                                   const Http::RequestHeaderMap& request_headers) {
   Http::RequestHeaderMapPtr possible_headers =
       Http::createHeaderMap<Http::RequestHeaderMapImpl>({});
 
-  for (const std::string& header : allowed_headers) {
+  absl::flat_hash_set<absl::string_view> header_names;
+  CacheHeadersUtils::getAllMatchingHeaderNames(request_headers, allowlist, header_names);
+
+  for (const absl::string_view& header : header_names) {
     std::vector<absl::string_view> values;
     Http::HeaderUtility::getAllOfHeader(request_headers, header, values);
     for (const absl::string_view& value : values) {
-      possible_headers->addCopy(Http::LowerCaseString(header), value);
+      possible_headers->addCopy(Http::LowerCaseString(std::string{header}), value);
     }
   }
 

@@ -58,7 +58,7 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
 
 bool CacheabilityUtils::isCacheableResponse(
     const Http::ResponseHeaderMap& headers,
-    const absl::flat_hash_set<std::string>& allowed_vary_headers) {
+    const std::vector<Matchers::StringMatcherPtr>& vary_allowlist) {
   absl::string_view cache_control = headers.getInlineValue(response_cache_control_handle.handle());
   ResponseCacheControl response_cache_control(cache_control);
 
@@ -73,7 +73,7 @@ bool CacheabilityUtils::isCacheableResponse(
 
   return !response_cache_control.no_store_ &&
          cacheableStatusCodes().contains((headers.getStatusValue())) && has_validation_data &&
-         VaryHeader::isAllowed(allowed_vary_headers, headers);
+         VaryHeader::isAllowed(vary_allowlist, headers);
 }
 
 } // namespace Cache

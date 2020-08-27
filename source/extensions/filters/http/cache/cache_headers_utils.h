@@ -1,11 +1,14 @@
 #pragma once
 
 #include "envoy/common/time.h"
+#include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
 #include "envoy/http/header_map.h"
 
+#include "common/common/matchers.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
+#include "common/protobuf/protobuf.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
@@ -102,12 +105,17 @@ public:
    * absl::nullopt without advancing "*str".
    */
   static absl::optional<uint64_t> readAndRemoveLeadingDigits(absl::string_view& str);
+
+  // Add to out all header names from the given map that match any of the given rules.
+  static void getAllMatchingHeaderNames(const Http::HeaderMap& headers,
+                                        const std::vector<Matchers::StringMatcherPtr>& ruleset,
+                                        absl::flat_hash_set<absl::string_view>& out);
 };
 
 class VaryHeader {
 public:
   // Checks if the headers contain an allowed value in the Vary header.
-  static bool isAllowed(const absl::flat_hash_set<std::string>& allowed_headers,
+  static bool isAllowed(const std::vector<Matchers::StringMatcherPtr>& allowlist,
                         const Http::ResponseHeaderMap& headers);
 
   // Checks if the headers contain a non-empty value in the Vary header.
@@ -123,11 +131,13 @@ public:
   // Returns a header map containing the subset of the original headers that can be varied from the
   // request.
   static Http::RequestHeaderMapPtr
-  possibleVariedHeaders(const absl::flat_hash_set<std::string>& allowed_headers,
+  possibleVariedHeaders(const std::vector<Matchers::StringMatcherPtr>& allowlist,
                         const Http::RequestHeaderMap& request_headers);
 
-  // Parses the allowlist of header values that can be used to create varied responses.
-  static absl::flat_hash_set<std::string> parseAllowlist();
+  // Parses the allowlist of matching rules that define header names that can be used to create
+  // varied responses.
+  static std::vector<Matchers::StringMatcherPtr> parseAllowlist(
+      const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allowlist);
 };
 
 } // namespace Cache

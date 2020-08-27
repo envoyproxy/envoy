@@ -28,11 +28,11 @@ struct CacheResponseCodeDetailValues {
 
 using CacheResponseCodeDetails = ConstSingleton<CacheResponseCodeDetailValues>;
 
-CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig&,
-                         const std::string&, Stats::Scope&, TimeSource& time_source,
-                         HttpCache& http_cache)
+CacheFilter::CacheFilter(
+    const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config, const std::string&,
+    Stats::Scope&, TimeSource& time_source, HttpCache& http_cache)
     : time_source_(time_source), cache_(http_cache),
-      allowed_vary_headers_(VaryHeader::parseAllowlist()) {}
+      vary_allowlist_(VaryHeader::parseAllowlist(config.allowed_vary_headers())) {}
 
 void CacheFilter::onDestroy() {
   filter_state_ = FilterState::Destroyed;
@@ -61,7 +61,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   ASSERT(decoder_callbacks_);
 
-  LookupRequest lookup_request(headers, time_source_.systemTime(), allowed_vary_headers_);
+  LookupRequest lookup_request(headers, time_source_.systemTime(), vary_allowlist_);
   request_allows_inserts_ = !lookup_request.requestCacheControl().no_store_;
   lookup_ = cache_.makeLookupContext(std::move(lookup_request));
 
@@ -94,8 +94,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
 
   // Either a cache miss or a cache entry that is no longer valid.
   // Check if the new response can be cached.
-  if (request_allows_inserts_ &&
-      CacheabilityUtils::isCacheableResponse(headers, allowed_vary_headers_)) {
+  if (request_allows_inserts_ && CacheabilityUtils::isCacheableResponse(headers, vary_allowlist_)) {
     // TODO(#12140): Add date internal header or metadata to cached responses.
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
