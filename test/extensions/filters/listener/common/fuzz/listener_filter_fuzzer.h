@@ -48,7 +48,7 @@ public:
   Api::SysCallSizeResult read(void* buffer, size_t length, bool peek);
 
   // Returns the number of bytes currently available to read()
-  const size_t size();
+  size_t size();
 
   // Returns true if end of stream reached (no more reads)
   bool done();
