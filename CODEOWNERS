@@ -128,6 +128,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/compression/common @junr03 @rojkov
 /*/extensions/compression/gzip @junr03 @rojkov
 /*/extensions/filters/http/decompressor @rojkov @dio
+# Watchdog Extensions
+/*/extensions/watchdog/profile_action @kbaichoo @htuch
 # Core upstream code
 extensions/upstreams/http @alyssawilk @snowp @mattklein123
 extensions/upstreams/http/http @alyssawilk @snowp @mattklein123
