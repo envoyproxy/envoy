@@ -10,7 +10,6 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/socket.h"
-#include "envoy/tcp/conn_info.h"
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
@@ -19,6 +18,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
+#include "common/tcp/conn_info.h"
 
 namespace Envoy {
 namespace Network {
@@ -703,7 +703,7 @@ absl::string_view ConnectionImpl::transportFailureReason() const {
   return transport_socket_->failureReason();
 }
 
-absl::optional<std::chrono::milliseconds> lastRoundTripTime() const {
+absl::optional<std::chrono::milliseconds> ConnectionImpl::lastRoundTripTime() const {
   return Envoy::Tcp::ConnectionInfo::lastRoundTripTime(socket_.get());
 };
 
