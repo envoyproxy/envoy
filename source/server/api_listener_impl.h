@@ -134,7 +134,7 @@ protected:
       void setDelayedCloseTimeout(std::chrono::milliseconds) override {}
       absl::string_view transportFailureReason() const override { return EMPTY_STRING; }
       absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override {
-        return absl::optional();
+        return {};
       };
 
       SyntheticReadCallbacks& parent_;
