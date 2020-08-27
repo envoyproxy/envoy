@@ -113,7 +113,7 @@ Api::SysCallSizeResult FuzzedInputStream::read(void* buffer, size_t length, bool
   return Api::SysCallSizeResult{static_cast<ssize_t>(len), 0};
 }
 
-size_t FuzzedInputStream::size() { return indices_[nread_] - index_ + 1; }
+size_t FuzzedInputStream::size() const { return indices_[nread_] - index_ + 1; }
 
 bool FuzzedInputStream::done() { return nread_ >= nreads_ - 1; }
 
