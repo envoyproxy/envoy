@@ -1,0 +1,16 @@
+config {
+  name: "envoy.filters.network.sni_dynamic_forward_proxy"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3alpha.FilterConfig"
+    value: "\n&\n\033envoy.filters.thrift.router2\007\n\005\020\200\200\370\003"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 33619984
+  }
+}
