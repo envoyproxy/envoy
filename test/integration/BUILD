@@ -351,6 +351,7 @@ envoy_cc_test(
     srcs = [
         "http_subset_lb_integration_test.cc",
     ],
+    # Consistently times out in CI on Windows, but observed to pass locally
     tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
@@ -538,6 +539,7 @@ envoy_cc_test(
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 2,
+    # Consistently fails in CI on Windows, but observed to pass locally
     tags = ["flaky_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
@@ -706,7 +708,8 @@ envoy_cc_test(
         "websocket_integration_test.cc",
         "websocket_integration_test.h",
     ],
-    tags = ["fails_on_windows"],
+    # Consistently fails in CI on Windows, but observed to pass locally
+    tags = ["flaky_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -774,7 +777,8 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_stats_integration_test",
     srcs = ["load_stats_integration_test.cc"],
-    tags = ["fails_on_windows"],
+    # Consistently timing out on Windows, observed to pass locally
+    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//test/config:utility_lib",
@@ -793,6 +797,7 @@ envoy_cc_test(
     name = "hds_integration_test",
     srcs = ["hds_integration_test.cc"],
     shard_count = 2,
+    # Alternately timing out and failing in CI on windows; observed to pass locally
     tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
@@ -974,6 +979,8 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     shard_count = 2,
+    # Fails intermittantly on local build
+    tags = ["flaky_on_windows"],
     deps = [
         ":integration_lib",
         ":tcp_proxy_integration_proto_cc_proto",
@@ -1049,7 +1056,7 @@ envoy_cc_test(
         "uds_integration_test.cc",
         "uds_integration_test.h",
     ],
-    tags = ["flaky_on_windows"],
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/event:dispatcher_includes",

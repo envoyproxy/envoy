@@ -22,7 +22,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "proxy_protocol_regression_test",
     srcs = ["proxy_protocol_regression_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",

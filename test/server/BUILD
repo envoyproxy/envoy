@@ -127,6 +127,7 @@ envoy_cc_test(
     name = "guarddog_impl_test",
     size = "small",
     srcs = ["guarddog_impl_test.cc"],
+    # Fails intermittantly on local build
     tags = ["flaky_on_windows"],
     deps = [
         "//include/envoy/common:time_interface",

@@ -74,6 +74,8 @@ envoy_cc_test(
         "gen_unittest_certs.sh",
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
+    # Fails intermittantly on local build
+    tags = ["flaky_on_windows"],
     deps = [
         ":ssl_test_utils",
         "//source/common/json:json_loader_lib",

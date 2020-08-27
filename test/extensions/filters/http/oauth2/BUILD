@@ -26,9 +26,6 @@ envoy_extension_cc_test(
     name = "oauth_integration_test",
     srcs = ["oauth_integration_test.cc"],
     extension_name = "envoy.filters.http.oauth2",
-    tags = [
-        "fails_on_windows",
-    ],
     deps = [
         "//source/extensions/filters/http/oauth2:config",
         "//test/integration:http_integration_lib",

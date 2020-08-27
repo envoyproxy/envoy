@@ -20,7 +20,6 @@ envoy_extension_cc_test(
     # *used* to rely on Event::FileTriggerType::Edge and we got away with it
     # because we mock the dispatcher. Need to verify that the scenario is
     # actually working.
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/common:hex_lib",
         "//source/common/http:utility_lib",
