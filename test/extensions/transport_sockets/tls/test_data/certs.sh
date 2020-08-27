@@ -12,16 +12,21 @@ cleanup() {
   rm *csr
   rm *srl
   rm crl_*
-  rm intermediate_csr_*
+  rm intermediate_crl_*
 }
 
 # $1=<CA name> $2=[issuer name]
 generate_ca() {
-  if [[ "$2" != "" ]]; then local EXTRA_ARGS="-CA $2_cert.pem -CAkey $2_key.pem -CAcreateserial"; fi
+  if [[ "$2" != "" ]]; then
+    local EXTRA_ARGS="-CA $2_cert.pem -CAkey $2_key.pem -CAcreateserial";
+  else
+    local EXTRA_ARGS="-signkey $1_key.pem";
+  fi
   openssl genrsa -out $1_key.pem 2048
   openssl req -new -key $1_key.pem -out $1_cert.csr -config $1_cert.cfg -batch -sha256
-  openssl x509 -req -days ${DEFAULT_VALIDITY_DAYS} -in $1_cert.csr -signkey $1_key.pem -out $1_cert.pem \
+  openssl x509 -req -days ${DEFAULT_VALIDITY_DAYS} -in $1_cert.csr -out $1_cert.pem \
     -extensions v3_ca -extfile $1_cert.cfg $EXTRA_ARGS
+  generate_info_header $1
 }
 
 # $1=<certificate name> $2=[key size] $3=[password]
@@ -79,7 +84,6 @@ generate_selfsigned_x509_cert() {
 
 # Generate ca_cert.pem.
 generate_ca ca
-generate_x509_cert ca ca
 
 # Generate intermediate_ca_cert.pem.
 generate_ca intermediate_ca ca
@@ -116,14 +120,14 @@ generate_rsa_key san_dns3
 generate_x509_cert san_dns3 intermediate_ca
 rm -f san_dns3_cert.cfg
 
+# Concatenate san_dns3_cert.pem and Test Intermediate CA (intermediate_ca_cert.pem) to create valid certificate chain.
+cat san_dns3_cert.pem intermediate_ca_cert.pem > san_dns3_chain.pem
+
 # Generate san_dns4_cert.pm (signed by intermediate_ca_cert.pem).
 cp -f san_dns_cert.cfg san_dns4_cert.cfg
 generate_rsa_key san_dns4
 generate_x509_cert san_dns4 intermediate_ca
 rm -f san_dns4_cert.cfg
-
-# Concatenate san_dns3_cert.pem and Test Intermediate CA (intermediate_ca_cert.pem) to create valid certificate chain.
-cat san_dns3_cert.pem intermediate_ca_cert.pem > san_dns3_chain.pem
 
 # Generate san_multiple_dns_cert.pem.
 generate_rsa_key san_multiple_dns
@@ -136,6 +140,13 @@ generate_x509_cert san_only_dns ca
 # Generate san_uri_cert.pem.
 generate_rsa_key san_uri
 generate_x509_cert san_uri ca
+
+# Generate san_ip_cert.pem.
+generate_rsa_key san_ip
+generate_x509_cert san_ip ca
+
+# Concatenate san_ip_cert.pem and Test Intermediate CA (intermediate_ca_cert.pem) to create valid certificate chain.
+cat san_ip_cert.pem intermediate_ca_cert.pem > san_ip_chain.pem
 
 # Generate certificate with extensions
 generate_rsa_key extensions

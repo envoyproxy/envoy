@@ -1,8 +1,8 @@
 // NOLINT(namespace-envoy)
 constexpr char TEST_SAN_DNS4_CERT_256_HASH[] =
-    "a937ec00ebb74334db95a263bd145678e67bd6eebe91903ce59180942578fc45";
-constexpr char TEST_SAN_DNS4_CERT_1_HASH[] = "30210002602613f87093dbebef4d18bbe6698e28";
-constexpr char TEST_SAN_DNS4_CERT_SPKI[] = "EgHGmCDbzadIrTDx4mYYeLhS1StNQUIfMo/K7bCyj+E=";
-constexpr char TEST_SAN_DNS4_CERT_SERIAL[] = "4f56024bfdaccc3ddb3473483b4ff84ff41a0bec";
-constexpr char TEST_SAN_DNS4_CERT_NOT_BEFORE[] = "Aug 24 23:09:48 2020 GMT";
-constexpr char TEST_SAN_DNS4_CERT_NOT_AFTER[] = "Aug 24 23:09:48 2022 GMT";
+    "bacedca770148c6e353bf449edae8d2b97188528118be0846eea7d5da73e72ba";
+constexpr char TEST_SAN_DNS4_CERT_1_HASH[] = "46bec336a88879335207923081013e5cdcc4e24c";
+constexpr char TEST_SAN_DNS4_CERT_SPKI[] = "h5L1TnkoSRao/0KnRZX7re4dsuaZL0rqco3bg+H5/Xg=";
+constexpr char TEST_SAN_DNS4_CERT_SERIAL[] = "9227f8037cfee4e6";
+constexpr char TEST_SAN_DNS4_CERT_NOT_BEFORE[] = "Aug 27 15:10:51 2020 GMT";
+constexpr char TEST_SAN_DNS4_CERT_NOT_AFTER[] = "Aug 27 15:10:51 2022 GMT";
