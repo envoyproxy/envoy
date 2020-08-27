@@ -7,6 +7,7 @@
 
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -262,7 +263,10 @@ private:
   absl::optional<Http::Code> abortHttpStatus(const Http::RequestHeaderMap& request_headers);
   absl::optional<Grpc::Status::GrpcStatus>
   abortGrpcStatus(const Http::RequestHeaderMap& request_headers);
-  void maybeIncActiveFaults();
+  // Checks whether we should allow a fault; if we do, increment the number of faults.
+  bool maybeDoFault();
+  bool maybeDoAbort(const Http::RequestHeaderMap& request_headers);
+  bool maybeSetupDelay(const Http::RequestHeaderMap& request_headers);
   void maybeSetupResponseRateLimit(const Http::RequestHeaderMap& request_headers);
 
   FaultFilterConfigSharedPtr config_;
