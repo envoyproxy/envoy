@@ -26,6 +26,7 @@ CAS
 CB
 CDS
 CEL
+DSR
 LTT
 ceil
 CHACHA
@@ -354,6 +355,7 @@ WRR
 WS
 WSA
 WSABUF
+WSAEINVAL
 WSS
 Welford's
 Wi
@@ -626,6 +628,7 @@ func
 functor
 functors
 gRPC
+gateway
 gcov
 genrule
 getaddrinfo
@@ -963,6 +966,7 @@ repeatability
 reperform
 repicked
 repo
+reproducibility
 requirepass
 reselecting
 reserialize
