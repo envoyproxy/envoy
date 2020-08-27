@@ -39,7 +39,7 @@ class FuzzedInputStream {
 public:
   FuzzedInputStream(const test::extensions::filters::listener::FilterFuzzTestCase& input);
 
-  FuzzedInputStream(const std::vector<uint8_t> buffer, const std::vector<size_t> indices);
+  FuzzedInputStream(std::vector<uint8_t> buffer, std::vector<size_t> indices);
 
   // Makes data from the next read available to read()
   void next();
@@ -48,7 +48,7 @@ public:
   Api::SysCallSizeResult read(void* buffer, size_t length, bool peek);
 
   // Returns the number of bytes currently available to read()
-  size_t size();
+  const size_t size();
 
   // Returns true if end of stream reached (no more reads)
   bool done();

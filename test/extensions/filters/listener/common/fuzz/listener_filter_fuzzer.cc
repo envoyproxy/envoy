@@ -92,9 +92,9 @@ FuzzedInputStream::FuzzedInputStream(
   }
 }
 
-FuzzedInputStream::FuzzedInputStream(const std::vector<uint8_t> buffer,
-                                     const std::vector<size_t> indices)
-    : nreads_(indices.size()), data_(buffer), indices_(indices) {}
+FuzzedInputStream::FuzzedInputStream(std::vector<uint8_t> buffer,
+                                     std::vector<size_t> indices)
+    : nreads_(indices.size()), data_(std::move(buffer)), indices_(std::move(indices)) {}
 
 void FuzzedInputStream::next() {
   if (!done()) {
@@ -114,7 +114,7 @@ Api::SysCallSizeResult FuzzedInputStream::read(void* buffer, size_t length, bool
   return Api::SysCallSizeResult{static_cast<ssize_t>(len), 0};
 }
 
-size_t FuzzedInputStream::size() { return indices_[nread_] - index_ + 1; }
+const size_t FuzzedInputStream::size() { return indices_[nread_] - index_ + 1; }
 
 bool FuzzedInputStream::done() { return nread_ >= nreads_ - 1; }
 
