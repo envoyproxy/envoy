@@ -453,18 +453,18 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
 }
 
 void ScopedRdsConfigSubscription::onDemandRdsUpdate(
-    uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
+    std::shared_ptr<Router::ScopeKey> scope_key, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallback&& route_config_updated_cb,
     std::weak_ptr<Envoy::Config::ConfigSubscriptionCommonBase> weak_subscription) {
-  factory_context_.dispatcher().post([this, &thread_local_dispatcher, key_hash,
-                                      route_config_updated_cb, weak_subscription]() {
+  factory_context_.dispatcher().post([this, &thread_local_dispatcher, scope_key, route_config_updated_cb,
+                                      weak_subscription]() {
     // If the subscription has been destroyed, return immediately.
     if (!weak_subscription.lock()) {
       thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
       return;
     }
 
-    auto iter = scope_name_by_hash_.find(key_hash);
+    auto iter = scope_name_by_hash_.find(scope_key->hash());
     // Return to filter chain if we can't find the scope.
     // The scope may have been destroyed when callback reach the main thread.
     if (iter == scope_name_by_hash_.end()) {

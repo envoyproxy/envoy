@@ -130,7 +130,7 @@ private:
     void requestVhdsUpdate(const std::string host_header,
                            Event::Dispatcher& thread_local_dispatcher,
                            Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
-    void requestSrdsUpdate(uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
+    void requestSrdsUpdate(Router::ScopeKeyPtr scope_key, Event::Dispatcher& thread_local_dispatcher,
                            Http::RouteConfigUpdatedCallback&& route_config_updated_cb);
 
   private:

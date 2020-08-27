@@ -1104,12 +1104,11 @@ key:
                             Stats::Gauge::ImportMode::Accumulate)
                      .value());
 
-  absl::optional<uint64_t> key_hash =
-      getScopedRdsProvider()->config<ScopedConfigImpl>()->computeKeyHash(
-          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
+  ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
+      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
   EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
-  getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_,
+  getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_,
                                             std::move(route_config_updated_cb));
   // After on demand request, push rds update, both scopes should find the route configuration.
   pushRdsConfig({"foo_routes"}, "111");
@@ -1192,13 +1191,12 @@ key:
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "foo_routes");
-  absl::optional<uint64_t> key_hash =
-      getScopedRdsProvider()->config<ScopedConfigImpl>()->computeKeyHash(
-          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
+  ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
+      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).Times(1);
   EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
-  getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_,
+  getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_,
                                             std::move(route_config_updated_cb));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
@@ -1374,18 +1372,25 @@ key:
                             Stats::Gauge::ImportMode::Accumulate)
                      .value());
 
-  absl::optional<uint64_t> key_hash =
-      getScopedRdsProvider()->config<ScopedConfigImpl>()->computeKeyHash(
-          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
   // All the on demand updated callbacks will be executed when the route table comes.
   for (int i = 0; i < 5; i++) {
+    ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
+        TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
     std::function<void(bool)> route_config_updated_cb = [](bool) {};
-    getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_,
+    getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_,
                                               std::move(route_config_updated_cb));
   }
   EXPECT_CALL(event_dispatcher_, post(_)).Times(5);
   // After on demand request, push rds update.
   pushRdsConfig({"foo_routes"}, "111");
+  for (int i = 0; i < 5; i++) {
+    EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
+    ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
+        TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
+    std::function<void(bool)> route_config_updated_cb = [](bool) {};
+    getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_,
+                                              std::move(route_config_updated_cb));
+  }
   // Activating the same on_demand scope multiple times, active_scopes is still 1.
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
@@ -1421,9 +1426,11 @@ scope_key_builder:
   TestUtility::loadFromYaml(config_yaml, scoped_routes_config);
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
       .WillOnce(testing::SaveArg<0>(&temp_post_cb));
-  getScopedRdsProvider()->onDemandRdsUpdate(666, event_dispatcher_,
+  std::shared_ptr<ScopeKey> scope_key =
+      getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
+          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
+  getScopedRdsProvider()->onDemandRdsUpdate(scope_key, event_dispatcher_,
                                             std::move(route_config_updated_cb));
-  EXPECT_NO_THROW(temp_post_cb());
   // Destroy the scoped_rds subscription by destroying its only config provider.
   provider_.reset();
   EXPECT_CALL(event_dispatcher_, post(_)).Times(1);

@@ -153,13 +153,13 @@ ScopedConfigImpl::getRouteConfig(const Http::HeaderMap& headers) const {
   return nullptr;
 }
 
-absl::optional<uint64_t> ScopedConfigImpl::computeKeyHash(const Http::HeaderMap& headers) const {
+ScopeKeyPtr ScopedConfigImpl::computeScopeKey(const Http::HeaderMap& headers) const {
   ScopeKeyPtr scope_key = scope_key_builder_.computeScopeKey(headers);
   if (scope_key &&
       scoped_route_info_by_key_.find(scope_key->hash()) != scoped_route_info_by_key_.end()) {
-    return scope_key->hash();
+    return scope_key;
   }
-  return {};
+  return nullptr;
 }
 
 } // namespace Router

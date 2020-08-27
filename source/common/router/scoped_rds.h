@@ -120,7 +120,8 @@ public:
   const ScopedRouteMap& scopedRouteMap() const { return scoped_route_map_; }
 
   void
-  onDemandRdsUpdate(uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
+  onDemandRdsUpdate(std::shared_ptr<Router::ScopeKey> scope_key,
+                    Event::Dispatcher& thread_local_dispatcher,
                     Http::RouteConfigUpdatedCallback&& route_config_updated_cb,
                     std::weak_ptr<Envoy::Config::ConfigSubscriptionCommonBase> weak_subscription);
 
@@ -149,7 +150,7 @@ private:
 
     void addOnDemandUpdateCallback(std::function<void()> callback);
 
-    // Run all the callback from worker thread to continue filter chain.
+    // Runs all the callback from worker thread to continue filter chain.
     void runOnDemandUpdateCallback();
 
     // If route provider has not been initialized, initialize it.
@@ -245,10 +246,10 @@ public:
   ScopedRdsConfigSubscription& subscription() const {
     return *static_cast<ScopedRdsConfigSubscription*>(subscription_.get());
   }
-  void onDemandRdsUpdate(uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
+  void onDemandRdsUpdate(std::shared_ptr<Router::ScopeKey> scope_key, Event::Dispatcher& thread_local_dispatcher,
                          Http::RouteConfigUpdatedCallback&& route_config_updated_cb) const {
     subscription().onDemandRdsUpdate(
-        key_hash, thread_local_dispatcher, std::move(route_config_updated_cb),
+        std::move(scope_key), thread_local_dispatcher, std::move(route_config_updated_cb),
         std::weak_ptr<Envoy::Config::ConfigSubscriptionCommonBase>(subscription_));
   }
 };

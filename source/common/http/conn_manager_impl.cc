@@ -483,7 +483,7 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
   absl::optional<Router::ConfigConstSharedPtr> route_config = parent_.routeConfig();
   Event::Dispatcher& thread_local_dispatcher =
       parent_.connection_manager_.read_callbacks_->connection().dispatcher();
-  absl::optional<uint64_t> scope_key_hash;
+  Router::ScopeKeyPtr scope_key;
   if (route_config.has_value() && route_config.value()->usesVhds()) {
     // On demand vhds
     ASSERT(!parent_.filter_manager_.requestHeaders()->Host()->value().empty());
@@ -492,7 +492,7 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
     requestVhdsUpdate(host_header, thread_local_dispatcher, std::move(route_config_updated_cb));
     return;
   } else if (parent_.snapped_scoped_routes_config_ != nullptr &&
-             (scope_key_hash = parent_.snapped_scoped_routes_config_->computeKeyHash(
+             (scope_key = parent_.snapped_scoped_routes_config_->computeScopeKey(
                   *parent_.filter_manager_.requestHeaders()))) {
     // On demand srds
     Http::RouteConfigUpdatedCallback scoped_route_config_updated_cb =
@@ -508,7 +508,7 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
                 (*cb)(scope_exist && parent_.hasCachedRoute());
               }
             });
-    requestSrdsUpdate(*scope_key_hash, thread_local_dispatcher,
+    requestSrdsUpdate(std::move(scope_key), thread_local_dispatcher,
                       std::move(scoped_route_config_updated_cb));
     return;
   }
@@ -524,14 +524,14 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestVhdsUpdate(
 }
 
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
-    uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
+    Router::ScopeKeyPtr scope_key, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallback&& route_config_updated_cb) {
   // If it is inline scope_route_config_provider, will be cast to nullptr.
   if (!scoped_route_config_provider_) {
     route_config_updated_cb(false);
     return;
   }
-  scoped_route_config_provider_->onDemandRdsUpdate(key_hash, thread_local_dispatcher,
+  scoped_route_config_provider_->onDemandRdsUpdate(std::move(scope_key), thread_local_dispatcher,
                                                    std::move(route_config_updated_cb));
 }
 
