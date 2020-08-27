@@ -197,8 +197,6 @@ public:
   void endListenerUpdate(FailureStates&& failure_state) override;
   Http::Context& httpContext() { return server_.httpContext(); }
   ApiListenerOptRef apiListener() override;
-  bool hasWorker(const std::string& name);
-  Worker& getWorkerByName(const std::string& name);
   Instance& server_;
   ListenerComponentFactory& factory_;
 
@@ -310,7 +308,6 @@ private:
   using UpdateFailureState = envoy::admin::v3::UpdateFailureState;
   absl::flat_hash_map<std::string, std::unique_ptr<UpdateFailureState>> error_state_tracker_;
   FailureStates overall_error_state_;
-  absl::flat_hash_map<std::string, std::list<WorkerPtr>::iterator> worker_by_name_;
 };
 
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {

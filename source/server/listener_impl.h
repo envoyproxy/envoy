@@ -228,7 +228,7 @@ public:
 
   void storeWorkerCallback(Event::Dispatcher& worker_dispatcher,
                            Network::FilterChainRebuildCallback callback);
-  void callbackToWorkers(bool success);
+  void callbackWorkers(bool success);
   bool rebuildingFailed() { return state_ == State::Failed; }
   bool rebuildUnfinished() { return state_ == State::Running; }
   bool timeoutEnabled() { return timeout_enabled_; }
@@ -418,8 +418,6 @@ public:
   bool createListenerFilterChain(Network::ListenerFilterManager& manager) override;
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
-  bool hasWorker(const std::string& name);
-  Worker& getWorkerByName(const std::string& name);
 
   SystemTime last_updated_;
 
@@ -504,7 +502,6 @@ private:
   // callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
 
-  absl::flat_hash_map<const envoy::config::listener::v3::FilterChain* const, bool> filter_chains_;
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
 };

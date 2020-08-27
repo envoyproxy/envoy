@@ -262,7 +262,6 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
         worker_factory.createWorker(server.overloadManager(), absl::StrCat("worker_", i)));
-    worker_by_name_[absl::StrCat("worker_", i)] = prev(workers_.end());
   }
 }
 
@@ -1042,14 +1041,6 @@ Network::ListenSocketFactorySharedPtr ListenerManagerImpl::createListenSocketFac
 
 ApiListenerOptRef ListenerManagerImpl::apiListener() {
   return api_listener_ ? ApiListenerOptRef(std::ref(*api_listener_)) : absl::nullopt;
-}
-
-bool ListenerManagerImpl::hasWorker(const std::string& name) {
-  return worker_by_name_.find(name) != worker_by_name_.end();
-}
-
-Worker& ListenerManagerImpl::getWorkerByName(const std::string& name) {
-  return **worker_by_name_[name];
 }
 
 } // namespace Server

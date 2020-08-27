@@ -88,15 +88,6 @@ public:
    */
   virtual void stopListener(Network::ListenerConfig& listener,
                             std::function<void()> completion) PURE;
-
-  /**
-   * Notify all listeners on this worker that the filter chain of this protobuf config is rebuilt
-   * and ready. Retry all connections that requiring this filter chain.
-   * @param filter_chain filter chain protobuf message.
-   */
-  virtual void
-  onFilterChainRebuilt(bool success,
-                       const envoy::config::listener::v3::FilterChain* const& filter_chain) PURE;
 };
 
 using WorkerPtr = std::unique_ptr<Worker>;

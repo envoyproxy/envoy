@@ -378,17 +378,20 @@ public:
   virtual const envoy::config::listener::v3::FilterChain& getFilterChainMessage() const PURE;
 
   /**
-   * This function will temporarily store the rebuilt filter chain inside the placeholder.
-   * If the rebuilding completes successfully, the filter chain is not a placeholder any more, and
-   * the stored filter chain will provide transportSocketFactory and networkFilterFactories. If
-   * requests for filter chain dependencies failed or timeout, rebuilding will fail and the stored
-   * filter chain will be removed.
+   * This function helps on-demand filter chain to temporarily store the rebuilt filter chain inside
+   * the placeholder. If the rebuilding completes successfully, the filter chain is not a
+   * placeholder any more, and the stored filter chain will provide transportSocketFactory and
+   * networkFilterFactories. If requests for filter chain dependencies failed or timeout, rebuilding
+   * will fail and the stored filter chain will be removed.
    */
-  virtual void storeRebuiltFilterChain(std::shared_ptr<FilterChain> real_filter_chain) PURE;
+  virtual void storeRebuiltFilterChain(std::shared_ptr<FilterChain> rebuilt_filter_chain) PURE;
 
   /**
-   * If the filter chain rebuilding fails or timeout, the rebuilt filter chain will be deleted. And
-   * the original filter chain will become a placeholder again.
+   * This function helps on-demand filter chain to change the status of a rebuilt placeholder to
+   * become back to a placeholder. After a place holder stores the rebuilt filter chain, we first
+   * set the filter chain as not a placeholder. If the rebuilding succeeds in time, we will not
+   * change it back to a placeholder. Otherwise, if the rebuilding reaches timeout without getting
+   * dependencies ready, the filter chain will become back to a placeholder.
    */
   virtual void backToPlaceholder() PURE;
 };

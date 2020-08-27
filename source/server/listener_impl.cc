@@ -231,18 +231,18 @@ PerFilterChainRebuilder::PerFilterChainRebuilder(
     : listener_(listener), filter_chain_(filter_chain), parent_context_(factory_context),
       state_(State::Running),
       rebuild_init_manager_(std::make_unique<Init::ManagerImpl>("rebuild_init_manager")),
-      rebuild_watcher_(
-          "rebuild_watcher",
-          [this] {
-            if (state_ == State::Running) {
-              ENVOY_LOG(debug, "rebuild_watcher is ready, rebuilder will callback to workers");
-              state_ = State::Succeeded;
-              callbackToWorkers(true);
-              if (timeout_enabled_) {
-                rebuild_timer_->disableTimer();
-              }
-            }
-          }),
+      rebuild_watcher_("rebuild_watcher",
+                       [this] {
+                         if (state_ == State::Running) {
+                           ENVOY_LOG(debug,
+                                     "rebuild_watcher is ready, rebuilder will callback workers");
+                           state_ = State::Succeeded;
+                           callbackWorkers(true);
+                           if (timeout_enabled_) {
+                             rebuild_timer_->disableTimer();
+                           }
+                         }
+                       }),
       rebuild_timer_(listener_.dispatcher().createTimer([this]() -> void { onTimeout(); })),
       rebuild_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(filter_chain->on_demand_configuration(),
                                                   rebuild_timeout, 15000)) {}
@@ -261,7 +261,7 @@ PerFilterChainRebuilder::createFilterChainFactoryContext(
   return std::make_unique<PerFilterChainFactoryContextImpl>(parent_context_, initManager());
 }
 
-void PerFilterChainRebuilder::callbackToWorkers(bool success) {
+void PerFilterChainRebuilder::callbackWorkers(bool success) {
   // Send callbacks to all stored workers.
   // Possible optimization: send callback to all workers.
   for (const auto& [worker_dispatcher, callback] : workers_to_callback_) {
@@ -281,13 +281,15 @@ void PerFilterChainRebuilder::startRebuilding() {
     timeout_enabled_ = true;
     startTimer();
   }
-
   rebuild_init_manager_->initialize(rebuild_watcher_);
 }
 
 void PerFilterChainRebuilder::cancelRebuilding() {
   if (state_ == State::Running) {
     state_ = State::Failed;
+    if (timeout_enabled_) {
+      rebuild_timer_->disableTimer();
+    }
   }
 }
 
@@ -298,7 +300,7 @@ void PerFilterChainRebuilder::onTimeout() {
     // If timeout before getting response from dependencies, rebuilding fails.
     state_ = State::Failed;
     listener_.stopRebuildingFilterChain(filter_chain_);
-    callbackToWorkers(false);
+    callbackWorkers(false);
   }
 }
 
@@ -642,12 +644,6 @@ void ListenerImpl::cancelAllFilterChainRebuilding() {
     }
   }
   filter_chain_rebuilder_map_.clear();
-}
-
-bool ListenerImpl::hasWorker(const std::string& name) { return parent_.hasWorker(name); }
-
-Worker& ListenerImpl::getWorkerByName(const std::string& name) {
-  return parent_.getWorkerByName(name);
 }
 
 void ListenerImpl::buildSocketOptions() {

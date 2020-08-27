@@ -150,12 +150,5 @@ void WorkerImpl::stopAcceptingConnectionsCb(OverloadActionState state) {
   }
 }
 
-void WorkerImpl::onFilterChainRebuilt(
-    bool success, const envoy::config::listener::v3::FilterChain* const& filter_chain) {
-  ENVOY_LOG(debug, "listeners on this worker should retry connections with rebuilt filter chain.");
-  dispatcher_->post(
-      [this, &success, &filter_chain]() { handler_->retryConnections(success, filter_chain); });
-}
-
 } // namespace Server
 } // namespace Envoy
