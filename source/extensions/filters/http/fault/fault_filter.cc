@@ -409,11 +409,12 @@ bool FaultFilter::maybeDoFault() {
     return true;
   }
 
-  // We only check for overflow when attempting to perform a fault. Note that this means that a single request
-  // might increment the counter more than once if it tries to apply multiple faults, though it is also
-  // possible for it to fail the first check then succeed on the second (should another thread decrement the fault).
-  // TODO(snowp): Is this behavior ideal? Should we track whether we've rejected faults for this filter and then stick
-  // with that decision to prevent double counting?
+  // We only check for overflow when attempting to perform a fault. Note that this means that a
+  // single request might increment the counter more than once if it tries to apply multiple faults,
+  // though it is also possible for it to fail the first check then succeed on the second (should
+  // another thread decrement the fault).
+  // TODO(snowp): Is this behavior ideal? Should we track whether we've rejected faults for this
+  // filter and then stick with that decision to prevent double counting?
   if (faultOverflow()) {
     return false;
   }
