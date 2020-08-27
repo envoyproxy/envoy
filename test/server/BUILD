@@ -125,6 +125,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "guarddog_impl_test",
+    size = "small",
     srcs = ["guarddog_impl_test.cc"],
     tags = ["flaky_on_windows"],
     deps = [
