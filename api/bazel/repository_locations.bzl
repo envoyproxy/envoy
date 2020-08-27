@@ -40,7 +40,7 @@ REPOSITORY_LOCATIONS = dict(
     ),
     com_github_cncf_udpa = dict(
         sha256 = UDPA_SHA256,
-        strip_prefix = "udpa-" + UDPA_GIT_SHA,
+        strip_prefix = "udpa-" + UDPA_RELEASE,
         urls = ["https://github.com/cncf/udpa/archive/v" + UDPA_RELEASE + ".tar.gz"],
     ),
     prometheus_metrics_model = dict(
@@ -50,7 +50,7 @@ REPOSITORY_LOCATIONS = dict(
     ),
     opencensus_proto = dict(
         sha256 = OPENCENSUS_PROTO_SHA256,
-        strip_prefix = "opencensus-proto-" + OPENCENSUS_PROTO_GIT_SHA + "/src",
+        strip_prefix = "opencensus-proto-" + OPENCENSUS_PROTO_RELEASE + "/src",
         urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/v" + OPENCENSUS_PROTO_RELEASE + ".tar.gz"],
     ),
     rules_proto = dict(
