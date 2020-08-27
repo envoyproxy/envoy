@@ -227,7 +227,7 @@ public:
       const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
 
   void storeWorkerCallback(Event::Dispatcher& worker_dispatcher,
-                                 Network::FilterChainRebuildCallback callback);
+                           Network::FilterChainRebuildCallback callback);
   void callbackToWorkers(bool success);
   bool rebuildingFailed() { return state_ == State::Failed; }
   bool rebuildUnfinished() { return state_ == State::Running; }
