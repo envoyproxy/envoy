@@ -137,7 +137,9 @@ TEST(Logger, LogOnceMacro) {
   EXPECT_EQ(2, helper.evaluations_);
   // We don't expect log statements of a severity that gets filtered to add.
   helper.logSomethingBelowLogLevel();
-  EXPECT_EQ(2, helper.evaluations_);
+  // Without fine-grained logging, we shouldn't observe additional argument evaluations
+  // for log lines below the configured log level.
+  EXPECT_EQ(::Envoy::Logger::Context::useFancyLogger() ? 3 : 2, helper.evaluations_);
 }
 
 TEST(RegistryTest, LoggerWithName) {
