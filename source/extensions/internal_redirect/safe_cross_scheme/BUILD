@@ -23,12 +23,11 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "robust_to_untrusted_downstream_and_upstream",
     # TODO(#9953) clean up by moving the redirect test to extensions.
-    visibility = [
-        "//:extension_config",
+    extra_visibility = [
         "//test/integration:__subpackages__",
     ],
+    security_posture = "robust_to_untrusted_downstream_and_upstream",
     deps = [
         ":safe_cross_scheme_lib",
         "//include/envoy/registry",
