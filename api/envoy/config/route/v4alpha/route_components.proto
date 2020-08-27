@@ -1091,7 +1091,7 @@ message RetryPolicy {
         "envoy.config.route.v3.RetryPolicy.ResetHeader";
 
     string name = 1
-        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
     ResetHeaderFormat format = 2 [(validate.rules).enum = {defined_only: true}];
   }

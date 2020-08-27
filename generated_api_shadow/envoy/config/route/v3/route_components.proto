@@ -1117,7 +1117,7 @@ message RetryPolicy {
 
   message ResetHeader {
     string name = 1
-        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
     ResetHeaderFormat format = 2 [(validate.rules).enum = {defined_only: true}];
   }
@@ -1761,7 +1761,7 @@ message HeaderMatcher {
     // Examples:
     //
     // * The value *abcd* matches the value *xyzabcdpqr*, but not for *xyzbcdpqr*.
-    string contains_match = 12 [(validate.rules).string = {min_bytes: 1}];
+    string contains_match = 12 [(validate.rules).string = {min_len: 1}];
 
     string hidden_envoy_deprecated_regex_match = 5 [
       deprecated = true,
