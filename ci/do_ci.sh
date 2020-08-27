@@ -134,7 +134,6 @@ function bazel_binary_build() {
 function run_process_test_result() {
   echo "running flaky test reporting script"
   "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
-  #|| echo "not able to locate the script needed to process test results"
 }
 
 CI_TARGET=$1
