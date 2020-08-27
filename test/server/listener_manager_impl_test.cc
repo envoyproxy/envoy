@@ -4377,13 +4377,15 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
 
   // Several rebuilding requests for the same filter chain from the same listener.
   auto& listener = manager_->listeners().back().get();
-  Event::MockDispatcher worker_dispatcher, worker_dispatcher2, worker_dispatcher3,
-      worker_dispatcher4;
-  EXPECT_CALL(worker_dispatcher, post(_)).Times(1);
+  Event::MockDispatcher worker_dispatcher1{"worker1"};
+  Event::MockDispatcher worker_dispatcher2{"worker2"};
+  Event::MockDispatcher worker_dispatcher3{"worker3"};
+  Event::MockDispatcher worker_dispatcher4{"worker4"};
+  EXPECT_CALL(worker_dispatcher1, post(_)).Times(1);
   EXPECT_CALL(worker_dispatcher2, post(_)).Times(1);
   EXPECT_CALL(worker_dispatcher3, post(_)).Times(1);
   EXPECT_CALL(worker_dispatcher4, post(_)).Times(1);
-  listener.rebuildFilterChain(&filter_chain_message, worker_dispatcher, nullptr);
+  listener.rebuildFilterChain(&filter_chain_message, worker_dispatcher1, nullptr);
   // On the first request, a rebuilder will be created to start rebuilding.
   // If multiple requests arrive for the same filter chain before the first rebuilding has
   // completed, the later requests will not trigger rebuilder creation, only the worker name will be
@@ -4503,6 +4505,114 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
   filter_chain = findFilterChain(8080, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_FALSE(filter_chain->isPlaceholder());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, ListenerUpdateWhileOnDemandFilterChainRebuilding) {
+  // InSequence s;
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: foo
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.filters.listener.tls_inspector"
+      typed_config: {}
+    filter_chains:
+    - filter_chain_match:
+        destination_port: 8080
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      on_demand_configuration: {}
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+  const std::string update_yaml = TestEnvironment::substitute(R"EOF(
+    name: foo
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.filters.listener.tls_inspector"
+      typed_config: {}
+    filter_chains:
+    - filter_chain_match:
+        destination_port: 8080
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      on_demand_configuration: {}
+    - filter_chain_match:
+        destination_port: 8081
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      on_demand_configuration: {}
+  )EOF",
+                                                              Network::Address::IpVersion::v4);
+
+  envoy::config::listener::v3::Listener listener_config = parseListenerFromV3Yaml(yaml);
+  envoy::config::listener::v3::Listener update_listener_config =
+      parseListenerFromV3Yaml(update_yaml);
+  const auto& filter_chain_message = listener_config.filter_chains().Get(0);
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+
+  // should enable supportUpdateFilterChain to use newListenerWithFilterChain.
+  EXPECT_TRUE(manager_->addOrUpdateListener(listener_config, "", true));
+  EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  // IPv4 client connects to unknown port - no match.
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain, nullptr);
+
+  // IPv4 client connects to valid port - using 1st filter chain.
+  filter_chain = findFilterChain(8080, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->isPlaceholder());
+
+  RebuilderHandle* rebuilder_foo = expectFilterChainRebuild(true);
+  EXPECT_CALL(rebuilder_foo->target_, initialize());
+
+  // Rebuild the filter chain placeholder.
+  auto& listener = manager_->listeners().back().get();
+  Event::MockDispatcher worker_dispatcher;
+  EXPECT_CALL(worker_dispatcher, post(_)).Times(0);
+  listener.rebuildFilterChain(&filter_chain_message, worker_dispatcher, nullptr);
+
+  // Listener update while previous rebuilding did not succeed.
+  // rebuilder_foo->target_.ready();
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  manager_->addOrUpdateListener(update_listener_config, "", true);
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+  EXPECT_EQ(1U, manager_->listeners().size());
+  worker_->callAddCompletion(true);
+
+  // After listener update, the old listener will be drained. All unfinished rebuilding will be
+  // canceled. So the filter chain moved to the new listener is still a placeholder.
+  filter_chain = findFilterChain(8080, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->isPlaceholder());
 }
 
 TEST_F(ListenerManagerImplTest, StopInplaceWarmingListener) {

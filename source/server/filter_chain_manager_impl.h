@@ -122,8 +122,6 @@ public:
     return *filter_chain_message_;
   }
 
-  // This function helps on-demand filter chain to store the rebuilt filter chain, which will act as
-  // the provider of transportSocketFactory and networkFilterFactories.
   void storeRebuiltFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
     absl::MutexLock lock(&lock_);
 
@@ -132,11 +130,6 @@ public:
     rebuilt_filter_chain_ = std::move(rebuilt_filter_chain);
   }
 
-  // This function helps on-demand filter chain to change the status of a rebuilt placeholder to
-  // become back to a placeholder. After a place holder stores the rebuilt filter chain, we first
-  // set the filter chain as not a placeholder. If the rebuilding succeeds in time, we will not
-  // change it back to a placeholder. Otherwise, if the rebuilding reaches timeout without getting
-  // dependencies ready, the filter chain will become back to a placeholder.
   void backToPlaceholder() override {
     absl::MutexLock lock(&lock_);
 
