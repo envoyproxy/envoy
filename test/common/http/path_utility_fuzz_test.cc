@@ -22,7 +22,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::PathUtilityTestCase& input) {
             break;
         }
         case test::common::http::PathUtilityTestCase::kMergeSlashes: {
-            auto request_headers = fromHeaders<Http::TestRequestHeaderMapImpl>(input.canonical_path().request_headers(),
+            auto request_headers = fromHeaders<Http::TestRequestHeaderMapImpl>(input.merge_slashes().request_headers(),
                                                       {}, {});
             Http::PathUtil::mergeSlashes(request_headers);
             break;
