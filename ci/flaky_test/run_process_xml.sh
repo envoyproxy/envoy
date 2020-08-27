@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. tools/shell_utils.sh
+. "${ENVOY_SRCDIR}"/ci/flaky_test/tools/shell_utils.sh
 
 if [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]]; then
   export MULTIDICT_NO_EXTENSIONS=1
