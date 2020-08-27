@@ -481,6 +481,9 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     if (body_text != local_reply_data.body_text_ || response_headers->ContentType() == nullptr) {
       response_headers->setReferenceContentType(content_type);
     }
+  } else {
+    response_headers->removeContentLength();
+    response_headers->removeContentType();
   }
 
   if (local_reply_data.is_head_request_) {
