@@ -195,15 +195,6 @@ void HdsDelegate::processMessage(
         auto* new_endpoint = new_lb_endpoint->mutable_endpoint();
 
         new_endpoint->mutable_address()->MergeFrom(endpoint.address());
-
-        for (auto& health_check : cluster_health_check.health_checks()) {
-          auto* metadata = new_lb_endpoint->mutable_metadata();
-          const auto metadata_source =
-              HealthCheckerImplBase::initTransportSocketMatchMetadata(health_check);
-          if (metadata_source != nullptr) {
-            metadata->MergeFrom(*metadata_source);
-          }
-        }
       }
     }
 

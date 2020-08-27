@@ -3,6 +3,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/service/health/v3/hds.pb.h"
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/upstream/upstream.h"
@@ -12,6 +13,10 @@
 #include "common/protobuf/utility.h"
 #include "common/upstream/health_checker_impl.h"
 #include "common/upstream/health_discovery_service.h"
+
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/context_impl.h"
+#include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/config/utility.h"
@@ -39,8 +44,8 @@ public:
     hds_upstream_->set_allow_unexpected_disconnects(true);
     HttpIntegrationTest::createUpstreams();
   }
-
-  void initialize() override {
+  void initialize() override { initialize(Envoy::FakeHttpConnection::Type::HTTP1); }
+  void initialize(FakeHttpConnection::Type http_conn_type, bool use_ssl = false) {
     setUpstreamCount(upstream_endpoints_);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Setup hds and corresponding gRPC cluster.
@@ -60,9 +65,16 @@ public:
     HttpIntegrationTest::initialize();
 
     // Endpoint connections
-    host_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type_, version_, timeSystem());
+    if (use_ssl) {
+      host_upstream_ = std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0, http_conn_type,
+                                                      version_, timeSystem());
+      host2_upstream_ = std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0,
+                                                       http_conn_type, version_, timeSystem());
+    } else {
+      host_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type, version_, timeSystem());
+      host2_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type, version_, timeSystem());
+    }
     host_upstream_->set_allow_unexpected_disconnects(true);
-    host2_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type_, version_, timeSystem());
     host2_upstream_->set_allow_unexpected_disconnects(true);
   }
 
@@ -73,6 +85,29 @@ public:
     RELEASE_ASSERT(result, result.message());
     result = hds_fake_connection_->waitForNewStream(*dispatcher_, hds_stream_);
     RELEASE_ASSERT(result, result.message());
+  }
+
+  Network::TransportSocketFactoryPtr createUpstreamSslContext() {
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    const std::string yaml = absl::StrFormat(
+        R"EOF(
+common_tls_context:
+  tls_certificates:
+  - certificate_chain: { filename: "%s" }
+    private_key: { filename: "%s" }
+  validation_context:
+    trusted_ca: { filename: "%s" }
+require_client_certificate: true
+)EOF",
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"),
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"),
+        TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+    TestUtility::loadFromYaml(yaml, tls_context);
+    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+        tls_context, factory_context_);
+    static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
+    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
   }
 
   // Envoy sends health check messages to the endpoints
@@ -124,8 +159,9 @@ public:
 
   // Creates a basic HealthCheckSpecifier message containing one endpoint and
   // one HTTP health_check
-  envoy::service::health::v3::HealthCheckSpecifier
-  makeHttpHealthCheckSpecifier(bool enable_transport_socket_match = false) {
+  envoy::service::health::v3::HealthCheckSpecifier makeHttpHealthCheckSpecifier(
+      envoy::type::v3::CodecClientType codec_type = envoy::type::v3::CodecClientType::HTTP1,
+      bool use_ssl = false) {
     envoy::service::health::v3::HealthCheckSpecifier server_health_check_specifier_;
     server_health_check_specifier_.mutable_interval()->set_nanos(100000000); // 0.1 seconds
 
@@ -148,23 +184,22 @@ public:
     health_check->mutable_grpc_health_check();
     auto* http_health_check = health_check->mutable_http_health_check();
     http_health_check->set_path("/healthcheck");
-    http_health_check->set_codec_client_type(envoy::type::v3::CodecClientType::HTTP1);
-    if (enable_transport_socket_match) {
+    http_health_check->set_codec_client_type(codec_type);
+    if (use_ssl) {
       // set bool for use in struct.
       ProtobufWkt::Value v;
-      v.set_bool_value(true);
+      v.set_string_value("true");
 
       // map our transport socket matches with our matcher.
-      http_health_check->set_codec_client_type(envoy::type::v3::CodecClientType::HTTP2);
       auto* match_filter = health_check->mutable_transport_socket_match_criteria();
-      match_filter->mutable_fields()->insert({"tls_socket", v});
+      match_filter->mutable_fields()->insert({"good_match", v});
 
       // create the list of all possible matches.
       const std::string match_yaml = absl::StrFormat(
           R"EOF(
   name: "tls_socket"
   match:
-    mtlsReady: "true"
+    good_match: "true"
   transport_socket:
     name: tls
     typed_config:
@@ -337,8 +372,6 @@ public:
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse envoy_msg_;
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse response_;
   envoy::service::health::v3::HealthCheckSpecifier server_health_check_specifier_;
-
-  FakeHttpConnection::Type http_conn_type_ = FakeHttpConnection::Type::HTTP1;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, HdsIntegrationTest,
@@ -910,11 +943,9 @@ TEST_P(HdsIntegrationTest, TestDefaultTimer) {
   cleanupHdsConnection();
 }
 
-// Tests Envoy HTTP health checking a single healthy endpoint and reporting that it is
-// indeed healthy to the server.
-TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttpsContext) {
-  http_conn_type_ = FakeHttpConnection::Type::HTTP2;
-  initialize();
+// Health checks a single endpoint over SSL with HTTP/2
+TEST_P(HdsIntegrationTest, SingleEndpointHealthySslHttp2) {
+  initialize(FakeHttpConnection::Type::HTTP2, true);
 
   // Server <--> Envoy
   waitForHdsStream();
@@ -923,7 +954,42 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttpsContext) {
             envoy::service::health::v3::Capability::HTTP);
 
   // Server asks for health checking
-  server_health_check_specifier_ = makeHttpHealthCheckSpecifier(true);
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP2, true);
+  hds_stream_->startGrpcStream();
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
+
+  // Envoy sends a health check message to an endpoint
+  healthcheckEndpoints();
+
+  // Endpoint responds to the health check
+  host_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  host_stream_->encodeData(1024, true);
+
+  // Receive updates until the one we expect arrives
+  waitForEndpointHealthResponse(envoy::config::core::v3::HEALTHY);
+
+  checkCounters(1, 2, 1, 0);
+
+  // Clean up connections
+  cleanupHostConnections();
+  cleanupHdsConnection();
+}
+
+// Health checks a single endpoint over SSL with HTTP/1
+TEST_P(HdsIntegrationTest, SingleEndpointHealthySslHttp1) {
+  initialize(FakeHttpConnection::Type::HTTP1, true);
+
+  // Server <--> Envoy
+  waitForHdsStream();
+  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
+  EXPECT_EQ(envoy_msg_.health_check_request().capability().health_check_protocols(0),
+            envoy::service::health::v3::Capability::HTTP);
+
+  // Server asks for health checking
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, true);
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);

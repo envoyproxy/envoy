@@ -164,7 +164,6 @@ message LocalityEndpoints {
 // health checks to support statistics reporting, logging and debugging by the
 // Envoy instance (outside of HDS). For maximum usefulness, it should match the
 // same cluster structure as that provided by EDS.
-// [#next-free-field: 44]
 message ClusterHealthCheck {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.health.v3.ClusterHealthCheck";
@@ -178,7 +177,7 @@ message ClusterHealthCheck {
   // Optional map that gets filtered by :ref:`health_checks.transport_socket_match_criteria <envoy_api_field_config.core.v4alpha.HealthCheck.transport_socket_match_criteria>`
   // on connection when health checking. For more details, see
   // :ref:`config.cluster.v3.Cluster.transport_socket_matches <envoy_api_field_config.cluster.v4alpha.Cluster.transport_socket_matches>`.
-  repeated config.cluster.v4alpha.Cluster.TransportSocketMatch transport_socket_matches = 43;
+  repeated config.cluster.v4alpha.Cluster.TransportSocketMatch transport_socket_matches = 4;
 }
 
 message HealthCheckSpecifier {
