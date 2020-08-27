@@ -90,25 +90,29 @@ RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode
     if (engine->handleAction(callbacks_->connection(), callbacks_->connection().streamInfo(),
                              &effective_policy_id)) {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
-        ENVOY_LOG(debug, "shadow allowed");
+        ENVOY_LOG(debug, "shadow allowed, matched policy {}",
+                  effective_policy_id.empty() ? "none" : effective_policy_id);
         config_->stats().shadow_allowed_.inc();
         setDynamicMetadata(
             Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed,
             effective_policy_id);
       } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
-        ENVOY_LOG(debug, "enforced allowed");
+        ENVOY_LOG(debug, "enforced allowed, matched policy {}",
+                  effective_policy_id.empty() ? "none" : effective_policy_id);
         config_->stats().allowed_.inc();
       }
       return Allow;
     } else {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
-        ENVOY_LOG(debug, "shadow denied");
+        ENVOY_LOG(debug, "shadow denied, matched policy {}",
+                  effective_policy_id.empty() ? "none" : effective_policy_id);
         config_->stats().shadow_denied_.inc();
         setDynamicMetadata(
             Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied,
             effective_policy_id);
       } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
-        ENVOY_LOG(debug, "enforced denied");
+        ENVOY_LOG(debug, "enforced denied, matched policy {}",
+                  effective_policy_id.empty() ? "none" : effective_policy_id);
         config_->stats().denied_.inc();
       }
       return Deny;
