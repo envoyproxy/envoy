@@ -21,6 +21,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "factory_base_lib",
     hdrs = ["factory_base.h"],
+    visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/server:filter_config_interface",
     ],

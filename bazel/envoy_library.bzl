@@ -9,6 +9,10 @@ load(
     "envoy_linkstatic",
 )
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "EXTENSION_CONFIG_VISIBILITY",
+)
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
 # SelectorValue values have to match the attribute type. See
@@ -70,14 +74,15 @@ def envoy_cc_extension(
         undocumented = False,
         status = "stable",
         tags = [],
-        # TODO(rgs1): revert this to //:extension_config once
-        # https://github.com/envoyproxy/envoy/issues/12444 is fixed.
-        visibility = ["//visibility:public"],
+        extra_visibility = [],
+        visibility = EXTENSION_CONFIG_VISIBILITY,
         **kwargs):
     if security_posture not in EXTENSION_SECURITY_POSTURES:
         fail("Unknown extension security posture: " + security_posture)
     if status not in EXTENSION_STATUS_VALUES:
         fail("Unknown extension status: " + status)
+    if "//visibility:public" not in visibility:
+        visibility = visibility + extra_visibility
     envoy_cc_library(name, tags = tags, visibility = visibility, **kwargs)
 
 # Envoy C++ library targets should be specified with this function.

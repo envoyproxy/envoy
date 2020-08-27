@@ -32,14 +32,16 @@ load(
     _envoy_py_test_binary = "envoy_py_test_binary",
     _envoy_sh_test = "envoy_sh_test",
 )
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "EXTENSION_PACKAGE_VISIBILITY",
+)
 
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
 
 def envoy_extension_package():
-    # TODO(rgs1): revert this to //:extension_library once
-    # https://github.com/envoyproxy/envoy/issues/12444 is fixed.
-    native.package(default_visibility = ["//visibility:public"])
+    native.package(default_visibility = EXTENSION_PACKAGE_VISIBILITY)
 
 # A genrule variant that can output a directory. This is useful when doing things like
 # generating a fuzz corpus mechanically.
