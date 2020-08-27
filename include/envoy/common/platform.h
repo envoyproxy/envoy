@@ -193,6 +193,14 @@ struct msghdr {
 #define SOL_UDP 17
 #endif
 
+#ifndef SOL_IP
+#define SOL_IP IPPROTO_IP
+#endif
+
+#ifndef SOL_IPV6
+#define SOL_IPV6 IPPROTO_IPV6
+#endif
+
 #ifndef UDP_GRO
 #define UDP_GRO 104
 #endif
