@@ -580,6 +580,13 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
+  if (connection_manager_.remote_close_) {
+    filter_manager_.streamInfo().setResponseCodeDetails(
+        StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect);
+    filter_manager_.streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::DownstreamConnectionTermination);
+  }
+
   if (connection_manager_.codec_->protocol() < Protocol::Http2) {
     // For HTTP/2 there are still some reset cases where details are not set.
     // For HTTP/1 there shouldn't be any. Regression-proof this.
