@@ -57,6 +57,7 @@ envoy_cc_test(
     deps = [
         "//source/common/upstream:cluster_update_tracker_lib",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:thread_local_cluster_mocks",
     ],
 )
 

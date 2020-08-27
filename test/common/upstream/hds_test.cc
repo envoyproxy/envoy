@@ -18,7 +18,6 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
-#include "test/mocks/upstream/cluster.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_info_factory.h"
 #include "test/mocks/upstream/cluster_manager.h"
