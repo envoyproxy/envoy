@@ -324,9 +324,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       // NOTE: We move the existing pending streams to a temporary list. This is done so that
       //       if retry logic submits a new stream to the pool, we don't fail it inline.
       purgePendingRequests(client.real_host_description_, failure_reason, reason);
-      // All requests will be purged. newStream may create new ones, at which
-      // point prefetching will happen there.
-      ASSERT(!shouldCreateNewConnection());
+      // See if we should prefetch another connection based on active connections.
+      tryCreateNewConnections();
     }
 
     // We need to release our resourceManager() resources before checking below for
@@ -390,6 +389,7 @@ void ConnPoolImplBase::purgePendingRequests(
     host_->cluster().stats().upstream_rq_pending_failure_eject_.inc();
     onPoolFailure(host_description, failure_reason, reason, stream->context());
   }
+  std::cerr << "pending_streams: " << pending_streams_.size() << std::endl;
 }
 
 bool ConnPoolImplBase::connectingConnectionIsExcess() const {
