@@ -1,6 +1,8 @@
 #pragma once
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
@@ -13,6 +15,15 @@ namespace Envoy {
 namespace Http {
 
 class FilterManager;
+
+template <class T> using MaybeOwnedPtr = absl::variant<std::unique_ptr<T>, T*>;
+template <class T> T* asRaw(const MaybeOwnedPtr<T>& ptr) {
+  if (std::holds_alternative<T*>(ptr)) {
+    return std::get<T*>(ptr);
+  }
+
+  return std::get<std::unique_ptr<T>>(ptr).get();
+}
 
 /**
  * Base class wrapper for both stream encoder and decoder filters.
@@ -276,14 +287,14 @@ public:
    * @param response_headers the encoded headers.
    * @param end_stream whether this is a header only response.
    */
-  virtual void encodeHeaders(ResponseHeaderMap& response_headers, bool end_stream) PURE;
+  virtual void encodeHeaders(ResponseHeaderMapPtr&& response_headers, bool end_stream) PURE;
 
   /**
    * Called when the provided 100 Continue headers have been encoded by all the filters in the
    * chain.
    * @param response_headers the encoded headers.
    */
-  virtual void encode100ContinueHeaders(ResponseHeaderMap& response_headers) PURE;
+  virtual void encode100ContinueHeaders(ResponseHeaderMapPtr&& response_headers) PURE;
 
   /**
    * Called when the provided data has been encoded by all filters in the chain.
@@ -296,7 +307,7 @@ public:
    * Called when the provided trailers have been encoded by all filters in the chain.
    * @param trailers the encoded trailers.
    */
-  virtual void encodeTrailers(ResponseTrailerMap& trailers) PURE;
+  virtual void encodeTrailers(ResponseTrailerMapPtr&& trailers) PURE;
 
   /**
    * Called when the provided metadata has been encoded by all filters in the chain.
@@ -337,13 +348,14 @@ public:
   /**
    * Called when the stream should be re-created, e.g. for an internal redirect.
    */
-  virtual void recreateStream(RequestHeaderMapPtr&& request_headers,
-                              StreamInfo::FilterStateSharedPtr filter_state) PURE;
+  virtual void recreateStream(StreamInfo::FilterStateSharedPtr filter_state) PURE;
 
   /**
    * Called when the stream should be reset.
    */
   virtual void resetStream() PURE;
+
+  virtual void addAccessLogger(AccessLog::InstanceSharedPtr access_log) PURE;
 
   /**
    * Returns the upgrade map for the current route entry.
@@ -435,14 +447,7 @@ public:
         buffer_limit_(buffer_limit), filter_chain_factory_(filter_chain_factory),
         local_reply_(local_reply),
         stream_info_(protocol, time_source, parent_filter_state, filter_state_life_span) {}
-  ~FilterManager() override {
-    for (const auto& log_handler : access_log_handlers_) {
-      log_handler->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
-                       stream_info_);
-    }
-
-    ASSERT(state_.filter_call_state_ == 0);
-  }
+  ~FilterManager() override { ASSERT(state_.filter_call_state_ == 0); }
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level = 0) const override {
@@ -452,9 +457,9 @@ public:
        << "\n";
 
     DUMP_DETAILS(request_headers_);
-    DUMP_DETAILS(request_trailers_);
-    DUMP_DETAILS(response_headers_);
-    DUMP_DETAILS(response_trailers_);
+    DUMP_DETAILS(asRaw(request_trailers_));
+    DUMP_DETAILS(responseHeaders());
+    DUMP_DETAILS(responseTrailers());
     DUMP_DETAILS(&stream_info_);
   }
 
@@ -492,7 +497,8 @@ public:
    * @param end_stream whether the request is header only.
    */
   void decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
-    decodeHeaders(nullptr, headers, end_stream);
+    setRequestHeaders(&headers);
+    decodeHeaders(nullptr, end_stream);
   }
 
   /**
@@ -508,11 +514,11 @@ public:
    * Decodes the provided trailers starting at the first filter in the chain.
    * @param trailers the trailers to decode.
    */
-  void decodeTrailers(RequestTrailerMapPtr&& trailers) {
-    ASSERT(request_trailers_ == nullptr);
+  void decodeTrailers(RequestTrailerMap& trailers) {
+    ASSERT(requestTrailers() == nullptr);
 
-    request_trailers_ = std::move(trailers);
-    decodeTrailers(nullptr, *request_trailers_);
+    request_trailers_ = &trailers;
+    decodeTrailers(nullptr);
   }
 
   /**
@@ -543,23 +549,15 @@ public:
                       const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details);
-  /**
-   * Sends a local reply by constructing a response and passing it through all the encoder
-   * filters. The resulting response will be passed out via the FilterManagerCallbacks.
-   */
-  void sendLocalReplyViaFilterChain(
-      bool is_grpc_request, Code code, absl::string_view body,
-      const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
-      const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
 
-  /**
-   * Sends a local reply by constructing a response and skipping the encoder filters. The
-   * resulting response will be passed out via the FilterManagerCallbacks.
-   */
-  void sendDirectLocalReply(Code code, absl::string_view body,
-                            const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                            bool is_head_request,
-                            const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
+  void sendLocalReply(Http::RequestHeaderMap& request_headers, bool is_grpc_request, Code code,
+                      absl::string_view body,
+                      const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details) {
+    setRequestHeaders(&request_headers);
+    sendLocalReply(is_grpc_request, code, body, modify_headers, grpc_status, details);
+  }
 
   // Possibly increases buffer_limit_ to the value of limit.
   void setBufferLimit(uint32_t limit);
@@ -574,7 +572,8 @@ public:
   void callHighWatermarkCallbacks();
   void callLowWatermarkCallbacks();
 
-  void setRequestHeaders(RequestHeaderMapPtr&& request_headers) {
+private:
+  void setRequestHeaders(RequestHeaderMap* request_headers) {
     if (Http::Headers::get().MethodValues.Head == request_headers->getMethodValue()) {
       state_.is_head_request_ = true;
     }
@@ -584,10 +583,12 @@ public:
     // of this by updating the calls to sendLocalReply to pass ownership over the headers + adding
     // asserts that we don't call the overload that doesn't pass ownership unless decodeData has
     // been called.
-    ASSERT(request_headers_ == nullptr);
-    request_headers_ = std::move(request_headers);
+    // TODO(snowp): This is no good since create FC moves the ptr as well, fix
+    // ASSERT(request_headers_ == nullptr);
+    request_headers_ = request_headers;
   }
 
+public:
   /**
    * Marks local processing as complete.
    */
@@ -615,12 +616,12 @@ public:
   /**
    * Returns the current request headers, or nullptr if header decoding hasn't started yet.
    */
-  RequestHeaderMap* requestHeaders() const { return request_headers_.get(); }
+  RequestHeaderMap* requestHeaders() const { return request_headers_; }
 
   /**
    * Returns the current request trailers, or nullptr if trailer decoding hasn't started yet.
    */
-  RequestTrailerMap* requestTrailers() const { return request_trailers_.get(); }
+  RequestTrailerMap* requestTrailers() const { return asRaw(request_trailers_); }
 
   /**
    * Returns the current response headers, or nullptr if header encoding hasn't started yet.
@@ -637,6 +638,12 @@ public:
   const StreamInfo::StreamInfoImpl& streamInfo() const { return stream_info_; }
 
   // Set up the Encoder/Decoder filter chain.
+  bool createFilterChain(RequestHeaderMap& request_headers) {
+    ASSERT(!request_headers_);
+    setRequestHeaders(&request_headers);
+
+    return createFilterChain();
+  }
   bool createFilterChain();
 
   const Network::Connection* connection() const { return &connection_; }
@@ -644,6 +651,24 @@ public:
   uint64_t streamId() const { return stream_id_; }
 
 private:
+  /**
+   * Sends a local reply by constructing a response and passing it through all the encoder
+   * filters. The resulting response will be passed out via the FilterManagerCallbacks.
+   */
+  void sendLocalReplyViaFilterChain(
+      bool is_grpc_request, Code code, absl::string_view body,
+      const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
+      const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
+
+  /**
+   * Sends a local reply by constructing a response and skipping the encoder filters. The
+   * resulting response will be passed out via the FilterManagerCallbacks.
+   */
+  void sendDirectLocalReply(Code code, absl::string_view body,
+                            const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+                            bool is_head_request,
+                            const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
+
   // Indicates which filter to start the iteration with.
   enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
 
@@ -662,29 +687,28 @@ private:
   // to it.
   void maybeContinueDecoding(
       const std::list<ActiveStreamDecoderFilterPtr>::iterator& maybe_continue_data_entry);
-  void decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHeaderMap& headers, bool end_stream);
+  void decodeHeaders(ActiveStreamDecoderFilter* filter, bool end_stream);
   // Sends data through decoding filter chains. filter_iteration_start_state indicates which
   // filter to start the iteration with.
   void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream,
                   FilterIterationStartState filter_iteration_start_state);
-  void decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTrailerMap& trailers);
+  void decodeTrailers(ActiveStreamDecoderFilter* filter);
   void decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMap& metadata_map);
   void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
   ResponseTrailerMap& addEncodedTrailers();
-  void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers);
+  void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter);
   // As with most of the encode functions, this runs encodeHeaders on various
   // filters before calling encodeHeadersInternal which does final header munging and passes the
   // headers to the encoder.
   void maybeContinueEncoding(
       const std::list<ActiveStreamEncoderFilterPtr>::iterator& maybe_continue_data_entry);
-  void encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers,
-                     bool end_stream);
+  void encodeHeaders(ActiveStreamEncoderFilter* filter, bool end_stream);
   // Sends data through encoding filter chains. filter_iteration_start_state indicates which
   // filter to start the iteration with, and finally calls encodeDataInternal
   // to update stats, do end stream bookkeeping, and send the data to encoder.
   void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream,
                   FilterIterationStartState filter_iteration_start_state);
-  void encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTrailerMap& trailers);
+  void encodeTrailers(ActiveStreamEncoderFilter* filter);
   void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
 
   // Returns true if new metadata is decoded. Otherwise, returns false.
@@ -711,13 +735,22 @@ private:
 
   std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
   std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
-  std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
 
-  ResponseHeaderMapPtr continue_headers_;
-  ResponseHeaderMapPtr response_headers_;
-  ResponseTrailerMapPtr response_trailers_;
-  RequestHeaderMapPtr request_headers_;
-  RequestTrailerMapPtr request_trailers_;
+  // Request headers are *always* provided elsewhere, so we never own them.
+  RequestHeaderMap* request_headers_{};
+  // We may or may not own the request trailers: either we receive a reference to trailers from our
+  // parent (the FM does not own the trailers) or a filter requested that we add trailers when none
+  // exist (the FM owns the trailers).
+  MaybeOwnedPtr<RequestTrailerMap> request_trailers_{nullptr};
+
+  // We always own the response headers/trailers, as they are either created by the FM or moved into
+  // the FM from an upstream.
+  // Note that the FM should not retain ownership of these: once filter iteration is done ownership
+  // is passed on via the FM callbacks.
+  ResponseHeaderMapPtr continue_headers_{nullptr};
+  ResponseHeaderMapPtr response_headers_{nullptr};
+  ResponseTrailerMapPtr response_trailers_{nullptr};
+
   // Stores metadata added in the decoding filter that is being processed. Will be cleared before
   // processing the next filter. The storage is created on demand. We need to store metadata
   // temporarily in the filter in case the filter has stopped all while processing headers.
@@ -765,7 +798,7 @@ private:
     State()
         : remote_complete_(false), local_complete_(false), has_continue_headers_(false),
           created_filter_chain_(false), is_head_request_(false),
-          non_100_response_headers_encoded_(false) {}
+          non_100_response_headers_encoded_(false), received_response_headers_(false) {}
 
     uint32_t filter_call_state_{0};
 
@@ -780,6 +813,8 @@ private:
     bool is_head_request_ : 1;
     // Tracks if headers other than 100-Continue have been encoded to the codec.
     bool non_100_response_headers_encoded_ : 1;
+    // Tracks whether we've seen the response headers and started encoding.
+    bool received_response_headers_ : 1;
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield

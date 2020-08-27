@@ -65,7 +65,7 @@ void ActiveStreamFilterBase::commonContinue() {
     do100ContinueHeaders();
     // If the response headers have not yet come in, don't continue on with
     // headers and body. doHeaders expects request headers to exist.
-    if (!parent_.response_headers_.get()) {
+    if (!parent_.responseHeaders()) {
       return;
     }
   }
@@ -258,7 +258,7 @@ Buffer::WatermarkBufferPtr& ActiveStreamDecoderFilter::bufferedData() {
 bool ActiveStreamDecoderFilter::complete() { return parent_.state_.remote_complete_; }
 
 void ActiveStreamDecoderFilter::doHeaders(bool end_stream) {
-  parent_.decodeHeaders(this, *parent_.request_headers_, end_stream);
+  parent_.decodeHeaders(this, end_stream);
 }
 
 void ActiveStreamDecoderFilter::doData(bool end_stream) {
@@ -266,10 +266,8 @@ void ActiveStreamDecoderFilter::doData(bool end_stream) {
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
 
-void ActiveStreamDecoderFilter::doTrailers() {
-  parent_.decodeTrailers(this, *parent_.request_trailers_);
-}
-bool ActiveStreamDecoderFilter::hasTrailers() { return parent_.request_trailers_ != nullptr; }
+void ActiveStreamDecoderFilter::doTrailers() { parent_.decodeTrailers(this); }
+bool ActiveStreamDecoderFilter::hasTrailers() { return parent_.requestTrailers() != nullptr; }
 
 void ActiveStreamDecoderFilter::drainSavedRequestMetadata() {
   ASSERT(saved_request_metadata_ != nullptr);
@@ -335,13 +333,14 @@ void ActiveStreamDecoderFilter::encode100ContinueHeaders(ResponseHeaderMapPtr&& 
   // 100-Continue, then proxies a duplicate 100 Continue from upstream.
   if (parent_.proxy_100_continue_) {
     parent_.continue_headers_ = std::move(headers);
-    parent_.encode100ContinueHeaders(nullptr, *parent_.continue_headers_);
+    parent_.encode100ContinueHeaders(nullptr);
   }
 }
 
 void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
+  parent_.state_.received_response_headers_ = true;
   parent_.response_headers_ = std::move(headers);
-  parent_.encodeHeaders(nullptr, *parent_.response_headers_, end_stream);
+  parent_.encodeHeaders(nullptr, end_stream);
 }
 
 void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -351,7 +350,7 @@ void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stre
 
 void ActiveStreamDecoderFilter::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
   parent_.response_trailers_ = std::move(trailers);
-  parent_.encodeTrailers(nullptr, *parent_.response_trailers_);
+  parent_.encodeTrailers(nullptr);
 }
 
 void ActiveStreamDecoderFilter::encodeMetadata(MetadataMapPtr&& metadata_map_ptr) {
@@ -404,7 +403,7 @@ void FilterManager::addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr fi
 }
 
 void FilterManager::addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
-  access_log_handlers_.push_back(handler);
+  filter_manager_callbacks_.addAccessLogger(handler);
 }
 
 void FilterManager::maybeContinueDecoding(
@@ -420,8 +419,7 @@ void FilterManager::maybeContinueDecoding(
   }
 }
 
-void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHeaderMap& headers,
-                                  bool end_stream) {
+void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, bool end_stream) {
   // Headers filter iteration should always start with the next filter if available.
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
       commonDecodePrefix(filter, FilterIterationStartState::AlwaysStartFromNext);
@@ -432,7 +430,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
     (*entry)->end_stream_ = state_.decoding_headers_only_ ||
                             (end_stream && continue_data_entry == decoder_filters_.end());
-    FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
+    FilterHeadersStatus status = (*entry)->decodeHeaders(*requestHeaders(), (*entry)->end_stream_);
 
     ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && (*entry)->end_stream_));
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
@@ -494,7 +492,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
   }
 
   auto trailers_added_entry = decoder_filters_.end();
-  const bool trailers_exists_at_start = request_trailers_ != nullptr;
+  const bool trailers_exists_at_start = asRaw(request_trailers_) != nullptr;
   // Filter iteration may start at the current filter.
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
       commonDecodePrefix(filter, filter_iteration_start_state);
@@ -549,7 +547,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     recordLatestDataFilter(entry, state_.latest_data_decoding_filter_, decoder_filters_);
 
     state_.filter_call_state_ |= FilterCallState::DecodeData;
-    (*entry)->end_stream_ = end_stream && !request_trailers_;
+    (*entry)->end_stream_ = end_stream && !requestTrailers();
     FilterDataStatus status = (*entry)->handle_->decodeData(data, (*entry)->end_stream_);
     if ((*entry)->end_stream_) {
       (*entry)->handle_->decodeComplete();
@@ -563,7 +561,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
 
     processNewlyAddedMetadata();
 
-    if (!trailers_exists_at_start && request_trailers_ &&
+    if (!trailers_exists_at_start && requestTrailers() &&
         trailers_added_entry == decoder_filters_.end()) {
       trailers_added_entry = entry;
     }
@@ -580,7 +578,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
   // If trailers were adding during decodeData we need to trigger decodeTrailers in order
   // to allow filters to process the trailers.
   if (trailers_added_entry != decoder_filters_.end()) {
-    decodeTrailers(trailers_added_entry->get(), *request_trailers_);
+    decodeTrailers(trailers_added_entry->get());
   }
 
   if (end_stream) {
@@ -593,10 +591,10 @@ RequestTrailerMap& FilterManager::addDecodedTrailers() {
   ASSERT(state_.filter_call_state_ & FilterCallState::LastDataFrame);
 
   // Trailers can only be added once.
-  ASSERT(!request_trailers_);
+  ASSERT(!requestTrailers());
 
   request_trailers_ = RequestTrailerMapImpl::create();
-  return *request_trailers_;
+  return *requestTrailers();
 }
 
 void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data,
@@ -623,7 +621,7 @@ void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::In
 
 MetadataMapVector& FilterManager::addDecodedMetadata() { return *getRequestMetadataMapVector(); }
 
-void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTrailerMap& trailers) {
+void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter) {
   // If we previously decided to decode only the headers, do nothing here.
   if (state_.decoding_headers_only_) {
     return;
@@ -646,7 +644,7 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
 
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeTrailers));
     state_.filter_call_state_ |= FilterCallState::DecodeTrailers;
-    FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
+    FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(*requestTrailers());
     (*entry)->handle_->decodeComplete();
     (*entry)->end_stream_ = true;
     state_.filter_call_state_ &= ~FilterCallState::DecodeTrailers;
@@ -740,7 +738,7 @@ void FilterManager::sendLocalReply(
 
   filter_manager_callbacks_.onLocalReply(code);
 
-  if (response_headers_ == nullptr) {
+  if (!state_.received_response_headers_) {
     // If the response has not started at all, send the response through the filter chain.
     sendLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
                                  grpc_status, details);
@@ -771,7 +769,7 @@ void FilterManager::sendLocalReplyViaFilterChain(
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   ENVOY_STREAM_LOG(debug, "Sending local reply with details {}", *this, details);
-  ASSERT(response_headers_ == nullptr);
+  ASSERT(responseHeaders() == nullptr);
   // For early error handling, do a best-effort attempt to create a filter chain
   // to ensure access logging. If the filter chain already exists this will be
   // a no-op.
@@ -782,17 +780,18 @@ void FilterManager::sendLocalReplyViaFilterChain(
       Utility::EncodeFunctions{
           [this](ResponseHeaderMap& response_headers, Code& code, std::string& body,
                  absl::string_view& content_type) -> void {
-            local_reply_.rewrite(request_headers_.get(), response_headers, stream_info_, code, body,
+            local_reply_.rewrite(request_headers_, response_headers, stream_info_, code, body,
                                  content_type);
           },
           [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
             if (modify_headers != nullptr) {
               modify_headers(*headers);
             }
+            state_.received_response_headers_ = true;
             response_headers_ = std::move(headers);
             // TODO: Start encoding from the last decoder filter that saw the
             // request instead.
-            encodeHeaders(nullptr, *response_headers_, end_stream);
+            encodeHeaders(nullptr, end_stream);
           },
           [this](Buffer::Instance& data, bool end_stream) -> void {
             // TODO: Start encoding from the last decoder filter that saw the
@@ -814,7 +813,7 @@ void FilterManager::sendDirectLocalReply(
       Utility::EncodeFunctions{
           [&](ResponseHeaderMap& response_headers, Code& code, std::string& body,
               absl::string_view& content_type) -> void {
-            local_reply_.rewrite(request_headers_.get(), response_headers, stream_info_, code, body,
+            local_reply_.rewrite(request_headers_, response_headers, stream_info_, code, body,
                                  content_type);
           },
           [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
@@ -825,22 +824,23 @@ void FilterManager::sendDirectLocalReply(
             // Move the response headers into the FilterManager to make sure they're visible to
             // access logs.
             response_headers_ = std::move(response_headers);
+            state_.received_response_headers_ = true;
 
             state_.non_100_response_headers_encoded_ = true;
-            filter_manager_callbacks_.encodeHeaders(*response_headers_, end_stream);
+            filter_manager_callbacks_.encodeHeaders(std::move(response_headers_), end_stream);
             maybeEndEncode(end_stream);
           },
           [&](Buffer::Instance& data, bool end_stream) -> void {
             filter_manager_callbacks_.encodeData(data, end_stream);
             maybeEndEncode(end_stream);
           }},
-      Utility::LocalReplyData{Grpc::Common::hasGrpcContentType(*request_headers_), code, body,
-                              grpc_status, is_head_request});
+      Utility::LocalReplyData{requestHeaders() &&
+                                  Grpc::Common::hasGrpcContentType(*requestHeaders()),
+                              code, body, grpc_status, is_head_request});
   maybeEndEncode(state_.local_complete_);
 }
 
-void FilterManager::encode100ContinueHeaders(ActiveStreamEncoderFilter* filter,
-                                             ResponseHeaderMap& headers) {
+void FilterManager::encode100ContinueHeaders(ActiveStreamEncoderFilter* filter) {
   filter_manager_callbacks_.resetIdleTimer();
   ASSERT(proxy_100_continue_);
   // The caller must guarantee that encode100ContinueHeaders() is invoked at most once.
@@ -858,7 +858,7 @@ void FilterManager::encode100ContinueHeaders(ActiveStreamEncoderFilter* filter,
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::Encode100ContinueHeaders));
     state_.filter_call_state_ |= FilterCallState::Encode100ContinueHeaders;
-    FilterHeadersStatus status = (*entry)->handle_->encode100ContinueHeaders(headers);
+    FilterHeadersStatus status = (*entry)->handle_->encode100ContinueHeaders(*continue_headers_);
     state_.filter_call_state_ &= ~FilterCallState::Encode100ContinueHeaders;
     ENVOY_STREAM_LOG(trace, "encode 100 continue headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -867,7 +867,7 @@ void FilterManager::encode100ContinueHeaders(ActiveStreamEncoderFilter* filter,
     }
   }
 
-  filter_manager_callbacks_.encode100ContinueHeaders(headers);
+  filter_manager_callbacks_.encode100ContinueHeaders(std::move(continue_headers_));
 }
 
 void FilterManager::maybeContinueEncoding(
@@ -883,11 +883,11 @@ void FilterManager::maybeContinueEncoding(
   }
 }
 
-void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers,
-                                  bool end_stream) {
+void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, bool end_stream) {
   // See encodeHeaders() comments in include/envoy/http/filter.h for why the 1xx precondition holds.
-  ASSERT(!CodeUtility::is1xx(Utility::getResponseStatus(headers)) ||
-         Utility::getResponseStatus(headers) == enumToInt(Http::Code::SwitchingProtocols));
+  ASSERT(!CodeUtility::is1xx(Utility::getResponseStatus(*responseHeaders())) ||
+         Utility::getResponseStatus(*responseHeaders()) ==
+             enumToInt(Http::Code::SwitchingProtocols));
   filter_manager_callbacks_.resetIdleTimer();
   disarmRequestTimeout();
 
@@ -901,7 +901,8 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     state_.filter_call_state_ |= FilterCallState::EncodeHeaders;
     (*entry)->end_stream_ = state_.encoding_headers_only_ ||
                             (end_stream && continue_data_entry == encoder_filters_.end());
-    FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, (*entry)->end_stream_);
+    FilterHeadersStatus status =
+        (*entry)->handle_->encodeHeaders(*responseHeaders(), (*entry)->end_stream_);
     if ((*entry)->end_stream_) {
       (*entry)->handle_->encodeComplete();
     }
@@ -936,7 +937,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
   const bool modified_end_stream = state_.encoding_headers_only_ ||
                                    (end_stream && continue_data_entry == encoder_filters_.end());
   state_.non_100_response_headers_encoded_ = true;
-  filter_manager_callbacks_.encodeHeaders(headers, modified_end_stream);
+  filter_manager_callbacks_.encodeHeaders(std::move(response_headers_), modified_end_stream);
   maybeEndEncode(modified_end_stream);
 
   if (!modified_end_stream) {
@@ -980,10 +981,10 @@ ResponseTrailerMap& FilterManager::addEncodedTrailers() {
   ASSERT(state_.filter_call_state_ & FilterCallState::LastDataFrame);
 
   // Trailers can only be added once.
-  ASSERT(!response_trailers_);
+  ASSERT(!responseTrailers());
 
   response_trailers_ = ResponseTrailerMapImpl::create();
-  return *response_trailers_;
+  return *responseTrailers();
 }
 
 void FilterManager::addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data,
@@ -1023,7 +1024,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
       commonEncodePrefix(filter, end_stream, filter_iteration_start_state);
   auto trailers_added_entry = encoder_filters_.end();
 
-  const bool trailers_exists_at_start = response_trailers_ != nullptr;
+  const bool trailers_exists_at_start = responseTrailers() != nullptr;
   for (; entry != encoder_filters_.end(); entry++) {
     // If the filter pointed by entry has stopped for all frame type, return now.
     if (handleDataIfStopAll(**entry, data, state_.encoder_filters_streaming_)) {
@@ -1046,7 +1047,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
 
     recordLatestDataFilter(entry, state_.latest_data_encoding_filter_, encoder_filters_);
 
-    (*entry)->end_stream_ = end_stream && !response_trailers_;
+    (*entry)->end_stream_ = end_stream && !responseTrailers();
     FilterDataStatus status = (*entry)->handle_->encodeData(data, (*entry)->end_stream_);
     if ((*entry)->end_stream_) {
       (*entry)->handle_->encodeComplete();
@@ -1058,7 +1059,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
     ENVOY_STREAM_LOG(trace, "encode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
-    if (!trailers_exists_at_start && response_trailers_ &&
+    if (!trailers_exists_at_start && responseTrailers() &&
         trailers_added_entry == encoder_filters_.end()) {
       trailers_added_entry = entry;
     }
@@ -1076,12 +1077,11 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
   // If trailers were adding during encodeData we need to trigger decodeTrailers in order
   // to allow filters to process the trailers.
   if (trailers_added_entry != encoder_filters_.end()) {
-    encodeTrailers(trailers_added_entry->get(), *response_trailers_);
+    encodeTrailers(trailers_added_entry->get());
   }
 }
 
-void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
-                                   ResponseTrailerMap& trailers) {
+void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter) {
   filter_manager_callbacks_.resetIdleTimer();
 
   // If we previously decided to encode only the headers, do nothing here.
@@ -1099,7 +1099,7 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
     }
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeTrailers));
     state_.filter_call_state_ |= FilterCallState::EncodeTrailers;
-    FilterTrailersStatus status = (*entry)->handle_->encodeTrailers(trailers);
+    FilterTrailersStatus status = (*entry)->handle_->encodeTrailers(*response_trailers_);
     (*entry)->handle_->encodeComplete();
     (*entry)->end_stream_ = true;
     state_.filter_call_state_ &= ~FilterCallState::EncodeTrailers;
@@ -1110,7 +1110,7 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
     }
   }
 
-  filter_manager_callbacks_.encodeTrailers(trailers);
+  filter_manager_callbacks_.encodeTrailers(std::move(response_trailers_));
   maybeEndEncode(true);
 }
 
@@ -1249,8 +1249,7 @@ bool ActiveStreamDecoderFilter::recreateStream() {
   parent_.stream_info_.setResponseCodeDetails(
       StreamInfo::ResponseCodeDetails::get().InternalRedirect);
 
-  parent_.filter_manager_callbacks_.recreateStream(std::move(parent_.request_headers_),
-                                                   parent_.stream_info_.filter_state_);
+  parent_.filter_manager_callbacks_.recreateStream(parent_.stream_info_.filter_state_);
 
   return true;
 }
@@ -1290,11 +1289,9 @@ bool ActiveStreamEncoderFilter::complete() { return parent_.state_.local_complet
 bool ActiveStreamEncoderFilter::has100Continueheaders() {
   return parent_.state_.has_continue_headers_ && !continue_headers_continued_;
 }
-void ActiveStreamEncoderFilter::do100ContinueHeaders() {
-  parent_.encode100ContinueHeaders(this, *parent_.continue_headers_);
-}
+void ActiveStreamEncoderFilter::do100ContinueHeaders() { parent_.encode100ContinueHeaders(this); }
 void ActiveStreamEncoderFilter::doHeaders(bool end_stream) {
-  parent_.encodeHeaders(this, *parent_.response_headers_, end_stream);
+  parent_.encodeHeaders(this, end_stream);
 }
 void ActiveStreamEncoderFilter::doData(bool end_stream) {
   parent_.encodeData(this, *parent_.buffered_response_data_, end_stream,
@@ -1321,10 +1318,8 @@ void ActiveStreamEncoderFilter::handleMetadataAfterHeadersCallback() {
   // Restores the original value of iterate_from_current_filter_.
   iterate_from_current_filter_ = saved_state;
 }
-void ActiveStreamEncoderFilter::doTrailers() {
-  parent_.encodeTrailers(this, *parent_.response_trailers_);
-}
-bool ActiveStreamEncoderFilter::hasTrailers() { return parent_.response_trailers_ != nullptr; }
+void ActiveStreamEncoderFilter::doTrailers() { parent_.encodeTrailers(this); }
+bool ActiveStreamEncoderFilter::hasTrailers() { return parent_.responseTrailers() != nullptr; }
 void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool streaming) {
   return parent_.addEncodedData(*this, data, streaming);
 }

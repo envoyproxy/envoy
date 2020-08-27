@@ -161,8 +161,13 @@ private:
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) override {
-      return filter_manager_.sendLocalReply(is_grpc_request, code, body, modify_headers,
-                                            grpc_status, details);
+      if (filter_manager_.requestHeaders() || !request_headers_) {
+        return filter_manager_.sendLocalReply(is_grpc_request, code, body, modify_headers,
+                                              grpc_status, details);
+      } else {
+        return filter_manager_.sendLocalReply(*request_headers_, is_grpc_request, code, body,
+                                              modify_headers, grpc_status, details);
+      }
     }
     uint64_t streamId() { return stream_id_; }
 
@@ -204,11 +209,14 @@ private:
     }
 
     // FilterManagerCallbacks
-    void encodeHeaders(ResponseHeaderMap& response_headers, bool end_stream) override;
-    void encode100ContinueHeaders(ResponseHeaderMap& response_headers) override;
+    void encodeHeaders(ResponseHeaderMapPtr&& response_headers, bool end_stream) override;
+    void encode100ContinueHeaders(ResponseHeaderMapPtr&& response_headers) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
-    void encodeTrailers(ResponseTrailerMap& trailers) override;
+    void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
     void encodeMetadata(MetadataMapVector& metadata) override;
+    void addAccessLogger(AccessLog::InstanceSharedPtr log) override {
+      access_log_handlers_.push_back(log);
+    }
     void endStream() override {
       ASSERT(!state_.codec_saw_local_complete_);
       state_.codec_saw_local_complete_ = true;
@@ -225,8 +233,7 @@ private:
     }
     void disarmRequestTimeout() override;
     void resetIdleTimer() override;
-    void recreateStream(RequestHeaderMapPtr&& request_headers,
-                        StreamInfo::FilterStateSharedPtr filter_state) override;
+    void recreateStream(StreamInfo::FilterStateSharedPtr filter_state) override;
     void resetStream() override;
     const Router::RouteEntry::UpgradeMap* upgradeMap() override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
@@ -301,6 +308,17 @@ private:
     // both locations, then refer to the FM when doing stream logs.
     const uint64_t stream_id_;
     FilterManager filter_manager_;
+
+    std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
+
+    Http::RequestHeaderMapPtr request_headers_;
+    Http::RequestTrailerMapPtr request_trailers_;
+
+    // We need to take over ownership of the response headers/trailers from the FM; this ensures
+    // that they are still around when the dtor runs them through the access logger.
+    Http::ResponseHeaderMapPtr response_headers_;
+    Http::ResponseTrailerMapPtr response_trailers_;
+
     Router::ConfigConstSharedPtr snapped_route_config_;
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     Tracing::SpanPtr active_span_;
