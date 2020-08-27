@@ -75,7 +75,7 @@ steps:
       testRunTitle: "${{ parameters.ciTarget }}"
       searchFolder: $(Build.StagingDirectory)/tmp
     condition: always()
-  
+
   - task: PublishBuildArtifacts@1
     inputs:
       pathtoPublish: "$(Build.StagingDirectory)/envoy"

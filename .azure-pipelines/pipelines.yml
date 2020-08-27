@@ -183,7 +183,7 @@ jobs:
           testRunTitle: "macOS"
         condition: always()
 
-      - script: ./tools/flaky_test/process_xml.py
+      - script: ./ci/flaky_test/run_process_xml_mac.sh
         displayName: "Process Test Results"
         env:
           TEST_TMPDIR: $(Build.SourcesDirectory)

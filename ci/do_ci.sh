@@ -132,13 +132,8 @@ function bazel_binary_build() {
 }
 
 function run_process_test_result() {
-  if [[ "$CI_TARGET" == "bazel.release" || "$CI_TARGET" == "bazel.gcc" || "$CI_TARGET" == "bazel.asan" || "$CI_TARGET" == "bazel.tsan" || \
-    "$CI_TARGET" == "bazel.compile_time_options" || "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage" ]];
-  then
-    echo "running flaky test reporting script"
-    tools/flaky_test/run_process_xml.sh "$CI_TARGET" || echo "not able to locate the script needed to process test results"
-  fi
-
+  echo "running flaky test reporting script"
+  flaky_test/run_process_xml.sh "$CI_TARGET" || echo "not able to locate the script needed to process test results"
 }
 
 CI_TARGET=$1

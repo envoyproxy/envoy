@@ -91,11 +91,11 @@ if __name__ == "__main__":
   output_msg = "``` \n"
   has_flaky_test = False
 
-  if os.getenv("TEST_TMPDIR"):
+  if os.getenv("TEST_TMPDIR") and os.getenv("REPO_URI") and os.getenv("BUILD_URI"):
     os.environ["TMP_OUTPUT_PROCESS_XML"] = os.getenv("TEST_TMPDIR") + "/tmp_output_process_xml.txt"
   else:
-    print("set the TEST_TMPDIR env variable first")
-    sys.exit(1)
+    print("set the env variables first")
+    sys.exit(0)
   output_msg += getGitInfo(CI_TARGET)
 
   if CI_TARGET == "MacOS":

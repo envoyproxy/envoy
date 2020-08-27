@@ -24,4 +24,3 @@ python_venv() {
   shift
   python3 "${SCRIPT_DIR}/${PY_NAME}.py" $*
 }
-
