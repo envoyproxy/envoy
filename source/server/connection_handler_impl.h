@@ -190,6 +190,73 @@ private:
   };
 
   /**
+   * Wrapper for an active internal listener owned by this handler.
+   */
+  class ActiveInternalListener : public Network::InternalListenerCallbacks,
+                                 public ActiveListenerImplBase {
+  public:
+    ActiveInternalListener(ConnectionHandlerImpl& parent, Network::ListenerConfig& config);
+
+    ~ActiveInternalListener() override;
+
+    void decNumConnections() {
+      ASSERT(num_listener_connections_ > 0);
+      --num_listener_connections_;
+      config_->openConnections().dec();
+    }
+
+    // Network::InternalListenerCallbacks
+    void setupNewConnection(Network::ConnectionPtr server_conn,
+                            Network::ConnectionSocketPtr socket) override;
+
+    // ActiveListenerImplBase
+    Network::Listener* listener() override { return listener_.get(); }
+    void pauseListening() override { listener_->disable(); }
+    void resumeListening() override { listener_->enable(); }
+    void shutdownListener() override { listener_.reset(); }
+
+    /**
+     * Remove and destroy an active connection.
+     * @param connection supplies the connection to remove.
+     */
+    void removeConnection(ActiveTcpConnection& connection);
+
+    /**
+     * Create a new connection from a socket accepted by the listener.
+     */
+    void newConnection(Network::ConnectionSocketPtr&& socket,
+                       const envoy::config::core::v3::Metadata& dynamic_metadata);
+
+    /**
+     * Return the active connections container attached with the given filter chain.
+     */
+    ActiveConnections& getOrCreateActiveConnections(const Network::FilterChain& filter_chain);
+
+    /**
+     * Schedule to remove and destroy the active connections which are not tracked by listener
+     * config. Caution: The connection are not destroyed yet when function returns.
+     */
+    void deferredRemoveFilterChains(
+        const std::list<const Network::FilterChain*>& draining_filter_chains);
+
+    /**
+     * Update the listener config. The follow up connections will see the new config. The existing
+     * connections are not impacted.
+     */
+    void updateListenerConfig(Network::ListenerConfig& config);
+
+    ConnectionHandlerImpl& parent_;
+    Network::ListenerPtr listener_;
+    std::list<ActiveTcpSocketPtr> sockets_;
+    absl::node_hash_map<const Network::FilterChain*, ActiveConnectionsPtr> connections_by_context_;
+
+    // The number of connections currently active on this listener. This is typically used for
+    // connection balancing across per-handler listeners.
+    std::atomic<uint64_t> num_listener_connections_{};
+    bool is_deleting_{false};
+  };
+
+  /**
    * Wrapper for a group of active connections which are attached to the same filter chain context.
    */
   class ActiveConnections : public Event::DeferredDeletable {

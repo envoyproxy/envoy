@@ -188,6 +188,17 @@ public:
 };
 
 /**
+ * Callbacks invoked by a internal listener.
+ */
+class InternalListenerCallbacks {
+public:
+  virtual ~InternalListenerCallbacks() = default;
+
+  virtual void setupNewConnection(Network::ConnectionPtr server_conn,
+                                  Network::ConnectionSocketPtr socket) PURE;
+};
+
+/**
  * Utility struct that encapsulates the information from a udp socket's recvmmsg call.
  */
 struct UdpRecvData {

@@ -7,6 +7,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
 
+#include "common/common/assert.h"
 #include "common/event/deferred_task.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
@@ -607,6 +608,182 @@ void ActiveRawUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& fil
 }
 
 Network::UdpListener& ActiveRawUdpListener::udpListener() { return *udp_listener_; }
+
+ConnectionHandlerImpl::ActiveInternalListener::ActiveInternalListener(
+    ConnectionHandlerImpl& parent, Network::ListenerConfig& config)
+    : ConnectionHandlerImpl::ActiveListenerImplBase(parent, &config), parent_(parent) {}
+
+void ConnectionHandlerImpl::ActiveInternalListener::updateListenerConfig(
+    Network::ListenerConfig& config) {
+  ENVOY_LOG(trace, "replacing listener ", config_->listenerTag(), " by ", config.listenerTag());
+  config_ = &config;
+}
+
+ConnectionHandlerImpl::ActiveInternalListener::~ActiveInternalListener() {
+  is_deleting_ = true;
+
+  // Purge sockets that have not progressed to connections. This should only happen when
+  // a listener filter stops iteration and never resumes.
+  while (!sockets_.empty()) {
+    ActiveTcpSocketPtr removed = sockets_.front()->removeFromList(sockets_);
+    parent_.dispatcher_.deferredDelete(std::move(removed));
+  }
+
+  for (auto& chain_and_connections : connections_by_context_) {
+    ASSERT(chain_and_connections.second != nullptr);
+    auto& connections = chain_and_connections.second->connections_;
+    while (!connections.empty()) {
+      connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+    }
+  }
+  parent_.dispatcher_.clearDeferredDeleteList();
+
+  // By the time a listener is destroyed, in the common case, there should be no connections.
+  // However, this is not always true if there is an in flight rebalanced connection that is
+  // being posted. This assert is extremely useful for debugging the common path so we will leave it
+  // for now. If it becomes a problem (developers hitting this assert when using debug builds) we
+  // can revisit. This case, if it happens, should be benign on production builds. This case is
+  // covered in ConnectionHandlerTest::RemoveListenerDuringRebalance.
+  ASSERT(num_listener_connections_ == 0);
+}
+
+// Copied from newConnection(). Invoked by SetupPipeListener.
+void ConnectionHandlerImpl::ActiveInternalListener::setupNewConnection(
+    Network::ConnectionPtr server_conn, Network::ConnectionSocketPtr socket) {
+
+  auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(parent_.dispatcher_.timeSource());
+  stream_info->setDownstreamLocalAddress(socket->localAddress());
+  stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
+  stream_info->setDownstreamDirectRemoteAddress(socket->directRemoteAddress());
+
+  // TODO(lambdai): refactor
+  // auto p = dynamic_cast<Network::ServerPipeImpl*>(server_conn.get());
+  // ASSERT(p);
+  // p->setStreamInfo(stream_info.get());
+
+  // Find matching filter chain.
+  const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
+  if (filter_chain == nullptr) {
+    ENVOY_LOG(debug, "closing connection: no matching filter chain found");
+    stats_.no_filter_chain_match_.inc();
+    stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+    stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
+    emitLogs(*config_, *stream_info);
+    socket->close();
+    return;
+  }
+
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  stream_info->setDownstreamSslConnection(transport_socket->ssl());
+  auto& active_connections = getOrCreateActiveConnections(*filter_chain);
+  // TODO(lambdai): set stream_info
+  ActiveTcpConnectionPtr active_connection(
+      new ActiveTcpConnection(active_connections, std::move(server_conn),
+                              parent_.dispatcher_.timeSource(), std::move(stream_info)));
+  active_connection->connection_->setBufferLimits(config_->perConnectionBufferLimitBytes());
+
+  const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
+      *active_connection->connection_, filter_chain->networkFilterFactories());
+  if (empty_filter_chain) {
+    ENVOY_CONN_LOG(debug, "closing connection: no filters", *active_connection->connection_);
+    active_connection->connection_->close(Network::ConnectionCloseType::NoFlush);
+  }
+
+  // If the connection is already closed, we can just let this connection immediately die.
+  if (active_connection->connection_->state() != Network::Connection::State::Closed) {
+    ENVOY_CONN_LOG(debug, "new connection", *active_connection->connection_);
+    active_connection->connection_->addConnectionCallbacks(*active_connection);
+    LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
+  }
+}
+
+void ConnectionHandlerImpl::ActiveInternalListener::newConnection(
+    Network::ConnectionSocketPtr&& socket,
+    const envoy::config::core::v3::Metadata& dynamic_metadata) {
+  auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
+      parent_.dispatcher_.timeSource(), StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info->setDownstreamLocalAddress(socket->localAddress());
+  stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
+  stream_info->setDownstreamDirectRemoteAddress(socket->directRemoteAddress());
+
+  // merge from the given dynamic metadata if it's not empty
+  if (dynamic_metadata.filter_metadata_size() > 0) {
+    stream_info->dynamicMetadata().MergeFrom(dynamic_metadata);
+  }
+
+  // Find matching filter chain.
+  const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
+  if (filter_chain == nullptr) {
+    ENVOY_LOG(debug, "closing connection: no matching filter chain found");
+    stats_.no_filter_chain_match_.inc();
+    stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+    stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
+    emitLogs(*config_, *stream_info);
+    socket->close();
+    return;
+  }
+
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  stream_info->setDownstreamSslConnection(transport_socket->ssl());
+  auto& active_connections = getOrCreateActiveConnections(*filter_chain);
+  Network::ConnectionPtr server_conn_ptr;
+  server_conn_ptr = parent_.dispatcher_.createServerConnection(
+      std::move(socket), std::move(transport_socket), *stream_info);
+
+  ActiveTcpConnectionPtr active_connection(
+      new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
+                              parent_.dispatcher_.timeSource(), std::move(stream_info)));
+  active_connection->connection_->setBufferLimits(config_->perConnectionBufferLimitBytes());
+
+  const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
+      *active_connection->connection_, filter_chain->networkFilterFactories());
+  if (empty_filter_chain) {
+    ENVOY_CONN_LOG(debug, "closing connection: no filters", *active_connection->connection_);
+    active_connection->connection_->close(Network::ConnectionCloseType::NoFlush);
+  }
+
+  // If the connection is already closed, we can just let this connection immediately die.
+  if (active_connection->connection_->state() != Network::Connection::State::Closed) {
+    ENVOY_CONN_LOG(debug, "new connection", *active_connection->connection_);
+    active_connection->connection_->addConnectionCallbacks(*active_connection);
+    LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
+  }
+}
+
+ConnectionHandlerImpl::ActiveConnections&
+ConnectionHandlerImpl::ActiveInternalListener::getOrCreateActiveConnections(
+    const Network::FilterChain& filter_chain) {
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  ActiveConnectionsPtr& connections = connections_by_context_[&filter_chain];
+  // if (connections == nullptr) {
+  //   connections = std::make_unique<ConnectionHandlerImpl::ActiveConnections>(*this,
+  //   filter_chain);
+  // }
+  return *connections;
+}
+
+void ConnectionHandlerImpl::ActiveInternalListener::deferredRemoveFilterChains(
+    const std::list<const Network::FilterChain*>& draining_filter_chains) {
+  // Need to recover the original deleting state.
+  const bool was_deleting = is_deleting_;
+  is_deleting_ = true;
+  for (const auto* filter_chain : draining_filter_chains) {
+    auto iter = connections_by_context_.find(filter_chain);
+    if (iter == connections_by_context_.end()) {
+      // It is possible when listener is stopping.
+    } else {
+      auto& connections = iter->second->connections_;
+      while (!connections.empty()) {
+        connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+      }
+      // Since is_deleting_ is on, we need to manually remove the map value and drive the iterator.
+      // Defer delete connection container to avoid race condition in destroying connection.
+      parent_.dispatcher_.deferredDelete(std::move(iter->second));
+      connections_by_context_.erase(iter);
+    }
+  }
+  is_deleting_ = was_deleting;
+}
 
 } // namespace Server
 } // namespace Envoy

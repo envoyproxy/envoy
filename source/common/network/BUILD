@@ -234,6 +234,7 @@ envoy_cc_library(
     ],
     hdrs = [
         "base_listener_impl.h",
+        "internal_listener_impl.h",
         "tcp_listener_impl.h",
         "udp_listener_impl.h",
     ],
