@@ -95,7 +95,7 @@ void UdpProxyFilter::ClusterInfo::onData(Network::UdpRecvData& data) {
       return;
     }
 
-    UdpLoadBalancerContext context(filter_.config_->hashPolicy(), data.addresses_);
+    UdpLoadBalancerContext context(filter_.config_->hashPolicy(), data.addresses_.peer_);
     Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(&context);
     if (host == nullptr) {
       ENVOY_LOG(debug, "cannot find any valid host. failed to create a session.");
@@ -111,7 +111,7 @@ void UdpProxyFilter::ClusterInfo::onData(Network::UdpRecvData& data) {
       // to a healthy host. We may eventually want to make this behavior configurable, but for now
       // this will be the universal behavior.
 
-      UdpLoadBalancerContext context(filter_.config_->hashPolicy(), data.addresses_);
+      UdpLoadBalancerContext context(filter_.config_->hashPolicy(), data.addresses_.peer_);
       Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(&context);
       if (host != nullptr && host->health() != Upstream::Host::Health::Unhealthy &&
           host.get() != &active_session->host()) {

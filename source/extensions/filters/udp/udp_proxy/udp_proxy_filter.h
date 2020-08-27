@@ -7,11 +7,12 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/api/os_sys_calls_impl.h"
-#include "common/network/hash_policy.h"
 #include "common/network/socket_impl.h"
 #include "common/network/socket_interface.h"
 #include "common/network/utility.h"
 #include "common/upstream/load_balancer_impl.h"
+
+#include "extensions/filters/udp/udp_proxy/hash_policy_impl.h"
 
 #include "absl/container/flat_hash_set.h"
 
@@ -74,11 +75,8 @@ public:
           "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
           "is not running with the CAP_NET_ADMIN capability.");
     }
-    if (config.has_route_policy() && config.route_policy().has_hash_policy()) {
-      // Only one hash policy is supported.
-      const envoy::type::v3::HashPolicy* const hash_policies[] = {
-          &config.route_policy().hash_policy()};
-      hash_policy_ = std::make_unique<Network::HashPolicyImpl>(hash_policies);
+    if (!config.hash_policy().empty()) {
+      hash_policy_ = std::make_unique<HashPolicyImpl>(config.hash_policy());
     }
   }
 
@@ -86,7 +84,7 @@ public:
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   std::chrono::milliseconds sessionTimeout() const { return session_timeout_; }
   bool usingOriginalSrcIp() const { return use_original_src_ip_; }
-  const Network::HashPolicy* hashPolicy() const { return hash_policy_.get(); }
+  const Udp::HashPolicy* hashPolicy() const { return hash_policy_.get(); }
   UdpProxyDownstreamStats& stats() const { return stats_; }
   TimeSource& timeSource() const { return time_source_; }
 
@@ -103,7 +101,7 @@ private:
   const std::string cluster_;
   const std::chrono::milliseconds session_timeout_;
   const bool use_original_src_ip_;
-  std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
+  std::unique_ptr<const HashPolicyImpl> hash_policy_;
   mutable UdpProxyDownstreamStats stats_;
 };
 
@@ -114,10 +112,10 @@ using UdpProxyFilterConfigSharedPtr = std::shared_ptr<const UdpProxyFilterConfig
  */
 class UdpLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
-  UdpLoadBalancerContext(const Network::HashPolicy* hash_policy,
-                         const Network::UdpRecvData::LocalPeerAddresses& addresses) {
+  UdpLoadBalancerContext(const Udp::HashPolicy* hash_policy,
+                         const Network::Address::InstanceConstSharedPtr& address) {
     if (hash_policy) {
-      hash_ = hash_policy->generateHash(addresses.peer_.get(), addresses.local_.get());
+      hash_ = hash_policy->generateHash(address.get());
     }
   }
   ~UdpLoadBalancerContext() override = default;
