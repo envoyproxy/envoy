@@ -464,9 +464,11 @@ key:
                                      {"Addr", "x-foo-key=foo"}},
       456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123,
       /*cluster_0*/ 0);
+  cleanupUpstreamAndDownstream();
 }
 
 // Test that a scoped route config update is performed on demand and http request will succeed.
+
 TEST_P(ScopedRdsIntegrationTest, OnDemandUpdateSuccess) {
   config_helper_.addFilter(R"EOF(
     name: envoy.filters.http.on_demand
@@ -484,6 +486,9 @@ key:
     sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
   };
   initialize();
+  registerTestServerPorts({"http"});
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
   const std::string route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
@@ -493,7 +498,7 @@ key:
         - match: {{ prefix: "/" }}
           route: {{ cluster: {} }}
 )EOF";
-  codec_client_ = makeHttpConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   // Request that match lazily loaded scope will trigger on demand loading.
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
@@ -504,17 +509,15 @@ key:
   createRdsStream("foo_route1");
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
-  response->waitForEndStream();
+
+  waitForNextUpstreamRequest();
+  // Send response headers, and end_stream if there is no response body.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  response->waitForHeaders();
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
   cleanupUpstreamAndDownstream();
-  // The scoped route configuration have been loaded, http request succeed with 200.
-  sendRequestAndVerifyResponse(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/meh"},
-                                     {":authority", "host"},
-                                     {":scheme", "http"},
-                                     {"Addr", "x-foo-key=foo"}},
-      456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123,
-      /*cluster_0*/ 0);
 }
 
 // With on demand update filter configured, scope not match should still return 404
@@ -553,7 +556,7 @@ key:
   initialize();
   registerTestServerPorts({"http"});
 
-  // No scope key matches "xyz-route".
+  // No scope key matches "bar".
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
@@ -603,7 +606,7 @@ key:
   initialize();
   registerTestServerPorts({"http"});
 
-  // No scope key matches "xyz-route".
+  // No virtual host matches "neh".
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
@@ -659,7 +662,7 @@ key:
   initialize();
   registerTestServerPorts({"http"});
 
-  // No scope key matches "xyz-route".
+  // No scope key matches "bar".
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},

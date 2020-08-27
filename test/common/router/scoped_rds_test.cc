@@ -1195,7 +1195,6 @@ key:
   absl::optional<uint64_t> key_hash =
       getScopedRdsProvider()->config<ScopedConfigImpl>()->computeKeyHash(
           TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
-  // EXPECT_CALL(server_factory_context_, dispatcher());
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).Times(1);
   EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
@@ -1352,12 +1351,12 @@ TEST_F(ScopedRdsTest, MultipleOnDemandUpdatedCallback) {
   init_watcher_.expectReady();
   // On demand scope should be loaded lazily.
   const std::string config_yaml2 = R"EOF(
-name: foo_scope2
+name: foo_scope
 route_configuration_name: foo_routes
 on_demand: true
 key:
   fragments:
-    - string_key: x-bar-key
+    - string_key: x-foo-key
 )EOF";
   const auto lazy_resource = parseScopedRouteConfigurationFromYaml(config_yaml2);
 
@@ -1366,22 +1365,31 @@ key:
   context_init_manager_.initialize(init_watcher_);
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
 
+  EXPECT_EQ(0UL, server_factory_context_.scope_
+                     .gauge("foo.scoped_rds.foo_scoped_routes.active_scopes",
+                            Stats::Gauge::ImportMode::Accumulate)
+                     .value());
+  EXPECT_EQ(1UL, server_factory_context_.scope_
+                     .gauge("foo.scoped_rds.foo_scoped_routes.on_demand_scopes",
+                            Stats::Gauge::ImportMode::Accumulate)
+                     .value());
+
   absl::optional<uint64_t> key_hash =
       getScopedRdsProvider()->config<ScopedConfigImpl>()->computeKeyHash(
-          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
+          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
   // All the on demand updated callbacks will be executed when the route table comes.
-  EXPECT_CALL(event_dispatcher_, post(_)).Times(5);
   for (int i = 0; i < 5; i++) {
     std::function<void(bool)> route_config_updated_cb = [](bool) {};
     getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_,
                                               std::move(route_config_updated_cb));
   }
+  EXPECT_CALL(event_dispatcher_, post(_)).Times(5);
   // After on demand request, push rds update.
   pushRdsConfig({"foo_routes"}, "111");
   // Activating the same on_demand scope multiple times, active_scopes is still 1.
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "foo_routes");
   EXPECT_EQ(1UL, server_factory_context_.scope_

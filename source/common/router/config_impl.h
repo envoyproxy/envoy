@@ -1023,6 +1023,7 @@ public:
   const std::string& name() const override { return name_; }
   bool usesVhds() const override { return false; }
   bool mostSpecificHeaderMutationsWins() const override { return false; }
+  bool isNull() const override { return true; }
 
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;
