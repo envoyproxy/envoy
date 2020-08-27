@@ -929,6 +929,12 @@ public:
   virtual bool drainConnectionsOnHostRemoval() const PURE;
 
   /**
+   *  @return whether to create a new connection pool for each downstream connection routed to
+   *          the cluster
+   */
+  virtual bool connectionPoolPerDownstreamConnection() const PURE;
+
+  /**
    * @return true if this cluster is configured to ignore hosts for the purpose of load balancing
    * computations until they have been health checked for the first time.
    */

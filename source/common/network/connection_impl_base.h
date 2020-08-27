@@ -11,12 +11,20 @@ namespace Network {
 class ConnectionImplBase : public FilterManagerConnection,
                            protected Logger::Loggable<Logger::Id::connection> {
 public:
+  /**
+   * Add a connection id to a hash key
+   * @param hash_key the current hash key -- the function will only append to this vector
+   * @param connection_id the 64-bit connection id
+   */
+  static void addIdToHashKey(std::vector<uint8_t>& hash_key, uint64_t connection_id);
+
   ConnectionImplBase(Event::Dispatcher& dispatcher, uint64_t id);
 
   // Network::Connection
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   uint64_t id() const override { return id_; }
+  void hashKey(std::vector<uint8_t>& hash) const override;
   void setConnectionStats(const ConnectionStats& stats) override;
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
 

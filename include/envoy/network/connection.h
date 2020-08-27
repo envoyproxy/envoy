@@ -128,6 +128,12 @@ public:
   virtual uint64_t id() const PURE;
 
   /**
+   * @param vector of bytes to which the connection should append hash key data. Any data already in
+   * the key vector must not be modified.
+   */
+  virtual void hashKey(std::vector<uint8_t>& hash) const PURE;
+
+  /**
    * @return std::string the next protocol to use as selected by network level negotiation. (E.g.,
    *         ALPN). If network level negotiation is not supported by the connection or no protocol
    *         has been negotiated the empty string is returned.

@@ -75,6 +75,25 @@ TEST(ConnectionImplUtility, updateBufferStats) {
   ConnectionImplUtility::updateBufferStats(3, 3, previous_total, counter, gauge);
 }
 
+TEST(ConnectionImplBaseUtility, addIdToHashKey) {
+  uint64_t connection_id = 0x0123456789abcdef;
+  std::vector<uint8_t> hash{{0xff, 0xfe, 0xfd, 0xfc}};
+  ConnectionImplBase::addIdToHashKey(hash, connection_id);
+  ASSERT_EQ(12, hash.size());
+  EXPECT_EQ(0xff, hash[0]);
+  EXPECT_EQ(0xfe, hash[1]);
+  EXPECT_EQ(0xfd, hash[2]);
+  EXPECT_EQ(0xfc, hash[3]);
+  EXPECT_EQ(0xef, hash[4]);
+  EXPECT_EQ(0xcd, hash[5]);
+  EXPECT_EQ(0xab, hash[6]);
+  EXPECT_EQ(0x89, hash[7]);
+  EXPECT_EQ(0x67, hash[8]);
+  EXPECT_EQ(0x45, hash[9]);
+  EXPECT_EQ(0x23, hash[10]);
+  EXPECT_EQ(0x01, hash[11]);
+}
+
 class ConnectionImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplDeathTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),

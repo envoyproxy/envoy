@@ -612,6 +612,9 @@ public:
   };
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
+  bool connectionPoolPerDownstreamConnection() const override {
+    return connection_pool_per_downstream_connection_;
+  }
   bool warmHosts() const override { return warm_hosts_; }
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
   upstreamHttpProtocolOptions() const override {
@@ -684,6 +687,7 @@ private:
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
+  const bool connection_pool_per_downstream_connection_;
   const bool warm_hosts_;
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;

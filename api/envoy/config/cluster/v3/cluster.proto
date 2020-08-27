@@ -43,7 +43,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 51]
+// [#next-free-field: 52]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -917,6 +917,10 @@ message Cluster {
   // [#not-implemented-hide:]
   // Prefetch configuration for this cluster.
   PrefetchPolicy prefetch_policy = 50;
+
+  // If `connection_pool_per_downstream_connection` is true, the cluster will use a separate
+  // connection pool for every downstream connection
+  bool connection_pool_per_downstream_connection = 51;
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.
