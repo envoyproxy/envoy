@@ -14,7 +14,7 @@ OAuth2
 Example configuration
 ---------------------
 
-.. code-block::
+.. code-block:: yaml
 
    http_filters:
    - name: oauth2

@@ -22,7 +22,7 @@ If :ref:`payload_passthrough <envoy_v3_api_field_extensions.filters.http.aws_lam
 However, if :ref:`payload_passthrough <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.payload_passthrough>`
 is set to ``false``, then the HTTP request is transformed to a JSON payload with the following schema:
 
-.. code-block::
+.. code-block:: json
 
     {
         "rawPath": "/path/to/resource",

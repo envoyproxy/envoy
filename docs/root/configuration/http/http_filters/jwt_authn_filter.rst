@@ -9,7 +9,7 @@ JWKS is needed to verify JWT signatures. They can be specified in the filter con
 
 Following are supported JWT alg:
 
-.. code-block::
+.. code-block:: none
 
    ES256, ES384, ES512,
    HS256, HS384, HS512,

@@ -19,7 +19,7 @@ The local response content returned by Envoy can be customized. A list of :ref:`
 
 Example of a LocalReplyConfig
 
-.. code-block::
+.. code-block:: yaml
 
   mappers:
   - filter:
