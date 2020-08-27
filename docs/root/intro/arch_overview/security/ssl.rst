@@ -27,6 +27,7 @@ requirements (TLS1.2, SNI, etc.). Envoy supports the following TLS features:
   performed asynchronously from an extension. This allows extending Envoy to support various key
   management schemes (such as TPM) and TLS acceleration. This mechanism uses
   `BoringSSL private key method interface <https://github.com/google/boringssl/blob/c0b4c72b6d4c6f4828a373ec454bd646390017d4/include/openssl/ssl.h#L1169>`_.
+* **OCSP Stapling**: Online Certificate Stapling Protocol responses may be stapled to certificates.
 
 Underlying implementation
 -------------------------
@@ -152,7 +153,7 @@ certificates. These may be a mix of RSA and P-256 ECDSA certificates. The follow
 * Non-P-256 server ECDSA certificates are rejected.
 * If the client supports P-256 ECDSA, a P-256 ECDSA certificate will be selected if one is present in the
   :ref:`DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`
-  that is in compliance with the OCSP policy.
+  and it is in compliance with the OCSP policy.
 * If the client only supports RSA certificates, a RSA certificate will be selected if present in the
   :ref:`DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`.
 * Otherwise, the first certificate listed is used. This will result in a failed handshake if the
@@ -180,27 +181,32 @@ OCSP Stapling
 :ref:`DownstreamTlsContexts <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` support
 stapling an Online Certificate Status Protocol (OCSP) response to a TLS certificate during the handshake. The
 ``ocsp_staple`` field allows the operator to supply a pre-computed OCSP response per-certificate in the context.
-A single response cannot pertain to multiple certificates. OCSP responses must be valid at configuration time,
-but responses may not always be provided and may expire at runtime.
+A single response may not pertain to multiple certificates. If provided, OCSP responses must be valid and
+affirm the certificate has not been revoked. Expired OCSP responses are accepted, but may cause downstream
+connection errors depending on the OCSP staple policy.
+
 :ref:`DownstreamTlsContexts <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`
-support an ``ocsp_staple_policy`` field to determine whether envoy should stop using a certificate or
-continue without stapling when its associated OCSP response expires.
+support an ``ocsp_staple_policy`` field to control whether Envoy should stop using a certificate or
+continue without stapling when its associated OCSP response is missing or expired.
 Certificates marked as `must-staple <https://tools.ietf.org/html/rfc7633>`_ require a
-valid OCSP response regardless of the OCSP staple policy. Envoy will not use a must-staple certificate for
-new connections after its OCSP response expires.
+valid OCSP response regardless of the OCSP staple policy. In practice, a must-staple certificate causes
+cEnvoy to behave as if the OCSP staple policy is :ref:`MUST_STAPLE<envoy_v3_api_enum_value_extensions.transport_sockets.tls.v3.DownstreamTlsContext.OcspStaplePolicy.MUST_STAPLE>`.
+Envoy will not use a must-staple certificate for new connections after its OCSP response expires.
+
+OCSP responses are never stapled to TLS requests that do not indicate support for OCSP stapling
+via the ``status_request`` extension.
 
 The following runtime flags are provided to adjust the requirements of OCSP responses and override
 the OCSP policy. These flags default to ``true``.
 
-* ``envoy.reloadable_features.require_ocsp_response_for_must_staple_certs``: Disabling this allows the operator to omit an OCSP response for must-staple certs in the config.
-* ``envoy.reloadable_features.validate_ocsp_expiration_on_connection``: Disabling this will staple OCSP responses on new connections even if they are expired.
+* ``envoy.reloadable_features.require_ocsp_response_for_must_staple_certs``: Disabling this allows
+  the operator to omit an OCSP response for must-staple certs in the config.
+* ``envoy.reloadable_features.check_ocsp_policy``: Disabling this will disable OCSP policy
+  checking. OCSP responses are stapled when available if the client supports it, even if the
+  response is expired. Stapling is skipped if no response is present.
 
 OCSP responses are ignored for :ref:`UpstreamTlsContexts
 <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`.
-
-.. attention::
-
-  Envoy will reject a new connection if at the time no certificates comply with the OCSP staple policy.
 
 .. _arch_overview_ssl_auth_filter:
 

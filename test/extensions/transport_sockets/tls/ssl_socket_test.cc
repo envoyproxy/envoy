@@ -5409,7 +5409,7 @@ TEST_P(SslSocketTest, TestConnectionFailsWhenCertIsMustStapleAndResponseExpired)
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
-  testUtil(test_options.setExpectedServerStats("ssl.ocsp_staple_failed"));
+  testUtil(test_options.setExpectedServerStats("ssl.ocsp_staple_failed").enableOcspStapling());
 }
 
 TEST_P(SslSocketTest, TestConnectionSucceedsForMustStapleCertExpirationValidationOff) {
@@ -5434,7 +5434,7 @@ TEST_P(SslSocketTest, TestConnectionSucceedsForMustStapleCertExpirationValidatio
 
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.validate_ocsp_expiration_on_connection", "false"}});
+      {{"envoy.reloadable_features.check_ocsp_policy", "false"}});
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   std::string ocsp_response_path = "{{ test_tmpdir }}/ocsp_test_data/revoked_ocsp_resp.der";
@@ -5466,7 +5466,7 @@ TEST_P(SslSocketTest, TestConnectionSucceedsForMustStapleCertNoValidationNoRespo
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.require_ocsp_response_for_must_staple_certs", "false"},
-       {"envoy.reloadable_features.validate_ocsp_expiration_on_connection", "false"}});
+       {"envoy.reloadable_features.check_ocsp_policy", "false"}});
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setExpectedServerStats("ssl.ocsp_staple_omitted")
                .enableOcspStapling()

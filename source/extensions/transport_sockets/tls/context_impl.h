@@ -242,7 +242,7 @@ private:
   bool session_keys_single_use_{false};
 };
 
-enum class OcspStapleAction { Staple, NoStaple, Fail };
+enum class OcspStapleAction { Staple, NoStaple, Fail, ClientNotCapable };
 
 class ServerContextImpl : public ContextImpl, public Envoy::Ssl::ServerContext {
 public:
@@ -257,10 +257,12 @@ private:
   int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                            HMAC_CTX* hmac_ctx, int encrypt);
   bool isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
+  bool isClientOcspCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
   // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
   // ClientHello details.
   enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
-  OcspStapleAction ocspStapleAction(const ServerContextImpl::TlsContext& ctx);
+  OcspStapleAction ocspStapleAction(const ServerContextImpl::TlsContext& ctx,
+                                    bool client_ocsp_capable);
 
   SessionContextID generateHashForSessionContextId(const std::vector<std::string>& server_names);
 

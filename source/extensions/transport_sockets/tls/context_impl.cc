@@ -1043,23 +1043,6 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      config.requireClientCertificate());
     }
 
-    // We don't actually set the certificate here. That is done in
-    // `SSL_CTX_set_select_certificate_cb`, which is called before most of the
-    // client hello processing. This callback is guaranteed to be
-    // called after processing extensions and is the only supported place
-    // to call `SSL_get_tlsext_status_type` to query whether an ocsp response
-    // was requested.
-    SSL_CTX_set_cert_cb(
-        ctx.ssl_ctx_.get(),
-        [](SSL* ssl, void*) -> int {
-          if (SSL_get_tlsext_status_type(ssl) == TLSEXT_STATUSTYPE_ocsp) {
-            auto* ctx = static_cast<ServerContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
-            ctx->stats_.ocsp_staple_requests_.inc();
-          }
-          return 1;
-        },
-        nullptr);
-
     if (!parsed_alpn_protocols_.empty()) {
       SSL_CTX_set_alpn_select_cb(
           ctx.ssl_ctx_.get(),
@@ -1379,29 +1362,61 @@ bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_
   return false;
 }
 
-OcspStapleAction ServerContextImpl::ocspStapleAction(const ContextImpl::TlsContext& ctx) {
+bool ServerContextImpl::isClientOcspCapable(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  const uint8_t* status_request_data;
+  size_t status_request_len;
+  if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_status_request,
+                                           &status_request_data, &status_request_len)) {
+    return true;
+  }
+
+  return false;
+}
+
+OcspStapleAction ServerContextImpl::ocspStapleAction(const ContextImpl::TlsContext& ctx,
+                                                     bool client_ocsp_capable) {
+  if (!client_ocsp_capable) {
+    return OcspStapleAction::ClientNotCapable;
+  }
+
   auto& response = ctx.ocsp_response_;
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.validate_ocsp_expiration_on_connection")) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.check_ocsp_policy")) {
+    // Expiration check is disabled. Proceed as if the policy is LenientStapling and the response
+    // is not expired.
     return response ? OcspStapleAction::Staple : OcspStapleAction::NoStaple;
   }
 
-  if (ctx.is_must_staple_ && (!response || response->isExpired())) {
-    return OcspStapleAction::Fail;
+  auto policy = ocsp_staple_policy_;
+  if (ctx.is_must_staple_) {
+    // The certificate has the must-staple extension, so upgrade the policy to match.
+    policy = Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple;
   }
 
-  if (response && !response->isExpired()) {
-    return OcspStapleAction::Staple;
-  }
+  const bool valid_response = response && !response->isExpired();
 
-  // `response` is either not present or expired, and the action depends on the policy.
-  switch (ocsp_staple_policy_) {
+  switch (policy) {
   case Ssl::ServerContextConfig::OcspStaplePolicy::LenientStapling:
-    return OcspStapleAction::NoStaple;
+    if (!valid_response) {
+      return OcspStapleAction::NoStaple;
+    }
+    return OcspStapleAction::Staple;
+
   case Ssl::ServerContextConfig::OcspStaplePolicy::StrictStapling:
-    return response ? OcspStapleAction::Fail : OcspStapleAction::NoStaple;
+    if (valid_response) {
+      return OcspStapleAction::Staple;
+    }
+    if (response) {
+      // Expired response.
+      return OcspStapleAction::Fail;
+    }
+    return OcspStapleAction::NoStaple;
+
   case Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple:
-    return OcspStapleAction::Fail;
+    if (!valid_response) {
+      return OcspStapleAction::Fail;
+    }
+    return OcspStapleAction::Staple;
+
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -1410,20 +1425,33 @@ OcspStapleAction ServerContextImpl::ocspStapleAction(const ContextImpl::TlsConte
 enum ssl_select_cert_result_t
 ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
   const bool client_ecdsa_capable = isClientEcdsaCapable(ssl_client_hello);
+  const bool client_ocsp_capable = isClientOcspCapable(ssl_client_hello);
+
   // Fallback on first certificate.
   const TlsContext* selected_ctx = &tls_contexts_[0];
+  auto ocsp_staple_action = ocspStapleAction(*selected_ctx, client_ocsp_capable);
   for (const auto& ctx : tls_contexts_) {
-    if (client_ecdsa_capable == ctx.is_ecdsa_ && ocspStapleAction(ctx) != OcspStapleAction::Fail) {
-      selected_ctx = &ctx;
-      break;
+    if (client_ecdsa_capable != ctx.is_ecdsa_) {
+      continue;
     }
+
+    auto action = ocspStapleAction(ctx, client_ocsp_capable);
+    if (action == OcspStapleAction::Fail) {
+      continue;
+    }
+
+    selected_ctx = &ctx;
+    ocsp_staple_action = action;
+    break;
   }
 
-  switch (ocspStapleAction(*selected_ctx)) {
+  if (client_ocsp_capable) {
+    stats_.ocsp_staple_requests_.inc();
+  }
+
+  switch (ocsp_staple_action) {
   case OcspStapleAction::Staple: {
-    // Set the OCSP response sent to clients that request it.
-    // TODO(zuercher): Consider inspecting ssl_client_hello->extensions to see if the client has
-    // requested OCSP.
+    // We avoid setting the OCSP response if the client didn't request it, but doing so is safe.
     RELEASE_ASSERT(selected_ctx->ocsp_response_,
                    "OCSP response must be present under OcspStapleAction::Staple");
     auto& resp_bytes = selected_ctx->ocsp_response_->rawBytes();
@@ -1437,6 +1465,8 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
   case OcspStapleAction::Fail:
     stats_.ocsp_staple_failed_.inc();
     return ssl_select_cert_error;
+  case OcspStapleAction::ClientNotCapable:
+    break;
   }
 
   RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_client_hello->ssl, selected_ctx->ssl_ctx_.get()) != nullptr,
