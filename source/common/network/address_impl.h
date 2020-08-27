@@ -269,9 +269,9 @@ public:
 private:
   struct EnvoyInternalAddressImpl : public EnvoyInternalAddress {
     explicit EnvoyInternalAddressImpl(const std::string& address_id) : address_id_(address_id) {}
-    ~EnvoyInternalAddressImpl() = default;
+    ~EnvoyInternalAddressImpl() override = default;
     const std::string& addressId() const override { return address_id_; }
-    std::string address_id_;
+    const std::string address_id_;
   };
   EnvoyInternalAddressImpl internal_address_;
 };
