@@ -163,9 +163,7 @@ message Http1ProtocolOptions {
   // when this option is true, then Envoy will leave the HTTP/1.1 connection
   // open where possible.
   // If set, this overrides any HCM :ref:`stream_error_on_invalid_http_messaging
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`;
-  // this is overridden by any HCM :ref:`stream_error_on_invalid_http_messaging
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`, which defaults to false.
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`.
   google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 6;
 }
 

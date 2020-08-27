@@ -501,9 +501,7 @@ TEST_P(Http2CodecImplTest, CodecHasCorrectStreamErrorIfFalse) {
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
 
-  auto stream_error = response_encoder_->streamErrorOnInvalidHttpMessage();
-  EXPECT_TRUE(stream_error.has_value());
-  EXPECT_FALSE(stream_error.value());
+  EXPECT_FALSE(response_encoder_->streamErrorOnInvalidHttpMessage());
 }
 
 TEST_P(Http2CodecImplTest, CodecHasCorrectStreamErrorIfTrue) {
@@ -515,9 +513,7 @@ TEST_P(Http2CodecImplTest, CodecHasCorrectStreamErrorIfTrue) {
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
 
-  auto stream_error = response_encoder_->streamErrorOnInvalidHttpMessage();
-  EXPECT_TRUE(stream_error.has_value());
-  EXPECT_TRUE(stream_error.value());
+  EXPECT_TRUE(response_encoder_->streamErrorOnInvalidHttpMessage());
 }
 
 TEST_P(Http2CodecImplTest, InvalidRepeatContinue) {
