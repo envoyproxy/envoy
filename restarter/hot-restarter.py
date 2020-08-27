@@ -98,7 +98,7 @@ def sigint_handler(signum, frame):
 
 
 def sighup_handler(signum, frame):
-  """ Handler for SIGUP. This signal is used to cause the restarter to fork and exec a new
+  """ Handler for SIGHUP. This signal is used to cause the restarter to fork and exec a new
       child. """
 
   print("got SIGHUP")
