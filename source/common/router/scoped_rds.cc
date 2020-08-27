@@ -150,8 +150,7 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::addOnDemandUpdat
     std::function<void()> callback) {
   // If route table has been initialized, run the callback to continue in filter chain, otherwise
   // cache it and wait for the route table to be initialized.
-  if (route_provider_ != nullptr && !routeConfig()->isNull()) {
-    ENVOY_LOG(debug, "fuck3");
+  if (route_provider_ != nullptr && !routeConfig()->name().empty()) {
     callback();
     return;
   }
@@ -184,7 +183,6 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::initRdsConfigPro
 void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConfigProvider() {
   // If the route provider have been initialized, return and wait for rds config update.
   if (route_provider_ != nullptr) {
-    ENVOY_LOG(debug, "fuck1");
     return;
   }
 
@@ -206,8 +204,7 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConf
   initRdsConfigProvider(rds, *srds_init_mgr);
   ENVOY_LOG(debug, fmt::format("Scope on demand update: {}", scope_name_));
   // If RouteConfiguration hasn't been initialized, return.
-  if (routeConfig()->isNull()) {
-    ENVOY_LOG(debug, "fuck2");
+  if (routeConfig()->name().empty()) {
     return;
   }
   // If RouteConfiguration has been initialized, apply update to all the threads.

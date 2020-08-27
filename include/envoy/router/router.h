@@ -1129,11 +1129,6 @@ public:
    * manager level.
    */
   virtual bool mostSpecificHeaderMutationsWins() const PURE;
-
-  /**
-   * @return whether router configuration is NullConfig.
-   */
-  virtual bool isNull() const { return false; }
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
