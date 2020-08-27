@@ -270,6 +270,8 @@ bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
 Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config);
 
 struct EncodeFunctions {
+  // Function to modify locally generated response headers.
+  std::function<void(ResponseHeaderMap& headers)> modify_headers_;
   // Function to rewrite locally generated response.
   std::function<void(ResponseHeaderMap& response_headers, Code& code, std::string& body,
                      absl::string_view& content_type)>

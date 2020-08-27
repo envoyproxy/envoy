@@ -108,7 +108,7 @@ public:
     Http::Utility::sendLocalReply(
         false,
         Http::Utility::EncodeFunctions(
-            {nullptr,
+            {nullptr, nullptr,
              [&](Http::ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
                encoder_.encodeHeaders(*headers, end_stream);
              },
