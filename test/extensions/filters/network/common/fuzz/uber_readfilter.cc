@@ -22,6 +22,7 @@ void UberFilterFuzzer::reset() {
   Event::MockDispatcher& mock_dispatcher =
       dynamic_cast<Event::MockDispatcher&>(read_filter_callbacks_->connection_.dispatcher_);
   mock_dispatcher.clearDeferredDeleteList();
+  factory_context_.admin_.config_tracker_.config_tracker_callbacks_.clear();
   read_filter_.reset();
 }
 
