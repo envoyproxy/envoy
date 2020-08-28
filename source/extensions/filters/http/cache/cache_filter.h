@@ -85,6 +85,8 @@ private:
   // onHeaders for Range Responses, otherwise initialized by encodeCachedResponse.
   std::vector<AdjustedByteRange> remaining_ranges_;
 
+  // TODO(cbdm): Could possibly not have this allowlist copied in memory, and use it directly from a
+  // config proto reference.
   // Stores the headers that can be used to vary responses.
   absl::flat_hash_set<std::string> allowed_vary_headers_;
 

@@ -251,6 +251,9 @@ std::vector<std::string> VaryHeader::parseHeaderValue(const Http::HeaderEntry* v
   std::vector<std::string> header_values =
       absl::StrSplit(vary_header->value().getStringView(), ',');
   for (std::string& value : header_values) {
+    // TODO(cbdm): Might be able to improve the performance here: (1) could use StringUtil::trim to
+    // remove whitespace; (2) lowering the case might not be necessary depending on the
+    // functionality of isAllowed (e.g., if a hash-set, could has ignoring case).
     absl::StripAsciiWhitespace(&value);
     absl::AsciiStrToLower(&value);
   }
