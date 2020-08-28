@@ -4,27 +4,11 @@
 
 namespace Envoy {
 namespace Formatter {
-namespace {
-
-absl::flat_hash_map<std::string, std::string>
-convertJsonFormatToMap(const ProtobufWkt::Struct& json_format) {
-  absl::flat_hash_map<std::string, std::string> output;
-  for (const auto& pair : json_format.fields()) {
-    if (pair.second.kind_case() != ProtobufWkt::Value::kStringValue) {
-      throw EnvoyException("Only string values are supported in the JSON access log format.");
-    }
-    output.emplace(pair.first, pair.second.string_value());
-  }
-  return output;
-}
-
-} // namespace
 
 FormatterPtr
 SubstitutionFormatStringUtils::createJsonFormatter(const ProtobufWkt::Struct& struct_format,
                                                    bool preserve_types) {
-  auto json_format_map = convertJsonFormatToMap(struct_format);
-  return std::make_unique<JsonFormatterImpl>(json_format_map, preserve_types);
+  return std::make_unique<JsonFormatterImpl>(struct_format, preserve_types);
 }
 
 FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(

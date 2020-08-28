@@ -393,6 +393,17 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
   auto existing_active_listener = getListenerByName(active_listeners_, name);
   auto existing_warming_listener = getListenerByName(warming_listeners_, name);
 
+  // The listener should be updated back to its original state and the warming listener should be
+  // removed.
+  if (existing_warming_listener != warming_listeners_.end() &&
+      existing_active_listener != active_listeners_.end() &&
+      (*existing_active_listener)->blockUpdate(hash)) {
+    warming_listeners_.erase(existing_warming_listener);
+    updateWarmingActiveGauges();
+    stats_.listener_modified_.inc();
+    return true;
+  }
+
   // Do a quick blocked update check before going further. This check needs to be done against both
   // warming and active.
   if ((existing_warming_listener != warming_listeners_.end() &&

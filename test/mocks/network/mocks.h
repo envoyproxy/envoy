@@ -15,6 +15,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/network/filter_manager_impl.h"
+#include "common/network/socket_interface.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -357,6 +358,7 @@ public:
   MOCK_METHOD(Network::UdpPacketWriterFactoryOptRef, udpPacketWriterFactory, ());
   MOCK_METHOD(ConnectionBalancer&, connectionBalancer, ());
   MOCK_METHOD(ResourceLimit&, openConnections, ());
+  MOCK_METHOD(uint32_t, tcpBacklogSize, (), (const));
 
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
@@ -442,11 +444,12 @@ public:
   const std::string& asString() const override { return physical_; }
   absl::string_view asStringView() const override { return physical_; }
   const std::string& logicalName() const override { return logical_; }
-  const std::string& socketInterface() const override { return socket_interface_; }
+  const Network::SocketInterface& socketInterface() const override {
+    return SocketInterfaceSingleton::get();
+  }
 
   const std::string logical_;
   const std::string physical_;
-  const std::string socket_interface_{""};
 };
 
 class MockTransportSocketCallbacks : public TransportSocketCallbacks {

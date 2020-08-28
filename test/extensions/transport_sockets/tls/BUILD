@@ -39,6 +39,7 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/stream_info:stream_info_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
@@ -73,6 +74,8 @@ envoy_cc_test(
         "gen_unittest_certs.sh",
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
+    # Fails intermittantly on local build
+    tags = ["flaky_on_windows"],
     deps = [
         ":ssl_test_utils",
         "//source/common/json:json_loader_lib",
