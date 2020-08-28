@@ -334,7 +334,7 @@ def allowlistedForRegisterFactory(file_path):
 
 
 def allowlistedForSerializeAsString(file_path):
-  return file_path in SERIALIZE_AS_STRING_ALLOWLIST
+  return file_path in SERIALIZE_AS_STRING_ALLOWLIST or file_path.endswith(DOCS_SUFFIX)
 
 
 def allowlistedForJsonStringToMessage(file_path):
