@@ -454,7 +454,7 @@ message RouteMatch {
     ];
   }
 
-  // Indicates that prefix/path matching should be case insensitive. The default
+  // Indicates that prefix/path matching should be case sensitive. The default
   // is true.
   google.protobuf.BoolValue case_sensitive = 4;
 
@@ -1558,6 +1558,10 @@ message RateLimit {
 
       // The value to use in the descriptor entry.
       string descriptor_value = 1 [(validate.rules).string = {min_bytes: 1}];
+
+      // An optional key to use in the descriptor entry. If not set it defaults
+      // to 'generic_key' as the descriptor key.
+      string descriptor_key = 2;
     }
 
     // The following descriptor entry is appended to the descriptor:

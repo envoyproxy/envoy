@@ -2,10 +2,12 @@
 
 #include <memory>
 
+#include "common/http/message_impl.h"
+
 #include "extensions/filters/http/jwt_authn/authenticator.h"
 #include "extensions/filters/http/jwt_authn/verifier.h"
 
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 
 #include "gmock/gmock.h"
 

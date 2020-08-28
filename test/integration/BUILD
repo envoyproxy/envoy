@@ -336,7 +336,8 @@ envoy_cc_test(
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/integration/filters:test_socket_interface_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:retry_priority_factory_mocks",
+        "//test/mocks/upstream:retry_priority_mocks",
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -350,6 +351,7 @@ envoy_cc_test(
     srcs = [
         "http_subset_lb_integration_test.cc",
     ],
+    # Consistently times out in CI on Windows, but observed to pass locally
     tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
@@ -510,6 +512,7 @@ envoy_cc_test_library(
         "//test/integration/filters:passthrough_filter_config_lib",
         "//test/integration/filters:pause_filter_lib",
         "//test/integration/filters:wait_for_whole_request_and_response_config_lib",
+        "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -536,6 +539,7 @@ envoy_cc_test(
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 2,
+    # Consistently fails in CI on Windows, but observed to pass locally
     tags = ["flaky_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
@@ -632,7 +636,8 @@ envoy_cc_test_library(
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:retry_priority_factory_mocks",
+        "//test/mocks/upstream:retry_priority_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:printers_lib",
@@ -703,7 +708,8 @@ envoy_cc_test(
         "websocket_integration_test.cc",
         "websocket_integration_test.h",
     ],
-    tags = ["fails_on_windows"],
+    # Consistently fails in CI on Windows, but observed to pass locally
+    tags = ["flaky_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -771,7 +777,8 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_stats_integration_test",
     srcs = ["load_stats_integration_test.cc"],
-    tags = ["fails_on_windows"],
+    # Consistently timing out on Windows, observed to pass locally
+    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//test/config:utility_lib",
@@ -790,6 +797,7 @@ envoy_cc_test(
     name = "hds_integration_test",
     srcs = ["hds_integration_test.cc"],
     shard_count = 2,
+    # Alternately timing out and failing in CI on windows; observed to pass locally
     tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
@@ -971,6 +979,8 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     shard_count = 2,
+    # Fails intermittantly on local build
+    tags = ["flaky_on_windows"],
     deps = [
         ":integration_lib",
         ":tcp_proxy_integration_proto_cc_proto",
@@ -1046,7 +1056,7 @@ envoy_cc_test(
         "uds_integration_test.cc",
         "uds_integration_test.h",
     ],
-    tags = ["flaky_on_windows"],
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/event:dispatcher_includes",
