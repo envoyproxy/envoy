@@ -267,6 +267,65 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
       "Unexpected RDS configuration (expecting foo_route_config): INVALID_NAME_FOR_route_config");
 }
 
+// rds and vhds configurations change together
+TEST_F(RdsImplTest, VHDSandRDSupdateTogether) {
+  setup();
+
+  const std::string response1_json = R"EOF(
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "foo_route_config",
+      "virtual_hosts": [
+        {
+          "name": "foo",
+          "domains": [
+            "foo"
+          ],
+          "routes": [
+            {
+              "match": {
+                "prefix": "/foo"
+              },
+              "route": {
+                "cluster": "foo"
+              }
+            }
+          ]
+        }
+      ],
+      "vhds": {
+        "config_source": {
+          "api_config_source": {
+            "api_type": "DELTA_GRPC",
+            "grpc_services": {
+              "envoy_grpc": {
+                "cluster_name": "xds_cluster"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
+)EOF";
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_json);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
+
+  EXPECT_CALL(init_watcher_, ready());
+  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+  EXPECT_TRUE(rds_->config()->usesVhds());
+
+  EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
+                       ->routeEntry()
+                       ->clusterName());
+}
+
 // Validate behavior when the config fails delivery at the subscription level.
 TEST_F(RdsImplTest, FailureSubscription) {
   InSequence s;
