@@ -6,7 +6,7 @@ readonly SEARCH_FOLDER="//source/common/..."
 set -e -o pipefail
 
 # This is to filter out the redudant .cc or .h build targets that bazel
-# queryemits when rdeps = 0
+# query emits when rdeps = 0
 function filter_line() {
   while read line
   do
