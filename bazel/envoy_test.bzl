@@ -135,6 +135,7 @@ def envoy_cc_fuzz_test(
                 repository + "//test/fuzz:main",
             ],
         }),
+        size = size,
         tags = ["fuzz_target"] + tags,
     )
 
