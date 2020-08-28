@@ -579,21 +579,6 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       connection_manager_.read_callbacks_->connection().requestedServerName());
 }
 
-ConnectionManagerImpl::ActiveStream::~ActiveStream() {
-  if (connection_manager_.remote_close_) {
-    filter_manager_.streamInfo().setResponseCodeDetails(
-        StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect);
-    filter_manager_.streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::DownstreamConnectionTermination);
-  }
-
-  if (connection_manager_.codec_->protocol() < Protocol::Http2) {
-    // For HTTP/2 there are still some reset cases where details are not set.
-    // For HTTP/1 there shouldn't be any. Regression-proof this.
-    ASSERT(filter_manager_.streamInfo().responseCodeDetails().has_value());
-  }
-}
-
 void ConnectionManagerImpl::ActiveStream::completeRequest() {
   filter_manager_.streamInfo().onRequestComplete();
   Upstream::HostDescriptionConstSharedPtr upstream_host =
@@ -615,6 +600,12 @@ void ConnectionManagerImpl::ActiveStream::completeRequest() {
         StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect);
     filter_manager_.streamInfo().setResponseFlag(
         StreamInfo::ResponseFlag::DownstreamConnectionTermination);
+  }
+
+  if (connection_manager_.codec_->protocol() < Protocol::Http2) {
+    // For HTTP/2 there are still some reset cases where details are not set.
+    // For HTTP/1 there shouldn't be any. Regression-proof this.
+    ASSERT(filter_manager_.streamInfo().responseCodeDetails().has_value());
   }
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
