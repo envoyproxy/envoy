@@ -7,16 +7,16 @@ EXCLUDED_BUILD_CONFIGS=${EXCLUDED_BUILD_CONFIGS:-"^./jaeger-native-tracing|docke
 
 
 trap_errors () {
-    local frame=0 COMMAND LINE SUB FILE
-    if [ -n "$example" ]; then
-        COMMAND=" (${example})"
+    local frame=0 command line sub file
+    if [[ -n "$example" ]]; then
+        command=" (${example})"
     fi
     set +v
-    while read -r LINE SUB FILE < <(caller "$frame"); do
-        if [ "$frame" -ne "0" ]; then
-            FAILED+=("  > ${SUB}@ ${FILE} :${LINE}")
+    while read -r line sub file < <(caller "$frame"); do
+        if [[ "$frame" -ne "0" ]]; then
+            FAILED+=("  > ${sub}@ ${file} :${line}")
         else
-            FAILED+=("${SUB}@ ${FILE} :${LINE}${COMMAND}")
+            FAILED+=("${sub}@ ${file} :${line}${command}")
         fi
         ((frame++))
     done
@@ -46,7 +46,7 @@ verify_build_configs () {
     for config in $configs; do
         grep "\"$config\"" BUILD || missing+=("$config")
     done
-    if [ -n "${missing[*]}" ]; then
+    if [[ -n "${missing[*]}" ]]; then
        for config in "${missing[@]}"; do
            echo "Missing config: $config" >&2
        done
@@ -58,7 +58,7 @@ verify_build_configs
 run_examples
 
 
-if [ "${#FAILED[@]}" -ne "0" ]; then
+if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "TESTS FAILED:"
     for failed in "${FAILED[@]}"; do
         echo "$failed" >&2
