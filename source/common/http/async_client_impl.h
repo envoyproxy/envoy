@@ -375,7 +375,7 @@ private:
     Utility::sendLocalReply(
         remote_closed_,
         Utility::EncodeFunctions{
-            nullptr,
+            nullptr, nullptr,
             [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
               if (modify_headers != nullptr) {
                 modify_headers(*headers);

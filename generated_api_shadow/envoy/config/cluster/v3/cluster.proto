@@ -928,6 +928,10 @@ message Cluster {
   // Prefetch configuration for this cluster.
   PrefetchPolicy prefetch_policy = 50;
 
+  // If `connection_pool_per_downstream_connection` is true, the cluster will use a separate
+  // connection pool for every downstream connection
+  bool connection_pool_per_downstream_connection = 51;
+
   repeated core.v3.Address hidden_envoy_deprecated_hosts = 7 [deprecated = true];
 
   envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext hidden_envoy_deprecated_tls_context =
