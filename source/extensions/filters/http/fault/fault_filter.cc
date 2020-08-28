@@ -411,8 +411,8 @@ bool FaultFilter::tryIncActiveFaults() {
 
   // We only check for overflow when attempting to perform a fault. Note that this means that a
   // single request might increment the counter more than once if it tries to apply multiple faults,
-  // though it is also possible for it to fail the first check then succeed on the second (should
-  // another thread decrement the fault).
+  // and it is also possible for it to fail the first check then succeed on the second (should
+  // another thread decrement the active fault gauge).
   if (faultOverflow()) {
     return false;
   }
