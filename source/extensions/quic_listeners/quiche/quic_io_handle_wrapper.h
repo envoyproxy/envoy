@@ -14,7 +14,7 @@ public:
   QuicIoHandleWrapper(Network::IoHandle& io_handle) : io_handle_(io_handle) {}
 
   // Network::IoHandle
-  os_fd_t fd() const override { return io_handle_.fd(); }
+  os_fd_t fdDoNotUse() const override { return io_handle_.fdDoNotUse(); }
   Api::IoCallUint64Result close() override {
     closed_ = true;
     return Api::ioCallUint64ResultNoError();

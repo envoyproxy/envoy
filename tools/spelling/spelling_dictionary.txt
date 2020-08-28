@@ -28,6 +28,7 @@ CDS
 CEL
 DSR
 LTT
+TIDs
 ceil
 CHACHA
 CHLO
@@ -966,6 +967,7 @@ repeatability
 reperform
 repicked
 repo
+reproducibility
 requirepass
 reselecting
 reserialize

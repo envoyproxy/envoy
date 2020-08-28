@@ -140,7 +140,7 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   check_listener_stats(0, 1);
 }
 
-TEST_P(IntegrationTest, RouterDirectResponse) {
+TEST_P(IntegrationTest, RouterDirectResponseWithBody) {
   const std::string body = "Response body";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", body);
   static const std::string domain("direct.example.com");
@@ -157,6 +157,11 @@ TEST_P(IntegrationTest, RouterDirectResponse) {
         header_value_option = route_config->mutable_response_headers_to_add()->Add();
         header_value_option->mutable_header()->set_key("content-type");
         header_value_option->mutable_header()->set_value("text/html");
+        header_value_option->mutable_append()->set_value(false);
+        // Add a wrong content-length.
+        header_value_option = route_config->mutable_response_headers_to_add()->Add();
+        header_value_option->mutable_header()->set_key("content-length");
+        header_value_option->mutable_header()->set_value("2000");
         header_value_option->mutable_append()->set_value(false);
         auto* virtual_host = route_config->add_virtual_hosts();
         virtual_host->set_name(domain);
@@ -178,7 +183,53 @@ TEST_P(IntegrationTest, RouterDirectResponse) {
                                  ->value()
                                  .getStringView());
   EXPECT_EQ("text/html", response->headers().getContentTypeValue());
+  // Verify content-length is correct.
+  EXPECT_EQ(fmt::format("{}", body.size()), response->headers().getContentLengthValue());
   EXPECT_EQ(body, response->body());
+}
+
+TEST_P(IntegrationTest, RouterDirectResponseEmptyBody) {
+  static const std::string domain("direct.example.com");
+  static const std::string prefix("/");
+  static const Http::Code status(Http::Code::OK);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* route_config = hcm.mutable_route_config();
+        auto* header_value_option = route_config->mutable_response_headers_to_add()->Add();
+        header_value_option->mutable_header()->set_key("x-additional-header");
+        header_value_option->mutable_header()->set_value("example-value");
+        header_value_option->mutable_append()->set_value(false);
+        header_value_option = route_config->mutable_response_headers_to_add()->Add();
+        header_value_option->mutable_header()->set_key("content-type");
+        header_value_option->mutable_header()->set_value("text/html");
+        header_value_option->mutable_append()->set_value(false);
+        // Add a wrong content-length.
+        header_value_option = route_config->mutable_response_headers_to_add()->Add();
+        header_value_option->mutable_header()->set_key("content-length");
+        header_value_option->mutable_header()->set_value("2000");
+        header_value_option->mutable_append()->set_value(false);
+        auto* virtual_host = route_config->add_virtual_hosts();
+        virtual_host->set_name(domain);
+        virtual_host->add_domains(domain);
+        virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
+        virtual_host->mutable_routes(0)->mutable_direct_response()->set_status(
+            static_cast<uint32_t>(status));
+      });
+  initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "direct.example.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("example-value", response->headers()
+                                 .get(Envoy::Http::LowerCaseString("x-additional-header"))
+                                 ->value()
+                                 .getStringView());
+  // Content-type header is removed.
+  EXPECT_EQ(nullptr, response->headers().ContentType());
+  // Content-length header is correct.
+  EXPECT_EQ("0", response->headers().getContentLengthValue());
 }
 
 TEST_P(IntegrationTest, ConnectionClose) {

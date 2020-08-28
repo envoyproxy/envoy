@@ -24,7 +24,7 @@ public:
   ~IoSocketHandleImpl() override;
 
   // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
-  os_fd_t fd() const override { return fd_; }
+  os_fd_t fdDoNotUse() const override { return fd_; }
 
   Api::IoCallUint64Result close() override;
 
