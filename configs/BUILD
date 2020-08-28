@@ -16,8 +16,9 @@ py_binary(
         "*.yaml",
     ]),
     deps = [
-        requirement("Jinja2")],
-        requirement("MarkupSafe")],
+        requirement("Jinja2"),
+        requirement("MarkupSafe"),
+    ],
 )
 
 filegroup(
