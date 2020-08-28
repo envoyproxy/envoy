@@ -10,7 +10,6 @@ namespace ListenerFilters {
 namespace HttpInspector {
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCase& input) {
-
   try {
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {

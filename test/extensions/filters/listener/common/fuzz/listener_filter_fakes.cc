@@ -67,6 +67,7 @@ absl::string_view FakeConnectionSocket::requestedServerName() const { return ser
 
 Api::SysCallIntResult FakeConnectionSocket::getSocketOption(int level, int, void* optval,
                                                             socklen_t*) const {
+#ifdef SOL_IP
   switch (level) {
   case SOL_IPV6:
     static_cast<sockaddr_storage*>(optval)->ss_family = AF_INET6;
@@ -79,6 +80,11 @@ Api::SysCallIntResult FakeConnectionSocket::getSocketOption(int level, int, void
   }
 
   return Api::SysCallIntResult{0, 0};
+#else
+  // TODO: Waiting to determine if connection redirection possible, see
+  // Network::Utility::getOriginalDst()
+  return Api::SysCallIntResult{-1, 0};
+#endif
 }
 
 } // namespace ListenerFilters

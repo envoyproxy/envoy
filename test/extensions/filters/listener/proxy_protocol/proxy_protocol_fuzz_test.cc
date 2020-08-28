@@ -1,16 +1,16 @@
-#include "extensions/filters/listener/original_src/original_src.h"
+#include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.h"
-#include "test/extensions/filters/listener/original_src/original_src_fuzz_test.pb.validate.h"
+#include "test/extensions/filters/listener/proxy_protocol/proxy_protocol_fuzz_test.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
-namespace OriginalSrc {
+namespace ProxyProtocol {
 
 DEFINE_PROTO_FUZZER(
-    const test::extensions::filters::listener::original_src::OriginalSrcTestCase& input) {
+    const test::extensions::filters::listener::proxy_protocol::ProxyProtocolTestCase& input) {
   try {
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {
@@ -18,13 +18,15 @@ DEFINE_PROTO_FUZZER(
     return;
   }
 
-  Config config(input.config());
-  auto filter = std::make_unique<OriginalSrcFilter>(config);
+  Stats::IsolatedStoreImpl store;
+  ConfigSharedPtr cfg = std::make_shared<Config>(store, input.config());
+  auto filter = std::make_unique<Filter>(std::move(cfg));
+
   ListenerFilterFuzzer fuzzer;
   fuzzer.fuzz(*filter, input.fuzzed());
 }
 
-} // namespace OriginalSrc
+} // namespace ProxyProtocol
 } // namespace ListenerFilters
 } // namespace Extensions
 } // namespace Envoy
