@@ -351,17 +351,15 @@ config_setting(
 
 config_setting(
     name = "libfuzzer_coverage",
-    flag_values = {
-        "@rules_fuzzing//fuzzing:engine": "libfuzzer",
-    },
-    values = {
-        "define": "ENVOY_CONFIG_COVERAGE=1",
+    define_values = {
+        "FUZZING_ENGINE": "libfuzzer",
+        "ENVOY_CONFIG_COVERAGE": "1",
     },
 )
 
 config_setting(
     name = "libfuzzer",
-    flag_values = {"@rules_fuzzing//fuzzing:engine": "libfuzzer"},
+    values = {"define": "FUZZING_ENGINE=libfuzzer"},
 )
 
 alias(
