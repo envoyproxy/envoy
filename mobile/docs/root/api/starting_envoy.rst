@@ -7,32 +7,34 @@ Starting Envoy
 ``StreamClient``
 ----------------
 
-Starting an instance of Envoy Mobile for performing requests is done by creating a ``StreamClient``.
+Starting an instance of Envoy Mobile is done by building the ``Engine`` instance with ``EngineBuilder``. Requests are performed by the ``StatsClient`` provided by ``Engine``.
 
-To do so, create a ``StreamClientBuilder`` and call ``build()`` (see below).
+To obtain a ``StatsClient``, call ``streamClient()`` on the ``Engine`` instance (see below).
 
-After the client is created, it should be stored and used to start network requests/streams.
+After the stream client is obtain, it should be stored and used to start network requests/streams.
 
 **Kotlin example**::
 
-  val streamClient = AndroidStreamClientBuilder(getApplication())
+  val streamClient = AndroidEngineBuilder(getApplication())
     .addLogLevel(LogLevel.WARN)
     ...
     .build()
+    .streamClient()
 
 **Swift example**::
 
-  let streamClient = try StreamClientBuilder()
+  let streamClient = try EngineBuilder()
     .addLogLevel(.warn)
     ...
     .build()
+    .streamClient()
 
------------------------
-``StreamClientBuilder``
------------------------
+-----------------
+``EngineBuilder``
+-----------------
 
-This type is used to configure an instance of ``StreamClient`` before finally
-creating the client using ``.build()``.
+This type is used to configure an instance of ``Engine`` before finally
+creating the engine using ``.build()``.
 
 Available builders are 1:1 between iOS/Android, and are documented below.
 
@@ -195,19 +197,21 @@ This may be done by initializing a builder with the contents of the YAML file yo
 
 **Kotlin example**::
 
-  val streamClient = AndroidStreamClientBuilder(baseContext, Yaml(yamlFileString))
+  val streamClient = AndroidEngineBuilder(baseContext, Yaml(yamlFileString))
     .addLogLevel(LogLevel.WARN)
     .addStatsFlushSeconds(60)
     ...
     .build()
+    .streamClient()
 
 **Swift example**::
 
-  let streamClient = try StreamClientBuilder(yaml: yamlFileString)
+  let streamClient = try EngineBuilder(yaml: yamlFileString)
     .addLogLevel(.warn)
     .addStatsFlushSeconds(60)
     ...
     .build()
+    .streamClient()
 
 .. attention::
 
@@ -219,7 +223,7 @@ This may be done by initializing a builder with the contents of the YAML file yo
 Making requests
 ---------------
 
-Now that you have an Envoy Mobile instance, you can start making requests:
+Now that you have a stream client instance, you can start making requests:
 
 - :ref:`HTTP requests and streams <api_http>`
 - :ref:`gRPC streams <api_grpc>`
