@@ -215,12 +215,16 @@ private:
       request_trailers_ = std::move(request_trailers);
     }
     void setContinueHeaders(Http::ResponseHeaderMapPtr&& continue_headers) override {
+      ASSERT(!continue_headers_);
       continue_headers_ = std::move(continue_headers);
     }
     void setResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers) override {
+      // We'll overwrite the headers in the case where we fail the stream after upstream headers
+      // have begun filter processing but before they have been sent downstream.
       response_headers_ = std::move(response_headers);
     }
     void setResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers) override {
+      ASSERT(!response_trailers_);
       response_trailers_ = std::move(response_trailers);
     }
 
