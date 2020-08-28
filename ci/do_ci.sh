@@ -31,7 +31,6 @@ echo "building for ${ENVOY_BUILD_ARCH}"
 function collect_build_profile() {
   declare -g build_profile_count=${build_profile_count:-1}
   mv -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" || true
-  mv -f ${BUILD_DIR}/build_event.json "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.build_event.json" || true
   ((build_profile_count++))
 }
 
@@ -51,6 +50,7 @@ function bazel_with_collection() {
     exit "${BAZEL_STATUS}"
   fi
   collect_build_profile $1
+  run_process_test_result
 }
 
 function cp_binary_for_outside_access() {
@@ -130,6 +130,11 @@ function bazel_binary_build() {
 
 }
 
+function run_process_test_result() {
+  echo "running flaky test reporting script"
+  "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
+}
+
 CI_TARGET=$1
 shift
 
@@ -152,7 +157,7 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_MEMORY_TEST_EXACT=true"
 
   setup_clang_toolchain
-  echo "Testing ${TEST_TARGETS}"
+  echo "Testing ${TEST_TARGETS} with options: ${BAZEL_BUILD_OPTIONS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c opt ${TEST_TARGETS}
 
   echo "bazel release build with tests..."
@@ -239,6 +244,7 @@ elif [[ "$CI_TARGET" == "bazel.msan" ]]; then
   echo "bazel MSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${TEST_TARGETS}
+  exit 0
 elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
   setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
@@ -248,6 +254,9 @@ elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
 
   echo "Building and testing ${TEST_TARGETS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c fastbuild ${TEST_TARGETS}
+  # TODO(foreseeable): consolidate this and the API tool tests in a dedicated target.
+  bazel_with_collection //tools/envoy_headersplit:headersplit_test --spawn_strategy=local
+  bazel_with_collection //tools/envoy_headersplit:replace_includes_test --spawn_strategy=local
   exit 0
 elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
@@ -289,7 +298,6 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   echo "Building binary..."
   bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   collect_build_profile build
-
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   setup_clang_toolchain

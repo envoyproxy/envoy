@@ -23,6 +23,7 @@ public:
   ThreadId() : id_(std::numeric_limits<int64_t>::min()) {}
   explicit ThreadId(int64_t id) : id_(id) {}
 
+  int64_t getId() const { return id_; }
   std::string debugString() const { return std::to_string(id_); }
   int64_t getId() const { return id_; }
   bool isEmpty() const { return *this == ThreadId(); }
