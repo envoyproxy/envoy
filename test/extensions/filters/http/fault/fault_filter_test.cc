@@ -526,6 +526,7 @@ TEST_F(FaultFilterTest, Overflow) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
 
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
   EXPECT_EQ(1UL, config_->stats().faults_overflow_.value());
 }
 

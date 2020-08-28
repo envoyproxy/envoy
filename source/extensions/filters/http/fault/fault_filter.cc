@@ -166,7 +166,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
 bool FaultFilter::maybeSetupDelay(const Http::RequestHeaderMap& request_headers) {
   absl::optional<std::chrono::milliseconds> duration = delayDuration(request_headers);
-  if (duration.has_value() && maybeDoFault()) {
+  if (duration.has_value() && tryIncActiveFaults()) {
     delay_timer_ = decoder_callbacks_->dispatcher().createTimer(
         [this, &request_headers]() -> void { postDelayInjection(request_headers); });
     ENVOY_LOG(debug, "fault: delaying request {}ms", duration.value().count());
@@ -183,7 +183,7 @@ bool FaultFilter::maybeDoAbort(const Http::RequestHeaderMap& request_headers) {
   absl::optional<Grpc::Status::GrpcStatus> grpc_status;
   std::tie(http_status, grpc_status) = abortStatus(request_headers);
 
-  if (http_status.has_value() && maybeDoFault()) {
+  if (http_status.has_value() && tryIncActiveFaults()) {
     abortWithStatus(http_status.value(), grpc_status);
     return true;
   }
@@ -202,7 +202,7 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& requ
     return;
   }
 
-  if (!maybeDoFault()) {
+  if (!tryIncActiveFaults()) {
     return;
   }
 
@@ -401,7 +401,7 @@ FaultFilterStats FaultFilterConfig::generateStats(const std::string& prefix, Sta
                                  POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-bool FaultFilter::maybeDoFault() {
+bool FaultFilter::tryIncActiveFaults() {
   // Only charge 1 active fault per filter in case we are injecting multiple faults.
   // Since we count at most one active fault per filter, we also allow multiple faults
   // per filter without checking for overflow.

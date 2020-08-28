@@ -263,8 +263,9 @@ private:
   absl::optional<Http::Code> abortHttpStatus(const Http::RequestHeaderMap& request_headers);
   absl::optional<Grpc::Status::GrpcStatus>
   abortGrpcStatus(const Http::RequestHeaderMap& request_headers);
-  // Checks whether we should allow a fault; if we do, increment the number of faults.
-  bool maybeDoFault();
+  // Attempts to increase the number of active faults. Returns false if we've reached the maximum
+  // number of allowed faults, in which case no fault should be performed.
+  bool tryIncActiveFaults();
   bool maybeDoAbort(const Http::RequestHeaderMap& request_headers);
   bool maybeSetupDelay(const Http::RequestHeaderMap& request_headers);
   void maybeSetupResponseRateLimit(const Http::RequestHeaderMap& request_headers);
