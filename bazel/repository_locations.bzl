@@ -514,6 +514,16 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/{version}.tar.gz"],
         use_category = ["build"],
     ),
+    rules_fuzzing = dict(
+        project_name = "Rules for fuzzing in Bazel",
+        project_url = "https://github.com/googleinterns/bazel-rules-fuzzing",
+        version = "bc4b3afc59a56cec8c61f964efa93fa81e3eb6a8",
+        sha256 = "8901c2438fb94b55b160e82dd14a8fc3c208f948497822946319c60939c34c4f",
+        strip_prefix = "bazel-rules-fuzzing-{version}",
+        # 2020-08-21
+        urls = ["https://github.com/googleinterns/bazel-rules-fuzzing/archive/{version}.zip"],
+        use_category = ["test"],
+    ),
     rules_python = dict(
         project_name = "Python rules for Bazel",
         project_url = "https://github.com/bazelbuild/rules_python",

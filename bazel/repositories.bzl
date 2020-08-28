@@ -225,6 +225,7 @@ def envoy_dependencies(skip_targets = []):
     _repository_impl("bazel_compdb")
     _repository_impl("envoy_build_tools")
     _repository_impl("rules_cc")
+    _repository_impl("rules_fuzzing")
     _org_unicode_icuuc()
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.

@@ -15,6 +15,10 @@ def _python_deps():
         requirements = "@envoy//tools/protodoc:requirements.txt",
     )
     pip3_import(
+        name = "fuzzing_py_deps",
+        requirements = "@rules_fuzzing//fuzzing:requirements.txt",
+    )
+    pip3_import(
         name = "headersplit_pip3",
         requirements = "@envoy//tools/envoy_headersplit:requirements.txt",
     )
