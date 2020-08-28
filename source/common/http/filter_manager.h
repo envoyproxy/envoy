@@ -339,17 +339,17 @@ public:
   virtual RequestTrailerMap* requestTrailers() PURE;
 
   /**
-   * Retrives a pointer to the continue headers set via setResponseHeaders.
+   * Retrieves a pointer to the continue headers set via setResponseHeaders.
    */
   virtual ResponseHeaderMap* continueHeaders() PURE;
 
   /**
-   * Retrives a pointer to the response headers set via setResponseHeaders.
+   * Retrieves a pointer to the response headers set via setResponseHeaders.
    */
   virtual ResponseHeaderMap* responseHeaders() PURE;
 
   /**
-   * Retrives a pointer to the response trailers set via setResponseTrailers.
+   * Retrieves a pointer to the response trailers set via setResponseTrailers.
    */
   virtual ResponseTrailerMap* responseTrailers() PURE;
 
