@@ -632,9 +632,7 @@ TEST_P(Http1ServerConnectionImplTest, CodecHasCorrectStreamErrorIfTrue) {
       }));
 
   auto status = codec_->dispatch(buffer);
-  auto stream_error = response_encoder->streamErrorOnInvalidHttpMessage();
-  EXPECT_TRUE(stream_error.has_value());
-  EXPECT_TRUE(stream_error.value());
+  EXPECT_TRUE(response_encoder->streamErrorOnInvalidHttpMessage());
 }
 
 TEST_P(Http1ServerConnectionImplTest, CodecHasCorrectStreamErrorIfFalse) {
@@ -659,12 +657,10 @@ TEST_P(Http1ServerConnectionImplTest, CodecHasCorrectStreamErrorIfFalse) {
       }));
 
   auto status = codec_->dispatch(buffer);
-  auto stream_error = response_encoder->streamErrorOnInvalidHttpMessage();
-  EXPECT_TRUE(stream_error.has_value());
-  EXPECT_FALSE(stream_error.value());
+  EXPECT_FALSE(response_encoder->streamErrorOnInvalidHttpMessage());
 }
 
-TEST_P(Http1ServerConnectionImplTest, CodecHasNoStreamErrorIfNotSet) {
+TEST_P(Http1ServerConnectionImplTest, CodecHasDefaultStreamErrorIfNotSet) {
   initialize();
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
