@@ -475,8 +475,7 @@ void AdminImpl::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
   for (const auto& [name, callback] : callbacks_map) {
     ProtobufTypes::MessagePtr message = callback();
     ASSERT(message);
-
-    if (mask.has_value()) {
+    if (name != "unreadytargets" && mask.has_value()) {
       Protobuf::FieldMask field_mask;
       ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
       // We don't use trimMessage() above here since masks don't support
@@ -522,7 +521,7 @@ AdminImpl::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
 
     auto repeated = reflection->GetRepeatedPtrField<Protobuf::Message>(*message, field_descriptor);
     for (Protobuf::Message& msg : repeated) {
-      if (mask.has_value()) {
+      if (name != "unreadytargets" && mask.has_value()) {
         Protobuf::FieldMask field_mask;
         ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
         trimResourceMessage(field_mask, msg);
@@ -632,13 +631,12 @@ ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
 }
 
 ProtobufTypes::MessagePtr
-AdminImpl::dumpUnreadyTargetsConfigs(const absl::optional<std::string>& mask) const {
+AdminImpl::dumpUnreadyTargetsConfigs(const absl::optional<std::string>& target) const {
   auto unready_targets_config_dump_list =
       std::make_unique<envoy::admin::v3::UnreadyTargetsConfigDumpList>();
 
-  if (mask.has_value()) {
-    const std::string& mask_string = mask.value();
-    if (mask_string == "listener") {
+  if (target.has_value()) {
+    if (target.value() == "listener") {
       dumpListenerUnreadyTargetsConfigs(*unready_targets_config_dump_list);
     }
     // More options for unready targets config dump.
@@ -660,7 +658,7 @@ void AdminImpl::dumpListenerUnreadyTargetsConfigs(
   }
 
   for (const auto& listener_config : listeners) {
-    auto& listener = dynamic_cast<ListenerImpl&>(listener_config.get());
+    auto& listener = listener_config.get();
     listener.initManager().dumpUnreadyTargetsConfig(unready_targets_config_dump_list);
   }
 }

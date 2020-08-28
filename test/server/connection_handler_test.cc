@@ -65,7 +65,7 @@ public:
           name_(name), listener_filters_timeout_(listener_filters_timeout),
           continue_on_listener_filters_timeout_(continue_on_listener_filters_timeout),
           connection_balancer_(std::make_unique<Network::NopConnectionBalancerImpl>()),
-          inline_filter_chain_manager_(filter_chain_manager) {
+          inline_filter_chain_manager_(filter_chain_manager), init_manager_(nullptr) {
       envoy::config::listener::v3::UdpListenerConfig dummy;
       std::string listener_name("raw_udp_listener");
       dummy.set_udp_listener_name(listener_name);
@@ -112,6 +112,7 @@ public:
     }
     ResourceLimit& openConnections() override { return open_connections_; }
     uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
+    Init::Manager& initManager() override { return *init_manager_; }
 
     void setMaxConnections(const uint32_t num_connections) {
       open_connections_.setMax(num_connections);
@@ -134,6 +135,7 @@ public:
     BasicResourceLimitImpl open_connections_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
     std::shared_ptr<NiceMock<Network::MockFilterChainManager>> inline_filter_chain_manager_;
+    std::unique_ptr<Init::Manager> init_manager_;
   };
 
   using TestListenerPtr = std::unique_ptr<TestListener>;

@@ -359,6 +359,7 @@ public:
   MOCK_METHOD(ConnectionBalancer&, connectionBalancer, ());
   MOCK_METHOD(ResourceLimit&, openConnections, ());
   MOCK_METHOD(uint32_t, tcpBacklogSize, (), (const));
+  MOCK_METHOD(Init::Manager&, initManager, ());
 
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;

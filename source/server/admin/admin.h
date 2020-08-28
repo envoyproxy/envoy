@@ -375,7 +375,8 @@ private:
   public:
     AdminListener(AdminImpl& parent, Stats::ScopePtr&& listener_scope)
         : parent_(parent), name_("admin"), scope_(std::move(listener_scope)),
-          stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)) {}
+          stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)),
+          init_manager_(nullptr) {}
 
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
@@ -406,6 +407,7 @@ private:
       return empty_access_logs_;
     }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+    Init::Manager& initManager() override { return *init_manager_; }
 
     AdminImpl& parent_;
     const std::string name_;
@@ -416,6 +418,7 @@ private:
 
   private:
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+    std::unique_ptr<Init::Manager> init_manager_;
   };
   using AdminListenerPtr = std::unique_ptr<AdminListener>;
 

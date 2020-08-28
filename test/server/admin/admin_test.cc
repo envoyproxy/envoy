@@ -951,5 +951,116 @@ fake_cluster::1.2.3.4:80::local_origin_success_rate::93.2
   EXPECT_EQ(expected_text, response2.toString());
 }
 
+// Test Using /config_dump?include_unready_targets to dump configs of all unready targets.
+TEST_P(AdminInstanceTest, UnreadyTargetsConfigDump) {
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+
+  Network::MockListenerConfig listener_1;
+  Init::ManagerImpl init_manager_1{"test_init_manager_1"};
+  Init::TargetImpl target_1("test_target_1", nullptr);
+  init_manager_1.add(target_1);
+  EXPECT_CALL(listener_1, initManager()).WillOnce(ReturnRef(init_manager_1));
+
+  Network::MockListenerConfig listener_2;
+  Init::ManagerImpl init_manager_2{"test_init_manager_2"};
+  Init::TargetImpl target_2("test_target_2", nullptr);
+  init_manager_2.add(target_2);
+  EXPECT_CALL(listener_2, initManager()).WillOnce(ReturnRef(init_manager_2));
+
+  MockListenerManager listener_manager;
+  EXPECT_CALL(server_, listenerManager()).WillRepeatedly(ReturnRef(listener_manager));
+
+  std::vector<std::reference_wrapper<Envoy::Network::ListenerConfig>> listeners;
+  listeners.push_back(listener_1);
+  listeners.push_back(listener_2);
+  EXPECT_CALL(listener_manager, isWorkerStarted()).WillRepeatedly(Return(true));
+  EXPECT_CALL(listener_manager, listeners(_)).WillOnce(Return(listeners));
+
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/config_dump?include_unready_targets", header_map, response));
+  std::string output = response.toString();
+  // The expected value should be updated when ProtobufTypes::MessagePtr
+  // AdminImpl::dumpUnreadyTargetsConfigs function includes more dump when mask has no value.
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v3.UnreadyTargetsConfigDumpList",
+   "unready_targets_configs": [
+    {
+     "name": "init manager test_init_manager_1",
+     "target_names": [
+      "target test_target_1"
+     ]
+    },
+    {
+     "name": "init manager test_init_manager_2",
+     "target_names": [
+      "target test_target_2"
+     ]
+    }
+   ]
+  }
+ ]
+}
+)EOF";
+  EXPECT_EQ(output, expected_json);
+}
+
+// Test Using /config_dump?include_unready_targets&mask=listener to dump configs of listener unready
+// targets.
+TEST_P(AdminInstanceTest, ListenerUnreadyTargetsConfigDump) {
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+
+  Network::MockListenerConfig listener_1;
+  Init::ManagerImpl init_manager_1{"test_init_manager_1"};
+  Init::TargetImpl target_1("test_target_1", nullptr);
+  init_manager_1.add(target_1);
+  EXPECT_CALL(listener_1, initManager()).WillOnce(ReturnRef(init_manager_1));
+
+  Network::MockListenerConfig listener_2;
+  Init::ManagerImpl init_manager_2{"test_init_manager_2"};
+  Init::TargetImpl target_2("test_target_2", nullptr);
+  init_manager_2.add(target_2);
+  EXPECT_CALL(listener_2, initManager()).WillOnce(ReturnRef(init_manager_2));
+
+  MockListenerManager listener_manager;
+  EXPECT_CALL(server_, listenerManager()).WillRepeatedly(ReturnRef(listener_manager));
+
+  std::vector<std::reference_wrapper<Envoy::Network::ListenerConfig>> listeners;
+  listeners.push_back(listener_1);
+  listeners.push_back(listener_2);
+  EXPECT_CALL(listener_manager, isWorkerStarted()).WillRepeatedly(Return(true));
+  EXPECT_CALL(listener_manager, listeners(_)).WillOnce(Return(listeners));
+
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?include_unready_targets&mask=listener",
+                                        header_map, response));
+  std::string output = response.toString();
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v3.UnreadyTargetsConfigDumpList",
+   "unready_targets_configs": [
+    {
+     "name": "init manager test_init_manager_1",
+     "target_names": [
+      "target test_target_1"
+     ]
+    },
+    {
+     "name": "init manager test_init_manager_2",
+     "target_names": [
+      "target test_target_2"
+     ]
+    }
+   ]
+  }
+ ]
+}
+)EOF";
+  EXPECT_EQ(output, expected_json);
+}
+
 } // namespace Server
 } // namespace Envoy
