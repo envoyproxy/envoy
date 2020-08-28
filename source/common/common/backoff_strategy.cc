@@ -29,8 +29,9 @@ JitteredLowerBoundBackOffStrategy::JitteredLowerBoundBackOffStrategy(
     : min_interval_(min_interval), random_(random) {}
 
 uint64_t JitteredLowerBoundBackOffStrategy::nextBackOffMs() {
-  // random(min_interval_, 1.5 * min_interval_)
-  return (random_.random() % (min_interval_ >> 1)) + min_interval_;
+  // random(min_interval, 1.5 * min_interval)
+  uint64_t min_interval_non_zero = std::max(min_interval_ >> 1, 1UL);
+  return (random_.random() % min_interval_non_zero) + min_interval_;
 }
 
 FixedBackOffStrategy::FixedBackOffStrategy(uint64_t interval_ms) : interval_ms_(interval_ms) {
