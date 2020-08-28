@@ -323,12 +323,44 @@ void ActiveStreamDecoderFilter::modifyDecodingBuffer(
   callback(*parent_.buffered_request_data_.get());
 }
 
+void ActiveStreamDecoderFilter::setContinueHeaders(Http::ResponseHeaderMapPtr&& response_headers) {
+  parent_.filter_manager_callbacks_.setContinueHeaders(std::move(response_headers));
+}
+void ActiveStreamDecoderFilter::setResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers) {
+  parent_.filter_manager_callbacks_.setResponseHeaders(std::move(response_headers));
+}
+void ActiveStreamDecoderFilter::setResponseTrailers(
+    Http::ResponseTrailerMapPtr&& response_trailers) {
+  parent_.filter_manager_callbacks_.setResponseTrailers(std::move(response_trailers));
+}
+// Http::RequestHeaderMap* requestHeaders() override {
+// parent_.filter_manager_callbacks_.requestHeaders(); } Http::RequestTrailerMap* requestTrailers()
+// override { parent_.filter_manager_callbacks_.requestTrailers(); }
+Http::ResponseHeaderMap* ActiveStreamDecoderFilter::continueHeaders() {
+  return parent_.filter_manager_callbacks_.continueHeaders();
+}
+Http::ResponseHeaderMap* ActiveStreamDecoderFilter::responseHeaders() {
+  return parent_.filter_manager_callbacks_.responseHeaders();
+}
+Http::ResponseTrailerMap* ActiveStreamDecoderFilter::responseTrailers() {
+  return parent_.filter_manager_callbacks_.responseTrailers();
+}
+
 void ActiveStreamDecoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   parent_.stream_info_.setResponseCodeDetails(details);
   parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, grpc_status, details);
+}
+
+void ActiveStreamDecoderFilter::encode100ContinueHeaders(ResponseHeaderMap& headers) {
+  // If Envoy is not configured to proxy 100-Continue responses, swallow the 100 Continue
+  // here. This avoids the potential situation where Envoy strips Expect: 100-Continue and sends a
+  // 100-Continue, then proxies a duplicate 100 Continue from upstream.
+  if (parent_.proxy_100_continue_) {
+    parent_.encode100ContinueHeaders(nullptr, headers);
+  }
 }
 
 void ActiveStreamDecoderFilter::encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) {
@@ -341,6 +373,10 @@ void ActiveStreamDecoderFilter::encode100ContinueHeaders(ResponseHeaderMapPtr&& 
   }
 }
 
+void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMap& headers, bool end_stream) {
+  parent_.encodeHeaders(nullptr, headers, end_stream);
+}
+
 void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
   parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
   parent_.encodeHeaders(nullptr, *parent_.filter_manager_callbacks_.responseHeaders(), end_stream);
@@ -349,6 +385,10 @@ void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bo
 void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   parent_.encodeData(nullptr, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
+}
+
+void ActiveStreamDecoderFilter::encodeTrailers(ResponseTrailerMap& trailers) {
+  parent_.encodeTrailers(nullptr, trailers);
 }
 
 void ActiveStreamDecoderFilter::encodeTrailers(ResponseTrailerMapPtr&& trailers) {

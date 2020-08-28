@@ -170,10 +170,21 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
+  void setContinueHeaders(Http::ResponseHeaderMapPtr&& response_headers) override;
+  void setResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers) override;
+  void setResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers) override;
+  // Http::RequestHeaderMap* requestHeaders() override { parent_.filter_manager_callbacks_.requestHeaders(); }
+  // Http::RequestTrailerMap* requestTrailers() override { parent_.filter_manager_callbacks_.requestTrailers(); }
+  Http::ResponseHeaderMap* continueHeaders() override;
+  Http::ResponseHeaderMap* responseHeaders() override;
+  Http::ResponseTrailerMap* responseTrailers() override;
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override;
+  void encode100ContinueHeaders(ResponseHeaderMap& headers) override;
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
+  void encodeHeaders(ResponseHeaderMap& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
+  void encodeTrailers(ResponseTrailerMap& trailers) override;
   void encodeMetadata(MetadataMapPtr&& metadata_map_ptr) override;
   void onDecoderFilterAboveWriteBufferHighWatermark() override;
   void onDecoderFilterBelowWriteBufferLowWatermark() override;
@@ -492,6 +503,11 @@ public:
     }
 
     ASSERT(state_.filter_call_state_ == 0);
+  }
+
+  bool decodeComplete() {
+    // TODO(snowp): Add another state variable?
+    return  true;
   }
 
   // ScopeTrackedObject

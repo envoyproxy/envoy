@@ -12,6 +12,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 #include "envoy/ssl/connection.h"
 
 #include "common/http/header_map_impl.h"
@@ -160,6 +161,18 @@ public:
                        std::function<void(ResponseHeaderMap& headers)> modify_headers,
                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                        absl::string_view details);
+
+void setContinueHeaders(ResponseHeaderMapPtr&& ) override {}
+void setResponseHeaders(ResponseHeaderMapPtr&& ) override {}
+void setResponseTrailers(ResponseTrailerMapPtr&& ) override {}
+
+  MOCK_METHOD(ResponseHeaderMap*, continueHeaders, ());
+  MOCK_METHOD(ResponseHeaderMap*, responseHeaders, ());
+  MOCK_METHOD(ResponseTrailerMap*, responseTrailers, ());
+
+  MOCK_METHOD(void, encode100ContinueHeaders, (ResponseHeaderMap&));
+  MOCK_METHOD(void, encodeHeaders, (ResponseHeaderMap&, bool));
+  MOCK_METHOD(void, encodeTrailers, (ResponseTrailerMap&));
 
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
     encode100ContinueHeaders_(*headers);

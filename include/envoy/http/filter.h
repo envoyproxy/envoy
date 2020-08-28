@@ -356,6 +356,14 @@ public:
    */
   virtual MetadataMapVector& addDecodedMetadata() PURE;
 
+  virtual void setContinueHeaders(ResponseHeaderMapPtr&& continue_headers) PURE;
+  virtual void setResponseHeaders(ResponseHeaderMapPtr&& response_headers) PURE;
+  virtual void setResponseTrailers(ResponseTrailerMapPtr&& response_trailers) PURE;
+
+  virtual ResponseHeaderMap* continueHeaders() PURE;
+  virtual ResponseHeaderMap* responseHeaders() PURE;
+  virtual ResponseTrailerMap* responseTrailers() PURE;
+
   /**
    * Called with 100-Continue headers to be encoded.
    *
@@ -366,6 +374,7 @@ public:
    *
    * @param headers supplies the headers to be encoded.
    */
+  virtual void encode100ContinueHeaders(ResponseHeaderMap& headers) PURE;
   virtual void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) PURE;
 
   /**
@@ -380,6 +389,7 @@ public:
    * @param headers supplies the headers to be encoded.
    * @param end_stream supplies whether this is a header only request/response.
    */
+  virtual void encodeHeaders(ResponseHeaderMap& headers, bool end_stream) PURE;
   virtual void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) PURE;
 
   /**
@@ -393,6 +403,7 @@ public:
    * Called with trailers to be encoded. This implicitly ends the stream.
    * @param trailers supplies the trailers to encode.
    */
+  virtual void encodeTrailers(ResponseTrailerMap& trailers) PURE;
   virtual void encodeTrailers(ResponseTrailerMapPtr&& trailers) PURE;
 
   /**

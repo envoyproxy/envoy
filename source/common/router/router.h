@@ -257,15 +257,15 @@ class RouterFilterInterface {
 public:
   virtual ~RouterFilterInterface() = default;
 
-  virtual void onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
+  virtual void onUpstream100ContinueHeaders(Http::ResponseHeaderMap& headers,
                                             UpstreamRequest& upstream_request) PURE;
-  virtual void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
+  virtual void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& headers,
                                  UpstreamRequest& upstream_request, bool end_stream) PURE;
   virtual void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
                               bool end_stream) PURE;
-  virtual void onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
+  virtual void onUpstreamTrailers(Http::ResponseTrailerMap& trailers,
                                   UpstreamRequest& upstream_request) PURE;
-  virtual void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map) PURE;
+  virtual void onUpstreamMetadata(Http::MetadataMap& metadata_map) PURE;
   virtual void onUpstreamReset(Http::StreamResetReason reset_reason,
                                absl::string_view transport_failure,
                                UpstreamRequest& upstream_request) PURE;
@@ -429,15 +429,15 @@ public:
   }
 
   // RouterFilterInterface
-  void onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
+  void onUpstream100ContinueHeaders(Http::ResponseHeaderMap& headers,
                                     UpstreamRequest& upstream_request) override;
-  void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
+  void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& headers,
                          UpstreamRequest& upstream_request, bool end_stream) override;
   void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
                       bool end_stream) override;
-  void onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
+  void onUpstreamTrailers(Http::ResponseTrailerMap& trailers,
                           UpstreamRequest& upstream_request) override;
-  void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map) override;
+  void onUpstreamMetadata(Http::MetadataMap& metadata_map) override;
   void onUpstreamReset(Http::StreamResetReason reset_reason, absl::string_view transport_failure,
                        UpstreamRequest& upstream_request) override;
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override;
