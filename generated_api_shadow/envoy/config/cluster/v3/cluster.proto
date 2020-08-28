@@ -44,7 +44,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 52]
+// [#next-free-field: 53]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -812,7 +812,7 @@ message Cluster {
     RingHashLbConfig ring_hash_lb_config = 23;
 
     // Optional configuration for the Maglev load balancing policy.
-    MaglevLbConfig maglev_lb_config = 51;
+    MaglevLbConfig maglev_lb_config = 52;
 
     // Optional configuration for the Original Destination load balancing policy.
     OriginalDstLbConfig original_dst_lb_config = 34;
