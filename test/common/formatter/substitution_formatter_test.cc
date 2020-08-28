@@ -93,9 +93,9 @@ private:
 };
 
 TEST(SubstitutionFormatUtilsTest, protocolToString) {
-  EXPECT_EQ("HTTP/1.0", SubstitutionFormatUtils::protocolToString(Http::Protocol::Http10));
-  EXPECT_EQ("HTTP/1.1", SubstitutionFormatUtils::protocolToString(Http::Protocol::Http11));
-  EXPECT_EQ("HTTP/2", SubstitutionFormatUtils::protocolToString(Http::Protocol::Http2));
+  EXPECT_EQ("HTTP/1.0", SubstitutionFormatUtils::protocolToString(Http::Protocol::Http10).value().get());
+  EXPECT_EQ("HTTP/1.1", SubstitutionFormatUtils::protocolToString(Http::Protocol::Http11).value().get());
+  EXPECT_EQ("HTTP/2", SubstitutionFormatUtils::protocolToString(Http::Protocol::Http2).value().get());
   EXPECT_EQ(absl::nullopt, SubstitutionFormatUtils::protocolToString({}));
 }
 
