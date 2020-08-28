@@ -8,8 +8,6 @@ envoy_package()
 
 exports_files([
     "gen_sh_test_runner.sh",
-    "fuzzing_coverage_test.sh",
-    "fuzzing_test.sh",
     "sh_test_wrapper.sh",
     "test_for_benchmark_wrapper.sh",
 ])
