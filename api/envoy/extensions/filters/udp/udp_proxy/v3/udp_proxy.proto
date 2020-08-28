@@ -23,7 +23,7 @@ message UdpProxyConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig";
 
-  // Specifies the udp hash policy.
+  // Specifies the UDP hash policy.
   // The packets can be routed by hash policy.
   message HashPolicy {
     oneof policy_specifier {

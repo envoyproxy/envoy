@@ -113,12 +113,11 @@ using UdpProxyFilterConfigSharedPtr = std::shared_ptr<const UdpProxyFilterConfig
 class UdpLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
   UdpLoadBalancerContext(const Udp::HashPolicy* hash_policy,
-                         const Network::Address::InstanceConstSharedPtr& address) {
+                         const Network::Address::InstanceConstSharedPtr& peer_address) {
     if (hash_policy) {
-      hash_ = hash_policy->generateHash(address.get());
+      hash_ = hash_policy->generateHash(peer_address);
     }
   }
-  ~UdpLoadBalancerContext() override = default;
 
   absl::optional<uint64_t> computeHashKey() override { return hash_; }
 

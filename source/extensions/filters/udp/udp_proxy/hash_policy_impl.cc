@@ -10,7 +10,7 @@ namespace UdpProxy {
 class SourceIpHashMethod : public HashPolicyImpl::HashMethod {
 public:
   absl::optional<uint64_t>
-  evaluate(const Network::Address::Instance* downstream_addr) const override {
+  evaluate(const Network::Address::InstanceConstSharedPtr& downstream_addr) const override {
     if (downstream_addr && downstream_addr->ip()) {
       ASSERT(!downstream_addr->ip()->addressAsString().empty());
       return HashUtil::xxHash64(downstream_addr->ip()->addressAsString());
@@ -33,7 +33,7 @@ HashPolicyImpl::HashPolicyImpl(
 }
 
 absl::optional<uint64_t>
-HashPolicyImpl::generateHash(const Network::Address::Instance* downstream_addr) const {
+HashPolicyImpl::generateHash(const Network::Address::InstanceConstSharedPtr& downstream_addr) const {
   return hash_impl_->evaluate(downstream_addr);
 }
 

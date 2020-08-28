@@ -16,10 +16,10 @@ public:
   /**
    * @param downstream_address is the address of the peer client.
    * @return absl::optional<uint64_t> an optional hash value to route on. A hash value might not be
-   * returned if for example the downstream address is nullptr.
+   * returned if for example the downstream address has a nullptr.
    */
   virtual absl::optional<uint64_t>
-  generateHash(const Network::Address::Instance* downstream_address) const PURE;
+  generateHash(const Network::Address::InstanceConstSharedPtr& downstream_address) const PURE;
 };
 } // namespace Udp
 } // namespace Envoy
