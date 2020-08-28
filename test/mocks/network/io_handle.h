@@ -19,7 +19,7 @@ public:
     return Event::FileEventPtr{createFileEvent_(dispatcher, cb, trigger, events)};
   }
 
-  MOCK_METHOD(os_fd_t, fd, (), (const));
+  MOCK_METHOD(os_fd_t, fdDoNotUse, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, readv,

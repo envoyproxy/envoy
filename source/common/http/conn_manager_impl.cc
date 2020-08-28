@@ -1213,14 +1213,26 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
                                                   connection_manager_.config_,
                                                   connection_manager_.config_.via());
 
+  bool drain_connection_due_to_overload = false;
+  if (connection_manager_.drain_state_ == DrainState::NotDraining &&
+      connection_manager_.overload_disable_keepalive_ref_.isSaturated()) {
+    ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
+    if (connection_manager_.codec_->protocol() < Protocol::Http2 ||
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2")) {
+      drain_connection_due_to_overload = true;
+    }
+    connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
+  }
+
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
   // header block.
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
-      connection_manager_.drain_close_.drainClose()) {
+      (connection_manager_.drain_close_.drainClose() || drain_connection_due_to_overload)) {
 
     // This doesn't really do anything for HTTP/1.1 other then give the connection another boost
-    // of time to race with incoming requests. It mainly just keeps the logic the same between
-    // HTTP/1.1 and HTTP/2.
+    // of time to race with incoming requests. For HTTP/2 connections, send a GOAWAY frame to
+    // prevent any new streams.
     connection_manager_.startDrainSequence();
     connection_manager_.stats_.named_.downstream_cx_drain_close_.inc();
     ENVOY_STREAM_LOG(debug, "drain closing connection", *this);
@@ -1242,13 +1254,6 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   if (connection_manager_.drain_state_ == DrainState::NotDraining && state_.saw_connection_close_) {
     ENVOY_STREAM_LOG(debug, "closing connection due to connection close header", *this);
     connection_manager_.drain_state_ = DrainState::Closing;
-  }
-
-  if (connection_manager_.drain_state_ == DrainState::NotDraining &&
-      connection_manager_.overload_disable_keepalive_ref_.isSaturated()) {
-    ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
-    connection_manager_.drain_state_ = DrainState::Closing;
-    connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
   }
 
   // If we are destroying a stream before remote is complete and the connection does not support

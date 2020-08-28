@@ -444,7 +444,7 @@ public:
   RecordGuardDogAction(std::vector<std::string>& events) : events_(events) {}
 
   void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
-           std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs,
+           const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs,
            MonotonicTime /*now*/) override {
     std::string event_string =
         envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent_Name(event);
@@ -470,7 +470,7 @@ public:
   AssertGuardDogAction() = default;
 
   void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent /*event*/,
-           std::vector<std::pair<Thread::ThreadId, MonotonicTime>> /*thread_ltt_pairs*/,
+           const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& /*thread_ltt_pairs*/,
            MonotonicTime /*now*/) override {
     RELEASE_ASSERT(false, "ASSERT_GUARDDOG_ACTION");
   }

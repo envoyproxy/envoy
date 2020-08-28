@@ -31,7 +31,6 @@ echo "building for ${ENVOY_BUILD_ARCH}"
 function collect_build_profile() {
   declare -g build_profile_count=${build_profile_count:-1}
   mv -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" || true
-  mv -f ${BUILD_DIR}/build_event.json "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.build_event.json" || true
   ((build_profile_count++))
 }
 

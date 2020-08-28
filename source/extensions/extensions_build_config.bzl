@@ -196,14 +196,17 @@ EXTENSIONS = {
     #
     # Http Upstreams (excepting envoy.upstreams.http.generic which is hard-coded into the build so not registered here)
     #
-
     "envoy.upstreams.http.http":                        "//source/extensions/upstreams/http/http:config",
     "envoy.upstreams.http.tcp":                         "//source/extensions/upstreams/http/tcp:config",
 
+    #
+    # Watchdog actions
+    #
+    "envoy.watchdog.profile_action":                    "//source/extensions/watchdog/profile_action:config",
+
 }
 
-# This can be used to extend the visibility rules for Envoy extensions
-# (//:extension_config and //:extension_library in //BUILD)
-# if downstream Envoy builds need to directly reference envoy extensions.
-ADDITIONAL_VISIBILITY = [
-]
+# These can be changed to ["//visibility:public"], for  downstream builds which
+# need to directly reference Envoy extensions.
+EXTENSION_CONFIG_VISIBILITY = ["//:extension_config"]
+EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library"]
