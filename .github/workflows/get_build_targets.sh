@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 # This limits the directory that bazel query is going to search under.
 readonly SEARCH_FOLDER="//source/common/..."
 
