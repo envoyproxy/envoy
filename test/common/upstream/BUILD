@@ -577,8 +577,11 @@ envoy_cc_test(
 )
 
 
-#envoy_cc_fuzz_test(
-#    name = "health_check_fuzz_test",
-#    srcs = ["health_check_fuzz_test.cc"],
-#    corpus = ["//test/common/upstream:health_check_corpus"],
-#)
+envoy_cc_fuzz_test(
+    name = "health_check_fuzz_test",
+    srcs = ["health_check_fuzz_test.cc"],
+    corpus = ["//test/common/upstream:health_check_corpus"],
+    deps = [
+        ":utility_lib",
+    ],
+)

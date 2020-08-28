@@ -2,13 +2,38 @@ syntax = "proto3";
 
 package test.common.upstream;
 
+#NOTE TO SELF, SINCE THE TEST CLASS ALREADY HANDLES CONFIG WILL ALL THE OPTIONS
+
+message Respond {
+    string code = 1;
+    boolean conn_close = 2;
+    boolean proxy_close = 3;
+    #body
+    #trailers
+    service_cluster = 6;
+    boolean degraded = 7;
+}
 
 message Action {
-    oneof action_selector
+    oneof action_selector {
+        Respond respond;
+    }
+}
+
+message HTTP { #THESE ARE UNIQUE TO HTTP
+    string host = 1;
+    string path = 2;
+}
+
+message Type {
+    oneof health_check_type {
+        HTTP = 1;
+    }
 }
 
 message Config {
-    
+    Type type;
+    google.protobuf.duration timeout = 1; //validate rules etc.
 }
 
 message HealthCheckTestCase {
