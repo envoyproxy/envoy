@@ -209,6 +209,25 @@ private:
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(ResponseTrailerMap& trailers) override;
     void encodeMetadata(MetadataMapVector& metadata) override;
+    void setRequestTrailers(Http::RequestTrailerMapPtr&& request_trailers) override {
+      ASSERT(!request_trailers_);
+      request_trailers_ = std::move(request_trailers);
+    }
+    void setContinueHeaders(Http::ResponseHeaderMapPtr&& continue_headers) override {
+      continue_headers_ = std::move(continue_headers);
+    }
+    void setResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers) override {
+      response_headers_ = std::move(response_headers);
+    }
+    void setResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers) override {
+      response_trailers_ = std::move(response_trailers);
+    }
+    Http::RequestHeaderMap* requestHeaders() override { return request_headers_.get(); }
+    Http::RequestTrailerMap* requestTrailers() override { return request_trailers_.get(); }
+    Http::ResponseHeaderMap* continueHeaders() override { return continue_headers_.get(); }
+    Http::ResponseHeaderMap* responseHeaders() override { return response_headers_.get(); }
+    Http::ResponseTrailerMap* responseTrailers() override { return response_trailers_.get(); }
+
     void endStream() override {
       ASSERT(!state_.codec_saw_local_complete_);
       state_.codec_saw_local_complete_ = true;
@@ -225,8 +244,7 @@ private:
     }
     void disarmRequestTimeout() override;
     void resetIdleTimer() override;
-    void recreateStream(RequestHeaderMapPtr&& request_headers,
-                        StreamInfo::FilterStateSharedPtr filter_state) override;
+    void recreateStream(StreamInfo::FilterStateSharedPtr filter_state) override;
     void resetStream() override;
     const Router::RouteEntry::UpgradeMap* upgradeMap() override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
@@ -301,6 +319,14 @@ private:
     // both locations, then refer to the FM when doing stream logs.
     const uint64_t stream_id_;
     FilterManager filter_manager_;
+
+    RequestHeaderMapPtr request_headers_;
+    RequestTrailerMapPtr request_trailers_;
+
+    ResponseHeaderMapPtr continue_headers_;
+    ResponseHeaderMapPtr response_headers_;
+    ResponseTrailerMapPtr response_trailers_;
+
     Router::ConfigConstSharedPtr snapped_route_config_;
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     Tracing::SpanPtr active_span_;
