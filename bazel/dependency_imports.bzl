@@ -54,5 +54,6 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     )
 
     config_validation_pip_install()
+    configs_pip_install()
     protodoc_pip_install()
     headersplit_pip_install()
