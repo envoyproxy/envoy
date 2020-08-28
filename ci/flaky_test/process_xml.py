@@ -47,7 +47,8 @@ def parseXML(file, visited):
             visited.add((testcase.attrib['name'], testsuite.attrib['name']))
   return ret
 
-# The following function links the filepath of 'test.xml' (the result for the last attempt) with 
+
+# The following function links the filepath of 'test.xml' (the result for the last attempt) with
 # that of its 'attmpt_n.xml' file and stores it in a dictionary for easy lookup.
 def processFindOutput(f, problematic_tests):
   for line in f:
