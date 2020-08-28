@@ -41,7 +41,7 @@ message GrpcService {
     // Note that this authority does not override the SNI. The SNI is provided by the transport socket of the cluster.
     string authority = 2
         [(validate.rules).string =
-             {min_bytes: 0 max_len: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}];
+             {min_len: 0 max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}];
   }
 
   // [#next-free-field: 9]

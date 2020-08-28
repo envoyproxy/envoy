@@ -146,14 +146,6 @@ def checkFileExpectingOK(filename):
   return status + fixFileExpectingNoChange(filename)
 
 
-def checkPGVStringValidation(filename):
-  command, status, stdout = runCheckFormat("check", getInputFile(filename))
-  if status != 0:
-    logging.error("Proto validation Error in file: %s. status=%d, output:\n"  % (filename, status))
-    emitStdoutAsError(stdout)
-  return status + fixFileExpectingNoChange(filename)
-
-
 def runChecks():
   errors = 0
 
@@ -257,8 +249,8 @@ def runChecks():
                                 "Don't use std::variant; use absl::variant instead")
   errors += checkUnfixableError(
       "throw.cc", "Don't introduce throws into exception-free files, use error statuses instead.")
+  errors += checkUnfixableError("pgv_string.proto", "Proto validation Error in file, use min_len instead")
   errors += checkFileExpectingOK("commented_throw.cc")
-  errors += checkPGVStringValidation("pgv_string.proto")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",
