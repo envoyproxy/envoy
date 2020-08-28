@@ -130,7 +130,6 @@ def envoy_cc_fuzz_test(
                 repository + "//test/fuzz:main",
             ],
         }),
-        tags = ["fuzz_target"] + tags,
         testonly = True,
     )
 
@@ -161,6 +160,15 @@ def envoy_cc_fuzz_test(
         srcs = ["//bazel:fuzzing_test.sh"],
         data = [name + "_run"],
         args = ["$(locations %s)" % (name + "_run")],
+    )
+
+    # Target for fuzzing coverage test
+    native.sh_test(
+        name = name + "_coverage",
+        srcs = ["//bazel:fuzzing_coverage_test.sh"],
+        data = [name + "_binary"],
+        args = ["$(locations %s)" % (name + "_binary")],
+        tags = ["fuzz_target"] + tags,
     )
 
     # This target exists only for
