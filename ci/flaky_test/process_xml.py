@@ -47,8 +47,9 @@ def parseXML(file, visited):
             visited.add((testcase.attrib['name'], testsuite.attrib['name']))
   return ret
 
-
-def processFindOutput(f, problematic_files):
+# The following function links the filepath of 'test.xml' (the result for the last attempt) with 
+# that of its 'attmpt_n.xml' file and stores it in a dictionary for easy lookup.
+def processFindOutput(f, problematic_tests):
   for line in f:
     lineList = line.split('/')
     filepath = ""
@@ -57,7 +58,7 @@ def processFindOutput(f, problematic_files):
         break
       filepath += lineList[i] + "/"
     filepath += "test.xml"
-    problematic_files[filepath] = line.strip('\n')
+    problematic_tests[filepath] = line.strip('\n')
 
 
 # Prints out helpful information on the run using Git.
@@ -109,23 +110,26 @@ if __name__ == "__main__":
   if f.closed:
     print("cannot open {}".format(os.environ['TMP_OUTPUT_PROCESS_XML']))
 
-  problematic_files = {}
-  processFindOutput(f, problematic_files)
+  # All output of find command should be either failed or flaky tests, as only then will
+  # a test be rerun and have an 'attempt_n.xml' file. problematic_tests holds a lookup
+  # table between the last_attempt xml filepath and the failed previous attempt filepath.
+  problematic_tests = {}
+  processFindOutput(f, problematic_tests)
+
+  # Needed to make sure no duplicate flaky tests are going to be reported.
   visited = set()
 
   # The logic here goes as follows: If there is a test suite that has run multiple times,
   # which produces attempt_*.xml files, it means that the end result of that test
   # is either flaky or failed. So if we find that the last run of the test succeeds
   # we know for sure that this is a flaky test.
-  for k in problematic_files.keys():
+  for k in problematic_tests.keys():
     if checkTestStatus(k):
       has_flaky_test = True
-      output_msg += parseXML(problematic_files[k], visited)
-
+      output_msg += parseXML(problematic_tests[k], visited)
   output_msg += "``` \n"
-  print(output_msg)
+
   if has_flaky_test:
-    print(output_msg)
     if os.getenv("SLACK_TOKEN"):
       SLACKTOKEN = os.environ["SLACK_TOKEN"]
       client = slack.WebClient(SLACKTOKEN)
