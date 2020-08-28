@@ -76,18 +76,12 @@ struct HandshakerCapabilities {
   // itself.
   bool handles_session_resumption = false;
 
-  // Whether or not a handshaker implementation handles session tickets.
-  bool handles_session_tickets = false;
-
   // Whether or not a handshaker implementation provides its own list of ciphers
   // and curves.
   bool provides_ciphers_and_curves = false;
 
   // Whether or not a handshaker implementation handles ALPN selection.
   bool handles_alpn_selection = false;
-
-  // Whether or not a handshaker implementation sets a timeout.
-  bool sets_timeout = false;
 
   // Should return true if this handshaker is FIPS-compliant.
   // Envoy will fail to compile if this returns true and `--define=boringssl=fips`.

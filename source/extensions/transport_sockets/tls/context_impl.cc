@@ -1038,7 +1038,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     // If the handshaker handles session tickets natively, don't call
     // `SSL_CTX_set_tlsext_ticket_key_cb`.
     if (config.disableStatelessSessionResumption() ||
-        config.capabilities().handles_session_tickets) {
+        config.capabilities().handles_session_resumption) {
       SSL_CTX_set_options(ctx.ssl_ctx_.get(), SSL_OP_NO_TICKET);
     } else if (!session_ticket_keys_.empty()) {
       SSL_CTX_set_tlsext_ticket_key_cb(
@@ -1054,7 +1054,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
           });
     }
 
-    if (config.sessionTimeout() && !config.capabilities().sets_timeout) {
+    if (config.sessionTimeout() && !config.capabilities().handles_session_resumption) {
       auto timeout = config.sessionTimeout().value().count();
       SSL_CTX_set_timeout(ctx.ssl_ctx_.get(), uint32_t(timeout));
     }
