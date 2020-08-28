@@ -3132,6 +3132,29 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch
                             "the same matching rules defined as 'foo'");
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleMatchAllFilterChainsIsNotValid) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.filters.listener.tls_inspector"
+      typed_config: {}
+    filter_chains:
+    - name : foo
+      filter_chain_match:
+        match_all: true
+    - name: bar
+      filter_chain_match:
+        transport_protocol: "tls"
+        match_all: true
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), EnvoyException,
+      "error adding listener '127.0.0.1:1234': has more than 1 match all filter chain 'bar'");
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest,
        MultipleFilterChainsWithSameMatchPlusUnimplementedFields) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(

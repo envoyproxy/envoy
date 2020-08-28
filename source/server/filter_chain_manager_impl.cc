@@ -154,8 +154,18 @@ void FilterChainManagerImpl::addFilterChain(
                       MessageUtil>
       filter_chains;
   uint32_t new_filter_chain_size = 0;
+  bool see_match_all = false;
   for (const auto& filter_chain : filter_chain_span) {
     const auto& filter_chain_match = filter_chain->filter_chain_match();
+    if (filter_chain_match.match_all()) {
+      if (see_match_all) {
+        throw EnvoyException(
+            fmt::format("error adding listener '{}': has more than 1 match all filter chain '{}'",
+                        address_->asString(), filter_chain->name()));
+      } else {
+        see_match_all = true;
+      }
+    }
     if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
       throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' contains "
                                        "unimplemented fields",

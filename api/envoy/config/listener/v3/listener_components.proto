@@ -80,7 +80,7 @@ message Filter {
 // listed at the end, because that's how we want to list them in the docs.
 //
 // [#comment:TODO(PiotrSikora): Add support for configurable precedence of the rules]
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message FilterChainMatch {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.FilterChainMatch";
@@ -175,6 +175,12 @@ message FilterChainMatch {
   //   and matching on values other than ``h2`` is going to lead to a lot of false negatives,
   //   unless all connecting clients are known to use ALPN.
   repeated string application_protocols = 10;
+
+  // True if the owned filter chain is the back up filter chain. This filter chain is chosen
+  // when no other filter chain matches the incoming connection. All above criteria are ignored if true.
+  // Note that each listener has at most one back up filter chain.
+  // [#not-implemented-hide:]
+  bool match_all = 13;
 }
 
 // A filter chain wraps a set of match criteria, an option TLS context, a set of filters, and
