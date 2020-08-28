@@ -1,0 +1,4 @@
+multidict
+yarl
+wheel==0.35.1
+slackclient==2.8.0
