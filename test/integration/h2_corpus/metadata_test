@@ -33,3 +33,22 @@ events {
     }
   }
 }
+events {
+  downstream_send_event {
+    h2_frames {
+      metadata {
+        stream_index: 1
+        metadata {
+          metadata {
+              key: "connections"
+              value: "15"
+          }
+          metadata {
+            key: "Timeout Seconds"
+            value: "10"
+          }
+        }
+      }
+    }
+  }
+}
