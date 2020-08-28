@@ -7,6 +7,7 @@ load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependenci
 load("@upb//bazel:repository_defs.bzl", upb_bazel_version_repository = "bazel_version_repository")
 load("@config_validation_pip3//:requirements.bzl", config_validation_pip_install = "pip_install")
 load("@protodoc_pip3//:requirements.bzl", protodoc_pip_install = "pip_install")
+load("@headersplit_pip3//:requirements.bzl", headersplit_pip_install = "pip_install")
 load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@fuzzing_py_deps//:requirements.bzl", fuzzing_pip_install = "pip_install")
@@ -57,3 +58,4 @@ def envoy_dependency_imports(go_version = GO_VERSION):
 
     config_validation_pip_install()
     protodoc_pip_install()
+    headersplit_pip_install()

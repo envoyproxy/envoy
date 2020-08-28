@@ -17,6 +17,8 @@ def _python_deps():
     pip3_import(
         name = "fuzzing_py_deps",
         requirements = "@rules_fuzzing//fuzzing:requirements.txt",
+        name = "headersplit_pip3",
+        requirements = "@envoy//tools/envoy_headersplit:requirements.txt",
     )
 
 # Envoy deps that rely on a first stage of dependency loading in envoy_dependencies().
