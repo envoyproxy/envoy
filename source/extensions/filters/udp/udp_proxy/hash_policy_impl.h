@@ -17,7 +17,7 @@ using namespace envoy::extensions::filters::udp::udp_proxy::v3;
  */
 class HashPolicyImpl : public Udp::HashPolicy {
 public:
-  explicit HashPolicyImpl(const absl::Span<const UdpProxyConfig::HashPolicy* const>& hash_policy);
+  explicit HashPolicyImpl(const absl::Span<const UdpProxyConfig::HashPolicy* const>& hash_policies);
 
   // Udp::HashPolicy
   absl::optional<uint64_t>

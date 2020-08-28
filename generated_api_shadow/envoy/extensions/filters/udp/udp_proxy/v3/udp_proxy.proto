@@ -26,14 +26,11 @@ message UdpProxyConfig {
   // Specifies the udp hash policy.
   // The packets can be routed by hash policy.
   message HashPolicy {
-    // The source IP will be used to compute the hash used by hash-based load balancing algorithms.
-    message SourceIp {
-    }
-
     oneof policy_specifier {
       option (validate.required) = true;
 
-      SourceIp source_ip = 1;
+      // The source IP will be used to compute the hash used by hash-based load balancing algorithms.
+      bool source_ip = 1 [(validate.rules).bool = {const: true}];
     }
   }
 
@@ -67,8 +64,8 @@ message UdpProxyConfig {
   // If the platform does not support this option, Envoy will raise a configuration error.
   bool use_original_src_ip = 4;
 
-  // Optional configuration for UDP proxy hash policy. If hash_policy is not set, the hash-based
+  // Optional configuration for UDP proxy hash policies. If hash_policies is not set, the hash-based
   // load balancing algorithms will select a host randomly. Currently the number of hash policies is
   // limited to 1.
-  repeated HashPolicy hash_policy = 5 [(validate.rules).repeated = {max_items: 1}];
+  repeated HashPolicy hash_policies = 5 [(validate.rules).repeated = {max_items: 1}];
 }

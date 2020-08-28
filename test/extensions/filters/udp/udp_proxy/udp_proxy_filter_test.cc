@@ -703,11 +703,26 @@ TEST_F(UdpProxyFilterTest, HashPolicyWithSourceIp) {
   setup(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-hash_policy:
-- source_ip: {}
+hash_policies:
+- source_ip: true
   )EOF");
 
   EXPECT_NE(nullptr, config_->hashPolicy());
+}
+
+// Make sure validation fails if source_ip is false.
+TEST_F(UdpProxyFilterTest, ValidateHashPolicyWithSourceIp) {
+  InSequence s;
+  auto config = R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+hash_policies:
+- source_ip: false
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(setup(config), EnvoyException,
+                          "caused by HashPolicyValidationError\\.SourceIp: \\[\"value must equal "
+                          "\" %!q\\(bool=true\\)\\]");
 }
 
 // Make sure hash policy is null if it is not mentioned.
@@ -729,8 +744,8 @@ TEST_F(UdpProxyFilterTest, HashWithSourceIp) {
   setup(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-hash_policy:
-- source_ip: {}
+hash_policies:
+- source_ip: true
   )EOF");
 
   auto host = createHost(upstream_address_);

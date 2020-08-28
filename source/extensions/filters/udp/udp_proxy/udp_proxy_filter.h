@@ -75,8 +75,8 @@ public:
           "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
           "is not running with the CAP_NET_ADMIN capability.");
     }
-    if (!config.hash_policy().empty()) {
-      hash_policy_ = std::make_unique<HashPolicyImpl>(config.hash_policy());
+    if (!config.hash_policies().empty()) {
+      hash_policy_ = std::make_unique<HashPolicyImpl>(config.hash_policies());
     }
   }
 
