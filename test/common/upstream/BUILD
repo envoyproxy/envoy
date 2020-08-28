@@ -144,8 +144,10 @@ envoy_benchmark_test(
 
 envoy_cc_test(
     name = "health_checker_impl_test",
-    srcs = ["health_checker_impl_test.cc",
-    "health_checker_impl_test.h"],
+    srcs = [
+        "health_checker_impl_test.cc",
+        "health_checker_impl_test.h",
+    ],
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
@@ -616,4 +618,3 @@ envoy_cc_test(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
-
