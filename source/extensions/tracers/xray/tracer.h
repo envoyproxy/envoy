@@ -35,8 +35,8 @@ public:
    * @param broker Facilitates communication with the X-Ray daemon.
    */
   Span(TimeSource& time_source, Random::RandomGenerator& random, DaemonBroker& broker)
-      : time_source_(time_source), random_(random), id_(Hex::uint64ToHex(random_.random())),
-        broker_(broker), sampled_(true) {}
+      : time_source_(time_source), random_(random), broker_(broker),
+        id_(Hex::uint64ToHex(random_.random())), sampled_(true) {}
 
   /**
    * Sets the Span's trace ID.
@@ -166,9 +166,11 @@ public:
                               Envoy::SystemTime start_time) override;
 
 private:
+  Envoy::TimeSource& time_source_;
+  Random::RandomGenerator& random_;
+  DaemonBroker& broker_;
   Envoy::SystemTime start_time_;
   std::string operation_name_;
-  Random::RandomGenerator& random_;
   std::string id_;
   std::string trace_id_;
   std::string parent_segment_id_;
@@ -178,8 +180,6 @@ private:
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_request_annotations_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_response_annotations_;
   absl::flat_hash_map<std::string, std::string> custom_annotations_;
-  Envoy::TimeSource& time_source_;
-  DaemonBroker& broker_;
   bool sampled_;
 };
 
