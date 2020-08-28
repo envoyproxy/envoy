@@ -18,9 +18,9 @@ namespace Watchdog {
 namespace AbortAction {
 namespace {
 #ifdef __linux__
-pid_t to_platform_tid(int64_t tid) { return static_cast<pid_t>(tid); }
+pid_t toPlatformTid(int64_t tid) { return static_cast<pid_t>(tid); }
 #elif defined(__APPLE__)
-uint64 to_platform_tid(int64_t tid) { return static_cast<uint64>(tid); }
+uint64 toPlatformTid(int64_t tid) { return static_cast<uint64>(tid); }
 #endif
 } // namespace
 
@@ -48,7 +48,7 @@ void AbortAction::run(
   // Assume POSIX-compatible system and signal to the thread.
   ENVOY_LOG_MISC(error, "AbortAction sending abort signal to thread with tid {}.", raw_tid);
 
-  if (kill(to_platform_tid(raw_tid), SIGABRT) == 0) {
+  if (kill(toPlatformTid(raw_tid), SIGABRT) == 0) {
     // Successfully sent signal, sleep for wait_duration.
     absl::SleepFor(absl::Milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config_, wait_duration, 0)));
   } else {
@@ -56,7 +56,7 @@ void AbortAction::run(
     ENVOY_LOG_MISC(error, "Failed to send signal to tid {}", raw_tid);
   }
 
-  // Abort from the action since the signaled thread hasn't yet crashed the proccess.
+  // Abort from the action since the signaled thread hasn't yet crashed the process.
   PANIC(
       fmt::format("Failed to kill thread with id {}, aborting from AbortAction instead.", raw_tid));
 #endif

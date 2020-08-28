@@ -5,8 +5,6 @@
 
 #include "common/protobuf/protobuf.h"
 
-#include "extensions/watchdog/well_known_names.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Watchdog {
@@ -14,7 +12,7 @@ namespace AbortAction {
 
 class AbortActionFactory : public Server::Configuration::GuardDogActionFactory {
 public:
-  AbortActionFactory() : name_(WatchdogActionNames::get().AbortAction){};
+  AbortActionFactory() : name_("envoy.watchdog.abort_action") {}
 
   Server::Configuration::GuardDogActionPtr createGuardDogActionFromProto(
       const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& config,

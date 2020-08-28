@@ -56,7 +56,7 @@ TEST_F(AbortActionTest, ShouldNotAbortIfNoTids) {
   const auto now = api_->timeSource().monotonicTime();
   const std::vector<std::pair<Thread::ThreadId, MonotonicTime>> tid_ltt_pairs = {};
 
-  // Should not signal or panic since there are no tids.
+  // Should not signal or panic since there are no TIDs.
   action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::KILL, tid_ltt_pairs, now);
 }
 
@@ -119,7 +119,7 @@ TEST_F(AbortActionTest, PanicsIfThreadDoesNotDie) {
       std::memset(&saction, 0, sizeof(saction));
       saction.sa_flags = SA_SIGINFO;
       saction.sa_sigaction = &handler;
-      sigaction(SIGABRT, &saction, NULL);
+      sigaction(SIGABRT, &saction, nullptr);
 
       // Signal to test thread that tid has been set.
       {

@@ -35,7 +35,6 @@ envoy_cc_extension(
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:message_validator_lib",
-        "//source/extensions/watchdog:well_known_names",
         "@envoy_api//envoy/extensions/watchdog/abort_action/v3alpha:pkg_cc_proto",
     ],
 )

@@ -1021,6 +1021,7 @@ setsockopt
 sig
 sigaction
 sigactions
+siginfo
 signalstack
 siloed
 sim
