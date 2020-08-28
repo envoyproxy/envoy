@@ -112,12 +112,29 @@ for how to update or override dependencies.
     consider uninstalling binutils.
 
     ### Windows
-    On Windows, you'll need to install several dependencies manually.
 
-    [python3](https://www.python.org/downloads/): Specifically, the Windows-native flavor. The POSIX flavor
-    available via MSYS2 will not work, nor will the Windows Store flavor. You need to add a symlink for `python3.exe` pointing to
-    the installed `python.exe` for Bazel rules which follow POSIX conventions. Be sure to add
-    `pip.exe` to the PATH and install the `wheel` package.
+    Follow all items below to configure the Windows build toolchain and prepare the build environment,
+    or just install Docker, Git, MSYS2 to use the Docker image (the same as used in the CI pipeline):
+    ```
+    ./ci/run_envoy_docker_windows.sh './ci/windows_ci_steps.sh'
+    ```
+
+    Install bazelisk in the PATH using the `bazel.exe` executable name as described above in the first section.
+
+    When building Envoy, Bazel creates very long path names. One way to work around these excessive path
+    lengths is to change the output base directory for bazel to a very short root path. The CI pipeline
+    for Windows uses `C:\_eb` as the bazel base path. This and other preferences should be set up by placing
+    the following bazelrc configuration line in a system `%ProgramData%\bazel.bazelrc` file or the individual
+    user's `%USERPROFILE%\.bazelrc` file (rather than including it on every bazel command line):
+    ```
+    startup --output_base=C:/_eb
+    ```
+
+    [python3](https://www.python.org/downloads/): Specifically, the Windows-native flavor distributed
+    by python.org. The POSIX flavor available via MSYS2, the Windows Store flavor and other distributions
+    will not work. Add a symlink for `python3.exe` pointing to the installed `python.exe` for Envoy scripts
+    and Bazel rules which follow POSIX python conventions. Add `pip.exe` to the PATH and install the `wheel`
+    package.
     ```
     mklink %USERPROFILE%\Python38\python3.exe %USERPROFILE%\Python38\python.exe
     set PATH=%PATH%;%USERPROFILE%\Python38
@@ -127,19 +144,20 @@ for how to update or override dependencies.
 
     [Build Tools for Visual Studio 2019](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019):
     For building with MSVC (the `msvc-cl` config option), you must install at least the VC++ workload.
-    You may also download Visual Studio 2019 and use the Build Tools packaged with that
-    installation. Earlier versions of VC++ Build Tools/Visual Studio are not recommended at this
-    time. If installed in a non-standard filesystem location, be sure to set the `BAZEL_VC`
-    environment variable to the path of the VC++ package to allow Bazel to find your installation
-    of VC++. Use caution to ensure the `link.exe` that resolves on your PATH is from VC++ Build Tools and
-    not MSYS2.
+    You may alternately install the entire Visual Studio 2019 and use the Build Tools installed in that
+    package. Earlier versions of VC++ Build Tools/Visual Studio are not recommended or supported.
+    If installed in a non-standard filesystem location, be sure to set the `BAZEL_VC` environment variable
+    to the path of the VC++ package to allow Bazel to find your installation of VC++. NOTE: ensure that
+    the `link.exe` that resolves on your PATH is from VC++ Build Tools and not `/usr/bin/link.exe` from MSYS2.
     ```
     set BAZEL_VC=%USERPROFILE%\VSBT2019\VC
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\VC\Tools\MSVC\14.26.28801\bin\Hostx64\x64
     ```
 
     Ensure `CMake` and `ninja` binaries are on the PATH. The versions packaged with VC++ Build
-    Tools are sufficient.
+    Tools are sufficient in most cases, but are 32 bit binaries. These flavors will not run in
+    the project's GCP CI remote build environment, so 64 bit builds from the CMake and ninja
+    projects are used instead.
     ```
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja
@@ -154,24 +172,27 @@ for how to update or override dependencies.
     set BAZEL_SH=%USERPROFILE%\msys64\usr\bin\bash.exe
     set MSYS2_ARG_CONV_EXCL=*
     ```
-    In addition, because of the behavior of the `rules_foreign_cc` component of Bazel, set the
-    `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
-    `C:\Windows\TEMP`). This variable is used frequently by `mktemp` from MSYS2 in the Envoy Bazel
-    build and can cause problems if not set to a value outside the MSYS2 filesystem. Note that
-    using the `ci/windows_ci_steps.sh` script (to build and run tests) will create a directory
-    symlink linking `C:\c` to `C:\` in order to enable build scripts run via MSYS2 to access
-    dependencies in the temporary directory specified above. If you are not using that script, you
-    will need to create that symlink manually.
+
+    Set the `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
+    `C:\Windows\TEMP`), and create a directory symlink `C:\c` to `C:\`, so that the MSYS2
+    path `/c/Windows/TEMP` is equivilant to the Windows path `C:\Windows\TEMP`:
     ```
     set TMPDIR=C:\Windows\TEMP
     mklink /d C:\c C:\
     ```
+
+    The TMPDIR path and MSYS2 `mktemp` command are used frequently by the `rules_foreign_cc`
+    component of Bazel as well as Envoy's test scripts, causing problems if not set to a path
+    accessible to both Windows and msys commands. [Note the `ci/windows_ci_steps.sh` script
+    which builds envoy and run tests in CI) creates this symlink automatically.]
+
     In the MSYS2 shell, install additional packages via pacman:
     ```
     pacman -S diffutils patch unzip zip
     ```
 
-    [Git](https://git-scm.com/downloads): The version installable via MSYS2 is also sufficient.
+    [Git](https://git-scm.com/downloads): This version from the Git project, or the version
+    distributed using pacman under MSYS2 will both work, ensure one is on the PATH:.
     ```
     set PATH=%PATH%;%USERPROFILE%\Git\bin
     ```
