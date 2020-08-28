@@ -24,7 +24,6 @@ jobs:
     - name: Get build targets
       run: |
        . .github/workflows/get_build_targets.sh
-       echo $BUILD_TARGETS_LOCAL
        echo ::set-env name=BUILD_TARGETS::$(echo $BUILD_TARGETS_LOCAL)
     # If this run was triggered by a pull request event, then checkout
     # the head of the pull request instead of the merge commit.
@@ -50,8 +49,7 @@ jobs:
 
     - name: Build
       run: 
-       echo "Building targets..."
-       echo $BUILD_TARGETS
+       echo -e "Building targets...\n$BUILD_TARGETS";
        bazel/setup_clang.sh bin/clang10
        bazelisk shutdown
        bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ $BUILD_TARGETS
