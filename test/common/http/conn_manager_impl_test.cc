@@ -2133,8 +2133,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
 
 class StreamErrorOnInvalidHttpMessageTest : public HttpConnectionManagerImplTest {
 public:
-  void sendInvalidRequestAndVerifyConnectionState(bool codec_stream_error,
-                                                  bool is_connection_terminated) {
+  void sendInvalidRequestAndVerifyConnectionState(bool stream_error_on_invalid_http_message) {
     setup(false, "");
 
     EXPECT_CALL(*codec_, dispatch(_))
@@ -2159,14 +2158,14 @@ public:
 
     // codec stream error
     EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
-        .WillOnce(Return(codec_stream_error));
+        .WillOnce(Return(stream_error_on_invalid_http_message));
     EXPECT_CALL(*filter, encodeHeaders(_, true));
     EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
         .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
           EXPECT_EQ("400", headers.getStatusValue());
           EXPECT_EQ("missing_host_header",
                     filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
-          if (is_connection_terminated) {
+          if (!stream_error_on_invalid_http_message) {
             EXPECT_NE(nullptr, headers.Connection());
             EXPECT_EQ("close", headers.getConnectionValue());
           } else {

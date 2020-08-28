@@ -416,7 +416,6 @@ Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions&
 
 Http1Settings
 Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
-                            bool hcm_stream_error_set,
                             const Protobuf::BoolValue& hcm_stream_error) {
   Http1Settings ret = parseHttp1Settings(config);
 
@@ -425,8 +424,8 @@ Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions&
     // stream_error_on_invalid_http_message
     ret.stream_error_on_invalid_http_message_ =
         config.override_stream_error_on_invalid_http_message().value();
-  } else if (hcm_stream_error_set) {
-    // HCM, if set, overrides override_stream_error_on_invalid_http_message
+  } else {
+    // fallback to HCM value
     ret.stream_error_on_invalid_http_message_ = hcm_stream_error.value();
   }
 
