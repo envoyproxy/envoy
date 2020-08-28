@@ -1,6 +1,12 @@
 #include <vector>
+
 #include "common/upstream/health_checker_impl.h"
-#include "test/mocks/upstream/mocks.h"
+
+#include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/mocks/upstream/health_check_event_logger.h"
+#include "test/mocks/common.h"
+#include "test/mocks/http/mocks.h"
+#include "test/mocks/network/mocks.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -31,7 +37,6 @@ public:
 
   Http::CodecClient::Type codecClientType() { return codec_client_type_; }
 };
-
 
 class HttpHealthCheckerImplTest : public testing::Test, public HealthCheckerTestBase {
 public:
@@ -119,6 +124,6 @@ public:
   const HostWithHealthCheckMap health_checker_map_{};
 };
 
-} //namespace
-} //namespace Upstream
-} //namespace Envoy
+} // namespace
+} // namespace Upstream
+} // namespace Envoy

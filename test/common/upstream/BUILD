@@ -145,7 +145,7 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "health_checker_impl_test",
     srcs = ["health_checker_impl_test.cc",
-            "health_checker_impl_test.h"],
+    "health_checker_impl_test.h"],
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
@@ -169,7 +169,6 @@ envoy_cc_test(
         "//test/mocks/upstream:health_check_event_logger_mocks",
         "//test/mocks/upstream:host_set_mocks",
         "//test/mocks/upstream:transport_socket_match_mocks",
-        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
