@@ -1,0 +1,179 @@
+# Adding a sandbox example
+
+## Add a `verify.sh` test to your sandbox
+
+Sandboxes are tested as part of the continous integration process, which expects
+each sandbox to have a `verify.sh` script containing tests for the example.
+
+### Basic layout of the `verify.sh` script
+
+At a minimum the verify.sh script should include the necessary parts to start
+and stop your sandbox.
+
+Given a sandbox with single a single `docker` composition, adding the following
+to `verify.sh` will ensure the sandbox can be started and stopped.
+
+```
+#!/bin/bash -e
+
+export NAME=example-sandbox
+
+# shellcheck source=examples/verify-common.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
+
+# add example tests here...
+
+```
+
+The `$NAME` variable is used for logging when testing the example, and will
+often be the same as the directory name.
+
+### Log before running each test
+
+There is a utility function `run_log` that can be used to indicate in test logs what
+is being executed and why, for example:
+
+```
+run_log "Checking foo.txt was created"
+ls foo.txt
+
+run_log "Checking bar.txt was created"
+ls bar.txt
+```
+
+### Add tests reflecting the documented examples
+
+The tests should follow the steps laid out in the documentation.
+
+For example, if the documentation provides a series of `bash` commands to execute, add these in order to `verify.sh`.
+
+You may wish to grep the response, or check the return code to ensure the command responds as expected.
+
+Likewise, if the documentation asks the user to browse to a page - eg http://localhost:8000 - then you should add a test
+to ensure that the given url responds as expected.
+
+If an example web page is also expected to make further javascript http requests to function, then add tests for requests
+that mimick this interaction.
+
+A number of utility functions have been added to simplify browser testing.
+
+#### Utility functions: `responds_with`
+
+This can be called to ensure that the given url returns with expected http content:
+
+It follows the form `responds_with <expected_content> <url> <curl args>`
+
+An simple example `GET` request:
+
+```
+responds_with \
+    "Hello, world" \
+	http://localhost:8000
+```
+
+An example of a `POST` request that expects "Hello, postie" in the returned html,
+and also sets the headers and uses `https`:
+
+```
+responds_with \
+    "Hello, postie" \
+	https://localhost:8000/some-endpoint \
+	-k \
+	-X POST \
+	-d 'data=hello,rcpt=service' \
+    -H 'Origin: https://example-service.com'
+```
+
+#### Utility functions: `responds_with_header`
+
+You can check that a request responds with an expected header as follows:
+
+```
+responds_with_header \
+    "HTTP/1.1 403 Forbidden" \
+	"http://localhost:8000/?name=notdown"
+```
+
+`responds_with_header` can accept additional curl arguments like  `responds_with`
+
+#### Utility functions: `responds_without_header`
+
+You can aslo check that a request *does not* respond with a given header:
+
+```
+responds_without_header \
+    "X-Secret: treasure" \
+	"http://localhost:8000"
+```
+
+`responds_without_header` can accept additional curl arguments like  `responds_with`
+
+### Slow starting `docker` compositions
+
+Unless your example provides a way for ensuring that all containers are healthy by
+the time `docker-compose up -d` returns you may need to add a `DELAY` before running
+the steps in your `verify.sh`
+
+For example, to wait 10 seconds after `docker-compose` has been called set the following:
+
+```
+#!/bin/bash -e
+
+export NAME=example-sandbox
+export DELAY=10
+
+# shellcheck source=examples/verify-common.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
+
+# add example tests here...
+```
+
+### Examples with multiple `docker` compositions
+
+For your example to work it may need more than one `docker` composition to be run.
+
+You can set where to find the `docker-compose.yml` files with the `PATHS` argument.
+
+By default `PATHS=.`, but you can change this to a comma-separated list of paths.
+
+For example a sandbox containing `frontend/docker-compose.yml` and `backend/docker-compose.yml`,
+might use a `verify.sh` with:
+
+```
+#!/bin/bash -e
+
+export NAME=example-sandbox
+export PATHS=frontend,backend
+
+# shellcheck source=examples/verify-common.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
+
+# add example tests here...
+```
+
+### Bringing stacks up manually
+
+You may need to bring up the stack manually, in order to run some steps beforehand.
+
+Sourcing `verify-common.sh` will always leave you in the sandbox directory, and from there
+you can use the `bring_up_stack` function.
+
+For example:
+
+```
+#!/bin/bash -e
+
+export NAME=example-sandbox
+export MANUAL=true
+
+# shellcheck source=examples/verify-common.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
+
+echo foo > bar.txt
+
+bring_up_example
+
+# add example tests here...
+```
+
+If your sandbox has multiple paths, `bring_up_example` will bring all up
