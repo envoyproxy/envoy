@@ -318,7 +318,6 @@ private:
     // TODO(snowp): It might make sense to move this to the FilterManager to avoid storing it in
     // both locations, then refer to the FM when doing stream logs.
     const uint64_t stream_id_;
-    FilterManager filter_manager_;
 
     RequestHeaderMapPtr request_headers_;
     RequestTrailerMapPtr request_trailers_;
@@ -326,6 +325,9 @@ private:
     ResponseHeaderMapPtr continue_headers_;
     ResponseHeaderMapPtr response_headers_;
     ResponseTrailerMapPtr response_trailers_;
+
+    // Note: The FM must outlive the above headers, as they are possibly accessed during filter destruction.
+    FilterManager filter_manager_;
 
     Router::ConfigConstSharedPtr snapped_route_config_;
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
