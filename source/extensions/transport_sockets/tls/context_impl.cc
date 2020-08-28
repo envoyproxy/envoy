@@ -272,7 +272,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   for (auto& ctx : tls_contexts_) {
-    if (verify_mode != SSL_VERIFY_NONE && !capabilities_.verifies_certificates) {
+    if (verify_mode != SSL_VERIFY_NONE && !capabilities_.verifies_peer_certificates) {
       SSL_CTX_set_verify(ctx.ssl_ctx_.get(), verify_mode, nullptr);
       SSL_CTX_set_cert_verify_callback(ctx.ssl_ctx_.get(), ContextImpl::verifyCallback, this);
     }
@@ -1018,7 +1018,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   }
 
   for (auto& ctx : tls_contexts_) {
-    if (!config.capabilities().verifies_certificates &&
+    if (!config.capabilities().verifies_peer_certificates &&
         config.certificateValidationContext() != nullptr &&
         !config.certificateValidationContext()->caCert().empty()) {
       ctx.addClientValidationContext(*config.certificateValidationContext(),

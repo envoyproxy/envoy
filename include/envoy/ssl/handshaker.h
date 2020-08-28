@@ -70,7 +70,7 @@ struct HandshakerCapabilities {
   bool provides_certificates = false;
 
   // Whether or not a handshaker implementation verifies certificates itself.
-  bool verifies_certificates = false;
+  bool verifies_peer_certificates = false;
 
   // Whether or not a handshaker implementation handles session resumption
   // itself.
