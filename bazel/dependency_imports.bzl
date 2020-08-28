@@ -7,7 +7,10 @@ load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependenci
 load("@upb//bazel:repository_defs.bzl", upb_bazel_version_repository = "bazel_version_repository")
 load("@config_validation_pip3//:requirements.bzl", config_validation_pip_install = "pip_install")
 load("@configs_pip3//:requirements.bzl", configs_pip_install = "pip_install")
+<<<<<<< HEAD
 load("@kafka_pip3//:requirements.bzl", kafka_pip_install = "pip_install")
+=======
+>>>>>>> upstream/master
 load("@protodoc_pip3//:requirements.bzl", protodoc_pip_install = "pip_install")
 load("@headersplit_pip3//:requirements.bzl", headersplit_pip_install = "pip_install")
 load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
@@ -56,6 +59,10 @@ def envoy_dependency_imports(go_version = GO_VERSION):
 
     config_validation_pip_install()
     configs_pip_install()
+<<<<<<< HEAD
+=======
+    protodoc_pip_install()
+>>>>>>> upstream/master
     headersplit_pip_install()
     kafka_pip_install()
     protodoc_pip_install()
