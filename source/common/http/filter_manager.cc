@@ -270,7 +270,7 @@ void ActiveStreamDecoderFilter::doTrailers() {
   parent_.decodeTrailers(this, *parent_.filter_manager_callbacks_.requestTrailers());
 }
 bool ActiveStreamDecoderFilter::hasTrailers() {
-  return parent_.filter_manager_callbacks_.requestTrailers() != nullptr;
+  return parent_.filter_manager_callbacks_.requestTrailers().has_value();
 }
 
 void ActiveStreamDecoderFilter::drainSavedRequestMetadata() {
@@ -496,7 +496,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
   }
 
   auto trailers_added_entry = decoder_filters_.end();
-  const bool trailers_exists_at_start = filter_manager_callbacks_.requestTrailers() != nullptr;
+  const bool trailers_exists_at_start = filter_manager_callbacks_.requestTrailers().has_value();
   // Filter iteration may start at the current filter.
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
       commonDecodePrefix(filter, filter_iteration_start_state);
@@ -739,7 +739,7 @@ void FilterManager::sendLocalReply(
 
   filter_manager_callbacks_.onLocalReply(code);
 
-  if (filter_manager_callbacks_.responseHeaders() == nullptr) {
+  if (!filter_manager_callbacks_.responseHeaders().has_value()) {
     // If the response has not started at all, send the response through the filter chain.
     sendLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
                                  grpc_status, details);
@@ -770,7 +770,7 @@ void FilterManager::sendLocalReplyViaFilterChain(
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   ENVOY_STREAM_LOG(debug, "Sending local reply with details {}", *this, details);
-  ASSERT(filter_manager_callbacks_.responseHeaders() == nullptr);
+  ASSERT(!filter_manager_callbacks_.responseHeaders().has_value());
   // For early error handling, do a best-effort attempt to create a filter chain
   // to ensure access logging. If the filter chain already exists this will be
   // a no-op.
@@ -782,14 +782,16 @@ void FilterManager::sendLocalReplyViaFilterChain(
           modify_headers,
           [this](ResponseHeaderMap& response_headers, Code& code, std::string& body,
                  absl::string_view& content_type) -> void {
-            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders(), response_headers,
-                                 stream_info_, code, body, content_type);
+            // TODO(snowp): This &get() business isn't nice, rework LocalReply and others to accept
+            // opt refs.
+            local_reply_.rewrite(&filter_manager_callbacks_.requestHeaders()->get(),
+                                 response_headers, stream_info_, code, body, content_type);
           },
           [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
             filter_manager_callbacks_.setResponseHeaders(std::move(headers));
             // TODO: Start encoding from the last decoder filter that saw the
             // request instead.
-            encodeHeaders(nullptr, *filter_manager_callbacks_.responseHeaders(), end_stream);
+            encodeHeaders(nullptr, filter_manager_callbacks_.responseHeaders()->get(), end_stream);
           },
           [this](Buffer::Instance& data, bool end_stream) -> void {
             // TODO: Start encoding from the last decoder filter that saw the
@@ -812,8 +814,10 @@ void FilterManager::sendDirectLocalReply(
           modify_headers,
           [&](ResponseHeaderMap& response_headers, Code& code, std::string& body,
               absl::string_view& content_type) -> void {
-            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders(), response_headers,
-                                 stream_info_, code, body, content_type);
+            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().has_value()
+                                     ? &filter_manager_callbacks_.requestHeaders()->get()
+                                     : nullptr,
+                                 response_headers, stream_info_, code, body, content_type);
           },
           [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
             // Move the response headers into the FilterManager to make sure they're visible to
@@ -830,8 +834,9 @@ void FilterManager::sendDirectLocalReply(
             maybeEndEncode(end_stream);
           }},
       Utility::LocalReplyData{
-          Grpc::Common::hasGrpcContentType(*filter_manager_callbacks_.requestHeaders()), code, body,
-          grpc_status, is_head_request});
+          filter_manager_callbacks_.requestHeaders().has_value() &&
+              Grpc::Common::hasGrpcContentType(filter_manager_callbacks_.requestHeaders()->get()),
+          code, body, grpc_status, is_head_request});
   maybeEndEncode(state_.local_complete_);
 }
 
@@ -1019,7 +1024,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
       commonEncodePrefix(filter, end_stream, filter_iteration_start_state);
   auto trailers_added_entry = encoder_filters_.end();
 
-  const bool trailers_exists_at_start = filter_manager_callbacks_.responseTrailers() != nullptr;
+  const bool trailers_exists_at_start = filter_manager_callbacks_.responseTrailers().has_value();
   for (; entry != encoder_filters_.end(); entry++) {
     // If the filter pointed by entry has stopped for all frame type, return now.
     if (handleDataIfStopAll(**entry, data, state_.encoder_filters_streaming_)) {
@@ -1172,11 +1177,11 @@ bool FilterManager::createFilterChain() {
   bool upgrade_rejected = false;
   const HeaderEntry* upgrade = nullptr;
   if (filter_manager_callbacks_.requestHeaders()) {
-    upgrade = filter_manager_callbacks_.requestHeaders()->Upgrade();
+    upgrade = filter_manager_callbacks_.requestHeaders()->get().Upgrade();
 
     // Treat CONNECT requests as a special upgrade case.
     if (!upgrade && HeaderUtility::isConnect(*filter_manager_callbacks_.requestHeaders())) {
-      upgrade = filter_manager_callbacks_.requestHeaders()->Method();
+      upgrade = filter_manager_callbacks_.requestHeaders()->get().Method();
     }
   }
 
@@ -1320,7 +1325,7 @@ void ActiveStreamEncoderFilter::doTrailers() {
   parent_.encodeTrailers(this, *parent_.filter_manager_callbacks_.responseTrailers());
 }
 bool ActiveStreamEncoderFilter::hasTrailers() {
-  return parent_.filter_manager_callbacks_.responseTrailers() != nullptr;
+  return parent_.filter_manager_callbacks_.responseTrailers().has_value();
 }
 void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool streaming) {
   return parent_.addEncodedData(*this, data, streaming);

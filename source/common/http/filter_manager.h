@@ -4,6 +4,7 @@
 #include "envoy/http/header_map.h"
 
 #include "common/buffer/watermark_buffer.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/grpc/common.h"
@@ -331,27 +332,27 @@ public:
   /**
    * The downstream request headers if set.
    */
-  virtual RequestHeaderMap* requestHeaders() PURE;
+  virtual RequestHeaderMapOptRef requestHeaders() PURE;
 
   /**
    * The downstream request trailers if present.
    */
-  virtual RequestTrailerMap* requestTrailers() PURE;
+  virtual RequestTrailerMapOptRef requestTrailers() PURE;
 
   /**
    * Retrieves a pointer to the continue headers set via setResponseHeaders.
    */
-  virtual ResponseHeaderMap* continueHeaders() PURE;
+  virtual ResponseHeaderMapOptRef continueHeaders() PURE;
 
   /**
    * Retrieves a pointer to the response headers set via setResponseHeaders.
    */
-  virtual ResponseHeaderMap* responseHeaders() PURE;
+  virtual ResponseHeaderMapOptRef responseHeaders() PURE;
 
   /**
    * Retrieves a pointer to the response trailers set via setResponseTrailers.
    */
-  virtual ResponseTrailerMap* responseTrailers() PURE;
+  virtual ResponseTrailerMapOptRef responseTrailers() PURE;
 
   /**
    * Called after encoding has completed.
@@ -486,9 +487,17 @@ public:
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
     for (const auto& log_handler : access_log_handlers_) {
-      log_handler->log(filter_manager_callbacks_.requestHeaders(),
-                       filter_manager_callbacks_.responseHeaders(),
-                       filter_manager_callbacks_.responseTrailers(), stream_info_);
+      // TODO(snowp): Make access logger accept opt const ref or move out to HCM.
+      log_handler->log(filter_manager_callbacks_.requestHeaders().has_value()
+                           ? &filter_manager_callbacks_.requestHeaders()->get()
+                           : nullptr,
+                       filter_manager_callbacks_.responseHeaders().has_value()
+                           ? &filter_manager_callbacks_.responseHeaders()->get()
+                           : nullptr,
+                       filter_manager_callbacks_.responseTrailers().has_value()
+                           ? &filter_manager_callbacks_.responseTrailers()->get()
+                           : nullptr,
+                       stream_info_);
     }
 
     ASSERT(state_.filter_call_state_ == 0);
@@ -501,10 +510,10 @@ public:
        << DUMP_MEMBER(state_.decoding_headers_only_) << DUMP_MEMBER(state_.encoding_headers_only_)
        << "\n";
 
-    DUMP_DETAILS(filter_manager_callbacks_.requestHeaders());
-    DUMP_DETAILS(filter_manager_callbacks_.requestTrailers());
-    DUMP_DETAILS(filter_manager_callbacks_.responseHeaders());
-    DUMP_DETAILS(filter_manager_callbacks_.responseTrailers());
+    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.requestHeaders());
+    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.requestTrailers());
+    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.responseHeaders());
+    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.responseTrailers());
     DUMP_DETAILS(&stream_info_);
   }
 
@@ -621,7 +630,7 @@ public:
 
   void requestHeadersInitialized() {
     if (Http::Headers::get().MethodValues.Head ==
-        filter_manager_callbacks_.requestHeaders()->getMethodValue()) {
+        filter_manager_callbacks_.requestHeaders()->get().getMethodValue()) {
       state_.is_head_request_ = true;
     }
   }

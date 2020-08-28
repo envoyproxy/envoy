@@ -5,6 +5,7 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -222,11 +223,23 @@ private:
     void setResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers) override {
       response_trailers_ = std::move(response_trailers);
     }
-    Http::RequestHeaderMap* requestHeaders() override { return request_headers_.get(); }
-    Http::RequestTrailerMap* requestTrailers() override { return request_trailers_.get(); }
-    Http::ResponseHeaderMap* continueHeaders() override { return continue_headers_.get(); }
-    Http::ResponseHeaderMap* responseHeaders() override { return response_headers_.get(); }
-    Http::ResponseTrailerMap* responseTrailers() override { return response_trailers_.get(); }
+
+    // TODO(snowp): Create shared OptRef/OptConstRef helpers
+    Http::RequestHeaderMapOptRef requestHeaders() override {
+      return request_headers_ ? std::make_optional(std::ref(*request_headers_)) : absl::nullopt;
+    }
+    Http::RequestTrailerMapOptRef requestTrailers() override {
+      return request_trailers_ ? std::make_optional(std::ref(*request_trailers_)) : absl::nullopt;
+    }
+    Http::ResponseHeaderMapOptRef continueHeaders() override {
+      return continue_headers_ ? std::make_optional(std::ref(*continue_headers_)) : absl::nullopt;
+    }
+    Http::ResponseHeaderMapOptRef responseHeaders() override {
+      return response_headers_ ? std::make_optional(std::ref(*response_headers_)) : absl::nullopt;
+    }
+    Http::ResponseTrailerMapOptRef responseTrailers() override {
+      return response_trailers_ ? std::make_optional(std::ref(*response_trailers_)) : absl::nullopt;
+    }
 
     void endStream() override {
       ASSERT(!state_.codec_saw_local_complete_);
@@ -264,8 +277,8 @@ private:
 
     void traceRequest();
 
-    // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is
-    // not found, snapped_route_config_ is set to Router::NullConfigImpl.
+    // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope
+    // is not found, snapped_route_config_ is set to Router::NullConfigImpl.
     void snapScopedRouteConfig();
 
     void refreshCachedRoute();
@@ -279,8 +292,8 @@ private:
           : codec_saw_local_complete_(false), saw_connection_close_(false),
             successful_upgrade_(false), is_internally_created_(false), decorated_propagate_(true) {}
 
-      bool codec_saw_local_complete_ : 1; // This indicates that local is complete as written all
-                                          // the way through to the codec.
+      bool codec_saw_local_complete_ : 1; // This indicates that local is complete as written
+                                          // all the way through to the codec.
       bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
 
@@ -384,8 +397,8 @@ private:
   enum class DrainState { NotDraining, Draining, Closing };
 
   ConnectionManagerConfig& config_;
-  ConnectionManagerStats& stats_; // We store a reference here to avoid an extra stats() call on the
-                                  // config in the hot path.
+  ConnectionManagerStats& stats_; // We store a reference here to avoid an extra stats() call on
+                                  // the config in the hot path.
   ServerConnectionPtr codec_;
   std::list<ActiveStreamPtr> streams_;
   Stats::TimespanPtr conn_length_;
@@ -406,8 +419,8 @@ private:
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   ConnectionManagerListenerStats& listener_stats_;
-  // References into the overload manager thread local state map. Using these lets us avoid a map
-  // lookup in the hot path of processing each request.
+  // References into the overload manager thread local state map. Using these lets us avoid a
+  // map lookup in the hot path of processing each request.
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;

@@ -610,9 +610,9 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   }
 
   if (active_span_) {
-    Tracing::HttpTracerUtility::finalizeDownstreamSpan(*active_span_, request_headers_.get(),
-                                                       response_trailers_.get(), response_trailers_.get(),
-                                                       filter_manager_.streamInfo(), *this);
+    Tracing::HttpTracerUtility::finalizeDownstreamSpan(
+        *active_span_, request_headers_.get(), response_headers_.get(), response_trailers_.get(),
+        filter_manager_.streamInfo(), *this);
   }
   if (state_.successful_upgrade_) {
     connection_manager_.stats_.named_.downstream_cx_upgrades_active_.dec();
@@ -631,7 +631,7 @@ void ConnectionManagerImpl::ActiveStream::resetIdleTimer() {
 void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   connection_manager_.stats_.named_.downstream_rq_idle_timeout_.inc();
   // If headers have not been sent to the user, send a 408.
-  if (responseHeaders() != nullptr &&
+  if (responseHeaders().has_value() &&
       !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_response_for_timeout")) {
     // TODO(htuch): We could send trailers here with an x-envoy timeout header
     // or gRPC status code, and/or set H2 RST_STREAM error.
@@ -641,8 +641,8 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   } else {
     // TODO(mattklein) this may result in multiple flags. This Ok?
     filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
-    sendLocalReply(requestHeaders() != nullptr &&
-                       Grpc::Common::isGrpcRequestHeaders(*requestHeaders()),
+    sendLocalReply(request_headers_ != nullptr &&
+                       Grpc::Common::isGrpcRequestHeaders(*request_headers_),
                    Http::Code::RequestTimeout, "stream timeout", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
   }
@@ -650,8 +650,8 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
 
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
-  sendLocalReply(requestHeaders() != nullptr &&
-                     Grpc::Common::isGrpcRequestHeaders(*requestHeaders()),
+  sendLocalReply(request_headers_ != nullptr &&
+                     Grpc::Common::isGrpcRequestHeaders(*request_headers_),
                  Http::Code::RequestTimeout, "request timeout", nullptr, absl::nullopt,
                  StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
 }
@@ -660,8 +660,8 @@ void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_response_for_timeout")) {
-    sendLocalReply(requestHeaders() != nullptr &&
-                       Grpc::Common::isGrpcRequestHeaders(*requestHeaders()),
+    sendLocalReply(request_headers_ != nullptr &&
+                       Grpc::Common::isGrpcRequestHeaders(*request_headers_),
                    Http::Code::RequestTimeout, "downstream duration timeout", nullptr,
                    absl::nullopt, StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
   } else {
@@ -746,7 +746,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
         upstream_host->cluster().requestResponseSizeStats();
     if (req_resp_stats.has_value()) {
-      req_resp_stats->get().upstream_rq_headers_size_.recordValue(requestHeaders()->byteSize());
+      req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
     }
   }
 
@@ -757,11 +757,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fixed_connection_close");
   if (fixed_connection_close) {
     state_.saw_connection_close_ =
-        HeaderUtility::shouldCloseConnection(protocol, *requestHeaders());
+        HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
   }
-  if (HeaderUtility::isConnect(*requestHeaders()) && !requestHeaders()->Path() &&
+  if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path() &&
       !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.stop_faking_paths")) {
-    requestHeaders()->setPath("/");
+    request_headers_->setPath("/");
   }
 
   // We need to snap snapped_route_config_ here as it's used in mutateRequestHeaders later.
@@ -778,7 +778,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   }
 
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
-                   *requestHeaders());
+                   *request_headers_);
 
   // We end the decode here only if the request is header only. If we convert the request to a
   // header only, the stream will be marked as done once a subsequent decodeData/decodeTrailers is
@@ -791,23 +791,23 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     // overload it is more important to avoid unnecessary allocation than to create the filters.
     filter_manager_.skipFilterChainCreation();
     connection_manager_.stats_.named_.downstream_rq_overload_close_.inc();
-    sendLocalReply(Grpc::Common::isGrpcRequestHeaders(*requestHeaders()),
+    sendLocalReply(Grpc::Common::isGrpcRequestHeaders(*request_headers_),
                    Http::Code::ServiceUnavailable, "envoy overloaded", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().Overload);
     return;
   }
 
-  if (!connection_manager_.config_.proxy100Continue() && requestHeaders()->Expect() &&
-      requestHeaders()->Expect()->value() == Headers::get().ExpectValues._100Continue.c_str()) {
+  if (!connection_manager_.config_.proxy100Continue() && request_headers_->Expect() &&
+      request_headers_->Expect()->value() == Headers::get().ExpectValues._100Continue.c_str()) {
     // Note in the case Envoy is handling 100-Continue complexity, it skips the filter chain
     // and sends the 100-Continue directly to the encoder.
     chargeStats(continueHeader());
     response_encoder_->encode100ContinueHeaders(continueHeader());
     // Remove the Expect header so it won't be handled again upstream.
-    requestHeaders()->removeExpect();
+    request_headers_->removeExpect();
   }
 
-  connection_manager_.user_agent_.initializeFromHeaders(*requestHeaders(),
+  connection_manager_.user_agent_.initializeFromHeaders(*request_headers_,
                                                         connection_manager_.stats_.prefixStatName(),
                                                         connection_manager_.stats_.scope_);
 
@@ -828,62 +828,62 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       // HTTP/1.0 defaults to single-use connections. Make sure the connection
       // will be closed unless Keep-Alive is present.
       state_.saw_connection_close_ = true;
-      if (absl::EqualsIgnoreCase(requestHeaders()->getConnectionValue(),
+      if (absl::EqualsIgnoreCase(request_headers_->getConnectionValue(),
                                  Http::Headers::get().ConnectionValues.KeepAlive)) {
         state_.saw_connection_close_ = false;
       }
     }
-    if (!requestHeaders()->Host() &&
+    if (!request_headers_->Host() &&
         !connection_manager_.config_.http1Settings().default_host_for_http_10_.empty()) {
       // Add a default host if configured to do so.
-      requestHeaders()->setHost(
+      request_headers_->setHost(
           connection_manager_.config_.http1Settings().default_host_for_http_10_);
     }
   }
 
-  if (!requestHeaders()->Host()) {
+  if (!request_headers_->Host()) {
     // Require host header. For HTTP/1.1 Host has already been translated to :authority.
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*requestHeaders()), Code::BadRequest, "",
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
                    nullptr, absl::nullopt, StreamInfo::ResponseCodeDetails::get().MissingHost);
     return;
   }
 
   // Verify header sanity checks which should have been performed by the codec.
-  ASSERT(HeaderUtility::requestHeadersValid(*requestHeaders()).has_value() == false);
+  ASSERT(HeaderUtility::requestHeadersValid(*request_headers_).has_value() == false);
 
   // Check for the existence of the :path header for non-CONNECT requests, or present-but-empty
   // :path header for CONNECT requests. We expect the codec to have broken the path into pieces if
   // applicable. NOTE: Currently the HTTP/1.1 codec only does this when the allow_absolute_url flag
   // is enabled on the HCM.
-  if ((!HeaderUtility::isConnect(*requestHeaders()) || requestHeaders()->Path()) &&
-      requestHeaders()->getPathValue().empty()) {
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*requestHeaders()), Code::NotFound, "", nullptr,
+  if ((!HeaderUtility::isConnect(*request_headers_) || request_headers_->Path()) &&
+      request_headers_->getPathValue().empty()) {
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
                    absl::nullopt, StreamInfo::ResponseCodeDetails::get().MissingPath);
     return;
   }
 
   // Currently we only support relative paths at the application layer.
-  if (!requestHeaders()->getPathValue().empty() && requestHeaders()->getPathValue()[0] != '/') {
+  if (!request_headers_->getPathValue().empty() && request_headers_->getPathValue()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*requestHeaders()), Code::NotFound, "", nullptr,
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
                    absl::nullopt, StreamInfo::ResponseCodeDetails::get().AbsolutePath);
     return;
   }
 
   // Path sanitization should happen before any path access other than the above sanity check.
-  if (!ConnectionManagerUtility::maybeNormalizePath(*requestHeaders(),
+  if (!ConnectionManagerUtility::maybeNormalizePath(*request_headers_,
                                                     connection_manager_.config_)) {
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*requestHeaders()), Code::BadRequest, "",
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
                    nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
     return;
   }
 
-  ConnectionManagerUtility::maybeNormalizeHost(*requestHeaders(), connection_manager_.config_,
+  ConnectionManagerUtility::maybeNormalizeHost(*request_headers_, connection_manager_.config_,
                                                localPort());
 
   if (!fixed_connection_close && protocol == Protocol::Http11 &&
-      absl::EqualsIgnoreCase(requestHeaders()->getConnectionValue(),
+      absl::EqualsIgnoreCase(request_headers_->getConnectionValue(),
                              Http::Headers::get().ConnectionValues.Close)) {
     state_.saw_connection_close_ = true;
   }
@@ -891,7 +891,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // since it is supported by http-parser the underlying parser for http
   // requests.
   if (!fixed_connection_close && protocol < Protocol::Http2 && !state_.saw_connection_close_ &&
-      absl::EqualsIgnoreCase(requestHeaders()->getProxyConnectionValue(),
+      absl::EqualsIgnoreCase(request_headers_->getProxyConnectionValue(),
                              Http::Headers::get().ConnectionValues.Close)) {
     state_.saw_connection_close_ = true;
   }
@@ -900,7 +900,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     // Modify the downstream remote address depending on configuration and headers.
     filter_manager_.streamInfo().setDownstreamRemoteAddress(
         ConnectionManagerUtility::mutateRequestHeaders(
-            *requestHeaders(), connection_manager_.read_callbacks_->connection(),
+            *request_headers_, connection_manager_.read_callbacks_->connection(),
             connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_));
   }
   ASSERT(filter_manager_.streamInfo().downstreamRemoteAddress() != nullptr);
@@ -910,11 +910,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   if (!state_.is_internally_created_) { // Only mutate tracing headers on first pass.
     ConnectionManagerUtility::mutateTracingRequestHeader(
-        *requestHeaders(), connection_manager_.runtime_, connection_manager_.config_,
+        *request_headers_, connection_manager_.runtime_, connection_manager_.config_,
         cached_route_.value().get());
   }
 
-  filter_manager_.streamInfo().setRequestHeaders(*requestHeaders());
+  filter_manager_.streamInfo().setRequestHeaders(*request_headers_);
 
   const bool upgrade_rejected = filter_manager_.createFilterChain() == false;
 
@@ -929,7 +929,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       // contains a smuggled HTTP request.
       state_.saw_connection_close_ = true;
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
-      sendLocalReply(Grpc::Common::hasGrpcContentType(*requestHeaders()), Code::Forbidden, "",
+      sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::Forbidden, "",
                      nullptr, absl::nullopt, StreamInfo::ResponseCodeDetails::get().UpgradeFailed);
       return;
     }
@@ -964,7 +964,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     traceRequest();
   }
 
-  filter_manager_.decodeHeaders(*requestHeaders(), end_stream);
+  filter_manager_.decodeHeaders(*request_headers_, end_stream);
 
   // Reset it here for both global and overridden cases.
   resetIdleTimer();
@@ -972,12 +972,12 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
 void ConnectionManagerImpl::ActiveStream::traceRequest() {
   Tracing::Decision tracing_decision =
-      Tracing::HttpTracerUtility::isTracing(filter_manager_.streamInfo(), *requestHeaders());
+      Tracing::HttpTracerUtility::isTracing(filter_manager_.streamInfo(), *request_headers_);
   ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
                                             connection_manager_.config_.tracingStats());
 
   active_span_ = connection_manager_.tracer().startSpan(
-      *this, *requestHeaders(), filter_manager_.streamInfo(), tracing_decision);
+      *this, *request_headers_, filter_manager_.streamInfo(), tracing_decision);
 
   if (!active_span_) {
     return;
@@ -1006,10 +1006,10 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
     // propagation enabled) as a request header to enable the receiving service to use it in its
     // server span.
     if (decorated_operation_ && state_.decorated_propagate_) {
-      requestHeaders()->setEnvoyDecoratorOperation(*decorated_operation_);
+      request_headers_->setEnvoyDecoratorOperation(*decorated_operation_);
     }
   } else {
-    const HeaderEntry* req_operation_override = requestHeaders()->EnvoyDecoratorOperation();
+    const HeaderEntry* req_operation_override = request_headers_->EnvoyDecoratorOperation();
 
     // For ingress (inbound) requests, if a decorator operation name has been provided, it
     // should be used to override the active span's operation.
@@ -1022,7 +1022,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
         decorated_operation_ = nullptr;
       }
       // Remove header so not propagated to service
-      requestHeaders()->removeEnvoyDecoratorOperation();
+      request_headers_->removeEnvoyDecoratorOperation();
     }
   }
 }
@@ -1073,7 +1073,7 @@ void ConnectionManagerImpl::startDrainSequence() {
 void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
   // returned, in that case we let it pass.
-  snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(*requestHeaders());
+  snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(*request_headers_);
   if (snapped_route_config_ == nullptr) {
     ENVOY_STREAM_LOG(trace, "can't find SRDS scope.", *this);
     // TODO(stevenzzzz): Consider to pass an error message to router filter, so that it can
@@ -1086,14 +1086,14 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() { refreshCachedRo
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::RouteCallback& cb) {
   Router::RouteConstSharedPtr route;
-  if (requestHeaders() != nullptr) {
+  if (request_headers_ != nullptr) {
     if (connection_manager_.config_.isRoutable() &&
         connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
       // NOTE: re-select scope as well in case the scope key header has been changed by a filter.
       snapScopedRouteConfig();
     }
     if (snapped_route_config_ != nullptr) {
-      route = snapped_route_config_->route(cb, *requestHeaders(), filter_manager_.streamInfo(),
+      route = snapped_route_config_->route(cb, *request_headers_, filter_manager_.streamInfo(),
                                            stream_id_);
     }
   }
@@ -1138,8 +1138,8 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
 void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
     Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  ASSERT(!requestHeaders()->Host()->value().empty());
-  const auto& host_header = absl::AsciiStrToLower(requestHeaders()->getHostValue());
+  ASSERT(!request_headers_->Host()->value().empty());
+  const auto& host_header = absl::AsciiStrToLower(request_headers_->getHostValue());
   route_config_update_requester_->requestRouteConfigUpdate(host_header, thread_local_dispatcher,
                                                            std::move(route_config_updated_cb));
 }
@@ -1166,7 +1166,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
     ResponseHeaderMap& response_headers) {
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, requestHeaders(),
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers_.get(),
                                                   connection_manager_.config_, EMPTY_STRING);
 
   // Count both the 1xx and follow-up response code in stats.
@@ -1200,8 +1200,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
        headers.Server() == nullptr)) {
     headers.setReferenceServer(connection_manager_.config_.serverName());
   }
-  ConnectionManagerUtility::mutateResponseHeaders(
-      headers, requestHeaders(), connection_manager_.config_, connection_manager_.config_.via());
+  ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(),
+                                                  connection_manager_.config_,
+                                                  connection_manager_.config_.via());
 
   bool drain_connection_due_to_overload = false;
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
@@ -1263,7 +1264,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     // Do not do this for H2 (which drains via GOAWAY) or Upgrade or CONNECT (as the
     // payload is no longer HTTP/1.1)
     if (!Utility::isUpgrade(headers) &&
-        !HeaderUtility::isConnectResponse(requestHeaders(), *responseHeaders())) {
+        !HeaderUtility::isConnectResponse(request_headers_.get(), *responseHeaders())) {
       headers.setReferenceConnection(Headers::get().ConnectionValues.Close);
     }
   }
