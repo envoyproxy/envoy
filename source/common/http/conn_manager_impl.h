@@ -326,7 +326,8 @@ private:
     ResponseHeaderMapPtr response_headers_;
     ResponseTrailerMapPtr response_trailers_;
 
-    // Note: The FM must outlive the above headers, as they are possibly accessed during filter destruction.
+    // Note: The FM must outlive the above headers, as they are possibly accessed during filter
+    // destruction.
     FilterManager filter_manager_;
 
     Router::ConfigConstSharedPtr snapped_route_config_;
