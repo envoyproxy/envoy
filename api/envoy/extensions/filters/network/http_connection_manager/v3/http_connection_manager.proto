@@ -589,7 +589,7 @@ message LocalReplyConfig {
   //  json_format:
   //    status: "%RESPONSE_CODE%"
   //    message: "%LOCAL_REPLY_BODY%"
-  //    path: "$REQ(:path)%""
+  //    path: "$REQ(:path)%"
   //
   // The following response body in "application/json" format would be generated for a request with
   // local reply body of "upstream connection error", response_code=503 and path=/foo.
