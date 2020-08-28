@@ -89,7 +89,8 @@ actions {
 * `actions.advance_time.milliseconds` is the duration in milliseconds for the simulatedSystemTime to advance by.
 For more details, see the APIs for [ReadFilter Fuzz Testcase](https://github.com/envoyproxy/envoy/blob/master/test/extensions/filters/network/common/fuzz/network_readfilter_fuzz.proto) and  [WriteFilter Fuzz Testcase](https://github.com/envoyproxy/envoy/blob/master/test/extensions/filters/network/common/fuzz/network_writefilter_fuzz.proto).
 
-## Convert a unit test case to a fuzz test case manually (experimental)
+## Convert a unit test case to a fuzz test case manually
+This section explains an approach to generate a corpus from unit tests. It is an optional step for users who want to generate the highest possible coverage.
 Unit test cases usually leads the filter into interesting states. Currently there is no automatic way to convert a unit test case into a fuzz test case. However, there is a way to convert it manually.
 We can write a utility function like this and use it to print the `buffer` and `protobuf` as a octal sequence to avoid invisible characters:
 ```
