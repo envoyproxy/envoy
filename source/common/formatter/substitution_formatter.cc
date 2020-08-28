@@ -109,7 +109,7 @@ const std::string SubstitutionFormatUtils::getHostnameOrDefault() {
 }
 
 FormatterImpl::FormatterImpl(const std::string& format, bool omit_empty_values)
-    : omit_empty_values_(omit_empty_values) {
+    : empty_value_string_(omit_empty_values ? EMPTY_STRING : DefaultUnspecifiedValueString) {
   providers_ = SubstitutionFormatParser::parse(format);
 }
 
@@ -121,11 +121,10 @@ std::string FormatterImpl::format(const Http::RequestHeaderMap& request_headers,
   std::string log_line;
   log_line.reserve(256);
 
-  const std::string empty_value = omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString;
   for (const FormatterProviderPtr& provider : providers_) {
-    const auto& bit = provider->format(request_headers, response_headers, response_trailers,
-                                       stream_info, local_reply_body);
-    log_line += bit.value_or(empty_value);
+    const auto bit = provider->format(request_headers, response_headers, response_trailers,
+                                      stream_info, local_reply_body);
+    log_line += bit.value_or(empty_value_string_);
   }
 
   return log_line;
@@ -167,6 +166,7 @@ ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& re
                                                 const Http::ResponseTrailerMap& response_trailers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 absl::string_view local_reply_body) const {
+  const std::string& empty_value = omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString;
   const std::function<ProtobufWkt::Value(const std::vector<FormatterProviderPtr>&)>
       providers_callback = [&](const std::vector<FormatterProviderPtr>& providers) {
         ASSERT(!providers.empty());
@@ -189,11 +189,9 @@ ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& re
         }
         // Multiple providers forces string output.
         std::string str;
-        const std::string empty_value =
-            omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString;
         for (const auto& provider : providers) {
-          const auto& bit = provider->format(request_headers, response_headers, response_trailers,
-                                             stream_info, local_reply_body);
+          const auto bit = provider->format(request_headers, response_headers, response_trailers,
+                                            stream_info, local_reply_body);
           str += bit.value_or(empty_value);
         }
         return ValueUtil::stringValue(str);

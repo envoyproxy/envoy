@@ -337,10 +337,10 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
       const auto& formatters = start_time_formatters_.at(pattern);
       std::string formatted;
       for (const auto& formatter : formatters) {
-        const auto& bit = formatter->format(*Http::StaticEmptyHeaders::get().request_headers,
-                                            *Http::StaticEmptyHeaders::get().response_headers,
-                                            *Http::StaticEmptyHeaders::get().response_trailers,
-                                            stream_info, absl::string_view());
+        const auto bit = formatter->format(*Http::StaticEmptyHeaders::get().request_headers,
+                                           *Http::StaticEmptyHeaders::get().response_headers,
+                                           *Http::StaticEmptyHeaders::get().response_trailers,
+                                           stream_info, absl::string_view());
         absl::StrAppend(&formatted, bit.value_or("-"));
       }
       return formatted;

@@ -101,7 +101,7 @@ public:
                      absl::string_view local_reply_body) const override;
 
 private:
-  bool omit_empty_values_;
+  const std::string& empty_value_string_;
   std::vector<FormatterProviderPtr> providers_;
 };
 
