@@ -43,7 +43,7 @@ py_test(
     data = glob(["code_corpus/**"]),
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = ["no-sandbox"], # TODO (foreseeable): make this test run under sandbox
+    tags = ["no-sandbox"],  # TODO (foreseeable): make this test run under sandbox
     visibility = ["//visibility:public"],
     deps = [
         requirement("clang"),
@@ -59,7 +59,7 @@ py_test(
     data = glob(["code_corpus/**"]),
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = ["no-sandbox"], # TODO (foreseeable): make this test run under sandbox
+    tags = ["no-sandbox"],  # TODO (foreseeable): make this test run under sandbox
     visibility = ["//visibility:public"],
     deps = [
         ":replace_includes",
