@@ -8,7 +8,8 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 

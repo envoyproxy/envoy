@@ -15,9 +15,14 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/host.h"
+#include "test/mocks/upstream/host_set.h"
+#include "test/mocks/upstream/load_balancer.h"
+#include "test/mocks/upstream/priority_set.h"
 
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"

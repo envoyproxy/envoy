@@ -15,7 +15,9 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/host_set.h"
+#include "test/mocks/upstream/priority_set.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

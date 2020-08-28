@@ -45,6 +45,7 @@ envoy_extension_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:admin_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:cluster_update_callbacks_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
