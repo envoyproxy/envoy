@@ -17,8 +17,11 @@ native client instead of with Envoy's builtin Zipkin client has the following ad
 
 This sandbox is very similar to the front proxy architecture described above, with one difference:
 service1 makes an API call to service2 before returning a response.
-The three containers will be deployed inside a virtual network called ``envoymesh``. (Note: the sandbox
-only works on x86-64).
+The three containers will be deployed inside a virtual network called ``envoymesh``.
+
+.. note::
+
+   The jaeger native tracing sandbox only works on x86-64.
 
 All incoming requests are routed via the front Envoy, which is acting as a reverse proxy
 sitting on the edge of the ``envoymesh`` network. Port ``8000`` is exposed
@@ -45,11 +48,29 @@ Running the Sandbox
 ~~~~~~~~~~~~~~~~~~~
 
 The following documentation runs through the setup of an Envoy cluster organized
-as is described in the image above.
+as is described above.
 
-**Step 1: Build the sandbox**
+**Step 1: Install Docker**
 
-To build this sandbox example, and start the example apps run the following commands::
+Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
+
+A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
+
+**Step 2: Clone the Envoy repo**
+
+If you have not cloned the Envoy repo, clone it with:
+
+``git clone git@github.com:envoyproxy/envoy``
+
+or
+
+``git clone https://github.com/envoyproxy/envoy.git``
+
+**Step 3: Build the sandbox**
+
+To build this sandbox example, and start the example apps run the following commands:
+
+.. code-block:: console
 
     $ pwd
     envoy/examples/jaeger-native-tracing
@@ -64,9 +85,11 @@ To build this sandbox example, and start the example apps run the following comm
     jaeger-native-tracing_service1_1      /start-service.sh              Up      10000/tcp, 8000/tcp
     jaeger-native-tracing_service2_1      /start-service.sh              Up      10000/tcp, 8000/tcp
 
-**Step 2: Generate some load**
+**Step 4: Generate some load**
 
-You can now send a request to service1 via the front-envoy as follows::
+You can now send a request to service1 via the front-envoy as follows:
+
+.. code-block:: console
 
     $ curl -v localhost:8000/trace/1
     *   Trying 192.168.99.100...
@@ -86,7 +109,7 @@ You can now send a request to service1 via the front-envoy as follows::
     Hello from behind Envoy (service 1)! hostname: f26027f1ce28 resolvedhostname: 172.19.0.6
     * Connection #0 to host 192.168.99.100 left intact
 
-**Step 3: View the traces in Jaeger UI**
+**Step 5: View the traces in Jaeger UI**
 
 Point your browser to http://localhost:16686 . You should see the Jaeger dashboard.
 Set the service to "front-proxy" and hit 'Find Traces'. You should see traces from the front-proxy.
