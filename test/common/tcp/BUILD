@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["conn_info_test.cc"],
     deps = [
         "//test/mocks/network:network_mocks",
+        "//test/mocks/network:socket_mocks",
     ],
 )
 
