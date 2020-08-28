@@ -81,7 +81,7 @@ Api::SysCallIntResult FakeConnectionSocket::getSocketOption(int level, int, void
 
   return Api::SysCallIntResult{0, 0};
 #else
-  // TODO: Waiting on zuercher to determine if connection redirection possible, see
+  // TODO: Waiting to determine if connection redirection possible, see
   // Network::Utility::getOriginalDst()
   return Api::SysCallIntResult{-1, 0};
 #endif
