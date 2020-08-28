@@ -55,8 +55,6 @@ public:
    */
   std::vector<uint8_t> payloadFrameFlagBytes();
 
-  std::string payload() const;
-
 private:
   /**
    * Creates wire format HTTP/2 header block from metadata_map.
