@@ -4,6 +4,9 @@ on:
     - 'source/common/**'
   pull_request:
 
+variables:
+  BUILD_TARGETS: ""
+
 jobs:
   CodeQL-Build:
 
@@ -13,8 +16,6 @@ jobs:
     # CodeQL runs on ubuntu-latest and windows-latest
     runs-on: ubuntu-latest
     
-    variables:
-      BUILD_TARGETS: ""
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
