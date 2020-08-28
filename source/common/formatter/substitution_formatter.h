@@ -73,9 +73,9 @@ private:
 class SubstitutionFormatUtils {
 public:
   static FormatterPtr defaultSubstitutionFormatter();
-  static const absl::optional<std::string>
+  static const absl::optional<std::reference_wrapper<const std::string>>
   protocolToString(const absl::optional<Http::Protocol>& protocol);
-  static const std::string
+  static const std::string&
   protocolToStringOrDefault(const absl::optional<Http::Protocol>& protocol);
   static const absl::optional<std::string> getHostname();
   static const std::string getHostnameOrDefault();

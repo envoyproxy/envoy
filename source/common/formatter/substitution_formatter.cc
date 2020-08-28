@@ -65,7 +65,7 @@ FormatterPtr SubstitutionFormatUtils::defaultSubstitutionFormatter() {
   return FormatterPtr{new FormatterImpl(DEFAULT_FORMAT, false)};
 }
 
-const absl::optional<std::string>
+const absl::optional<std::reference_wrapper<const std::string>>
 SubstitutionFormatUtils::protocolToString(const absl::optional<Http::Protocol>& protocol) {
   if (protocol) {
     return Http::Utility::getProtocolString(protocol.value());
@@ -73,7 +73,7 @@ SubstitutionFormatUtils::protocolToString(const absl::optional<Http::Protocol>& 
   return absl::nullopt;
 }
 
-const std::string
+const std::string&
 SubstitutionFormatUtils::protocolToStringOrDefault(const absl::optional<Http::Protocol>& protocol) {
   if (protocol) {
     return Http::Utility::getProtocolString(protocol.value());
@@ -166,7 +166,8 @@ ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& re
                                                 const Http::ResponseTrailerMap& response_trailers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 absl::string_view local_reply_body) const {
-  const std::string& empty_value = omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString;
+  const std::string& empty_value =
+      omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString;
   const std::function<ProtobufWkt::Value(const std::vector<FormatterProviderPtr>&)>
       providers_callback = [&](const std::vector<FormatterProviderPtr>& providers) {
         ASSERT(!providers.empty());
