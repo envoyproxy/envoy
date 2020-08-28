@@ -1,20 +1,24 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
-    "envoy_py_test_binary",
 )
+load("@rules_python//python:defs.bzl", "py_binary")
+load("@configs_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_py_test_binary(
+py_binary(
     name = "configgen",
     srcs = ["configgen.py"],
     data = glob([
         "*.yaml",
     ]),
-    external_deps = ["jinja2"],
+    deps = [
+        requirement("Jinja2"),
+        requirement("MarkupSafe"),
+    ],
 )
 
 filegroup(
