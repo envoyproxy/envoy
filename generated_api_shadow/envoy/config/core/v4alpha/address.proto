@@ -31,7 +31,6 @@ message Pipe {
 }
 
 // The address represents an envoy internal listener.
-// [#not-implemented-hide:]
 message EnvoyInternalAddress {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.EnvoyInternalAddress";
