@@ -114,25 +114,33 @@ bool ActiveStreamFilterBase::commonHandleAfterHeadersCallback(FilterHeadersStatu
   ASSERT(!headers_continued_);
   ASSERT(canIterate());
 
-  if (status == FilterHeadersStatus::StopIteration) {
+  switch (status) {
+  case FilterHeadersStatus::StopIteration:
     iteration_state_ = IterationState::StopSingleIteration;
-  } else if (status == FilterHeadersStatus::StopAllIterationAndBuffer) {
+    break;
+  case FilterHeadersStatus::StopAllIterationAndBuffer:
     iteration_state_ = IterationState::StopAllBuffer;
-  } else if (status == FilterHeadersStatus::StopAllIterationAndWatermark) {
+    break;
+  case FilterHeadersStatus::StopAllIterationAndWatermark:
     iteration_state_ = IterationState::StopAllWatermark;
-  } else if (status == FilterHeadersStatus::ContinueAndEndStream) {
+    break;
+  case FilterHeadersStatus::ContinueAndEndStream:
     // Set headers_only to true so we know to end early if necessary,
     // but continue filter iteration so we actually write the headers/run the cleanup code.
     headers_only = true;
     ENVOY_STREAM_LOG(debug, "converting to headers only", parent_);
-  } else if (status == FilterHeadersStatus::ContinueAndDontEndStream) {
+    break;
+  case FilterHeadersStatus::ContinueAndDontEndStream:
     headers_only = false;
     end_stream = false;
     headers_continued_ = true;
     ENVOY_STREAM_LOG(debug, "converting to headers and body (body not available yet)", parent_);
-  } else {
-    ASSERT(status == FilterHeadersStatus::Continue);
+    break;
+  case FilterHeadersStatus::Continue:
     headers_continued_ = true;
+    break;
+  default:
+    ASSERT(false, "Unrecognized FilterHeadersStatus");
   }
 
   handleMetadataAfterHeadersCallback();
