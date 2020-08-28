@@ -51,7 +51,8 @@ void ActiveStreamFilterBase::commonContinue() {
 
   ENVOY_STREAM_LOG(trace, "continuing filter chain: filter={}", *this,
                    static_cast<const void*>(this));
-  ASSERT(!canIterate());
+  ASSERT(!canIterate(),
+         "Attempting to continue iteration while the IterationState is already Continue");
   // If iteration has stopped for all frame types, set iterate_from_current_filter_ to true so the
   // filter iteration starts with the current filter instead of the next one.
   if (stoppedAll()) {

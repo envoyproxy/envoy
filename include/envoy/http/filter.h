@@ -44,6 +44,16 @@ enum class FilterHeadersStatus {
   // The filter is responsible to continue the stream by providing a body through
   // injectEncodedDataToFilterChain()/injectDecodedDataToFilterChain().
   // If the filter cannot provide a body the stream should be reset.
+  //
+  // Adding a body through calling addDecodedData()/addEncodedData() then
+  // continueDecoding()/continueEncoding() is currently not supported and causes an assert failure.
+  //
+  // TODO(yosrym93): Support adding a body in this case by calling addDecodedData()/addEncodedData()
+  // then continueDecoding()/continueEncoding(). To support this a new FilterManager::IterationState
+  // needs to be added and set when a filter returns this status in FilterManager::encodeHeades.
+  // Currently, when a fitler retuns this, the IterationState is Continue. This causes ASSERTs at
+  // FilterManager::commonContinue() to fail when continueDecoding()/continueEncoding() is called;
+  // due to trying to continue iteration when the IterationState is already Continue.
   ContinueAndDontEndStream,
   // Do not iterate for headers as well as data and trailers for the current filter and the filters
   // following, and buffer body data for later dispatching. ContinueDecoding() MUST
