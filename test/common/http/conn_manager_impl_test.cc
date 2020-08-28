@@ -2240,11 +2240,11 @@ public:
 };
 
 TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionTerminatedIfCodecStreamErrorIsFalse) {
-  sendInvalidRequestAndVerifyConnectionState(false, true);
+  sendInvalidRequestAndVerifyConnectionState(false);
 }
 
 TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionOpenIfCodecStreamErrorIsTrue) {
-  sendInvalidRequestAndVerifyConnectionState(true, false);
+  sendInvalidRequestAndVerifyConnectionState(true);
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
