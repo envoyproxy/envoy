@@ -29,24 +29,24 @@ public:
   };
   using HashingLoadBalancerSharedPtr = std::shared_ptr<HashingLoadBalancer>;
 
+  /**
+   * Class for consistent hashing load balancer (CH-LB) with bounded loads.
+   * It is common to both RingHash and Maglev load balancers, because the logic of selecting the
+   * next host when one is overloaded is independent of the CH-LB type.
+   */
   class BoundedLoadHashingLoadBalancer : public HashingLoadBalancer {
   public:
-    /**
-     * Class for consistent hashing load balancer (CH-LB) with bounded loads.
-     * It is common to both RingHash and Maglev load balancers, because the logic of selecting the
-     * next host when one is overloaded is independent of the CH-LB type.
-     */
     BoundedLoadHashingLoadBalancer(HashingLoadBalancerSharedPtr hashing_lb_ptr,
-                                   const NormalizedHostWeightVector& normalized_host_weights,
+                                   NormalizedHostWeightVector normalized_host_weights,
                                    uint32_t hash_balance_factor)
         : normalized_host_weights_map_(initNormalizedHostWeightMap(normalized_host_weights)),
-          hashing_lb_ptr_(hashing_lb_ptr),
+          hashing_lb_ptr_(std::move(hashing_lb_ptr)),
           normalized_host_weights_(std::move(normalized_host_weights)),
           hash_balance_factor_(hash_balance_factor) {
       ASSERT(hashing_lb_ptr_ != nullptr);
       ASSERT(hash_balance_factor > 0);
     }
-    ~BoundedLoadHashingLoadBalancer() override = default;
+    ~BoundedLoadHashingLoadBalancer() = default;
     HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
 
   protected:

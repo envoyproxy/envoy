@@ -81,8 +81,8 @@ private:
       return ring_hash_lb;
     }
 
-    return std::make_shared<BoundedLoadHashingLoadBalancer>(ring_hash_lb, normalized_host_weights,
-                                                            hash_balance_factor_);
+    return std::make_shared<BoundedLoadHashingLoadBalancer>(
+        ring_hash_lb, std::move(normalized_host_weights), hash_balance_factor_);
   }
 
   static RingHashLoadBalancerStats generateStats(Stats::Scope& scope);

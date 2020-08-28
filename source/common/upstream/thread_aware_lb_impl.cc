@@ -122,8 +122,8 @@ void ThreadAwareLoadBalancerBase::refresh() {
     double max_normalized_weight = 0.0;
     normalizeWeights(*host_set, per_priority_state->global_panic_, normalized_host_weights,
                      min_normalized_weight, max_normalized_weight);
-    per_priority_state->current_lb_ =
-        createLoadBalancer(normalized_host_weights, min_normalized_weight, max_normalized_weight);
+    per_priority_state->current_lb_ = createLoadBalancer(
+        std::move(normalized_host_weights), min_normalized_weight, max_normalized_weight);
   }
 
   {

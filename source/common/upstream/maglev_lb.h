@@ -90,8 +90,8 @@ private:
       return maglev_lb;
     }
 
-    return std::make_shared<BoundedLoadHashingLoadBalancer>(maglev_lb, normalized_host_weights,
-                                                            hash_balance_factor_);
+    return std::make_shared<BoundedLoadHashingLoadBalancer>(
+        maglev_lb, std::move(normalized_host_weights), hash_balance_factor_);
   }
 
   static MaglevLoadBalancerStats generateStats(Stats::Scope& scope);
