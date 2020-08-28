@@ -95,7 +95,7 @@ TEST_F(AbortActionTest, CanKillThread) {
     action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::KILL, tid_ltt_pairs, now);
   };
 
-  EXPECT_DEATH(die_function(), "Caught Aborted");
+  EXPECT_DEATH(die_function(), "");
 }
 
 void handler(int sig, siginfo_t* /*siginfo*/, void* /*context*/) {

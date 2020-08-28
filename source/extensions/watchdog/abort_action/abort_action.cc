@@ -20,7 +20,7 @@ namespace {
 #ifdef __linux__
 pid_t toPlatformTid(int64_t tid) { return static_cast<pid_t>(tid); }
 #elif defined(__APPLE__)
-uint64 toPlatformTid(int64_t tid) { return static_cast<uint64>(tid); }
+uint64_t toPlatformTid(int64_t tid) { return static_cast<uint64_t>(tid); }
 #endif
 } // namespace
 
