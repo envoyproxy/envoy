@@ -601,7 +601,6 @@ void ConnectionManagerImpl::ActiveStream::completeRequest() {
     filter_manager_.streamInfo().setResponseFlag(
         StreamInfo::ResponseFlag::DownstreamConnectionTermination);
   }
-
   if (connection_manager_.codec_->protocol() < Protocol::Http2) {
     // For HTTP/2 there are still some reset cases where details are not set.
     // For HTTP/1 there shouldn't be any. Regression-proof this.

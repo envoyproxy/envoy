@@ -4869,7 +4869,9 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
         EXPECT_FALSE(stream_info.hasAnyResponseFlag());
       }));
 
-  doRemoteClose();
+  expectOnDestroy();
+  EXPECT_CALL(stream_, removeCallbacks(_));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
 }
 
 TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimits) {
