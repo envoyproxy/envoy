@@ -31,18 +31,5 @@ events {
         flags: ACK
       }
     }
-    h2_frames {
-      headers {
-      	flags: NONE
-      	flags: END_STREAM
-	stream_index: 1
-      }
-    }
-    h2_frames {
-      data {
-        flags: NONE
-	stream_index: 1
-      }
-    }
   }
 }

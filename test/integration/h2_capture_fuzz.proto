@@ -20,9 +20,11 @@ message H2FrameSettings {
 }
 
 enum H2HeadersFlags {
+  option allow_alias = true;
   NONE = 0;
   END_STREAM = 1;
   END_HEADERS = 4;
+  END_METADATA = 4;
 }
 
 message H2FrameHeaders {
@@ -120,6 +122,16 @@ message H2FrameGeneric {
   bytes frame_bytes = 1;
 }
 
+message Metadata {
+  map<string, string> metadata = 1;
+}
+
+message H2FrameMetadata {
+  H2HeadersFlags flags = 1;
+  uint32 stream_index = 2;
+  Metadata metadata = 3;
+}
+
 message H2TestFrame {
   // These values map to the frame creation methods in:
   // test/common/http/http2/http2_frame.h
@@ -139,6 +151,7 @@ message H2TestFrame {
     H2FrameRequest request = 13;
     H2FramePostRequest post_request = 14;
     H2FrameGeneric generic = 15;
+    H2FrameMetadata metadata = 77;
   }
 }
 
@@ -152,9 +165,9 @@ message UpstreamSendEvent {
 
 message Event {
   oneof event_selector {
-    // Downstream sent given frames.
+    // Frames sent from downstream.
     DownstreamSendEvent downstream_send_event = 1;
-    // Upstream sent given frames.
+    // Frames sent from upstream.
     UpstreamSendEvent upstream_send_event = 2;
   }
 }
