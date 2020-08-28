@@ -46,3 +46,5 @@ if ! brew link --overwrite bazelbuild/tap/bazelisk; then
     echo "Failed to install and link bazelbuild/tap/bazelisk"
     exit 1
 fi
+
+pip3 install slackclient
