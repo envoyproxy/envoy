@@ -14,7 +14,8 @@ public:
    *  time of the connection. If the platform does not support this, then an empty optional is
    *  returned.
    */
-  static absl::optional<std::chrono::milliseconds> lastRoundTripTime(Envoy::Network::Socket* socket);
+  static absl::optional<std::chrono::milliseconds>
+  lastRoundTripTime(Envoy::Network::Socket* socket);
 };
 
 } // namespace Tcp
