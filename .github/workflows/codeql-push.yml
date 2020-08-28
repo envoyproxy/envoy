@@ -25,8 +25,7 @@ jobs:
       run: |
        . .github/workflows/get_build_targets.sh
        echo $BUILD_TARGETS_LOCAL
-       echo "::set-env name=BUILD_TARGETS::$(echo $BUILD_TARGETS_LOCAL)"
-
+      echo "::set-env name=BUILD_TARGETS::$BUILD_TARGETS_LOCAL"
     # If this run was triggered by a pull request event, then checkout
     # the head of the pull request instead of the merge commit.
     - run: git checkout HEAD^2
