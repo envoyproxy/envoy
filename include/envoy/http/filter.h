@@ -50,8 +50,8 @@ enum class FilterHeadersStatus {
   //
   // TODO(yosrym93): Support adding a body in this case by calling addDecodedData()/addEncodedData()
   // then continueDecoding()/continueEncoding(). To support this a new FilterManager::IterationState
-  // needs to be added and set when a filter returns this status in FilterManager::encodeHeades.
-  // Currently, when a fitler retuns this, the IterationState is Continue. This causes ASSERTs at
+  // needs to be added and set when a filter returns this status in FilterManager::encodeHeaders.
+  // Currently, when a fitler returns this, the IterationState is Continue. This causes ASSERTs at
   // FilterManager::commonContinue() to fail when continueDecoding()/continueEncoding() is called;
   // due to trying to continue iteration when the IterationState is already Continue.
   ContinueAndDontEndStream,
