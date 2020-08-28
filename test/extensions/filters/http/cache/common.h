@@ -9,54 +9,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-// Wrapper for SimpleHttpCache that delays the onHeaders/onBody/onTrailers callbacks from
-// getHeaders/getBody/getTrailers; for verifying that CacheFilter works correctly whether the
-// callbacks happen immediately, or after getHeaders/getBody/getTrailers return
-// Used to test the synchronization made using get_headers_state_ &  encode_cached_response_state_
-class DelayedCache : public SimpleHttpCache {
-public:
-  // HttpCache
-  LookupContextPtr makeLookupContext(LookupRequest&& request) override {
-    return std::make_unique<DelayedLookupContext>(
-        SimpleHttpCache::makeLookupContext(std::move(request)),
-        DelayedCallbacks{delayed_headers_cb_, delayed_body_cb_, delayed_trailers_cb_});
-  }
-  InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context) override {
-    return SimpleHttpCache::makeInsertContext(
-        std::move(dynamic_cast<DelayedLookupContext&>(*lookup_context).context_));
-  }
-
-  std::function<void()> delayed_headers_cb_, delayed_body_cb_, delayed_trailers_cb_;
-
-private:
-  struct DelayedCallbacks {
-    std::function<void()>&headers_cb_, &body_cb_, &trailers_cb_;
-  };
-  class DelayedLookupContext : public LookupContext {
-  public:
-    DelayedLookupContext(LookupContextPtr&& context, DelayedCallbacks delayed_callbacks)
-        : context_(std::move(context)), delayed_callbacks_(delayed_callbacks) {}
-    void getHeaders(LookupHeadersCallback&& cb) override {
-      delayed_callbacks_.headers_cb_ = [this, cb]() mutable {
-        context_->getHeaders(std::move(cb));
-      };
-    }
-    void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override {
-      delayed_callbacks_.body_cb_ = [this, cb, range]() mutable {
-        context_->getBody(range, std::move(cb));
-      };
-    }
-    void getTrailers(LookupTrailersCallback&& cb) override {
-      delayed_callbacks_.trailers_cb_ = [this, cb]() mutable {
-        context_->getTrailers(std::move(cb));
-      };
-    }
-
-    LookupContextPtr context_;
-    DelayedCallbacks delayed_callbacks_;
-  };
-};
-
 std::ostream& operator<<(std::ostream& os, const RequestCacheControl& request_cache_control) {
   std::string s = "{";
   s += request_cache_control.must_validate_ ? "must_validate, " : "";
