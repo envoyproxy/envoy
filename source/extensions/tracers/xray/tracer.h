@@ -203,7 +203,7 @@ public:
    * overruling that decision in the upstream service in case that service itself uses X-Ray for
    * tracing.
    */
-  XRay::SpanPtr createNonSampledSpan();
+  XRay::SpanPtr createNonSampledSpan() const;
 
 private:
   const std::string segment_name_;

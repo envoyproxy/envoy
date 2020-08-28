@@ -147,7 +147,7 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name, Envoy::Sys
   return span_ptr;
 }
 
-XRay::SpanPtr Tracer::createNonSampledSpan() {
+XRay::SpanPtr Tracer::createNonSampledSpan() const {
   auto span_ptr = std::make_unique<XRay::Span>(time_source_, random_, *daemon_broker_);
   span_ptr->setName(segment_name_);
   span_ptr->setOrigin(origin_);
