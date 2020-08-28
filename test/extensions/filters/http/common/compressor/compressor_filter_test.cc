@@ -315,12 +315,12 @@ INSTANTIATE_TEST_SUITE_P(
                     std::make_tuple("test;q=invalid", false, 0, 0, 1, 0)));
 
 TEST_P(IsAcceptEncodingAllowedTest, Validate) {
-  std::string accept_encoding = std::get<0>(GetParam());
-  bool is_compression_expected = std::get<1>(GetParam());
-  int compressor_used = std::get<2>(GetParam());
-  int wildcard = std::get<3>(GetParam());
-  int not_valid = std::get<4>(GetParam());
-  int identity = std::get<5>(GetParam());
+  const std::string& accept_encoding = std::get<0>(GetParam());
+  const bool is_compression_expected = std::get<1>(GetParam());
+  const int compressor_used = std::get<2>(GetParam());
+  const int wildcard = std::get<3>(GetParam());
+  const int not_valid = std::get<4>(GetParam());
+  const int identity = std::get<5>(GetParam());
 
   doRequest({{":method", "get"}, {"accept-encoding", accept_encoding}});
   Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}};
@@ -363,9 +363,9 @@ INSTANTIATE_TEST_SUITE_P(
         std::make_tuple("test/insensitive", true, true)));
 
 TEST_P(IsContentTypeAllowedTest, Validate) {
-  std::string content_type = std::get<0>(GetParam());
-  bool should_compress = std::get<1>(GetParam());
-  bool is_custom_config = std::get<2>(GetParam());
+  const std::string& content_type = std::get<0>(GetParam());
+  const bool should_compress = std::get<1>(GetParam());
+  const bool is_custom_config = std::get<2>(GetParam());
 
   if (is_custom_config) {
     setUpFilter(R"EOF(
@@ -405,9 +405,9 @@ INSTANTIATE_TEST_SUITE_P(
                     std::make_tuple("x-garbage", "garbagevalue", false)));
 
 TEST_P(CompressWithEtagTest, CompressionIsEnabledOnEtag) {
-  std::string header_name = std::get<0>(GetParam());
-  std::string header_value = std::get<1>(GetParam());
-  bool is_weak_etag = std::get<2>(GetParam());
+  const std::string& header_name = std::get<0>(GetParam());
+  const std::string& header_value = std::get<1>(GetParam());
+  const bool is_weak_etag = std::get<2>(GetParam());
 
   doRequest({{":method", "get"}, {"accept-encoding", "test, deflate"}});
   Http::TestResponseHeaderMapImpl headers{
@@ -423,8 +423,8 @@ TEST_P(CompressWithEtagTest, CompressionIsEnabledOnEtag) {
 }
 
 TEST_P(CompressWithEtagTest, CompressionIsDisabledOnEtag) {
-  std::string header_name = std::get<0>(GetParam());
-  std::string header_value = std::get<1>(GetParam());
+  const std::string& header_name = std::get<0>(GetParam());
+  const std::string& header_value = std::get<1>(GetParam());
 
   setUpFilter(R"EOF(
 {
@@ -465,8 +465,8 @@ INSTANTIATE_TEST_SUITE_P(HasCacheControlNoTransformTestSuite, HasCacheControlNoT
                                          std::make_tuple("No-Transform", false)));
 
 TEST_P(HasCacheControlNoTransformTest, Validate) {
-  std::string cache_control = std::get<0>(GetParam());
-  bool is_compression_expected = std::get<1>(GetParam());
+  const std::string& cache_control = std::get<0>(GetParam());
+  const bool is_compression_expected = std::get<1>(GetParam());
 
   doRequest({{":method", "get"}, {"accept-encoding", "test, deflate"}});
   Http::TestResponseHeaderMapImpl headers{
@@ -492,10 +492,10 @@ INSTANTIATE_TEST_SUITE_P(
                     std::make_tuple("content-length", "499", "\"content_length\": 500,", false)));
 
 TEST_P(IsMinimumContentLengthTest, Validate) {
-  std::string header_name = std::get<0>(GetParam());
-  std::string header_value = std::get<1>(GetParam());
-  std::string content_length_config = std::get<2>(GetParam());
-  bool is_compression_expected = std::get<3>(GetParam());
+  const std::string& header_name = std::get<0>(GetParam());
+  const std::string& header_value = std::get<1>(GetParam());
+  const std::string& content_length_config = std::get<2>(GetParam());
+  const bool is_compression_expected = std::get<3>(GetParam());
 
   setUpFilter(fmt::format(R"EOF(
 {{
@@ -533,9 +533,9 @@ INSTANTIATE_TEST_SUITE_P(
                     std::make_tuple("x-garbage", "no_value", true)));
 
 TEST_P(IsTransferEncodingAllowedTest, Validate) {
-  std::string header_name = std::get<0>(GetParam());
-  std::string header_value = std::get<1>(GetParam());
-  bool is_compression_expected = std::get<2>(GetParam());
+  const std::string& header_name = std::get<0>(GetParam());
+  const std::string& header_value = std::get<1>(GetParam());
+  const bool is_compression_expected = std::get<2>(GetParam());
 
   doRequest({{":method", "get"}, {"accept-encoding", "test"}});
   Http::TestResponseHeaderMapImpl headers{
@@ -559,9 +559,9 @@ INSTANTIATE_TEST_SUITE_P(
                     std::make_tuple("vary", "Accept-Encoding", "Accept-Encoding")));
 
 TEST_P(InsertVaryHeaderTest, Validate) {
-  std::string header_name = std::get<0>(GetParam());
-  std::string header_value = std::get<1>(GetParam());
-  std::string expected = std::get<2>(GetParam());
+  const std::string& header_name = std::get<0>(GetParam());
+  const std::string& header_value = std::get<1>(GetParam());
+  const std::string& expected = std::get<2>(GetParam());
 
   doRequest({{":method", "get"}, {"accept-encoding", "test"}});
   Http::TestResponseHeaderMapImpl headers{
