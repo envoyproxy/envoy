@@ -610,8 +610,8 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   }
 
   if (active_span_) {
-    Tracing::HttpTracerUtility::finalizeDownstreamSpan(*active_span_, requestHeaders(),
-                                                       responseHeaders(), responseTrailers(),
+    Tracing::HttpTracerUtility::finalizeDownstreamSpan(*active_span_, request_headers_.get(),
+                                                       response_trailers_.get(), response_trailers_.get(),
                                                        filter_manager_.streamInfo(), *this);
   }
   if (state_.successful_upgrade_) {
