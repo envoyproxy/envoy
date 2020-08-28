@@ -140,7 +140,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     }
   }
 
-#ifndef BORINGSSL_FIPS
+#ifdef BORINGSSL_FIPS
   if (!capabilities_.is_fips_compliant) {
     throw EnvoyException(
         "Can't load a FIPS noncompliant custom handshaker while running in FIPS compliant mode.");
