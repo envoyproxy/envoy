@@ -45,6 +45,11 @@ function exclude_testdata() {
   grep -v tools/testdata/check_format/
 }
 
+# Do not run clang-tidy on envoy_headersplit testdata files.
+function exclude_testdata() {
+  grep -v tools/envoy_headersplit/
+}
+
 # Exclude files in third_party which are temporary forks from other OSS projects.
 function exclude_third_party() {
   grep -v third_party/
