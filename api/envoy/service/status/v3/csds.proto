@@ -64,7 +64,6 @@ message ClientStatusRequest {
 
   // The node making the csds request.
   config.core.v3.Node node = 2;
-  
   // When true, response will include status, but no config.
   bool exclude_config = 3;
 }
