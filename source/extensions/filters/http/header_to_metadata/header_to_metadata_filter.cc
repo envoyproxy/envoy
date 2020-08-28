@@ -244,10 +244,10 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
     absl::optional<std::string> value = rule.selector_->extract(headers);
 
     if (value && proto_rule.has_on_header_present()) {
-      applyKeyValue(value.value_or(""), rule, proto_rule.on_header_present(),
+      applyKeyValue(std::move(value).value_or(""), rule, proto_rule.on_header_present(),
                     structs_by_namespace);
     } else if (!value && proto_rule.has_on_header_missing()) {
-      applyKeyValue(value.value_or(""), rule, proto_rule.on_header_missing(),
+      applyKeyValue(std::move(value).value_or(""), rule, proto_rule.on_header_missing(),
                     structs_by_namespace);
     }
   }
