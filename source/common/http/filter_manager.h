@@ -329,6 +329,9 @@ public:
    */
   virtual void setResponseTrailers(ResponseTrailerMapPtr&& response_trailers) PURE;
 
+  // TODO(snowp): We should consider moving filter access to headers/trailers to happen via the
+  // callbacks instead of via the encode/decode callbacks on the filters.
+
   /**
    * The downstream request headers if set.
    */
