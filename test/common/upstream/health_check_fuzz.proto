@@ -2,41 +2,39 @@ syntax = "proto3";
 
 package test.common.upstream;
 
-#NOTE TO SELF, SINCE THE TEST CLASS ALREADY HANDLES CONFIG WILL ALL THE OPTIONS
+message HealthCheckConfig {
+
+}
+
+message HttpHealthCheckConfig {
+    HealthCheckConfig config = 1;
+    string host = 2;
+    string path = 3;
+}
 
 message Respond {
     string code = 1;
     boolean conn_close = 2;
     boolean proxy_close = 3;
-    #body
-    #trailers
-    service_cluster = 6;
-    boolean degraded = 7;
+    boolean body = 4;
+    boolean trailers = 5;
+    boolean degraded = 6;
+}
+
+message DegradationBehavior {
+    boolean degraded = 1;
+    int simulated_time_seconds_for_degradation = 2;
 }
 
 message Action {
     oneof action_selector {
-        Respond respond;
+        Respond respond = 1;
+        boolean stream_create = 2;
+        DegradationBehavior = 3;
     }
 }
 
-message HTTP { #THESE ARE UNIQUE TO HTTP
-    string host = 1;
-    string path = 2;
-}
-
-message Type {
-    oneof health_check_type {
-        HTTP = 1;
-    }
-}
-
-message Config {
-    Type type;
-    google.protobuf.duration timeout = 1; //validate rules etc.
-}
-
-message HealthCheckTestCase {
-    Config config = 1;
+message HttpHealthCheckTestCase {
+    HealthCheck config = 1; #Health Check config directly
     repeated Action actions = 2;
 }
