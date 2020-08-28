@@ -46,7 +46,6 @@ public:
       ASSERT(hashing_lb_ptr_ != nullptr);
       ASSERT(hash_balance_factor > 0);
     }
-    ~BoundedLoadHashingLoadBalancer() = default;
     HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
 
   protected:
