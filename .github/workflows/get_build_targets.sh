@@ -1,5 +1,7 @@
 #!/bin/bash
 
+readonly TMP_OUTPUT_FILE="tmp.txt"
+
 # This limits the directory that bazel query is going to search under.
 readonly SEARCH_FOLDER="//source/common/..."
 
@@ -17,4 +19,7 @@ do
       ;;
   esac
   # Limit to the first 10 targets.
-done | sort -u | head -n 10 | cat
+done | sort -u | head -n 10 | tee $TMP_OUTPUT_FILE
+
+export BUILD_TARGETS_LOCAL=$(cat $TMP_OUTPUT_FILE)
+rm $TMP_OUTPUT_FILE
