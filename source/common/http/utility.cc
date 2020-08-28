@@ -418,7 +418,7 @@ void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks&
                              const LocalReplyData& local_reply_data) {
   sendLocalReply(
       is_reset,
-      Utility::EncodeFunctions{nullptr,
+      Utility::EncodeFunctions{nullptr, nullptr,
                                [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
                                  callbacks.encodeHeaders(std::move(headers), end_stream);
                                },
@@ -441,6 +441,9 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
   ResponseHeaderMapPtr response_headers{createHeaderMap<ResponseHeaderMapImpl>(
       {{Headers::get().Status, std::to_string(enumToInt(response_code))}})};
 
+  if (encode_functions.modify_headers_) {
+    encode_functions.modify_headers_(*response_headers);
+  }
   if (encode_functions.rewrite_) {
     encode_functions.rewrite_(*response_headers, response_code, body_text, content_type);
   }
@@ -463,13 +466,24 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
       }
       response_headers->setGrpcMessage(PercentEncoding::encode(body_text));
     }
+    // The `modify_headers` function may have added content-length, remove it.
+    response_headers->removeContentLength();
     encode_functions.encode_headers_(std::move(response_headers), true); // Trailers only response
     return;
   }
 
   if (!body_text.empty()) {
     response_headers->setContentLength(body_text.size());
-    response_headers->setReferenceContentType(content_type);
+    // If the `rewrite` function has changed body_text or content-type is not set, set it.
+    // This allows `modify_headers` function to set content-type for the body. For example,
+    // router.direct_response is calling sendLocalReply and may need to set content-type for
+    // the body.
+    if (body_text != local_reply_data.body_text_ || response_headers->ContentType() == nullptr) {
+      response_headers->setReferenceContentType(content_type);
+    }
+  } else {
+    response_headers->removeContentLength();
+    response_headers->removeContentType();
   }
 
   if (local_reply_data.is_head_request_) {
@@ -478,7 +492,7 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
   }
 
   encode_functions.encode_headers_(std::move(response_headers), body_text.empty());
-  // encode_headers()) may have changed the referenced is_reset so we need to test it
+  // encode_headers() may have changed the referenced is_reset so we need to test it
   if (!body_text.empty() && !is_reset) {
     Buffer::OwnedImpl buffer(body_text);
     encode_functions.encode_data_(buffer, true);

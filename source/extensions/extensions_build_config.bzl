@@ -196,9 +196,13 @@ EXTENSIONS = {
     #
     # Http Upstreams (excepting envoy.upstreams.http.generic which is hard-coded into the build so not registered here)
     #
-
     "envoy.upstreams.http.http":                        "//source/extensions/upstreams/http/http:config",
     "envoy.upstreams.http.tcp":                         "//source/extensions/upstreams/http/tcp:config",
+
+    #
+    # Watchdog actions
+    #
+    "envoy.watchdog.profile_action":                    "//source/extensions/watchdog/profile_action:config",
 
 }
 
