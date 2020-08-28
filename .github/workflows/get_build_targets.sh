@@ -5,21 +5,6 @@ readonly SEARCH_FOLDER="//source/common/..."
 
 set -e -o pipefail
 
-# This is to filter out the redudant .cc or .h build targets that bazel
-# query emits when rdeps = 0
-function filter_line() {
-  while read line
-  do
-    case "$line" in
-        *.cc|*.h)
-          ;;
-        *)
-          echo "$line"
-          ;;
-    esac
-  done < "${1:-/dev/stdin}"
-}
-
 function get_targets() {
   # Comparing the PR HEAD with the upstream master HEAD.
   git diff --name-only HEAD FETCH_HEAD | while IFS= read -r line
@@ -30,8 +15,11 @@ function get_targets() {
         bazel query "rdeps($SEARCH_FOLDER, $line, 1)" 2>/dev/null
         ;;
     esac
-    # Limit to the first 10 targets.
-  done | filter_line | sort -u | head -n 10
+    # This chain of commands from left to right are:
+    # 1. Excluding the redundant .cc/.h targets that bazel query emits.
+    # 2. Storing only the unique output.
+    # 3. Limiting to the first 10 targets.
+  done | grep -v '.cc\|.h' | sort -u | head -n 10
 }
 
 # Fetching the upstream HEAD to compare with and stored in FETCH_HEAD.
