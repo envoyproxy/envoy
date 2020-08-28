@@ -15,7 +15,9 @@ py_binary(
     data = glob([
         "*.yaml",
     ]),
-    deps = [requirement("Jinja2")],
+    deps = [
+        requirement("Jinja2")],
+        requirement("MarkupSafe")],
 )
 
 filegroup(
