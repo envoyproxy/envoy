@@ -17,7 +17,7 @@ TEST(EqualityMetadataFrame, Http2FrameTest) {
   Http2Frame http2FrameFromUtility = Http2Frame::makeMetadataFrameFromMetadataMap(
       1, metadataMap, Http2Frame::MetadataFlags::EndMetadata);
   std::string payloadFromHttp2Frame(http2FrameFromUtility);
-  // Note: the actual encoding of the metadata map is nondeterministic and flaky. This is okay!
+  // Note: the actual encoding of the metadata map is non-deterministic and flaky. This is okay!
   ASSERT_EQ(static_cast<int>(http2FrameFromUtility.type()), 0x4D); // type
   ASSERT_EQ(payloadFromHttp2Frame[4], 4);                          // flags
   ASSERT_EQ(std::to_string(payloadFromHttp2Frame[8]),
