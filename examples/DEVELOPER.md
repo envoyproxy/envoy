@@ -7,11 +7,11 @@ each sandbox to have a `verify.sh` script containing tests for the example.
 
 ### Basic layout of the `verify.sh` script
 
-At a minimum the verify.sh script should include the necessary parts to start
+At a minimum the `verify.sh` script should include the necessary parts to start
 and stop your sandbox.
 
-Given a sandbox with single a single `docker` composition, adding the following
-to `verify.sh` will ensure the sandbox can be started and stopped.
+Given a sandbox with a single `docker` composition, adding the following
+to `verify.sh` will test that the sandbox can be started and stopped.
 
 ```
 #!/bin/bash -e
@@ -52,35 +52,36 @@ You may wish to grep the response, or check the return code to ensure the comman
 Likewise, if the documentation asks the user to browse to a page - eg http://localhost:8000 - then you should add a test
 to ensure that the given url responds as expected.
 
-If an example web page is also expected to make further javascript http requests to function, then add tests for requests
-that mimick this interaction.
+If an example web page is also expected to make further javascript http requests in order to function, then add
+tests for requests that mimick this interaction.
 
 A number of utility functions have been added to simplify browser testing.
 
 #### Utility functions: `responds_with`
 
-This can be called to ensure that the given url returns with expected http content:
+The `responds_with` function can be used to ensure a request to a given url responds with
+expected http content.
 
-It follows the form `responds_with <expected_content> <url> <curl args>`
+It follows the form `responds_with <expected_content> <url> <curl_args>`
 
-An simple example `GET` request:
+For example, a simple `GET` request:
 
 ```
 responds_with \
     "Hello, world" \
-	http://localhost:8000
+    http://localhost:8000
 ```
 
-An example of a `POST` request that expects "Hello, postie" in the returned html,
-and also sets the headers and uses `https`:
+This is a more complicated example that uses an `https` `POST` request and sends some
+additional headers:
 
 ```
 responds_with \
     "Hello, postie" \
-	https://localhost:8000/some-endpoint \
-	-k \
-	-X POST \
-	-d 'data=hello,rcpt=service' \
+    https://localhost:8000/some-endpoint \
+    -k \
+    -X POST \
+    -d 'data=hello,rcpt=service' \
     -H 'Origin: https://example-service.com'
 ```
 
@@ -91,30 +92,31 @@ You can check that a request responds with an expected header as follows:
 ```
 responds_with_header \
     "HTTP/1.1 403 Forbidden" \
-	"http://localhost:8000/?name=notdown"
+    "http://localhost:8000/?name=notdown"
 ```
 
-`responds_with_header` can accept additional curl arguments like  `responds_with`
+`responds_with_header` can accept additional curl arguments like `responds_with`
 
 #### Utility functions: `responds_without_header`
 
-You can aslo check that a request *does not* respond with a given header:
+You can also check that a request *does not* respond with a given header:
 
 ```
 responds_without_header \
     "X-Secret: treasure" \
-	"http://localhost:8000"
+    "http://localhost:8000"
 ```
 
-`responds_without_header` can accept additional curl arguments like  `responds_with`
+`responds_without_header` can accept additional curl arguments like `responds_with`
 
 ### Slow starting `docker` compositions
 
 Unless your example provides a way for ensuring that all containers are healthy by
-the time `docker-compose up -d` returns you may need to add a `DELAY` before running
+the time `docker-compose up -d` returns, you may need to add a `DELAY` before running
 the steps in your `verify.sh`
 
-For example, to wait 10 seconds after `docker-compose` has been called set the following:
+For example, to wait 10 seconds after `docker-compose up -d` has been called, set the
+following:
 
 ```
 #!/bin/bash -e
@@ -156,7 +158,7 @@ export PATHS=frontend,backend
 You may need to bring up the stack manually, in order to run some steps beforehand.
 
 Sourcing `verify-common.sh` will always leave you in the sandbox directory, and from there
-you can use the `bring_up_stack` function.
+you can use the `bring_up_example` function.
 
 For example:
 
@@ -169,6 +171,7 @@ export MANUAL=true
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
+run_log "Creating bar.txt before starting containers"
 echo foo > bar.txt
 
 bring_up_example
@@ -176,4 +179,32 @@ bring_up_example
 # add example tests here...
 ```
 
-If your sandbox has multiple paths, `bring_up_example` will bring all up
+If your sandbox has multiple `$PATHS`, `bring_up_example` will bring all
+all of your compositions up.
+
+
+### Additional arguments to `docker-compose up -d`
+
+If you need to pass additional arguments to compose you can set the `UPARGS`
+env var.
+
+For example, to scale a composition with a service named `http_service`, you
+should add the following:
+
+```
+#!/bin/bash -e
+
+export NAME=example-sandbox
+export UPARGS="--scale http_service=2"
+
+# shellcheck source=examples/verify-common.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
+
+# add example tests here...
+```
+
+### Running commands inside `docker` containers
+
+If your example asks the user to run commands inside containers, you can
+mimick this using `docker-compose exec -T`. The `-T` flag is necessary as the
+tests do not have access to a `tty` in the ci pipeline.
