@@ -197,6 +197,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       }
     }
 
+    ENVOY_STREAM_LOG(trace, "ext_authz filter removed header(s) from the request:", *callbacks_);
+    for (const auto& header : response->headers_to_remove) {
+      ENVOY_STREAM_LOG(trace, "'{}'", *callbacks_, header.get());
+      request_headers_->remove(header);
+    }
+
     if (!response->dynamic_metadata.fields().empty()) {
       callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().ExtAuthorization,
                                                   response->dynamic_metadata);
