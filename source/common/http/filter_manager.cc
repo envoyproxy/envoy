@@ -449,7 +449,13 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
                             (end_stream && continue_data_entry == decoder_filters_.end());
     FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
 
-    ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && (*entry)->end_stream_));
+    ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && (*entry)->end_stream_),
+           "Filters should not return FilterHeadersStatus::ContinueAndEndStream from decodeHeaders "
+           "when end_stream is already true");
+    ASSERT(!(status == FilterHeadersStatus::ContinueAndDontEndStream && !(*entry)->end_stream_),
+           "Filters should not return FilterHeadersStatus::ContinueAndDontEndStream from "
+           "decodeHeaders when end_stream is already false");
+
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -918,6 +924,14 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     (*entry)->end_stream_ = state_.encoding_headers_only_ ||
                             (end_stream && continue_data_entry == encoder_filters_.end());
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, (*entry)->end_stream_);
+
+    ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && (*entry)->end_stream_),
+           "Filters should not return FilterHeadersStatus::ContinueAndEndStream from encodeHeaders "
+           "when end_stream is already true");
+    ASSERT(!(status == FilterHeadersStatus::ContinueAndDontEndStream && !(*entry)->end_stream_),
+           "Filters should not return FilterHeadersStatus::ContinueAndDontEndStream from "
+           "encodeHeaders when end_stream is already false");
+
     if ((*entry)->end_stream_) {
       (*entry)->handle_->encodeComplete();
     }
