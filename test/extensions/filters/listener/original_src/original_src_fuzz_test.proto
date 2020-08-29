@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.listener.original_src;
+package test.extensions.filters.listener.original_src;
 
 import "envoy/extensions/filters/listener/original_src/v3/original_src.proto";
 import "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.proto";
