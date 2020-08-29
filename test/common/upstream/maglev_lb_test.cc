@@ -72,7 +72,7 @@ TEST_F(MaglevLoadBalancerTest, NoHost) {
 // Throws an exception if table size is not a prime number.
 TEST_F(MaglevLoadBalancerTest, NoPrimeNumber) {
   EXPECT_THROW_WITH_MESSAGE(init(8), EnvoyException,
-                            "The table size of maglev should be prime number");
+                            "The table size of maglev must be prime number");
 };
 
 // Basic sanity tests.

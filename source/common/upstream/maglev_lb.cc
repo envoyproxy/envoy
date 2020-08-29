@@ -107,9 +107,9 @@ MaglevLoadBalancer::MaglevLoadBalancer(
               ? common_config.consistent_hashing_lb_config().use_hostname_for_hashing()
               : false) {
   ENVOY_LOG(debug, "maglev table size: {}", table_size_);
-  // The table size should be prime number.
+  // The table size must be prime number.
   if (!Primes::isPrime(table_size_)) {
-    throw EnvoyException("The table size of maglev should be prime number");
+    throw EnvoyException("The table size of maglev must be prime number");
   }
 }
 
