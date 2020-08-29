@@ -59,6 +59,7 @@ message DeniedHttpResponse {
 }
 
 // HTTP attributes for an OK response.
+// [#next-free-field: 6]
 message OkHttpResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.auth.v3.OkHttpResponse";
@@ -74,6 +75,8 @@ message OkHttpResponse {
   // by Leaving `append` as false, the filter will either add a new header, or override an existing
   // one if there is a match.
   repeated config.core.v4alpha.HeaderValueOption headers = 2;
+
+  repeated string headers_to_remove = 5;
 }
 
 // Intended for gRPC and Network Authorization servers `only`.
