@@ -2,9 +2,11 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
     "envoy_cc_benchmark_binary",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library"
 )
 
 licenses(["notice"])  # Apache 2
@@ -576,14 +578,32 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "health_check_fuzz_lib",
+    srcs = ["health_check_fuzz.cc"],
+    hdrs = ["health_check_fuzz.h"],
+    deps = [
+        ":utility_lib",
+        "//test/common/upstream:health_checker_impl_test",
+        ":health_check_fuzz_proto_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "health_check_fuzz_proto",
+    srcs = ["health_check_fuzz.proto"],
+    deps = [
+        "//test/fuzz:common_proto",
+        "@envoy_api//envoy/config/core/v3:pkg",
+    ],
+)
 
 envoy_cc_fuzz_test(
     name = "health_check_fuzz_test",
-    srcs = ["health_check_fuzz_test.cc",
-    "health_check_fuzz_test.h"],
-    corpus = ["//test/common/upstream:health_check_corpus"],
+    srcs = ["health_check_fuzz_test.cc"],
+    corpus = "//test/common/upstream:health_check_corpus",
     deps = [
-        ":utility_lib",
-        "//test/common/upstream:health_checker_impl_test"
+        ":health_check_fuzz_proto_cc_proto",
+        ":health_check_fuzz_lib"
     ],
 )
