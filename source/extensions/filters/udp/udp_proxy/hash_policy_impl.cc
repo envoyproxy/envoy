@@ -32,8 +32,8 @@ HashPolicyImpl::HashPolicyImpl(
   }
 }
 
-absl::optional<uint64_t>
-HashPolicyImpl::generateHash(const Network::Address::InstanceConstSharedPtr& downstream_addr) const {
+absl::optional<uint64_t> HashPolicyImpl::generateHash(
+    const Network::Address::InstanceConstSharedPtr& downstream_addr) const {
   return hash_impl_->evaluate(downstream_addr);
 }
 
