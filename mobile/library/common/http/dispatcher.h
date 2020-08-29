@@ -97,7 +97,7 @@ public:
    * @param stream, the stream to reset.
    * @return envoy_status_t, the resulting status of the operation.
    */
-  envoy_status_t resetStream(envoy_stream_t stream);
+  envoy_status_t cancelStream(envoy_stream_t stream);
 
   const DispatcherStats& stats() const;
 
@@ -177,29 +177,18 @@ private:
      * Return whether a callback should be allowed to continue with execution.
      * This ensures at most one 'terminal' callback is issued for any given stream.
      *
+     * When param `close` is false, this function returns `true` while the stream
+     * remains open and false once it's closed. When param `close` is true, this
+     * function returns `true` exactly once, if the stream is still open, and
+     * subsequently always returns false.
+     *
      * @param close, whether the DirectStream should close if it has not closed before.
      * @return bool, whether callbacks on this stream are dispatchable or not.
      */
     bool dispatchable(bool close);
 
     const envoy_stream_t stream_handle_;
-    // https://github.com/lyft/envoy-mobile/pull/616 moved stream cancellation (and its atomic
-    // state) from the platform layer to the core layer, here. This change was made to solidify two
-    // platform-level implementations into one implementation in the core layer. Moreover, it
-    // allowed Envoy Mobile to have test coverage where it didn't before.
-
-    // However, it introduced a subtle race between Dispatcher::resetStream's onCancel and any of
-    // encodeHeaders/Data's callbacks that are _not_ terminal. The race happens because the two
-    // callbacks are being enqueued onto the same dispatch queue/ran on the same executor by two
-    // different threading contexts _after_ the atomic check of the closed_ state happens. This
-    // means that they could be serialized in either order; whereas we want to guarantee that _no_
-    // callback will be executed after onCancel fires in the application. The lock protects the
-    // critical region between the call to dispatchable, and after the call that dispatches the
-    // appropriate callback. There should not be much lock contention because most calls will happen
-    // from the single-threaded context of the Envoy Main thread (encodeHeaders/Data). Alternative
-    // solutions will be considered in: https://github.com/lyft/envoy-mobile/issues/647
-    Thread::MutexBasicLockable dispatch_lock_;
-    std::atomic<bool> closed_{};
+    bool closed_{};
     bool local_closed_{};
     bool hcm_stream_pending_destroy_{};
 
@@ -251,18 +240,7 @@ private:
   // Related issue: https://github.com/lyft/envoy-mobile/issues/720
   const std::string stats_prefix_;
   absl::optional<DispatcherStats> stats_ GUARDED_BY(ready_lock_){};
-  // absl::flat_hash_map is not safe for concurrent access. Thus a cross-thread, concurrent find
-  // in cancellation (which happens in a platform thread) with an erase (which always happens in the
-  // Envoy Main thread) is not safe.
-  // TODO: implement a lock-free access scheme here.
-  // https://github.com/lyft/envoy-mobile/issues/647
-  Thread::MutexBasicLockable streams_lock_;
-  // streams_ holds shared_ptr in order to allow cancellation to happen synchronously even though
-  // DirectStream cleanup happens asynchronously. This is also done to keep the scope of the
-  // streams_lock_ small to make it easier to remove; one could easily use the lock in the
-  // Dispatcher::resetStream to avoid using shared_ptrs.
-  // @see Dispatcher::resetStream.
-  absl::flat_hash_map<envoy_stream_t, DirectStreamSharedPtr> streams_ GUARDED_BY(streams_lock_);
+  absl::flat_hash_map<envoy_stream_t, DirectStreamSharedPtr> streams_;
   std::atomic<envoy_network_t>& preferred_network_;
   // Shared synthetic address across DirectStreams.
   Network::Address::InstanceConstSharedPtr address_;

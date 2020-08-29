@@ -57,16 +57,12 @@ void Dispatcher::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& h
     // Testing hook.
     http_dispatcher_.synchronizer_.syncPoint("dispatch_encode_headers");
 
-    // @see Dispatcher::DirectStream::dispatch_lock_ for why this lock is necessary.
-    Thread::BasicLockable* mutex = end_stream ? nullptr : &direct_stream_.dispatch_lock_;
-    Thread::OptionalReleasableLockGuard lock(mutex);
     if (direct_stream_.dispatchable(end_stream)) {
       ENVOY_LOG(debug,
                 "[S{}] dispatching to platform response headers for stream (end_stream={}):\n{}",
                 direct_stream_.stream_handle_, end_stream, headers);
       bridge_callbacks_.on_headers(Utility::toBridgeHeaders(headers), end_stream,
                                    bridge_callbacks_.context);
-      lock.release();
       closeRemote(end_stream);
     }
     return;
@@ -78,13 +74,9 @@ void Dispatcher::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& h
   // mobile networking libraries.
   switch (response_status) {
   case 200: {
-    // @see Dispatcher::DirectStream::dispatch_lock_ for why this lock is necessary.
-    Thread::BasicLockable* mutex = end_stream ? nullptr : &direct_stream_.dispatch_lock_;
-    Thread::OptionalReleasableLockGuard lock(mutex);
     if (direct_stream_.dispatchable(end_stream)) {
       bridge_callbacks_.on_headers(Utility::toBridgeHeaders(headers), end_stream,
                                    bridge_callbacks_.context);
-      lock.release();
       closeRemote(end_stream);
     }
     return;
@@ -130,16 +122,12 @@ void Dispatcher::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool 
       http_dispatcher_.synchronizer_.syncPoint("dispatch_encode_final_data");
     }
 
-    // @see Dispatcher::DirectStream::dispatch_lock_ for why this lock is necessary.
-    Thread::BasicLockable* mutex = end_stream ? nullptr : &direct_stream_.dispatch_lock_;
-    Thread::OptionalReleasableLockGuard lock(mutex);
     if (direct_stream_.dispatchable(end_stream)) {
       ENVOY_LOG(debug,
                 "[S{}] dispatching to platform response data for stream (length={} end_stream={})",
                 direct_stream_.stream_handle_, data.length(), end_stream);
       bridge_callbacks_.on_data(Buffer::Utility::toBridgeData(data), end_stream,
                                 bridge_callbacks_.context);
-      lock.release();
       closeRemote(end_stream);
     }
   } else {
@@ -271,10 +259,11 @@ void Dispatcher::DirectStream::closeLocal(bool end_stream) {
 
 bool Dispatcher::DirectStream::dispatchable(bool close) {
   if (close) {
-    // Set closed to true and return true if not previously closed.
-    return !closed_.exchange(close);
+    bool previous = closed_;
+    closed_ = true;
+    return !previous;
   }
-  return !closed_.load();
+  return !closed_;
 }
 
 Dispatcher::Dispatcher(std::atomic<envoy_network_t>& preferred_network)
@@ -326,9 +315,7 @@ envoy_status_t Dispatcher::startStream(envoy_stream_t new_stream_handle,
         &TS_UNCHECKED_READ(api_listener_)
              ->newStream(*direct_stream->callbacks_, true /* is_internally_created */);
 
-    Thread::ReleasableLockGuard lock(streams_lock_);
     streams_.emplace(new_stream_handle, std::move(direct_stream));
-    lock.release();
     ENVOY_LOG(debug, "[S{}] start stream", new_stream_handle);
   });
 
@@ -423,59 +410,34 @@ envoy_status_t Dispatcher::sendTrailers(envoy_stream_t stream, envoy_headers tra
   return ENVOY_SUCCESS;
 }
 
-envoy_status_t Dispatcher::resetStream(envoy_stream_t stream) {
-  // Testing hook.
-  synchronizer_.syncPoint("getStream_on_cancel");
+envoy_status_t Dispatcher::cancelStream(envoy_stream_t stream) {
+  post([this, stream]() -> void {
+    Dispatcher::DirectStreamSharedPtr direct_stream = getStream(stream);
+    if (direct_stream) {
+      // Testing hook.
+      synchronizer_.syncPoint("dispatch_on_cancel");
 
-  Dispatcher::DirectStreamSharedPtr direct_stream = getStream(stream);
-  if (direct_stream) {
+      if (direct_stream->dispatchable(true)) {
+        direct_stream->callbacks_->onCancel();
 
-    // Testing hook.
-    synchronizer_.syncPoint("dispatch_on_cancel");
-
-    // @see Dispatcher::DirectStream::dispatch_lock_ for why this lock is necessary.
-    Thread::ReleasableLockGuard lock(direct_stream->dispatch_lock_);
-    if (direct_stream->dispatchable(true)) {
-      direct_stream->callbacks_->onCancel();
-      lock.release();
-      // n.b: this is guarded by the call above. If the onCancel is not dispatchable then that means
-      // that another terminal callback has already happened. All terminal callbacks clean up stream
-      // state, so there is no need to dispatch here.
-      post([this, stream]() -> void {
-        Dispatcher::DirectStreamSharedPtr direct_stream = getStream(stream);
-        if (direct_stream) {
-          // This interaction is important. The runResetCallbacks call synchronously causes Envoy to
-          // defer delete the HCM's ActiveStream. That means that the lifetime of the DirectStream
-          // only needs to be as long as that deferred delete. Therefore, we synchronously call
-          // cleanup here which will defer delete the DirectStream, which by definition will be
-          // scheduled **after** the HCM's defer delete as they are scheduled on the same dispatcher
-          // context.
-          //
-          // StreamResetReason::RemoteReset is used as the platform code that issues the
-          // cancellation is considered the remote.
-          //
-          // This call is guarded by hcm_stream_pending_destroy_ to protect against the
-          // following race condition:
-          //   1. resetStream executes first on a platform thread, getting through the dispatch
-          //   guard and posting this lambda.
-          //   2. The event dispatcher's thread executes a terminal encoding or a reset in the
-          //   Http::ConnectionManager, thus calling deferredDelete on the ActiveStream.
-          //   3. The event dispatcher's thread executes this post body, thus calling
-          //   runResetCallbacks, which ends up calling deferredDelete (for a second time!) on the
-          //   ActiveStream.
-          // This protection makes sure that Envoy Mobile's Http::Dispatcher::DirectStream knows
-          // synchronously when the ActiveStream is deferredDelete'd for the first time.
-          if (!direct_stream->hcm_stream_pending_destroy_) {
-            direct_stream->hcm_stream_pending_destroy_ = true;
-            direct_stream->runResetCallbacks(StreamResetReason::RemoteReset);
-          }
-          cleanup(direct_stream->stream_handle_);
+        // This interaction is important. The runResetCallbacks call synchronously causes Envoy to
+        // defer delete the HCM's ActiveStream. That means that the lifetime of the DirectStream
+        // only needs to be as long as that deferred delete. Therefore, we synchronously call
+        // cleanup here which will defer delete the DirectStream, which by definition will be
+        // scheduled **after** the HCM's defer delete as they are scheduled on the same dispatcher
+        // context.
+        //
+        // StreamResetReason::RemoteReset is used as the platform code that issues the
+        // cancellation is considered the remote.
+        if (!direct_stream->hcm_stream_pending_destroy_) {
+          direct_stream->hcm_stream_pending_destroy_ = true;
+          direct_stream->runResetCallbacks(StreamResetReason::RemoteReset);
         }
-      });
+        cleanup(direct_stream->stream_handle_);
+      }
     }
-    return ENVOY_SUCCESS;
-  }
-  return ENVOY_FAILURE;
+  });
+  return ENVOY_SUCCESS;
 }
 
 const DispatcherStats& Dispatcher::stats() const {
@@ -486,8 +448,6 @@ const DispatcherStats& Dispatcher::stats() const {
 }
 
 Dispatcher::DirectStreamSharedPtr Dispatcher::getStream(envoy_stream_t stream) {
-  Thread::LockGuard lock(streams_lock_);
-
   auto direct_stream_pair_it = streams_.find(stream);
   // Returning will copy the shared_ptr and increase the ref count. Moreover, this is safe because
   // creation of the return value happens before destruction of local variables:
@@ -512,9 +472,7 @@ void Dispatcher::cleanup(envoy_stream_t stream_handle) {
   TS_UNCHECKED_READ(event_dispatcher_)->deferredDelete(std::move(direct_stream_wrapper));
   // However, the entry in the map should not exist after cleanup.
   // Hence why it is synchronously erased from the streams map.
-  Thread::ReleasableLockGuard lock(streams_lock_);
   size_t erased = streams_.erase(stream_handle);
-  lock.release();
   ASSERT(erased == 1, "cleanup should always remove one entry from the streams map");
   ENVOY_LOG(debug, "[S{}] erased stream from streams container", stream_handle);
 }
