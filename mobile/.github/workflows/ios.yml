@@ -91,7 +91,7 @@ jobs:
   swifttests:
     name: swift_tests
     runs-on: macOS-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v1
         with:
