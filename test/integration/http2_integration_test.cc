@@ -1245,6 +1245,34 @@ TEST_P(Http2IntegrationTest, PauseAndResumeHeadersOnly) {
   ASSERT_TRUE(response->complete());
 }
 
+TEST_P(Http2IntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
+  config_helper_.addFilter(R"EOF(
+  name: continue-headers-only-inject-body-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send a headers only request.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Make sure that the body was injected to the request.
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(upstream_request_->receivedData());
+  EXPECT_EQ(upstream_request_->body().toString(), "body");
+
+  // Send a headers only response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+
+  // Make sure that the body was injected to the response.
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->body(), "body");
+}
+
 // Verify the case when we have large pending data with empty trailers. It should not introduce
 // stack-overflow (on ASan build). This is a regression test for
 // https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=24714.
