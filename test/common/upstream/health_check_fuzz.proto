@@ -2,14 +2,51 @@ syntax = "proto3";
 
 package test.common.upstream;
 
+import "envoy/api/v2/core/health_check.proto";
+import "google/protobuf/duration.proto";
+
 message HealthCheckConfig {
+    #fields that change logic that are common amongst all types of health checkers
+    google.protobuf.Duration timeout = 1 [(validate.rules).duration = {
+        required: true
+        gt {}
+    }];
 
-}
+    google.protobuf.Duration interval = 2 [(validate.rules).duration = {
+        required: true
+        gt {}  
+    }];
 
-message HttpHealthCheckConfig {
-    HealthCheckConfig config = 1;
-    string host = 2;
-    string path = 3;
+    google.protobuf.Duration initial_jitter = 3;
+    google.protobuf.Duration interval_jitter = 4;
+    uint32 interval_jitter_percent = 5;
+    google.protobuf.UInt32Value unhealthy_threshold = 6 [(validate.rules).message = {required: true}];
+    google.protobuf.UInt32Value healthy_threshold = 7 [(validate.rules).message = {required: true}];
+    google.protobuf.UInt32Value alt_port = 8;
+    google.protobuf.BoolValue reuse_connection = 9;
+    google.protobuf.Duration no_traffic_interval = 10 [(validate.rules).duration = {gt {}}];
+    google.protobuf.Duration unhealthy_interval = 11 [(validate.rules).duration = {gt {}}];
+    google.protobuf.Duration unhealthy_edge_interval = 12 [(validate.rules).duration = {gt {}}];
+    google.protobuf.Duration healthy_edge_interval = 13 [(validate.rules).duration = {gt {}}];
+    string event_log_path = 14;
+    EventServiceConfig event_service = 15;
+    bool always_log_health_check_failures = 16;
+    TlsOptions tls_options = 17;
+
+    int timeout = 1;
+    int interval = 2;
+    int initial_jitter = 3;
+    int interval_jitter = 4;
+    int interval_jitter_percent = 5;
+    int unhealthy_threshold = 6;
+    int healthy_threshold = 7;
+    bool reuse_connection = 8;
+    int no_traffic_interval = 9;
+    int unhealthy_interval = 10;
+    int unhealthy_edge_interval = 11;
+    int healthy_edge_interval = 12;
+    bool always_log_health_check_failures = 13;
+    tls_options = 14;
 }
 
 message Respond {
@@ -26,15 +63,28 @@ message DegradationBehavior {
     int simulated_time_seconds_for_degradation = 2;
 }
 
-message Action {
+message StreamCreate {
+
+}
+
+message HttpAction {
     oneof action_selector {
         Respond respond = 1;
-        boolean stream_create = 2;
-        DegradationBehavior = 3;
+        StreamCreate stream_create = 2;
+        #DegradationBehavior = 3;
     }
 }
 
-message HttpHealthCheckTestCase {
-    HealthCheck config = 1; #Health Check config directly
-    repeated Action actions = 2;
+message HttpHealthCheckConfig {
+    HealthCheckConfig config = 1;
+    core.HealthCheck.HttpHealthCheck http_config = 2;
+    repeated HttpAction actions = 3;
+}
+
+message HealthCheckTestCase {
+    oneof health_check_type_selector {
+        HttpHealthCheckConfig http_config = 1;
+        #TcpHealthCheckConfig tcp_config = 2;
+        #gRPCHealthCheckConfig grpc_config = 3;
+    }
 }

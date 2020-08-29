@@ -134,7 +134,8 @@ envoy_benchmark_test(
 
 envoy_cc_test(
     name = "health_checker_impl_test",
-    srcs = ["health_checker_impl_test.cc"],
+    srcs = ["health_checker_impl_test.cc",
+    "health_checker_impl_test.h"],
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
@@ -480,8 +481,7 @@ envoy_cc_test(
 
 envoy_cc_test_library(
     name = "utility_lib",
-    hdrs = ["utility.h",
-    "health_checker_impl_test.h"],
+    hdrs = ["utility.h"],
     deps = [
         "//include/envoy/stats:stats_interface",
         "//source/common/json:json_loader_lib",
@@ -579,9 +579,11 @@ envoy_cc_test(
 
 envoy_cc_fuzz_test(
     name = "health_check_fuzz_test",
-    srcs = ["health_check_fuzz_test.cc"],
+    srcs = ["health_check_fuzz_test.cc",
+    "health_check_fuzz_test.h"],
     corpus = ["//test/common/upstream:health_check_corpus"],
     deps = [
         ":utility_lib",
+        "//test/common/upstream:health_checker_impl_test"
     ],
 )
