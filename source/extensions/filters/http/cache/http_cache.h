@@ -173,8 +173,8 @@ size_t stableHashKey(const Key& key);
 // The metadata associated with a cached response.
 // TODO(yosrym93): This could be changed to a proto if a need arises.
 struct ResponseMetadata {
-  // The time at which a response was inserted into the cache.
-  // This represents "response_time" in the age header calculations at:
+  // The time at which a response was was most recently inserted, updated, or validated in this
+  // cache. This represents "response_time" in the age header calculations at:
   // https://httpwg.org/specs/rfc7234.html#age.calculations
   SystemTime response_time_;
 };

@@ -160,7 +160,7 @@ Seconds CacheHeadersUtils::calculateAge(const Http::ResponseHeaderMap& response_
   const SystemTime::duration apparent_age =
       std::max(SystemTime::duration(0), response_time - date_value);
 
-  // Assumption: response_delay is negligible -> correct_age_value = age_value.
+  // Assumption: response_delay is negligible -> corrected_age_value = age_value.
   const SystemTime::duration corrected_age_value = Seconds(age_value);
   const SystemTime::duration corrected_initial_age = std::max(apparent_age, corrected_age_value);
 
