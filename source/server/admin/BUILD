@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = ["admin.h"],
     deps = [
         ":admin_filter_lib",
+        ":clusters_handler_lib",
         ":config_tracker_lib",
         ":listeners_handler_lib",
         ":logs_handler_lib",
@@ -22,7 +23,6 @@ envoy_cc_library(
         ":server_cmd_handler_lib",
         ":server_info_handler_lib",
         ":stats_handler_lib",
-        ":clusters_handler_lib",
         ":utils_lib",
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:filter_interface",
@@ -239,6 +239,7 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/upstream:host_utility_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )
 
