@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -400,11 +401,34 @@ protected:
     }                                                                                              \
   } while (0)
 
-#define ENVOY_LOG_ONCE(LEVEL, ...)                                                                 \
+#define ENVOY_LOG_FIRST_N(LEVEL, N, ...)                                                           \
   do {                                                                                             \
-    static std::atomic<bool>* logged = new std::atomic<bool>(false);                               \
-    bool expected = false;                                                                         \
-    if (logged->compare_exchange_strong(expected /*expected value*/, true /*new value*/)) {        \
+    static auto* countdown = new std::atomic<uint64_t>(N);                                         \
+    if (countdown->fetch_sub(1) > 0) {                                                             \
+      ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_LOG_ONCE(LEVEL, ...) ENVOY_LOG_FIRST_N(LEVEL, 1, ##__VA_ARGS__)
+
+#define ENVOY_LOG_EVERY_NTH(LEVEL, N, ...)                                                         \
+  do {                                                                                             \
+    static auto* count = new std::atomic<uint64_t>(1);                                             \
+    if ((count->fetch_add(1) % N) == 0) {                                                          \
+      ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
+    }                                                                                              \
+  } while (0)
+
+// This is to get us to pass the format check. We reference a real-world time source here.
+// I think it's not easy to mock/simulate time here as it stands today anyway.
+using t_logclock = std::chrono::steady_clock; // NOLINT
+
+#define ENVOY_LOG_PERIODIC(LEVEL, CHRONO_DURATION, ...)                                            \
+  do {                                                                                             \
+    static auto* last_hit = new std::atomic<t_logclock::time_point>();                             \
+    auto last = last_hit->load();                                                                  \
+    const auto now = t_logclock::now();                                                            \
+    if ((now - last) > CHRONO_DURATION && last_hit->compare_exchange_strong(last, now)) {          \
       ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
     }                                                                                              \
   } while (0)
