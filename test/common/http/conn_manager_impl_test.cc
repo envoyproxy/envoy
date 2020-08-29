@@ -5070,9 +5070,8 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamHeaders) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, true);
 
-  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true))
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::ContinueAndEndStream));
-  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(*encoder_filters_[0], encodeComplete());
@@ -5082,7 +5081,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamHeaders) {
 
   decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[1]->callbacks_->encodeHeaders(
-      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true);
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), false);
 
   Buffer::OwnedImpl response_body("response");
   decoder_filters_[1]->callbacks_->encodeData(response_body, true);
