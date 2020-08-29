@@ -2,7 +2,7 @@
 
 ## Add a `verify.sh` test to your sandbox
 
-Sandboxes are tested as part of the continous integration process, which expects
+Sandboxes are tested as part of the continuous integration process, which expects
 each sandbox to have a `verify.sh` script containing tests for the example.
 
 ### Basic layout of the `verify.sh` script
