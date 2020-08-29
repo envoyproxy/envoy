@@ -302,6 +302,7 @@ static void* jvm_on_error(envoy_error error, void* context) {
   error.message.release(error.message.context);
   // No further callbacks happen on this context. Delete the reference held by native code.
   env->DeleteGlobalRef(j_context);
+  env->DeleteLocalRef(jcls_JvmObserverContext);
   return result;
 }
 
@@ -325,6 +326,7 @@ static void* jvm_on_cancel(void* context) {
 
   // No further callbacks happen on this context. Delete the reference held by native code.
   env->DeleteGlobalRef(j_context);
+  env->DeleteLocalRef(jcls_JvmObserverContext);
   return result;
 }
 
@@ -344,6 +346,7 @@ static const void* jvm_http_filter_init(const void* context) {
   jobject j_filter = env->CallObjectMethod(j_context, jmid_create);
   __android_log_print(ANDROID_LOG_VERBOSE, "[Envoy]", "j_filter: %p", j_filter);
   jobject retained_filter = env->NewGlobalRef(j_filter);
+  env->DeleteLocalRef(jcls_JvmFilterFactoryContext);
   return retained_filter;
 }
 
