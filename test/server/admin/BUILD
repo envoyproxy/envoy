@@ -1,11 +1,11 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
 )
-
-licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -111,6 +111,15 @@ envoy_cc_test(
         ":admin_instance_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//test/test_common:logging_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "clusters_handler_test",
+    srcs = ["clusters_handler_test.cc"],
+    deps = [
+        ":admin_instance_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )
