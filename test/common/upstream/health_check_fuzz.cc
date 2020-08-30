@@ -1,7 +1,8 @@
-#include "health_check_fuzz.h"
+#include "test/common/upstream/health_check_fuzz.h"
 #include "test/common/upstream/utility.h"
 
 namespace Envoy {
+namespace Upstream {
 
 HealthCheckFuzz::HealthCheckFuzz() {
 
@@ -42,8 +43,8 @@ void HealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase inp
     replay(input);
 }
 
-void HealthCheckFuzz::respond(test::common::upstream::Respond respondFields) {
-    Upstream::HttpHealthCheckerImplTest::respond(0, respondFields.code(), respondFields.conn_close(), respondFields.proxy_close(), respondFields.body(), respondFields.trailers(), {}, respondFields.degraded()); //TODO: HEALTH CHECK CLUSTER
+void HealthCheckFuzz::respondFields(test::common::upstream::Respond respondFields) {
+    respond(0, respondFields.code(), respondFields.conn_close(), respondFields.proxy_close(), respondFields.body(), respondFields.trailers(), {}, respondFields.degraded()); //TODO: HEALTH CHECK CLUSTER
 }
 
 void HealthCheckFuzz::streamCreate() {
@@ -56,7 +57,7 @@ void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) 
         ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
         switch (event.action_selector_case()) { //TODO: Once added implementations for tcp and gRPC, move this to a seperate method, handleHttp
             case test::common::upstream::HttpAction::kRespond: { //Respond
-                respond(event.respond());
+                respondFields(event.respond());
                 break;
             }
             case test::common::upstream::HttpAction::kStreamCreate: { //Expect Stream Create
@@ -70,4 +71,6 @@ void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) 
         }
     }
 }
-}
+
+} //namespace Upstream
+} //namespace Envoy

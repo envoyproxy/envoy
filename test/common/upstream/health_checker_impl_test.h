@@ -1,8 +1,10 @@
+#pragma once
+
 #include <vector>
 #include "common/upstream/health_checker_impl.h"
 #include "test/mocks/upstream/mocks.h"
 
-/*#include <chrono>
+#include <chrono>
 #include <memory>
 #include <string>
 #include <vector>
@@ -34,11 +36,9 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
-*/
 
 namespace Envoy {
 namespace Upstream {
-namespace {
 
 class HealthCheckerTestBase {
 public:
@@ -153,6 +153,5 @@ public:
   const HostWithHealthCheckMap health_checker_map_{};
 };
 
-} //namespace
 } //namespace Upstream
 } //namespace Envoy

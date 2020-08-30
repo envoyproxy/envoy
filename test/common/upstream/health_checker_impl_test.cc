@@ -1,7 +1,8 @@
+#include "test/common/upstream/health_checker_impl_test.h"
+/*
 #include <chrono>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
@@ -16,27 +17,24 @@
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/upstream/health_checker_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
-#include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/host_set.h"
+#include "test/mocks/upstream/transport_socket_match.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
-
-#include "test/common/upstream/health_checker_impl_test.h"
-
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "gtest/gtest.h"*/
 
 using testing::_;
 using testing::DoAll;
@@ -50,7 +48,6 @@ using testing::SaveArg;
 
 namespace Envoy {
 namespace Upstream {
-namespace {
 
 envoy::config::core::v3::HealthCheck createGrpcHealthCheckConfig() {
   envoy::config::core::v3::HealthCheck health_check;
@@ -99,21 +96,21 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
                              .get()));
 }
 
-  void HttpHealthCheckerImplTest::allocHealthChecker(const std::string& yaml, bool avoid_boosting) {
-    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV3Yaml(yaml, avoid_boosting), dispatcher_, runtime_, random_,
-        HealthCheckEventLoggerPtr(event_logger_storage_.release()));
-  }
+void HttpHealthCheckerImplTest::allocHealthChecker(const std::string& yaml, bool avoid_boosting) {
+  health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+      *cluster_, parseHealthCheckFromV3Yaml(yaml, avoid_boosting), dispatcher_, runtime_, random_,
+      HealthCheckEventLoggerPtr(event_logger_storage_.release()));
+}
 
-  void HttpHealthCheckerImplTest::addCompletionCallback() {
-    health_checker_->addHostCheckCompleteCb(
-        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
-          onHostStatus(host, changed_state);
-        });
-  }
+void HttpHealthCheckerImplTest::addCompletionCallback() {
+  health_checker_->addHostCheckCompleteCb(
+      [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+        onHostStatus(host, changed_state);
+      });
+}
 
-  void HttpHealthCheckerImplTest::setupNoServiceValidationHCWithHttp2() {
-    const std::string yaml = R"EOF(
+void HttpHealthCheckerImplTest::setupNoServiceValidationHCWithHttp2() {
+  const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -127,12 +124,12 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
       codec_client_type: Http2
     )EOF";
 
-    allocHealthChecker(yaml);
-    addCompletionCallback();
-  }
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+}
 
-  void HttpHealthCheckerImplTest::setupInitialJitter() {
-    const std::string yaml = R"EOF(
+void HttpHealthCheckerImplTest::setupInitialJitter() {
+  const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -146,12 +143,12 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
-    addCompletionCallback();
-  }
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+}
 
-  void HttpHealthCheckerImplTest::setupIntervalJitterPercent() {
-    const std::string yaml = R"EOF(
+void HttpHealthCheckerImplTest::setupIntervalJitterPercent() {
+  const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -164,12 +161,12 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
-    addCompletionCallback();
-  }
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+}
 
-  void HttpHealthCheckerImplTest::setupNoServiceValidationHC() {
-    const std::string yaml = R"EOF(
+void HttpHealthCheckerImplTest::setupNoServiceValidationHC() {
+  const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -182,12 +179,12 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
-    addCompletionCallback();
-  }
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+}
 
-  void HttpHealthCheckerImplTest::setupNoServiceValidationHCOneUnhealthy() {
-    const std::string yaml = R"EOF(
+void HttpHealthCheckerImplTest::setupNoServiceValidationHCOneUnhealthy() {
+  const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -200,12 +197,12 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
-    addCompletionCallback();
-  }
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+}
 
-  void HttpHealthCheckerImplTest::setupNoServiceValidationHCAlwaysLogFailure() {
-    const std::string yaml = R"EOF(
+void HttpHealthCheckerImplTest::setupNoServiceValidationHCAlwaysLogFailure() {
+  const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -219,12 +216,12 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
     always_log_health_check_failures: true
     )EOF";
 
-    allocHealthChecker(yaml);
-    addCompletionCallback();
-  }
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+}
 
-  void HttpHealthCheckerImplTest::setupNoServiceValidationNoReuseConnectionHC() {
-    std::string yaml = R"EOF(
+void HttpHealthCheckerImplTest::setupNoServiceValidationNoReuseConnectionHC() {
+  std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
     interval_jitter: 1s
@@ -235,12 +232,12 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
-    addCompletionCallback();
-  }
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+}
 
-  void HttpHealthCheckerImplTest::setupHealthCheckIntervalOverridesHC() {
-    const std::string yaml = R"EOF(
+void HttpHealthCheckerImplTest::setupHealthCheckIntervalOverridesHC() {
+  const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
     unhealthy_interval: 2s
@@ -256,12 +253,12 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
-    addCompletionCallback();
-  }
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+}
 
-  void HttpHealthCheckerImplTest::setupServiceValidationHC() {
-    std::string yaml = R"EOF(
+void HttpHealthCheckerImplTest::setupServiceValidationHC() {
+  std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
     interval_jitter: 1s
@@ -273,12 +270,12 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
-    addCompletionCallback();
-  }
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+}
 
-  void HttpHealthCheckerImplTest::setupDeprecatedServiceNameValidationHC(const std::string& prefix) {
-    std::string yaml = fmt::format(R"EOF(
+void HttpHealthCheckerImplTest::setupDeprecatedServiceNameValidationHC(const std::string& prefix) {
+  std::string yaml = fmt::format(R"EOF(
     timeout: 1s
     interval: 1s
     interval_jitter: 1s
@@ -289,14 +286,14 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
         prefix: {0}
       path: /healthcheck
     )EOF",
-                                   prefix);
+                                 prefix);
 
-    allocHealthChecker(yaml);
-    addCompletionCallback();
-  }
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+}
 
-  void HttpHealthCheckerImplTest::setupServicePrefixPatternValidationHC() {
-    std::string yaml = R"EOF(
+void HttpHealthCheckerImplTest::setupServicePrefixPatternValidationHC() {
+  std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
     interval_jitter: 1s
@@ -308,12 +305,12 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
-    addCompletionCallback();
-  }
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+}
 
-  void HttpHealthCheckerImplTest::setupServiceExactPatternValidationHC() {
-    std::string yaml = R"EOF(
+void HttpHealthCheckerImplTest::setupServiceExactPatternValidationHC() {
+  std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
     interval_jitter: 1s
@@ -325,12 +322,12 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
-    addCompletionCallback();
-  }
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+}
 
-  void HttpHealthCheckerImplTest::setupServiceRegexPatternValidationHC() {
-    std::string yaml = R"EOF(
+void HttpHealthCheckerImplTest::setupServiceRegexPatternValidationHC() {
+  std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
     interval_jitter: 1s
@@ -344,12 +341,13 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
       path: /healthcheck
     )EOF";
 
-    allocHealthChecker(yaml);
-    addCompletionCallback();
-  }
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+}
 
-  void HttpHealthCheckerImplTest::setupServiceValidationWithCustomHostValueHC(const std::string& host) {
-    std::string yaml = fmt::format(R"EOF(
+void HttpHealthCheckerImplTest::setupServiceValidationWithCustomHostValueHC(
+    const std::string& host) {
+  std::string yaml = fmt::format(R"EOF(
     timeout: 1s
     interval: 1s
     interval_jitter: 1s
@@ -361,30 +359,31 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
       path: /healthcheck
       host: {0}
     )EOF",
-                                   host);
+                                 host);
 
-    allocHealthChecker(yaml);
-    addCompletionCallback();
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+}
+
+const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig
+HttpHealthCheckerImplTest::makeHealthCheckConfig(const uint32_t port_value) {
+  envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
+  config.set_port_value(port_value);
+  return config;
+}
+
+void HttpHealthCheckerImplTest::appendTestHosts(std::shared_ptr<MockClusterMockPrioritySet> cluster,
+                                                const HostWithHealthCheckMap& hosts,
+                                                const std::string& protocol,
+                                                const uint32_t priority) {
+  for (const auto& host : hosts) {
+    cluster->prioritySet().getMockHostSet(priority)->hosts_.emplace_back(
+        makeTestHost(cluster->info_, fmt::format("{}{}", protocol, host.first), host.second));
   }
+}
 
-  const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig
-  HttpHealthCheckerImplTest::makeHealthCheckConfig(const uint32_t port_value) {
-    envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
-    config.set_port_value(port_value);
-    return config;
-  }
-
-  void HttpHealthCheckerImplTest::appendTestHosts(std::shared_ptr<MockClusterMockPrioritySet> cluster,
-                       const HostWithHealthCheckMap& hosts, const std::string& protocol,
-                       const uint32_t priority) {
-    for (const auto& host : hosts) {
-      cluster->prioritySet().getMockHostSet(priority)->hosts_.emplace_back(
-          makeTestHost(cluster->info_, fmt::format("{}{}", protocol, host.first), host.second));
-    }
-  }
-
-  void HttpHealthCheckerImplTest::setupServiceValidationWithAdditionalHeaders() {
-    std::string yaml = R"EOF(
+void HttpHealthCheckerImplTest::setupServiceValidationWithAdditionalHeaders() {
+  std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
     interval_jitter: 1s
@@ -433,12 +432,12 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
             value: "%START_TIME(%s.%9f)%"
     )EOF";
 
-    allocHealthChecker(yaml);
-    addCompletionCallback();
-  }
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+}
 
-  void HttpHealthCheckerImplTest::setupServiceValidationWithoutUserAgent() {
-    std::string yaml = R"EOF(
+void HttpHealthCheckerImplTest::setupServiceValidationWithoutUserAgent() {
+  std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
     interval_jitter: 1s
@@ -453,151 +452,155 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
       request_headers_to_remove: ["user-agent"]
     )EOF";
 
-    allocHealthChecker(yaml);
-    addCompletionCallback();
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+}
+
+void HttpHealthCheckerImplTest::expectSessionCreate(
+    const HostWithHealthCheckMap& health_check_map) {
+  // Expectations are in LIFO order.
+  TestSessionPtr new_test_session(new TestSession());
+  test_sessions_.emplace_back(std::move(new_test_session));
+  TestSession& test_session = *test_sessions_.back();
+  test_session.timeout_timer_ = new Event::MockTimer(&dispatcher_);
+  test_session.interval_timer_ = new Event::MockTimer(&dispatcher_);
+  expectClientCreate(test_sessions_.size() - 1, health_check_map);
+}
+
+void HttpHealthCheckerImplTest::expectClientCreate(size_t index,
+                                                   const HostWithHealthCheckMap& health_check_map) {
+  TestSession& test_session = *test_sessions_[index];
+  test_session.codec_ = new NiceMock<Http::MockClientConnection>();
+  ON_CALL(*test_session.codec_, protocol()).WillByDefault(Return(Http::Protocol::Http11));
+  test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
+  connection_index_.push_back(index);
+  codec_index_.push_back(index);
+
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+      .Times(testing::AnyNumber())
+      .WillRepeatedly(InvokeWithoutArgs([&]() -> Network::ClientConnection* {
+        uint32_t index = connection_index_.front();
+        connection_index_.pop_front();
+        return test_sessions_[index]->client_connection_;
+      }));
+  EXPECT_CALL(*health_checker_, createCodecClient_(_))
+      .WillRepeatedly(
+          Invoke([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
+            if (!health_check_map.empty()) {
+              const auto& health_check_config =
+                  health_check_map.at(conn_data.host_description_->address()->asString());
+              // To make sure health checker checks the correct port.
+              EXPECT_EQ(health_check_config.port_value(),
+                        conn_data.host_description_->healthCheckAddress()->ip()->port());
+            }
+            uint32_t index = codec_index_.front();
+            codec_index_.pop_front();
+            TestSession& test_session = *test_sessions_[index];
+            std::shared_ptr<Upstream::MockClusterInfo> cluster{
+                new NiceMock<Upstream::MockClusterInfo>()};
+            Event::MockDispatcher dispatcher_;
+            return new CodecClientForTest(
+                Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
+                test_session.codec_, nullptr,
+                Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
+          }));
+}
+
+void HttpHealthCheckerImplTest::expectStreamCreate(size_t index) {
+  test_sessions_[index]->request_encoder_.stream_.callbacks_.clear();
+  EXPECT_CALL(*test_sessions_[index]->codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&test_sessions_[index]->stream_response_callbacks_),
+                      ReturnRef(test_sessions_[index]->request_encoder_)));
+}
+
+void HttpHealthCheckerImplTest::respond(size_t index, const std::string& code, bool conn_close,
+                                        bool proxy_close, bool body, bool trailers,
+                                        const absl::optional<std::string>& service_cluster,
+                                        bool degraded) {
+  std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", code}});
+
+  if (degraded) {
+    response_headers->setEnvoyDegraded(1);
   }
 
-  void HttpHealthCheckerImplTest::expectSessionCreate(const HostWithHealthCheckMap& health_check_map) {
-    // Expectations are in LIFO order.
-    TestSessionPtr new_test_session(new TestSession());
-    test_sessions_.emplace_back(std::move(new_test_session));
-    TestSession& test_session = *test_sessions_.back();
-    test_session.timeout_timer_ = new Event::MockTimer(&dispatcher_);
-    test_session.interval_timer_ = new Event::MockTimer(&dispatcher_);
-    expectClientCreate(test_sessions_.size() - 1, health_check_map);
+  if (service_cluster) {
+    response_headers->addCopy(Http::Headers::get().EnvoyUpstreamHealthCheckedCluster,
+                              service_cluster.value());
+  }
+  if (conn_close) {
+    response_headers->addCopy("connection", "close");
+  }
+  if (proxy_close) {
+    response_headers->addCopy("proxy-connection", "close");
   }
 
-  void HttpHealthCheckerImplTest::expectClientCreate(size_t index, const HostWithHealthCheckMap& health_check_map) {
-    TestSession& test_session = *test_sessions_[index];
-    test_session.codec_ = new NiceMock<Http::MockClientConnection>();
-    ON_CALL(*test_session.codec_, protocol()).WillByDefault(Return(Http::Protocol::Http11));
-    test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
-    connection_index_.push_back(index);
-    codec_index_.push_back(index);
-
-    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-        .Times(testing::AnyNumber())
-        .WillRepeatedly(InvokeWithoutArgs([&]() -> Network::ClientConnection* {
-          uint32_t index = connection_index_.front();
-          connection_index_.pop_front();
-          return test_sessions_[index]->client_connection_;
-        }));
-    EXPECT_CALL(*health_checker_, createCodecClient_(_))
-        .WillRepeatedly(
-            Invoke([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
-              if (!health_check_map.empty()) {
-                const auto& health_check_config =
-                    health_check_map.at(conn_data.host_description_->address()->asString());
-                // To make sure health checker checks the correct port.
-                EXPECT_EQ(health_check_config.port_value(),
-                          conn_data.host_description_->healthCheckAddress()->ip()->port());
-              }
-              uint32_t index = codec_index_.front();
-              codec_index_.pop_front();
-              TestSession& test_session = *test_sessions_[index];
-              std::shared_ptr<Upstream::MockClusterInfo> cluster{
-                  new NiceMock<Upstream::MockClusterInfo>()};
-              Event::MockDispatcher dispatcher_;
-              return new CodecClientForTest(
-                  Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
-                  test_session.codec_, nullptr,
-                  Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
-            }));
+  test_sessions_[index]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
+                                                                   !body && !trailers);
+  if (body) {
+    Buffer::OwnedImpl response_data;
+    test_sessions_[index]->stream_response_callbacks_->decodeData(response_data, !trailers);
   }
 
-  void HttpHealthCheckerImplTest::expectStreamCreate(size_t index) {
-    test_sessions_[index]->request_encoder_.stream_.callbacks_.clear();
-    EXPECT_CALL(*test_sessions_[index]->codec_, newStream(_))
-        .WillOnce(DoAll(SaveArgAddress(&test_sessions_[index]->stream_response_callbacks_),
-                        ReturnRef(test_sessions_[index]->request_encoder_)));
+  if (trailers) {
+    test_sessions_[index]->stream_response_callbacks_->decodeTrailers(
+        Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"some", "trailer"}}});
   }
+}
 
-  void HttpHealthCheckerImplTest::respond(size_t index, const std::string& code, bool conn_close, bool proxy_close,
-               bool body, bool trailers,
-               const absl::optional<std::string>& service_cluster,
-               bool degraded) {
-    std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers(
-        new Http::TestResponseHeaderMapImpl{{":status", code}});
+void HttpHealthCheckerImplTest::expectSessionCreate() { expectSessionCreate(health_checker_map_); }
+void HttpHealthCheckerImplTest::expectClientCreate(size_t index) {
+  expectClientCreate(index, health_checker_map_);
+}
 
-    if (degraded) {
-      response_headers->setEnvoyDegraded(1);
-    }
+void HttpHealthCheckerImplTest::expectSuccessStartFailedFailFirst(
+    const absl::optional<std::string>& health_checked_cluster) {
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
+      Host::HealthFlag::FAILED_ACTIVE_HC);
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
 
-    if (service_cluster) {
-      response_headers->addCopy(Http::Headers::get().EnvoyUpstreamHealthCheckedCluster,
-                                service_cluster.value());
-    }
-    if (conn_close) {
-      response_headers->addCopy("connection", "close");
-    }
-    if (proxy_close) {
-      response_headers->addCopy("proxy-connection", "close");
-    }
+  // Test that failing first disables fast success.
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
+  respond(0, "503", false, false, false, false, health_checked_cluster);
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
+      Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_EQ(Host::Health::Unhealthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
-    test_sessions_[index]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
-                                                                     !body && !trailers);
-    if (body) {
-      Buffer::OwnedImpl response_data;
-      test_sessions_[index]->stream_response_callbacks_->decodeData(response_data, !trailers);
-    }
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
 
-    if (trailers) {
-      test_sessions_[index]->stream_response_callbacks_->decodeTrailers(
-          Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"some", "trailer"}}});
-    }
-  }
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, false, false, health_checked_cluster);
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
+      Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_EQ(Host::Health::Unhealthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
-  void HttpHealthCheckerImplTest::expectSessionCreate() { expectSessionCreate(health_checker_map_); }
-  void HttpHealthCheckerImplTest::expectClientCreate(size_t index) { expectClientCreate(index, health_checker_map_); }
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
 
-  void HttpHealthCheckerImplTest::expectSuccessStartFailedFailFirst(
-      const absl::optional<std::string>& health_checked_cluster) {
-    cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-        makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
-    cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
-        Host::HealthFlag::FAILED_ACTIVE_HC);
-    expectSessionCreate();
-    expectStreamCreate(0);
-    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-    health_checker_->start();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(event_logger_, logAddHealthy(_, _, false));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, false, false, health_checked_cluster);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
 
-    // Test that failing first disables fast success.
-    EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
-    EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
-    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-    EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
-    respond(0, "503", false, false, false, false, health_checked_cluster);
-    EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
-        Host::HealthFlag::FAILED_ACTIVE_HC));
-    EXPECT_EQ(Host::Health::Unhealthy,
-              cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-
-    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-    expectStreamCreate(0);
-    test_sessions_[0]->interval_timer_->invokeCallback();
-
-    EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
-    EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
-    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-    respond(0, "200", false, false, false, false, health_checked_cluster);
-    EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
-        Host::HealthFlag::FAILED_ACTIVE_HC));
-    EXPECT_EQ(Host::Health::Unhealthy,
-              cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-
-    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-    expectStreamCreate(0);
-    test_sessions_[0]->interval_timer_->invokeCallback();
-
-    EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
-    EXPECT_CALL(event_logger_, logAddHealthy(_, _, false));
-    EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
-    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-    respond(0, "200", false, false, false, false, health_checked_cluster);
-    EXPECT_EQ(Host::Health::Healthy,
-              cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-  }
-
+namespace {
 TEST_F(HttpHealthCheckerImplTest, Success) {
   setupNoServiceValidationHC();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);

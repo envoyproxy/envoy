@@ -134,10 +134,14 @@ envoy_benchmark_test(
     benchmark_binary = "eds_speed_test",
 )
 
-envoy_cc_test(
+envoy_cc_test_library(
     name = "health_checker_impl_test",
-    srcs = ["health_checker_impl_test.cc",
-    "health_checker_impl_test.h"],
+    srcs = [
+        "health_checker_impl_test.cc",
+    ],
+    hdrs = [
+        "health_checker_impl_test.h",
+    ],
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
