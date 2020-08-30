@@ -409,7 +409,11 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   if (downstreamConnection()) {
     ENVOY_LOG(info, "Setting sockets options a second time!");
     std::cout << "COUT setting socket options a second time!\n";
-    if (!read_callbacks_->connection().streamInfo().filterState()->hasData<Network::ProxyProtocolFilterState>(Network::ProxyProtocolFilterState::key())) {
+    if (!read_callbacks_->connection()
+             .streamInfo()
+             .filterState()
+             ->hasData<Network::ProxyProtocolFilterState>(
+                 Network::ProxyProtocolFilterState::key())) {
       read_callbacks_->connection().streamInfo().filterState()->setData(
           Network::ProxyProtocolFilterState::key(),
           std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
