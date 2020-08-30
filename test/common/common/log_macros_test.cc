@@ -1,3 +1,5 @@
+#include <functional>
+#include <future>
 #include <iostream>
 #include <string>
 
@@ -118,28 +120,61 @@ TEST(Logger, checkLoggerLevel) {
   EXPECT_THAT(test_obj.executeAtTraceLevel(), testing::Eq(2));
 }
 
+void spamCall(std::function<void()>&& callToSpam, const uint32_t num_threads) {
+  std::vector<std::thread> threads(num_threads);
+  std::promise<void> signal_all_threads_running;
+  std::shared_future<void> future(signal_all_threads_running.get_future());
+
+  for (auto& thread : threads) {
+    thread = std::thread([future, &callToSpam] {
+      future.wait();
+      callToSpam();
+    });
+  }
+  sleep(1);
+  signal_all_threads_running.set_value();
+  for (std::thread& thread : threads) {
+    thread.join();
+  }
+}
+
 TEST(Logger, LogOnceMacro) {
   class LogOnceTestHelper : public Logger::Loggable<Logger::Id::filter> {
   public:
     LogOnceTestHelper() { ENVOY_LOGGER().set_level(spdlog::level::info); }
-    void logSomething() { ENVOY_LOG_ONCE(error, "foo1 '{}'", evaluations_++); }
-    void logSomethingElse() { ENVOY_LOG_ONCE(error, "foo2 '{}'", evaluations_++); }
-    void logSomethingBelowLogLevel() { ENVOY_LOG_ONCE(debug, "foo3 '{}'", evaluations_++); }
-    uint32_t evaluations_{0};
+    void logSomething() { ENVOY_LOG_ONCE(error, "foo1 '{}'", evaluations()++); }
+    void logSomethingElse() { ENVOY_LOG_ONCE(error, "foo2 '{}'", evaluations()++); }
+    void logSomethingBelowLogLevel() { ENVOY_LOG_ONCE(debug, "foo3 '{}'", evaluations()++); }
+    int32_t& evaluations() { MUTABLE_CONSTRUCT_ON_FIRST_USE(int32_t); };
   };
-  // Two distinct log lines ought to result in two evaluations, and no more.
+  constexpr uint32_t kNumThreads = 100;
   LogOnceTestHelper helper;
-  helper.logSomething();
-  helper.logSomething();
-  EXPECT_EQ(1, helper.evaluations_);
-  helper.logSomethingElse();
-  helper.logSomethingElse();
-  EXPECT_EQ(2, helper.evaluations_);
-  // We don't expect log statements of a severity that gets filtered to add.
-  helper.logSomethingBelowLogLevel();
+  spamCall(
+      [&helper]() {
+        helper.logSomething();
+        helper.logSomething();
+      },
+      kNumThreads);
+  EXPECT_EQ(1, helper.evaluations());
+  spamCall(
+      [&helper]() {
+        helper.logSomething();
+        helper.logSomething();
+        helper.logSomethingElse();
+        helper.logSomethingElse();
+      },
+      kNumThreads);
+  // Two distinct log lines ought to result in two evaluations, and no more.
+  EXPECT_EQ(2, helper.evaluations());
+  spamCall(
+      [&helper]() {
+        // We don't expect log statements of a severity that gets filtered to add.
+        helper.logSomethingBelowLogLevel();
+      },
+      kNumThreads);
   // Without fine-grained logging, we shouldn't observe additional argument evaluations
   // for log lines below the configured log level.
-  EXPECT_EQ(::Envoy::Logger::Context::useFancyLogger() ? 3 : 2, helper.evaluations_);
+  EXPECT_EQ(::Envoy::Logger::Context::useFancyLogger() ? 3 : 2, helper.evaluations());
 }
 
 TEST(RegistryTest, LoggerWithName) {

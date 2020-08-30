@@ -403,8 +403,8 @@ protected:
 
 #define ENVOY_LOG_FIRST_N(LEVEL, N, ...)                                                           \
   do {                                                                                             \
-    static auto* countdown = new std::atomic<uint64_t>(N);                                         \
-    if (countdown->fetch_sub(1) > 0) {                                                             \
+    static auto* countdown = new std::atomic<uint64_t>();                                          \
+    if (countdown->fetch_add(1) < N) {                                                             \
       ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
     }                                                                                              \
   } while (0)
@@ -413,7 +413,7 @@ protected:
 
 #define ENVOY_LOG_EVERY_NTH(LEVEL, N, ...)                                                         \
   do {                                                                                             \
-    static auto* count = new std::atomic<uint64_t>(1);                                             \
+    static auto* count = new std::atomic<int64_t>(1);                                              \
     if ((count->fetch_add(1) % N) == 0) {                                                          \
       ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
     }                                                                                              \
