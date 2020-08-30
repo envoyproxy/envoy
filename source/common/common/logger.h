@@ -409,11 +409,14 @@ protected:
     }                                                                                              \
   } while (0)
 
-#define ENVOY_LOG_ONCE(LEVEL, ...) ENVOY_LOG_FIRST_N(LEVEL, 1, ##__VA_ARGS__)
+#define ENVOY_LOG_ONCE(LEVEL, ...)                                                                 \
+  do {                                                                                             \
+    ENVOY_LOG_FIRST_N(LEVEL, 1, ##__VA_ARGS__);                                                    \
+  } while (0)
 
 #define ENVOY_LOG_EVERY_NTH(LEVEL, N, ...)                                                         \
   do {                                                                                             \
-    static auto* count = new std::atomic<int64_t>(1);                                              \
+    static auto* count = new std::atomic<uint64_t>();                                              \
     if ((count->fetch_add(1) % N) == 0) {                                                          \
       ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
     }                                                                                              \

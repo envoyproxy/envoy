@@ -1,3 +1,4 @@
+#include <chrono>
 #include <functional>
 #include <future>
 #include <iostream>
@@ -14,6 +15,8 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+using namespace std::chrono_literals;
 
 class TestFilterLog : public Logger::Loggable<Logger::Id::filter> {
 public:
@@ -120,17 +123,19 @@ TEST(Logger, checkLoggerLevel) {
   EXPECT_THAT(test_obj.executeAtTraceLevel(), testing::Eq(2));
 }
 
-void spamCall(std::function<void()>&& callToSpam, const uint32_t num_threads) {
+void spamCall(std::function<void()>&& call_to_spam, const uint32_t num_threads) {
   std::vector<std::thread> threads(num_threads);
   std::promise<void> signal_all_threads_running;
   std::shared_future<void> future(signal_all_threads_running.get_future());
 
   for (auto& thread : threads) {
-    thread = std::thread([future, &callToSpam] {
+    thread = std::thread([future, &call_to_spam] {
       future.wait();
-      callToSpam();
+      call_to_spam();
     });
   }
+  // Allow threads to accrue on future.wait() to maximize concurrency on the call
+  // we are testing.
   sleep(1);
   signal_all_threads_running.set_value();
   for (std::thread& thread : threads) {
@@ -138,17 +143,20 @@ void spamCall(std::function<void()>&& callToSpam, const uint32_t num_threads) {
   }
 }
 
-TEST(Logger, LogOnceMacro) {
-  class LogOnceTestHelper : public Logger::Loggable<Logger::Id::filter> {
+TEST(Logger, SparseLogMacros) {
+  class SparseLogMacrosTestHelper : public Logger::Loggable<Logger::Id::filter> {
   public:
-    LogOnceTestHelper() { ENVOY_LOGGER().set_level(spdlog::level::info); }
+    SparseLogMacrosTestHelper() { ENVOY_LOGGER().set_level(spdlog::level::info); }
     void logSomething() { ENVOY_LOG_ONCE(error, "foo1 '{}'", evaluations()++); }
     void logSomethingElse() { ENVOY_LOG_ONCE(error, "foo2 '{}'", evaluations()++); }
-    void logSomethingBelowLogLevel() { ENVOY_LOG_ONCE(debug, "foo3 '{}'", evaluations()++); }
+    void logSomethingBelowLogLevelOnce() { ENVOY_LOG_ONCE(debug, "foo3 '{}'", evaluations()++); }
+    void logSomethingThrice() { ENVOY_LOG_FIRST_N(error, 3, "foo4 '{}'", evaluations()++); }
+    void logEverySeventh() { ENVOY_LOG_EVERY_NTH(error, 7, "foo5 '{}'", evaluations()++); }
+    void logEverySecond() { ENVOY_LOG_PERIODIC(error, 1s, "foo6 '{}'", evaluations()++); }
     int32_t& evaluations() { MUTABLE_CONSTRUCT_ON_FIRST_USE(int32_t); };
   };
   constexpr uint32_t kNumThreads = 100;
-  LogOnceTestHelper helper;
+  SparseLogMacrosTestHelper helper;
   spamCall(
       [&helper]() {
         helper.logSomething();
@@ -158,23 +166,35 @@ TEST(Logger, LogOnceMacro) {
   EXPECT_EQ(1, helper.evaluations());
   spamCall(
       [&helper]() {
-        helper.logSomething();
-        helper.logSomething();
         helper.logSomethingElse();
         helper.logSomethingElse();
       },
       kNumThreads);
   // Two distinct log lines ought to result in two evaluations, and no more.
   EXPECT_EQ(2, helper.evaluations());
-  spamCall(
-      [&helper]() {
-        // We don't expect log statements of a severity that gets filtered to add.
-        helper.logSomethingBelowLogLevel();
-      },
-      kNumThreads);
+
+  spamCall([&helper]() { helper.logSomethingThrice(); }, kNumThreads);
+  // Single log line should be emitted 3 times.
+  EXPECT_EQ(5, helper.evaluations());
+
+  spamCall([&helper]() { helper.logEverySeventh(); }, kNumThreads);
+  // (100 threads / log every 7th) + 1s = 15 more evaluations upon logging very 7th.
+  EXPECT_EQ(20, helper.evaluations());
+
+  // So use our knowledge that spamCall will sleep 1 second in the following lines:
+  // We expect one log entry / second. Therefore each spamCall ought to result in one
+  // more evaluation. This depends on real time and not sim time, hopefully 1 second
+  // is enough to not introduce flakes in practice.
+  spamCall([&helper]() { helper.logEverySecond(); }, kNumThreads);
+  EXPECT_EQ(21, helper.evaluations());
+  spamCall([&helper]() { helper.logEverySecond(); }, kNumThreads);
+  EXPECT_EQ(22, helper.evaluations());
+
+  spamCall([&helper]() { helper.logSomethingBelowLogLevelOnce(); }, kNumThreads);
   // Without fine-grained logging, we shouldn't observe additional argument evaluations
   // for log lines below the configured log level.
-  EXPECT_EQ(::Envoy::Logger::Context::useFancyLogger() ? 3 : 2, helper.evaluations());
+  // TODO(#12885): fancy logger shouldn't always evaluate variadic macro arguments.
+  EXPECT_EQ(::Envoy::Logger::Context::useFancyLogger() ? 23 : 22, helper.evaluations());
 }
 
 TEST(RegistryTest, LoggerWithName) {
