@@ -407,8 +407,6 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   }
 
   if (downstreamConnection()) {
-    ENVOY_LOG(info, "Setting sockets options a second time!");
-    std::cout << "COUT setting socket options a second time!\n";
     if (!read_callbacks_->connection()
              .streamInfo()
              .filterState()

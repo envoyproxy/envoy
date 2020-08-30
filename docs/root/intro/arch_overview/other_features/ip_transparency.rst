@@ -45,13 +45,14 @@ metadata includes the source IP. Envoy supports consuming this information using
 the downstream remote address for propagation into an
 :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` header. It can also be used in
 conjunction with the
-:ref:`Original Src Listener Filter <arch_overview_ip_transparency_original_src_listener>`.
+:ref:`Original Src Listener Filter <arch_overview_ip_transparency_original_src_listener>`. Finally,
+Envoy supports generating this header using the :ref:`Proxy Protocol Transport Socket <extension_envoy.transport_sockets.upstream_proxy_protocol>`.
 
 Some drawbacks to Proxy Protocol:
 
 * It only supports TCP protocols.
 * It requires upstream host support.
-* Envoy cannot yet send it to the upstream.
+
 
 .. _arch_overview_ip_transparency_original_src_listener:
 
