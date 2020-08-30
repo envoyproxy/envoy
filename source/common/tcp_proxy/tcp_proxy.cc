@@ -407,12 +407,16 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   }
 
   if (downstreamConnection()) {
-    read_callbacks_->connection().streamInfo().filterState()->setData(
-        Network::ProxyProtocolFilterState::key(),
-        std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-            downstreamConnection()->remoteAddress(), downstreamConnection()->localAddress()}),
-        StreamInfo::FilterState::StateType::ReadOnly,
-        StreamInfo::FilterState::LifeSpan::Connection);
+    ENVOY_LOG(info, "Setting sockets options a second time!");
+    std::cout << "COUT setting socket options a second time!\n";
+    if (!read_callbacks_->connection().streamInfo().filterState()->hasData<Network::ProxyProtocolFilterState>(Network::ProxyProtocolFilterState::key())) {
+      read_callbacks_->connection().streamInfo().filterState()->setData(
+          Network::ProxyProtocolFilterState::key(),
+          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
+              downstreamConnection()->remoteAddress(), downstreamConnection()->localAddress()}),
+          StreamInfo::FilterState::StateType::ReadOnly,
+          StreamInfo::FilterState::LifeSpan::Connection);
+    }
     transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
         downstreamConnection()->streamInfo().filterState());
   }
