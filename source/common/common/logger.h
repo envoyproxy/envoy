@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bitset>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -424,7 +425,7 @@ protected:
 #define ENVOY_LOG_WITH_BACKOFF(LEVEL, ...)                                                         \
   do {                                                                                             \
     static auto* count = new std::atomic<uint64_t>();                                              \
-    if (__builtin_popcount(1 + count->fetch_add(1)) == 1) {                                        \
+    if (std::bitset<64>(1 + count->fetch_add(1)).count() == 1) {                                   \
       ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
     }                                                                                              \
   } while (0)
