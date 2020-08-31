@@ -91,16 +91,16 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     boringssl = dict(
         project_name = "BoringSSL",
         project_url = "https://github.com/google/boringssl",
-        version = "a0899df79b3a63e606448c72d63a090d86bdb75b",
-        sha256 = "07f1524766b9ed1543674b48e7fce7e3569b6e2b6c0c43ec124dedee9b60f641",
+        version = "597b810379e126ae05d32c1d94b1a9464385acd0",
+        sha256 = "1ea42456c020daf0a9b0f9e8d8bc3a403c9314f4f54230c617257af996cd5fa6",
         strip_prefix = "boringssl-{version}",
         # To update BoringSSL, which tracks Chromium releases:
         # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/stable release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-84.0.4147.45(beta)
-        # 2020-05-14
+        # chromium-85.0.4183.83
+        # 2020-06-23
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
@@ -557,11 +557,11 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_googlesource_chromium_v8 = dict(
         project_name = "V8",
         project_url = "https://v8.dev",
-        version = "8.3",
+        version = "8.5.210.20",
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
         # and contains complete checkout of V8 with all dependencies necessary to build wee8.
-        sha256 = "cc6f5357cd10922bfcf667bd882624ad313e21b009b919ce00f322f390012476",
-        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.110.9.tar.gz"],
+        sha256 = "ef404643d7da6854b76b9fb9950a79a1acbd037b7a26f02c585ac379b0f7dee1",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
