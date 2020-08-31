@@ -14,7 +14,7 @@ public:
   QuicIoHandleWrapper(Network::IoHandle& io_handle) : io_handle_(io_handle) {}
 
   // Network::IoHandle
-  os_fd_t fd() const override { return io_handle_.fd(); }
+  os_fd_t fdDoNotUse() const override { return io_handle_.fdDoNotUse(); }
   Api::IoCallUint64Result close() override {
     closed_ = true;
     return Api::ioCallUint64ResultNoError();
@@ -62,6 +62,14 @@ public:
     }
     return io_handle_.recvmmsg(slices, self_port, output);
   }
+  Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override {
+    if (closed_) {
+      ASSERT(false, "recv called after close.");
+      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
+                                                        Network::IoSocketError::deleteIoError));
+    }
+    return io_handle_.recv(buffer, length, flags);
+  }
   bool supportsMmsg() const override { return io_handle_.supportsMmsg(); }
   bool supportsUdpGro() const override { return io_handle_.supportsUdpGro(); }
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override {
@@ -92,6 +100,11 @@ public:
   Network::Address::InstanceConstSharedPtr peerAddress() override {
     return io_handle_.peerAddress();
   }
+  Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                      Event::FileTriggerType trigger, uint32_t events) override {
+    return io_handle_.createFileEvent(dispatcher, cb, trigger, events);
+  }
+  Api::SysCallIntResult shutdown(int how) override { return io_handle_.shutdown(how); }
 
 private:
   Network::IoHandle& io_handle_;

@@ -13,7 +13,8 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 

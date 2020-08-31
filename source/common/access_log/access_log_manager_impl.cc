@@ -20,8 +20,8 @@ AccessLogManagerImpl::~AccessLogManagerImpl() {
 }
 
 void AccessLogManagerImpl::reopen() {
-  for (auto& [log_key, log_file_ptr] : access_logs_) {
-    log_file_ptr->reopen();
+  for (auto& iter : access_logs_) {
+    iter.second->reopen();
   }
 }
 

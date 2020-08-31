@@ -13,7 +13,6 @@
 #include "extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/proto/bookstore.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"

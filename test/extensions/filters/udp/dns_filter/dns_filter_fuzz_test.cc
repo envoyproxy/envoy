@@ -52,12 +52,12 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     } break;
 
     case 1: {
-      DnsQueryRecordPtr ptr = message_parser.parseDnsQueryRecord(query_buffer, &offset);
+      DnsQueryRecordPtr ptr = message_parser.parseDnsQueryRecord(query_buffer, offset);
       UNREFERENCED_PARAMETER(ptr);
     } break;
 
     case 2: {
-      DnsAnswerRecordPtr ptr = message_parser.parseDnsAnswerRecord(query_buffer, &offset);
+      DnsAnswerRecordPtr ptr = message_parser.parseDnsAnswerRecord(query_buffer, offset);
       UNREFERENCED_PARAMETER(ptr);
     } break;
     } // end case

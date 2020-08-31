@@ -137,18 +137,19 @@ void RdsRouteConfigSubscription::onConfigUpdate(
           config_update_info_->routeConfiguration().vhds().config_source().resource_api_version());
       vhds_subscription_->registerInitTargetWithInitManager(
           noop_init_manager == nullptr ? local_init_manager_ : *noop_init_manager);
-    } else {
-      ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
-                config_update_info_->configHash());
-
-      for (auto* provider : route_config_providers_) {
-        provider->onConfigUpdate();
-      }
-      // RDS update removed VHDS configuration
-      if (!config_update_info_->routeConfiguration().has_vhds()) {
-        vhds_subscription_.release();
-      }
     }
+
+    ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
+              config_update_info_->configHash());
+
+    for (auto* provider : route_config_providers_) {
+      provider->onConfigUpdate();
+    }
+    // RDS update removed VHDS configuration
+    if (!config_update_info_->routeConfiguration().has_vhds()) {
+      vhds_subscription_.release();
+    }
+
     update_callback_manager_.runCallbacks();
   }
 

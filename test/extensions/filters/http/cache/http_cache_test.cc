@@ -262,9 +262,9 @@ TEST_F(LookupRequestTest, PragmaNoFallback) {
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
 }
 
-TEST_F(LookupRequestTest, SatisfiableRange) {
-  // add range to headers
-  request_headers_.addReference(Http::Headers::get().Range, "bytes=1-99,3-,-2");
+TEST_F(LookupRequestTest, SingleSatisfiableRange) {
+  // add range info to headers
+  request_headers_.addReference(Http::Headers::get().Range, "bytes=1-99");
   const LookupRequest lookup_request(request_headers_, currentTime());
 
   const Http::TestResponseHeaderMapImpl response_headers(
@@ -281,26 +281,47 @@ TEST_F(LookupRequestTest, SatisfiableRange) {
   EXPECT_EQ(lookup_response.content_length_, 4);
 
   // checks that the ranges have been adjusted to the content's length
-  EXPECT_EQ(lookup_response.response_ranges_.size(), 3);
+  EXPECT_EQ(lookup_response.response_ranges_.size(), 1);
 
   EXPECT_EQ(lookup_response.response_ranges_[0].begin(), 1);
   EXPECT_EQ(lookup_response.response_ranges_[0].end(), 4);
   EXPECT_EQ(lookup_response.response_ranges_[0].length(), 3);
 
-  EXPECT_EQ(lookup_response.response_ranges_[1].begin(), 3);
-  EXPECT_EQ(lookup_response.response_ranges_[1].end(), 4);
-  EXPECT_EQ(lookup_response.response_ranges_[1].length(), 1);
+  EXPECT_FALSE(lookup_response.has_trailers_);
+}
 
-  EXPECT_EQ(lookup_response.response_ranges_[2].begin(), 2);
-  EXPECT_EQ(lookup_response.response_ranges_[2].end(), 4);
-  EXPECT_EQ(lookup_response.response_ranges_[2].length(), 2);
+TEST_F(LookupRequestTest, MultipleSatisfiableRanges) {
+  // Because we do not support multi-part responses for now, we are limiting parsing of a single
+  // range. Thus, multiple ranges are ignored, and a usual "::Ok" should be expected. If multi-part
+  // responses are implemented (and the parsing limit is changed), this test should be adjusted.
 
+  // add range info to headers
+  request_headers_.addCopy(Http::Headers::get().Range.get(), "bytes=1-99,3-,-3");
+
+  const LookupRequest lookup_request(request_headers_, currentTime());
+
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"date", formatter_.fromTime(currentTime())},
+       {"cache-control", "public, max-age=3600"},
+       {"content-length", "4"}});
+  const uint64_t content_length = 4;
+  const LookupResult lookup_response =
+      makeLookupResult(lookup_request, response_headers, content_length);
+
+  ASSERT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
+
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 4);
+
+  // Check that the ranges have been ignored since we don't support multi-part responses.
+  EXPECT_EQ(lookup_response.response_ranges_.size(), 0);
   EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
 TEST_F(LookupRequestTest, NotSatisfiableRange) {
-  // add range headers
-  request_headers_.addReference(Http::Headers::get().Range, "bytes=5-99,100-");
+  // add range info to headers
+  request_headers_.addReference(Http::Headers::get().Range, "bytes=100-");
 
   const LookupRequest lookup_request(request_headers_, currentTime());
 
