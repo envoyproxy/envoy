@@ -94,6 +94,7 @@ public:
   } CacheControlValues;
 
   struct {
+    const std::string Brotli{"br"};
     const std::string Gzip{"gzip"};
   } ContentEncodingValues;
 

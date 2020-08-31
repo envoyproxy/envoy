@@ -343,6 +343,16 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:gnu:zlib:*",
     ),
+    org_brotli = dict(
+        project_name = "brotli",
+        project_url = "https://brotli.org",
+        version = "1.0.9",
+        sha256 = "f9e8d81d0405ba66d181529af42a3354f838c939095ff99930da6aa9cdf6fe46",
+        strip_prefix = "brotli-{version}",
+        urls = ["https://github.com/google/brotli/archive/v{version}.tar.gz"],
+        use_category = ["dataplane"],
+        cpe = "N/A",
+    ),
     com_github_zlib_ng_zlib_ng = dict(
         project_name = "zlib-ng",
         project_url = "https://github.com/zlib-ng/zlib-ng",
