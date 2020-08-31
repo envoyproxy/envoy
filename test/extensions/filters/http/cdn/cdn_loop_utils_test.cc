@@ -1,10 +1,11 @@
 #include "extensions/filters/http/cdn/cdn_loop_utils.h"
 
-#include "absl/strings/str_cat.h"
+#include "test/extensions/filters/http/cdn/status_helpers.h"
+
 #include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "test/extensions/filters/http/cdn/status_helpers.h"
 
 namespace Envoy {
 namespace Extensions {

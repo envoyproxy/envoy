@@ -2,9 +2,10 @@
 
 #include <iostream>
 
-#include "absl/strings/string_view.h"
-#include "absl/strings/str_join.h"
 #include "common/common/statusor.h"
+
+#include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
 
 // This file defines a parser for the CDN-Loop header value.
 //
@@ -16,30 +17,30 @@
 //   pseudonym = token
 //
 // Each of those productions rely on definitions in RFC 3986, RFC 5234, RFC
-// 7230, and RFC 7231.  Their use is noted in the individual parse functions.
+// 7230, and RFC 7231. Their use is noted in the individual parse functions.
 //
 // The parser is a top-down combined parser and lexer that implements just
 // enough of the RFC spec to make it possible count the number of times a
-// particular CDN value appears.  The main differences between the RFC's grammar
+// particular CDN value appears. The main differences between the RFC's grammar
 // and the parser defined here are:
 //
-// 1.  the parser has a more lax interpretation of what's a valid uri-host.  See
+// 1. the parser has a more lax interpretation of what's a valid uri-host. See
 //     ParseCdnId for details.
 //
-// 2.  the parser allows leading and trailing whitespace around the header
-//     value.  See ParseCdnInfoList for details.
+// 2. the parser allows leading and trailing whitespace around the header
+//     value. See ParseCdnInfoList for details.
 //
 // Each parse function takes as input a ParseContext that tells the
-// function where to start.  Parse functions that just need to parse a portion
+// function where to start. Parse functions that just need to parse a portion
 // of the CDN-Loop header, but don't need to return a value, should return a
-// ParseContext pointing to the next character to parse.  Parse functions that
+// ParseContext pointing to the next character to parse. Parse functions that
 // need to return a value should return something that contains a ParseContext.
 //
 // Parse functions that can fail (most of them!) wrap their return value in an
 // Envoy::StatusOr.
 //
 // In the interest of performance, this parser works with string_views and
-// references instead of copying std::strings.  The string_view passed into the
+// references instead of copying std::strings. The string_view passed into the
 // ParseContext of a parse function must outlive the return value of the
 // function.
 
@@ -205,7 +206,7 @@ StatusOr<ParseContext> ParseToken(const ParseContext& input);
 // Parse something that looks like an IPv6 address literal.
 //
 // A proper IPv6 address literal is defined in RFC 3986, Section 3.2.2 as part
-// of the host rule.  We're going to allow something simpler:
+// of the host rule. We're going to allow something simpler:
 //
 // plausible-ipv6 = "[" *( HEXDIGIT | "." | ":" ) "]
 // HEXDIGIT = DIGIT | %x41-46 | %x61-66 ; 0-9 | A-F | a-f
@@ -225,7 +226,7 @@ StatusOr<ParseContext> ParsePlausibleIpV6(const ParseContext& input);
 // pseudonym = token
 //
 // The uri-host portion of the cdn-id is the "host" rule from RFC 3986 Section
-// 3.2.2.  Parsing the host rule is remarkably difficult because the host rule
+// 3.2.2. Parsing the host rule is remarkably difficult because the host rule
 // tries to parse exactly valid IP addresses (e.g., disallowing values greater
 // than 255 in an IPv4 address or only allowing one instance of "::" in IPv6
 // addresses) and needs to deal with % escaping in names. Worse, the host rule
@@ -233,7 +234,7 @@ StatusOr<ParseContext> ParsePlausibleIpV6(const ParseContext& input);
 // host, making parsing ambiguous in some cases!
 //
 // Luckily, the token rule more or less covers the uri-host rule for names and
-// for IPv4 addresses.  We just a new rule to parse IPv6 addresses.  See
+// for IPv4 addresses. We just a new rule to parse IPv6 addresses. See
 // ParsePlausibleIpV6 for the rule we'll follow.
 //
 // The definition of port comes from RFC 3986 Section
@@ -262,13 +263,13 @@ StatusOr<ParsedCdnInfo> ParseCdnInfo(const ParseContext& input);
 //
 // CDN-Loop  = #cdn-info
 //
-// The # rule is defined by RFC 7230 Section 7.  The # is different for senders
-// and recipients.  We're a recipient, so:
+// The # rule is defined by RFC 7230 Section 7. The # is different for senders
+// and recipients. We're a recipient, so:
 //
 //   For compatibility with legacy list rules, a recipient MUST parse and
 //   ignore a reasonable number of empty list elements: enough to handle
 //   common mistakes by senders that merge values, but not so much that
-//   they could be used as a denial-of-service mechanism.  In other words,
+//   they could be used as a denial-of-service mechanism. In other words,
 //   a recipient MUST accept lists that satisfy the following syntax:
 //
 //     #element => [ ( "," / element ) *( OWS "," [ OWS element ] ) ]
@@ -281,7 +282,7 @@ StatusOr<ParsedCdnInfo> ParseCdnInfo(const ParseContext& input);
 // blank entries.
 //
 // In a divergence with the RFC's grammar, this function will also ignore
-// leading and trailing OWS.  This function expects to consume the entire input
+// leading and trailing OWS. This function expects to consume the entire input
 // and will return an error if there is something it cannot parse.
 StatusOr<ParsedCdnInfoList> ParseCdnInfoList(const ParseContext& input);
 

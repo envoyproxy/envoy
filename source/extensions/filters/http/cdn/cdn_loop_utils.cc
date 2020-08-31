@@ -2,10 +2,12 @@
 
 #include <algorithm>
 
+#include "common/common/statusor.h"
+
+#include "extensions/filters/http/cdn/cdn_loop_parser.h"
+
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
-#include "common/common/statusor.h"
-#include "extensions/filters/http/cdn/cdn_loop_parser.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,9 +1,10 @@
 #include "extensions/filters/http/cdn/cdn_loop_parser.h"
 
+#include "test/extensions/filters/http/cdn/status_helpers.h"
+
 #include "absl/status/status.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "test/extensions/filters/http/cdn/status_helpers.h"
 
 namespace Envoy {
 namespace Extensions {

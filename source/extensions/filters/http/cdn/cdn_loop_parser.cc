@@ -1,9 +1,10 @@
 #include "extensions/filters/http/cdn/cdn_loop_parser.h"
 
-#include "absl/status/status.h"
-#include "absl/strings/string_view.h"
-#include "absl/strings/str_format.h"
 #include "common/common/statusor.h"
+
+#include "absl/status/status.h"
+#include "absl/strings/str_format.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
