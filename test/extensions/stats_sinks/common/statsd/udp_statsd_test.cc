@@ -43,6 +43,8 @@ public:
   std::vector<std::string> buffer_writes;
 };
 
+// Skipping this test as Datagram sockets are not currently supported by UDS on Windows
+#ifndef WIN32
 // Regression test for https://github.com/envoyproxy/envoy/issues/8911
 TEST(UdpOverUdsStatsdSinkTest, InitWithPipeAddress) {
   auto uds_address = std::make_shared<Network::Address::PipeInstance>(
@@ -71,6 +73,7 @@ TEST(UdpOverUdsStatsdSinkTest, InitWithPipeAddress) {
   receive_buffer.read(sock.ioHandle(), 32);
   EXPECT_EQ("envoy.test_counter:1|c", receive_buffer.toString());
 }
+#endif
 
 class UdpStatsdSinkTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, UdpStatsdSinkTest,

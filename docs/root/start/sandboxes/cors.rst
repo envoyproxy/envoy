@@ -37,12 +37,19 @@ Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
 
 A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
 
-**Step 2: Clone the Envoy repo and start all of our containers**
+**Step 2: Clone the Envoy repo**
 
-If you have not cloned the Envoy repo, clone it with ``git clone git@github.com:envoyproxy/envoy``
-or ``git clone https://github.com/envoyproxy/envoy.git``
+If you have not cloned the Envoy repo, clone it with:
 
-Terminal 1
+``git clone git@github.com:envoyproxy/envoy``
+
+or
+
+``git clone https://github.com/envoyproxy/envoy.git``
+
+**Step 3: Start all of our containers**
+
+Switch to the ``frontend`` directory in the ``cors`` example, and start the containers:
 
 .. code-block:: console
 
@@ -57,12 +64,13 @@ Terminal 1
   frontend_front-envoy_1        /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
   frontend_frontend-service_1   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
 
-Terminal 2
+Now, switch to the ``backend`` directory in the ``cors`` example, and start the containers:
 
 .. code-block:: console
 
   $ pwd
   envoy/examples/cors/backend
+  $ docker-compose pull
   $ docker-compose up --build -d
   $ docker-compose ps
 
@@ -71,12 +79,13 @@ Terminal 2
   backend_backend-service_1   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
   backend_front-envoy_1       /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8002->8000/tcp, 0.0.0.0:8003->8001/tcp
 
-**Step 3: Test Envoy's CORS capabilities**
+**Step 4: Test Envoy's CORS capabilities**
 
-You can now open a browser to view your frontend service at ``localhost:8000``.
+You can now open a browser to view your frontend service at http://localhost:8000.
 
 Results of the cross-origin request will be shown on the page under *Request Results*.
-Your browser's CORS enforcement logs can be found in the console.
+
+Your browser's ``CORS`` enforcement logs can be found in the browser console.
 
 For example:
 
@@ -85,13 +94,14 @@ For example:
   Access to XMLHttpRequest at 'http://192.168.99.100:8002/cors/disabled' from origin 'http://192.168.99.101:8000'
   has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
 
-**Step 4: Check stats of backend via admin**
+**Step 5: Check stats of backend via admin**
 
-When Envoy runs, it can listen to ``admin`` requests if a port is configured. In the example
-configs, the backend admin is bound to port ``8003``.
+When Envoy runs, it can listen to ``admin`` requests if a port is configured.
 
-If you go to ``localhost:8003/stats`` you will be able to view
-all of the Envoy stats for the backend. You should see the CORS stats for
+In the example configs, the backend admin is bound to port ``8003``.
+
+If you browse to http://localhost:8003/stats you will be able to view
+all of the Envoy stats for the backend. You should see the ``CORS`` stats for
 invalid and valid origins increment as you make requests from the frontend cluster.
 
 .. code-block:: none

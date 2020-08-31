@@ -581,4 +581,117 @@ TEST_P(ExtAuthzHttpIntegrationTest, DisableCaseSensitiveStringMatcher) {
   EXPECT_EQ(case_sensitive_header_value_, header_entry->value().getStringView());
 }
 
+class ExtAuthzLocalReplyIntegrationTest : public HttpIntegrationTest,
+                                          public TestWithParam<Network::Address::IpVersion> {
+public:
+  ExtAuthzLocalReplyIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  }
+
+  void cleanup() {
+    if (fake_ext_authz_connection_ != nullptr) {
+      AssertionResult result = fake_ext_authz_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_ext_authz_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
+    cleanupUpstreamAndDownstream();
+  }
+
+  FakeHttpConnectionPtr fake_ext_authz_connection_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzLocalReplyIntegrationTest,
+                         ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// This integration test uses ext_authz combined with `local_reply_config`.
+// * If ext_authz response status is 401; its response headers and body are sent to the client.
+// * But if `local_reply_config` is specified, the response body and its content-length and type
+//   are controlled by the `local_reply_config`.
+// This integration test verifies that content-type and content-length generated
+// from `local_reply_config` are not overridden by ext_authz response.
+TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedHeaderTest) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ext_authz_cluster->set_name("ext_authz");
+
+    envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
+    const std::string ext_authz_config = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+  )EOF";
+    TestUtility::loadFromYaml(ext_authz_config, proto_config);
+
+    envoy::config::listener::v3::Filter ext_authz_filter;
+    ext_authz_filter.set_name(Extensions::HttpFilters::HttpFilterNames::get().ExtAuthorization);
+    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config);
+    config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ext_authz_filter));
+  });
+
+  const std::string local_reply_yaml = R"EOF(
+body_format:
+  json_format:
+    code: "%RESPONSE_CODE%"
+    message: "%LOCAL_REPLY_BODY%"
+  )EOF";
+  envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig
+      local_reply_config;
+  TestUtility::loadFromYaml(local_reply_yaml, local_reply_config);
+  config_helper_.setLocalReply(local_reply_config);
+
+  HttpIntegrationTest::initialize();
+
+  auto conn = makeClientConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(std::move(conn));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  AssertionResult result =
+      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+  RELEASE_ASSERT(result, result.message());
+  FakeStreamPtr ext_authz_request;
+  result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request);
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  Http::TestResponseHeaderMapImpl ext_authz_response_headers{
+      {":status", "401"},
+      {"content-type", "fake-type"},
+  };
+  ext_authz_request->encodeHeaders(ext_authz_response_headers, true);
+
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+
+  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
+  // Without fixing the bug, "content-type" and "content-length" are overridden by the ext_authz
+  // responses as its "content-type: fake-type" and "content-length: 0".
+  EXPECT_EQ("application/json", response->headers().ContentType()->value().getStringView());
+  EXPECT_EQ("26", response->headers().ContentLength()->value().getStringView());
+
+  const std::string expected_body = R"({
+      "code": 401,
+      "message": ""
+})";
+  EXPECT_TRUE(TestUtility::jsonStringEqual(response->body(), expected_body));
+
+  cleanup();
+}
+
 } // namespace Envoy
