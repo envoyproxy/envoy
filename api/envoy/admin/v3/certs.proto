@@ -40,14 +40,11 @@ message CertificateDetails {
       "envoy.admin.v2alpha.CertificateDetails";
 
   message OcspDetails {
-    // Seconds until expiration of the certificate's OCSP response.
-    uint64 seconds_until_expiration = 1;
-
     // Indicates the time from which the OCSP response is valid.
-    google.protobuf.Timestamp valid_from = 2;
+    google.protobuf.Timestamp valid_from = 1;
 
     // Indicates the time at which the OCSP response expires.
-    google.protobuf.Timestamp expiration_time = 3;
+    google.protobuf.Timestamp expiration_time = 2;
   }
 
   // Path of the certificate.

@@ -756,7 +756,7 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
                          TestEnvironment::substitute(
                              "{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp_details.txt"),
                          true),
-                     "\n");
+                     '\n');
   std::string valid_from, expiration_time;
   for (const auto& detail : ocsp_text_details) {
     std::string::size_type pos = detail.find(this_update);

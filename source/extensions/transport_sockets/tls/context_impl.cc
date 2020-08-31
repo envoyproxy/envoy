@@ -834,8 +834,6 @@ ContextImpl::certificateDetails(X509* cert, const std::string& path,
       Utility::getDaysUntilExpiration(cert, time_source_));
   if (ocsp_response) {
     auto* ocsp_details = certificate_details->mutable_ocsp_details();
-    ocsp_details->set_seconds_until_expiration(ocsp_response->secondsUntilExpiration());
-
     ProtobufWkt::Timestamp* valid_from = ocsp_details->mutable_valid_from();
     TimestampUtil::systemClockToTimestamp(ocsp_response->getThisUpdate(), *valid_from);
     ProtobufWkt::Timestamp* expiration_time = ocsp_details->mutable_expiration_time();
