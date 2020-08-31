@@ -148,8 +148,10 @@ ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProvide
 // cache the callback and wait for RouteConfiguration to come.
 void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::addOnDemandUpdateCallback(
     std::function<void()> callback) {
-  // If route table has been initialized, run the callback to continue in filter chain, otherwise
-  // cache it and wait for the route table to be initialized.
+  // If RouteConfiguration has been initialized, run the callback to continue in filter chain,
+  // otherwise cache it and wait for the route table to be initialized. If RouteConfiguration hasn't
+  // been initialized, routeConfig() return a shared_ptr to NullConfigImpl. The name of
+  // NullConfigImpl is an empty string.
   if (route_provider_ != nullptr && !routeConfig()->name().empty()) {
     callback();
     return;
@@ -203,7 +205,8 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConf
       parent_.scoped_route_map_[scope_name_]->configProto().route_configuration_name());
   initRdsConfigProvider(rds, *srds_init_mgr);
   ENVOY_LOG(debug, fmt::format("Scope on demand update: {}", scope_name_));
-  // If RouteConfiguration hasn't been initialized, return.
+  // If RouteConfiguration hasn't been initialized, routeConfig() return a shared_ptr to
+  // NullConfigImpl. The name of NullConfigImpl is an empty string.
   if (routeConfig()->name().empty()) {
     return;
   }

@@ -483,7 +483,6 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
   absl::optional<Router::ConfigConstSharedPtr> route_config = parent_.routeConfig();
   Event::Dispatcher& thread_local_dispatcher =
       parent_.connection_manager_.read_callbacks_->connection().dispatcher();
-  Router::ScopeKeyPtr scope_key;
   if (route_config.has_value() && route_config.value()->usesVhds()) {
     // On demand vhds
     ASSERT(!parent_.filter_manager_.requestHeaders()->Host()->value().empty());
@@ -491,26 +490,15 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
         absl::AsciiStrToLower(parent_.filter_manager_.requestHeaders()->getHostValue());
     requestVhdsUpdate(host_header, thread_local_dispatcher, std::move(route_config_updated_cb));
     return;
-  } else if (parent_.snapped_scoped_routes_config_ != nullptr &&
-             (scope_key = parent_.snapped_scoped_routes_config_->computeScopeKey(
-                  *parent_.filter_manager_.requestHeaders()))) {
-    // On demand srds
-    Http::RouteConfigUpdatedCallback scoped_route_config_updated_cb =
-        Http::RouteConfigUpdatedCallback(
-            [this, weak_route_config_updated_cb = std::weak_ptr<Http::RouteConfigUpdatedCallback>(
-                       route_config_updated_cb)](bool scope_exist) {
-              // If the callback can be locked, this ActiveStream is still alive.
-              if (auto cb = weak_route_config_updated_cb.lock()) {
-                // Refresh the route before continue the filter chain.
-                if (scope_exist) {
-                  parent_.refreshCachedRoute();
-                }
-                (*cb)(scope_exist && parent_.hasCachedRoute());
-              }
-            });
-    requestSrdsUpdate(std::move(scope_key), thread_local_dispatcher,
-                      std::move(scoped_route_config_updated_cb));
-    return;
+  } else if (parent_.snapped_scoped_routes_config_ != nullptr) {
+    Router::ScopeKeyPtr scope_key = parent_.snapped_scoped_routes_config_->computeScopeKey(
+        *parent_.filter_manager_.requestHeaders());
+    if (scope_key != nullptr) {
+      // On demand srds
+      requestSrdsUpdate(std::move(scope_key), thread_local_dispatcher,
+                        std::move(route_config_updated_cb));
+      return;
+    }
   }
   // Continue the filter chain if no on demand update is requested.
   (*route_config_updated_cb)(false);
@@ -525,14 +513,27 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestVhdsUpdate(
 
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
     Router::ScopeKeyPtr scope_key, Event::Dispatcher& thread_local_dispatcher,
-    Http::RouteConfigUpdatedCallback&& route_config_updated_cb) {
+    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   // If it is inline scope_route_config_provider, will be cast to nullptr.
-  if (!scoped_route_config_provider_) {
-    route_config_updated_cb(false);
+  if (scoped_route_config_provider_ == nullptr) {
+    (*route_config_updated_cb)(false);
     return;
   }
+  Http::RouteConfigUpdatedCallback scoped_route_config_updated_cb =
+      Http::RouteConfigUpdatedCallback(
+          [this, weak_route_config_updated_cb = std::weak_ptr<Http::RouteConfigUpdatedCallback>(
+                     route_config_updated_cb)](bool scope_exist) {
+            // If the callback can be locked, this ActiveStream is still alive.
+            if (auto cb = weak_route_config_updated_cb.lock()) {
+              // Refresh the route before continue the filter chain.
+              if (scope_exist) {
+                parent_.refreshCachedRoute();
+              }
+              (*cb)(scope_exist && parent_.hasCachedRoute());
+            }
+          });
   scoped_route_config_provider_->onDemandRdsUpdate(std::move(scope_key), thread_local_dispatcher,
-                                                   std::move(route_config_updated_cb));
+                                                   std::move(scoped_route_config_updated_cb));
 }
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager,

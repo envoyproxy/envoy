@@ -132,7 +132,7 @@ private:
                            Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
     void requestSrdsUpdate(Router::ScopeKeyPtr scope_key,
                            Event::Dispatcher& thread_local_dispatcher,
-                           Http::RouteConfigUpdatedCallback&& route_config_updated_cb);
+                           Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
 
   private:
     Router::RouteConfigProvider* route_config_provider_;
