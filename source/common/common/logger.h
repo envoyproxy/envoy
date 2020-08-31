@@ -428,10 +428,12 @@ using t_logclock = std::chrono::steady_clock; // NOLINT
 
 #define ENVOY_LOG_PERIODIC(LEVEL, CHRONO_DURATION, ...)                                            \
   do {                                                                                             \
-    static auto* last_hit = new std::atomic<t_logclock::time_point>();                             \
+    static auto* last_hit = new std::atomic<uint64_t>();                                           \
     auto last = last_hit->load();                                                                  \
-    const auto now = t_logclock::now();                                                            \
-    if ((now - last) > CHRONO_DURATION && last_hit->compare_exchange_strong(last, now)) {          \
+    const auto now = t_logclock::now().time_since_epoch().count();                                 \
+    if ((now - last) >                                                                             \
+            std::chrono::duration_cast<std::chrono::nanoseconds>(CHRONO_DURATION).count() &&       \
+        last_hit->compare_exchange_strong(last, now)) {                                            \
       ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
     }                                                                                              \
   } while (0)
