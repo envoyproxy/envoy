@@ -1,8 +1,9 @@
-load("@rules_python//python:defs.bzl", "py_test")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
 )
+load("@rules_python//python:defs.bzl", "py_test")
+load("@kafka_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 
@@ -23,5 +24,8 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     tags = ["manual"],
-    deps = ["@com_github_pallets_jinja//:jinja2"],
+    deps = [
+        requirement("Jinja2"),
+        requirement("MarkupSafe"),
+    ],
 )

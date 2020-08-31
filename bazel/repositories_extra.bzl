@@ -15,12 +15,16 @@ def _python_deps():
         requirements = "@envoy//configs:requirements.txt",
     )
     pip3_import(
-        name = "protodoc_pip3",
-        requirements = "@envoy//tools/protodoc:requirements.txt",
+        name = "kafka_pip3",
+        requirements = "@envoy//source/extensions/filters/network/kafka:requirements.txt",
     )
     pip3_import(
         name = "headersplit_pip3",
         requirements = "@envoy//tools/envoy_headersplit:requirements.txt",
+    )
+    pip3_import(
+        name = "protodoc_pip3",
+        requirements = "@envoy//tools/protodoc:requirements.txt",
     )
 
 # Envoy deps that rely on a first stage of dependency loading in envoy_dependencies().
