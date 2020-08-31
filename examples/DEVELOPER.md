@@ -52,7 +52,7 @@ You may wish to grep the responses, or check return codes to ensure the commands
 Likewise, if the documentation asks the user to browse to a page - for example http://localhost:8000 -
 then you should add a test to ensure that the given URL responds as expected.
 
-If an example web page is also expected to make further Javascript `HTTP` requests in order to function, then add
+If an example web page is also expected to make further JavaScript `HTTP` requests in order to function, then add
 tests for requests that mimick this interaction.
 
 A number of utility functions have been added to simplify browser testing.
