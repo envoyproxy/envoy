@@ -26,7 +26,7 @@ TEST(EnvoyQuicUtilsTest, ConversionBetweenQuicAddressAndEnvoyAddress) {
   // Mock out socket() system call to test both V4 and V6 address conversion.
   testing::NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_calls{&os_sys_calls};
-  ON_CALL(os_sys_calls, socket(_, _, _)).WillByDefault(Return(Api::SysCallIntResult{1, 0}));
+  ON_CALL(os_sys_calls, socket(_, _, _)).WillByDefault(Return(Api::SysCallSocketResult{1, 0}));
   ON_CALL(os_sys_calls, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
 
   quic::QuicSocketAddress quic_uninitialized_addr;

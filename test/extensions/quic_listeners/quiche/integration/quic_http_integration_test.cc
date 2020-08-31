@@ -344,8 +344,8 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
             1);
 }
 
-TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersWithBPF) {
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
+TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersWithBPF) {
   concurrency_ = 8;
   set_reuse_port_ = true;
   initialize();
@@ -379,8 +379,8 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersWithBPF) {
   for (size_t i = 0; i < concurrency_; ++i) {
     codec_clients[i]->close();
   }
-#endif
 }
+#endif
 
 #ifndef __APPLE__
 TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersNoBPF) {
