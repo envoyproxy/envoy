@@ -78,6 +78,7 @@ public:
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
   const MaglevLoadBalancerStats& stats() const { return stats_; }
+  uint64_t tableSize() const { return table_size_; }
 
 private:
   // ThreadAwareLoadBalancerBase
