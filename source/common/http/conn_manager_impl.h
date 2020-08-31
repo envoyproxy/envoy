@@ -281,8 +281,8 @@ private:
 
     void traceRequest();
 
-    // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope
-    // is not found, snapped_route_config_ is set to Router::NullConfigImpl.
+    // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is
+    // not found, snapped_route_config_ is set to Router::NullConfigImpl.
     void snapScopedRouteConfig();
 
     void refreshCachedRoute();
@@ -296,8 +296,8 @@ private:
           : codec_saw_local_complete_(false), saw_connection_close_(false),
             successful_upgrade_(false), is_internally_created_(false), decorated_propagate_(true) {}
 
-      bool codec_saw_local_complete_ : 1; // This indicates that local is complete as written
-                                          // all the way through to the codec.
+      bool codec_saw_local_complete_ : 1; // This indicates that local is complete as written all
+                                          // the way through to the codec.
       bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
 
