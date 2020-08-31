@@ -29,7 +29,7 @@ private:
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute& proto_config,
-      Server::Configuration::FactoryContext& context,
+      Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validator) override;
 };
 
