@@ -29,7 +29,8 @@ void GrpcSubscriptionImpl::start(const std::set<std::string>& resources,
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
 
-  watch_ = grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_, use_namespace_matching);
+  watch_ =
+      grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_, use_namespace_matching);
 
   // The attempt stat here is maintained for the purposes of having consistency between ADS and
   // gRPC/filesystem/REST Subscriptions. Since ADS is push based and muxed, the notion of an

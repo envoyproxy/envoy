@@ -93,7 +93,9 @@ public:
    * @param callbacks the callbacks to be notified of configuration updates. These must be valid
    *                  until GrpcMuxWatch is destroyed.
    * @param resource_decoder how incoming opaque resource objects are to be decoded.
-   * @param use_namespace_matching if namespace watch should be created. This is used for creating watches on collections of resources; individual members of a collection are identified by the namespace in resource name.
+   * @param use_namespace_matching if namespace watch should be created. This is used for creating
+   * watches on collections of resources; individual members of a collection are identified by the
+   * namespace in resource name.
    * @return GrpcMuxWatchPtr a handle to cancel the subscription with. E.g. when a cluster goes
    * away, its EDS updates should be cancelled by destroying the GrpcMuxWatchPtr.
    */
