@@ -343,12 +343,15 @@ public:
   virtual RequestTrailerMapOptRef requestTrailers() PURE;
 
   /**
-   * Retrieves a pointer to the continue headers set via setResponseHeaders.
+   * Retrieves a pointer to the continue headers set via the call to setContinueHeaders.
    */
   virtual ResponseHeaderMapOptRef continueHeaders() PURE;
 
   /**
-   * Retrieves a pointer to the response headers set via setResponseHeaders.
+   * Retrieves a pointer to the response headers set via the last call to setResponseHeaders.
+   * Note that response headers might be set multiple times (e.g. if a local reply is issued after
+   * headers have been received but before headers have been encoded), so it is not safe in general
+   * to assume that any set of headers will be valid for the duration of a stream.
    */
   virtual ResponseHeaderMapOptRef responseHeaders() PURE;
 
