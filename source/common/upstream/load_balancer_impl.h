@@ -56,8 +56,6 @@ protected:
    * retrying host selection.
    */
   virtual HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) PURE;
-  // FIXME Comment
-  virtual HostConstSharedPtr peekHostOnce(LoadBalancerContext* context) const PURE;
 
   /**
    * For the given host_set @return if we should be in a panic mode or not. For example, if the
@@ -361,7 +359,7 @@ public:
                       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
   // Upstream::LoadBalancerBase
-  HostConstSharedPtr peekHostOnce(LoadBalancerContext* context) const override;
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
 
 protected:
@@ -420,17 +418,19 @@ private:
   double hostWeight(const Host& host) override { return host.weight(); }
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                         const HostsSource& source) const override {
-    // To avoid storing the RR index in the base class, we end up using a second map here with
-    // host source as the key. This means that each LB decision will require two map lookups in
-    // the unweighted case. We might consider trying to optimize this in the future.
-    if (rr_indexes_.find(source) == rr_indexes_.end()) {
+    uint64_t* peekahead_index = const_cast<uint64_t*>(&peekahead_index_);
+    auto i = rr_indexes_.find(source);
+    if (i == rr_indexes_.end()) {
       return nullptr;
     }
-    const uint64_t val = rr_indexes_.find(source)->second;
-    return hosts_to_use[val % hosts_to_use.size()];
+    return hosts_to_use[(i->second + (*peekahead_index)++) % hosts_to_use.size()];
   }
+
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                         const HostsSource& source) override {
+    if (peekahead_index_ > 0) {
+      --peekahead_index_;
+    }
     // To avoid storing the RR index in the base class, we end up using a second map here with
     // host source as the key. This means that each LB decision will require two map lookups in
     // the unweighted case. We might consider trying to optimize this in the future.
@@ -438,6 +438,7 @@ private:
     return hosts_to_use[rr_indexes_[source]++ % hosts_to_use.size()];
   }
 
+  uint64_t peekahead_index_{};
   absl::node_hash_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
 };
 
@@ -554,10 +555,10 @@ public:
 
   // Upstream::LoadBalancerBase
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
-  HostConstSharedPtr peekHostOnce(LoadBalancerContext* context) const override;
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
 
 protected:
-  absl::optional<uint64_t> stashed_random_;
+  std::list<uint64_t> stashed_random_;
 };
 
 /**

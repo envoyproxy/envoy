@@ -22,6 +22,7 @@ robin order. If :ref:`weights
 endpoints in a locality, then a weighted round robin schedule is used, where
 higher weighted endpoints will appear more often in the rotation to achieve the
 effective weighting.
+Weighted round robin supports predictive predictive prefetching.
 
 .. _arch_overview_load_balancing_types_least_request:
 
@@ -61,6 +62,8 @@ same or different weights.
   steady state but may not adapt to load imbalance as quickly. Additionally, unlike P2C, a host will
   never truly drain, though it will receive fewer requests over time.
 
+The weighted least request load balancer does not currently support predictive prefetching.
+
 .. _arch_overview_load_balancing_types_ring_hash:
 
 Ring hash
@@ -89,6 +92,10 @@ affect only 1/N requests.
 
 When priority based load balancing is in use, the priority level is also chosen by hash, so the
 endpoint selected will still be consistent when the set of backends is stable.
+
+The ring hash load balancer does not currently support predictive prefetching but per-upstream
+prefetch can functionally fill the same role, in anticipating further sticky requests mapped to
+a given upstream.
 
 .. _arch_overview_load_balancing_types_maglev:
 
@@ -123,6 +130,10 @@ likely a superior drop in replacement for ring hash. The advanced reader can use
 :repo:`this benchmark </test/common/upstream/load_balancer_benchmark.cc>` to compare ring hash
 versus Maglev with different parameters.
 
+The Maglev load balancer does not currently support predictive prefetching but per-upstream prefetch
+can functionally fill the same role, in anticipating further sticky requests mapped to a given
+upstream.
+
 .. _arch_overview_load_balancing_types_random:
 
 Random
@@ -132,3 +143,4 @@ The random load balancer selects a random available host. The random load balanc
 better than round robin if no health checking policy is configured. Random selection avoids bias
 towards the host in the set that comes after a failed host.
 
+The random load balancer supports predictive prefetching.

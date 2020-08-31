@@ -483,6 +483,8 @@ private:
   void onClusterInit(Cluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();
+  void maybePrefetch(ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry,
+                     LoadBalancerContext* context, ConnectionPool::Instance* conn_pool);
 
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;

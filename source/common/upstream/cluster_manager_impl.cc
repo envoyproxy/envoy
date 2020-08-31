@@ -822,6 +822,31 @@ ThreadLocalCluster* ClusterManagerImpl::get(absl::string_view cluster) {
   }
 }
 
+void ClusterManagerImpl::maybePrefetch(
+    ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry, LoadBalancerContext* context,
+    ConnectionPool::Instance* conn_pool) {
+  // TODO(alyssawilk) As currently implemented, this will always just prefetch
+  // one connection ahead of actually needed connections.
+  //
+  // Instead we want to track the following metrics across the entire connection
+  // pool and use the same algorithm we do for per-upstream prefetch:
+  // ((pending_streams_ + num_active_streams_) * global_prefetch_ratio >
+  //  (connecting_stream_capacity_ + num_active_streams_)))
+  //  and allow multiple prefetches per pick.
+  //  Also cap prefetches such that
+  //  num_unused_prefetch < num hosts
+  //  since if we have more prefetches than hosts, we should consider kicking into
+  //  per-upstream prefetch.
+  //
+  //  Once we do this, this should loop capped number of times while shouldPrefetch is true.
+  if (cluster_entry->cluster_info_->peekaheadRatio() != 0) {
+    HostConstSharedPtr prefetch_host = cluster_entry->lb_->peekAnotherHost(context);
+    if (prefetch_host && conn_pool) {
+      conn_pool->maybePrefetch(cluster_entry->cluster_info_->peekaheadRatio());
+    }
+  }
+}
+
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
                                            absl::optional<Http::Protocol> protocol,
@@ -834,7 +859,16 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
   }
 
   // Select a host and create a connection pool for it if it does not already exist.
-  return entry->second->connPool(priority, protocol, context);
+  Http::ConnectionPool::Instance* conn_pool = entry->second->connPool(priority, protocol, context);
+
+  // httpConnPoolForCluster is called immediately before a call for newStream. newStream doesn't
+  // have the load balancer context needed to make selection decisions so prefetching must be
+  // performed here in anticipation of the new stream.
+  // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
+  // code-enforced.
+  maybePrefetch(entry->second, context, conn_pool);
+
+  return conn_pool;
 }
 
 Tcp::ConnectionPool::Instance*
@@ -847,8 +881,17 @@ ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePr
     return nullptr;
   }
 
+  Tcp::ConnectionPool::Instance* conn_pool = entry->second->tcpConnPool(priority, context);
+
+  // tcpConnPoolForCluster is called immediately before a call for newConnection. newConnection
+  // doesn't have the load balancer context needed to make selection decisions so prefetching must
+  // be performed here in anticipation of the new connection.
+  // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
+  // code-enforced.
+  maybePrefetch(entry->second, context, conn_pool);
+
   // Select a host and create a connection pool for it if it does not already exist.
-  return entry->second->tcpConnPool(priority, context);
+  return conn_pool;
 }
 
 void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,

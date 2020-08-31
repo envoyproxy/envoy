@@ -325,7 +325,6 @@ LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) const {
   if (context) {
     const auto priority_loads = context->determinePriorityLoad(
         priority_set_, per_priority_load_, Upstream::RetryPriority::defaultPriorityMapping);
-
     const auto priority_and_source =
         choosePriority(random_.random(), priority_loads.healthy_priority_load_,
                        priority_loads.degraded_priority_load_);
@@ -748,8 +747,8 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // refreshes for the weighted case.
     if (!hosts.empty()) {
       for (uint32_t i = 0; i < seed_ % hosts.size(); ++i) {
-        auto host = scheduler.edf_->pick();
-        scheduler.edf_->add(hostWeight(*host), host);
+        auto host =
+            scheduler.edf_->pickAndAdd([this](const Host& host) { return hostWeight(host); });
       }
     }
   };
@@ -775,7 +774,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
   }
 }
 
-HostConstSharedPtr EdfLoadBalancerBase::peekHostOnce(LoadBalancerContext* context) const {
+HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* context) {
   const absl::optional<HostsSource> hosts_source = hostSourceToUse(context);
   if (!hosts_source) {
     return nullptr;
@@ -791,7 +790,7 @@ HostConstSharedPtr EdfLoadBalancerBase::peekHostOnce(LoadBalancerContext* contex
   // whether to use EDF or do unweighted (fast) selection. EDF is non-null iff the original weights
   // of 2 or more hosts differ.
   if (scheduler.edf_ != nullptr) {
-    return scheduler.edf_->pick();
+    return scheduler.edf_->peekAgain([this](const Host& host) { return hostWeight(host); });
   } else {
     const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
     if (hosts_to_use.empty()) {
@@ -817,10 +816,7 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
   // whether to use EDF or do unweighted (fast) selection. EDF is non-null iff the original weights
   // of 2 or more hosts differ.
   if (scheduler.edf_ != nullptr) {
-    auto host = scheduler.edf_->pick();
-    if (host != nullptr) {
-      scheduler.edf_->add(hostWeight(*host), host);
-    }
+    auto host = scheduler.edf_->pickAndAdd([this](const Host& host) { return hostWeight(host); });
     return host;
   } else {
     const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
@@ -862,7 +858,7 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
   return candidate_host;
 }
 
-HostConstSharedPtr RandomLoadBalancer::peekHostOnce(LoadBalancerContext* context) const {//FIXME stash random
+HostConstSharedPtr RandomLoadBalancer::peekAnotherHost(LoadBalancerContext* context) {
   const absl::optional<HostsSource> hosts_source = hostSourceToUse(context);
   if (!hosts_source) {
     return nullptr;
@@ -873,11 +869,8 @@ HostConstSharedPtr RandomLoadBalancer::peekHostOnce(LoadBalancerContext* context
     return nullptr;
   }
 
-  if (!stashed_random_.has_value()) {
-    *const_cast<absl::optional<uint64_t>*>(&stashed_random_) = random_.random();
-  }
-
-  return hosts_to_use[stashed_random_.value() % hosts_to_use.size()];
+  stashed_random_.push_back(random_.random());
+  return hosts_to_use[stashed_random_.back() % hosts_to_use.size()];
 }
 
 HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* context) {
@@ -892,9 +885,9 @@ HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* conte
   }
 
   uint64_t random;
-  if (stashed_random_.has_value()) {
-    random = stashed_random_.value();
-    stashed_random_ = absl::nullopt;
+  if (!stashed_random_.empty()) {
+    random = stashed_random_.front();
+    stashed_random_.pop_front();
   } else {
     random = random_.random();
   }

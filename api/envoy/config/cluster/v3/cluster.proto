@@ -603,6 +603,22 @@ message Cluster {
     // This is limited somewhat arbitrarily to 3 because prefetching connections too aggressively can
     // harm latency more than the prefetching helps.
     google.protobuf.DoubleValue prefetch_ratio = 1 [(validate.rules).double = {lte: 3.0 gte: 1.0}];
+
+    // Indicates how many many streams (rounded up) can be anticipated across a cluster for each
+    // stream, useful for low QPS services. This is currently supported for deterministic non-sticky
+    // load-balancing algorithms (weighted round robin, random).
+    //
+    // For example if prefetching is set to 2 for a round robin HTTP/2 cluster, on the first
+    // incoming stream, 2 connections will be prefetched - one to the first upstream for this
+    // cluster, one to the second on the assumption there will be a follow-up stream.
+    //
+    // Prefetching will be limited to one prefetch per configured upstream in the cluster.
+    //
+    // If this value is not set, Envoy will fetch as many connections as needed to serve streams in
+    // flight, so during warm up and in steady state if a connection is closed, there will be a
+    // latency hit for connection establishment.
+    google.protobuf.DoubleValue predictive_prefetch_ratio = 2
+        [(validate.rules).double = {lte: 3.0 gte: 1.0}];
   }
 
   reserved 12, 15, 7, 11, 35;

@@ -149,6 +149,7 @@ public:
   void checkForDrained();
   void onUpstreamReady();
   ConnectionPool::Cancellable* newStream(AttachContext& context);
+  bool maybePrefetch(float global_prefetch_ratio);
 
   virtual ConnectionPool::Cancellable* newPendingRequest(AttachContext& context) PURE;
 
@@ -176,7 +177,7 @@ protected:
 
   // Creates a new connection if there is sufficient demand, it is allowed by resourceManager, or
   // to avoid starving this pool.
-  bool tryCreateNewConnection();
+  bool tryCreateNewConnection(float global_prefetch_ratio = 0);
 
   // A helper function which determines if a canceled pending connection should
   // be closed as excess or not.
@@ -184,9 +185,9 @@ protected:
 
   // A helper function which determines if a new incoming stream should trigger
   // connection prefetch.
-  bool shouldCreateNewConnection() const;
+  bool shouldCreateNewConnection(float global_prefetch_ratio) const;
 
-  float prefetchRatio() const;
+  float perUpstreamPrefetchRatio() const;
 
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;

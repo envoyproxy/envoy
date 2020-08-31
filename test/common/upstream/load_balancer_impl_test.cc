@@ -68,7 +68,7 @@ public:
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  HostConstSharedPtr peekHostOnce(LoadBalancerContext*) const override {
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 };
@@ -572,6 +572,7 @@ TEST_P(FailoverTest, BasicFailover) {
   failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
   init(false);
+  EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->peekAnotherHost(nullptr));
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr));
 }
 
@@ -581,6 +582,7 @@ TEST_P(FailoverTest, BasicDegradedHosts) {
   host_set_.degraded_hosts_ = host_set_.hosts_;
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
   init(false);
+  EXPECT_EQ(host_set_.degraded_hosts_[0], lb_->peekAnotherHost(nullptr));
   EXPECT_EQ(host_set_.degraded_hosts_[0], lb_->chooseHost(nullptr));
 }
 
@@ -766,9 +768,17 @@ TEST_P(RoundRobinLoadBalancerTest, Normal) {
                               makeTestHost(info_, "tcp://127.0.0.1:81")};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   init(false);
+
+  // Make sure the round robin pattern works for peeking.
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->peekAnotherHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->peekAnotherHost(nullptr));
+
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+
+  // Make sure that if picks get ahead of peeks, peeks resume at the next pick.
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->peekAnotherHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 }
 
@@ -1661,6 +1671,8 @@ public:
 
 TEST_P(RandomLoadBalancerTest, NoHosts) {
   init();
+
+  EXPECT_EQ(nullptr, lb_->peekAnotherHost(nullptr));
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
 }
 
@@ -1672,8 +1684,12 @@ TEST_P(RandomLoadBalancerTest, Normal) {
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->peekAnotherHost(nullptr));
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->peekAnotherHost(nullptr));
+  std::cerr << "Peeking done\n";
+  EXPECT_CALL(random_, random()).Times(0);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 }
 
