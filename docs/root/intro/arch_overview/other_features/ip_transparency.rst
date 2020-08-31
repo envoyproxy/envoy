@@ -53,7 +53,6 @@ Some drawbacks to Proxy Protocol:
 * It only supports TCP protocols.
 * It requires upstream host support.
 
-
 .. _arch_overview_ip_transparency_original_src_listener:
 
 Original Source Listener Filter
