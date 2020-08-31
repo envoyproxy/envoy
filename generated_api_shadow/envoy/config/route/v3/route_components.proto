@@ -557,7 +557,7 @@ message CorsPolicy {
       [deprecated = true, (validate.rules).repeated = {items {string {max_bytes: 1024}}}];
 }
 
-// [#next-free-field: 37]
+// [#next-free-field: 36]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -576,17 +576,6 @@ message RouteAction {
 
     PASS_THROUGH_INTERNAL_REDIRECT = 0;
     HANDLE_INTERNAL_REDIRECT = 1;
-  }
-
-  enum VhRateLimitsOptions {
-    // Use the virtual host rate limits unless the route has a rate limit policy
-    OVERRIDE = 0;
-
-    // Use the virtual host rate limits even if the route has a rate limit policy
-    INCLUDE = 1;
-
-    // Ignores the virtual host rate limits even if the route does not have a rate limit policy
-    IGNORE = 2;
   }
 
   // The router is capable of shadowing traffic from one cluster to another. The current
@@ -984,18 +973,13 @@ message RouteAction {
   // route.
   repeated RateLimit rate_limits = 13;
 
-  oneof vh_rate_limits_options {
-    // Specifies if the rate limit filter should include the virtual host rate
-    // limits. By default, if the route configured rate limits, the virtual host
-    // :ref:`rate_limits <envoy_api_field_config.route.v3.VirtualHost.rate_limits>` are not applied to the
-    // request.
-    //
-    // This field is deprecated. Please use :ref:`vh_rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.vh_rate_limits>`
-    google.protobuf.BoolValue include_vh_rate_limits = 14 [deprecated = true];
-
-    // Specifies if the rate limit filter should include the virtual host rate limits.
-    VhRateLimitsOptions vh_rate_limits = 36 [(validate.rules).enum = {defined_only: true}];
-  }
+  // Specifies if the rate limit filter should include the virtual host rate
+  // limits. By default, if the route configured rate limits, the virtual host
+  // :ref:`rate_limits <envoy_api_field_config.route.v3.VirtualHost.rate_limits>` are not applied to the
+  // request.
+  //
+  // This field is deprecated. Please use :ref:`vh_rate_limits <envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits>`
+  google.protobuf.BoolValue include_vh_rate_limits = 14 [deprecated = true];
 
   // Specifies a list of hash policies to use for ring hash load balancing. Each
   // hash policy is evaluated individually and the combined result is used to

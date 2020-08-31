@@ -36,6 +36,14 @@ Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
+Router::RouteSpecificFilterConfigConstSharedPtr
+RateLimitFilterConfig::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute& proto_config,
+    Server::Configuration::FactoryContext& context, ProtobufMessage::ValidationVisitor& validator) {
+  return std::make_shared<FilterConfigPerRoute>(proto_config);
+  ;
+}
+
 /**
  * Static registration for the rate limit filter. @see RegisterFactory.
  */

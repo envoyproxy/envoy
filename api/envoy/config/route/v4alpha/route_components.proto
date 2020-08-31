@@ -547,7 +547,7 @@ message CorsPolicy {
   core.v4alpha.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 37]
+// [#next-free-field: 36]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.RouteAction";
 
@@ -557,17 +557,6 @@ message RouteAction {
 
     // HTTP status code - 404 Not Found.
     NOT_FOUND = 1;
-  }
-
-  enum VhRateLimitsOptions {
-    // Use the virtual host rate limits unless the route has a rate limit policy
-    OVERRIDE = 0;
-
-    // Use the virtual host rate limits even if the route has a rate limit policy
-    INCLUDE = 1;
-
-    // Ignores the virtual host rate limits even if the route does not have a rate limit policy
-    IGNORE = 2;
   }
 
   // The router is capable of shadowing traffic from one cluster to another. The current
@@ -971,11 +960,6 @@ message RouteAction {
   // Specifies a set of rate limit configurations that could be applied to the
   // route.
   repeated RateLimit rate_limits = 13;
-
-  oneof vh_rate_limits_options {
-    // Specifies if the rate limit filter should include the virtual host rate limits.
-    VhRateLimitsOptions vh_rate_limits = 36 [(validate.rules).enum = {defined_only: true}];
-  }
 
   // Specifies a list of hash policies to use for ring hash load balancing. Each
   // hash policy is evaluated individually and the combined result is used to

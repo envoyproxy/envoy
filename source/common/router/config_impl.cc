@@ -420,34 +420,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
         std::make_unique<TlsContextMatchCriteriaImpl>(route.match().tls_context());
   }
 
-  if (route.route().vh_rate_limits_options_case() ==
-      envoy::config::route::v3::RouteAction::VhRateLimitsOptionsCase::kVhRateLimits) {
-    vh_rate_limits_option_case_ = Router::VhRateLimitOptionsCase::kVhRateLimits;
-  } else {
-    vh_rate_limits_option_case_ = Router::VhRateLimitOptionsCase::kIncludeVhRateLimits;
-  }
-
-  if (vh_rate_limits_option_case_ == Router::VhRateLimitOptionsCase::kVhRateLimits) {
-    switch (route.route().vh_rate_limits()) {
-    case envoy::config::route::v3::RouteAction::OVERRIDE:
-      vh_rate_limits_ = Router::VhRateLimitOptions::Override;
-      break;
-    case envoy::config::route::v3::RouteAction::INCLUDE:
-      vh_rate_limits_ = Router::VhRateLimitOptions::Include;
-      break;
-    case envoy::config::route::v3::RouteAction::IGNORE:
-      vh_rate_limits_ = Router::VhRateLimitOptions::Ignore;
-      break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-  } else {
-    // Only set include_vh_rate_limits_ to true if the rate limit policy for the route is empty
-    // or the route set `include_vh_rate_limits` to true.
-    include_vh_rate_limits_ =
-        (rate_limit_policy_.empty() ||
-         PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false));
-  }
+  // Returns true if include_vh_rate_limits is explicitly set to true otherwise it defaults to false
+  // which is similar to VhRateLimitOptions::Override and will only use virtual host rate limits if
+  // the route is empty
+  include_vh_rate_limits_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false);
 
   if (route.route().has_cors()) {
     cors_policy_ =

@@ -701,19 +701,6 @@ public:
 class HttpRouteTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
 /**
- * Options for setting the virtual host rate limits on the route.
- */
-enum class VhRateLimitOptions { Override, Include, Ignore };
-
-/**
- * Configuration options for setting the virtual host rate limit options.
- *
- * Deprecated and only added to support a breaking change when deprecating
- * include_vh_rate_limits in favor of vh_rate_limits.
- */
-enum class VhRateLimitOptionsCase { kVhRateLimits, kIncludeVhRateLimits };
-
-/**
  * An individual resolved route entry.
  */
 class RouteEntry : public ResponseEntry {
@@ -855,21 +842,6 @@ public:
    * @return bool true if the virtual host rate limits should be included.
    */
   virtual bool includeVirtualHostRateLimits() const PURE;
-
-  /**
-   *
-   * @return VhRateLimitOptions return the virtual rate limit option set for the route
-   */
-  virtual VhRateLimitOptions virtualHostRateLimitsOption() const PURE;
-
-  /**
-   *
-   * @return VhRateLimitOptionsCase return the type of virtual host rate limits option being used.
-   *
-   * Deprecated and only introduced to support breaking change when deprecating
-   * include_vh_rate_limits in favor of vh_rate_limits.
-   */
-  virtual VhRateLimitOptionsCase vhRateLimitsOptionsCase() const PURE;
 
   /**
    * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config

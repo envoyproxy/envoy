@@ -98,10 +98,6 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, virtualCluster(_)).WillByDefault(Return(&virtual_cluster_));
   ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(virtual_host_));
   ON_CALL(*this, includeVirtualHostRateLimits()).WillByDefault(Return(true));
-  ON_CALL(*this, virtualHostRateLimitsOption())
-      .WillByDefault(Return(Router::VhRateLimitOptions::Override));
-  ON_CALL(*this, vhRateLimitsOptionsCase())
-      .WillByDefault(Return(Router::VhRateLimitOptionsCase::kVhRateLimits));
   ON_CALL(*this, pathMatchCriterion()).WillByDefault(ReturnRef(path_match_criterion_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(upgrade_map_));

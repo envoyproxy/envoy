@@ -373,8 +373,6 @@ public:
   MOCK_METHOD(bool, autoHostRewrite, (), (const));
   MOCK_METHOD((const std::multimap<std::string, std::string>&), opaqueConfig, (), (const));
   MOCK_METHOD(bool, includeVirtualHostRateLimits, (), (const));
-  MOCK_METHOD(Router::VhRateLimitOptions, virtualHostRateLimitsOption, (), (const));
-  MOCK_METHOD(Router::VhRateLimitOptionsCase, vhRateLimitsOptionsCase, (), (const));
   MOCK_METHOD(const CorsPolicy*, corsPolicy, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));

@@ -4804,7 +4804,9 @@ virtual_hosts:
     EXPECT_EQ(nullptr, route_entry->hashPolicy());
     EXPECT_TRUE(route_entry->opaqueConfig().empty());
     EXPECT_FALSE(route_entry->autoHostRewrite());
-    EXPECT_TRUE(route_entry->includeVirtualHostRateLimits());
+    // Default behavior when include_vh_rate_limits is not set, similar to
+    // VhRateLimitOptions::Override
+    EXPECT_FALSE(route_entry->includeVirtualHostRateLimits());
     EXPECT_EQ(Http::Code::ServiceUnavailable, route_entry->clusterNotFoundResponseCode());
     EXPECT_EQ(nullptr, route_entry->corsPolicy());
     EXPECT_EQ("test_value",
@@ -5412,10 +5414,9 @@ virtual_hosts:
   std::unique_ptr<TestConfigImpl> config_ptr;
 
   config_ptr = std::make_unique<TestConfigImpl>(parseRouteConfigurationFromYaml(yaml),
-                                                factory_context_, true);
-  EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
-  EXPECT_EQ(config_ptr->route(headers, 0)->routeEntry()->vhRateLimitsOptionsCase(),
-            Router::VhRateLimitOptionsCase::kIncludeVhRateLimits);
+
+  // Default behavior when include_vh_rate_limits is not set, similar to VhRateLimitOptions::Override                                              factory_context_, true);
+  EXPECT_FALSE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 
   yaml = R"EOF(
 virtual_hosts:
@@ -5435,8 +5436,6 @@ virtual_hosts:
   config_ptr = std::make_unique<TestConfigImpl>(parseRouteConfigurationFromYaml(yaml),
                                                 factory_context_, true);
   EXPECT_FALSE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
-  EXPECT_EQ(config_ptr->route(headers, 0)->routeEntry()->vhRateLimitsOptionsCase(),
-            Router::VhRateLimitOptionsCase::kIncludeVhRateLimits);
 
   yaml = R"EOF(
 virtual_hosts:
@@ -5457,93 +5456,6 @@ virtual_hosts:
   config_ptr = std::make_unique<TestConfigImpl>(parseRouteConfigurationFromYaml(yaml),
                                                 factory_context_, true);
   EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
-  EXPECT_EQ(config_ptr->route(headers, 0)->routeEntry()->vhRateLimitsOptionsCase(),
-            Router::VhRateLimitOptionsCase::kIncludeVhRateLimits);
-}
-
-TEST_F(RoutePropertyTest, TestVirtualHostRateLimitOptions) {
-  std::string yaml = R"EOF(
-virtual_hosts:
-- name: www2
-  domains:
-  - "*"
-  rate_limits:
-  - actions:
-    - generic_key:
-        descriptor_value: fake_value
-  routes:
-  - match:
-      prefix: "/"
-    route:
-      cluster: www2
-      vh_rate_limits: OVERRIDE
-      rate_limits:
-      - actions:
-        - remote_address: {}
-  )EOF";
-  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
-  std::unique_ptr<TestConfigImpl> config_ptr;
-
-  config_ptr = std::make_unique<TestConfigImpl>(parseRouteConfigurationFromYaml(yaml),
-                                                factory_context_, true);
-  EXPECT_EQ(config_ptr->route(headers, 0)->routeEntry()->virtualHostRateLimitsOption(),
-            Router::VhRateLimitOptions::Override);
-  EXPECT_EQ(config_ptr->route(headers, 0)->routeEntry()->vhRateLimitsOptionsCase(),
-            Router::VhRateLimitOptionsCase::kVhRateLimits);
-
-  yaml = R"EOF(
-virtual_hosts:
-- name: www2
-  domains:
-  - "*"
-  rate_limits:
-  - actions:
-    - generic_key:
-        descriptor_value: fake_value
-  routes:
-  - match:
-      prefix: "/"
-    route:
-      cluster: www2
-      vh_rate_limits: INCLUDE
-      rate_limits:
-      - actions:
-        - remote_address: {}
-  )EOF";
-
-  config_ptr = std::make_unique<TestConfigImpl>(parseRouteConfigurationFromYaml(yaml),
-                                                factory_context_, true);
-  EXPECT_EQ(config_ptr->route(headers, 0)->routeEntry()->virtualHostRateLimitsOption(),
-            Router::VhRateLimitOptions::Include);
-  EXPECT_EQ(config_ptr->route(headers, 0)->routeEntry()->vhRateLimitsOptionsCase(),
-            Router::VhRateLimitOptionsCase::kVhRateLimits);
-
-  yaml = R"EOF(
-virtual_hosts:
-- name: www2
-  domains:
-  - "*"
-  rate_limits:
-  - actions:
-    - generic_key:
-        descriptor_value: fake_value
-  routes:
-  - match:
-      prefix: "/"
-    route:
-      cluster: www2
-      vh_rate_limits: IGNORE
-      rate_limits:
-      - actions:
-        - remote_address: {}
-  )EOF";
-
-  config_ptr = std::make_unique<TestConfigImpl>(parseRouteConfigurationFromYaml(yaml),
-                                                factory_context_, true);
-  EXPECT_EQ(config_ptr->route(headers, 0)->routeEntry()->virtualHostRateLimitsOption(),
-            Router::VhRateLimitOptions::Ignore);
-  EXPECT_EQ(config_ptr->route(headers, 0)->routeEntry()->vhRateLimitsOptionsCase(),
-            Router::VhRateLimitOptionsCase::kVhRateLimits);
 }
 
 // When allow_origin: and allow_origin_regex: are removed, simply remove them
