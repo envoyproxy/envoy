@@ -137,11 +137,11 @@ TEST(ParseTokenTest, TwoTokens) {
     EXPECT_THAT(ParseToken(input), IsOkAndHolds(ParseContext(value, 6)));
   }
   {
-    ParseContext input{.value = value, .next = 6};
+    ParseContext input(value, 6);
     EXPECT_THAT(ParseToken(input), StatusIs(absl::StatusCode::kInvalidArgument));
   }
   {
-    ParseContext input{.value = value, .next = 7};
+    ParseContext input(value, 7);
     EXPECT_THAT(ParseToken(input), IsOkAndHolds(ParseContext(value, 13)));
   }
 }
@@ -210,7 +210,7 @@ TEST(ParseCdnIdTest, SecondInSeries) {
   // This showcases a bug where I thought absl::string_view::substr took (start,
   // end) arguments, not (start, len).
   const std::string value = "cdn1, cdn2, cdn3";
-  ParseContext input{.value = value, .next = 6};
+  ParseContext input(value, 6);
   EXPECT_THAT(ParseCdnId(input), IsOkAndHolds(ParsedCdnId(ParseContext(value, 10), "cdn2")));
 }
 
