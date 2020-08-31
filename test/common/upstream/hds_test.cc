@@ -8,7 +8,9 @@
 #include "common/protobuf/protobuf.h"
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
+#include "common/upstream/transport_socket_match_impl.h"
 
+#include "extensions/transport_sockets/raw_buffer/config.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
@@ -480,81 +482,85 @@ TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   hds_delegate_->onReceiveMessage(std::move(message));
 }
-// Test connection context is being set as expected
-TEST_F(HdsTest, TestHttpsContext) {
+
+// Test that a transport_socket_matches and transport_socket_match_criteria filter as expected to
+// build the correct TransportSocketFactory based on these fields.
+TEST_F(HdsTest, TestSocketContext) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
-  // Create Message
+  // Create Message.
   message.reset(createSimpleMessage());
 
+  // Add transport socket matches to message.
   const std::string match_yaml = absl::StrFormat(
       R"EOF(
-name: "tls_socket"
+name: "test_socket"
 match:
-  mtlsReady: "true"
+  test_match: "true"
 transport_socket:
-  name: tls
-  typed_config:
-    "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+  name: "envoy.transport_sockets.raw_buffer"
  )EOF");
   auto* cluster_health_check = message->mutable_cluster_health_checks(0);
   auto* transport_socket_match = cluster_health_check->add_transport_socket_matches();
   TestUtility::loadFromYaml(match_yaml, *transport_socket_match);
 
+  // Add transport socket match criteria to our health check, for filtering matches.
   auto* health_check = cluster_health_check->mutable_health_checks(0);
   auto* transport_socket_match_criteria = health_check->mutable_transport_socket_match_criteria();
   ProtobufWkt::Value v;
-  v.set_bool_value(true);
-  transport_socket_match_criteria->mutable_fields()->insert({"tls_socket", v});
+  v.set_string_value("true");
+  transport_socket_match_criteria->mutable_fields()->insert({"test_match", v});
 
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection));
 
-  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(1);
-  // Carry over cluster name on a call to createClusterInfo,
-  // in the same way that the prod factory does.
-  bool valid = false;
+  // Pull out socket_matcher object normally internal to createClusterInfo, to test that a matcher
+  // would match the expected socket.
+  std::unique_ptr<TransportSocketMatcherImpl> socket_matcher;
   EXPECT_CALL(test_factory_, createClusterInfo(_))
       .WillRepeatedly(Invoke([&](const ClusterInfoFactory::CreateClusterInfoParams& params) {
-        std::shared_ptr<Upstream::MockClusterInfo> cluster_info{
-            new NiceMock<Upstream::MockClusterInfo>()};
-        // copy name for use in sendResponse() in HdsCluster
-        valid = params.cluster_.transport_socket_matches_size() == 1;
-        if (valid) {
-          valid = Envoy::Protobuf::util::MessageDifferencer::Equivalent(
-              *transport_socket_match, params.cluster_.transport_socket_matches()[0]);
-        }
-        cluster_info->name_ = params.cluster_.name();
-        return cluster_info;
+        // Build scope, factory_context as does ProdClusterInfoFactory.
+        Envoy::Stats::ScopePtr scope =
+            params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
+        Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+            params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
+            params.dispatcher_, params.random_, params.stats_, params.singleton_manager_,
+            params.tls_, params.validation_visitor_, params.api_);
+
+        // Create a mock socket_factory for the scope of this unit test.
+        std::unique_ptr<Envoy::Network::TransportSocketFactory> socket_factory =
+            std::make_unique<Network::MockTransportSocketFactory>();
+
+        // set socket_matcher object in test scope.
+        socket_matcher = std::make_unique<Envoy::Upstream::TransportSocketMatcherImpl>(
+            params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope);
+
+        // But still use the fake cluster_info_.
+        return cluster_info_;
       }));
 
   EXPECT_CALL(*connection, setBufferLimits(_));
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
-  // Process message
+
+  // Process message.
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   hds_delegate_->onReceiveMessage(std::move(message));
 
   // pretend our endpoint was connected to.
   connection->raiseEvent(Network::ConnectionEvent::Connected);
 
-  // get our cluster from delegate
-  ASSERT_EQ(hds_delegate_->hdsClusters().size(), 1);
-  auto cluster = hds_delegate_->hdsClusters()[0];
+  // Get our health checker to match against.
+  auto clusters = hds_delegate_->hdsClusters();
+  ASSERT_EQ(clusters.size(), 1);
+  auto hcs = clusters[0]->healthCheckers();
+  ASSERT_EQ(hcs.size(), 1);
 
-  // check to see if our health checker got the correct metadata map field
-  ASSERT_EQ(cluster->healthCheckers().size(), 1);
-  auto health_checker = cluster->healthCheckers()[0];
-  HttpHealthCheckerImpl* health_checker_child;
-  ASSERT_TRUE(health_checker_child = dynamic_cast<HttpHealthCheckerImpl*>(health_checker.get()));
-  auto metadata = health_checker_child->transportSocketMatchMetadata();
-  EXPECT_TRUE(Envoy::Protobuf::util::MessageDifferencer::Equivalent(
-      metadata->filter_metadata().at(
-          Envoy::Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKET_MATCH),
-      *transport_socket_match_criteria));
-
-  // check to see if our cluster got the correct transport socket matches
-  EXPECT_TRUE(valid);
+  // Check that our match hits.
+  HealthCheckerImplBase* health_checker_base = dynamic_cast<HealthCheckerImplBase*>(hcs[0].get());
+  auto match = socket_matcher->resolve(health_checker_base->transportSocketMatchMetadata().get());
+  EXPECT_EQ(match.name_, "test_socket");
 }
 
 // Tests OnReceiveMessage given a HealthCheckSpecifier message without interval field
