@@ -15,8 +15,6 @@
 
 namespace Envoy {
 
-using namespace std::chrono_literals;
-
 class TestFilterLog : public Logger::Loggable<Logger::Id::filter> {
 public:
   void logMessage() {
