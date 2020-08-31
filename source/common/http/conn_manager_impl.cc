@@ -203,6 +203,9 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
   stream.filter_manager_.disarmRequestTimeout();
 
+  stream.completeRequest();
+  stream.filter_manager_.log();
+
   stream.filter_manager_.destroyFilters();
 
   read_callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(streams_));
@@ -576,7 +579,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       connection_manager_.read_callbacks_->connection().requestedServerName());
 }
 
-ConnectionManagerImpl::ActiveStream::~ActiveStream() {
+void ConnectionManagerImpl::ActiveStream::completeRequest() {
   filter_manager_.streamInfo().onRequestComplete();
   Upstream::HostDescriptionConstSharedPtr upstream_host =
       connection_manager_.read_callbacks_->upstreamHost();

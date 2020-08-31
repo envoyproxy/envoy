@@ -492,20 +492,6 @@ public:
         stream_info_(protocol, time_source, parent_filter_state, filter_state_life_span) {}
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
-    for (const auto& log_handler : access_log_handlers_) {
-      // TODO(snowp): Make access logger accept opt const ref or move out to HCM.
-      log_handler->log(filter_manager_callbacks_.requestHeaders().has_value()
-                           ? &filter_manager_callbacks_.requestHeaders()->get()
-                           : nullptr,
-                       filter_manager_callbacks_.responseHeaders().has_value()
-                           ? &filter_manager_callbacks_.responseHeaders()->get()
-                           : nullptr,
-                       filter_manager_callbacks_.responseTrailers().has_value()
-                           ? &filter_manager_callbacks_.responseTrailers()->get()
-                           : nullptr,
-                       stream_info_);
-    }
-
     ASSERT(state_.filter_call_state_ == 0);
   }
 
@@ -535,6 +521,25 @@ public:
     addStreamEncoderFilterWorker(filter, true);
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
+
+  void log() {
+    RequestHeaderMap* request_headers = nullptr;
+    if (filter_manager_callbacks_.requestHeaders()) {
+      request_headers = &filter_manager_callbacks_.requestHeaders()->get();
+    }
+    ResponseHeaderMap* response_headers = nullptr;
+    if (filter_manager_callbacks_.responseHeaders()) {
+      response_headers = &filter_manager_callbacks_.responseHeaders()->get();
+    }
+    ResponseTrailerMap* response_trailers = nullptr;
+    if (filter_manager_callbacks_.responseTrailers()) {
+      response_trailers = &filter_manager_callbacks_.responseTrailers()->get();
+    }
+
+    for (const auto& log_handler : access_log_handlers_) {
+      log_handler->log(request_headers, response_headers, response_trailers, stream_info_);
+    }
+  }
 
   void destroyFilters() {
     state_.destroyed_ = true;
