@@ -14,9 +14,9 @@ to the services, and requests to ``/admin`` respectively. Two backend services a
 
 The front Envoy is configured to run the Cache Filter, which will store cacheable responses in an in-memory cache, 
 and serve it to subsequent requests. In this demo, the responses that are served by the deployed services are stored in :repo:`/examples/cache/responses.yaml`. 
-This file is mounted to both services containers, so any changes made to the stored responses while the services are running should be instantly effective (no need to rebuild or rerun). 
+This file is mounted to both services' containers, so any changes made to the stored responses while the services are running should be instantly effective (no need to rebuild or rerun). 
 For the purposes of the demo, a response's date of creation is appended to its body before being served. 
-An Etag is computed for every response for validation purposes, which only depends on the response body in the yaml file (i.e the appended date is not taken into account). 
+An Etag is computed for every response for validation purposes, which only depends on the response body in the yaml file (i.e. the appended date is not taken into account). 
 Cached responses can be identified by having an ``age`` header. Validated responses can be identified by having a generation date older than the ``date`` header;
 as when a response is validated the ``date`` header is updated, while the body stays the same.
 
@@ -61,7 +61,7 @@ or
 **Step 4: Test Envoy's HTTP caching capabilities**
 
 You can now send a request to both services via the ``front-envoy``. Note that since the two services have different routes,
-identical requests to different services have different cache entries (i.e a request sent to service 2 will not be served by a cached
+identical requests to different services have different cache entries (i.e. a request sent to service 2 will not be served by a cached
 response produced by service 1).
 
 To send a request: 
