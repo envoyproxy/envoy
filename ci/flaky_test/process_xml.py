@@ -70,10 +70,11 @@ def getGitInfo(CI_TARGET):
   os.system("git remote -v > ${TMP_OUTPUT_PROCESS_XML}")
   os.system("git describe --all >> ${TMP_OUTPUT_PROCESS_XML}")
   os.system("git show >> ${TMP_OUTPUT_PROCESS_XML}")
-  f = open(os.environ['TMP_OUTPUT_PROCESS_XML'], 'r+')
+  f = open(os.environ['TMP_OUTPUT_PROCESS_XML'], 'r+', encoding='utf-8')
   # Fetching the URL from predefined env variable
   envoy_link = os.environ["REPO_URI"]
   for line in [next(f) for x in range(6)]:
+    print(f)
     if line.split('/')[0] == 'remotes':
       for token in line.split('/')[1:-1]:
         envoy_link += '/' + token
