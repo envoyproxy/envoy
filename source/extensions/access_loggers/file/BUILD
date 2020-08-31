@@ -27,12 +27,11 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "robust_to_untrusted_downstream",
     # TODO(#9953) determine if this is core or should be cleaned up.
-    visibility = [
-        "//:extension_config",
+    extra_visibility = [
         "//test:__subpackages__",
     ],
+    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":file_access_log_lib",
         "//include/envoy/registry",

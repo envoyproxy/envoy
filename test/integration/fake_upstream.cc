@@ -5,29 +5,19 @@
 #include <memory>
 #include <string>
 
-#include "envoy/event/timer.h"
-
-#include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
-#include "common/common/fmt.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http1/codec_impl_legacy.h"
-#include "common/http/http2/codec_impl.h"
 #include "common/http/http2/codec_impl_legacy.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
-#include "common/network/raw_buffer_socket.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 
 #include "server/connection_handler_impl.h"
 
-#include "extensions/transport_sockets/tls/ssl_socket.h"
-
-#include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -281,7 +271,7 @@ FakeHttpConnection::FakeHttpConnection(
     uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
-    : FakeConnectionBase(shared_connection, time_system) {
+    : FakeConnectionBase(shared_connection, time_system), type_(type) {
   if (type == Type::HTTP1) {
     Http::Http1Settings http1_settings;
     // For the purpose of testing, we always have the upstream encode the trailers if any
@@ -345,6 +335,13 @@ Http::RequestDecoder& FakeHttpConnection::newStream(Http::ResponseEncoder& encod
   absl::MutexLock lock(&lock_);
   new_streams_.emplace_back(new FakeStream(*this, encoder, time_system_));
   return *new_streams_.back();
+}
+
+void FakeHttpConnection::onGoAway(Http::GoAwayErrorCode code) {
+  ASSERT(type_ == Type::HTTP2);
+  // Usually indicates connection level errors, no operations are needed since
+  // the connection will be closed soon.
+  ENVOY_LOG(info, "FakeHttpConnection receives GOAWAY: ", code);
 }
 
 AssertionResult FakeConnectionBase::waitForDisconnect(milliseconds timeout) {
@@ -623,7 +620,8 @@ AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* 
   };
   ENVOY_LOG(debug, "waiting for {} bytes of data", num_bytes);
   if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
-    return AssertionFailure() << "Timed out waiting for data.";
+    return AssertionFailure() << fmt::format(
+               "Timed out waiting for data. Got '{}', waiting for {} bytes.", data_, num_bytes);
   }
   if (data != nullptr) {
     *data = data_;
