@@ -37,6 +37,9 @@ independently sourced, the following steps should be followed:
 
 ## Quick start Bazel build for developers
 
+This section describes how to and what dependencies to install to get started building Envoy with Bazel.
+If you would rather use a pre-build Docker image with required tools installed, skip to [this section](#building-envoy-with-the-ci-docker-image).
+
 As a developer convenience, a [WORKSPACE](https://github.com/envoyproxy/envoy/blob/master/WORKSPACE) and
 [rules for building a recent
 version](https://github.com/envoyproxy/envoy/blob/master/bazel/repositories.bzl) of the various Envoy
@@ -112,12 +115,6 @@ for how to update or override dependencies.
     consider uninstalling binutils.
 
     ### Windows
-
-    Follow all items below to configure the Windows build toolchain and prepare the build environment,
-    or just install Docker, Git, MSYS2 to use the Docker image (the same as used in the CI pipeline):
-    ```
-    ./ci/run_envoy_docker_windows.sh './ci/windows_ci_steps.sh'
-    ```
 
     Install bazelisk in the PATH using the `bazel.exe` executable name as described above in the first section.
 
@@ -224,7 +221,8 @@ On Linux, run:
 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
-On Windows:
+From a Windows host with Docker installed, the Windows containers feature enabled, and bash (installed via
+MSYS2 or Git bash), run:
 
 ```
 ./ci/run_envoy_docker_windows.sh './ci/windows_ci_steps.sh'
