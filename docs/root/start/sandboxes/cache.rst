@@ -72,11 +72,24 @@ To send a request:
 
 ``response``: The response that is being requested. The responses are found in :repo:`/examples/cache/responses.yaml`.
 
+
+The existing example responses are:
+
+- ``valid-for-minute``
+    This response remains fresh in the cache for a minute. After which, the response gets validated by the backend service before being served from the cache.
+    If found to be updated, the new response is served (and cached). Otherwise, the cached response is served and refreshed.
+
+- ``private``
+    This response is private; it cannot be stored by shared caches (such as proxies). It will always be served from the backend service.
+    
+- ``no-cache``
+    This response has to be validated every time before being served.
+    
 You can change the responses headers and bodies (or add new ones) while the sandbox is running to experiment.
 
 Example responses
 ^^^^^^^^^^^^^^^^^^^^^
-1. A response that stays fresh for a minute:
+1. A response that stays fresh for a minute (valid-for-minute):
 
 .. code-block:: console
 
@@ -168,7 +181,11 @@ You can see this as the response generation time is the same,
 but the response ``date`` header was updated with the validation response date. 
 Also, no ``age`` header.
 
-2. A private response:
+Every time the response is validated, it stays fresh for another minute. 
+If the response body changes while the cached response is still fresh, 
+the cached response will still be served. The cached response will only be updated when it is no longer fresh.
+
+2. A private response (private):
 
 .. code-block:: console
 
@@ -197,9 +214,8 @@ Also, no ``age`` header.
 
 No matter how many times you make this request, you will always receive a new response; 
 new date of generation, new ``date`` header, and no ``age`` header. 
-This is because private response cannot be cached by shared caches such as proxies.
 
-3. A response that must always be validated:
+3. A response that must always be validated (no-cache):
 
 .. code-block:: console
 
@@ -282,8 +298,8 @@ If you change the response body in the yaml file:
     This response can be cached, but it has to be validated on each request!!!
     Response body generated at: Mon, 31 Aug 2020 19:10:2
 
-You will receive a new response that's served from the backend.
+You will receive a new response that's served from the backend. The new response will be cached.
 
 You can also add new responses to the yaml file with different ``cache-control`` headers and start experimenting!
-Different ``cache-control`` headers can be found in 
-the `MDN Web Docs <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control>`_.
+To learn more about caching and ``cache-control`` headers visit 
+the `MDN Web Docs <https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching>`_.
