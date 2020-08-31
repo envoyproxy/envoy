@@ -88,8 +88,9 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
 
   if (filter_state_ == FilterState::ValidatingCachedResponse && isResponseNotModified(headers)) {
     processSuccessfulValidation(headers);
-    // Stop the encoding stream until the cached response is fetched & added to the encoding stream.
-    return Http::FilterHeadersStatus::StopIteration;
+    // Continue encoding the headers but do not end the stream as the response body is yet to be
+    // injected.
+    return Http::FilterHeadersStatus::ContinueAndDontEndStream;
   }
 
   // Either a cache miss or a cache entry that is no longer valid.
@@ -109,10 +110,6 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
     // This call was invoked during decoding by decoder_callbacks_->encodeData because a fresh
     // cached response was found and is being added to the encoding stream -- ignore it.
     return Http::FilterDataStatus::Continue;
-  }
-  if (filter_state_ == FilterState::EncodeServingFromCache) {
-    // Stop the encoding stream until the cached response is fetched & added to the encoding stream.
-    return Http::FilterDataStatus::StopIterationAndBuffer;
   }
   if (insert_) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeData inserting body", *encoder_callbacks_);
@@ -315,14 +312,12 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
 
   filter_state_ == FilterState::DecodeServingFromCache
       ? decoder_callbacks_->encodeData(*body, end_stream)
-      : encoder_callbacks_->addEncodedData(*body, true);
+      : encoder_callbacks_->injectEncodedDataToFilterChain(*body, end_stream);
 
   if (!remaining_ranges_.empty()) {
     getBody();
   } else if (response_has_trailers_) {
     getTrailers();
-  } else {
-    finalizeEncodingCachedResponse();
   }
 }
 
@@ -338,8 +333,9 @@ void CacheFilter::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   } else {
     Http::ResponseTrailerMap& response_trailers = encoder_callbacks_->addEncodedTrailers();
     response_trailers = std::move(*trailers);
+    // Continue encoding iteration to process the added trailers and end encoding.
+    encoder_callbacks_->continueEncoding();
   }
-  finalizeEncodingCachedResponse();
 }
 
 void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_headers) {
@@ -463,15 +459,6 @@ void CacheFilter::encodeCachedResponse() {
   } else if (response_has_trailers_) {
     getTrailers();
   }
-}
-
-void CacheFilter::finalizeEncodingCachedResponse() {
-  if (filter_state_ == FilterState::EncodeServingFromCache) {
-    // encodeHeaders returned StopIteration waiting for finishing encoding the cached response --
-    // continue encoding.
-    encoder_callbacks_->continueEncoding();
-  }
-  filter_state_ = FilterState::ResponseServedFromCache;
 }
 
 } // namespace Cache

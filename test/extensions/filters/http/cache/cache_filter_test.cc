@@ -283,11 +283,9 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
     Http::TestResponseHeaderMapImpl not_modified_response_headers = {{":status", "304"},
                                                                      {"date", not_modified_date}};
 
-    // The filter should stop encoding iteration when encodeHeaders is called as a cached response
-    // is being fetched and added to the encoding stream. StopIteration does not stop encodeData of
-    // the same filter from being called
+    // The filter should continue headers encoding without ending the stream as data will be injected.
     EXPECT_EQ(filter->encodeHeaders(not_modified_response_headers, true),
-              Http::FilterHeadersStatus::StopIteration);
+              Http::FilterHeadersStatus::ContinueAndDontEndStream);
 
     // Check for the cached response headers with updated date
     Http::TestResponseHeaderMapImpl updated_response_headers = response_headers_;
@@ -296,18 +294,11 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
                 testing::AllOf(IsSupersetOfHeaders(updated_response_headers),
                                HeaderHasValueRef(Http::Headers::get().Age, "0")));
 
-    // A 304 response should not have a body, so encodeData should not be called
-    // However, if a body is present by mistake, encodeData should stop iteration until
-    // encoding the cached response is done
-    Buffer::OwnedImpl not_modified_body;
-    EXPECT_EQ(filter->encodeData(not_modified_body, true),
-              Http::FilterDataStatus::StopIterationAndBuffer);
-
     // The filter should add the cached response body to encoded data.
     Buffer::OwnedImpl buffer(body);
     EXPECT_CALL(
         encoder_callbacks_,
-        addEncodedData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
+        injectEncodedDataToFilterChain(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
 
     // The cache getBody callback should be posted to the dispatcher.
     // Run events on the dispatcher so that the callback is invoked.

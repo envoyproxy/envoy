@@ -111,10 +111,6 @@ private:
     // A cached response was successfully validated and it is being added to the encoding stream
     EncodeServingFromCache,
 
-    // The cached response was successfully added to the encoding stream (either during decoding or
-    // encoding).
-    ResponseServedFromCache,
-
     // CacheFilter::onDestroy has been called, the filter will be destroyed soon. Any triggered
     // callbacks should be ignored.
     Destroyed
