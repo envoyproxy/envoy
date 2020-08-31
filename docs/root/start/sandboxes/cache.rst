@@ -52,7 +52,7 @@ or
     $ docker-compose up -d
     $ docker-compose ps
 
-           Name                      Command               State                             Ports                          
+           Name                      Command            State                             Ports                          
     ------------------------------------------------------------------------------------------------------------------------
     cache_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
     cache_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp                                      
