@@ -153,7 +153,7 @@ TEST(Logger, SparseLogMacros) {
     void logSomethingThrice() { ENVOY_LOG_FIRST_N(error, 3, "foo4 '{}'", evaluations()++); }
     void logEverySeventh() { ENVOY_LOG_EVERY_NTH(error, 7, "foo5 '{}'", evaluations()++); }
     void logEverySecond() { ENVOY_LOG_PERIODIC(error, 1s, "foo6 '{}'", evaluations()++); }
-    int32_t& evaluations() { MUTABLE_CONSTRUCT_ON_FIRST_USE(int32_t); };
+    std::atomic<int32_t>& evaluations() { MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<int32_t>); };
   };
   constexpr uint32_t kNumThreads = 100;
   SparseLogMacrosTestHelper helper;
