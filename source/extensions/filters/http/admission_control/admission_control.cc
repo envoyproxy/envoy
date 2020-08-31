@@ -61,7 +61,6 @@ AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigShare
       expect_grpc_status_in_trailer_(false), record_request_(true) {}
 
 Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  // TODO(tonya11en): Ensure we document the fact that healthchecks are ignored.
   if (!config_->filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
     // We must forego recording the success/failure of this request during encoding.
     record_request_ = false;
@@ -69,7 +68,12 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
   }
 
   if (shouldRejectRequest()) {
+    // We do not want to sample requests that we are rejecting, since this taints the measurements
+    // that should be describing the upstreams. In addition, if we were to record the requests
+    // rejected, the rejection probabilities would not converge back to 0 even if the upstream
+    // success rate returns to 100%.
     record_request_ = false;
+
     stats_.rq_rejected_.inc();
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
                                        "denied by admission control");

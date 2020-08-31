@@ -34,8 +34,8 @@ public:
   Double(const envoy::config::core::v3::RuntimeDouble& double_proto, Runtime::Loader& runtime)
       : runtime_key_(double_proto.runtime_key()), default_value_(double_proto.default_value()),
         runtime_(runtime) {}
-  Double(const std::string runtime_key, const double default_value, Runtime::Loader& runtime)
-      : runtime_key_(runtime_key), default_value_(default_value), runtime_(runtime) {}
+  Double(std::string runtime_key, double default_value, Runtime::Loader& runtime)
+      : runtime_key_(std::move(runtime_key)), default_value_(default_value), runtime_(runtime) {}
   virtual ~Double() = default;
 
   const std::string& runtimeKey() const { return runtime_key_; }

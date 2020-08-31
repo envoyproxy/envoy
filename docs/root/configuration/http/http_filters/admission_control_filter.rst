@@ -47,6 +47,9 @@ where,
    with an anomalous success rate. Therefore, the rejection probability may vary between worker
    threads.
 
+.. note::
+   Health check traffic does not count towards any of the filter's measurements.
+
 See the :ref:`v3 API reference
 <envoy_v3_api_msg_extensions.filters.http.admission_control.v3alpha.AdmissionControl>` for more
 details on this parameter.
