@@ -84,7 +84,7 @@ public:
   constexpr bool operator!=(const ParseContext& other) const { return !(*this == other); }
 
   friend std::ostream& operator<<(std::ostream& os, ParseContext arg) {
-    return os << "ParseContext{.next=" << arg.next_ << "}";
+    return os << "ParseContext{next=" << arg.next_ << "}";
   }
 
 private:
@@ -111,7 +111,7 @@ public:
   constexpr bool operator!=(const ParsedCdnId& other) const { return !(*this == other); }
 
   friend std::ostream& operator<<(std::ostream& os, ParsedCdnId arg) {
-    return os << "ParsedCdnId{.context=" << arg.context_ << ", .cdn_id=" << arg.cdn_id_ << "}";
+    return os << "ParsedCdnId{context=" << arg.context_ << ", cdn_id=" << arg.cdn_id_ << "}";
   }
 
 private:
@@ -134,7 +134,7 @@ struct ParsedCdnInfo {
   constexpr bool operator!=(const ParsedCdnInfo& other) const { return !(*this == other); }
 
   friend std::ostream& operator<<(std::ostream& os, ParsedCdnInfo arg) {
-    return os << "ParsedCdnInfo{.context=" << arg.context_ << ", .cdn_id=" << arg.cdn_id_ << "}";
+    return os << "ParsedCdnInfo{context=" << arg.context_ << ", cdn_id=" << arg.cdn_id_ << "}";
   }
 
 private:
@@ -156,7 +156,7 @@ struct ParsedCdnInfoList {
   constexpr bool operator!=(const ParsedCdnInfoList& other) const { return !(*this == other); }
 
   friend std::ostream& operator<<(std::ostream& os, ParsedCdnInfoList arg) {
-    return os << "ParsedCdnInfoList{.context=" << arg.context_ << ", .cdn_ids=["
+    return os << "ParsedCdnInfoList{context=" << arg.context_ << ", cdn_ids=["
               << absl::StrJoin(arg.cdn_ids_, ", ") << "]}";
   }
 
