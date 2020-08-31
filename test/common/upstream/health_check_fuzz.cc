@@ -30,6 +30,19 @@ std::string HealthCheckFuzz::constructYamlFromProtoInput(test::common::upstream:
             path: %s
             service_name: %s
     )EOF")*/
+    //hardcoded first unit test
+    yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      service_name_matcher:
+        prefix: locations
+      path: /healthcheck
+    )EOF";
     return yaml;
 }
 
@@ -40,15 +53,32 @@ void HealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase inp
       Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
     expectSessionCreate();
     expectStreamCreate(0);
+    //EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+    //Note: don't need these expects everywhere, just release on asserts if no longer need to fuzz
+    health_checker_->start();
     replay(input);
 }
 
 void HealthCheckFuzz::respondFields(test::common::upstream::Respond respondFields) {
     respond(0, respondFields.code(), respondFields.conn_close(), respondFields.proxy_close(), respondFields.body(), respondFields.trailers(), {}, respondFields.degraded()); //TODO: HEALTH CHECK CLUSTER
+    //Most precedence up here, return if hits
+    //EXPECT BASED ON RESPONSE CODE, compared to respondfields
+    if (respondFields.degraded()) {
+        ENVOY_LOG_MISC(trace, "Replied that the host is degraded");
+        EXPECT_EQ(Host::Health::Degraded, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+        return;
+    }
+    //No clauses that represent the host not being healthy
+    ENVOY_LOG_MISC(trace, "Replied that the host is Healthy");
+    EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+    return;
 }
 
 void HealthCheckFuzz::streamCreate() {
+    ENVOY_LOG_MISC(trace, "Created a new stream.");
     expectStreamCreate(0);
+    //EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+    test_sessions_[0]->interval_timer_->invokeCallback();
 }
 
 void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) { //call this with the
@@ -64,7 +94,7 @@ void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) 
                 streamCreate();
                 break;
             }
-            //TODO: Expect degradation behavior
+            //TODO: Expect degradation behavior, unless this is can be taken care of by respond api exposed in unit test class
             default : {
                 break;
             }

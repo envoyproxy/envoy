@@ -12,6 +12,21 @@ http_config {
             proxy_close: false
             body: true
             trailers: false
+            degraded: true
+        }
+    }
+    actions {
+        stream_create {
+
+        }
+    }
+    actions {
+        respond {
+            code : "200"
+            conn_close: false
+            proxy_close: false
+            body: true
+            trailers: false
             degraded: false
         }
     }
