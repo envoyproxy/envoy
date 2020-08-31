@@ -12,7 +12,10 @@ namespace Watchdog {
 namespace AbortAction {
 
 /**
- * A GuardDogAction that will start signal to a particular thread to abort.
+ * A GuardDogAction that will terminate the process by sending SIGABRT to the
+ * stuck thread. This would allow easier access to the call stack of the stuck
+ * thread since we would run signal handlers on that thread.
+ *
  * This is currently only implemented for systems that support kill to send
  * signals.
  */

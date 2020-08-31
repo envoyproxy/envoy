@@ -12,7 +12,7 @@ namespace AbortAction {
 
 class AbortActionFactory : public Server::Configuration::GuardDogActionFactory {
 public:
-  AbortActionFactory() : name_("envoy.watchdog.abort_action") {}
+  AbortActionFactory() = default;
 
   Server::Configuration::GuardDogActionPtr createGuardDogActionFromProto(
       const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& config,
@@ -22,11 +22,9 @@ public:
     return std::make_unique<AbortActionConfig>();
   }
 
-  std::string name() const override { return name_; }
+  std::string name() const override { return "envoy.watchdog.abort_action"; }
 
-private:
   using AbortActionConfig = envoy::extensions::watchdog::abort_action::v3alpha::AbortActionConfig;
-  const std::string name_;
 };
 
 } // namespace AbortAction

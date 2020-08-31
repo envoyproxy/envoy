@@ -35,18 +35,19 @@ void AbortAction::run(
     MonotonicTime /*now*/) {
 
   if (thread_ltt_pairs.empty()) {
-    ENVOY_LOG_MISC(warn, "AbortAction called without any thread.");
+    ENVOY_LOG_MISC(warn, "Watchdog AbortAction called without any thread.");
     return;
   }
 
-  int64_t raw_tid = thread_ltt_pairs.at(0).first.getId();
+  int64_t raw_tid = thread_ltt_pairs[0].first.getId();
 
 #ifdef WIN32
   // TODO(kbaichoo): add support for this with windows.
-  ENVOY_LOG_MISC(error, "AbortAction is unimplemented for Windows.");
+  ENVOY_LOG_MISC(error, "Watchdog AbortAction is unimplemented for Windows.");
 #else
   // Assume POSIX-compatible system and signal to the thread.
-  ENVOY_LOG_MISC(error, "AbortAction sending abort signal to thread with tid {}.", raw_tid);
+  ENVOY_LOG_MISC(error, "Watchdog AbortAction sending abort signal to thread with tid {}.",
+                 raw_tid);
 
   if (kill(toPlatformTid(raw_tid), SIGABRT) == 0) {
     // Successfully sent signal, sleep for wait_duration.
@@ -57,8 +58,8 @@ void AbortAction::run(
   }
 
   // Abort from the action since the signaled thread hasn't yet crashed the process.
-  PANIC(
-      fmt::format("Failed to kill thread with id {}, aborting from AbortAction instead.", raw_tid));
+  PANIC(fmt::format("Failed to kill thread with id {}, aborting from Watchdog AbortAction instead.",
+                    raw_tid));
 #endif
 }
 

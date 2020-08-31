@@ -14,12 +14,12 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Watchdog Action that does CPU profiling.]
+// [#protodoc-title: Watchdog Action that sends a SIGABRT to kill the process.]
 // [#extension: envoy.watchdog.abort_action]
 
 // Configuration for the profile watchdog action.
 message AbortActionConfig {
-  // How long to wait for the thread to respond to the abort before killing the
+  // How long to wait for the thread to respond to the SIGABRT before killing the
   // process from this action. This is a blocking action.
   google.protobuf.Duration wait_duration = 1;
 }
