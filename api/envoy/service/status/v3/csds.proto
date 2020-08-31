@@ -64,7 +64,7 @@ message ClientStatusRequest {
 
   // The node making the csds request.
   config.core.v3.Node node = 2;
-  // When true, response will include status, but no config.
+  // When true, response will include status, but Config Dump objects will contain only version_info field.
   bool exclude_config = 3;
 }
 
