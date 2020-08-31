@@ -511,7 +511,8 @@ public:
    * network calls, etc. The reason there is an onDestroy() method vs. doing this type of cleanup
    * in the destructor is due to the deferred deletion model that Envoy uses to avoid stack unwind
    * complications. Filters must not invoke either encoder or decoder filter callbacks after having
-   * onDestroy() invoked.
+   * onDestroy() invoked. Filters that cross-register as access log handlers receive log() before
+   * onDestroy().
    */
   virtual void onDestroy() PURE;
 };

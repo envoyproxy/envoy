@@ -437,11 +437,6 @@ public:
         stream_info_(protocol, time_source, parent_filter_state, filter_state_life_span) {}
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
-    for (const auto& log_handler : access_log_handlers_) {
-      log_handler->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
-                       stream_info_);
-    }
-
     ASSERT(state_.filter_call_state_ == 0);
   }
 
@@ -471,6 +466,13 @@ public:
     addStreamEncoderFilterWorker(filter, true);
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
+
+  void log() {
+    for (const auto& log_handler : access_log_handlers_) {
+      log_handler->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
+                       stream_info_);
+    }
+  }
 
   void destroyFilters() {
     state_.destroyed_ = true;
