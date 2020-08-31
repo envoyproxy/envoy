@@ -177,10 +177,9 @@ Cc: envoy-announce@googlegroups.com, envoy-security@googlegroups.com, envoy-main
 
 Hello Envoy Community,
 
-The Envoy security team would like to announce the availability of the security fix for security
-defect(s) introduced in the main branch by [$GITSHORTCOMMITHASH]($GITHUBCOMMITURL) commit. The
-defect(s) caused by the [$GITSHORTCOMMITHASH]($GITHUBCOMMITURL) were not part of any Envoy stable
-releases.
+The Envoy security team would like to announce the availability of the fix for security defect(s)
+introduced in the main branch by [$GITSHORTCOMMITHASH]($GITHUBCOMMITURL) commit. The defect(s)
+caused by the [$GITSHORTCOMMITHASH]($GITHUBCOMMITURL) were not part of any Envoy stable releases.
 
 $DEFECTSSUMMARY
 
