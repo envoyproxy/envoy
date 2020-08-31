@@ -557,11 +557,11 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_googlesource_chromium_v8 = dict(
         project_name = "V8",
         project_url = "https://v8.dev",
-        version = "8.3",
+        version = "8.5.210.20",
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
         # and contains complete checkout of V8 with all dependencies necessary to build wee8.
-        sha256 = "cc6f5357cd10922bfcf667bd882624ad313e21b009b919ce00f322f390012476",
-        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.110.9.tar.gz"],
+        sha256 = "ef404643d7da6854b76b9fb9950a79a1acbd037b7a26f02c585ac379b0f7dee1",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
