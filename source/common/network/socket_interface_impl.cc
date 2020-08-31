@@ -10,6 +10,10 @@
 namespace Envoy {
 namespace Network {
 
+IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only) const {
+  return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only);
+}
+
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
                                         Address::IpVersion version, bool socket_v6only) const {
 #if defined(__APPLE__) || defined(WIN32)
@@ -40,11 +44,11 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
   const Api::SysCallSocketResult result = Api::OsSysCallsSingleton::get().socket(domain, flags, 0);
   RELEASE_ASSERT(SOCKET_VALID(result.rc_),
                  fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(result.rc_, socket_v6only);
+  IoHandlePtr io_handle = makeSocket(result.rc_, socket_v6only);
 
 #if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
-  const int rc = Api::OsSysCallsSingleton::get().setsocketblocking(io_handle->fd(), false).rc_;
+  const int rc = io_handle->setBlocking(false).rc_;
   RELEASE_ASSERT(!SOCKET_FAILURE(rc), "");
 #endif
 
@@ -63,9 +67,8 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
       SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version, v6only);
   if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6) {
     // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
-    const Api::SysCallIntResult result = Api::OsSysCallsSingleton::get().setsockopt(
-        io_handle->fd(), IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<const char*>(&v6only),
-        sizeof(v6only));
+    const Api::SysCallIntResult result = io_handle->setOption(
+        IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<const char*>(&v6only), sizeof(v6only));
     RELEASE_ASSERT(!SOCKET_FAILURE(result.rc_), "");
   }
   return io_handle;

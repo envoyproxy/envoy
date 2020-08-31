@@ -10,8 +10,7 @@ namespace ListenerFilters {
 namespace OriginalSrc {
 
 DEFINE_PROTO_FUZZER(
-    const envoy::extensions::filters::listener::original_src::OriginalSrcTestCase& input) {
-
+    const test::extensions::filters::listener::original_src::OriginalSrcTestCase& input) {
   try {
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {
