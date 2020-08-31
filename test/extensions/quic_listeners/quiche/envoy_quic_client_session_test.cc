@@ -95,7 +95,7 @@ public:
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_draft_29, GetParam());
+          SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
           SetQuicReloadableFlag(quic_disable_version_draft_27, !GetParam());
           SetQuicReloadableFlag(quic_disable_version_draft_25, !GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
@@ -209,6 +209,15 @@ TEST_P(EnvoyQuicClientSessionTest, OnResetFrame) {
                                 quic::QUIC_ERROR_PROCESSING_STREAM, /*bytes_written=*/0u);
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::RemoteReset, _));
   stream.OnStreamReset(rst1);
+}
+
+TEST_P(EnvoyQuicClientSessionTest, OnGoAwayFrame) {
+  Http::MockResponseDecoder response_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+
+  quic::QuicGoAwayFrame goaway;
+  EXPECT_CALL(http_connection_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
+  quic_connection_->OnGoAwayFrame(goaway);
 }
 
 TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {

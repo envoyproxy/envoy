@@ -89,11 +89,7 @@ TEST_P(FileEventImplActivateTest, Activate) {
   ReadyWatcher closed_event;
   EXPECT_CALL(closed_event, ready()).Times(1);
 
-#ifdef WIN32
-  const FileTriggerType trigger = FileTriggerType::Level;
-#else
-  const FileTriggerType trigger = FileTriggerType::Edge;
-#endif
+  const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
 
   Event::FileEventPtr file_event = dispatcher->createFileEvent(
       fd,
@@ -133,11 +129,7 @@ TEST_P(FileEventImplActivateTest, ActivateChaining) {
   evwatch_prepare_new(&static_cast<DispatcherImpl*>(dispatcher.get())->base(), onWatcherReady,
                       &prepare_watcher);
 
-#ifdef WIN32
-  const FileTriggerType trigger = FileTriggerType::Level;
-#else
-  const FileTriggerType trigger = FileTriggerType::Edge;
-#endif
+  const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
 
   Event::FileEventPtr file_event = dispatcher->createFileEvent(
       fd,
@@ -213,11 +205,7 @@ TEST_P(FileEventImplActivateTest, SetEnableCancelsActivate) {
   evwatch_prepare_new(&static_cast<DispatcherImpl*>(dispatcher.get())->base(), onWatcherReady,
                       &prepare_watcher);
 
-#ifdef WIN32
-  const FileTriggerType trigger = FileTriggerType::Level;
-#else
-  const FileTriggerType trigger = FileTriggerType::Edge;
-#endif
+  const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
 
   Event::FileEventPtr file_event = dispatcher->createFileEvent(
       fd,
@@ -318,11 +306,8 @@ TEST_F(FileEventImplTest, SetEnabled) {
   ReadyWatcher write_event;
   EXPECT_CALL(write_event, ready()).Times(2);
 
-#ifdef WIN32
-  const FileTriggerType trigger = FileTriggerType::Level;
-#else
-  const FileTriggerType trigger = FileTriggerType::Edge;
-#endif
+  const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+
   Event::FileEventPtr file_event = dispatcher_->createFileEvent(
       fds_[0],
       [&](uint32_t events) -> void {

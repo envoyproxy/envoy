@@ -6,7 +6,6 @@
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 
-#include "test/test_common/only_one_thread.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -29,11 +28,8 @@ public:
   SchedulerPtr createScheduler(Scheduler& base_scheduler, CallbackScheduler& cb_scheduler) override;
 
   // TestTimeSystem
-  void advanceTimeWait(const Duration& duration) override;
-  void advanceTimeAsync(const Duration& duration) override;
-  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-                                      const Duration& duration) noexcept
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
+  void advanceTimeWaitImpl(const Duration& duration) override;
+  void advanceTimeAsyncImpl(const Duration& duration) override;
 
   // TimeSource
   SystemTime systemTime() override;
@@ -66,32 +62,16 @@ public:
 private:
   class SimulatedScheduler;
   class Alarm;
-  friend class Alarm; // Needed to reference mutex for thread annotations.
-  struct AlarmRegistration {
-    AlarmRegistration(MonotonicTime time, uint64_t randomness, Alarm& alarm)
-        : time_(time), randomness_(randomness), alarm_(alarm) {}
 
-    MonotonicTime time_;
-    // Random tie-breaker for alarms scheduled for the same monotonic time used to mimic
-    // non-deterministic execution of real alarms scheduled for the same wall time.
-    uint64_t randomness_;
-    Alarm& alarm_;
+  void registerScheduler(SimulatedScheduler* scheduler) {
+    absl::MutexLock lock(&mutex_);
+    schedulers_.insert(scheduler);
+  }
 
-    friend bool operator<(const AlarmRegistration& lhs, const AlarmRegistration& rhs) {
-      if (lhs.time_ != rhs.time_) {
-        return lhs.time_ < rhs.time_;
-      }
-      if (lhs.randomness_ != rhs.randomness_) {
-        return lhs.randomness_ < rhs.randomness_;
-      }
-      // Out of paranoia, use pointer comparison on the alarms as a final tie-breaker but also
-      // ASSERT that this branch isn't hit in debug modes since in practice the randomness_
-      // associated with two registrations should never be equal.
-      ASSERT(false, "Alarm registration randomness_ for two alarms should never be equal.");
-      return &lhs.alarm_ < &rhs.alarm_;
-    }
-  };
-  using AlarmSet = std::set<AlarmRegistration>;
+  void unregisterScheduler(SimulatedScheduler* scheduler) {
+    absl::MutexLock lock(&mutex_);
+    schedulers_.erase(scheduler);
+  }
 
   /**
    * Sets the time forward monotonically. If the supplied argument moves
@@ -104,40 +84,25 @@ private:
   void setMonotonicTimeLockHeld(const MonotonicTime& monotonic_time)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  /**
-   * Schedule expired alarms so they execute in their event loops.
-   */
-  void scheduleReadyAlarms();
-  void scheduleReadyAlarmsLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-
-  void alarmActivateLockHeld(Alarm& alarm) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-
-  // Adds/removes an alarm.
-  void addAlarmLockHeld(Alarm&, const std::chrono::microseconds& duration,
-                        SimulatedScheduler& simulated_scheduler)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void removeAlarmLockHeld(Alarm&) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-
-  // Keeps track of how many alarms have been activated but not yet called,
-  // which helps waitFor() determine when to give up and declare a timeout.
-  void incPendingLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) { ++pending_alarms_; }
+  // Keeps track of the number of simulated schedulers that have pending monotonic time updates.
+  // Used by advanceTimeWait() to determine when the time updates have finished propagating.
+  void incPending() {
+    absl::MutexLock lock(&mutex_);
+    ++pending_updates_;
+  }
   void decPending() {
     absl::MutexLock lock(&mutex_);
-    decPendingLockHeld();
+    --pending_updates_;
   }
-  void decPendingLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) { --pending_alarms_; }
   void waitForNoPendingLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
   MonotonicTime monotonic_time_ ABSL_GUARDED_BY(mutex_);
   SystemTime system_time_ ABSL_GUARDED_BY(mutex_);
   TestRandomGenerator random_source_ ABSL_GUARDED_BY(mutex_);
-  AlarmSet alarms_ ABSL_GUARDED_BY(mutex_);
-  absl::flat_hash_map<Alarm*, AlarmSet::const_iterator>
-      alarm_registrations_map_ ABSL_GUARDED_BY(mutex_);
+  std::set<SimulatedScheduler*> schedulers_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
-  uint32_t pending_alarms_ ABSL_GUARDED_BY(mutex_);
-  Thread::OnlyOneThread only_one_thread_;
+  uint32_t pending_updates_ ABSL_GUARDED_BY(mutex_);
 };
 
 // Represents a simulated time system, where time is advanced by calling

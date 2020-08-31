@@ -12,8 +12,9 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_dispatcher.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_source.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
+#include "extensions/quic_listeners/quiche/udp_gso_batch_writer.h"
 
 namespace Envoy {
 namespace Quic {
@@ -42,8 +43,9 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
     const bool ok = Network::Socket::applyOptions(
         options, listen_socket_, envoy::config::core::v3::SocketOption::STATE_BOUND);
     if (!ok) {
+      // TODO(fcoras): consider removing the fd from the log message
       ENVOY_LOG(warn, "Failed to apply socket options to socket {} on listener {} after binding",
-                listen_socket_.ioHandle().fd(), listener_config.name());
+                listen_socket_.ioHandle().fdDoNotUse(), listener_config.name());
       throw Network::CreateListenerException("Failed to apply socket options.");
     }
     listen_socket_.addOptions(options);
@@ -66,7 +68,20 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
       per_worker_stats_, dispatcher, listen_socket_);
-  quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(listen_socket_));
+
+  // Create udp_packet_writer
+  Network::UdpPacketWriterPtr udp_packet_writer =
+      listener_config.udpPacketWriterFactory()->get().createUdpPacketWriter(
+          listen_socket_.ioHandle(), listener_config.listenerScope());
+  udp_packet_writer_ = udp_packet_writer.get();
+  if (udp_packet_writer->isBatchMode()) {
+    // UdpPacketWriter* can be downcasted to UdpGsoBatchWriter*, which indirectly inherits
+    // from the quic::QuicPacketWriter class and can be passed to InitializeWithWriter().
+    quic_dispatcher_->InitializeWithWriter(
+        dynamic_cast<Quic::UdpGsoBatchWriter*>(udp_packet_writer.release()));
+  } else {
+    quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(std::move(udp_packet_writer)));
+  }
 }
 
 ActiveQuicListener::~ActiveQuicListener() { onListenerShutdown(); }
@@ -79,9 +94,9 @@ void ActiveQuicListener::onListenerShutdown() {
 
 void ActiveQuicListener::onData(Network::UdpRecvData& data) {
   quic::QuicSocketAddress peer_address(
-      envoyAddressInstanceToQuicSocketAddress(data.addresses_.peer_));
+      envoyIpAddressToQuicSocketAddress(data.addresses_.peer_->ip()));
   quic::QuicSocketAddress self_address(
-      envoyAddressInstanceToQuicSocketAddress(data.addresses_.local_));
+      envoyIpAddressToQuicSocketAddress(data.addresses_.local_->ip()));
   quic::QuicTime timestamp =
       quic::QuicTime::Zero() +
       quic::QuicTime::Delta::FromMicroseconds(std::chrono::duration_cast<std::chrono::microseconds>(

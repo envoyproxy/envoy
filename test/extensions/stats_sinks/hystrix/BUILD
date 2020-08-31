@@ -38,7 +38,9 @@ envoy_extension_cc_test(
         "//test/mocks/server:admin_stream_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/stats:stats_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:priority_set_mocks",
     ],
 )
 
@@ -46,7 +48,6 @@ envoy_extension_cc_test(
     name = "hystrix_integration_test",
     srcs = ["hystrix_integration_test.cc"],
     extension_name = "envoy.stat_sinks.hystrix",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/stat_sinks/hystrix:config",
         "//test/integration:http_protocol_integration_lib",

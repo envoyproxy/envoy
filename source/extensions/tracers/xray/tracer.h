@@ -64,6 +64,16 @@ public:
   void setName(absl::string_view name) { name_ = std::string(name); }
 
   /**
+   * Sets the origin of the Span.
+   */
+  void setOrigin(absl::string_view origin) { origin_ = std::string(origin); }
+
+  /**
+   * Gets the origin of the Span.
+   */
+  const std::string& origin() { return origin_; }
+
+  /**
    * Adds a key-value pair to either the Span's annotations or metadata.
    * An allowlist of keys are added to the annotations, everything else is added to the metadata.
    */
@@ -77,6 +87,21 @@ public:
    */
   void setParentId(absl::string_view parent_segment_id) {
     parent_segment_id_ = std::string(parent_segment_id);
+  }
+
+  /**
+   * Sets the aws metadata field of the Span.
+   */
+  void setAwsMetadata(const absl::flat_hash_map<std::string, ProtobufWkt::Value>& aws_metadata) {
+    aws_metadata_ = aws_metadata;
+  }
+
+  /**
+   * Gets the AWS metadata
+   * field of the Span.
+   */
+  const absl::flat_hash_map<std::string, ProtobufWkt::Value>& awsMetadata() {
+    return aws_metadata_;
   }
 
   /**
@@ -132,6 +157,10 @@ public:
    */
   void log(Envoy::SystemTime, const std::string&) override {}
 
+  // X-Ray doesn't support baggage, so noop these OpenTracing functions.
+  void setBaggage(absl::string_view, absl::string_view) override {}
+  std::string getBaggage(absl::string_view) override { return std::string(); }
+
   /**
    * Creates a child span.
    * In X-Ray terms this creates a sub-segment and sets its parent ID to the current span's ID.
@@ -148,6 +177,8 @@ private:
   std::string trace_id_;
   std::string parent_segment_id_;
   std::string name_;
+  std::string origin_;
+  absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_request_annotations_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_response_annotations_;
   absl::flat_hash_map<std::string, std::string> custom_annotations_;
@@ -160,10 +191,11 @@ using SpanPtr = std::unique_ptr<Span>;
 
 class Tracer {
 public:
-  Tracer(absl::string_view segment_name, DaemonBrokerPtr daemon_broker, TimeSource& time_source)
-      : segment_name_(segment_name), daemon_broker_(std::move(daemon_broker)),
-        time_source_(time_source) {}
-
+  Tracer(absl::string_view segment_name, absl::string_view origin,
+         const absl::flat_hash_map<std::string, ProtobufWkt::Value>& aws_metadata,
+         DaemonBrokerPtr daemon_broker, TimeSource& time_source)
+      : segment_name_(segment_name), origin_(origin), aws_metadata_(aws_metadata),
+        daemon_broker_(std::move(daemon_broker)), time_source_(time_source) {}
   /**
    * Starts a tracing span for X-Ray
    */
@@ -179,6 +211,8 @@ public:
 
 private:
   const std::string segment_name_;
+  const std::string origin_;
+  const absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
   const DaemonBrokerPtr daemon_broker_;
   Envoy::TimeSource& time_source_;
 };

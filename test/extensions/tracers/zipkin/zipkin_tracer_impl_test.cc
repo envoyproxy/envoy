@@ -20,7 +20,8 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -689,6 +690,14 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   EXPECT_FALSE(zipkin_zipkin_span4.annotations().empty());
   EXPECT_EQ(timestamp_count, zipkin_zipkin_span4.annotations().back().timestamp());
   EXPECT_EQ("abc", zipkin_zipkin_span4.annotations().back().value());
+
+  // ====
+  // Test baggage noop
+  // ====
+  Tracing::SpanPtr span5 = driver_->startSpan(config_, request_headers_, operation_name_,
+                                              start_time_, {Tracing::Reason::Sampling, true});
+  span5->setBaggage("baggage_key", "baggage_value");
+  EXPECT_EQ("", span5->getBaggage("baggage_key"));
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {

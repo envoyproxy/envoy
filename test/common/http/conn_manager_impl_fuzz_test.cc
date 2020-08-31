@@ -19,6 +19,7 @@
 #include "common/http/context_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/exception.h"
+#include "common/http/header_utility.h"
 #include "common/http/request_id_extension_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
@@ -37,7 +38,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
@@ -477,9 +478,15 @@ public:
             Fuzz::fromHeaders<TestResponseHeaderMapImpl>(response_action.headers()));
         // The client codec will ensure we always have a valid :status.
         // Similarly, local replies should always contain this.
+        uint64_t status;
         try {
-          Utility::getResponseStatus(*headers);
+          status = Utility::getResponseStatus(*headers);
         } catch (const CodecClientException&) {
+          headers->setReferenceKey(Headers::get().Status, "200");
+        }
+        // The only 1xx header that may be provided to encodeHeaders() is a 101 upgrade,
+        // guaranteed by the codec parsers. See include/envoy/http/filter.h.
+        if (CodeUtility::is1xx(status) && status != enumToInt(Http::Code::SwitchingProtocols)) {
           headers->setReferenceKey(Headers::get().Status, "200");
         }
         decoder_filter_->callbacks_->encodeHeaders(std::move(headers), end_stream);
@@ -609,6 +616,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
     }
   }
 
+  filter_callbacks.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
   filter_callbacks.connection_.dispatcher_.clearDeferredDeleteList();
 }
 

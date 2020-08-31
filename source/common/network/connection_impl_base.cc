@@ -3,12 +3,22 @@
 namespace Envoy {
 namespace Network {
 
+void ConnectionImplBase::addIdToHashKey(std::vector<uint8_t>& hash_key, uint64_t connection_id) {
+  // Pack the connection_id into sizeof(connection_id) uint8_t entries in the hash_key vector.
+  hash_key.reserve(hash_key.size() + sizeof(connection_id));
+  for (unsigned i = 0; i < sizeof(connection_id); ++i) {
+    hash_key.push_back(0xFF & (connection_id >> (8 * i)));
+  }
+}
+
 ConnectionImplBase::ConnectionImplBase(Event::Dispatcher& dispatcher, uint64_t id)
     : dispatcher_(dispatcher), id_(id) {}
 
 void ConnectionImplBase::addConnectionCallbacks(ConnectionCallbacks& cb) {
   callbacks_.push_back(&cb);
 }
+
+void ConnectionImplBase::hashKey(std::vector<uint8_t>& hash) const { addIdToHashKey(hash, id()); }
 
 void ConnectionImplBase::setConnectionStats(const ConnectionStats& stats) {
   ASSERT(!connection_stats_,

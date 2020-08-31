@@ -577,6 +577,8 @@ public:
   COUNTER(upstream_rq_pending_total)                                                               \
   COUNTER(upstream_rq_per_try_timeout)                                                             \
   COUNTER(upstream_rq_retry)                                                                       \
+  COUNTER(upstream_rq_retry_backoff_exponential)                                                   \
+  COUNTER(upstream_rq_retry_backoff_ratelimited)                                                   \
   COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
   COUNTER(upstream_rq_retry_overflow)                                                              \
   COUNTER(upstream_rq_retry_success)                                                               \
@@ -925,6 +927,12 @@ public:
    *         after a host is removed from service discovery.
    */
   virtual bool drainConnectionsOnHostRemoval() const PURE;
+
+  /**
+   *  @return whether to create a new connection pool for each downstream connection routed to
+   *          the cluster
+   */
+  virtual bool connectionPoolPerDownstreamConnection() const PURE;
 
   /**
    * @return true if this cluster is configured to ignore hosts for the purpose of load balancing

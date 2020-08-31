@@ -125,14 +125,11 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
                                                  {":authority", "host"},
                                                  {"x-envoy-fault-delay-request", "200"},
                                                  {"x-envoy-fault-throughput-response", "1"}};
-  const auto current_time = simTime().monotonicTime();
   IntegrationStreamDecoderPtr decoder = codec_client_->makeHeaderOnlyRequest(request_headers);
+  test_server_->waitForCounterEq("http.config_test.fault.delays_injected", 1,
+                                 TestUtility::DefaultTimeout, dispatcher_.get());
+  simTime().advanceTimeWait(std::chrono::milliseconds(200));
   waitForNextUpstreamRequest();
-
-  // At least 200ms of simulated time should have elapsed before we got the upstream request.
-  EXPECT_LE(std::chrono::milliseconds(200), simTime().monotonicTime() - current_time);
-  // Active faults gauge is incremented.
-  EXPECT_EQ(1UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 
   // Verify response body throttling.
   upstream_request_->encodeHeaders(default_response_headers_, false);
@@ -215,6 +212,9 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultsConfig100PercentageHeaders)
                                      {"x-envoy-fault-delay-request-percentage", "100"},
                                      {"x-envoy-fault-throughput-response", "100"},
                                      {"x-envoy-fault-throughput-response-percentage", "100"}});
+  test_server_->waitForCounterEq("http.config_test.fault.delays_injected", 1,
+                                 TestUtility::DefaultTimeout, dispatcher_.get());
+  simTime().advanceTimeWait(std::chrono::milliseconds(100));
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();

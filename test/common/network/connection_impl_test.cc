@@ -75,6 +75,25 @@ TEST(ConnectionImplUtility, updateBufferStats) {
   ConnectionImplUtility::updateBufferStats(3, 3, previous_total, counter, gauge);
 }
 
+TEST(ConnectionImplBaseUtility, addIdToHashKey) {
+  uint64_t connection_id = 0x0123456789abcdef;
+  std::vector<uint8_t> hash{{0xff, 0xfe, 0xfd, 0xfc}};
+  ConnectionImplBase::addIdToHashKey(hash, connection_id);
+  ASSERT_EQ(12, hash.size());
+  EXPECT_EQ(0xff, hash[0]);
+  EXPECT_EQ(0xfe, hash[1]);
+  EXPECT_EQ(0xfd, hash[2]);
+  EXPECT_EQ(0xfc, hash[3]);
+  EXPECT_EQ(0xef, hash[4]);
+  EXPECT_EQ(0xcd, hash[5]);
+  EXPECT_EQ(0xab, hash[6]);
+  EXPECT_EQ(0x89, hash[7]);
+  EXPECT_EQ(0x67, hash[8]);
+  EXPECT_EQ(0x45, hash[9]);
+  EXPECT_EQ(0x23, hash[10]);
+  EXPECT_EQ(0x01, hash[11]);
+}
+
 class ConnectionImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplDeathTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -89,7 +108,7 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
       ConnectionImpl(*dispatcher,
                      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
                      Network::Test::createRawBufferSocket(), stream_info, false),
-      ".*assert failure: SOCKET_VALID\\(ConnectionImpl::ioHandle\\(\\)\\.fd\\(\\)\\).*");
+      ".*assert failure: SOCKET_VALID\\(fd\\)");
 }
 
 class TestClientConnectionImpl : public Network::ClientConnectionImpl {
@@ -108,7 +127,8 @@ protected:
     }
     socket_ = std::make_shared<Network::TcpListenSocket>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
+    listener_ =
+        dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->localAddress(), source_address_,
         Network::Test::createRawBufferSocket(), socket_options_);
@@ -1079,11 +1099,11 @@ TEST_P(ConnectionImplTest, BindTest) {
   std::string address_string = TestUtility::getIpv4Loopback();
   if (GetParam() == Network::Address::IpVersion::v4) {
     source_address_ = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv4Instance(address_string, 0)};
+        new Network::Address::Ipv4Instance(address_string, 0, nullptr)};
   } else {
     address_string = "::1";
     source_address_ = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv6Instance(address_string, 0)};
+        new Network::Address::Ipv6Instance(address_string, 0, nullptr)};
   }
   setUpBasicConnection();
   connect();
@@ -1097,11 +1117,11 @@ TEST_P(ConnectionImplTest, BindFromSocketTest) {
   Address::InstanceConstSharedPtr new_source_address;
   if (GetParam() == Network::Address::IpVersion::v4) {
     new_source_address = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv4Instance(address_string, 0)};
+        new Network::Address::Ipv4Instance(address_string, 0, nullptr)};
   } else {
     address_string = "::1";
     new_source_address = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv6Instance(address_string, 0)};
+        new Network::Address::Ipv6Instance(address_string, 0, nullptr)};
   }
   auto option = std::make_shared<NiceMock<MockSocketOption>>();
   EXPECT_CALL(*option, setOption(_, Eq(envoy::config::core::v3::SocketOption::STATE_PREBIND)))
@@ -1123,16 +1143,17 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   if (GetParam() == Network::Address::IpVersion::v6) {
     const std::string address_string = TestUtility::getIpv4Loopback();
     source_address_ = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv4Instance(address_string, 0)};
+        new Network::Address::Ipv4Instance(address_string, 0, nullptr)};
   } else {
     const std::string address_string = "::1";
     source_address_ = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv6Instance(address_string, 0)};
+        new Network::Address::Ipv6Instance(address_string, 0, nullptr)};
   }
   dispatcher_ = api_->allocateDispatcher("test_thread");
   socket_ = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-  listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
+  listener_ =
+      dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
 
   client_connection_ = dispatcher_->createClientConnection(
       socket_->localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
@@ -2238,7 +2259,8 @@ public:
     dispatcher_ = api_->allocateDispatcher("test_thread");
     socket_ = std::make_shared<Network::TcpListenSocket>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
+    listener_ =
+        dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
 
     client_connection_ = dispatcher_->createClientConnection(
         socket_->localAddress(), Network::Address::InstanceConstSharedPtr(),
