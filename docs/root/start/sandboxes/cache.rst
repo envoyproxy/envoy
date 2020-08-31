@@ -54,11 +54,11 @@ or
 
            Name                      Command               State                             Ports                          
     ------------------------------------------------------------------------------------------------------------------------
-    cache_front-envoy_1   /docker-entrypoint.sh /bin ...   Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
-    cache_service1_1      /bin/sh -c /usr/local/bin/ ...   Up      10000/tcp, 8000/tcp                                      
-    cache_service2_1      /bin/sh -c /usr/local/bin/ ...   Up      10000/tcp, 8000/tcp    
+    cache_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
+    cache_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp                                      
+    cache_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp    
 
-**Step 3: Test Envoy's HTTP caching capabilities**
+**Step 4: Test Envoy's HTTP caching capabilities**
 
 You can now send a request to both services via the ``front-envoy``. Note that since the two services have different routes,
 identical requests to different services have different cache entries (i.e a request sent to service 2 will not be served by a cached
