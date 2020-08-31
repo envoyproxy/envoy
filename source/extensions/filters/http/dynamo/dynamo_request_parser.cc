@@ -16,7 +16,7 @@ namespace Dynamo {
 
 /**
  * Basic json request/response format:
- * http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Appendix.CurrentAPI.html
+ * https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Operations_Amazon_DynamoDB.html
  */
 const Http::LowerCaseString RequestParser::X_AMZ_TARGET("X-AMZ-TARGET");
 
@@ -49,7 +49,10 @@ const std::vector<std::string> RequestParser::SUPPORTED_ERROR_TYPES{
     "TransactionCanceledException",
     "TransactionInProgressException",
     "UnrecognizedClientException",
-    "ValidationException"};
+    "ValidationException",
+    // Errors not listed in the error handling section of DynamoDB developer guide, but observed in runtime
+    "InvalidSignatureException", // https://github.com/aws/aws-sdk-go/issues/2598#issuecomment-526398896
+};
 // clang-format on
 
 const std::vector<std::string> RequestParser::BATCH_OPERATIONS{"BatchGetItem", "BatchWriteItem"};

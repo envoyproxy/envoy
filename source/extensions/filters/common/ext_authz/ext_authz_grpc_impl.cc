@@ -56,7 +56,6 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceOk);
     authz_response->status = CheckStatus::OK;
     if (response->has_ok_response()) {
-      authz_response->dynamic_metadata = response->ok_response().dynamic_metadata();
       toAuthzResponseHeader(authz_response, response->ok_response().headers());
     }
   } else {
@@ -70,6 +69,14 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     } else {
       authz_response->status_code = Http::Code::Forbidden;
     }
+  }
+
+  // OkHttpResponse.dynamic_metadata is deprecated. Until OkHttpResponse.dynamic_metadata is
+  // removed, it overrides dynamic_metadata field of the outer check response.
+  if (response->has_ok_response() && response->ok_response().has_dynamic_metadata()) {
+    authz_response->dynamic_metadata = response->ok_response().dynamic_metadata();
+  } else {
+    authz_response->dynamic_metadata = response->dynamic_metadata();
   }
 
   callbacks_->onComplete(std::move(authz_response));

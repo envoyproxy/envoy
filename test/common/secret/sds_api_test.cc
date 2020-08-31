@@ -7,6 +7,7 @@
 #include "envoy/service/secret/v3/sds.pb.h"
 
 #include "common/config/datasource.h"
+#include "common/config/filesystem_subscription_impl.h"
 #include "common/secret/sds_api.h"
 #include "common/ssl/certificate_validation_context_config_impl.h"
 #include "common/ssl/tls_certificate_config_impl.h"
@@ -62,8 +63,59 @@ TEST_F(SdsApiTest, BasicTest) {
   setupMocks();
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
-      server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
+      server.stats(), []() {}, *dispatcher_, *api_);
+  sds_api.registerInitTarget(init_manager_);
   initialize();
+}
+
+// Validate that a noop init manager is used if the InitManger passed into the constructor
+// has been already initialized. This is a regression test for
+// https://github.com/envoyproxy/envoy/issues/12013
+TEST_F(SdsApiTest, InitManagerInitialised) {
+  NiceMock<Server::MockInstance> server;
+  std::string sds_config =
+      R"EOF(
+  resources:
+    - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+      name: "abc.com"
+      tls_certificate:
+        certificate_chain:
+          filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
+        private_key:
+          filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
+     )EOF";
+
+  const std::string sds_config_path = TestEnvironment::writeStringToFileForTest(
+      "sds.yaml", TestEnvironment::substitute(sds_config), false);
+  NiceMock<Config::MockSubscriptionCallbacks> callbacks;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::extensions::transport_sockets::tls::v3::Secret>
+      resource_decoder("name");
+  Config::SubscriptionStats stats(Config::Utility::generateStats(server.stats()));
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  envoy::config::core::v3::ConfigSource config_source;
+
+  EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _))
+      .WillOnce(Invoke([this, &sds_config_path, &resource_decoder,
+                        &stats](const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                                Stats::Scope&, Config::SubscriptionCallbacks& cbs,
+                                Config::OpaqueResourceDecoder&) -> Config::SubscriptionPtr {
+        return std::make_unique<Config::FilesystemSubscriptionImpl>(*dispatcher_, sds_config_path,
+                                                                    cbs, resource_decoder, stats,
+                                                                    validation_visitor_, *api_);
+      }));
+
+  auto init_manager = Init::ManagerImpl("testing");
+  auto noop_init_target =
+      Init::TargetImpl(fmt::format("noop test init target"), [] { /*Do nothing.*/ });
+  init_manager.add(noop_init_target);
+  auto noop_watcher = Init::WatcherImpl(fmt::format("noop watcher"), []() { /*Do nothing.*/ });
+  init_manager.initialize(noop_watcher);
+
+  EXPECT_EQ(Init::Manager::State::Initializing, init_manager.state());
+  TlsCertificateSdsApi sds_api(
+      config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
+      server.stats(), []() {}, *dispatcher_, *api_);
+  EXPECT_NO_THROW(sds_api.registerInitTarget(init_manager));
 }
 
 // Validate that bad ConfigSources are caught at construction time. This is a regression test for
@@ -79,8 +131,7 @@ TEST_F(SdsApiTest, BadConfigSource) {
       }));
   EXPECT_THROW_WITH_MESSAGE(TlsCertificateSdsApi(
                                 config_source, "abc.com", subscription_factory_, time_system_,
-                                validation_visitor_, server.stats(), init_manager_, []() {},
-                                *dispatcher_, *api_),
+                                validation_visitor_, server.stats(), []() {}, *dispatcher_, *api_),
                             EnvoyException, "bad config");
 }
 
@@ -92,7 +143,8 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   setupMocks();
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
-      server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
+      server.stats(), []() {}, *dispatcher_, *api_);
+  sds_api.registerInitTarget(init_manager_);
   initialize();
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -136,7 +188,9 @@ public:
                  Event::Dispatcher& dispatcher, Api::Api& api)
       : SdsApi(
             config_source, "abc.com", subscription_factory, time_source, validation_visitor_,
-            server.stats(), init_manager, []() {}, dispatcher, api) {}
+            server.stats(), []() {}, dispatcher, api) {
+    registerInitTarget(init_manager);
+  }
 
   MOCK_METHOD(void, onConfigUpdate,
               (const std::vector<Config::DecodedResourceRef>&, const std::string&));
@@ -189,7 +243,8 @@ TEST_F(SdsApiTest, DeltaUpdateSuccess) {
   setupMocks();
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
-      server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
+      server.stats(), []() {}, *dispatcher_, *api_);
+  sds_api.registerInitTarget(init_manager_);
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -234,7 +289,8 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   setupMocks();
   CertificateValidationContextSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
-      server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
+      server.stats(), []() {}, *dispatcher_, *api_);
+  sds_api.registerInitTarget(init_manager_);
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -288,7 +344,8 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   setupMocks();
   CertificateValidationContextSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
-      server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
+      server.stats(), []() {}, *dispatcher_, *api_);
+  sds_api.registerInitTarget(init_manager_);
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -376,7 +433,8 @@ TEST_F(SdsApiTest, GenericSecretSdsApiTest) {
   setupMocks();
   GenericSecretSdsApi sds_api(
       config_source, "encryption_key", subscription_factory_, time_system_, validation_visitor_,
-      server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
+      server.stats(), []() {}, *dispatcher_, *api_);
+  sds_api.registerInitTarget(init_manager_);
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -421,7 +479,8 @@ TEST_F(SdsApiTest, EmptyResource) {
   setupMocks();
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
-      server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
+      server.stats(), []() {}, *dispatcher_, *api_);
+  sds_api.registerInitTarget(init_manager_);
 
   initialize();
   EXPECT_THROW_WITH_MESSAGE(subscription_factory_.callbacks_->onConfigUpdate({}, ""),
@@ -436,7 +495,8 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
   setupMocks();
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
-      server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
+      server.stats(), []() {}, *dispatcher_, *api_);
+  sds_api.registerInitTarget(init_manager_);
 
   std::string yaml =
       R"EOF(
@@ -466,7 +526,8 @@ TEST_F(SdsApiTest, SecretUpdateWrongSecretName) {
   setupMocks();
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
-      server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
+      server.stats(), []() {}, *dispatcher_, *api_);
+  sds_api.registerInitTarget(init_manager_);
 
   std::string yaml =
       R"EOF(

@@ -19,7 +19,6 @@ envoy_extension_cc_test(
         "//source/common/stats:fake_symbol_table_lib",
         "//source/extensions/filters/http/grpc_web:grpc_web_filter_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:global_lib",
         "//test/test_common:utility_lib",
     ],
@@ -45,7 +44,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/grpc_web:config",
         "//source/extensions/filters/http/grpc_web:grpc_web_filter_lib",
         "//test/integration:http_integration_lib",
-        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
 )
