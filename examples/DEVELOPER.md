@@ -60,7 +60,7 @@ A number of utility functions have been added to simplify browser testing.
 #### Utility functions: `responds_with`
 
 The `responds_with` function can be used to ensure a request to a given URL responds with
-expected http content.
+expected `HTTP` content.
 
 It follows the form `responds_with <expected_content> <url> [<curl_args>]`
 
@@ -134,11 +134,11 @@ export DELAY=10
 
 For your example to work it may need more than one `docker` composition to be run.
 
-You can set where to find the `docker-compose.yml` files with the `PATHS` argument.
+You can set where to find the `docker-compose.yaml` files with the `PATHS` argument.
 
 By default `PATHS=.`, but you can change this to a comma-separated list of paths.
 
-For example a sandbox containing `frontend/docker-compose.yml` and `backend/docker-compose.yml`,
+For example a sandbox containing `frontend/docker-compose.yaml` and `backend/docker-compose.yaml`,
 might use a `verify.sh` with:
 
 ```bash
