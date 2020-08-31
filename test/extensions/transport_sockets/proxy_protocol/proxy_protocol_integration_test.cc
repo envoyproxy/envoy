@@ -63,14 +63,15 @@ TEST_P(ProxyProtocolIntegrationTest, TestV1ProxyProtocol) {
   if (GetParam() == Network::Address::IpVersion::v4) {
     ASSERT_TRUE(fake_upstream_connection->waitForData(48, &observed_data));
     std::ostringstream stream;
-    stream << "PROXY TCP4 127\\.0\\.0\\.1 127\\.0\\.0\\.1 [0-9]{1,5} " << listener_port
-           << "\r\ndata";
-    EXPECT_THAT(observed_data, testing::MatchesRegex(stream.str()));
+    stream << " " << listener_port << "\r\ndata";
+    EXPECT_THAT(observed_data, testing::StartsWith("PROXY TCP4 127.0.0.1 127.0.0.1 "));
+    EXPECT_THAT(observed_data, testing::EndsWith(stream.str()));
   } else if (GetParam() == Network::Address::IpVersion::v6) {
     ASSERT_TRUE(fake_upstream_connection->waitForData(36, &observed_data));
     std::ostringstream stream;
-    stream << "PROXY TCP6 ::1 ::1 [0-9]{1,5} " << listener_port << "\r\ndata";
-    EXPECT_THAT(observed_data, testing::MatchesRegex(stream.str()));
+    stream << " " << listener_port << "\r\ndata";
+    EXPECT_THAT(observed_data, testing::StartsWith("PROXY TCP6 ::1 ::1 "));
+    EXPECT_THAT(observed_data, testing::EndsWith(stream.str()));
   }
 
   auto previous_data = observed_data;
