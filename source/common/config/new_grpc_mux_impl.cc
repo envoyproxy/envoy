@@ -99,22 +99,21 @@ void NewGrpcMuxImpl::kickOffAck(UpdateAck ack) {
 // TODO(fredlas) to be removed from the GrpcMux interface very soon.
 void NewGrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
-// TODO (dmitri-d) verify that a prefix-matching watch isn't set up empty
 GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
                                          const std::set<std::string>& resources,
                                          SubscriptionCallbacks& callbacks,
                                          OpaqueResourceDecoder& resource_decoder,
-                                         const bool use_prefix_matching) {
+                                         const bool use_namespace_matching) {
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
-    addSubscription(type_url, use_prefix_matching);
-    return addWatch(type_url, resources, callbacks, resource_decoder, use_prefix_matching);
+    addSubscription(type_url, use_namespace_matching);
+    return addWatch(type_url, resources, callbacks, resource_decoder, use_namespace_matching);
   }
 
   Watch* watch = entry->second->watch_map_.addWatch(callbacks, resource_decoder);
   // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
-  updateWatch(type_url, watch, resources, use_prefix_matching);
+  updateWatch(type_url, watch, resources, use_namespace_matching);
   return std::make_unique<WatchImpl>(type_url, watch, *this);
 }
 
@@ -123,14 +122,14 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
 // subscription will enqueue and attempt to send an appropriate discovery request.
 void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
                                  const std::set<std::string>& resources,
-                                 bool creating_prefix_watch) {
+                                 bool creating_namespace_watch) {
   ASSERT(watch != nullptr);
   auto sub = subscriptions_.find(type_url);
   RELEASE_ASSERT(sub != subscriptions_.end(),
                  fmt::format("Watch of {} has no subscription to update.", type_url));
   auto added_removed = sub->second->watch_map_.updateWatchInterest(watch, resources);
-  if (creating_prefix_watch) {
-    // THis is to prevent sending out of requests that contain prefixes instead of resource names
+  if (creating_namespace_watch) {
+    // This is to prevent sending out of requests that contain prefixes instead of resource names
     sub->second->sub_state_.updateSubscriptionInterest({}, {});
   } else {
     sub->second->sub_state_.updateSubscriptionInterest(added_removed.added_,
@@ -162,9 +161,9 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   entry->second->watch_map_.removeWatch(watch);
 }
 
-void NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use_prefix_matching) {
+void NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use_namespace_matching) {
   subscriptions_.emplace(
-      type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_, use_prefix_matching));
+      type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_, use_namespace_matching));
   subscription_ordering_.emplace_back(type_url);
 }
 

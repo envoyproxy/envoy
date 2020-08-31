@@ -25,7 +25,7 @@ public:
 
   // Config::Subscription
   void start(const std::set<std::string>& resource_names,
-             const bool use_prefix_matching = false) override;
+             const bool use_namespace_matching = false) override;
   void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
   void requestOnDemandUpdate(const std::set<std::string>& add_these_names) override;
   // Config::SubscriptionCallbacks (all pass through to callbacks_!)

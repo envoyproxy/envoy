@@ -48,7 +48,7 @@ public:
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
                            OpaqueResourceDecoder& resource_decoder,
-                           const bool use_prefix_matching = false) override;
+                           const bool use_namespace_matching = false) override;
 
   void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;

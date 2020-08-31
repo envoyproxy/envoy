@@ -48,14 +48,6 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   return removed || updated || !resource_ids_in_last_update_.empty();
 }
 
-std::set<std::string> RouteConfigUpdateReceiverImpl::vhdsVhosts() const {
-  std::set<std::string> ret;
-  for (const auto& vhost : vhds_virtual_hosts_) {
-    ret.insert(vhost.first);
-  }
-  return ret;
-}
-
 void RouteConfigUpdateReceiverImpl::initializeRdsVhosts(
     const envoy::config::route::v3::RouteConfiguration& route_configuration) {
   rds_virtual_hosts_.clear();

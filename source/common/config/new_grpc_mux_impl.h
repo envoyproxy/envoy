@@ -40,7 +40,7 @@ public:
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
                            OpaqueResourceDecoder& resource_decoder,
-                           const bool use_prefix_matching = false) override;
+                           const bool use_namespace_matching = false) override;
 
   void requestOnDemandUpdate(const std::string& type_url,
                              const std::set<std::string>& for_update) override;
@@ -65,8 +65,8 @@ public:
 
   struct SubscriptionStuff {
     SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
-                      const bool use_prefix_matching)
-        : sub_state_(type_url, watch_map_, local_info, use_prefix_matching) {}
+                      const bool use_namespace_matching)
+        : sub_state_(type_url, watch_map_, local_info, use_namespace_matching) {}
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
@@ -114,9 +114,9 @@ private:
   // subscription will enqueue and attempt to send an appropriate discovery request.
   void updateWatch(const std::string& type_url, Watch* watch,
                    const std::set<std::string>& resources,
-                   const bool creating_prefix_watch = false);
+                   const bool creating_namespace_watch = false);
 
-  void addSubscription(const std::string& type_url, const bool use_prefix_matching);
+  void addSubscription(const std::string& type_url, const bool use_namespace_matching);
 
   void trySendDiscoveryRequests();
 
