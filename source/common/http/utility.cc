@@ -404,6 +404,7 @@ Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions&
   ret.accept_http_10_ = config.accept_http_10();
   ret.default_host_for_http_10_ = config.default_host_for_http_10();
   ret.enable_trailers_ = config.enable_trailers();
+  ret.allow_chunked_length_ = config.allow_chunked_length();
 
   if (config.header_key_format().has_proper_case_words()) {
     ret.header_key_format_ = Http1Settings::HeaderKeyFormat::ProperCase;

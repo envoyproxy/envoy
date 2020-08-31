@@ -208,7 +208,7 @@ public:
   bool maybeDirectDispatch(Buffer::Instance& data);
   virtual void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer&) {}
   Http::Http1::CodecStats& stats() { return stats_; }
-  bool enableTrailers() const { return enable_trailers_; }
+  bool enableTrailers() const { return codec_settings_.enable_trailers_; }
 
   // Http::Connection
   Http::Status dispatch(Buffer::Instance& data) override;
@@ -223,8 +223,9 @@ public:
 
 protected:
   ConnectionImpl(Network::Connection& connection, Http::Http1::CodecStats& stats,
-                 http_parser_type type, uint32_t max_headers_kb, const uint32_t max_headers_count,
-                 Http::Http1::HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers);
+                 const Http1Settings& settings, http_parser_type type, uint32_t max_headers_kb,
+                 const uint32_t max_headers_count,
+                 Http::Http1::HeaderKeyFormatterPtr&& header_key_formatter);
 
   bool resetStreamCalled() { return reset_stream_called_; }
   void onMessageBeginBase();
@@ -245,6 +246,7 @@ protected:
 
   Network::Connection& connection_;
   Http::Http1::CodecStats& stats_;
+  const Http1Settings codec_settings_;
   http_parser parser_;
   Http::Code error_code_{Http::Code::BadRequest};
   const Http::Http1::HeaderKeyFormatterPtr header_key_formatter_;
@@ -257,7 +259,6 @@ protected:
   // HTTP/1 message has been flushed from the parser. This allows raising an HTTP/2 style headers
   // block with end stream set to true with no further protocol data remaining.
   bool deferred_end_stream_headers_ : 1;
-  const bool enable_trailers_ : 1;
   const bool strict_1xx_and_204_headers_ : 1;
 
 private:
@@ -503,7 +504,6 @@ private:
 
   ServerConnectionCallbacks& callbacks_;
   absl::optional<ActiveRequest> active_request_;
-  Http1Settings codec_settings_;
   const Buffer::OwnedBufferFragmentImpl::Releasor response_buffer_releasor_;
   uint32_t outbound_responses_{};
   // This defaults to 2, which functionally disables pipelining. If any users
