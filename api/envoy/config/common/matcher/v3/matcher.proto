@@ -88,7 +88,7 @@ message HttpGenericBodyMatch {
       string string_match = 1 [(validate.rules).string = {min_len: 1}];
 
       // Sequence of bytes to be located in HTTP body.
-      bytes binary_match = 2 [(validate.rules).string = {min_len: 1}];
+      bytes binary_match = 2 [(validate.rules).bytes = {min_len: 1}];
     }
   }
 
