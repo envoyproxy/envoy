@@ -103,13 +103,13 @@ message RateLimit {
 
 message RateLimitPerRoute {
   enum VhRateLimitsOptions {
-    // Use the virtual host rate limits unless the route has a rate limit policy
+    // Use the virtual host rate limits unless the route has a rate limit policy.
     OVERRIDE = 0;
 
-    // Use the virtual host rate limits even if the route has a rate limit policy
+    // Use the virtual host rate limits even if the route has a rate limit policy.
     INCLUDE = 1;
 
-    // Ignore the virtual host rate limits even if the route does not have a rate limit policy
+    // Ignore the virtual host rate limits even if the route does not have a rate limit policy.
     IGNORE = 2;
   }
 
