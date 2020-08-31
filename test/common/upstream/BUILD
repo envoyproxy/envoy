@@ -273,14 +273,11 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:admin_mocks",
         "//test/mocks/server:instance_mocks",
-<<<<<<< HEAD
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:environment_lib",
-=======
         "//test/mocks/upstream:cluster_info_factory_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
->>>>>>> master
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
