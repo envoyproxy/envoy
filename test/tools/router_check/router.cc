@@ -160,18 +160,12 @@ void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
 void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
                                      const Router::DirectResponseEntry& entry) {
   auto encode_functions = Envoy::Http::Utility::EncodeFunctions{
-      [&](Http::ResponseHeaderMap& response_headers, Http::Code& code, std::string& body,
-          absl::string_view& content_type) -> void {
-        UNREFERENCED_PARAMETER(response_headers);
-        UNREFERENCED_PARAMETER(code);
-        UNREFERENCED_PARAMETER(body);
-        UNREFERENCED_PARAMETER(content_type);
-      },
-      [&](Http::ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+      nullptr,
+      [&](Envoy::Http::ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
         UNREFERENCED_PARAMETER(end_stream);
         Http::HeaderMapImpl::copyFrom(*tool_config.response_headers_->header_map_, *headers);
       },
-      [&](Buffer::Instance& data, bool end_stream) -> void {
+      [&](Envoy::Buffer::Instance& data, bool end_stream) -> void {
         UNREFERENCED_PARAMETER(data);
         UNREFERENCED_PARAMETER(end_stream);
       }};
