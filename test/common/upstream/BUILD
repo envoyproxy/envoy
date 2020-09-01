@@ -145,10 +145,10 @@ envoy_benchmark_test(
 envoy_cc_test_library(
     name = "health_checker_impl_test_lib",
     srcs = [
-        "health_checker_impl_test.cc",
+        "health_checker_impl_test_utils.cc",
     ],
     hdrs = [
-        "health_checker_impl_test.h",
+        "health_checker_impl_test_utils.h",
     ],
     deps = [
         ":utility_lib",
@@ -182,7 +182,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "health_checker_impl_test",
     srcs = [
-        "health_checker_test.cc",
+        "health_checker_impl_test.cc",
     ],
     deps = [
         ":health_checker_impl_test_lib",
