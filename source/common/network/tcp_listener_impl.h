@@ -10,12 +10,11 @@ namespace Network {
 
 /**
  * libevent implementation of Network::Listener for TCP.
- * TODO(conqerAtapple): Consider renaming the class to `TcpListenerImpl`.
  */
-class ListenerImpl : public BaseListenerImpl {
+class TcpListenerImpl : public BaseListenerImpl {
 public:
-  ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket, ListenerCallbacks& cb,
-               bool bind_to_port, uint32_t backlog_size);
+  TcpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
+                  TcpListenerCallbacks& cb, bool bind_to_port, uint32_t backlog_size);
   void disable() override;
   void enable() override;
 
@@ -24,7 +23,7 @@ public:
 protected:
   void setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket);
 
-  ListenerCallbacks& cb_;
+  TcpListenerCallbacks& cb_;
   const uint32_t backlog_size_;
 
 private:
