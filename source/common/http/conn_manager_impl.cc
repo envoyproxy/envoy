@@ -152,7 +152,8 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
 
 void ConnectionManagerImpl::checkForDeferredClose() {
   if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
-    doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt);
+    doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,
+                      StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect);
   }
 }
 
@@ -202,6 +203,9 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
   stream.filter_manager_.disarmRequestTimeout();
 
+  stream.completeRequest();
+  stream.filter_manager_.log();
+
   stream.filter_manager_.destroyFilters();
 
   read_callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(streams_));
@@ -233,15 +237,14 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
 
 void ConnectionManagerImpl::handleCodecError(absl::string_view error) {
   ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
-  read_callbacks_->connection().streamInfo().setResponseCodeDetails(
-      absl::StrCat("codec error: ", error));
   read_callbacks_->connection().streamInfo().setResponseFlag(
       StreamInfo::ResponseFlag::DownstreamProtocolError);
 
   // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
   // GOAWAY.
   doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay,
-                    StreamInfo::ResponseFlag::DownstreamProtocolError);
+                    StreamInfo::ResponseFlag::DownstreamProtocolError,
+                    absl::StrCat("codec error: ", error));
 }
 
 void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
@@ -324,8 +327,8 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   return Network::FilterStatus::StopIteration;
 }
 
-void ConnectionManagerImpl::resetAllStreams(
-    absl::optional<StreamInfo::ResponseFlag> response_flag) {
+void ConnectionManagerImpl::resetAllStreams(absl::optional<StreamInfo::ResponseFlag> response_flag,
+                                            absl::string_view details) {
   while (!streams_.empty()) {
     // Mimic a downstream reset in this case. We must also remove callbacks here. Though we are
     // about to close the connection and will disable further reads, it is possible that flushing
@@ -337,23 +340,16 @@ void ConnectionManagerImpl::resetAllStreams(
     // codec but there are no easy answers and this seems simpler.
     auto& stream = *streams_.front();
     stream.response_encoder_->getStream().removeCallbacks(stream);
-    stream.onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
-    if (response_flag.has_value()) {
-      // This code duplicates some of the logic in
-      // onResetStream(). There seems to be no easy way to force
-      // onResetStream to do the right thing within its current API.
-      // Encoding DownstreamProtocolError as reason==LocalReset does
-      // not work because local reset is generated in other places.
-      // Encoding it in the string_view argument would lead to a hack
-      // of the form: if parameter is nonempty, use that; else if the
-      // codec details are nonempty, use those. This hack does not
-      // seem better than the code duplication, so punt for now.
-      stream.filter_manager_.streamInfo().setResponseFlag(response_flag.value());
-      if (*response_flag == StreamInfo::ResponseFlag::DownstreamProtocolError) {
-        stream.filter_manager_.streamInfo().setResponseCodeDetails(
-            stream.response_encoder_->getStream().responseDetails());
-      }
+    if (!stream.response_encoder_->getStream().responseDetails().empty()) {
+      stream.filter_manager_.streamInfo().setResponseCodeDetails(
+          stream.response_encoder_->getStream().responseDetails());
+    } else if (!details.empty()) {
+      stream.filter_manager_.streamInfo().setResponseCodeDetails(details);
     }
+    if (response_flag.has_value()) {
+      stream.filter_manager_.streamInfo().setResponseFlag(response_flag.value());
+    }
+    stream.onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
   }
 }
 
@@ -368,6 +364,10 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
       remote_close_ = true;
       stats_.named_.downstream_cx_destroy_remote_.inc();
     }
+    absl::string_view details =
+        event == Network::ConnectionEvent::RemoteClose
+            ? StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect
+            : StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect;
     // TODO(mattklein123): It is technically possible that something outside of the filter causes
     // a local connection close, so we still guard against that here. A better solution would be to
     // have some type of "pre-close" callback that we could hook for cleanup that would get called
@@ -377,13 +377,13 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
     // NOTE: In the case where a local close comes from outside the filter, this will cause any
     // stream closures to increment remote close stats. We should do better here in the future,
     // via the pre-close callback mentioned above.
-    doConnectionClose(absl::nullopt, absl::nullopt);
+    doConnectionClose(absl::nullopt, absl::nullopt, details);
   }
 }
 
 void ConnectionManagerImpl::doConnectionClose(
     absl::optional<Network::ConnectionCloseType> close_type,
-    absl::optional<StreamInfo::ResponseFlag> response_flag) {
+    absl::optional<StreamInfo::ResponseFlag> response_flag, absl::string_view details) {
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
     connection_idle_timer_.reset();
@@ -415,7 +415,7 @@ void ConnectionManagerImpl::doConnectionClose(
     // Note that resetAllStreams() does not actually write anything to the wire. It just resets
     // all upstream streams and their filter stacks. Thus, there are no issues around recursive
     // entry.
-    resetAllStreams(response_flag);
+    resetAllStreams(response_flag, details);
   }
 
   if (close_type.has_value()) {
@@ -434,7 +434,7 @@ void ConnectionManagerImpl::onIdleTimeout() {
   if (!codec_) {
     // No need to delay close after flushing since an idle timeout has already fired. Attempt to
     // write out buffered data one last time and issue a local close if successful.
-    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt);
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt, "");
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();
   }
@@ -445,7 +445,8 @@ void ConnectionManagerImpl::onConnectionDurationTimeout() {
   stats_.named_.downstream_cx_max_duration_reached_.inc();
   if (!codec_) {
     // Attempt to write out buffered data one last time and issue a local close if successful.
-    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt);
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt,
+                      StreamInfo::ResponseCodeDetails::get().DurationTimeout);
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();
   }
@@ -578,7 +579,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       connection_manager_.read_callbacks_->connection().requestedServerName());
 }
 
-ConnectionManagerImpl::ActiveStream::~ActiveStream() {
+void ConnectionManagerImpl::ActiveStream::completeRequest() {
   filter_manager_.streamInfo().onRequestComplete();
   Upstream::HostDescriptionConstSharedPtr upstream_host =
       connection_manager_.read_callbacks_->upstreamHost();
@@ -594,19 +595,12 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     }
   }
 
-  // TODO(alyssawilk) this is not true. Fix.
-  // A downstream disconnect can be identified for HTTP requests when the upstream returns with a 0
-  // response code and when no other response flags are set.
-  if (!filter_manager_.streamInfo().hasAnyResponseFlag() &&
-      !filter_manager_.streamInfo().responseCode()) {
-    filter_manager_.streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::DownstreamConnectionTermination);
-  }
   if (connection_manager_.remote_close_) {
     filter_manager_.streamInfo().setResponseCodeDetails(
         StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect);
+    filter_manager_.streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::DownstreamConnectionTermination);
   }
-
   if (connection_manager_.codec_->protocol() < Protocol::Http2) {
     // For HTTP/2 there are still some reset cases where details are not set.
     // For HTTP/1 there shouldn't be any. Regression-proof this.
@@ -1222,14 +1216,26 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
                                                   connection_manager_.config_,
                                                   connection_manager_.config_.via());
 
+  bool drain_connection_due_to_overload = false;
+  if (connection_manager_.drain_state_ == DrainState::NotDraining &&
+      connection_manager_.overload_disable_keepalive_ref_.isSaturated()) {
+    ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
+    if (connection_manager_.codec_->protocol() < Protocol::Http2 ||
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2")) {
+      drain_connection_due_to_overload = true;
+    }
+    connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
+  }
+
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
   // header block.
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
-      connection_manager_.drain_close_.drainClose()) {
+      (connection_manager_.drain_close_.drainClose() || drain_connection_due_to_overload)) {
 
     // This doesn't really do anything for HTTP/1.1 other then give the connection another boost
-    // of time to race with incoming requests. It mainly just keeps the logic the same between
-    // HTTP/1.1 and HTTP/2.
+    // of time to race with incoming requests. For HTTP/2 connections, send a GOAWAY frame to
+    // prevent any new streams.
     connection_manager_.startDrainSequence();
     connection_manager_.stats_.named_.downstream_cx_drain_close_.inc();
     ENVOY_STREAM_LOG(debug, "drain closing connection", *this);
@@ -1251,13 +1257,6 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   if (connection_manager_.drain_state_ == DrainState::NotDraining && state_.saw_connection_close_) {
     ENVOY_STREAM_LOG(debug, "closing connection due to connection close header", *this);
     connection_manager_.drain_state_ = DrainState::Closing;
-  }
-
-  if (connection_manager_.drain_state_ == DrainState::NotDraining &&
-      connection_manager_.overload_disable_keepalive_ref_.isSaturated()) {
-    ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
-    connection_manager_.drain_state_ = DrainState::Closing;
-    connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
   }
 
   // If we are destroying a stream before remote is complete and the connection does not support
@@ -1362,7 +1361,6 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl:
   //       If we need to differentiate we need to do it inside the codec. Can start with this.
   ENVOY_STREAM_LOG(debug, "stream reset", *this);
   connection_manager_.stats_.named_.downstream_rq_rx_reset_.inc();
-  connection_manager_.doDeferredStreamDestroy(*this);
 
   // If the codec sets its responseDetails(), impute a
   // DownstreamProtocolError and propagate the details upwards.
@@ -1371,6 +1369,8 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl:
     filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
     filter_manager_.streamInfo().setResponseCodeDetails(encoder_details);
   }
+
+  connection_manager_.doDeferredStreamDestroy(*this);
 }
 
 void ConnectionManagerImpl::ActiveStream::onAboveWriteBufferHighWatermark() {

@@ -98,7 +98,9 @@ public:
 class GenericKeyAction : public RateLimitAction {
 public:
   GenericKeyAction(const envoy::config::route::v3::RateLimit::Action::GenericKey& action)
-      : descriptor_value_(action.descriptor_value()) {}
+      : descriptor_value_(action.descriptor_value()),
+        descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key()
+                                                         : "generic_key") {}
 
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
@@ -108,6 +110,7 @@ public:
 
 private:
   const std::string descriptor_value_;
+  const std::string descriptor_key_;
 };
 
 /**

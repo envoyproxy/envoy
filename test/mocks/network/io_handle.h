@@ -19,7 +19,7 @@ public:
     return Event::FileEventPtr{createFileEvent_(dispatcher, cb, trigger, events)};
   }
 
-  MOCK_METHOD(os_fd_t, fd, (), (const));
+  MOCK_METHOD(os_fd_t, fdDoNotUse, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, readv,
@@ -34,6 +34,7 @@ public:
                RecvMsgOutput& output));
   MOCK_METHOD(Api::IoCallUint64Result, recvmmsg,
               (RawSliceArrays & slices, uint32_t self_port, RecvMsgOutput& output));
+  MOCK_METHOD(Api::IoCallUint64Result, recv, (void* buffer, size_t length, int flags));
   MOCK_METHOD(bool, supportsMmsg, (), (const));
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
   MOCK_METHOD(Api::SysCallIntResult, bind, (Address::InstanceConstSharedPtr address));
@@ -51,6 +52,7 @@ public:
   MOCK_METHOD(Event::FileEvent*, createFileEvent_,
               (Event::Dispatcher & dispatcher, Event::FileReadyCb cb,
                Event::FileTriggerType trigger, uint32_t events));
+  MOCK_METHOD(Api::SysCallIntResult, shutdown, (int how));
 };
 
 } // namespace Network
