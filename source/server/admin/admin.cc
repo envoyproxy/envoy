@@ -139,44 +139,6 @@ bool shouldIncludeUnreadyTargetsInDump(const Http::Utility::QueryParams& params)
   return Utility::queryParam(params, "include_unready_targets") != absl::nullopt;
 }
 
-// Helper method that ensures that we've setting flags based on all the health flag values on the
-// host.
-void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
-                   envoy::admin::v3::HostHealthStatus& health_status) {
-  switch (flag) {
-  case Upstream::Host::HealthFlag::FAILED_ACTIVE_HC:
-    health_status.set_failed_active_health_check(
-        host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
-    break;
-  case Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK:
-    health_status.set_failed_outlier_check(
-        host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK));
-    break;
-  case Upstream::Host::HealthFlag::FAILED_EDS_HEALTH:
-  case Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH:
-    if (host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)) {
-      health_status.set_eds_health_status(envoy::config::core::v3::UNHEALTHY);
-    } else if (host.healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH)) {
-      health_status.set_eds_health_status(envoy::config::core::v3::DEGRADED);
-    } else {
-      health_status.set_eds_health_status(envoy::config::core::v3::HEALTHY);
-    }
-    break;
-  case Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC:
-    health_status.set_failed_active_degraded_check(
-        host.healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC));
-    break;
-  case Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL:
-    health_status.set_pending_dynamic_removal(
-        host.healthFlagGet(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
-    break;
-  case Upstream::Host::HealthFlag::PENDING_ACTIVE_HC:
-    health_status.set_pending_active_hc(
-        host.healthFlagGet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC));
-    break;
-  }
-}
-
 // Apply a field mask to a resource message. A simple field mask might look
 // like "cluster.name,cluster.alt_stat_name,last_updated" for a StaticCluster
 // resource. Unfortunately, since the "cluster" field is Any and the in-built
