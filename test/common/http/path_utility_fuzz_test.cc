@@ -14,7 +14,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::PathUtilityTestCase& input) {
         input.canonical_path().request_headers(), {},
         {":path"}); // needs to have path header in order to be valid
     Http::PathUtil::canonicalPath(request_headers);
-    ASSERT(request_headers.get_(":path") != "");
+    ASSERT(!request_headers.getPathValue().empty());
     break;
   }
   case test::common::http::PathUtilityTestCase::kMergeSlashes: {
