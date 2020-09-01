@@ -23,6 +23,8 @@ public:
     ENVOY_LOG(critical, "fake message");
     ENVOY_CONN_LOG(info, "fake message", connection_);
     ENVOY_STREAM_LOG(info, "fake message", stream_);
+    ENVOY_CONN_LOG(error, "fake error", connection_);
+    ENVOY_STREAM_LOG(error, "fake error", stream_);
   }
 
   void logMessageEscapeSequences() { ENVOY_LOG_MISC(info, "line 1 \n line 2 \t tab \\r test"); }
@@ -155,30 +157,61 @@ TEST(Fancy, Global) {
   FANCY_FLUSH_LOG();
 }
 
-TEST(Fancy, SetLevel) {
-  const char* file = "P=NP_file";
-  getFancyContext().setFancyLogger(file, spdlog::level::trace);
-
-  getFancyContext().setFancyLogger(__FILE__, spdlog::level::err);
-  FANCY_LOG(error, "Fancy Error! Here's a test for level.");
-  FANCY_LOG(warn, "Warning: you shouldn't see this message!");
-}
-
-TEST(Fancy, Default) {
-  getFancyContext().setFancyLogger(__FILE__, spdlog::level::info); // revert to default
-  std::string fmt = "[%t][%l][%n] %v";
-  getFancyContext().setDefaultFancyLevelFormat(spdlog::level::warn, fmt);
-  FANCY_LOG(info, "Info: you shouldn't see this message!");
-  FANCY_LOG(warn, "Warning: warning at default log level!");
-  EXPECT_EQ(Logger::Context::getFancyLogFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] %v");
-  EXPECT_EQ(Logger::Context::getFancyDefaultLevel(), spdlog::level::info);
-}
-
 TEST(Fancy, FastPath) {
   getFancyContext().setFancyLogger(__FILE__, spdlog::level::info);
   for (int i = 0; i < 10; i++) {
     FANCY_LOG(warn, "Fake warning No. {}", i);
   }
+}
+
+TEST(Fancy, SetLevel) {
+  const char* file = "P=NP_file";
+  bool res = getFancyContext().setFancyLogger(file, spdlog::level::trace);
+  EXPECT_EQ(res, false);
+  SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(file);
+  EXPECT_EQ(p, nullptr);
+
+  res = getFancyContext().setFancyLogger(__FILE__, spdlog::level::err);
+  EXPECT_EQ(res, true);
+  FANCY_LOG(error, "Fancy Error! Here's a test for level.");
+  FANCY_LOG(warn, "Warning: you shouldn't see this message!");
+  p = getFancyContext().getFancyLogEntry(__FILE__);
+  EXPECT_NE(p, nullptr);
+  EXPECT_EQ(p->level(), spdlog::level::err);
+
+  getFancyContext().setAllFancyLoggers(spdlog::level::info);
+  FANCY_LOG(info, "Info: all loggers back to info.");
+  FANCY_LOG(debug, "Debug: you shouldn't see this message!");
+  EXPECT_EQ(getFancyContext().getFancyLogEntry(__FILE__)->level(), spdlog::level::info);
+}
+
+TEST(Fancy, Iteration) {
+  FANCY_LOG(info, "Info: iteration test begins.");
+  getFancyContext().setAllFancyLoggers(spdlog::level::info);
+  std::string output = getFancyContext().listFancyLoggers();
+  EXPECT_EQ(output, "   test/common/common/log_macros_test.cc: 2\n");
+  std::string log_format = "[%T.%e][%t][%l][%n] %v";
+  getFancyContext().setFancyLogger(__FILE__, spdlog::level::err);
+  // setDefaultFancyLevelFormat relies on previous default and might cause error online
+  // getFancyContext().setDefaultFancyLevelFormat(spdlog::level::warn, log_format);
+  FANCY_LOG(warn, "Warning: now level is warning, format changed (Date removed).");
+  FANCY_LOG(warn, getFancyContext().listFancyLoggers());
+  // EXPECT_EQ(getFancyContext().getFancyLogEntry(__FILE__)->level(),
+  //           spdlog::level::warn); // note fancy_default_level isn't changed
+}
+
+TEST(Fancy, Context) {
+  FANCY_LOG(info, "Info: context API needs test.");
+  bool enable_fine_grain_logging = Logger::Context::useFancyLogger();
+  printf(" --> If use fancy logger: %d\n", enable_fine_grain_logging);
+  if (enable_fine_grain_logging) {
+    FANCY_LOG(critical, "Cmd option set: all previous Envoy Log should be converted now!");
+  }
+  Logger::Context::enableFancyLogger();
+  EXPECT_EQ(Logger::Context::useFancyLogger(), true);
+  EXPECT_EQ(Logger::Context::getFancyLogFormat(), "[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v");
+  // EXPECT_EQ(Logger::Context::getFancyDefaultLevel(),
+  //           spdlog::level::err); // default is error in test environment
 }
 
 } // namespace Envoy

@@ -1255,6 +1255,67 @@ filter_chains:
   EXPECT_CALL(*listener_baz_update1, onDestroy());
 }
 
+TEST_F(ListenerManagerImplTest, UpdateActiveToWarmAndBack) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add and initialize foo listener.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
+  checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  // Update foo into warming.
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+per_connection_buffer_limit_bytes: 999
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml), "", true));
+
+  // Should be both active and warming now.
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  // Update foo back to original active, should cause the warming listener to be removed.
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
+
+  checkStats(__LINE__, 1, 2, 0, 0, 1, 0, 0);
+  EXPECT_EQ(0UL, manager_->listeners(ListenerManager::WARMING).size());
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
 TEST_F(ListenerManagerImplTest, AddReusableDrainingListener) {
   InSequence s;
 
@@ -1425,6 +1486,16 @@ filter_chains:
   auto syscall_result = os_sys_calls_actual_.socket(AF_INET, SOCK_STREAM, 0);
   ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
 
+  // On Windows if the socket has not been bound to an address with bind
+  // the call to getsockname fails with WSAEINVAL. To avoid that we make sure
+  // that the bind system actually happens and it does not get mocked.
+  ON_CALL(os_sys_calls_, bind(_, _, _))
+      .WillByDefault(Invoke(
+          [&](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) -> Api::SysCallIntResult {
+            Api::SysCallIntResult result = os_sys_calls_actual_.bind(sockfd, addr, addrlen);
+            ASSERT(result.rc_ >= 0);
+            return result;
+          }));
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {{true, false}}))
       .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
@@ -3554,8 +3625,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;
 
+#ifdef SOL_IP
   // Return error when trying to retrieve the original dst on the invalid handle
   EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _)).WillOnce(Return(-1));
+#endif
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   Network::AcceptedSocketImpl socket(std::make_unique<Network::IoSocketHandleImpl>(),
@@ -4719,6 +4792,23 @@ filter_chains:
       manager_->listeners().front().get().udpPacketWriterFactory()->get().createUdpPacketWriter(
           listen_socket->ioHandle(), manager_->listeners()[0].get().listenerScope());
   EXPECT_FALSE(udp_packet_writer->isBatchMode());
+}
+
+TEST_F(ListenerManagerImplTest, TcpBacklogCustomConfig) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: TcpBacklogConfigListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    tcp_backlog_size: 100
+    filter_chains:
+    - filters:
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _));
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+  EXPECT_EQ(100U, manager_->listeners().back().get().tcpBacklogSize());
 }
 
 } // namespace

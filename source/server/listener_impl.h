@@ -311,6 +311,7 @@ public:
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return access_logs_;
   }
+  uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
   Init::Manager& initManager();
   envoy::config::core::v3::TrafficDirection direction() const override {
     return config().traffic_direction();
@@ -371,6 +372,7 @@ private:
   const bool added_via_api_;
   const bool workers_started_;
   const uint64_t hash_;
+  const uint32_t tcp_backlog_size_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 
   // A target is added to Server's InitManager if workers_started_ is false.

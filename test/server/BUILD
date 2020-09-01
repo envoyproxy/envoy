@@ -125,7 +125,10 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "guarddog_impl_test",
+    size = "small",
     srcs = ["guarddog_impl_test.cc"],
+    # Fails intermittantly on local build
+    tags = ["flaky_on_windows"],
     deps = [
         "//include/envoy/common:time_interface",
         "//source/common/api:api_lib",
@@ -136,6 +139,7 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/server:main_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
@@ -233,7 +237,6 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         ":listener_manager_impl_test_lib",
         ":utility_lib",
@@ -355,7 +358,6 @@ envoy_cc_test(
         ":server_test_data",
         ":static_validation_test_data",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",

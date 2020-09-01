@@ -43,8 +43,9 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
     const bool ok = Network::Socket::applyOptions(
         options, listen_socket_, envoy::config::core::v3::SocketOption::STATE_BOUND);
     if (!ok) {
+      // TODO(fcoras): consider removing the fd from the log message
       ENVOY_LOG(warn, "Failed to apply socket options to socket {} on listener {} after binding",
-                listen_socket_.ioHandle().fd(), listener_config.name());
+                listen_socket_.ioHandle().fdDoNotUse(), listener_config.name());
       throw Network::CreateListenerException("Failed to apply socket options.");
     }
     listen_socket_.addOptions(options);

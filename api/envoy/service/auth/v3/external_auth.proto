@@ -71,13 +71,11 @@ message OkHttpResponse {
   // one if there is a match.
   repeated config.core.v3.HeaderValueOption headers = 2;
 
-  // Optional response metadata that will be emitted as dynamic metadata to be consumed by the next
-  // filter. This metadata lives in a namespace specified by the canonical name of extension filter
-  // that requires it:
-  //
-  // - :ref:`envoy.filters.http.ext_authz <config_http_filters_ext_authz_dynamic_metadata>` for HTTP filter.
-  // - :ref:`envoy.filters.network.ext_authz <config_network_filters_ext_authz_dynamic_metadata>` for network filter.
-  google.protobuf.Struct dynamic_metadata = 3;
+  // This field has been deprecated in favor of :ref:`CheckResponse.dynamic_metadata
+  // <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>`. Until it is removed,
+  // setting this field overrides :ref:`CheckResponse.dynamic_metadata
+  // <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>`.
+  google.protobuf.Struct dynamic_metadata = 3 [deprecated = true];
 }
 
 // Intended for gRPC and Network Authorization servers `only`.
@@ -98,4 +96,12 @@ message CheckResponse {
     // Supplies http attributes for an ok response.
     OkHttpResponse ok_response = 3;
   }
+
+  // Optional response metadata that will be emitted as dynamic metadata to be consumed by the next
+  // filter. This metadata lives in a namespace specified by the canonical name of extension filter
+  // that requires it:
+  //
+  // - :ref:`envoy.filters.http.ext_authz <config_http_filters_ext_authz_dynamic_metadata>` for HTTP filter.
+  // - :ref:`envoy.filters.network.ext_authz <config_network_filters_ext_authz_dynamic_metadata>` for network filter.
+  google.protobuf.Struct dynamic_metadata = 4;
 }

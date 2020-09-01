@@ -11,6 +11,8 @@
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
+#include "extensions/filters/http/cache/inline_headers_handles.h"
+
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
@@ -19,35 +21,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
-
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    request_cache_control_handle(Http::CustomHeaders::get().CacheControl);
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    response_cache_control_handle(Http::CustomHeaders::get().CacheControl);
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    pragma_handler(Http::CustomHeaders::get().Pragma);
-
-std::ostream& operator<<(std::ostream& os, CacheEntryStatus status) {
-  switch (status) {
-  case CacheEntryStatus::Ok:
-    return os << "Ok";
-  case CacheEntryStatus::Unusable:
-    return os << "Unusable";
-  case CacheEntryStatus::RequiresValidation:
-    return os << "RequiresValidation";
-  case CacheEntryStatus::FoundNotModified:
-    return os << "FoundNotModified";
-  case CacheEntryStatus::NotSatisfiableRange:
-    return os << "NotSatisfiableRange";
-  case CacheEntryStatus::SatisfiableRange:
-    return os << "SatisfiableRange";
-  }
-  NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
-std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range) {
-  return os << "[" << range.begin() << "," << range.end() << ")";
-}
 
 LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp)
     : timestamp_(timestamp) {
@@ -68,11 +41,10 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   // TODO(toddmgreer): Let config determine whether to include forwarded_proto, host, and
   // query params.
   // TODO(toddmgreer): get cluster name.
-  // TODO(toddmgreer): handle the resultant vector<AdjustedByteRange> in CacheFilter::onOkHeaders.
-  // Range Requests are only valid for GET requests
   if (request_headers.getMethodValue() == Http::Headers::get().MethodValues.Get) {
-    // TODO(cbdm): using a constant limit of 10 ranges, could make this into a parameter.
-    const int RangeSpecifierLimit = 10;
+    // TODO(cbdm): using a constant limit of 1 range since we don't support multi-part responses nor
+    // coalesce multiple overlapping ranges. Could make this into a parameter based on config.
+    const int RangeSpecifierLimit = 1;
     request_range_spec_ = RangeRequests::parseRanges(request_headers, RangeSpecifierLimit);
   }
   key_.set_cluster_name("cluster_name_goes_here");
@@ -90,7 +62,7 @@ size_t localHashKey(const Key& key) { return stableHashKey(key); }
 void LookupRequest::initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers) {
   const absl::string_view cache_control =
       request_headers.getInlineValue(request_cache_control_handle.handle());
-  const absl::string_view pragma = request_headers.getInlineValue(pragma_handler.handle());
+  const absl::string_view pragma = request_headers.getInlineValue(pragma_handle.handle());
 
   if (!cache_control.empty()) {
     request_cache_control_ = RequestCacheControl(cache_control);
@@ -166,7 +138,6 @@ LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& respon
   result.headers_ = std::move(response_headers);
   result.content_length_ = content_length;
   if (!adjustByteRangeSet(result.response_ranges_, request_range_spec_, content_length)) {
-    result.headers_->setStatus(static_cast<uint64_t>(Http::Code::RangeNotSatisfiable));
     result.cache_entry_status_ = CacheEntryStatus::NotSatisfiableRange;
   } else if (!result.response_ranges_.empty()) {
     result.cache_entry_status_ = CacheEntryStatus::SatisfiableRange;

@@ -26,6 +26,9 @@ CAS
 CB
 CDS
 CEL
+DSR
+LTT
+TIDs
 ceil
 CHACHA
 CHLO
@@ -69,6 +72,7 @@ DRYs
 DS
 DST
 DW
+DWORD
 EADDRINUSE
 EADDRNOTAVAIL
 EAGAIN
@@ -211,6 +215,7 @@ NS
 NUL
 Nilsson
 Nonhashable
+Oauth
 OCSP
 OK
 OOM
@@ -350,6 +355,8 @@ WRONGPASS
 WRR
 WS
 WSA
+WSABUF
+WSAEINVAL
 WSS
 Welford's
 Wi
@@ -420,6 +427,7 @@ bazel
 behaviour
 benchmarked
 bidi
+bignum
 bitfield
 bitset
 bitwise
@@ -430,6 +438,7 @@ bool
 boolean
 booleans
 bools
+boringssl
 borks
 broadcasted
 buf
@@ -441,6 +450,7 @@ bulkstrings
 bursty
 bytecode
 bytestream
+bytestring
 cacheable
 cacheability
 callee
@@ -619,6 +629,7 @@ func
 functor
 functors
 gRPC
+gateway
 gcov
 genrule
 getaddrinfo
@@ -810,6 +821,7 @@ nullopt
 nullptr
 num
 numkeys
+oauth
 observability
 ocagent
 offsetof
@@ -924,6 +936,7 @@ realloc
 rebalanced
 rebalancing
 rebuffer
+rebuilder
 reconnection
 recurse
 recv
@@ -954,6 +967,7 @@ repeatability
 reperform
 repicked
 repo
+reproducibility
 requirepass
 reselecting
 reserialize
@@ -969,6 +983,7 @@ restarter
 resync
 retriable
 retriggers
+revalidated
 revalidation
 rmdir
 rocketmq

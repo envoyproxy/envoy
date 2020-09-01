@@ -16,6 +16,7 @@
 
 #include "common/common/cleanup.h"
 #include "common/common/logger.h"
+#include "common/common/utility.h"
 #include "common/config/api_version.h"
 #include "common/config/grpc_stream.h"
 #include "common/config/utility.h"
@@ -159,7 +160,7 @@ public:
 
   GrpcMuxWatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
                            OpaqueResourceDecoder&) override {
-    throw EnvoyException("ADS must be configured to support an ADS config source");
+    ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
   }
 
   void onWriteable() override {}

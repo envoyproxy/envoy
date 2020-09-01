@@ -393,6 +393,17 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
   auto existing_active_listener = getListenerByName(active_listeners_, name);
   auto existing_warming_listener = getListenerByName(warming_listeners_, name);
 
+  // The listener should be updated back to its original state and the warming listener should be
+  // removed.
+  if (existing_warming_listener != warming_listeners_.end() &&
+      existing_active_listener != active_listeners_.end() &&
+      (*existing_active_listener)->blockUpdate(hash)) {
+    warming_listeners_.erase(existing_warming_listener);
+    updateWarmingActiveGauges();
+    stats_.listener_modified_.inc();
+    return true;
+  }
+
   // Do a quick blocked update check before going further. This check needs to be done against both
   // warming and active.
   if ((existing_warming_listener != warming_listeners_.end() &&
@@ -639,11 +650,30 @@ ListenerManagerImpl::getListenerByName(ListenerList& listeners, const std::strin
   return ret;
 }
 
-std::vector<std::reference_wrapper<Network::ListenerConfig>> ListenerManagerImpl::listeners() {
+std::vector<std::reference_wrapper<Network::ListenerConfig>>
+ListenerManagerImpl::listeners(ListenerState state) {
   std::vector<std::reference_wrapper<Network::ListenerConfig>> ret;
-  ret.reserve(active_listeners_.size());
-  for (const auto& listener : active_listeners_) {
-    ret.push_back(*listener);
+
+  size_t size = 0;
+  size += state & WARMING ? warming_listeners_.size() : 0;
+  size += state & ACTIVE ? active_listeners_.size() : 0;
+  size += state & DRAINING ? draining_listeners_.size() : 0;
+  ret.reserve(size);
+
+  if (state & WARMING) {
+    for (const auto& listener : warming_listeners_) {
+      ret.push_back(*listener);
+    }
+  }
+  if (state & ACTIVE) {
+    for (const auto& listener : active_listeners_) {
+      ret.push_back(*listener);
+    }
+  }
+  if (state & DRAINING) {
+    for (const auto& draining_listener : draining_listeners_) {
+      ret.push_back(*(draining_listener.listener_));
+    }
   }
   return ret;
 }

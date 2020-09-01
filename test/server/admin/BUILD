@@ -91,6 +91,7 @@ envoy_cc_test(
     srcs = ["logs_handler_test.cc"],
     deps = [
         ":admin_instance_lib",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 
@@ -110,6 +111,15 @@ envoy_cc_test(
         ":admin_instance_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//test/test_common:logging_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "clusters_handler_test",
+    srcs = ["clusters_handler_test.cc"],
+    deps = [
+        ":admin_instance_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )

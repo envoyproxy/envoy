@@ -1,4 +1,0 @@
-sock {
-  local_address: "hello world"
-  remote_address: "tcp://0.0.0.0:0"
-}  
