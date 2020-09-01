@@ -172,10 +172,11 @@ void CacheHeadersUtils::getAllMatchingHeaderNames(
     const Http::HeaderMap& headers, const std::vector<Matchers::StringMatcherPtr>& ruleset,
     absl::flat_hash_set<absl::string_view>& out) {
   headers.iterate([&ruleset, &out](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    absl::string_view header_name = header.key().getStringView();
     for (const auto& rule : ruleset) {
-      absl::string_view header_name = header.key().getStringView();
       if (rule->match(header_name)) {
         out.emplace(header_name);
+        break;
       }
     }
     return Http::HeaderMap::Iterate::Continue;
