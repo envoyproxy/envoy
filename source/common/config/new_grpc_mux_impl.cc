@@ -56,6 +56,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
         ApiTypeOracle::getEarlierTypeUrl(message->type_url());
     if (old_type_url) {
       sub = subscriptions_.find(*old_type_url);
+      ENVOY_LOG(debug, "v3 {} converted to v2 {}.", message->type_url(), *old_type_url);
     }
   }
   if (sub == subscriptions_.end()) {

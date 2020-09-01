@@ -121,13 +121,17 @@ void GrpcMuxImpl::onDiscoveryResponse(
   if (message->has_control_plane()) {
     control_plane_stats.identifier_.set(message->control_plane().identifier());
   }
-  // If this type url is not watched, try older version of type url.
-  if (api_state_.count(type_url) == 0) {
+  // If this type url is not watched(no subscriber or no watcher), try older version of type url.
+  if (api_state_.count(type_url) == 0 ||
+      (api_state_[type_url].watches_.empty() && !message->resources().empty())) {
     absl::optional<std::string> old_type_url =
         ApiTypeOracle::getEarlierTypeUrl(message->type_url());
+    if (old_type_url) {
+      ENVOY_LOG(debug, "v3 {} converted to v2 {}.", message->type_url(), *old_type_url);
+    }
+
     if (old_type_url && api_state_.count(*old_type_url)) {
       type_url = *old_type_url;
-      ENVOY_LOG(debug, "v3 {} converted to v2 {}.", message->type_url(), *old_type_url);
     } else {
       // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
       // protocol violation
@@ -146,13 +150,15 @@ void GrpcMuxImpl::onDiscoveryResponse(
       // xDS server sends an empty list of ClusterLoadAssignment resources. we'll accept
       // this update. no need to send a discovery request, as we don't watch for anything.
       api_state_[type_url].request_.set_version_info(message->version_info());
+      return;
     } else {
-      // No watches and we have resources - this should not happen. send a NACK (by not
-      // updating the version).
-      ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
-      queueDiscoveryRequest(type_url);
+      bool type_match_found = false;
+      if (!type_match_found) {
+        ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
+        queueDiscoveryRequest(type_url);
+        return;
+      }
     }
-    return;
   }
   ScopedResume same_type_resume;
   // We pause updates of the same type. This is necessary for SotW and GrpcMuxImpl, since unlike

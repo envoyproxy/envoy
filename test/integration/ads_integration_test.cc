@@ -133,8 +133,9 @@ TEST_P(AdsIntegrationTest, MixV2V3TypeUrlInDiscoveryResponse) {
       {buildListener("listener_0", "route_config_0")}, {}, "1", false);
   // Discovery response with v2 type url.
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
-      {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
+      "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      {buildRouteConfig("route_config_0", "cluster_0")},
+      {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1", false);
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
   // Validate that we can process a request.
   makeSingleRequest();
