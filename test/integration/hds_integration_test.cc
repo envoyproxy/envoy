@@ -45,7 +45,7 @@ public:
     HttpIntegrationTest::createUpstreams();
   }
   void initialize() override { initialize(Envoy::FakeHttpConnection::Type::HTTP1); }
-  void initialize(FakeHttpConnection::Type http_conn_type, bool use_ssl = false) {
+  void initialize(FakeHttpConnection::Type http_conn_type, bool use_tls = false) {
     setUpstreamCount(upstream_endpoints_);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Setup hds and corresponding gRPC cluster.
@@ -65,10 +65,10 @@ public:
     HttpIntegrationTest::initialize();
 
     // Endpoint connections
-    if (use_ssl) {
-      host_upstream_ = std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0, http_conn_type,
+    if (use_tls) {
+      host_upstream_ = std::make_unique<FakeUpstream>(createUpstreamTlsContext(), 0, http_conn_type,
                                                       version_, timeSystem());
-      host2_upstream_ = std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0,
+      host2_upstream_ = std::make_unique<FakeUpstream>(createUpstreamTlsContext(), 0,
                                                        http_conn_type, version_, timeSystem());
     } else {
       host_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type, version_, timeSystem());
@@ -87,7 +87,7 @@ public:
     RELEASE_ASSERT(result, result.message());
   }
 
-  Network::TransportSocketFactoryPtr createUpstreamSslContext() {
+  Network::TransportSocketFactoryPtr createUpstreamTlsContext() {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     const std::string yaml = absl::StrFormat(
         R"EOF(
@@ -161,7 +161,7 @@ require_client_certificate: true
   // one HTTP health_check
   envoy::service::health::v3::HealthCheckSpecifier makeHttpHealthCheckSpecifier(
       envoy::type::v3::CodecClientType codec_type = envoy::type::v3::CodecClientType::HTTP1,
-      bool use_ssl = false) {
+      bool use_tls = false) {
     envoy::service::health::v3::HealthCheckSpecifier server_health_check_specifier_;
     server_health_check_specifier_.mutable_interval()->set_nanos(100000000); // 0.1 seconds
 
@@ -185,7 +185,7 @@ require_client_certificate: true
     auto* http_health_check = health_check->mutable_http_health_check();
     http_health_check->set_path("/healthcheck");
     http_health_check->set_codec_client_type(codec_type);
-    if (use_ssl) {
+    if (use_tls) {
       // set bool for use in struct.
       ProtobufWkt::Value v;
       v.set_string_value("true");
@@ -943,8 +943,8 @@ TEST_P(HdsIntegrationTest, TestDefaultTimer) {
   cleanupHdsConnection();
 }
 
-// Health checks a single endpoint over SSL with HTTP/2
-TEST_P(HdsIntegrationTest, SingleEndpointHealthySslHttp2) {
+// Health checks a single endpoint over TLS with HTTP/2
+TEST_P(HdsIntegrationTest, SingleEndpointHealthyTlsHttp2) {
   initialize(FakeHttpConnection::Type::HTTP2, true);
 
   // Server <--> Envoy
@@ -977,8 +977,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthySslHttp2) {
   cleanupHdsConnection();
 }
 
-// Health checks a single endpoint over SSL with HTTP/1
-TEST_P(HdsIntegrationTest, SingleEndpointHealthySslHttp1) {
+// Health checks a single endpoint over TLS with HTTP/1
+TEST_P(HdsIntegrationTest, SingleEndpointHealthyTlsHttp1) {
   initialize(FakeHttpConnection::Type::HTTP1, true);
 
   // Server <--> Envoy
