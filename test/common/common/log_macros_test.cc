@@ -125,7 +125,7 @@ void spamCall(std::function<void()>&& call_to_spam, const uint32_t num_threads) 
   absl::Barrier* barrier = new absl::Barrier(num_threads);
 
   for (auto& thread : threads) {
-    thread = std::thread([&call_to_spam, barrier] {
+    thread = std::thread([&call_to_spam, &barrier] {
       // Allow threads to accrue, to maximize concurrency on the call we are testing.
       if (barrier->Block()) {
         delete barrier;
