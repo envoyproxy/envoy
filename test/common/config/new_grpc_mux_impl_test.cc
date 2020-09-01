@@ -184,6 +184,7 @@ TEST_F(NewGrpcMuxImplTest, V3ResourceResponseV2ResourceWatch) {
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
     response->add_resources()->mutable_resource()->PackFrom(load_assignment);
+    // Send response that contains resource with v3 type url.
     response->set_type_url("type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment");
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
         .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,

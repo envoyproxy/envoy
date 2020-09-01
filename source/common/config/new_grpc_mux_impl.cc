@@ -50,6 +50,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
   auto sub = subscriptions_.find(message->type_url());
+  // If this type url is not watched, try older version type url.
   if (sub == subscriptions_.end()) {
     absl::optional<std::string> old_type_url =
         ApiTypeOracle::getEarlierTypeUrl(message->type_url());

@@ -121,6 +121,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
   if (message->has_control_plane()) {
     control_plane_stats.identifier_.set(message->control_plane().identifier());
   }
+  // If this type url is not watched, try older version of type url.
   if (api_state_.count(type_url) == 0) {
     absl::optional<std::string> old_type_url =
         ApiTypeOracle::getEarlierTypeUrl(message->type_url());

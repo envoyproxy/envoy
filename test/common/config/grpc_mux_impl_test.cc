@@ -738,11 +738,11 @@ TEST_F(GrpcMuxImplTest, WatchV2ResourceV3) {
   NiceMock<MockSubscriptionCallbacks> bar_callbacks;
   auto bar_sub = grpc_mux_->addWatch(v2_type_url, {"y", "z"}, bar_callbacks, resource_decoder);
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  // Should dedupe the "x" resource.
   expectSendMessage(v2_type_url, {"y", "z", "x"}, "", true);
   grpc_mux_->start();
 
   {
+    // Send resource with v3 type url, should invoke onConfigUpdate.
     auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(v3_type_url);
     response->set_version_info("1");
