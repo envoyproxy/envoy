@@ -2,7 +2,7 @@
 name: Non-{crash,security} bug
 about: Bugs which are not crashes, DoS or other security issue
 title: ''
-labels: ''
+labels: bug,triage
 assignees: ''
 
 ---
