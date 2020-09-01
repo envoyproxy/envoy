@@ -80,11 +80,22 @@ Restart failed CircleCI tests.
 
 Example:
 ```
-/retest
+/retest-circle
 ```
 Restarts all failed CircleCI tests, as reported in the commit statuses.
 
-[Demo PR](https://github.com/envoyproxy/envoy/pull/5060#issuecomment-439285928)
+[Demo PR](https://github.com/envoyproxy/envoy/pull/12613#issuecomment-676141200)
+
+### [Azure Pipelines Retest](https://github.com/envoyproxy/envoy/blob/master/ci/repokitteh/modules/azure_pipelines.star)
+Restart failed Azure pipelines.
+
+Example:
+```
+/retest
+```
+Restarts all failed Azure pipelines.
+
+[Demo PR](https://github.com/envoyproxy/envoy/pull/12860#issuecomment-684832313)
 
 ### [Granular Ownerscheck](https://github.com/repokitteh/modules/blob/master/ownerscheck.star)
 
