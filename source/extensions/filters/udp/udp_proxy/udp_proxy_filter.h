@@ -115,7 +115,7 @@ public:
   UdpLoadBalancerContext(const Udp::HashPolicy* hash_policy,
                          const Network::Address::InstanceConstSharedPtr& peer_address) {
     if (hash_policy) {
-      hash_ = hash_policy->generateHash(peer_address);
+      hash_ = hash_policy->generateHash(*peer_address);
     }
   }
 
