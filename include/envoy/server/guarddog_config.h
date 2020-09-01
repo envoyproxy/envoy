@@ -9,6 +9,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/guarddog.h"
+#include "envoy/stats/scope.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -19,6 +20,7 @@ namespace Configuration {
 struct GuardDogActionFactoryContext {
   Api::Api& api_;
   Event::Dispatcher& dispatcher_; // not owned (this is the guard dog's dispatcher)
+  Stats::Scope& stats_;           // not owned (this is the server's stats scope)
 };
 
 class GuardDogAction {

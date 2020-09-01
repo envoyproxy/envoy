@@ -15,6 +15,7 @@
 #include "extensions/watchdog/profile_action/config.h"
 #include "extensions/watchdog/profile_action/profile_action.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
@@ -35,8 +36,9 @@ class ProfileActionTest : public testing::Test {
 protected:
   ProfileActionTest()
       : time_system_(std::make_unique<Event::SimulatedTimeSystem>()),
-        api_(Api::createApiForTest(*time_system_)), dispatcher_(api_->allocateDispatcher("test")),
-        context_({*api_, *dispatcher_}), test_path_(generateTestPath()) {}
+        api_(Api::createApiForTest(stats_, *time_system_)),
+        dispatcher_(api_->allocateDispatcher("test")), context_({*api_, *dispatcher_, stats_}),
+        test_path_(generateTestPath()) {}
 
   // Generates a unique path for a testcase.
   static std::string generateTestPath() {
@@ -76,6 +78,7 @@ protected:
     outstanding_notifies_ -= 1;
   }
 
+  Stats::TestUtil::TestStore stats_;
   std::unique_ptr<Event::TestTimeSystem> time_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;

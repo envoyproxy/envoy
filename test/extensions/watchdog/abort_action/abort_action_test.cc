@@ -11,6 +11,7 @@
 #include "extensions/watchdog/abort_action/abort_action.h"
 #include "extensions/watchdog/abort_action/config.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
@@ -28,8 +29,9 @@ class AbortActionTest : public testing::Test {
 protected:
   AbortActionTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test")),
-        context_({*api_, *dispatcher_}) {}
+        context_({*api_, *dispatcher_, stats_}) {}
 
+  Stats::TestUtil::TestStore stats_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Server::Configuration::GuardDogActionFactoryContext context_;

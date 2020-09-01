@@ -61,7 +61,7 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
 
         // We should be able to share the dispatcher since guard dog's lifetime
         // should eclipse those of actions.
-        Configuration::GuardDogActionFactoryContext context = {api, *dispatcher_};
+        Configuration::GuardDogActionFactoryContext context = {api, *dispatcher_, stats_scope};
 
         const auto& actions = config.actions();
         for (const auto& action : actions) {

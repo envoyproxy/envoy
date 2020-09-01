@@ -4,6 +4,7 @@
 
 #include "extensions/watchdog/abort_action/config.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -40,9 +41,10 @@ TEST(AbortActionFactoryTest, CanCreateAction) {
       )EOF",
       config);
 
+  Stats::TestUtil::TestStore stats_;
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
-  Server::Configuration::GuardDogActionFactoryContext context{*api, dispatcher};
+  Server::Configuration::GuardDogActionFactoryContext context{*api, dispatcher, stats_};
 
   EXPECT_NE(factory->createGuardDogActionFromProto(config, context), nullptr);
 }
