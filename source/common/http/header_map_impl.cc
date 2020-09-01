@@ -179,11 +179,21 @@ template <> bool HeaderMapImpl::HeaderList::isPseudoHeader(const LowerCaseString
   return key.get().c_str()[0] == ':';
 }
 
+namespace {
+
+// Loading the threshold for lazy map once to avoid changing it while an
+// header-map object is active, and to avoid costly calls to Runtime::getInteger.
+uint32_t lazyMapMinSize() {
+  CONSTRUCT_ON_FIRST_USE(
+      uint32_t, static_cast<uint32_t>(Runtime::getInteger("envoy.http.headermap.lazy_map_min_size",
+                                                          std::numeric_limits<uint32_t>::max())));
+}
+
+} // namespace
+
 bool HeaderMapImpl::HeaderList::maybeMakeMap() {
   if (lazy_map_.empty()) {
-    if (headers_.size() <
-        static_cast<uint32_t>(Runtime::getInteger("envoy.http.headermap.lazy_map_min_size",
-                                                  std::numeric_limits<uint32_t>::max()))) {
+    if (headers_.size() < lazyMapMinSize()) {
       return false;
     }
     // Add all entries from the list into the map.
