@@ -10,6 +10,7 @@
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"
 #include "common/common/empty_string.h"
+#include "common/runtime/runtime_features.h"
 #include "common/singleton/const_singleton.h"
 
 #include "absl/strings/match.h"
@@ -180,11 +181,11 @@ template <> bool HeaderMapImpl::HeaderList::isPseudoHeader(const LowerCaseString
 
 bool HeaderMapImpl::HeaderList::maybeMakeMap() {
   if (lazy_map_.empty()) {
-#if HEADER_MAP_SIZE_THRESHOLD != 0
-    if (headers_.size() < HEADER_MAP_SIZE_THRESHOLD) {
+    if (headers_.size() <
+        static_cast<uint32_t>(Runtime::getInteger("envoy.http.headermap.lazy_map_min_size",
+                                                  std::numeric_limits<uint32_t>::max()))) {
       return false;
     }
-#endif
     // Add all entries from the list into the map.
     for (auto node = headers_.begin(); node != headers_.end(); ++node) {
 #ifdef HEADERMAP_TYPE_MULTIMAP

@@ -16,8 +16,8 @@
 #ifndef HEADER_MAP_SIZE_THRESHOLD
 #define HEADER_MAP_SIZE_THRESHOLD 0
 #endif // !HEADER_MAP_SIZE_THRESHOLD
-#define HEADERMAP_TYPE_MULTIMAP
-#define MULTIMAP_ABSL_BTREE
+//#define HEADERMAP_TYPE_MULTIMAP
+//#define MULTIMAP_ABSL_BTREE
 #include "absl/container/btree_map.h"
 
 namespace Envoy {
