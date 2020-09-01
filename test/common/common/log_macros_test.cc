@@ -1,5 +1,4 @@
 #include <functional>
-#include <future>
 #include <iostream>
 #include <string>
 
@@ -10,6 +9,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/logging.h"
 
+#include "absl/synchronization/barrier.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -122,22 +122,17 @@ TEST(Logger, checkLoggerLevel) {
 
 void spamCall(std::function<void()>&& call_to_spam, const uint32_t num_threads) {
   std::vector<std::thread> threads(num_threads);
-  std::promise<void> signal_all_threads_running;
-  std::shared_future<void> future(signal_all_threads_running.get_future());
+  absl::Barrier* barrier = new absl::Barrier(num_threads);
 
-  std::atomic<uint32_t> runcount = 0;
   for (auto& thread : threads) {
-    thread = std::thread([future, &call_to_spam, &runcount] {
-      runcount++;
-      future.wait();
+    thread = std::thread([&call_to_spam, barrier] {
+      // Allow threads to accrue, to maximize concurrency on the call we are testing.
+      if (barrier->Block()) {
+        delete barrier;
+      }
       call_to_spam();
     });
   }
-  // Allow threads to accrue on future.wait() to maximize concurrency on the call
-  // we are testing.
-  while (runcount != num_threads) {
-  }
-  signal_all_threads_running.set_value();
   for (std::thread& thread : threads) {
     thread.join();
   }
@@ -152,7 +147,7 @@ TEST(Logger, SparseLogMacros) {
     void logSomethingBelowLogLevelOnce() { ENVOY_LOG_ONCE(debug, "foo3 '{}'", evaluations()++); }
     void logSomethingThrice() { ENVOY_LOG_FIRST_N(error, 3, "foo4 '{}'", evaluations()++); }
     void logEverySeventh() { ENVOY_LOG_EVERY_NTH(error, 7, "foo5 '{}'", evaluations()++); }
-    void logWithBackoff() { ENVOY_LOG_WITH_BACKOFF(error, "foo6 '{}'", evaluations()++); }
+    void logEveryPow2() { ENVOY_LOG_EVERY_POW_2(error, "foo6 '{}'", evaluations()++); }
     std::atomic<int32_t>& evaluations() { MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<int32_t>); };
   };
   constexpr uint32_t kNumThreads = 100;
@@ -181,11 +176,11 @@ TEST(Logger, SparseLogMacros) {
   // (100 threads / log every 7th) + 1s = 15 more evaluations upon logging very 7th.
   EXPECT_EQ(20, helper.evaluations());
 
-  helper.logWithBackoff();
+  helper.logEveryPow2();
   // First call ought to propagate.
   EXPECT_EQ(21, helper.evaluations());
 
-  spamCall([&helper]() { helper.logWithBackoff(); }, kNumThreads);
+  spamCall([&helper]() { helper.logEveryPow2(); }, kNumThreads);
   // 64 is the highest power of two that fits when kNumThreads == 100.
   // We should log on 2, 4, 8, 16, 32, 64, which means we can expect to add 6 more evaluations.
   EXPECT_EQ(27, helper.evaluations());

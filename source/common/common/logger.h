@@ -422,7 +422,7 @@ protected:
     }                                                                                              \
   } while (0)
 
-#define ENVOY_LOG_WITH_BACKOFF(LEVEL, ...)                                                         \
+#define ENVOY_LOG_EVERY_POW_2(LEVEL, ...)                                                          \
   do {                                                                                             \
     static auto* count = new std::atomic<uint64_t>();                                              \
     if (std::bitset<64>(1 + count->fetch_add(1)).count() == 1) {                                   \
