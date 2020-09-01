@@ -147,12 +147,14 @@ void SubsetLoadBalancer::rebuildSingle() {
   // This stat isn't added to `ClusterStats` because it wouldn't be used
   // for nearly all clusters, and is only set during configuration updates,
   // not in the data path, so performance of looking up the stat isn't critical.
-  Stats::StatNameManagedStorage name_storage("lb_subsets_single_host_per_subset_duplicate",
-                                             scope_.symbolTable());
+  if (single_duplicate_stat_ == nullptr) {
+    Stats::StatNameManagedStorage name_storage("lb_subsets_single_host_per_subset_duplicate",
+                                               scope_.symbolTable());
 
-  Stats::Utility::gaugeFromElements(scope_, {name_storage.statName()},
-                                    Stats::Gauge::ImportMode::Accumulate)
-      .set(collision_count);
+    single_duplicate_stat_ = &Stats::Utility::gaugeFromElements(
+        scope_, {name_storage.statName()}, Stats::Gauge::ImportMode::Accumulate);
+  }
+  single_duplicate_stat_->set(collision_count);
 }
 
 // When in `single_host_per_subset` mode, select a host based on the provided match_criteria.

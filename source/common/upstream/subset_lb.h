@@ -262,6 +262,7 @@ private:
 
   std::string single_key_;
   absl::flat_hash_map<HashedValue, HostConstSharedPtr> single_host_per_subset_map_;
+  Stats::Gauge* single_duplicate_stat_{};
 
   const bool locality_weight_aware_;
   const bool scale_locality_weight_;
