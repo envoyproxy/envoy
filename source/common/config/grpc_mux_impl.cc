@@ -132,7 +132,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
 
     if (old_type_url && api_state_.count(*old_type_url)) {
       type_url = *old_type_url;
-    } else {
+    }
+    if (api_state_.count(type_url) == 0) {
       // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
       // protocol violation
       ENVOY_LOG(warn, "Ignoring the message for type URL {} as it has no current subscribers.",

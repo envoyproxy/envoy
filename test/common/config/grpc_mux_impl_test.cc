@@ -759,6 +759,7 @@ TEST_F(GrpcMuxImplTest, WatchV2ResourceV3) {
                   resources[0].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
         }));
+    // Send request with v2 type url resources.
     expectSendMessage(v2_type_url, {"y", "z", "x"}, "1");
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
