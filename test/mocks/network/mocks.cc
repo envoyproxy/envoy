@@ -93,8 +93,8 @@ MockFilter::MockFilter() {
 
 MockFilter::~MockFilter() = default;
 
-MockListenerCallbacks::MockListenerCallbacks() = default;
-MockListenerCallbacks::~MockListenerCallbacks() = default;
+MockTcpListenerCallbacks::MockTcpListenerCallbacks() = default;
+MockTcpListenerCallbacks::~MockTcpListenerCallbacks() = default;
 
 MockUdpListenerCallbacks::MockUdpListenerCallbacks() = default;
 MockUdpListenerCallbacks::~MockUdpListenerCallbacks() = default;

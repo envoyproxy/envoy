@@ -60,7 +60,7 @@ public:
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::ListenerCallbacks& cb, bool bind_to_port,
+                                      Network::TcpListenerCallbacks& cb, bool bind_to_port,
                                       uint32_t backlog_size) override;
   Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
                                             Network::UdpListenerCallbacks& cb) override;
