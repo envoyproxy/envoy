@@ -86,6 +86,11 @@ private:
   // onHeaders for Range Responses, otherwise initialized by encodeCachedResponse.
   std::vector<AdjustedByteRange> remaining_ranges_;
 
+  // TODO(#12901): The allowlist could be constructed only once directly from the config, instead of
+  // doing it per-request.
+  // Stores the headers that can be used to vary responses.
+  absl::flat_hash_set<std::string> allowed_vary_headers_;
+
   // True if the response has trailers.
   // TODO(toddmgreer): cache trailers.
   bool response_has_trailers_ = false;

@@ -3,6 +3,11 @@
 #include "envoy/common/time.h"
 #include "envoy/http/header_map.h"
 
+#include "common/http/header_map_impl.h"
+#include "common/http/header_utility.h"
+#include "common/http/headers.h"
+
+#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 
@@ -98,6 +103,33 @@ public:
    */
   static absl::optional<uint64_t> readAndRemoveLeadingDigits(absl::string_view& str);
 };
+
+class VaryHeader {
+public:
+  // Checks if the headers contain an allowed value in the Vary header.
+  static bool isAllowed(const absl::flat_hash_set<std::string>& allowed_headers,
+                        const Http::ResponseHeaderMap& headers);
+
+  // Checks if the headers contain a non-empty value in the Vary header.
+  static bool hasVary(const Http::ResponseHeaderMap& headers);
+
+  // Creates a single string combining the values of the varied headers from entry_headers.
+  static std::string createVaryKey(const Http::HeaderEntry* vary_header,
+                                   const Http::RequestHeaderMap& entry_headers);
+
+  // Parses the header names that are in the Vary header value.
+  static std::vector<std::string> parseHeaderValue(const Http::HeaderEntry* vary_header);
+
+  // Returns a header map containing the subset of the original headers that can be varied from the
+  // request.
+  static Http::RequestHeaderMapPtr
+  possibleVariedHeaders(const absl::flat_hash_set<std::string>& allowed_headers,
+                        const Http::RequestHeaderMap& request_headers);
+
+  // Parses the allowlist of header values that can be used to create varied responses.
+  static absl::flat_hash_set<std::string> parseAllowlist();
+};
+
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions
