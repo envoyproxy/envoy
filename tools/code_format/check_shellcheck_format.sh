@@ -19,7 +19,8 @@ run_shellcheck_on () {
     local file
     file="$1"
     echo "Shellcheck: ${file}"
-    shellcheck -f diff -x "$file"
+    # TODO: add -f diff when shellcheck version allows (ubuntu > bionic)
+    shellcheck -x "$file"
 }
 
 run_shellchecks () {
