@@ -139,8 +139,6 @@ bool ActiveStreamFilterBase::commonHandleAfterHeadersCallback(FilterHeadersStatu
   case FilterHeadersStatus::Continue:
     headers_continued_ = true;
     break;
-  default:
-    ASSERT(false, "Unrecognized FilterHeadersStatus");
   }
 
   handleMetadataAfterHeadersCallback();
