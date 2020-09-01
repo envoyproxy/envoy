@@ -629,7 +629,7 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedHeaderTest) {
     server_uri:
       uri: "ext_authz:9000"
       cluster: "ext_authz"
-      timeout: 0.25s
+      timeout: 300s
   )EOF";
     TestUtility::loadFromYaml(ext_authz_config, proto_config);
 
