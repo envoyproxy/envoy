@@ -1,10 +1,19 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 
+#include "common/network/socket_impl.h"
+#include "common/network/socket_option_impl.h"
+
 #include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
-#include "test/mocks/network/io_handle.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/api/mocks.h"
+#include "test/mocks/network/socket.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster_update_callbacks.h"
+#include "test/mocks/upstream/cluster_update_callbacks_handle.h"
+#include "test/mocks/upstream/host.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -27,7 +36,7 @@ class TestUdpProxyFilter : public UdpProxyFilter {
 public:
   using UdpProxyFilter::UdpProxyFilter;
 
-  MOCK_METHOD(Network::IoHandlePtr, createIoHandle, (const Upstream::HostConstSharedPtr& host));
+  MOCK_METHOD(Network::SocketPtr, createSocket, (const Upstream::HostConstSharedPtr& host));
 };
 
 Api::IoCallUint64Result makeNoError(uint64_t rc) {
@@ -47,19 +56,43 @@ public:
     TestSession(UdpProxyFilterTest& parent,
                 const Network::Address::InstanceConstSharedPtr& upstream_address)
         : parent_(parent), upstream_address_(upstream_address),
-          io_handle_(new Network::MockIoHandle()) {}
+          socket_(new NiceMock<Network::MockSocket>()) {
+      ON_CALL(*socket_, ipVersion()).WillByDefault(Return(upstream_address_->ip()->version()));
+    }
 
-    void expectUpstreamWrite(const std::string& data, int sys_errno = 0) {
+    void expectSetIpTransparentSocketOption() {
+      EXPECT_CALL(*socket_->io_handle_, setOption(_, _, _, _))
+          .WillRepeatedly(Invoke([this](int level, int optname, const void* optval,
+                                        socklen_t) -> Api::SysCallIntResult {
+            sock_opts_[level][optname] = *reinterpret_cast<const int*>(optval);
+            return Api::SysCallIntResult{0, 0};
+          }));
+    }
+
+    void expectWriteToUpstream(const std::string& data, int sys_errno = 0,
+                               const Network::Address::Ip* local_ip = nullptr) {
       EXPECT_CALL(*idle_timer_, enableTimer(parent_.config_->sessionTimeout(), nullptr));
-      EXPECT_CALL(*io_handle_, sendmsg(_, 1, 0, nullptr, _))
+      EXPECT_CALL(*socket_->io_handle_, sendmsg(_, 1, 0, _, _))
           .WillOnce(Invoke(
-              [this, data, sys_errno](
-                  const Buffer::RawSlice* slices, uint64_t, int, const Network::Address::Ip*,
+              [this, data, local_ip, sys_errno](
+                  const Buffer::RawSlice* slices, uint64_t, int,
+                  const Network::Address::Ip* self_ip,
                   const Network::Address::Instance& peer_address) -> Api::IoCallUint64Result {
                 EXPECT_EQ(data, absl::string_view(static_cast<const char*>(slices[0].mem_),
                                                   slices[0].len_));
                 EXPECT_EQ(peer_address, *upstream_address_);
-                return sys_errno == 0 ? makeNoError(data.size()) : makeError(sys_errno);
+                if (local_ip == nullptr) {
+                  EXPECT_EQ(nullptr, self_ip);
+                } else {
+                  EXPECT_EQ(self_ip->addressAsString(), local_ip->addressAsString());
+                }
+                // For suppression of clang-tidy NewDeleteLeaks rule, don't use the ternary
+                // operator.
+                if (sys_errno == 0) {
+                  return makeNoError(data.size());
+                } else {
+                  return makeError(sys_errno);
+                }
               }));
     }
 
@@ -67,10 +100,10 @@ public:
                               int send_sys_errno = 0) {
       EXPECT_CALL(*idle_timer_, enableTimer(parent_.config_->sessionTimeout(), nullptr));
 
-      EXPECT_CALL(*io_handle_, supportsUdpGro());
-      EXPECT_CALL(*io_handle_, supportsMmsg());
+      EXPECT_CALL(*socket_->io_handle_, supportsUdpGro());
+      EXPECT_CALL(*socket_->io_handle_, supportsMmsg());
       // Return the datagram.
-      EXPECT_CALL(*io_handle_, recvmsg(_, 1, _, _))
+      EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _))
           .WillOnce(
               Invoke([this, data, recv_sys_errno](
                          Buffer::RawSlice* slices, const uint64_t, uint32_t,
@@ -99,9 +132,9 @@ public:
               }
             }));
         // Return an EAGAIN result.
-        EXPECT_CALL(*io_handle_, supportsUdpGro());
-        EXPECT_CALL(*io_handle_, supportsMmsg());
-        EXPECT_CALL(*io_handle_, recvmsg(_, 1, _, _))
+        EXPECT_CALL(*socket_->io_handle_, supportsUdpGro());
+        EXPECT_CALL(*socket_->io_handle_, supportsMmsg());
+        EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _))
             .WillOnce(Return(ByMove(Api::IoCallUint64Result(
                 0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
                                    Network::IoSocketError::deleteIoError)))));
@@ -114,13 +147,20 @@ public:
     UdpProxyFilterTest& parent_;
     const Network::Address::InstanceConstSharedPtr upstream_address_;
     Event::MockTimer* idle_timer_{};
-    Network::MockIoHandle* io_handle_;
+    NiceMock<Network::MockSocket>* socket_;
+    std::map<int, std::map<int, int>> sock_opts_;
     Event::FileReadyCb file_event_cb_;
   };
 
   UdpProxyFilterTest()
-      : upstream_address_(Network::Utility::parseInternetAddressAndPort("20.0.0.1:443")) {
+      : UdpProxyFilterTest(Network::Utility::parseInternetAddressAndPort(peer_ip_address_)) {}
+
+  explicit UdpProxyFilterTest(Network::Address::InstanceConstSharedPtr&& peer_address)
+      : os_calls_(&os_sys_calls_),
+        upstream_address_(Network::Utility::parseInternetAddressAndPort(upstream_ip_address_)),
+        peer_address_(std::move(peer_address)) {
     // Disable strict mock warnings.
+    ON_CALL(os_sys_calls_, supportsIpTransparent()).WillByDefault(Return(true));
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
     EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, address())
         .WillRepeatedly(Return(upstream_address_));
@@ -160,11 +200,10 @@ public:
     test_sessions_.emplace_back(*this, address);
     TestSession& new_session = test_sessions_.back();
     new_session.idle_timer_ = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
-    EXPECT_CALL(*filter_, createIoHandle(_))
-        .WillOnce(Return(ByMove(Network::IoHandlePtr{test_sessions_.back().io_handle_})));
-    EXPECT_CALL(*new_session.io_handle_, fd());
+    EXPECT_CALL(*filter_, createSocket(_))
+        .WillOnce(Return(ByMove(Network::SocketPtr{test_sessions_.back().socket_})));
     EXPECT_CALL(
-        callbacks_.udp_listener_.dispatcher_,
+        *new_session.socket_->io_handle_,
         createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
         .WillOnce(DoAll(SaveArg<1>(&new_session.file_event_cb_), Return(nullptr)));
     // Internal Buffer is Empty, flush will be a no-op
@@ -181,6 +220,50 @@ public:
     EXPECT_EQ(tx_datagrams, config_->stats().downstream_sess_tx_datagrams_.value());
   }
 
+  void checkSocketOptions(TestSession& session, const Network::SocketOptionName& ipv4_option,
+                          int ipv4_expect, const Network::SocketOptionName& ipv6_option,
+                          int ipv6_expect) {
+    EXPECT_EQ(ipv4_expect, session.sock_opts_[ipv4_option.level()][ipv4_option.option()]);
+    EXPECT_EQ(ipv6_expect, session.sock_opts_[ipv6_option.level()][ipv6_option.option()]);
+  }
+
+  void
+  ensureIpTransparentSocketOptions(const Network::Address::InstanceConstSharedPtr& upstream_address,
+                                   const std::string& local_address, int ipv4_expect,
+                                   int ipv6_expect) {
+    setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+use_original_src_ip: true
+    )EOF");
+
+    expectSessionCreate(upstream_address);
+    test_sessions_[0].expectSetIpTransparentSocketOption();
+    test_sessions_[0].expectWriteToUpstream("hello", 0, peer_address_->ip());
+    recvDataFromDownstream(peer_address_->asString(), local_address, "hello");
+
+    checkSocketOptions(test_sessions_[0], ENVOY_SOCKET_IP_TRANSPARENT, ipv4_expect,
+                       ENVOY_SOCKET_IPV6_TRANSPARENT, ipv6_expect);
+    EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+    EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+    checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
+
+    test_sessions_[0].recvDataFromUpstream("world");
+    checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+  }
+
+  bool isTransparentSocketOptionsSupported() {
+    for (const auto& option_name : transparent_options_) {
+      if (!option_name.hasValue()) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  Api::MockOsSysCalls os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_;
   Upstream::MockClusterManager cluster_manager_;
   NiceMock<MockTimeSystem> time_system_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -190,6 +273,52 @@ public:
   std::unique_ptr<TestUdpProxyFilter> filter_;
   std::vector<TestSession> test_sessions_;
   const Network::Address::InstanceConstSharedPtr upstream_address_;
+  const Network::Address::InstanceConstSharedPtr peer_address_;
+  const std::vector<Network::SocketOptionName> transparent_options_{ENVOY_SOCKET_IP_TRANSPARENT,
+                                                                    ENVOY_SOCKET_IPV6_TRANSPARENT};
+  inline static const std::string upstream_ip_address_ = "20.0.0.1:443";
+  inline static const std::string peer_ip_address_ = "10.0.0.1:1000";
+};
+
+class UdpProxyFilterIpv6Test : public UdpProxyFilterTest {
+public:
+  UdpProxyFilterIpv6Test()
+      : UdpProxyFilterIpv6Test(
+            Network::Utility::parseInternetAddressAndPort(upstream_ipv6_address_)) {}
+
+  explicit UdpProxyFilterIpv6Test(Network::Address::InstanceConstSharedPtr&& upstream_address_v6)
+      : UdpProxyFilterTest(Network::Utility::parseInternetAddressAndPort(peer_ipv6_address_)),
+        upstream_address_v6_(std::move(upstream_address_v6)) {
+    EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, address())
+        .WillRepeatedly(Return(upstream_address_v6_));
+  }
+
+  const Network::Address::InstanceConstSharedPtr upstream_address_v6_;
+  inline static const std::string upstream_ipv6_address_ = "[2001:db8:85a3::8a2e:370:7334]:443";
+  inline static const std::string peer_ipv6_address_ = "[2001:db8:85a3::9a2e:370:7334]:1000";
+};
+
+class UdpProxyFilterIpv4Ipv6Test : public UdpProxyFilterIpv6Test {
+public:
+  UdpProxyFilterIpv4Ipv6Test()
+      : UdpProxyFilterIpv6Test(Network::Utility::parseInternetAddressAndPort(
+            UdpProxyFilterIpv6Test::upstream_ipv6_address_, false)) {}
+
+  void ensureNoIpTransparentSocketOptions() {
+    expectSessionCreate(upstream_address_v6_);
+    test_sessions_[0].expectWriteToUpstream("hello");
+    recvDataFromDownstream("[2001:db8:85a3::9a2e:370:7334]:1000",
+                           "[2001:db8:85a3::9a2e:370:7335]:80", "hello");
+
+    checkSocketOptions(test_sessions_[0], ENVOY_SOCKET_IP_TRANSPARENT, 0,
+                       ENVOY_SOCKET_IPV6_TRANSPARENT, 0);
+    EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+    EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+    checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
+
+    test_sessions_[0].recvDataFromUpstream("world");
+    checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+  }
 };
 
 // Basic UDP proxy flow with a single session.
@@ -202,7 +331,7 @@ cluster: fake_cluster
   )EOF");
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -210,8 +339,8 @@ cluster: fake_cluster
   test_sessions_[0].recvDataFromUpstream("world");
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
 
-  test_sessions_[0].expectUpstreamWrite("hello2");
-  test_sessions_[0].expectUpstreamWrite("hello3");
+  test_sessions_[0].expectWriteToUpstream("hello2");
+  test_sessions_[0].expectWriteToUpstream("hello3");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
   checkTransferStats(11 /*rx_bytes*/, 2 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello3");
@@ -233,7 +362,7 @@ cluster: fake_cluster
   )EOF");
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -243,7 +372,7 @@ cluster: fake_cluster
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectUpstreamWrite("hello");
+  test_sessions_[1].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -262,7 +391,7 @@ cluster: fake_cluster
   EXPECT_EQ(1, config_->stats().downstream_sess_rx_errors_.value());
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
   EXPECT_EQ(5, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
@@ -283,7 +412,7 @@ cluster: fake_cluster
                    "udp.sess_rx_errors")
                    ->value());
 
-  test_sessions_[0].expectUpstreamWrite("hello", SOCKET_ERROR_MSG_SIZE);
+  test_sessions_[0].expectWriteToUpstream("hello", SOCKET_ERROR_MSG_SIZE);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   checkTransferStats(10 /*rx_bytes*/, 2 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
   EXPECT_EQ(5, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
@@ -350,7 +479,7 @@ cluster: fake_cluster
   // Now add the cluster we care about.
   cluster_update_callbacks_->onClusterAddOrUpdate(cluster_manager_.thread_local_cluster_);
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -377,7 +506,7 @@ cluster: fake_cluster
   cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(1, 0, 0, 0, 0);
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -395,7 +524,7 @@ cluster: fake_cluster
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectUpstreamWrite("hello");
+  test_sessions_[1].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.2:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -411,7 +540,7 @@ cluster: fake_cluster
   )EOF");
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -422,7 +551,7 @@ cluster: fake_cluster
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectUpstreamWrite("hello");
+  test_sessions_[1].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -439,14 +568,14 @@ cluster: fake_cluster
   )EOF");
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 
   EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, health())
       .WillRepeatedly(Return(Upstream::Host::Health::Unhealthy));
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
 }
 
@@ -461,7 +590,7 @@ cluster: fake_cluster
   )EOF");
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectUpstreamWrite("hello");
+  test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -474,10 +603,90 @@ cluster: fake_cluster
   ON_CALL(*new_host, health()).WillByDefault(Return(Upstream::Host::Health::Healthy));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(new_host));
   expectSessionCreate(new_host_address);
-  test_sessions_[1].expectUpstreamWrite("hello");
+  test_sessions_[1].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+}
+
+// Make sure socket option is set correctly if use_original_src_ip is set.
+TEST_F(UdpProxyFilterTest, SocketOptionForUseOriginalSrcIp) {
+  if (!isTransparentSocketOptionsSupported()) {
+    // The option is not supported on this platform. Just skip the test.
+    GTEST_SKIP();
+  }
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent());
+
+  InSequence s;
+
+  ensureIpTransparentSocketOptions(upstream_address_, "10.0.0.2:80", 1, 0);
+}
+
+// Make sure socket option is set correctly if use_original_src_ip is set in case of ipv6.
+TEST_F(UdpProxyFilterIpv6Test, SocketOptionForUseOriginalSrcIpInCaseOfIpv6) {
+  if (!isTransparentSocketOptionsSupported()) {
+    // The option is not supported on this platform. Just skip the test.
+    GTEST_SKIP();
+  }
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent());
+
+  InSequence s;
+
+  ensureIpTransparentSocketOptions(upstream_address_v6_, "[2001:db8:85a3::9a2e:370:7335]:80", 0, 1);
+}
+
+// Make sure socket options should not be set if use_original_src_ip is not set.
+TEST_F(UdpProxyFilterIpv4Ipv6Test, NoSocketOptionIfUseOriginalSrcIpIsNotSet) {
+  if (!isTransparentSocketOptionsSupported()) {
+    // The option is not supported on this platform. Just skip the test.
+    GTEST_SKIP();
+  }
+
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+use_original_src_ip: false
+  )EOF");
+
+  ensureNoIpTransparentSocketOptions();
+}
+
+// Make sure socket options should not be set if use_original_src_ip is not mentioned.
+TEST_F(UdpProxyFilterIpv4Ipv6Test, NoSocketOptionIfUseOriginalSrcIpIsNotMentioned) {
+  if (!isTransparentSocketOptionsSupported()) {
+    // The option is not supported on this platform. Just skip the test.
+    GTEST_SKIP();
+  }
+
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+  )EOF");
+
+  ensureNoIpTransparentSocketOptions();
+}
+
+// Make sure exit when use the use_original_src_ip but platform does not support ip
+// transparent option.
+TEST_F(UdpProxyFilterTest, ExitIpTransparentNoPlatformSupport) {
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent()).WillOnce(Return(false));
+
+  InSequence s;
+
+  auto config = R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+use_original_src_ip: true
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      setup(config), EnvoyException,
+      "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy is "
+      "not running with the CAP_NET_ADMIN capability.");
 }
 
 } // namespace

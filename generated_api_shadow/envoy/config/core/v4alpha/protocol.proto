@@ -100,7 +100,7 @@ message HttpProtocolOptions {
   HeadersWithUnderscoresAction headers_with_underscores_action = 5;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Http1ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.Http1ProtocolOptions";
@@ -157,6 +157,16 @@ message Http1ProtocolOptions {
   //   - Not a response to a HEAD request.
   //   - The content length header is not present.
   bool enable_trailers = 5;
+
+  // Allows Envoy to process requests/responses with both `Content-Length` and `Transfer-Encoding`
+  // headers set. By default such messages are rejected, but if option is enabled - Envoy will
+  // remove Content-Length header and process message.
+  // See `RFC7230, sec. 3.3.3 <https://tools.ietf.org/html/rfc7230#section-3.3.3>` for details.
+  //
+  // .. attention::
+  //   Enabling this option might lead to request smuggling vulnerability, especially if traffic
+  //   is proxied via multiple layers of proxies.
+  bool allow_chunked_length = 6;
 }
 
 // [#next-free-field: 15]

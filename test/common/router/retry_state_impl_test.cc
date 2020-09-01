@@ -8,11 +8,13 @@
 #include "common/router/retry_state_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 
+#include "test/mocks/common.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -1008,7 +1010,7 @@ TEST_F(RouterRetryStateImplTest, RateLimitedRetryBackoffStrategy) {
   reset_header->set_name("Retry-After");
   reset_header->set_format(envoy::config::route::v3::RetryPolicy::SECONDS);
 
-  policy_.num_retries_ = 3;
+  policy_.num_retries_ = 4;
   policy_.reset_headers_ = ResetHeaderParserImpl::buildResetHeaderParserVector(reset_headers);
 
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
@@ -1021,6 +1023,8 @@ TEST_F(RouterRetryStateImplTest, RateLimitedRetryBackoffStrategy) {
   Http::TestResponseHeaderMapImpl response_headers_plain{{":status", "500"}};
   Http::TestResponseHeaderMapImpl response_headers_reset_2{{":status", "500"},
                                                            {"retry-after", "5"}};
+  Http::TestResponseHeaderMapImpl response_headers_reset_invalid{{":status", "500"},
+                                                                 {"retry-after", "0"}};
 
   // reset header present -> ratelimit backoff used
   EXPECT_CALL(random_, random()).WillOnce(Return(190));
@@ -1043,11 +1047,19 @@ TEST_F(RouterRetryStateImplTest, RateLimitedRetryBackoffStrategy) {
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
+  // reset header present but invalid -> exponential backoff used
+  EXPECT_CALL(random_, random()).WillOnce(Return(190));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(40), _));
+  EXPECT_EQ(RetryStatus::Yes,
+            state_->shouldRetryHeaders(response_headers_reset_invalid, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->invokeCallback();
+
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
             state_->shouldRetryHeaders(response_headers_reset_2, callback_));
 
   EXPECT_EQ(2UL, cluster_.stats().upstream_rq_retry_backoff_ratelimited_.value());
-  EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_backoff_exponential_.value());
+  EXPECT_EQ(2UL, cluster_.stats().upstream_rq_retry_backoff_exponential_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, HostSelectionAttempts) {

@@ -26,7 +26,9 @@ CAS
 CB
 CDS
 CEL
+DSR
 LTT
+TIDs
 ceil
 CHACHA
 CHLO
@@ -213,6 +215,7 @@ NS
 NUL
 Nilsson
 Nonhashable
+Oauth
 OCSP
 OK
 OOM
@@ -353,6 +356,7 @@ WRR
 WS
 WSA
 WSABUF
+WSAEINVAL
 WSS
 Welford's
 Wi
@@ -625,6 +629,7 @@ func
 functor
 functors
 gRPC
+gateway
 gcov
 genrule
 getaddrinfo
@@ -816,6 +821,7 @@ nullopt
 nullptr
 num
 numkeys
+oauth
 observability
 ocagent
 offsetof
@@ -930,6 +936,7 @@ realloc
 rebalanced
 rebalancing
 rebuffer
+rebuilder
 reconnection
 recurse
 recv
@@ -960,6 +967,7 @@ repeatability
 reperform
 repicked
 repo
+reproducibility
 requirepass
 reselecting
 reserialize

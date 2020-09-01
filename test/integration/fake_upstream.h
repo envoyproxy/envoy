@@ -7,14 +7,11 @@
 
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/filter.h"
-#include "envoy/server/configuration.h"
-#include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -26,7 +23,6 @@
 #include "common/common/thread.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
-#include "common/http/exception.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/network/connection_balancer_impl.h"
@@ -37,7 +33,6 @@
 
 #include "server/active_raw_udp_listener_config.h"
 
-#include "test/test_common/printers.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -108,7 +103,7 @@ public:
     Http::Utility::sendLocalReply(
         false,
         Http::Utility::EncodeFunctions(
-            {nullptr,
+            {nullptr, nullptr,
              [&](Http::ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
                encoder_.encodeHeaders(*headers, end_stream);
              },
@@ -444,7 +439,8 @@ public:
 
   // Http::ServerConnectionCallbacks
   Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder, bool) override;
-  void onGoAway(Http::GoAwayErrorCode) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  // Should only be called for HTTP2
+  void onGoAway(Http::GoAwayErrorCode code) override;
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
@@ -473,6 +469,7 @@ private:
     FakeHttpConnection& parent_;
   };
 
+  const Type type_;
   Http::ServerConnectionPtr codec_;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);
 };

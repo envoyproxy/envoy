@@ -28,7 +28,7 @@ docker run --rm ${ENVOY_DOCKER_OPTIONS} -e HTTP_PROXY=${http_proxy} -e HTTPS_PRO
   -e BAZEL_BUILD_EXTRA_OPTIONS -e BAZEL_EXTRA_TEST_OPTIONS -e BAZEL_REMOTE_CACHE -e ENVOY_STDLIB -e BUILD_REASON \
   -e BAZEL_REMOTE_INSTANCE -e GCP_SERVICE_ACCOUNT_KEY -e NUM_CPUS -e ENVOY_RBE -e FUZZIT_API_KEY -e ENVOY_BUILD_IMAGE \
   -e ENVOY_SRCDIR -e ENVOY_BUILD_TARGET -e SYSTEM_PULLREQUEST_TARGETBRANCH -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \
-  -e GCS_ARTIFACT_BUCKET -e BUILD_SOURCEBRANCHNAME -e BAZELISK_BASE_URL -e ENVOY_BUILD_ARCH \
-  -v "$PWD":/source --cap-add SYS_PTRACE --cap-add NET_RAW --cap-add NET_ADMIN "${ENVOY_BUILD_IMAGE}" \
+  -e GCS_ARTIFACT_BUCKET -e BUILD_SOURCEBRANCHNAME -e BAZELISK_BASE_URL -e ENVOY_BUILD_ARCH -e SLACK_TOKEN -e BUILD_URI\
+  -e REPO_URI -v "$PWD":/source --cap-add SYS_PTRACE --cap-add NET_RAW --cap-add NET_ADMIN "${ENVOY_BUILD_IMAGE}" \
   /bin/bash -lc "groupadd --gid $(id -g) -f envoygroup && useradd -o --uid $(id -u) --gid $(id -g) --no-create-home \
   --home-dir /build envoybuild && usermod -a -G pcap envoybuild && sudo -EHs -u envoybuild bash -c \"cd /source && $*\""

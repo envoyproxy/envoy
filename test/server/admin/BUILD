@@ -116,6 +116,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "clusters_handler_test",
+    srcs = ["clusters_handler_test.cc"],
+    deps = [
+        ":admin_instance_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "config_tracker_impl_test",
     srcs = ["config_tracker_impl_test.cc"],
     deps = [

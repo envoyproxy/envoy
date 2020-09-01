@@ -39,10 +39,13 @@ fi
 
 # Required as bazel and a foreign bazelisk are installed in the latest macos vm image, we have
 # to unlink/overwrite them to install bazelisk
-echo "Installing bazelbuild/tap/bazelisk"
-brew tap bazelbuild/tap
-brew reinstall --force bazelbuild/tap/bazelisk
-if ! brew link --overwrite bazelbuild/tap/bazelisk; then
-    echo "Failed to install and link bazelbuild/tap/bazelisk"
+echo "Installing bazelisk"
+brew reinstall --force bazelisk
+if ! brew link --overwrite bazelisk; then
+    echo "Failed to install and link bazelisk"
     exit 1
 fi
+
+bazel version
+
+pip3 install slackclient
