@@ -405,9 +405,9 @@ message Cluster {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.cluster.v3.Cluster.MaglevLbConfig";
 
-    // The table size for Maglev hashing. In fact, Maglev aims for ‘minimal disruption’ rather than an absolute guarantee.
-    // The minimal disruption means when the set of upstreams changes, a connection will likely be sent to the same
-    // upstream as it was before. So, The larger table size reduces disruption of hashing.
+    // The table size for Maglev hashing. The Maglev aims for ‘minimal disruption’ rather than an absolute guarantee.
+    // Minimal disruption means that when the set of upstreams changes, a connection will likely be sent to the same
+    // upstream as it was before. Increasing the table size reduces the amount of disruption.
     // The table size must be prime number. If it is not specified, the default is 65537.
     google.protobuf.UInt64Value table_size = 1;
   }
