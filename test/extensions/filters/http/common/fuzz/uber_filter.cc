@@ -48,6 +48,8 @@ UberFilterFuzzer::UberFilterFuzzer() : async_request_{&cluster_manager_.async_cl
             enabled_ = false;
             decoder_callbacks_.sendLocalReply_(code, body, modify_headers, grpc_status, details);
           }));
+  ON_CALL(encoder_callbacks_, addEncodedTrailers())
+      .WillByDefault(testing::ReturnRef(encoded_trailers_));
   // Set expectations for particular filters that may get fuzzed.
   perFilterSetup();
 }
@@ -234,6 +236,7 @@ void UberFilterFuzzer::reset() {
   response_headers_.clear();
   request_trailers_.clear();
   response_trailers_.clear();
+  encoded_trailers_.clear();
 }
 
 } // namespace HttpFilters
