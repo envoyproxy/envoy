@@ -1,6 +1,6 @@
-#include "test/tools/router_check/coverage.h"
-
 #include <algorithm>
+
+#include "test/tools/router_check/coverage.h"
 
 namespace Envoy {
 double RouteCoverage::report() {
