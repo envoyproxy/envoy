@@ -115,7 +115,7 @@ Deprecated
 * hds: the :ref:`endpoints_health <envoy_v3_api_field_service.health.v3.EndpointHealthResponse.endpoints_health>`
   field has been deprecated in favor of :ref:`cluster_endpoints_health <envoy_v3_api_field_service.health.v3.EndpointHealthResponse.cluster_endpoints_health>` to maintain
   grouping by cluster and locality.
-* router: the :ref:`include_vh_rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.include_vh_rate_limits>` has been deprecated in favor of :ref:`vh_rate_limits <envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits>`.
+* router: the :ref:`include_vh_rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.include_vh_rate_limits>` field has been deprecated in favor of :ref:`vh_rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits>`.
 * tap: the :ref:`match_config <envoy_v3_api_field_config.tap.v3.TapConfig.match_config>` field has been deprecated in favor of
   :ref:`match <envoy_v3_api_field_config.tap.v3.TapConfig.match>` field.
 * ext_authz: the :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.OkHttpResponse.dynamic_metadata>` field in :ref:`OkHttpResponse <envoy_v3_api_msg_service.auth.v3.OkHttpResponse>`

@@ -978,7 +978,7 @@ message RouteAction {
   // :ref:`rate_limits <envoy_api_field_config.route.v3.VirtualHost.rate_limits>` are not applied to the
   // request.
   //
-  // This field is deprecated. Please use :ref:`vh_rate_limits <envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits>`
+  // This field is deprecated. Please use :ref:`vh_rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits>`
   google.protobuf.BoolValue include_vh_rate_limits = 14 [deprecated = true];
 
   // Specifies a list of hash policies to use for ring hash load balancing. Each
