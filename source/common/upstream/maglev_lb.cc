@@ -105,7 +105,9 @@ MaglevLoadBalancer::MaglevLoadBalancer(
       use_hostname_for_hashing_(
           common_config.has_consistent_hashing_lb_config()
               ? common_config.consistent_hashing_lb_config().use_hostname_for_hashing()
-              : false) {
+              : false),
+      hash_balance_factor_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          common_config.consistent_hashing_lb_config(), hash_balance_factor, 0)) {
   ENVOY_LOG(debug, "maglev table size: {}", table_size_);
   // The table size must be prime number.
   if (!Primes::isPrime(table_size_)) {
