@@ -154,21 +154,21 @@ void ConnectionHandlerImpl::closeSocketsOnListenerUpdate(
 }
 
 void ConnectionHandlerImpl::retryConnections(
-    bool success, const envoy::config::listener::v3::FilterChain* const& filter_chain_message) {
-  if (filter_chain_message == nullptr) {
-    ENVOY_LOG(debug, "filter chain has been cleared.");
-    return;
-  }
+    bool success, const envoy::config::listener::v3::FilterChain& filter_chain_message) {
+  ENVOY_LOG(debug, "receive callback from server, rebuilding finished with success status: {}",
+            success);
   // Go through all listeners on this worker, if a listener has sent request to rebuild the
   // filter chain, now retry connection with those stored sockets.
   for (auto& listener : listeners_) {
     if (listener.second.tcp_listener_.has_value()) {
       auto& active_tcp_listener = listener.second.tcp_listener_->get();
       const auto& listener_name = active_tcp_listener.config_->name();
+      ENVOY_LOG(debug, "listener {} might have pending sockets to retry.", listener_name);
       auto& pending_sockets = active_tcp_listener.pending_sockets_;
       // If this listener has requested rebuilding this filter chain, we retry all stored sockets
       // waiting for this filter chain.
-      auto listener_sockets_map_it = pending_sockets.find(*filter_chain_message);
+      ENVOY_LOG(debug, "size of its pending sockets: {}", pending_sockets.size());
+      auto listener_sockets_map_it = pending_sockets.find(filter_chain_message);
       if (listener_sockets_map_it != pending_sockets.end()) {
         ENVOY_LOG(debug, "found listener: {} that has stored sockets to retry.", listener_name);
         for (auto& [socket, metadata] : listener_sockets_map_it->second) {
@@ -499,7 +499,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
       listener.rebuildFilterChain(
           &filter_chain_message, worker_dispatcher,
           [&handler](bool success, const envoy::config::listener::v3::FilterChain& filter_chain) {
-            handler.retryConnections(success, &filter_chain);
+            handler.retryConnections(success, filter_chain);
           });
     });
     // Temporarily decrease num_listener_connections_, will increase when retry this connection. To

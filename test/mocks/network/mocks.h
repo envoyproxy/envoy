@@ -417,8 +417,7 @@ public:
   MOCK_METHOD(void, closeSocketsOnListenerUpdate,
               (const Network::ListenerConfig&, const Network::ListenerConfig&));
   MOCK_METHOD(void, retryConnections,
-              (bool success,
-               const envoy::config::listener::v3::FilterChain* const& filter_chain_message));
+              (bool success, const envoy::config::listener::v3::FilterChain& filter_chain_message));
 };
 
 class MockIp : public Address::Ip {

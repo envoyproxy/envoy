@@ -300,11 +300,12 @@ TEST_P(ListenerIntegrationTest, BasicSuccess) {
 TEST_P(ListenerIntegrationTest, BasicSuccessWithOnDemandFilterChain) {
   on_server_init_function_ = [&]() {
     createLdsStream();
+    listener_config_2_ = listener_config_;
+    listener_config_2_.set_name(listener_name_2_);
+
     auto* socket_address_ = listener_config_.mutable_address()->mutable_socket_address();
     socket_address_->set_port_value(12345); // Listener 1 will not be used.
 
-    listener_config_2_ = listener_config_;
-    listener_config_2_.set_name(listener_name_2_);
     // Make all filter chains of this listener to be built on-demand.
     for (auto i = 0; i < listener_config_2_.filter_chains().size(); i++) {
       auto* filter_chain = listener_config_2_.mutable_filter_chains(i);

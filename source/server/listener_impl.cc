@@ -264,11 +264,12 @@ PerFilterChainRebuilder::createFilterChainFactoryContext(
 void PerFilterChainRebuilder::callbackWorkers(bool success) {
   // Send callbacks to all stored workers.
   // Possible optimization: send callback to all workers.
+  ENVOY_LOG(debug, "callback to workers with success status: {}", success);
   for (const auto& [worker_dispatcher, callback] : workers_to_callback_) {
     ENVOY_LOG(debug, "rebuilding completed, callback to worker: {}", worker_dispatcher->name());
-    worker_dispatcher->post([this, &success, &retry = callback]() {
+    worker_dispatcher->post([&retry = callback, success, &filter_chain = *(this->filter_chain_)]() {
       if (retry != nullptr) {
-        retry(success, *this->filter_chain_);
+        retry(success, filter_chain);
       }
     });
   }

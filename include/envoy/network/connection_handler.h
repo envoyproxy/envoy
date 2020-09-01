@@ -107,11 +107,12 @@ public:
    * @param success indicates whether the rebuilding has completed successfully. If true, the worker
    * will retry all pending sockets that require the filter chain. Otherwise, it will close all
    * sockets related to this filter chain.
-   * @param filter_chain_message the filter chain of this message has just stopped rebuilding.
+   * @param filter_chain_message the filter chain that pending sockets are waiting for to be
+   * rebuilt.
    */
-  virtual void retryConnections(
-      bool success,
-      const envoy::config::listener::v3::FilterChain* const& filter_chain_message) PURE;
+  virtual void
+  retryConnections(bool success,
+                   const envoy::config::listener::v3::FilterChain& filter_chain_message) PURE;
 
   /**
    * Used by ConnectionHandler to manage listeners.

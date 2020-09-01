@@ -85,9 +85,9 @@ public:
   void closeSocketsOnListenerUpdate(const Network::ListenerConfig& old_config,
                                     const Network::ListenerConfig& new_config) override;
 
-  void retryConnections(
-      bool success,
-      const envoy::config::listener::v3::FilterChain* const& filter_chain_message) override;
+  void
+  retryConnections(bool success,
+                   const envoy::config::listener::v3::FilterChain& filter_chain_message) override;
 
   /**
    * Wrapper for an active listener owned by this handler.

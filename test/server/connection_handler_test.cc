@@ -576,7 +576,7 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingSuccess) {
   // Master thread sends callback to worker to call retryConnections. Then newConnection will be
   // called again. At this time, the same filter chain is found not to be a placeholder. Will call
   // createServerConnection.
-  handler_->retryConnections(true, &on_demand_filter_chain_message_);
+  handler_->retryConnections(true, on_demand_filter_chain_message_);
   EXPECT_EQ(1UL, handler_->numConnections());
 
   connection->close(Network::ConnectionCloseType::NoFlush);
@@ -616,7 +616,7 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingFail) {
 
   // Master thread sends callback to worker to call retryConnections.
   // Since rebuilding fails, the socket will be closed with no new connections created.
-  handler_->retryConnections(false, &on_demand_filter_chain_message_);
+  handler_->retryConnections(false, on_demand_filter_chain_message_);
   EXPECT_EQ(0UL, handler_->numConnections());
 
   EXPECT_CALL(*listener, onDestroy());
@@ -665,7 +665,7 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainMultipleRebuildingRequests) {
   // Master thread sends callback to worker to call retryConnections. Then newConnection will be
   // called again. At this time, the same filter chain is found not to be a placeholder. Will call
   // createServerConnection.
-  handler_->retryConnections(true, &on_demand_filter_chain_message_);
+  handler_->retryConnections(true, on_demand_filter_chain_message_);
   EXPECT_EQ(3UL, handler_->numConnections());
 
   EXPECT_CALL(*listener, onDestroy());
@@ -715,7 +715,7 @@ TEST_F(ConnectionHandlerTest, ListenerUpdateDuringOnDemandFilterChainRebuilding)
   // On listener updated, some stored sockets will be closed when the new listener does not have the
   // filter chain. However, if the new listener include the same filter chain as the old listener,
   // those sockets will not be closed.
-  handler_->retryConnections(true, &on_demand_filter_chain_message_);
+  handler_->retryConnections(true, on_demand_filter_chain_message_);
   EXPECT_EQ(0L, handler_->numConnections());
   EXPECT_CALL(*old_listener, onDestroy());
 }
