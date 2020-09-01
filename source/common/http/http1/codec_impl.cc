@@ -42,6 +42,7 @@ struct Http1ResponseCodeDetailValues {
   const absl::string_view TransferEncodingNotAllowed = "http1.transfer_encoding_not_allowed";
   const absl::string_view ContentLengthNotAllowed = "http1.content_length_not_allowed";
   const absl::string_view InvalidUnderscore = "http1.unexpected_underscore";
+  const absl::string_view ChunkedContentLength = "http1.content_length_and_chunked_not_allowed";
 };
 
 struct Http1HeaderTypesValues {
@@ -471,13 +472,12 @@ http_parser_settings ConnectionImpl::settings_{
 };
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
-                               http_parser_type type, uint32_t max_headers_kb,
-                               const uint32_t max_headers_count,
-                               HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers)
-    : connection_(connection), stats_(stats),
+                               const Http1Settings& settings, http_parser_type type,
+                               uint32_t max_headers_kb, const uint32_t max_headers_count,
+                               HeaderKeyFormatterPtr&& header_key_formatter)
+    : connection_(connection), stats_(stats), codec_settings_(settings),
       header_key_formatter_(std::move(header_key_formatter)), processing_trailers_(false),
       handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
-      enable_trailers_(enable_trailers),
       strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
       dispatching_(false),
@@ -487,6 +487,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
+  parser_.allow_chunked_length = 1;
   parser_.data = this;
 }
 
@@ -632,7 +633,7 @@ Status ConnectionImpl::onHeaderField(const char* data, size_t length) {
   // We previously already finished up the headers, these headers are
   // now trailers.
   if (header_parsing_state_ == HeaderParsingState::Done) {
-    if (!enable_trailers_) {
+    if (!enableTrailers()) {
       // Ignore trailers.
       return okStatus();
     }
@@ -651,7 +652,7 @@ Status ConnectionImpl::onHeaderField(const char* data, size_t length) {
 
 Status ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   ASSERT(dispatching_);
-  if (header_parsing_state_ == HeaderParsingState::Done && !enable_trailers_) {
+  if (header_parsing_state_ == HeaderParsingState::Done && !enableTrailers()) {
     // Ignore trailers.
     return okStatus();
   }
@@ -726,6 +727,29 @@ Envoy::StatusOr<int> ConnectionImpl::onHeadersCompleteBase() {
     }
     ENVOY_CONN_LOG(trace, "codec entering upgrade mode for CONNECT request.", connection_);
     handling_upgrade_ = true;
+  }
+
+  // https://tools.ietf.org/html/rfc7230#section-3.3.3
+  // If a message is received with both a Transfer-Encoding and a
+  // Content-Length header field, the Transfer-Encoding overrides the
+  // Content-Length. Such a message might indicate an attempt to
+  // perform request smuggling (Section 9.5) or response splitting
+  // (Section 9.4) and ought to be handled as an error. A sender MUST
+  // remove the received Content-Length field prior to forwarding such
+  // a message.
+
+  // Reject message with Http::Code::BadRequest if both Transfer-Encoding and Content-Length
+  // headers are present or if allowed by http1 codec settings and 'Transfer-Encoding'
+  // is chunked - remove Content-Length and serve request.
+  if (parser_.uses_transfer_encoding != 0 && request_or_response_headers.ContentLength()) {
+    if ((parser_.flags & F_CHUNKED) && codec_settings_.allow_chunked_length_) {
+      request_or_response_headers.removeContentLength();
+    } else {
+      error_code_ = Http::Code::BadRequest;
+      RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().ChunkedContentLength));
+      return codecProtocolError(
+          "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
+    }
   }
 
   // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
@@ -822,9 +846,9 @@ ServerConnectionImpl::ServerConnectionImpl(
     const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
-    : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb,
-                     max_request_headers_count, formatter(settings), settings.enable_trailers_),
-      callbacks_(callbacks), codec_settings_(settings),
+    : ConnectionImpl(connection, stats, settings, HTTP_REQUEST, max_request_headers_kb,
+                     max_request_headers_count, formatter(settings)),
+      callbacks_(callbacks),
       response_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
         releaseOutboundResponse(fragment);
       }),
@@ -1123,15 +1147,16 @@ Status ServerConnectionImpl::checkHeaderNameForUnderscores() {
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                            ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
-    : ConnectionImpl(connection, stats, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB,
-                     max_response_headers_count, formatter(settings), settings.enable_trailers_) {}
+    : ConnectionImpl(connection, stats, settings, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB,
+                     max_response_headers_count, formatter(settings)) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if (pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) {
     ASSERT(!pending_response_done_);
     return true;
   } else if (parser_.status_code == 204 || parser_.status_code == 304 ||
-             (parser_.status_code >= 200 && parser_.content_length == 0)) {
+             (parser_.status_code >= 200 && parser_.content_length == 0 &&
+              !(parser_.flags & F_CHUNKED))) {
     return true;
   } else {
     return false;

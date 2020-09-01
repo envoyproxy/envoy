@@ -5,6 +5,13 @@
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
+#include "test/mocks/upstream/cds_api.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/mocks/upstream/cluster_real_priority_set.h"
+#include "test/mocks/upstream/cluster_update_callbacks.h"
+#include "test/mocks/upstream/health_checker.h"
+#include "test/mocks/upstream/load_balancer_context.h"
+#include "test/mocks/upstream/thread_aware_load_balancer.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -19,6 +26,7 @@ using ::testing::Mock;
 using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::ReturnNew;
+using ::testing::ReturnRef;
 using ::testing::SaveArg;
 
 envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml,
@@ -3906,6 +3914,52 @@ cluster_manager:
   const auto cluster = cluster_manager_->get("new_cluster");
   EXPECT_EQ(1, cluster->prioritySet().hostSetsPerPriority().size());
 }
+
+TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      connection_pool_per_downstream_connection: true
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  create(parseBootstrapFromV3Yaml(yaml));
+  NiceMock<MockLoadBalancerContext> lb_context;
+  NiceMock<Network::MockConnection> downstream_connection;
+  Network::Socket::OptionsSharedPtr options_to_return = nullptr;
+  ON_CALL(lb_context, downstreamConnection()).WillByDefault(Return(&downstream_connection));
+  ON_CALL(downstream_connection, socketOptions()).WillByDefault(ReturnRef(options_to_return));
+
+  std::vector<Http::ConnectionPool::MockInstance*> conn_pool_vector;
+  for (size_t i = 0; i < 3; ++i) {
+    conn_pool_vector.push_back(new Http::ConnectionPool::MockInstance());
+    EXPECT_CALL(factory_, allocateConnPool_(_, _, _)).WillOnce(Return(conn_pool_vector.back()));
+    EXPECT_CALL(downstream_connection, hashKey)
+        .WillOnce(Invoke([i](std::vector<uint8_t>& hash_key) { hash_key.push_back(i); }));
+    EXPECT_EQ(conn_pool_vector.back(),
+              cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,
+                                                       Http::Protocol::Http11, &lb_context));
+  }
+
+  // Check that the first entry is still in the pool map
+  EXPECT_CALL(downstream_connection, hashKey).WillOnce(Invoke([](std::vector<uint8_t>& hash_key) {
+    hash_key.push_back(0);
+  }));
+  EXPECT_EQ(conn_pool_vector.front(),
+            cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,
+                                                     Http::Protocol::Http11, &lb_context));
+} // namespace
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
