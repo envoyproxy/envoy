@@ -5414,8 +5414,9 @@ virtual_hosts:
   std::unique_ptr<TestConfigImpl> config_ptr;
 
   config_ptr = std::make_unique<TestConfigImpl>(parseRouteConfigurationFromYaml(yaml),
-
-  // Default behavior when include_vh_rate_limits is not set, similar to VhRateLimitOptions::Override                                              factory_context_, true);
+                                                factory_context_, true);
+  // Default behavior when include_vh_rate_limits is not set, similar to
+  // VhRateLimitOptions::Override
   EXPECT_FALSE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 
   yaml = R"EOF(
