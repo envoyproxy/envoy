@@ -351,6 +351,7 @@ envoy_cc_test(
     srcs = [
         "http_subset_lb_integration_test.cc",
     ],
+    # Consistently times out in CI on Windows, but observed to pass locally
     tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
@@ -538,6 +539,7 @@ envoy_cc_test(
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 2,
+    # Consistently fails in CI on Windows, but observed to pass locally
     tags = ["flaky_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
@@ -549,22 +551,211 @@ envoy_cc_test(
 )
 
 envoy_cc_test_library(
-    name = "integration_lib",
+    name = "integration_stream_decoder_lib",
     srcs = [
-        "autonomous_upstream.cc",
-        "fake_upstream.cc",
-        "integration.cc",
-        "server.cc",
-        "ssl_utility.cc",
+        "integration_stream_decoder.cc",
+    ],
+    hdrs = [
+        "integration_stream_decoder.h",
+    ],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/http:codec_interface",
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/http:metadata_interface",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "utility_lib",
+    srcs = [
         "utility.cc",
     ],
     hdrs = [
-        "autonomous_upstream.h",
-        "fake_upstream.h",
-        "integration.h",
-        "server.h",
-        "ssl_utility.h",
         "utility.h",
+    ],
+    deps = [
+        "//include/envoy/api:api_interface",
+        "//include/envoy/http:codec_interface",
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/network:filter_interface",
+        "//source/common/api:api_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/http:codec_client_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:printers_lib",
+        "//test/test_common:test_time_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "integration_tcp_client_lib",
+    srcs = [
+        "integration_tcp_client.cc",
+    ],
+    hdrs = [
+        "integration_tcp_client.h",
+    ],
+    deps = [
+        ":utility_lib",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/network:address_interface",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:listen_socket_interface",
+        "//include/envoy/network:socket_interface",
+        "//test/mocks/buffer:buffer_mocks",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "fake_upstream_lib",
+    srcs = [
+        "fake_upstream.cc",
+    ],
+    hdrs = [
+        "fake_upstream.h",
+    ],
+    copts = envoy_select_new_codecs_in_integration_tests(
+        ["-DENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS"],
+        "@envoy",
+    ),
+    deps = [
+        "//include/envoy/api:api_interface",
+        "//include/envoy/grpc:status",
+        "//include/envoy/http:codec_interface",
+        "//include/envoy/network:connection_handler_interface",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/stats:stats_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:zero_copy_input_stream_lib",
+        "//source/common/common:basic_resource_lib",
+        "//source/common/common:callback_impl_lib",
+        "//source/common/common:linked_object",
+        "//source/common/common:lock_guard_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/grpc:codec_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/http/http1:codec_legacy_lib",
+        "//source/common/http/http1:codec_lib",
+        "//source/common/http/http2:codec_legacy_lib",
+        "//source/common/http/http2:codec_lib",
+        "//source/common/network:connection_balancer_lib",
+        "//source/common/network:filter_lib",
+        "//source/common/network:listen_socket_lib",
+        "//source/common/network:socket_option_factory_lib",
+        "//source/common/network:udp_default_writer_config",
+        "//source/common/network:utility_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/server:active_raw_udp_listener_config",
+        "//source/server:connection_handler_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:test_time_system_interface",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "base_integration_test_lib",
+    srcs = [
+        "base_integration_test.cc",
+    ],
+    hdrs = [
+        "base_integration_test.h",
+    ],
+    deps = [
+        ":autonomous_upstream_lib",
+        ":fake_upstream_lib",
+        ":integration_tcp_client_lib",
+        ":server_lib",
+        ":utility_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/config:version_converter_lib",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
+        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//source/server:process_context_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/config:utility_lib",
+        "//test/mocks/buffer:buffer_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "server_lib",
+    srcs = [
+        "server.cc",
+    ],
+    hdrs = [
+        "server.h",
+    ],
+    deps = [
+        ":server_stats_interface",
+        ":tcp_dump",
+        ":utility_lib",
+        "//include/envoy/server:options_interface",
+        "//include/envoy/server:process_context_interface",
+        "//include/envoy/stats:stats_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:lock_guard_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/stats:allocator_lib",
+        "//source/common/thread_local:thread_local_lib",
+        "//source/server:drain_manager_lib",
+        "//source/server:hot_restart_nop_lib",
+        "//source/server:listener_hooks_lib",
+        "//source/server:options_lib",
+        "//source/server:process_context_lib",
+        "//source/server:server_lib",
+        "//test/common/runtime:utility_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:test_time_system_interface",
+        "//test/test_common:utility_lib",
+        "@com_google_absl//absl/synchronization",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "autonomous_upstream_lib",
+    srcs = [
+        "autonomous_upstream.cc",
+    ],
+    hdrs = [
+        "autonomous_upstream.h",
+    ],
+    deps = [
+        ":fake_upstream_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "integration_lib",
+    srcs = [
+        "ssl_utility.cc",
+    ],
+    hdrs = [
+        "integration.h",
+        "ssl_utility.h",
     ],
     copts = envoy_select_new_codecs_in_integration_tests(
         ["-DENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS"],
@@ -572,8 +763,12 @@ envoy_cc_test_library(
     ),
     data = ["//test/common/runtime:filesystem_test_data"],
     deps = [
-        ":server_stats_interface",
-        ":tcp_dump",
+        ":autonomous_upstream_lib",
+        ":base_integration_test_lib",
+        ":fake_upstream_lib",
+        ":integration_stream_decoder_lib",
+        ":integration_tcp_client_lib",
+        ":server_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -643,12 +838,6 @@ envoy_cc_test_library(
         "//test/test_common:test_time_lib",
         "//test/test_common:test_time_system_interface",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
@@ -706,7 +895,8 @@ envoy_cc_test(
         "websocket_integration_test.cc",
         "websocket_integration_test.h",
     ],
-    tags = ["fails_on_windows"],
+    # Consistently fails in CI on Windows, but observed to pass locally
+    tags = ["flaky_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -727,10 +917,6 @@ envoy_cc_test(
         # Uncomment this line to run this test repeatedly in exclusive mode if not using docker-sandbox,
         # or RBE, see comments in AddRemoveListener.
         # "exclusive",
-        # TODO(wrowe,sunjayBhatia): Skipping this on Windows as MSVC does not allow invoking
-        # connection.close() from within the lambda that is passed to the RawConnectionDriver
-        # constructor
-        "skip_on_windows",
     ],
     deps = [
         ":integration_lib",
@@ -774,7 +960,8 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_stats_integration_test",
     srcs = ["load_stats_integration_test.cc"],
-    tags = ["fails_on_windows"],
+    # Consistently timing out on Windows, observed to pass locally
+    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//test/config:utility_lib",
@@ -793,6 +980,7 @@ envoy_cc_test(
     name = "hds_integration_test",
     srcs = ["hds_integration_test.cc"],
     shard_count = 2,
+    # Alternately timing out and failing in CI on windows; observed to pass locally
     tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
@@ -974,6 +1162,8 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     shard_count = 2,
+    # Fails intermittantly on local build
+    tags = ["flaky_on_windows"],
     deps = [
         ":integration_lib",
         ":tcp_proxy_integration_proto_cc_proto",
@@ -1049,7 +1239,7 @@ envoy_cc_test(
         "uds_integration_test.cc",
         "uds_integration_test.h",
     ],
-    tags = ["flaky_on_windows"],
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/event:dispatcher_includes",

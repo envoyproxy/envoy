@@ -13,7 +13,7 @@ sudo chmod +x /usr/local/bin/bazel
 
 On macOS, run the following command:
 ```
-brew install bazelbuild/tap/bazelisk
+brew install bazelisk
 ```
 
 On Windows, run the following commands:
@@ -654,10 +654,8 @@ local_repository(
 ## Extra extensions
 
 If you are building your own Envoy extensions or custom Envoy builds and encounter visibility
-problems with, you may need to adjust the default visibility rules.
-By default, Envoy extensions are set up to only be visible to code within the
-[//source/extensions](../source/extensions/), or the Envoy server target. To adjust this,
-add any additional targets you need to `ADDITIONAL_VISIBILITY` in
+problems with, you may need to adjust the default visibility rules to be public,
+as documented in
 [extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
 See the instructions above about how to create your own custom version of
 [extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
