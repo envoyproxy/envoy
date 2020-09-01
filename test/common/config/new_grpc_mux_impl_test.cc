@@ -162,17 +162,39 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
   response->set_type_url(type_url);
   response->set_system_version_info("1");
 
-  response->add_resources();
-  response->mutable_resources()->at(0).set_name("not-found");
-  response->mutable_resources()->at(0).add_aliases("domain1.test");
+  envoy::config::route::v3::VirtualHost vhost;
+  vhost.set_name("vhost_1");
 
-  grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
+  response->add_resources()->mutable_resource()->PackFrom(vhost);
+}
 
-  const auto& subscriptions = grpc_mux_->subscriptions();
-  auto sub = subscriptions.find(type_url);
+// Watch v2 resource type_url, receive discovery response with v3 resource type_url.
+TEST_F(NewGrpcMuxImplTest, V3ResourceResponseV2ResourceWatch) {
+  setup();
 
-  EXPECT_TRUE(sub != subscriptions.end());
-  watch->update({});
+  // Watch for v2 resource type_url.
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  auto watch = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_);
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    response->set_system_version_info("1");
+    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+    load_assignment.set_cluster_name("x");
+    response->add_resources()->mutable_resource()->PackFrom(load_assignment);
+    response->set_type_url("type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment");
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
+        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                            const Protobuf::RepeatedPtrField<std::string>&,
+                                            const std::string&) {
+          EXPECT_EQ(1, added_resources.size());
+          EXPECT_TRUE(
+              TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+        }));
+    grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
+  }
 }
 
 } // namespace

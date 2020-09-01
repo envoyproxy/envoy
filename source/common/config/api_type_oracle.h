@@ -22,6 +22,8 @@ public:
 
   static const absl::optional<std::string>
   getEarlierVersionMessageTypeName(const std::string& message_type);
+
+  static const absl::optional<std::string> getEarlierTypeUrl(const std::string& type_url);
 };
 
 } // namespace Config

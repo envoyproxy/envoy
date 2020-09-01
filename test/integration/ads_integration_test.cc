@@ -115,6 +115,27 @@ TEST_P(AdsIntegrationTest, Failure) {
   makeSingleRequest();
 }
 
+// Validate that we can recover from failures.
+TEST_P(AdsIntegrationTest, MixV2V3TypeUrlInDiscoveryResponse) {
+  initialize();
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {buildCluster("cluster_0")},
+                                                             {buildCluster("cluster_0")}, {}, "1");
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      "type.googleapis.com/envoy.config.listener.v3.Listener",
+      {buildListener("listener_0", "route_config_0")},
+      {buildListener("listener_0", "route_config_0")}, {}, "1", false);
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  // Validate that we can process a request.
+  makeSingleRequest();
+}
+
 // Validate that the request with duplicate listeners is rejected.
 TEST_P(AdsIntegrationTest, DuplicateWarmingListeners) {
   initialize();

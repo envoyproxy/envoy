@@ -51,6 +51,13 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
             message->system_version_info());
   auto sub = subscriptions_.find(message->type_url());
   if (sub == subscriptions_.end()) {
+    absl::optional<std::string> old_type_url =
+        ApiTypeOracle::getEarlierTypeUrl(message->type_url());
+    if (old_type_url) {
+      sub = subscriptions_.find(*old_type_url);
+    }
+  }
+  if (sub == subscriptions_.end()) {
     ENVOY_LOG(warn,
               "Dropping received DeltaDiscoveryResponse (with version {}) for non-existent "
               "subscription {}.",

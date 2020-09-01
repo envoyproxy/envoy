@@ -31,5 +31,26 @@ ApiTypeOracle::getEarlierVersionMessageTypeName(const std::string& message_type)
   }
   return absl::nullopt;
 }
+
+const absl::optional<std::string> ApiTypeOracle::getEarlierTypeUrl(const std::string& type_url) {
+  char delimeter = '/';
+  size_t type_name_start = type_url.size();
+  for (size_t i = 0; i < type_url.size(); i++) {
+    if (type_url[i] == delimeter) {
+      type_name_start = i;
+    }
+  }
+  if (type_name_start == type_url.size()) {
+    return {};
+  }
+  std::string message_type = type_url.substr(type_name_start + 1);
+  absl::optional<std::string> old_message_type =
+      ApiTypeOracle::getEarlierVersionMessageTypeName(message_type);
+  if (old_message_type) {
+    return "type.googleapis.com/" + *old_message_type;
+  }
+  return {};
+}
+
 } // namespace Config
 } // namespace Envoy

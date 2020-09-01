@@ -116,17 +116,24 @@ ScopedResume GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
 void GrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
     ControlPlaneStats& control_plane_stats) {
-  const std::string& type_url = message->type_url();
+  std::string type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
   if (message->has_control_plane()) {
     control_plane_stats.identifier_.set(message->control_plane().identifier());
   }
   if (api_state_.count(type_url) == 0) {
-    ENVOY_LOG(warn, "Ignoring the message for type URL {} as it has no current subscribers.",
-              type_url);
-    // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
-    // protocol violation
-    return;
+    absl::optional<std::string> old_type_url =
+        ApiTypeOracle::getEarlierTypeUrl(message->type_url());
+    if (old_type_url && api_state_.count(*old_type_url)) {
+      type_url = *old_type_url;
+      ENVOY_LOG(debug, "v3 {} converted to v2 {}.", message->type_url(), *old_type_url);
+    } else {
+      // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
+      // protocol violation
+      ENVOY_LOG(warn, "Ignoring the message for type URL {} as it has no current subscribers.",
+                type_url);
+      return;
+    }
   }
   if (api_state_[type_url].watches_.empty()) {
     // update the nonce as we are processing this response.
@@ -164,10 +171,10 @@ void GrpcMuxImpl::onDiscoveryResponse(
     OpaqueResourceDecoder& resource_decoder =
         api_state_[type_url].watches_.front()->resource_decoder_;
     for (const auto& resource : message->resources()) {
-      if (type_url != resource.type_url()) {
+      if (message->type_url() != resource.type_url()) {
         throw EnvoyException(
             fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
-                        resource.type_url(), type_url, message->DebugString()));
+                        resource.type_url(), message->type_url(), message->DebugString()));
       }
       resources.emplace_back(
           new DecodedResourceImpl(resource_decoder, resource, message->version_info()));
