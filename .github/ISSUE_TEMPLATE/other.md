@@ -2,7 +2,7 @@
 name: Other
 about: Questions, design proposals, tech debt, etc.
 title: ''
-labels: ''
+labels: triage
 assignees: ''
 
 ---
