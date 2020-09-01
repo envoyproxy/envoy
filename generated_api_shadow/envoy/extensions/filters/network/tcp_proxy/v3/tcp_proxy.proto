@@ -81,7 +81,7 @@ message TcpProxy {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.DeprecatedV1.TCPRoute";
 
-      string cluster = 1 [(validate.rules).string = {min_len: 1}];
+      string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
 
       repeated config.core.v3.CidrRange destination_ip_list = 2;
 

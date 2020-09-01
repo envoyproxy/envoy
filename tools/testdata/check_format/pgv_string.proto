@@ -1,3 +1,2 @@
-syntax = "proto3";
 //  dummy proto file for validation check
 min_bytes

@@ -860,13 +860,13 @@ def checkSourcePath(file_path):
       error_messages += executeCommand(command, "header_order.py check failed", file_path)
     command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
     error_messages += executeCommand(command, "clang-format check failed", file_path)
-      
+
   if file_path.endswith(PROTO_SUFFIX) and isApiFile(file_path):
     package_name, error_message = packageNameForProto(file_path)
     if package_name is None:
       error_messages += error_message
     error_messages += checkProtoValidation(file_path)
-  return error_messages  
+  return error_messages
 
 
 # Example target outputs are:
@@ -910,11 +910,14 @@ def clangFormat(file_path):
 
 # Fix for https://github.com/envoyproxy/envoy/issues/10535
 def checkProtoValidation(file_path):
-  exclude_path = ['v1', 'v2']
+  exclude_path = ['v1', 'v2', 'generated_api_shadow']
   result = PROTO_VALIDATION_STRING.search(readFile(file_path))
   if result is not None:
-      if not any(x in file_path for x in exclude_path):
-          return ["Proto validation Error in file: %s. 'min_bytes' is DEPRECATED, Use 'min_len'."  % (file_path)]
+    if not any(x in file_path for x in exclude_path):
+      return [
+          "Proto validation Error in file: %s. 'min_bytes' is DEPRECATED, Use 'min_len'." %
+          (file_path)
+      ]
   return []
 
 
@@ -937,7 +940,7 @@ def checkFormat(file_path):
     if try_to_fix:
       error_messages += fixSourcePath(file_path)
     error_messages += checkSourcePath(file_path)
-  
+
   if error_messages:
     return ["From %s" % file_path] + error_messages
   return error_messages
@@ -1160,7 +1163,7 @@ if __name__ == "__main__":
     # to be rewritten by other multiprocessing pooled processes.
     PooledCheckFormat(lambda f: not isBuildFile(f))
     PooledCheckFormat(lambda f: isBuildFile(f))
-    
+
     error_messages += sum((r.get() for r in results), [])
 
   if checkErrorMessages(error_messages):
