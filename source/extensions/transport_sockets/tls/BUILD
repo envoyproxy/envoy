@@ -34,7 +34,10 @@ envoy_cc_library(
         "io_handle_bio.cc",
         "ssl_socket.cc",
     ],
-    hdrs = ["ssl_socket.h"],
+    hdrs = [
+        "io_handle_bio.h",
+        "ssl_socket.h",
+    ],
     external_deps = [
         "abseil_hash",
         "abseil_node_hash_map",

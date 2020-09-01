@@ -1,3 +1,5 @@
+#include "extensions/transport_sockets/tls/io_handle_bio.h"
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/io_handle.h"
 
@@ -11,20 +13,23 @@ namespace Tls {
 
 namespace {
 
-static inline Envoy::Network::IoHandle* bio_io_handle(BIO* bio) {
+// NOLINTNEXTLINE(readability-identifier-naming)
+inline Envoy::Network::IoHandle* bio_io_handle(BIO* bio) {
   return reinterpret_cast<Envoy::Network::IoHandle*>(bio->ptr);
 }
 
-static int io_handle_new(BIO* bio) {
+// NOLINTNEXTLINE(readability-identifier-naming)
+int io_handle_new(BIO* bio) {
   bio->init = 0;
   bio->num = -1;
-  bio->ptr = NULL;
+  bio->ptr = nullptr;
   bio->flags = 0;
   return 1;
 }
 
-static int io_handle_free(BIO* bio) {
-  if (bio == NULL) {
+// NOLINTNEXTLINE(readability-identifier-naming)
+int io_handle_free(BIO* bio) {
+  if (bio == nullptr) {
     return 0;
   }
 
@@ -38,15 +43,15 @@ static int io_handle_free(BIO* bio) {
   return 1;
 }
 
-static int io_handle_read(BIO* b, char* out, int outl) {
-  if (out == NULL) {
+// NOLINTNEXTLINE(readability-identifier-naming)
+int io_handle_read(BIO* b, char* out, int outl) {
+  if (out == nullptr) {
     return 0;
   }
 
   Envoy::Buffer::RawSlice slice;
   slice.mem_ = out;
   slice.len_ = outl;
-
   auto result = bio_io_handle(b)->readv(outl, &slice, 1);
   BIO_clear_retry_flags(b);
   if (!result.ok()) {
@@ -58,7 +63,8 @@ static int io_handle_read(BIO* b, char* out, int outl) {
   return result.rc_;
 }
 
-static int io_handle_write(BIO* b, const char* in, int inl) {
+// NOLINTNEXTLINE(readability-identifier-naming)
+int io_handle_write(BIO* b, const char* in, int inl) {
   Envoy::Buffer::RawSlice slice;
   slice.mem_ = const_cast<char*>(in);
   slice.len_ = inl;
@@ -73,7 +79,8 @@ static int io_handle_write(BIO* b, const char* in, int inl) {
   return result.rc_;
 }
 
-static long io_handle_ctrl(BIO* b, int cmd, long num, void* ptr) {
+// NOLINTNEXTLINE(readability-identifier-naming)
+long io_handle_ctrl(BIO* b, int cmd, long num, void* ptr) {
   long ret = 1;
 
   switch (cmd) {
@@ -86,7 +93,7 @@ static long io_handle_ctrl(BIO* b, int cmd, long num, void* ptr) {
     break;
   case BIO_C_GET_FD:
     ret = -1;
-    ptr = b->ptr;
+    *reinterpret_cast<void**>(ptr) = b->ptr;
     break;
   case BIO_CTRL_GET_CLOSE:
     ret = b->shutdown;
@@ -104,22 +111,25 @@ static long io_handle_ctrl(BIO* b, int cmd, long num, void* ptr) {
   return ret;
 }
 
-static const BIO_METHOD methods_io_handlep = {
-    BIO_TYPE_SOCKET,  "io_handle",    io_handle_write, io_handle_read, NULL /* puts */,
-    NULL /* gets, */, io_handle_ctrl, io_handle_new,   io_handle_free, NULL /* callback_ctrl */,
+const BIO_METHOD methods_io_handlep = {
+    BIO_TYPE_SOCKET,    "io_handle",
+    io_handle_write,    io_handle_read,
+    nullptr /* puts */, nullptr /* gets, */,
+    io_handle_ctrl,     io_handle_new,
+    io_handle_free,     nullptr /* callback_ctrl */,
 };
-
-const BIO_METHOD* BIO_s_io_handle(void) { return &methods_io_handlep; }
 
 } // namespace
 
+// NOLINTNEXTLINE(readability-identifier-naming)
+const BIO_METHOD* BIO_s_io_handle(void) { return &methods_io_handlep; }
+
+// NOLINTNEXTLINE(readability-identifier-naming)
 BIO* BIO_new_io_handle(Envoy::Network::IoHandle* io_handle) {
   BIO* ret;
 
   ret = BIO_new(BIO_s_io_handle());
-  if (ret == NULL) {
-    return NULL;
-  }
+  RELEASE_ASSERT(ret != nullptr, "");
   BIO_ctrl(ret, BIO_C_SET_FD, 0, io_handle);
   return ret;
 }

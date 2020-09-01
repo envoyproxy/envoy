@@ -42,8 +42,6 @@ struct SslSocketFactoryStats {
 
 enum class InitialState { Client, Server };
 
-BIO* BIO_new_io_handle(Envoy::Network::IoHandle* io_handle);
-
 class SslExtendedSocketInfoImpl : public Envoy::Ssl::SslExtendedSocketInfo {
 public:
   void setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus validated) override;

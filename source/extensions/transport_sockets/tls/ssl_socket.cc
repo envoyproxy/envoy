@@ -7,6 +7,7 @@
 #include "common/common/hex.h"
 #include "common/http/headers.h"
 
+#include "extensions/transport_sockets/tls/io_handle_bio.h"
 #include "extensions/transport_sockets/tls/utility.h"
 
 #include "absl/strings/str_replace.h"
