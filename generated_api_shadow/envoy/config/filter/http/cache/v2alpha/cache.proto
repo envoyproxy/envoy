@@ -76,5 +76,5 @@ message CacheConfig {
   //
   // Max body size the cache filter will insert into a cache. 0 means unlimited (though the cache
   // storage implementation may have its own limit beyond which it will reject insertions).
-  uint64 max_body_bytes = 4;
+  uint32 max_body_bytes = 4;
 }
