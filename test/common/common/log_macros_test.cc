@@ -122,13 +122,13 @@ TEST(Logger, checkLoggerLevel) {
 
 void spamCall(std::function<void()>&& call_to_spam, const uint32_t num_threads) {
   std::vector<std::thread> threads(num_threads);
-  absl::Barrier* barrier = new absl::Barrier(num_threads);
+  auto barrier = std::make_unique<absl::Barrier>(num_threads);
 
   for (auto& thread : threads) {
     thread = std::thread([&call_to_spam, &barrier] {
       // Allow threads to accrue, to maximize concurrency on the call we are testing.
       if (barrier->Block()) {
-        delete barrier;
+        barrier.reset();
       }
       call_to_spam();
     });
