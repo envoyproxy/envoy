@@ -91,7 +91,7 @@ TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
     unexpected_response->set_type_url(type_url);
     unexpected_response->set_system_version_info("0");
     // empty response should call onConfigUpdate on wildcard watch
-    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "0")).Times(1);
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "0"));
     grpc_mux_->onDiscoveryResponse(std::move(unexpected_response), control_plane_stats_);
   }
   {
