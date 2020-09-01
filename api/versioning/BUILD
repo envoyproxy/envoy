@@ -128,6 +128,7 @@ proto_library(
         "//envoy/extensions/upstreams/http/http/v3:pkg",
         "//envoy/extensions/upstreams/http/tcp/v3:pkg",
         "//envoy/extensions/wasm/v3:pkg",
+        "//envoy/extensions/watchdog/profile_action/v3alpha:pkg",
         "//envoy/service/accesslog/v3:pkg",
         "//envoy/service/auth/v3:pkg",
         "//envoy/service/cluster/v3:pkg",

@@ -1,8 +1,8 @@
-BAZEL_SKYLIB_RELEASE = "0.9.0"
-BAZEL_SKYLIB_SHA256 = "1dde365491125a3db70731e25658dfdd3bc5dbdfd11b840b3e987ecf043c7ca0"
+BAZEL_SKYLIB_RELEASE = "1.0.3"
+BAZEL_SKYLIB_SHA256 = "1c531376ac7e5a180e0237938a2536de0c54d93f5c278634818e0efc952dd56c"
 
-OPENCENSUS_PROTO_GIT_SHA = "be218fb6bd674af7519b1850cdf8410d8cbd48e8"  # Dec 20, 2019
-OPENCENSUS_PROTO_SHA256 = "e3bbdc94375e86c0edfb2fc5851507e08a3f26ee725ffff7c5c0e73264bdfcde"
+OPENCENSUS_PROTO_RELEASE = "0.3.0"
+OPENCENSUS_PROTO_SHA256 = "b7e13f0b4259e80c3070b583c2f39e53153085a6918718b1c710caf7037572b0"
 
 PGV_GIT_SHA = "278964a8052f96a2f514add0298098f63fb7f47f"  # June 9, 2020
 PGV_SHA256 = "e368733c9fb7f8489591ffaf269170d7658cc0cd1ee322b601512b769446d3c8"
@@ -10,22 +10,22 @@ PGV_SHA256 = "e368733c9fb7f8489591ffaf269170d7658cc0cd1ee322b601512b769446d3c8"
 GOOGLEAPIS_GIT_SHA = "82944da21578a53b74e547774cf62ed31a05b841"  # Dec 2, 2019
 GOOGLEAPIS_SHA = "a45019af4d3290f02eaeb1ce10990166978c807cb33a9692141a076ba46d1405"
 
-PROMETHEUS_GIT_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"  # Nov 17, 2017
-PROMETHEUS_SHA = "783bdaf8ee0464b35ec0c8704871e1e72afa0005c3f3587f65d9d6694bf3911b"
+PROMETHEUS_GIT_SHA = "60555c9708c786597e6b07bf846d0dc5c2a46f54"  # Jun 23, 2020
+PROMETHEUS_SHA = "6748b42f6879ad4d045c71019d2512c94be3dd86f60965e9e31e44a3f464323e"
 
-UDPA_GIT_SHA = "efcf912fb35470672231c7b7bef620f3d17f655a"  # June 29, 2020
-UDPA_SHA256 = "0f8179fbe3d27b89a4c34b2fbd55832f3b27b6810ea9b03b36d18da2629cc871"
+UDPA_RELEASE = "0.0.1"
+UDPA_SHA256 = "83a7dcc316d741031f34c0409021432b74a39c4811845a177133f02f948fe2d8"
 
-ZIPKINAPI_RELEASE = "0.2.2"  # Aug 23, 2019
+ZIPKINAPI_RELEASE = "0.2.2"
 ZIPKINAPI_SHA256 = "688c4fe170821dd589f36ec45aaadc03a618a40283bc1f97da8fa11686fc816b"
 
-RULES_PROTO_GIT_SHA = "2c0468366367d7ed97a1f702f9cd7155ab3f73c5"  # Nov 19, 2019
-RULES_PROTO_SHA256 = "73ebe9d15ba42401c785f9d0aeebccd73bd80bf6b8ac78f74996d31f2c0ad7a6"
+RULES_PROTO_GIT_SHA = "40298556293ae502c66579620a7ce867d5f57311"  # Aug 17, 2020
+RULES_PROTO_SHA256 = "aa1ee19226f707d44bee44c720915199c20c84a23318bb0597ed4e5c873ccbd5"
 
 REPOSITORY_LOCATIONS = dict(
     bazel_skylib = dict(
         sha256 = BAZEL_SKYLIB_SHA256,
-        urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/" + BAZEL_SKYLIB_RELEASE + "/bazel_skylib-" + BAZEL_SKYLIB_RELEASE + ".tar.gz"],
+        urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/" + BAZEL_SKYLIB_RELEASE + "/bazel-skylib-" + BAZEL_SKYLIB_RELEASE + ".tar.gz"],
     ),
     com_envoyproxy_protoc_gen_validate = dict(
         sha256 = PGV_SHA256,
@@ -40,8 +40,8 @@ REPOSITORY_LOCATIONS = dict(
     ),
     com_github_cncf_udpa = dict(
         sha256 = UDPA_SHA256,
-        strip_prefix = "udpa-" + UDPA_GIT_SHA,
-        urls = ["https://github.com/cncf/udpa/archive/" + UDPA_GIT_SHA + ".tar.gz"],
+        strip_prefix = "udpa-" + UDPA_RELEASE,
+        urls = ["https://github.com/cncf/udpa/archive/v" + UDPA_RELEASE + ".tar.gz"],
     ),
     prometheus_metrics_model = dict(
         sha256 = PROMETHEUS_SHA,
@@ -50,8 +50,8 @@ REPOSITORY_LOCATIONS = dict(
     ),
     opencensus_proto = dict(
         sha256 = OPENCENSUS_PROTO_SHA256,
-        strip_prefix = "opencensus-proto-" + OPENCENSUS_PROTO_GIT_SHA + "/src",
-        urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/" + OPENCENSUS_PROTO_GIT_SHA + ".tar.gz"],
+        strip_prefix = "opencensus-proto-" + OPENCENSUS_PROTO_RELEASE + "/src",
+        urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/v" + OPENCENSUS_PROTO_RELEASE + ".tar.gz"],
     ),
     rules_proto = dict(
         sha256 = RULES_PROTO_SHA256,

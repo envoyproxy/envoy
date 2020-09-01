@@ -24,7 +24,7 @@ public:
   ~IoSocketHandleImpl() override;
 
   // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
-  os_fd_t fd() const override { return fd_; }
+  os_fd_t fdDoNotUse() const override { return fd_; }
 
   Api::IoCallUint64Result close() override;
 
@@ -62,6 +62,7 @@ public:
   Address::InstanceConstSharedPtr peerAddress() override;
   Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                                       Event::FileTriggerType trigger, uint32_t events) override;
+  Api::SysCallIntResult shutdown(int how) override;
 
 protected:
   // Converts a SysCallSizeResult to IoCallUint64Result.
