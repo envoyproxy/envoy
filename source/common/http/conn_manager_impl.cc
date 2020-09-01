@@ -1167,8 +1167,8 @@ void ConnectionManagerImpl::ActiveStream::onLocalReply(Code code) {
   // The BadRequest error code indicates there has been a messaging error.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
-      !connection_manager_.config_.streamErrorOnInvalidHttpMessaging() &&
-      code == Http::Code::BadRequest && connection_manager_.codec_->protocol() < Protocol::Http2) {
+      code == Http::Code::BadRequest && connection_manager_.codec_->protocol() < Protocol::Http2 &&
+      !response_encoder_->streamErrorOnInvalidHttpMessage()) {
     state_.saw_connection_close_ = true;
   }
 }
