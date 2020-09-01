@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: {Crash,security} bugs
+    url: mailto:envoy-security@googlegroups.com
+    about: Please file any crash or security bug with envoy-security@googlegroups.com.
