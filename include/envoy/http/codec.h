@@ -380,6 +380,10 @@ struct Http1Settings {
   //  - Is neither a HEAD only request nor a HTTP Upgrade
   //  - Not a HEAD request
   bool enable_trailers_{false};
+  // Allows Envoy to process requests/responses with both `Content-Length` and `Transfer-Encoding`
+  // headers set. By default such messages are rejected, but if option is enabled - Envoy will
+  // remove Content-Length header and process message.
+  bool allow_chunked_length_{false};
 
   enum class HeaderKeyFormat {
     // By default no formatting is performed, presenting all headers in lowercase (as Envoy
