@@ -85,6 +85,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, RBACIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(RBACIntegrationTest, Allowed) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addFilter(RBAC_CONFIG);
   initialize();
 
@@ -105,9 +106,11 @@ TEST_P(RBACIntegrationTest, Allowed) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
 }
 
 TEST_P(RBACIntegrationTest, Denied) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addFilter(RBAC_CONFIG);
   initialize();
 
@@ -125,6 +128,7 @@ TEST_P(RBACIntegrationTest, Denied) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
+  EXPECT_EQ(waitForAccessLog(access_log_name_), "RBAC \n");
 }
 
 TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
