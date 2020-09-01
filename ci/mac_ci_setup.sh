@@ -46,4 +46,6 @@ if ! brew link --overwrite bazelisk; then
     exit 1
 fi
 
+bazel version
+
 pip3 install slackclient
