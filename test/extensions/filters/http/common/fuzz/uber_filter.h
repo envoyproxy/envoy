@@ -81,6 +81,7 @@ private:
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
+  Http::TestResponseTrailerMapImpl encoded_trailers_;
 };
 
 } // namespace HttpFilters
