@@ -24,6 +24,28 @@ namespace Envoy {
 namespace Config {
 namespace {
 
+void expectDeltaUpdate(
+    MockSubscriptionCallbacks& callbacks,
+    const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>& expected_resources,
+    const std::vector<std::string>& expected_removals, const std::string& version) {
+  EXPECT_CALL(callbacks, onConfigUpdate(_, _, _))
+      .WillOnce(Invoke([expected_resources, expected_removals,
+                        version](const std::vector<DecodedResourceRef>& gotten_resources,
+                                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                                 const std::string&) {
+        EXPECT_EQ(expected_resources.size(), gotten_resources.size());
+        for (size_t i = 0; i < expected_resources.size(); i++) {
+          EXPECT_EQ(gotten_resources[i].get().version(), version);
+          EXPECT_TRUE(
+              TestUtility::protoEqual(gotten_resources[i].get().resource(), expected_resources[i]));
+        }
+        EXPECT_EQ(expected_removals.size(), removed_resources.size());
+        for (size_t i = 0; i < expected_removals.size(); i++) {
+          EXPECT_EQ(expected_removals[i], removed_resources[i]);
+        }
+      }));
+}
+
 // expectDeltaAndSotwUpdate() EXPECTs two birds with one function call: we want to cover both SotW
 // and delta, which, while mechanically different, can behave identically for our testing purposes.
 // Specifically, as a simplification for these tests, every still-present resource is updated in
@@ -42,22 +64,7 @@ void expectDeltaAndSotwUpdate(
               TestUtility::protoEqual(gotten_resources[i].get().resource(), expected_resources[i]));
         }
       }));
-  EXPECT_CALL(callbacks, onConfigUpdate(_, _, _))
-      .WillOnce(Invoke([expected_resources, expected_removals,
-                        version](const std::vector<DecodedResourceRef>& gotten_resources,
-                                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                                 const std::string&) {
-        EXPECT_EQ(expected_resources.size(), gotten_resources.size());
-        for (size_t i = 0; i < expected_resources.size(); i++) {
-          EXPECT_EQ(gotten_resources[i].get().version(), version);
-          EXPECT_TRUE(
-              TestUtility::protoEqual(gotten_resources[i].get().resource(), expected_resources[i]));
-        }
-        EXPECT_EQ(expected_removals.size(), removed_resources.size());
-        for (size_t i = 0; i < expected_removals.size(); i++) {
-          EXPECT_EQ(expected_removals[i], removed_resources[i]);
-        }
-      }));
+  expectDeltaUpdate(callbacks, expected_resources, expected_removals, version);
 }
 
 void expectNoUpdate(MockSubscriptionCallbacks& callbacks, const std::string& version) {
@@ -88,13 +95,10 @@ wrapInResource(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& anys,
   return ret;
 }
 
-// Similar to expectDeltaAndSotwUpdate(), but making the onConfigUpdate() happen, rather than
-// EXPECT-ing it.
-void doDeltaAndSotwUpdate(WatchMap& watch_map,
-                          const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& sotw_resources,
-                          const std::vector<std::string>& removed_names,
-                          const std::string& version) {
-  watch_map.onConfigUpdate(sotw_resources, version);
+void doDeltaUpdate(WatchMap& watch_map,
+                   const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& sotw_resources,
+                   const std::vector<std::string>& removed_names, const std::string& version,
+                   const bool use_namespace_matching) {
 
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> delta_resources =
       wrapInResource(sotw_resources, version);
@@ -102,7 +106,17 @@ void doDeltaAndSotwUpdate(WatchMap& watch_map,
   for (const auto& n : removed_names) {
     *removed_names_proto.Add() = n;
   }
-  watch_map.onConfigUpdate(delta_resources, removed_names_proto, version, false);
+  watch_map.onConfigUpdate(delta_resources, removed_names_proto, version, use_namespace_matching);
+}
+
+// Similar to expectDeltaAndSotwUpdate(), but making the onConfigUpdate() happen, rather than
+// EXPECT-ing it.
+void doDeltaAndSotwUpdate(WatchMap& watch_map,
+                          const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& sotw_resources,
+                          const std::vector<std::string>& removed_names,
+                          const std::string& version) {
+  watch_map.onConfigUpdate(sotw_resources, version);
+  doDeltaUpdate(watch_map, sotw_resources, removed_names, version, false);
 }
 
 // Tests the simple case of a single watch. Checks that the watch will not be told of updates to
@@ -498,6 +512,65 @@ TEST(WatchMapTest, OnConfigUpdateFailed) {
   EXPECT_CALL(callbacks1, onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr));
   EXPECT_CALL(callbacks2, onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr));
   watch_map.onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr);
+}
+
+TEST(WatchMapTest, OnConfigUpdateUsingNamespaces) {
+  MockSubscriptionCallbacks callbacks1;
+  MockSubscriptionCallbacks callbacks2;
+  MockSubscriptionCallbacks callbacks3;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
+  WatchMap watch_map;
+  Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
+  Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
+  Watch* watch3 = watch_map.addWatch(callbacks3, resource_decoder);
+  watch_map.updateWatchInterest(watch1, {"ns1"});
+  watch_map.updateWatchInterest(watch2, {"ns1", "ns2"});
+  watch_map.updateWatchInterest(watch3, {"ns3"});
+
+  // verify update
+  {
+    Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
+    envoy::config::endpoint::v3::ClusterLoadAssignment resource;
+    resource.set_cluster_name("ns1/resource1");
+    update.Add()->PackFrom(resource);
+    expectDeltaUpdate(callbacks1, {resource}, {}, "version0");
+    expectDeltaUpdate(callbacks2, {resource}, {}, "version0");
+    doDeltaUpdate(watch_map, update, {}, "version0", true);
+  }
+  // verify removal
+  {
+    Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
+    expectDeltaUpdate(callbacks2, {}, {"ns2/removed"}, "version1");
+    doDeltaUpdate(watch_map, update, {"ns2/removed"}, "version1", true);
+  }
+  // verify a not-found response to an on-demand request: such a response will contain an empty
+  // resource wrapper with the name and aliases fields containing the alias used in the request.
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> empty_resources;
+    const auto version = "version3";
+    const auto not_resolved = "ns3/not_resolved";
+
+    auto* cur_resource = empty_resources.Add();
+    cur_resource->set_version(version);
+    cur_resource->set_name(not_resolved);
+    cur_resource->add_aliases(not_resolved);
+
+    EXPECT_CALL(callbacks3, onConfigUpdate(_, _, _))
+        .WillOnce(Invoke([not_resolved, version](
+                             const std::vector<DecodedResourceRef>& gotten_resources,
+                             const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+          EXPECT_EQ(1, gotten_resources.size());
+          EXPECT_EQ(gotten_resources[0].get().version(), version);
+          EXPECT_FALSE(gotten_resources[0].get().hasResource());
+          EXPECT_EQ(gotten_resources[0].get().name(), not_resolved);
+          EXPECT_EQ(gotten_resources[0].get().aliases(), std::vector<std::string>{not_resolved});
+        }));
+
+    Protobuf::RepeatedPtrField<std::string> removed_names_proto;
+
+    watch_map.onConfigUpdate(empty_resources, removed_names_proto, "version2", true);
+  }
 }
 
 } // namespace
