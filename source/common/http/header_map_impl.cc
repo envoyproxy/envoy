@@ -191,10 +191,10 @@ bool HeaderMapImpl::HeaderList::maybeMakeMap() {
 #ifdef HEADERMAP_TYPE_MULTIMAP
       // Adds node after the last value with the same key (if exists).
       lazy_map_.insert(std::make_pair(node->key().getStringView(), node));
-#else  // !HEADERMAP_TYPE_MULTIMAP
+#else
       HeaderNodeVector& v = lazy_map_[node->key().getStringView()];
       v.push_back(node);
-#endif // !HEADERMAP_TYPE_MULTIMAP
+#endif
     }
   }
   return true;
@@ -214,7 +214,7 @@ size_t HeaderMapImpl::HeaderList::remove(absl::string_view key) {
     }
     // Erase the range in the map.
     lazy_map_.erase(map_entries_range.first, map_entries_range.second);
-#else  // !HEADERMAP_TYPE_MULTIMAP
+#else
     auto iter = lazy_map_.find(key);
     if (iter != lazy_map_.end()) {
       // Erase from the map, and all same key entries from the list.
@@ -226,7 +226,7 @@ size_t HeaderMapImpl::HeaderList::remove(absl::string_view key) {
         erase(node, false /* remove_from_map */);
       }
     }
-#endif // !HEADERMAP_TYPE_MULTIMAP
+#endif
   } else {
     // Erase all same key entries from the list.
     for (auto i = headers_.begin(); i != headers_.end();) {
@@ -522,14 +522,14 @@ HeaderEntry* HeaderMapImpl::getExisting(const LowerCaseString& key) {
       HeaderEntryImpl& header_entry = *iter->second;
       return &header_entry;
     }
-#else  // !HEADERMAP_TYPE_MULTIMAP
+#else
     if (iter != headers_.mapEnd()) {
       const HeaderList::HeaderNodeVector& v = iter->second;
       ASSERT(!v.empty()); // It's impossible to have a map entry with an empty vector as its value.
       HeaderEntryImpl& header_entry = *v[0];
       return &header_entry;
     }
-#endif // !HEADERMAP_TYPE_MULTIMAP
+#endif
     return nullptr;
   }
 

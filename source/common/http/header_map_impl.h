@@ -194,13 +194,13 @@ protected:
 #ifdef HEADERMAP_TYPE_MULTIMAP
 #ifdef MULTIMAP_ABSL_BTREE
     using HeaderLazyMap = absl::btree_multimap<absl::string_view, HeaderNode>;
-#else  // !MULTIMAP_ABSL_BTREE
+#else
     using HeaderLazyMap = std::multimap<absl::string_view, HeaderNode>;
-#endif // !MULTIMAP_ABSL_BTREE
-#else  // !HEADERMAP_TYPE_MULTIMAP
+#endif
+#else
     using HeaderNodeVector = absl::InlinedVector<HeaderNode, 1>;
     using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderNodeVector>;
-#endif // !HEADERMAP_TYPE_MULTIMAP
+#endif
 
     HeaderList() : pseudo_headers_end_(headers_.end()) {}
 
@@ -216,9 +216,9 @@ protected:
 #ifdef HEADERMAP_TYPE_MULTIMAP
         // Adds i after the last value with the same key (if exists).
         lazy_map_.insert(std::make_pair(i->key().getStringView(), i));
-#else  // !HEADERMAP_TYPE_MULTIMAP
+#else
         lazy_map_[i->key().getStringView()].push_back(i);
-#endif // !HEADERMAP_TYPE_MULTIMAP
+#endif
       }
       if (!is_pseudo_header && pseudo_headers_end_ == headers_.end()) {
         pseudo_headers_end_ = i;
@@ -255,7 +255,7 @@ protected:
                 break;
               }
             }
-#else  // !HEADERMAP_TYPE_MULTIMAP
+#else
             auto& values_vec = lazy_map_[entry.key().getStringView()];
             if (values_vec.size() == 1) {
               lazy_map_.erase(entry.key().getStringView());
@@ -264,7 +264,7 @@ protected:
                                               [&](HeaderNode it) { return it == entry.entry_; }),
                                values_vec.end());
             }
-#endif // !HEADERMAP_TYPE_MULTIMAP
+#endif
           }
         }
         return to_remove;
@@ -295,9 +295,9 @@ protected:
 #ifdef HEADERMAP_TYPE_MULTIMAP
       // Returns the first occurrence of the given key (if any)
       return lazy_map_.lower_bound(key);
-#else  //! HEADERMAP_TYPE_MULTIMAP
+#else
       return lazy_map_.find(key);
-#endif //! HEADERMAP_TYPE_MULTIMAP
+#endif
     }
     HeaderLazyMap::iterator mapEnd() { return lazy_map_.end(); }
     size_t size() const { return headers_.size(); }
