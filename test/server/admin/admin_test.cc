@@ -4,7 +4,6 @@
 #include <regex>
 #include <vector>
 
-#include "envoy/admin/v3/clusters.pb.h"
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
