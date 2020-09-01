@@ -17,9 +17,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/stream_info/stream_info_impl.h"
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"
+#include "common/stream_info/stream_info_impl.h"
 
 #include "spdlog/spdlog.h"
 
@@ -243,8 +243,9 @@ private:
                     bool hand_off_restored_destination_connections)
         : listener_(listener), socket_(std::move(socket)),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
-          iter_(accept_filters_.end()),
-          stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(listener_.parent_.dispatcher_.timeSource(), StreamInfo::FilterState::LifeSpan::Connection)) {
+          iter_(accept_filters_.end()), stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
+                                            listener_.parent_.dispatcher_.timeSource(),
+                                            StreamInfo::FilterState::LifeSpan::Connection)) {
       listener_.stats_.downstream_pre_cx_active_.inc();
       stream_info_->setDownstreamLocalAddress(socket_->localAddress());
       stream_info_->setDownstreamRemoteAddress(socket_->remoteAddress());
@@ -312,8 +313,12 @@ private:
     Event::Dispatcher& dispatcher() override { return listener_.parent_.dispatcher_; }
     void continueFilterChain(bool success) override;
     void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override;
-    envoy::config::core::v3::Metadata& dynamicMetadata() override { return stream_info_->dynamicMetadata();};
-    const envoy::config::core::v3::Metadata& dynamicMetadata() const override { return stream_info_->dynamicMetadata(); };
+    envoy::config::core::v3::Metadata& dynamicMetadata() override {
+      return stream_info_->dynamicMetadata();
+    };
+    const envoy::config::core::v3::Metadata& dynamicMetadata() const override {
+      return stream_info_->dynamicMetadata();
+    };
 
     ActiveTcpListener& listener_;
     Network::ConnectionSocketPtr socket_;
@@ -322,6 +327,7 @@ private:
     std::list<ListenerFilterWrapperPtr>::iterator iter_;
     Event::TimerPtr timer_;
     std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
+    bool connected_{false};
   };
 
   using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;

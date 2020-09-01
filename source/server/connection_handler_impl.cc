@@ -17,6 +17,15 @@
 namespace Envoy {
 namespace Server {
 
+namespace {
+void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_info) {
+  stream_info.onRequestComplete();
+  for (const auto& access_log : config.accessLogs()) {
+    access_log->log(nullptr, nullptr, nullptr, stream_info);
+  }
+}
+} // namespace
+
 ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher), per_handler_stat_prefix_(dispatcher.name() + "."),
       disable_listeners_(false) {}
@@ -245,6 +254,10 @@ void ConnectionHandlerImpl::ActiveTcpSocket::unlink() {
   if (removed->timer_ != nullptr) {
     removed->timer_->disableTimer();
   }
+  // Emit logs if a connection is not established.
+  if (!connected_) {
+    emitLogs(*listener_.config_, *stream_info_);
+  }
   listener_.parent_.dispatcher_.deferredDelete(std::move(removed));
 }
 
@@ -293,6 +306,8 @@ void ConnectionHandlerImpl::ActiveTcpSocket::setDynamicMetadata(const std::strin
 }
 
 void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
+  connected_ = true;
+
   // Check if the socket may need to be redirected to another listener.
   ActiveTcpListenerOptRef new_listener;
 
@@ -363,21 +378,16 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
   if (active_socket->iter_ != active_socket->accept_filters_.end()) {
     active_socket->startTimer();
     LinkedList::moveIntoListBack(std::move(active_socket), sockets_);
+  } else {
+    // If active_socket is about to be destructed, emit logs if a connection is not created.
+    if (!active_socket->connected_) {
+      emitLogs(*config_, *active_socket->stream_info_);
+    }
   }
 }
-
-namespace {
-void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_info) {
-  stream_info.onRequestComplete();
-  for (const auto& access_log : config.accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, stream_info);
-  }
-}
-} // namespace
 
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
-    Network::ConnectionSocketPtr&& socket,
-    std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
+    Network::ConnectionSocketPtr&& socket, std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
   if (filter_chain == nullptr) {
