@@ -680,5 +680,101 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateHttpConnectionCloses) {
   cleanupUpstreamAndDownstream();
 }
 
+const char VhostTemplateAfterUpdate[] = R"EOF(
+name: {}
+domains: [{}]
+routes:
+- match: {{ prefix: "/after_update" }}
+  route: {{ cluster: "my_service" }}
+)EOF";
+
+// Verifies that after multiple vhds updates, vhosts from earlier updates still can receive updates
+// See https://github.com/envoyproxy/envoy/issues/12158 for more details
+TEST_P(VhdsIntegrationTest, MultipleUpdates) {
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  EXPECT_TRUE(codec_client_->waitForDisconnect());
+
+  {
+    // make first vhds request (for vhost.first)
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "vhost.first"},
+                                                   {"x-lyft-user-id", "123"}};
+    IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
+                                             {vhdsRequestResourceName("vhost.first")}, {},
+                                             vhds_stream_));
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "4", vhds_stream_,
+        {"my_route/vhost.first"});
+    EXPECT_TRUE(
+        compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
+
+    waitForNextUpstreamRequest(1);
+    // Send response headers, and end_stream if there is no response body.
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+
+    response->waitForHeaders();
+    EXPECT_EQ("200", response->headers().getStatusValue());
+
+    cleanupUpstreamAndDownstream();
+    EXPECT_TRUE(codec_client_->waitForDisconnect());
+  }
+  {
+    // make second vhds request (for vhost.second)
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "vhost.second"},
+                                                   {"x-lyft-user-id", "123"}};
+    IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
+                                             {vhdsRequestResourceName("vhost.second")}, {},
+                                             vhds_stream_));
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TypeUrl::get().VirtualHost,
+        {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+            virtualHostYaml("my_route/vhost_2", "vhost.second"))},
+        {}, "4", vhds_stream_, {"my_route/vhost.second"});
+    EXPECT_TRUE(
+        compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
+
+    waitForNextUpstreamRequest(1);
+    // Send response headers, and end_stream if there is no response body.
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+
+    response->waitForHeaders();
+    EXPECT_EQ("200", response->headers().getStatusValue());
+
+    cleanupUpstreamAndDownstream();
+    EXPECT_TRUE(codec_client_->waitForDisconnect());
+  }
+  {
+    // Attempt to push updates for both vhost.first and vhost.second
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TypeUrl::get().VirtualHost,
+        {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+             fmt::format(VhostTemplateAfterUpdate, "my_route/vhost_1", "vhost.first")),
+         TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+             fmt::format(VhostTemplateAfterUpdate, "my_route/vhost_2", "vhost.second"))},
+        {}, "5", vhds_stream_);
+    EXPECT_TRUE(
+        compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
+
+    // verify that both vhosts have been updated
+    testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/after_update", "vhost.first");
+    cleanupUpstreamAndDownstream();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+    testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/after_update", "vhost.second");
+    cleanupUpstreamAndDownstream();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  }
+}
+
 } // namespace
 } // namespace Envoy
