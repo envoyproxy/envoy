@@ -8,6 +8,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
 #include "envoy/http/codes.h"
+#include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
 
@@ -118,10 +119,6 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
     fault_settings_ = per_route_settings ? per_route_settings : fault_settings_;
   }
 
-  if (faultOverflow()) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
   if (!matchesTargetUpstreamCluster()) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -156,27 +153,42 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   maybeSetupResponseRateLimit(headers);
 
-  absl::optional<std::chrono::milliseconds> duration = delayDuration(headers);
-  if (duration.has_value()) {
-    delay_timer_ = decoder_callbacks_->dispatcher().createTimer(
-        [this, &headers]() -> void { postDelayInjection(headers); });
-    ENVOY_LOG(debug, "fault: delaying request {}ms", duration.value().count());
-    delay_timer_->enableTimer(duration.value(), &decoder_callbacks_->scope());
-    recordDelaysInjectedStats();
-    decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DelayInjected);
+  if (maybeSetupDelay(headers)) {
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  absl::optional<Http::Code> http_status;
-  absl::optional<Grpc::Status::GrpcStatus> grpc_status;
-  std::tie(http_status, grpc_status) = abortStatus(headers);
-
-  if (http_status.has_value()) {
-    abortWithStatus(http_status.value(), grpc_status);
+  if (maybeDoAbort(headers)) {
     return Http::FilterHeadersStatus::StopIteration;
   }
 
   return Http::FilterHeadersStatus::Continue;
+}
+
+bool FaultFilter::maybeSetupDelay(const Http::RequestHeaderMap& request_headers) {
+  absl::optional<std::chrono::milliseconds> duration = delayDuration(request_headers);
+  if (duration.has_value() && tryIncActiveFaults()) {
+    delay_timer_ = decoder_callbacks_->dispatcher().createTimer(
+        [this, &request_headers]() -> void { postDelayInjection(request_headers); });
+    ENVOY_LOG(debug, "fault: delaying request {}ms", duration.value().count());
+    delay_timer_->enableTimer(duration.value(), &decoder_callbacks_->scope());
+    recordDelaysInjectedStats();
+    decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DelayInjected);
+    return true;
+  }
+  return false;
+}
+
+bool FaultFilter::maybeDoAbort(const Http::RequestHeaderMap& request_headers) {
+  absl::optional<Http::Code> http_status;
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status;
+  std::tie(http_status, grpc_status) = abortStatus(request_headers);
+
+  if (http_status.has_value() && tryIncActiveFaults()) {
+    abortWithStatus(http_status.value(), grpc_status);
+    return true;
+  }
+
+  return false;
 }
 
 void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& request_headers) {
@@ -190,8 +202,10 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& requ
     return;
   }
 
-  // General stats. All injected faults are considered a single aggregate active fault.
-  maybeIncActiveFaults();
+  if (!tryIncActiveFaults()) {
+    return;
+  }
+
   config_->stats().response_rl_injected_.inc();
 
   response_limiter_ = std::make_unique<StreamRateLimiter>(
@@ -356,8 +370,6 @@ void FaultFilter::recordDelaysInjectedStats() {
     config_->incDelays(downstream_cluster_storage_->statName());
   }
 
-  // General stats. All injected faults are considered a single aggregate active fault.
-  maybeIncActiveFaults();
   config_->stats().delays_injected_.inc();
 }
 
@@ -367,8 +379,6 @@ void FaultFilter::recordAbortsInjectedStats() {
     config_->incAborts(downstream_cluster_storage_->statName());
   }
 
-  // General stats. All injected faults are considered a single aggregate active fault.
-  maybeIncActiveFaults();
   config_->stats().aborts_injected_.inc();
 }
 
@@ -391,15 +401,27 @@ FaultFilterStats FaultFilterConfig::generateStats(const std::string& prefix, Sta
                                  POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-void FaultFilter::maybeIncActiveFaults() {
+bool FaultFilter::tryIncActiveFaults() {
   // Only charge 1 active fault per filter in case we are injecting multiple faults.
+  // Since we count at most one active fault per filter, we also allow multiple faults
+  // per filter without checking for overflow.
   if (fault_active_) {
-    return;
+    return true;
+  }
+
+  // We only check for overflow when attempting to perform a fault. Note that this means that a
+  // single request might increment the counter more than once if it tries to apply multiple faults,
+  // and it is also possible for it to fail the first check then succeed on the second (should
+  // another thread decrement the active fault gauge).
+  if (faultOverflow()) {
+    return false;
   }
 
   // TODO(mattklein123): Consider per-fault type active fault gauges.
   config_->stats().active_faults_.inc();
   fault_active_ = true;
+
+  return true;
 }
 
 void FaultFilter::onDestroy() {
