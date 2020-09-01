@@ -55,11 +55,11 @@ std::string getSubjectFromCertificate(X509& cert);
 /**
  * Retrieves the value of a specific X509 extension from the cert, if present.
  * @param cert the certificate.
- * @param extension_name the name of the extension to extract.
- * @return absl::optional<std::string> the value of the extension field, if present.
+ * @param extension_name the name of the extension to extract in dotted number format
+ * @return absl::optional<std::string> the DER-encoded value of the extension field, if present.
  */
-absl::optional<std::string> getX509ExtensionValue(const X509& cert,
-                                                  absl::string_view extension_name);
+absl::optional<std::string> getCertificateExtensionValue(X509& cert,
+                                                         absl::string_view extension_name);
 
 /**
  * Returns the days until this certificate is valid.
