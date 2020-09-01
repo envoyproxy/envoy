@@ -4,7 +4,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/test_time.h"
 

@@ -8,7 +8,6 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
 WINDOWS_SKIP_TARGETS = [
-    "envoy.filters.http.lua",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.lightstep",
     "envoy.tracers.datadog",
@@ -19,24 +18,48 @@ WINDOWS_SKIP_TARGETS = [
 # archives, e.g. cares.
 BUILD_ALL_CONTENT = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])"""
 
+def _fail_missing_attribute(attr, key):
+    fail("The '%s' attribute must be defined for external dependecy " % attr + key)
+
 # Method for verifying content of the DEPENDENCY_REPOSITORIES defined in bazel/repository_locations.bzl
 # Verification is here so that bazel/repository_locations.bzl can be loaded into other tools written in Python,
 # and as such needs to be free of bazel specific constructs.
+#
+# We also remove the attributes for further consumption in this file, since rules such as http_archive
+# don't recognize them.
 def _repository_locations():
-    locations = dict(DEPENDENCY_REPOSITORIES)
-    for key, location in locations.items():
+    locations = {}
+    for key, location in DEPENDENCY_REPOSITORIES.items():
+        mutable_location = dict(location)
+        locations[key] = mutable_location
+
         if "sha256" not in location or len(location["sha256"]) == 0:
-            fail("SHA256 missing for external dependency " + str(location["urls"]))
+            _fail_missing_attribute("sha256", key)
+
+        if "project_name" not in location:
+            _fail_missing_attribute("project_name", key)
+        mutable_location.pop("project_name")
+
+        if "project_url" not in location:
+            _fail_missing_attribute("project_url", key)
+        mutable_location.pop("project_url")
+
+        if "version" not in location:
+            _fail_missing_attribute("version", key)
+        mutable_location.pop("version")
 
         if "use_category" not in location:
-            fail("The 'use_category' attribute must be defined for external dependecy " + str(location["urls"]))
+            _fail_missing_attribute("use_category", key)
+        mutable_location.pop("use_category")
 
-        if "cpe" not in location and not [category for category in USE_CATEGORIES_WITH_CPE_OPTIONAL if category in location["use_category"]]:
-            fail("The 'cpe' attribute must be defined for external dependecy " + str(location["urls"]))
+        if "cpe" in location:
+            mutable_location.pop("cpe")
+        elif not [category for category in USE_CATEGORIES_WITH_CPE_OPTIONAL if category in location["use_category"]]:
+            _fail_missing_attribute("cpe", key)
 
         for category in location["use_category"]:
             if category not in USE_CATEGORIES:
-                fail("Unknown use_category value '" + category + "' for dependecy " + str(location["urls"]))
+                fail("Unknown use_category value '" + category + "' for dependecy " + key)
 
     return locations
 
@@ -72,22 +95,6 @@ _default_envoy_build_config = repository_rule(
 # Python dependencies.
 def _python_deps():
     # TODO(htuch): convert these to pip3_import.
-    _repository_impl(
-        name = "com_github_pallets_markupsafe",
-        build_file = "@envoy//bazel/external:markupsafe.BUILD",
-    )
-    native.bind(
-        name = "markupsafe",
-        actual = "@com_github_pallets_markupsafe//:markupsafe",
-    )
-    _repository_impl(
-        name = "com_github_pallets_jinja",
-        build_file = "@envoy//bazel/external:jinja.BUILD",
-    )
-    native.bind(
-        name = "jinja2",
-        actual = "@com_github_pallets_jinja//:jinja2",
-    )
     _repository_impl(
         name = "com_github_apache_thrift",
         build_file = "@envoy//bazel/external:apache_thrift.BUILD",
@@ -190,6 +197,7 @@ def envoy_dependencies(skip_targets = []):
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
+    _com_github_zlib_ng_zlib_ng()
     _upb()
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
@@ -376,6 +384,12 @@ def _net_zlib():
     native.bind(
         name = "madler_zlib",
         actual = "@envoy//bazel/foreign_cc:zlib",
+    )
+
+def _com_github_zlib_ng_zlib_ng():
+    _repository_impl(
+        name = "com_github_zlib_ng_zlib_ng",
+        build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _com_google_cel_cpp():

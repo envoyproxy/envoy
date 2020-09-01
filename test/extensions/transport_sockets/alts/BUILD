@@ -39,6 +39,8 @@ envoy_extension_cc_test(
     name = "tsi_handshaker_test",
     srcs = ["tsi_handshaker_test.cc"],
     extension_name = "envoy.transport_sockets.alts",
+    # Fails intermittantly on local build
+    tags = ["flaky_on_windows"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//source/extensions/transport_sockets/alts:tsi_handshaker",
@@ -79,7 +81,6 @@ envoy_extension_cc_test(
         "grpc_alts_handshaker_proto",
         "grpc_alts_transport_security_common_proto",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/event:dispatcher_includes",
