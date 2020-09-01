@@ -30,7 +30,10 @@ envoy_cc_extension(
 
 envoy_cc_library(
     name = "ssl_socket_lib",
-    srcs = ["ssl_socket.cc"],
+    srcs = [
+        "io_handle_bio.cc",
+        "ssl_socket.cc",
+    ],
     hdrs = ["ssl_socket.h"],
     external_deps = [
         "abseil_hash",
