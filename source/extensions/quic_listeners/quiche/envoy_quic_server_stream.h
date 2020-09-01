@@ -36,6 +36,7 @@ public:
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
     return absl::nullopt;
   }
+  bool streamErrorOnInvalidHttpMessage() const override { return false; }
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;

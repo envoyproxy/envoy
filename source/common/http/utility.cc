@@ -415,6 +415,24 @@ Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions&
   return ret;
 }
 
+Http1Settings
+Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
+                            const Protobuf::BoolValue& hcm_stream_error) {
+  Http1Settings ret = parseHttp1Settings(config);
+
+  if (config.has_override_stream_error_on_invalid_http_message()) {
+    // override_stream_error_on_invalid_http_message, if set, takes precedence over any HCM
+    // stream_error_on_invalid_http_message
+    ret.stream_error_on_invalid_http_message_ =
+        config.override_stream_error_on_invalid_http_message().value();
+  } else {
+    // fallback to HCM value
+    ret.stream_error_on_invalid_http_message_ = hcm_stream_error.value();
+  }
+
+  return ret;
+}
+
 void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
                              const LocalReplyData& local_reply_data) {
   sendLocalReply(

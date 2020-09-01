@@ -847,6 +847,7 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
     data.drain(4);
     return Http::okStatus();
   }));
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(true));
 
   // This test also verifies that decoder/encoder filters have onDestroy() called only once.
   auto* filter = new MockStreamFilter();
@@ -856,7 +857,6 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
       }));
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
-
   EXPECT_CALL(*filter, encodeHeaders(_, true));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
@@ -2165,6 +2165,62 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
 
   Buffer::OwnedImpl fake_input;
   conn_manager_->onData(fake_input, false);
+}
+
+class StreamErrorOnInvalidHttpMessageTest : public HttpConnectionManagerImplTest {
+public:
+  void sendInvalidRequestAndVerifyConnectionState(bool stream_error_on_invalid_http_message) {
+    setup(false, "");
+
+    EXPECT_CALL(*codec_, dispatch(_))
+        .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+          RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+
+          // These request headers are missing the necessary ":host"
+          RequestHeaderMapPtr headers{
+              new TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
+          decoder->decodeHeaders(std::move(headers), true);
+          data.drain(0);
+          return Http::okStatus();
+        }));
+
+    auto* filter = new MockStreamFilter();
+    EXPECT_CALL(filter_factory_, createFilterChain(_))
+        .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+          callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
+        }));
+    EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+    EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
+
+    // codec stream error
+    EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
+        .WillOnce(Return(stream_error_on_invalid_http_message));
+    EXPECT_CALL(*filter, encodeHeaders(_, true));
+    EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+        .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+          EXPECT_EQ("400", headers.getStatusValue());
+          EXPECT_EQ("missing_host_header",
+                    filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
+          if (!stream_error_on_invalid_http_message) {
+            EXPECT_NE(nullptr, headers.Connection());
+            EXPECT_EQ("close", headers.getConnectionValue());
+          } else {
+            EXPECT_EQ(nullptr, headers.Connection());
+          }
+        }));
+    EXPECT_CALL(*filter, onDestroy());
+
+    Buffer::OwnedImpl fake_input;
+    conn_manager_->onData(fake_input, false);
+  }
+};
+
+TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionTerminatedIfCodecStreamErrorIsFalse) {
+  sendInvalidRequestAndVerifyConnectionState(false);
+}
+
+TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionOpenIfCodecStreamErrorIsTrue) {
+  sendInvalidRequestAndVerifyConnectionState(true);
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
@@ -5040,6 +5096,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
         return FilterHeadersStatus::Continue;
       }));
 
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(true));
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, true))
       .WillOnce(Invoke([&](ResponseHeaderMap& headers, bool) -> FilterHeadersStatus {
         EXPECT_EQ("11", headers.getContentLengthValue());
@@ -5081,6 +5138,7 @@ TEST_F(HttpConnectionManagerImplTest, ResetWithStoppedFilter) {
         return FilterHeadersStatus::Continue;
       }));
 
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(true));
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
       .WillOnce(Invoke([&](ResponseHeaderMap& headers, bool) -> FilterHeadersStatus {
         EXPECT_EQ("11", headers.getContentLengthValue());
