@@ -103,7 +103,7 @@ public:
 
   ParseContext context() const { return context_; }
 
-  absl::string_view cdn_id() const { return cdn_id_; }
+  absl::string_view cdnId() const { return cdn_id_; }
 
   constexpr bool operator==(const ParsedCdnId& other) const {
     return context_ == other.context_ && cdn_id_ == other.cdn_id_;
@@ -126,7 +126,7 @@ struct ParsedCdnInfo {
 
   ParseContext context() const { return context_; }
 
-  absl::string_view cdn_id() const { return cdn_id_; }
+  absl::string_view cdnId() const { return cdn_id_; }
 
   constexpr bool operator==(const ParsedCdnInfo& other) const {
     return context_ == other.context_ && cdn_id_ == other.cdn_id_;
@@ -148,7 +148,7 @@ struct ParsedCdnInfoList {
   ParsedCdnInfoList(ParseContext context, std::vector<absl::string_view> cdn_ids)
       : context_(context), cdn_ids_(std::move(cdn_ids)) {}
 
-  constexpr const std::vector<absl::string_view>& cdn_ids() { return cdn_ids_; }
+  constexpr const std::vector<absl::string_view>& cdnIds() { return cdn_ids_; }
 
   constexpr bool operator==(const ParsedCdnInfoList& other) const {
     return context_ == other.context_ && cdn_ids_ == other.cdn_ids_;
@@ -170,12 +170,12 @@ private:
 // OWS  = *( SP / HTAB )
 //
 // Since this is completely optional, there's no way this call can fail.
-ParseContext ParseOptionalWhitespace(const ParseContext& input);
+ParseContext parseOptionalWhitespace(const ParseContext& input);
 
 // Parse a quoted-pair according to RFC 7230 Section 3.2.6.
 //
 // quoted-pair    = "\" ( HTAB / SP / VCHAR / obs-text )
-StatusOr<ParseContext> ParseQuotedPair(const ParseContext& input);
+StatusOr<ParseContext> parseQuotedPair(const ParseContext& input);
 
 // Parse a quoted-string according to RFC 7230 Section 3.2.6.
 //
@@ -185,7 +185,7 @@ StatusOr<ParseContext> ParseQuotedPair(const ParseContext& input);
 // obs-text       = %x80-FF
 //
 // quoted-pair    = "\" ( HTAB / SP / VCHAR / obs-text )
-StatusOr<ParseContext> ParseQuotedString(const ParseContext& input);
+StatusOr<ParseContext> parseQuotedString(const ParseContext& input);
 
 // Parse a token according to RFC 7320 Section 3.2.6.
 //
@@ -201,7 +201,7 @@ StatusOr<ParseContext> ParseQuotedString(const ParseContext& input);
 // ALPHA          =  %x41-5A / %x61-7A   ; A-Z / a-z
 //
 // DIGIT          =  %x30-39
-StatusOr<ParseContext> ParseToken(const ParseContext& input);
+StatusOr<ParseContext> parseToken(const ParseContext& input);
 
 // Parse something that looks like an IPv6 address literal.
 //
@@ -216,7 +216,7 @@ StatusOr<ParseContext> ParseToken(const ParseContext& input);
 // - allows lower-case hex digits
 // - allows address sections with more than 4 hex digits in a row
 // - allows embedded IPv4 addresses multiple times rather than just at the end.
-StatusOr<ParseContext> ParsePlausibleIpV6(const ParseContext& input);
+StatusOr<ParseContext> parsePlausibleIpV6(const ParseContext& input);
 
 // Parse a cdn-id in a lax way.
 //
@@ -247,17 +247,17 @@ StatusOr<ParseContext> ParsePlausibleIpV6(const ParseContext& input);
 // In all, this function will parse cdn-id as:
 //
 // cdn-id = ( plausible-ipv6-address / token ) [ ":" *DIGIT ]
-StatusOr<ParsedCdnId> ParseCdnId(const ParseContext& input);
+StatusOr<ParsedCdnId> parseCdnId(const ParseContext& input);
 
 // Parse a parameter according RFC 7231 Appendix D.
 //
 // parameter = token "=" ( token / quoted-string )
-StatusOr<ParseContext> ParseParameter(const ParseContext& input);
+StatusOr<ParseContext> parseParameter(const ParseContext& input);
 
 // Parse a cdn-info according to RFC 8586 Section 2.
 //
 // cdn-info  = cdn-id *( OWS ";" OWS parameter )
-StatusOr<ParsedCdnInfo> ParseCdnInfo(const ParseContext& input);
+StatusOr<ParsedCdnInfo> parseCdnInfo(const ParseContext& input);
 
 // Parse the top-level cdn-info according to RFC 8586 Section 2.
 //
@@ -284,7 +284,7 @@ StatusOr<ParsedCdnInfo> ParseCdnInfo(const ParseContext& input);
 // In a divergence with the RFC's grammar, this function will also ignore
 // leading and trailing OWS. This function expects to consume the entire input
 // and will return an error if there is something it cannot parse.
-StatusOr<ParsedCdnInfoList> ParseCdnInfoList(const ParseContext& input);
+StatusOr<ParsedCdnInfoList> parseCdnInfoList(const ParseContext& input);
 
 } // namespace CdnLoopParser
 } // namespace Cdn

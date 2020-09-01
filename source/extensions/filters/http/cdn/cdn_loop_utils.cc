@@ -20,9 +20,9 @@ StatusOr<int> countCdnLoopOccurrences(absl::string_view header, absl::string_vie
   }
 
   if (absl::StatusOr<CdnLoopParser::ParsedCdnInfoList> parsed =
-          CdnLoopParser::ParseCdnInfoList(header);
+          CdnLoopParser::parseCdnInfoList(header);
       parsed) {
-    return std::count(parsed->cdn_ids().begin(), parsed->cdn_ids().end(), cdn_id);
+    return std::count(parsed->cdnIds().begin(), parsed->cdnIds().end(), cdn_id);
   } else {
     return parsed.status();
   }

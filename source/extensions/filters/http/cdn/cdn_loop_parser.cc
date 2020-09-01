@@ -17,46 +17,46 @@ namespace {
 // RFC 5234 Appendix B.1 says:
 //
 // ALPHA          =  %x41-5A / %x61-7A   ; A-Z / a-z
-constexpr bool IsAlpha(char c) {
+constexpr bool isAlpha(char c) {
   return ('\x41' <= c && c <= '\x5a') || ('\x61' <= c && c <= '\x7a');
 }
 
 // RFC 5234 Appendix B.1 says:
 //
 // DIGIT          =  %x30-39 ; 0-9
-constexpr bool IsDigit(char c) { return '\x30' <= c && c <= '\x39'; }
+constexpr bool isDigit(char c) { return '\x30' <= c && c <= '\x39'; }
 
 // RFC 2234 Section 6.1 defines HEXDIG as:
 //
 // HEXDIG         =  DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
 //
 // This rule allows lower case letters too in violation of the RFC.
-constexpr bool IsHexDigitCaseInsensitive(char c) {
-  return IsDigit(c) || ('A' <= c && c <= 'F') || ('a' <= c && c <= 'f');
+constexpr bool isHexDigitCaseInsensitive(char c) {
+  return isDigit(c) || ('A' <= c && c <= 'F') || ('a' <= c && c <= 'f');
 }
 
 // RFC 7230 Section 3.2.6 defines obs-text as:
 //
 // obs-text       = %x80-FF
-constexpr bool IsObsText(char c) { return 0x80 & c; }
+constexpr bool isObsText(char c) { return 0x80 & c; }
 
 // RFC 7230 Section 3.2.6 defines qdtext as:
 //
 // qdtext         = HTAB / SP /%x21 / %x23-5B / %x5D-7E / obs-text
-constexpr bool IsQdText(char c) {
+constexpr bool isQdText(char c) {
   return c == '\t' || c == ' ' || c == '\x21' || ('\x23' <= c && c <= '\x5B') ||
-         ('\x5D' <= c && c <= '\x7E') || IsObsText(c);
+         ('\x5D' <= c && c <= '\x7E') || isObsText(c);
 }
 
 // RFC 5324 Appendix B.1 says:
 //
 // VCHAR          =  %x21-7E
 //                        ; visible (printing) characters
-constexpr bool IsVChar(char c) { return '\x21' <= c && c <= '\x7e'; }
+constexpr bool isVChar(char c) { return '\x21' <= c && c <= '\x7e'; }
 
 } // namespace
 
-ParseContext ParseOptionalWhitespace(const ParseContext& input) {
+ParseContext parseOptionalWhitespace(const ParseContext& input) {
   ParseContext context = input;
   while (!context.atEnd()) {
     char c = context.peek();
@@ -68,7 +68,7 @@ ParseContext ParseOptionalWhitespace(const ParseContext& input) {
   return context;
 }
 
-StatusOr<ParseContext> ParseQuotedPair(const ParseContext& input) {
+StatusOr<ParseContext> parseQuotedPair(const ParseContext& input) {
   ParseContext context = input;
   if (context.atEnd()) {
     return absl::InvalidArgumentError(
@@ -87,7 +87,7 @@ StatusOr<ParseContext> ParseQuotedPair(const ParseContext& input) {
   }
 
   const char c = context.peek();
-  if (!(c == '\t' || c == ' ' || IsVChar(c) || IsObsText(c))) {
+  if (!(c == '\t' || c == ' ' || isVChar(c) || isObsText(c))) {
     return absl::InvalidArgumentError(
         absl::StrFormat("expected escapable character at position %d; found '\\x%x'.", input.next(),
                         context.peek()));
@@ -97,7 +97,7 @@ StatusOr<ParseContext> ParseQuotedPair(const ParseContext& input) {
   return context;
 }
 
-StatusOr<ParseContext> ParseQuotedString(const ParseContext& input) {
+StatusOr<ParseContext> parseQuotedString(const ParseContext& input) {
   ParseContext context = input;
 
   if (context.atEnd()) {
@@ -112,12 +112,12 @@ StatusOr<ParseContext> ParseQuotedString(const ParseContext& input) {
   context.increment();
 
   while (!context.atEnd() && context.peek() != '"') {
-    if (IsQdText(context.peek())) {
+    if (isQdText(context.peek())) {
       context.increment();
       continue;
     }
 
-    if (StatusOr<ParseContext> quoted_pair_context = ParseQuotedPair(context);
+    if (StatusOr<ParseContext> quoted_pair_context = parseQuotedPair(context);
         !quoted_pair_context) {
       return quoted_pair_context.status();
     } else {
@@ -143,13 +143,13 @@ StatusOr<ParseContext> ParseQuotedString(const ParseContext& input) {
   return context;
 }
 
-StatusOr<ParseContext> ParseToken(const ParseContext& input) {
+StatusOr<ParseContext> parseToken(const ParseContext& input) {
   ParseContext context = input;
   while (!context.atEnd()) {
     char c = context.peek();
     if (c == '!' || c == '#' || c == '$' || c == '%' || c == '&' || c == '\'' || c == '*' ||
         c == '+' || c == '-' || c == '.' || c == '^' || c == '_' || c == '`' || c == '|' ||
-        c == '~' || IsDigit(c) || IsAlpha(c)) {
+        c == '~' || isDigit(c) || isAlpha(c)) {
       context.increment();
     } else {
       break;
@@ -163,7 +163,7 @@ StatusOr<ParseContext> ParseToken(const ParseContext& input) {
   return context;
 }
 
-StatusOr<ParseContext> ParsePlausibleIpV6(const ParseContext& input) {
+StatusOr<ParseContext> parsePlausibleIpV6(const ParseContext& input) {
   ParseContext context = input;
   if (context.atEnd()) {
     return absl::InvalidArgumentError(absl::StrFormat(
@@ -182,7 +182,7 @@ StatusOr<ParseContext> ParsePlausibleIpV6(const ParseContext& input) {
       break;
     }
     char c = context.peek();
-    if (!(IsHexDigitCaseInsensitive(c) || c == ':' || c == '.')) {
+    if (!(isHexDigitCaseInsensitive(c) || c == ':' || c == '.')) {
       break;
     }
     context.increment();
@@ -204,7 +204,7 @@ StatusOr<ParseContext> ParsePlausibleIpV6(const ParseContext& input) {
   return context;
 }
 
-StatusOr<ParsedCdnId> ParseCdnId(const ParseContext& input) {
+StatusOr<ParsedCdnId> parseCdnId(const ParseContext& input) {
   ParseContext context = input;
 
   if (context.atEnd()) {
@@ -212,10 +212,10 @@ StatusOr<ParsedCdnId> ParseCdnId(const ParseContext& input) {
         absl::StrFormat("expected cdn-id at position %d; found end-of-input", context.next()));
   }
 
-  if (StatusOr<ParseContext> ipv6 = ParsePlausibleIpV6(context); ipv6) {
+  if (StatusOr<ParseContext> ipv6 = parsePlausibleIpV6(context); ipv6) {
     context.update(*ipv6);
   } else {
-    if (StatusOr<ParseContext> token = ParseToken(context); !token) {
+    if (StatusOr<ParseContext> token = parseToken(context); !token) {
       return token.status();
     } else {
       context.update(*token);
@@ -234,7 +234,7 @@ StatusOr<ParsedCdnId> ParseCdnId(const ParseContext& input) {
   context.increment();
 
   while (!context.atEnd()) {
-    if (IsDigit(context.value()[context.next()])) {
+    if (isDigit(context.value()[context.next()])) {
       context.increment();
     } else {
       break;
@@ -244,10 +244,10 @@ StatusOr<ParsedCdnId> ParseCdnId(const ParseContext& input) {
   return ParsedCdnId(context, context.value().substr(input.next(), context.next() - input.next()));
 }
 
-StatusOr<ParseContext> ParseParameter(const ParseContext& input) {
+StatusOr<ParseContext> parseParameter(const ParseContext& input) {
   ParseContext context = input;
 
-  if (StatusOr<ParseContext> parsed_token = ParseToken(context); !parsed_token) {
+  if (StatusOr<ParseContext> parsed_token = parseToken(context); !parsed_token) {
     return parsed_token.status();
   } else {
     context.update(*parsed_token);
@@ -264,11 +264,11 @@ StatusOr<ParseContext> ParseParameter(const ParseContext& input) {
   }
   context.increment();
 
-  if (StatusOr<ParseContext> value_token = ParseToken(context); value_token) {
+  if (StatusOr<ParseContext> value_token = parseToken(context); value_token) {
     return *value_token;
   }
 
-  if (StatusOr<ParseContext> value_quote = ParseQuotedString(context); value_quote) {
+  if (StatusOr<ParseContext> value_quote = parseQuotedString(context); value_quote) {
     return *value_quote;
   }
 
@@ -276,17 +276,17 @@ StatusOr<ParseContext> ParseParameter(const ParseContext& input) {
       absl::StrCat("expected token or quoted-string at position %d.", context.next()));
 }
 
-StatusOr<ParsedCdnInfo> ParseCdnInfo(const ParseContext& input) {
+StatusOr<ParsedCdnInfo> parseCdnInfo(const ParseContext& input) {
   absl::string_view cdn_id;
   ParseContext context = input;
-  if (StatusOr<ParsedCdnId> parsed_id = ParseCdnId(input); !parsed_id) {
+  if (StatusOr<ParsedCdnId> parsed_id = parseCdnId(input); !parsed_id) {
     return parsed_id.status();
   } else {
     context.update(parsed_id->context());
-    cdn_id = parsed_id->cdn_id();
+    cdn_id = parsed_id->cdnId();
   }
 
-  context.update(ParseOptionalWhitespace(context));
+  context.update(parseOptionalWhitespace(context));
 
   while (!context.atEnd()) {
     if (context.peek() != ';') {
@@ -294,25 +294,25 @@ StatusOr<ParsedCdnInfo> ParseCdnInfo(const ParseContext& input) {
     }
     context.increment();
 
-    context.update(ParseOptionalWhitespace(context));
+    context.update(parseOptionalWhitespace(context));
 
-    if (StatusOr<ParseContext> parameter = ParseParameter(context); !parameter) {
+    if (StatusOr<ParseContext> parameter = parseParameter(context); !parameter) {
       return parameter.status();
     } else {
       context.update(*parameter);
     }
 
-    context.update(ParseOptionalWhitespace(context));
+    context.update(parseOptionalWhitespace(context));
   }
 
   return ParsedCdnInfo(context, cdn_id);
 }
 
-StatusOr<ParsedCdnInfoList> ParseCdnInfoList(const ParseContext& input) {
+StatusOr<ParsedCdnInfoList> parseCdnInfoList(const ParseContext& input) {
   std::vector<std::string_view> cdn_infos;
   ParseContext context = input;
 
-  context.update(ParseOptionalWhitespace(context));
+  context.update(parseOptionalWhitespace(context));
 
   while (!context.atEnd()) {
     // Loop invariant: we're always at the beginning of a new element.
@@ -320,18 +320,18 @@ StatusOr<ParsedCdnInfoList> ParseCdnInfoList(const ParseContext& input) {
     if (context.peek() == ',') {
       // Empty element case
       context.increment();
-      context.update(ParseOptionalWhitespace(context));
+      context.update(parseOptionalWhitespace(context));
       continue;
     }
 
-    if (StatusOr<ParsedCdnInfo> parsed_cdn_info = ParseCdnInfo(context); !parsed_cdn_info) {
+    if (StatusOr<ParsedCdnInfo> parsed_cdn_info = parseCdnInfo(context); !parsed_cdn_info) {
       return parsed_cdn_info.status();
     } else {
-      cdn_infos.push_back(parsed_cdn_info->cdn_id());
+      cdn_infos.push_back(parsed_cdn_info->cdnId());
       context.update(parsed_cdn_info->context());
     }
 
-    context.update(ParseOptionalWhitespace(context));
+    context.update(parseOptionalWhitespace(context));
 
     if (context.atEnd()) {
       break;
@@ -344,7 +344,7 @@ StatusOr<ParsedCdnInfoList> ParseCdnInfoList(const ParseContext& input) {
       context.increment();
     }
 
-    context.update(ParseOptionalWhitespace(context));
+    context.update(parseOptionalWhitespace(context));
   }
 
   return ParsedCdnInfoList(context, std::move(cdn_infos));
