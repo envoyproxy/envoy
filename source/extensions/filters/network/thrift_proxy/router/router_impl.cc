@@ -506,9 +506,8 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
     parent_.callbacks_->sendLocalReply(
-        AppException(
-            AppExceptionType::InternalError,
-            fmt::format("thrift upstream request: too many connections")),
+        AppException(AppExceptionType::InternalError,
+                     fmt::format("thrift upstream request: too many connections")),
         true);
     break;
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
