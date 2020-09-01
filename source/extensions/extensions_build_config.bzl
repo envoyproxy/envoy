@@ -164,7 +164,7 @@ EXTENSIONS = {
     "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_proxy_protocol",
     "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
-    "envoy.transport_sockets.quic":                     "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
+    "envoy.transport_sockets.quic":                     "//source/extensions/quic_listeners/quiche:quic_factory_lib",
 
     #
     # Retry host predicates
