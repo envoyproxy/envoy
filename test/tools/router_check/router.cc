@@ -160,7 +160,7 @@ void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
 void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
                                      const Router::DirectResponseEntry& entry) {
   auto encode_functions = Envoy::Http::Utility::EncodeFunctions{
-      nullptr,
+      nullptr, nullptr,
       [&](Envoy::Http::ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
         UNREFERENCED_PARAMETER(end_stream);
         Http::HeaderMapImpl::copyFrom(*tool_config.response_headers_->header_map_, *headers);
