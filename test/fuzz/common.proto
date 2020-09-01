@@ -13,7 +13,7 @@ import "validate/validate.proto";
 // Common fuzzing input types.
 
 message Headers {
-  repeated envoy.config.core.v3.HeaderValue headers = 1;
+  repeated envoy.config.core.v3.HeaderValue headers = 1; //TODO: Add headers here
 }
 
 message Metadata {

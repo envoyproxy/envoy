@@ -2,33 +2,12 @@ syntax = "proto3";
 
 package test.common.upstream;
 
+import "test/fuzz/common.proto";
 import "envoy/config/core/v3/health_check.proto";
 
-message HealthCheckConfig {
-    //fields that change logic that are common amongst all types of health checkers
-    int32 timeout = 1;
-    int32 interval = 2;
-    int32 initial_jitter = 3;
-    int32 interval_jitter = 4;
-    int32 interval_jitter_percent = 5;
-    int32 unhealthy_threshold = 6;
-    int32 healthy_threshold = 7;
-    bool reuse_connection = 8;
-    int32 no_traffic_interval = 9;
-    int32 unhealthy_interval = 10;
-    int32 unhealthy_edge_interval = 11;
-    int32 healthy_edge_interval = 12;
-    bool always_log_health_check_failures = 13;
-    //tls_options = 14;
-}
-
 message Respond {
-    string code = 1;
-    bool conn_close = 2;
-    bool proxy_close = 3;
-    bool body = 4;
-    bool trailers = 5;
-    bool degraded = 6;
+    test.Fuzz.Headers headers = 1; //TODO: Add validation for path in any case
+    string status = 2; //Add validation that all the characters are between 0 - 9, or ' ', would something like "9 00 9" pass?, and require it
 }
 
 message DegradationBehavior {
@@ -43,21 +22,14 @@ message StreamCreate {
 message HttpAction {
     oneof action_selector {
         Respond respond = 1;
-        StreamCreate stream_create = 2;
-        //DegradationBehavior = 3;
+        boolean stream_create = 2;
+        //TODO: time advancement, multiple hosts (maps to other two as well), separate respondBody, respondTrailers
     }
 }
 
-message HttpHealthCheckConfig {
-    HealthCheckConfig config = 1;
-    envoy.config.core.v3.HealthCheck.HttpHealthCheck http_config = 2;
-    repeated HttpAction actions = 3;
-}
-
-message HealthCheckTestCase {
-    oneof health_check_type_selector {
-        HttpHealthCheckConfig http_config = 1;
-        //TcpHealthCheckConfig tcp_config = 2;
-        //gRPCHealthCheckConfig grpc_config = 3;
-    }
+message HttpHealthCheckTestCase {
+    core.HealthCheck health_check_config = 1;
+    Repeated HttpAction http_actions = 2;
+    //Repeated TcpAction tcp_actions = 3;
+    //Repeated GrpcAction grpc_actions = 4;
 }

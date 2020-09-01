@@ -31,3 +31,50 @@ http_config {
         }
     }
 }
+
+health_check_config {
+    timeout {
+        seconds: 1
+    }
+    interval {
+        seconds: 1
+    }
+    no_traffic_interval {
+        seconds: 1
+    }
+    interval_jitter {
+        seconds: 1
+    }
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check {
+        path: "/healthcheck"
+    }
+    service_name_matcher {
+        prefix: "locations"
+    }
+}
+http_actions {
+    respond {
+      headers {
+        key: ":status"
+        value: "200"
+      }
+      headers {
+        key: ":degraded"
+        value: "1"
+      }
+      status: "200"
+    }
+    respond {
+      headers {
+        key: ":status"
+        value: "200"
+      }
+      headers {
+        key: ":degraded"
+        value: "0"
+      }
+      status: "200"
+    }
+}

@@ -1,18 +1,31 @@
-http_config {
-    config { 
-
+health_check_config {
+    timeout {
+        seconds: 1
     }
-    http_config {
-
+    interval {
+        seconds: 1
     }
-    actions {
-        respond {
-            code : "200"
-            conn_close: false
-            proxy_close: false
-            body: true
-            trailers: false
-            degraded: false
-        }
+    no_traffic_interval {
+        seconds: 1
+    }
+    interval_jitter {
+        seconds: 1
+    }
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check {
+        path: "/healthcheck"
+    }
+    service_name_matcher {
+        prefix: "locations"
+    }
+}
+http_actions {
+    respond {
+      headers {
+        key: ":status"
+        value: "200"
+      }
+      status: "200"
     }
 }

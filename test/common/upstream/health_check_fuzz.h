@@ -1,6 +1,7 @@
 #pragma once
 #include "test/common/upstream/health_checker_impl_test.h"
 #include "test/common/upstream/health_check_fuzz.pb.h"
+#include "test/fuzz/common.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -12,7 +13,7 @@ namespace Upstream {
 
 
         private:
-            void respondFields(test::common::upstream::Respond respond);
+            void respondHeaders(test::fuzz::Headers headers, std::string status);
             void streamCreate();
             std::string constructYamlFromProtoInput(test::common::upstream::HealthCheckTestCase input);
             void TestBody() override {

@@ -8,46 +8,14 @@ HealthCheckFuzz::HealthCheckFuzz() {
 
 }
 
-std::string HealthCheckFuzz::constructYamlFromProtoInput(test::common::upstream::HealthCheckTestCase input) {
-    input.http_config();
-    std::string yaml; //TODO: hardcode at first, then provide options
-    /*sprintf(yaml, R"EOF(
-        timeout: %us
-        interval: %us
-        initial_jitter: %us
-        interval_jitter: %us
-        interval_jitter_percent: %u
-        unhealthy_threshold: %u
-        healthy_threshold: %u
-        reuse_connection: %s //x ? "true" : "false"
-        no_traffic_interval: %us
-        unhealthy_interval: %us
-        unhealthy_edge_interval: %us
-        healthy_edge_interval: %us
-        always_log_health_check_failures: %s //x ? "true" : "false"
-        http_health_check: //this is from the http message protobuf, specific to only http checking
-            host: %s
-            path: %s
-            service_name: %s
-    )EOF")*/
-    //hardcoded first unit test
-    yaml = R"EOF(
-    timeout: 1s
-    interval: 1s
-    no_traffic_interval: 5s
-    interval_jitter: 1s
-    unhealthy_threshold: 2
-    healthy_threshold: 2
-    http_health_check:
-      service_name_matcher:
-        prefix: locations
-      path: /healthcheck
-    )EOF";
-    return yaml;
+void HealthCheckFuzz::allocHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config) {
+    health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
+        *cluster_, config, dispatcher_, runtime_, random_,
+        HealthCheckEventLoggerPtr(event_logger_storage_.release()));
 }
 
 void HealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase input) {
-    allocHealthChecker(constructYamlFromProtoInput(input));
+    allocHealthCheckerFromProto(input.health_check_config());
     addCompletionCallback();
     cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -59,19 +27,29 @@ void HealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase inp
     replay(input);
 }
 
-void HealthCheckFuzz::respondFields(test::common::upstream::Respond respondFields) {
-    respond(0, respondFields.code(), respondFields.conn_close(), respondFields.proxy_close(), respondFields.body(), respondFields.trailers(), {}, respondFields.degraded()); //TODO: HEALTH CHECK CLUSTER
-    //Most precedence up here, return if hits
-    //EXPECT BASED ON RESPONSE CODE, compared to respondfields
-    if (respondFields.degraded()) {
-        ENVOY_LOG_MISC(trace, "Replied that the host is degraded");
-        EXPECT_EQ(Host::Health::Degraded, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-        return;
+//NEW RESPOND FIELDS:
+void HealthCheckFuzz::respondHeaders(test::fuzz::Headers headers, absl::string_view status) { //input arg: fuzz headers, should I use std::string or absl::string()
+    //convert fuzz headers to something usable - Http::TestResponseHeaderMapImpl
+    auto response_headers = <Http::TestResponseHeaderMapImpl>Fuzz::fromHeaders(headers, {}, {});
+    response_headers.setPath(status); //If Fuzzer created a status header - replace it with validated status
+
+    //TODO: Expect clauses based on whether status is within range, and also if degraded or not
+    //This will be from precedence notes
+
+    //TODO: 0 or 1 depending on whether first or second
+    test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), true);
+
+    if (response_headers.has(":degraded")) {
+        if (response_headers.get(":degraded")) {
+            ENVOY_LOG_MISC(trace, "Replied that the host is degraded");
+            EXPECT_EQ(Host::Health::Degraded, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+            return;
+        }
     }
+
     //No clauses that represent the host not being healthy
     ENVOY_LOG_MISC(trace, "Replied that the host is Healthy");
     EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
-    return;
 }
 
 void HealthCheckFuzz::streamCreate() {
@@ -87,7 +65,7 @@ void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) 
         ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
         switch (event.action_selector_case()) { //TODO: Once added implementations for tcp and gRPC, move this to a seperate method, handleHttp
             case test::common::upstream::HttpAction::kRespond: { //Respond
-                respondFields(event.respond());
+                respondHeaders(event.respond().headers(), event.respond().status());
                 break;
             }
             case test::common::upstream::HttpAction::kStreamCreate: { //Expect Stream Create
