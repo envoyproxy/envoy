@@ -458,6 +458,17 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
+    (*entry)->decode_headers_called_ = true;
+
+    // decoding_headers_only_ is set if the filter returns ContinueAndEndStream.
+    const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(
+        status, end_stream, state_.decoding_headers_only_);
+
+    // If this filter ended the stream, decodeComplete() should be called for it.
+    if ((*entry)->end_stream_ || state_.decoding_headers_only_) {
+      (*entry)->handle_->decodeComplete();
+    }
+
     const bool new_metadata_added = processNewlyAddedMetadata();
     // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
     // in headers by inserting an empty data frame with end_stream set. The empty data frame is sent
@@ -471,10 +482,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       addDecodedData(*((*entry).get()), empty_data, true);
     }
 
-    (*entry)->decode_headers_called_ = true;
-    if (!(*entry)->commonHandleAfterHeadersCallback(status, end_stream,
-                                                    state_.decoding_headers_only_) &&
-        std::next(entry) != decoder_filters_.end()) {
+    if (!continue_iteration && std::next(entry) != decoder_filters_.end()) {
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
       // processing since we need to handle the case where a terminal filter wants to buffer, but
       // a previous filter has added body.
@@ -663,7 +671,6 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
     if ((*entry)->stoppedAll()) {
       return;
     }
-
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeTrailers));
     state_.filter_call_state_ |= FilterCallState::DecodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
@@ -930,16 +937,20 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
            "Filters should not return FilterHeadersStatus::ContinueAndDontEndStream from "
            "encodeHeaders when end_stream is already false");
 
-    if ((*entry)->end_stream_) {
-      (*entry)->handle_->encodeComplete();
-    }
     state_.filter_call_state_ &= ~FilterCallState::EncodeHeaders;
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
     (*entry)->encode_headers_called_ = true;
+
+    // encoding_headers_only_ is set if the filter returns ContinueAndEndStream.
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(
         status, end_stream, state_.encoding_headers_only_);
+
+    // If this filter ended the stream, encodeComplete() should be called for it.
+    if ((*entry)->end_stream_ || state_.encoding_headers_only_) {
+      (*entry)->handle_->encodeComplete();
+    }
 
     // If we're encoding a headers only response, then mark the local as complete. This ensures
     // that we don't attempt to reset the downstream request in doEndStream.
