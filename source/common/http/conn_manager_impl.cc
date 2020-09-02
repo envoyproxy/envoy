@@ -498,7 +498,6 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
         *parent_.filter_manager_.requestHeaders());
     // If scope_key is not null, the scope exists but RouteConfiguration is not initialized.
     if (scope_key != nullptr) {
-      // On demand srds
       requestSrdsUpdate(std::move(scope_key), thread_local_dispatcher,
                         std::move(route_config_updated_cb));
       return;

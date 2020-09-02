@@ -762,16 +762,18 @@ key:
           route: {{ cluster: {} }}
 )EOF";
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  // Request that match lazily loaded scope will trigger on demand loading.
+  // A request that match lazily loaded scope will trigger on demand loading.
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/meh"},
                                      {":authority", "host"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=foo"}});
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 1);
   // Close the connection and destroy the active stream.
   cleanupUpstreamAndDownstream();
-  // Push rds update and there is noexception thrown.
+  // Push rds update, on demand updated callback is post to worker thread.
+  // There is no exception thrown even when active stream is dead because weak_ptr can't be locked.
   createRdsStream("foo_route1");
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);

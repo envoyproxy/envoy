@@ -254,7 +254,7 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
               scoped_route_info->scopeName(), version_info);
   }
 
-  // scoped_route_info of both eager loading and on demand scope will be propagated to work
+  // scoped_route_info of both eager loading and on demand scopes will be propagated to work
   // threads. Upon a scoped RouteConfiguration miss, if the scope exists, an on demand update
   // callback will be posted to main thread.
   if (!updated_scopes.empty()) {
