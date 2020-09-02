@@ -69,6 +69,10 @@ public:
     std::vector<std::pair<uint64_t, uint64_t>> ranges_;
   };
 
+  const HttpStatusChecker httpStatusChecker() const {
+    return http_status_checker_;
+  }
+
 private:
   struct HttpActiveHealthCheckSession : public ActiveHealthCheckSession,
                                         public Http::ResponseDecoder,

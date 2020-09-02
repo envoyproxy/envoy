@@ -2,6 +2,8 @@
 
 #include <chrono>
 
+#include "common/http/header_utility.h"
+
 #include "test/common/upstream/utility.h"
 #include "test/fuzz/utility.h"
 
@@ -64,6 +66,20 @@ void HealthCheckFuzz::respondHeaders(
   } else {
     test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), true);
   }
+
+  //handles what type of response it should be with asserts
+  //uint64_t response_code = Http::Utility::getResponseStatus(response_headers); //todo: remove
+    uint64_t response_code = std::stoi(static_cast<std::string>(status));
+  if (!health_checker_->httpStatusChecker().inRange(response_code)) {
+      ENVOY_LOG_MISC(trace, "Response code not in healthy range. Host is unhealthy");
+      ASSERT(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health() == Host::Health::Unhealthy);
+  }
+
+  if (response_headers->EnvoyDegraded() != nullptr) {
+    ENVOY_LOG_MISC(trace, "Replied that the host is degraded");
+    ASSERT(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health() == Host::Health::Degraded);
+  }
+
   /*if (response_headers->has("degraded")) { //Seg fault here on this has call
       if (response_headers->get_("degraded") == "1") {
           ENVOY_LOG_MISC(trace, "Replied that the host is degraded");
@@ -72,10 +88,9 @@ void HealthCheckFuzz::respondHeaders(
       }
   }*/
 
-  // No clauses that represent the host not being healthy
-  // ENVOY_LOG_MISC(trace, "Replied that the host is Healthy");
-  // EXPECT_EQ(Host::Health::Healthy,
-  // cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+  //No clauses that represent the host not being healthy
+  ENVOY_LOG_MISC(trace, "Replied that the host is Healthy");
+  ASSERT(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health() == Host::Health::Healthy);
 }
 
 void HealthCheckFuzz::streamCreate(bool create_stream_on_second_host) {
