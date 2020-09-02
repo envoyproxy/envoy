@@ -275,7 +275,11 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
     socket_mode_ = 0;
   } else {
     uint64_t socket_mode_helper;
-    StringUtil::atoull(socket_mode.getValue().c_str(), socket_mode_helper, 8);
+    if (!(socket_mode.getValue().find_first_not_of("01234567") == std::string::npos &&
+          StringUtil::atoull(socket_mode.getValue().c_str(), socket_mode_helper, 8))) {
+      throw MalformedArgvException(
+          fmt::format("error: invalid socket-mode '{}'", socket_mode.getValue()));
+    }
     socket_mode_ = socket_mode_helper;
   }
 

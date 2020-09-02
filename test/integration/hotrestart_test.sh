@@ -276,4 +276,17 @@ start_test disabling hot_restart by command line.
 CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --disable-hot-restart 2>&1)
 check [ "disabled" = "${CLI_HOT_RESTART_VERSION}" ]
 
+#Validate socket mode
+start_test socket-mode for socket path
+run_in_background_saving_pid "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
+      --restart-epoch 0  --base-id 0 --base-id-path "${BASE_ID_PATH}" \
+      --socket-path /tmp/envoy_domain_socket --socket-mode 644 \
+      --service-cluster cluster --service-node node --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" \
+      --admin-address-path "${ADMIN_ADDRESS_PATH_0}"
+sleep 3
+EXPECTED_SOCKET_MODE=$(stat -c '%a' '/tmp/envoy_domain_socket_parent_0')
+check [ "644" = "${EXPECTED_SOCKET_MODE}" ]
+kill ${BACKGROUND_PID}
+wait ${BACKGROUND_PID}
+  [[ $? == 0 ]]
 echo "PASS"
