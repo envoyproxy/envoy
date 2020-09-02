@@ -54,7 +54,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   if (sub == subscriptions_.end()) {
     absl::optional<std::string> old_type_url =
         ApiTypeOracle::getEarlierTypeUrl(message->type_url());
-    if (old_type_url) {
+    if (old_type_url.has_value()) {
       sub = subscriptions_.find(*old_type_url);
       ENVOY_LOG(debug, "v3 {} converted to v2 {}.", message->type_url(), *old_type_url);
     }
