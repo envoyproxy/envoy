@@ -142,11 +142,32 @@ envoy_benchmark_test(
     benchmark_binary = "eds_speed_test",
 )
 
-envoy_cc_test(
-    name = "health_checker_impl_test",
-    srcs = ["health_checker_impl_test.cc"],
+envoy_cc_test_library(
+    name = "health_checker_impl_test_lib",
+    srcs = [
+        "health_checker_impl_test_utils.cc",
+    ],
+    hdrs = [
+        "health_checker_impl_test_utils.h",
+    ],
     deps = [
         ":utility_lib",
+        "//test/common/http:common_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/mocks/upstream:health_check_event_logger_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "health_checker_impl_test",
+    srcs = [
+        "health_checker_impl_test.cc",
+    ],
+    deps = [
+        ":health_checker_impl_test_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:headers_lib",
