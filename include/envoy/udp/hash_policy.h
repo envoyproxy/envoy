@@ -2,6 +2,8 @@
 
 #include "envoy/network/address.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Udp {
 /**
@@ -13,9 +15,11 @@ public:
 
   /**
    * @param downstream_address is the address of the peer client.
-   * @return uint64_t a hash value to route on.
+   * @return absl::optional<uint64_t> an optional hash value to route on. A hash value might not be
+   * returned if for example the downstream address has a unix domain socket type.
    */
-  virtual uint64_t generateHash(const Network::Address::Instance& downstream_address) const PURE;
+  virtual absl::optional<uint64_t>
+  generateHash(const Network::Address::Instance& downstream_address) const PURE;
 };
 } // namespace Udp
 } // namespace Envoy

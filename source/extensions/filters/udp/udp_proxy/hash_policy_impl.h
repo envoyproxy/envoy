@@ -20,12 +20,14 @@ public:
   explicit HashPolicyImpl(const absl::Span<const UdpProxyConfig::HashPolicy* const>& hash_policies);
 
   // Udp::HashPolicy
-  uint64_t generateHash(const Network::Address::Instance& downstream_addr) const override;
+  absl::optional<uint64_t>
+  generateHash(const Network::Address::Instance& downstream_addr) const override;
 
   class HashMethod {
   public:
     virtual ~HashMethod() = default;
-    virtual uint64_t evaluate(const Network::Address::Instance& downstream_addr) const PURE;
+    virtual absl::optional<uint64_t>
+    evaluate(const Network::Address::Instance& downstream_addr) const PURE;
   };
 
   using HashMethodPtr = std::unique_ptr<HashMethod>;

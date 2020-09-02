@@ -31,6 +31,18 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "hash_policy_impl_test",
+    srcs = ["hash_policy_impl_test.cc"],
+    extension_name = "envoy.filters.udp_listener.udp_proxy",
+    deps = [
+        "//source/common/common:hash_lib",
+        "//source/common/network:address_lib",
+        "//source/extensions/filters/udp/udp_proxy:hash_policy_lib",
+        "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "udp_proxy_integration_test",
     srcs = ["udp_proxy_integration_test.cc"],
     extension_name = "envoy.filters.udp_listener.udp_proxy",

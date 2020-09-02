@@ -9,10 +9,14 @@ namespace UdpProxy {
 
 class SourceIpHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  uint64_t evaluate(const Network::Address::Instance& downstream_addr) const override {
-    ASSERT(downstream_addr.ip() != nullptr);
-    ASSERT(!downstream_addr.ip()->addressAsString().empty());
-    return HashUtil::xxHash64(downstream_addr.ip()->addressAsString());
+  absl::optional<uint64_t>
+  evaluate(const Network::Address::Instance& downstream_addr) const override {
+    if (downstream_addr.ip()) {
+      ASSERT(!downstream_addr.ip()->addressAsString().empty());
+      return HashUtil::xxHash64(downstream_addr.ip()->addressAsString());
+    }
+
+    return absl::nullopt;
   }
 };
 
@@ -28,7 +32,8 @@ HashPolicyImpl::HashPolicyImpl(
   }
 }
 
-uint64_t HashPolicyImpl::generateHash(const Network::Address::Instance& downstream_addr) const {
+absl::optional<uint64_t>
+HashPolicyImpl::generateHash(const Network::Address::Instance& downstream_addr) const {
   return hash_impl_->evaluate(downstream_addr);
 }
 
