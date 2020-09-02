@@ -267,7 +267,9 @@ TEST_F(ConnectionHandlerTest, RemoveListenerDuringRebalance) {
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
   current_handler->incNumConnections();
+#ifndef NDEBUG
   EXPECT_CALL(*access_log_, log(_, _, _, _)).Times(1);
+#endif
   current_handler->post(Network::ConnectionSocketPtr{connection});
 
   EXPECT_CALL(*connection_balancer, unregisterHandler(_));
