@@ -47,6 +47,10 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
       ssl_context_manager_(ssl_context_manager), random_(random), info_factory_(info_factory),
       access_log_manager_(access_log_manager), cm_(cm), local_info_(local_info), admin_(admin),
       singleton_manager_(singleton_manager), tls_(tls), specifier_hash_(0),
+      hds_clusters_hash_map_(
+          std::make_unique<absl::flat_hash_map<uint64_t, Envoy::Upstream::HdsClusterPtr>>()),
+      hds_clusters_name_map_(
+          std::make_unique<absl::flat_hash_map<std::string, Envoy::Upstream::HdsClusterPtr>>()),
       validation_visitor_(validation_visitor), api_(api) {
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       local_info_.node());
@@ -165,67 +169,113 @@ void HdsDelegate::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata
   UNREFERENCED_PARAMETER(metadata);
 }
 
+HdsClusterPtr HdsDelegate::tryUpdateHdsCluster(
+    HdsClusterPtr cluster,
+    const envoy::service::health::v3::ClusterHealthCheck& cluster_health_check) {
+  // TODO(drewsortega)
+  UNREFERENCED_PARAMETER(cluster_health_check);
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  return cluster;
+}
+
+HdsClusterPtr HdsDelegate::createHdsCluster(
+    const envoy::service::health::v3::ClusterHealthCheck& cluster_health_check) {
+  // Create HdsCluster config
+  static const envoy::config::core::v3::BindConfig bind_config;
+  envoy::config::cluster::v3::Cluster cluster_config;
+
+  cluster_config.set_name(cluster_health_check.cluster_name());
+  cluster_config.mutable_connect_timeout()->set_seconds(ClusterTimeoutSeconds);
+  cluster_config.mutable_per_connection_buffer_limit_bytes()->set_value(
+      ClusterConnectionBufferLimitBytes);
+
+  // Add endpoints to cluster
+  for (const auto& locality_endpoints : cluster_health_check.locality_endpoints()) {
+    // add endpoint group by locality to config
+    auto* endpoints = cluster_config.mutable_load_assignment()->add_endpoints();
+    // if this group contains locality information, save it.
+    if (locality_endpoints.has_locality()) {
+      endpoints->mutable_locality()->MergeFrom(locality_endpoints.locality());
+    }
+
+    // add all endpoints for this locality group to the config
+    for (const auto& endpoint : locality_endpoints.endpoints()) {
+      endpoints->add_lb_endpoints()->mutable_endpoint()->mutable_address()->MergeFrom(
+          endpoint.address());
+    }
+  }
+
+  // TODO(lilika): Add support for optional per-endpoint health checks
+
+  // Add healthchecks to cluster
+  for (auto& health_check : cluster_health_check.health_checks()) {
+    cluster_config.add_health_checks()->MergeFrom(health_check);
+  }
+
+  ENVOY_LOG(debug, "New HdsCluster config {} ", cluster_config.DebugString());
+
+  // Create HdsCluster.
+  auto new_cluster = std::make_shared<HdsCluster>(
+      admin_, runtime_, std::move(cluster_config), bind_config, store_stats_, ssl_context_manager_,
+      false, info_factory_, cm_, local_info_, dispatcher_, random_, singleton_manager_, tls_,
+      validation_visitor_, api_);
+
+  // Begin HCs in the background.
+  new_cluster->initialize([] {});
+  new_cluster->startHealthchecks(access_log_manager_, runtime_, random_, dispatcher_, api_);
+
+  return new_cluster;
+}
+
 void HdsDelegate::processMessage(
     std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
   ASSERT(message);
 
+  std::unique_ptr<absl::flat_hash_map<uint64_t, HdsClusterPtr>> new_hds_clusters_hash_map =
+      std::make_unique<absl::flat_hash_map<uint64_t, HdsClusterPtr>>();
+  std::unique_ptr<absl::flat_hash_map<std::string, HdsClusterPtr>> new_hds_clusters_name_map =
+      std::make_unique<absl::flat_hash_map<std::string, HdsClusterPtr>>();
+
   for (const auto& cluster_health_check : message->cluster_health_checks()) {
     const uint64_t cluster_config_hash = MessageUtil::hash(cluster_health_check);
+    HdsClusterPtr cluster_ptr;
 
     // If this cluster with the exact configuration is already being tracked, skip it.
-    if (hds_clusters_map_.contains(cluster_config_hash)) {
+    auto cluster_map_pair = hds_clusters_hash_map_->find(cluster_config_hash);
+    if (cluster_map_pair != hds_clusters_hash_map_->end()) {
+      // This cluster with the exact same configuration already exists, so just reuse it.
       ENVOY_LOG(debug, "HDS Cluster already exists with this configuration, skipping.");
-      continue;
-    }
+      cluster_ptr = cluster_map_pair->second;
+    } else if (!cluster_health_check.cluster_name().empty()) {
+      // If this particular cluster configuration happens to have a name, try to match and
+      // check to see if a cluster with this name already exists. If it does, reconfigure.
+      // If not, then just create a new one.
+      auto cluster_map_pair = hds_clusters_name_map_->find(cluster_health_check.cluster_name());
 
-    // Create HdsCluster config
-    static const envoy::config::core::v3::BindConfig bind_config;
-    envoy::config::cluster::v3::Cluster cluster_config;
-
-    cluster_config.set_name(cluster_health_check.cluster_name());
-    cluster_config.mutable_connect_timeout()->set_seconds(ClusterTimeoutSeconds);
-    cluster_config.mutable_per_connection_buffer_limit_bytes()->set_value(
-        ClusterConnectionBufferLimitBytes);
-
-    // Add endpoints to cluster
-    for (const auto& locality_endpoints : cluster_health_check.locality_endpoints()) {
-      // add endpoint group by locality to config
-      auto* endpoints = cluster_config.mutable_load_assignment()->add_endpoints();
-      // if this group contains locality information, save it.
-      if (locality_endpoints.has_locality()) {
-        endpoints->mutable_locality()->MergeFrom(locality_endpoints.locality());
+      if (cluster_map_pair != hds_clusters_name_map_->end()) {
+        // We have a previous cluster with this name, update.
+        cluster_ptr = tryUpdateHdsCluster(cluster_map_pair->second, cluster_health_check);
+      } else {
+        // There is no cluster with this name previously, so just create a new cluster.
+        cluster_ptr = createHdsCluster(cluster_health_check);
       }
 
-      // add all endpoints for this locality group to the config
-      for (const auto& endpoint : locality_endpoints.endpoints()) {
-        endpoints->add_lb_endpoints()->mutable_endpoint()->mutable_address()->MergeFrom(
-            endpoint.address());
-      }
+      // Since this cluster has a name, add it to our by-name map.
+      hds_clusters_name_map_->insert({cluster_health_check.cluster_name(), cluster_ptr});
+    } else {
+      // If no name or hash matches, then just create a new one.
+      cluster_ptr = createHdsCluster(cluster_health_check);
     }
 
-    // TODO(lilika): Add support for optional per-endpoint health checks
-
-    // Add healthchecks to cluster
-    for (auto& health_check : cluster_health_check.health_checks()) {
-      cluster_config.add_health_checks()->MergeFrom(health_check);
-    }
-
-    ENVOY_LOG(debug, "New HdsCluster config {} ", cluster_config.DebugString());
-
-    // Create HdsCluster.
-    auto new_cluster = std::make_shared<HdsCluster>(
-        admin_, runtime_, std::move(cluster_config), bind_config, store_stats_,
-        ssl_context_manager_, false, info_factory_, cm_, local_info_, dispatcher_, random_,
-        singleton_manager_, tls_, validation_visitor_, api_);
-
-    // Add to our two data structures.
-    hds_clusters_.push_back(new_cluster);
-    hds_clusters_map_.insert({cluster_config_hash, new_cluster});
-
-    new_cluster->initialize([] {});
-    new_cluster->startHealthchecks(access_log_manager_, runtime_, random_, dispatcher_, api_);
+    // Add to our remaining data structures.
+    hds_clusters_.push_back(cluster_ptr);
+    new_hds_clusters_hash_map->insert({cluster_config_hash, cluster_ptr});
   }
+
+  // Overwrite our map data structures.
+  hds_clusters_hash_map_ = std::move(new_hds_clusters_hash_map);
+  hds_clusters_name_map_ = std::move(new_hds_clusters_name_map);
 }
 
 // TODO(lilika): Add support for subsequent HealthCheckSpecifier messages that

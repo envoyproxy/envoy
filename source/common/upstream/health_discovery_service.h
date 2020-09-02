@@ -149,7 +149,11 @@ private:
   // Establishes a connection with the management server
   void establishNewStream();
   void processMessage(std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message);
-
+  HdsClusterPtr
+  tryUpdateHdsCluster(HdsClusterPtr cluster,
+                      const envoy::service::health::v3::ClusterHealthCheck& cluster_health_check);
+  HdsClusterPtr
+  createHdsCluster(const envoy::service::health::v3::ClusterHealthCheck& cluster_health_check);
   HdsDelegateStats stats_;
   const Protobuf::MethodDescriptor& service_method_;
 
@@ -177,7 +181,8 @@ private:
 
   std::vector<std::string> clusters_;
   std::vector<HdsClusterPtr> hds_clusters_;
-  absl::flat_hash_map<uint64_t, HdsClusterPtr> hds_clusters_map_;
+  std::unique_ptr<absl::flat_hash_map<uint64_t, HdsClusterPtr>> hds_clusters_hash_map_;
+  std::unique_ptr<absl::flat_hash_map<std::string, HdsClusterPtr>> hds_clusters_name_map_;
 
   Event::TimerPtr hds_stream_response_timer_;
   Event::TimerPtr hds_retry_timer_;
