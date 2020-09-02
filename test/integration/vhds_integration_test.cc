@@ -688,8 +688,8 @@ routes:
   route: {{ cluster: "my_service" }}
 )EOF";
 
-// Verifies that after multiple vhds updates, vhosts from earlier updates still can receive updates
-// See https://github.com/envoyproxy/envoy/issues/12158 for more details
+// Verifies that after multiple vhds updates, virtual hosts from earlier updates still can receive
+// updates See https://github.com/envoyproxy/envoy/issues/12158 for more details
 TEST_P(VhdsIntegrationTest, MultipleUpdates) {
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
   cleanupUpstreamAndDownstream();
