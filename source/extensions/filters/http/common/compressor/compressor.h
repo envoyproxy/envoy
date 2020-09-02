@@ -118,10 +118,6 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
 
 private:
-  // TODO(gsagula): This is here temporarily and just to facilitate testing. Ideally all
-  // the logic in these private member functions would be available in another class.
-  friend class CompressorFilterTest;
-
   bool hasCacheControlNoTransform(Http::ResponseHeaderMap& headers) const;
   bool isAcceptEncodingAllowed(const Http::ResponseHeaderMap& headers) const;
   bool isContentTypeAllowed(Http::ResponseHeaderMap& headers) const;
