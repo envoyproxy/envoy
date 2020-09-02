@@ -58,7 +58,7 @@ int main(int argc, char** argv) {
       scoped_runtime = std::make_unique<TestScopedRuntime>();
     }
     // Make sure the argument contains a single ":" character.
-    const std::vector<std::string> runtime_feature_split = absl::StrSplit(runtime_feature_arg, ":");
+    const std::vector<std::string> runtime_feature_split = absl::StrSplit(runtime_feature_arg, ':');
     if (runtime_feature_split.size() != 2) {
       ENVOY_LOG_MISC(critical,
                      "Given runtime flag \"{}\" should have a single ':' separating the flag name "
