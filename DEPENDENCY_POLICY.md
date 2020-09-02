@@ -31,7 +31,8 @@ Dependency declarations must:
 * Provide a meaningful project name and URL.
 * State the version in the `version` field. String interpolation should be used in `strip_prefix`
   and `urls` to reference the version. If you need to reference version `X.Y.Z` as `X_Y_Z`, this
-  may appear in a string as `{version}.replace('.','_')`.
+  may appear in a string as `{underscore_version}`, similarly for `X-Y-Z` you can use
+  `{dash_version}`.
 * Provide accurate entries for `use_category`. Please think carefully about whether there are data
   or control plane implications of the dependency.
 * CPEs are compulsory for all dependencies that are not purely build/test.

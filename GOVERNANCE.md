@@ -155,6 +155,11 @@ the maintainers per the voting process below.
 Adding new [extensions](REPO_LAYOUT.md#sourceextensions-layout) has a dedicated policy. Please
 see [this](./EXTENSION_POLICY.md) document for more information.
 
+# Exernal dependency policy
+
+Adding new external dependencies has a dedicated policy. Please see [this](DEPENDENCY_POLICY.md)
+document for more information.
+
 # Conflict resolution and voting
 
 In general, we prefer that technical issues and maintainer membership are amicably worked out
