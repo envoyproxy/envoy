@@ -224,7 +224,6 @@ private:
       response_headers_ = std::move(response_headers);
     }
     void setResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers) override {
-      ASSERT(!response_trailers_);
       response_trailers_ = std::move(response_trailers);
     }
 

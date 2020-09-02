@@ -356,7 +356,9 @@ public:
   virtual ResponseHeaderMapOptRef responseHeaders() PURE;
 
   /**
-   * Retrieves a pointer to the response trailers set via setResponseTrailers.
+   * Retrieves a pointer to the last response trailers set via setResponseTrailers.
+   * Note that response trailers might be set multiple times, so it is not safe in general to assume that
+   * any set of trailers will be valid for the duration of the stream.
    */
   virtual ResponseTrailerMapOptRef responseTrailers() PURE;
 
