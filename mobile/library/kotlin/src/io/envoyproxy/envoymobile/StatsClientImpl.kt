@@ -10,6 +10,6 @@ internal class StatsClientImpl constructor(
 ) : StatsClient {
 
   override fun counter(vararg elements: Element): Counter {
-    return Counter(engine, elements.asList())
+    return CounterImpl(engine, elements.asList())
   }
 }
