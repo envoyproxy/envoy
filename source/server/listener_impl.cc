@@ -850,6 +850,7 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   // The in place update needs the active listener in worker thread. worker_started guarantees the
   // existence of that active listener.
   if (!worker_started) {
+    ENVOY_LOG(debug, "does not support filter chain update: worker not started yet.");
     return false;
   }
 

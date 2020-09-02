@@ -215,6 +215,7 @@ protected:
   // listener config for listener with on-demand filter chains.
   envoy::config::listener::v3::Listener listener_config_2_;
   std::string listener_name_2_{"testing-listener-1"};
+
   std::string route_table_name_{"testing-route-table-0"};
   FakeUpstreamInfo lds_upstream_info_;
   FakeUpstreamInfo rds_upstream_info_;
@@ -306,7 +307,7 @@ TEST_P(ListenerIntegrationTest, BasicSuccessWithOnDemandFilterChain) {
     auto* socket_address_ = listener_config_.mutable_address()->mutable_socket_address();
     socket_address_->set_port_value(12345); // Listener 1 will not be used.
 
-    // Make all filter chains of this listener to be built on-demand.
+    // Set all filter chains of listener_2 to be built on-demand.
     for (auto i = 0; i < listener_config_2_.filter_chains().size(); i++) {
       auto* filter_chain = listener_config_2_.mutable_filter_chains(i);
       auto* on_demand_configuration = filter_chain->mutable_on_demand_configuration();
@@ -347,6 +348,112 @@ TEST_P(ListenerIntegrationTest, BasicSuccessWithOnDemandFilterChain) {
   // NOTE: The line above doesn't tell you if listener is up and listening.
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
   // Request is sent to cluster_0.
+
+  codec_client_ = makeHttpConnection(lookupPort(listener_name_2_));
+  int response_size = 800;
+  int request_size = 10;
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"server_id", "cluster_0, backend_0"}};
+  auto response = sendRequestAndWaitForResponse(
+      Http::TestResponseHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
+      request_size, response_headers, response_size, /*cluster_0*/ 0);
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_size, upstream_request_->bodyLength());
+
+  // update listener, rebuilt filter chain will not be rebuilt again.
+  auto* new_filter_chain = listener_config_2_.mutable_filter_chains()->Add();
+  *new_filter_chain = *listener_config_2_.mutable_filter_chains(0);
+  new_filter_chain->mutable_filter_chain_match()->mutable_destination_port()->set_value(9999);
+  ENVOY_LOG_MISC(error, "updated listener config with on-demand filter chains: {}",
+                 listener_config_2_.DebugString());
+  sendLdsResponseV3({MessageUtil::getYamlStringFromMessage(listener_config_),
+                     MessageUtil::getYamlStringFromMessage(listener_config_2_)},
+                    "2");
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 2);
+  // close current connection, make a new connection, will not request rebuilding again.
+  codec_client_->close();
+  codec_client_ = makeHttpConnection(lookupPort(listener_name_2_));
+
+  response = sendRequestAndWaitForResponse(
+      Http::TestResponseHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
+      request_size, response_headers, response_size, /*cluster_0*/ 0);
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_size, upstream_request_->bodyLength());
+}
+
+TEST_P(ListenerIntegrationTest, OnDemandFilterChainRetryRebuilding) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    listener_config_2_ = listener_config_;
+    listener_config_2_.set_name(listener_name_2_);
+
+    auto* socket_address_ = listener_config_.mutable_address()->mutable_socket_address();
+    socket_address_->set_port_value(12345); // Listener 1 will not be used.
+
+    // Set all filter chains of listener_2 to be built on-demand.
+    for (auto i = 0; i < listener_config_2_.filter_chains().size(); i++) {
+      auto* filter_chain = listener_config_2_.mutable_filter_chains(i);
+      auto* on_demand_configuration = filter_chain->mutable_on_demand_configuration();
+      on_demand_configuration->mutable_rebuild_timeout()->CopyFrom(
+          Protobuf::util::TimeUtil::MillisecondsToDuration(15000));
+    }
+    sendLdsResponseV3({MessageUtil::getYamlStringFromMessage(listener_config_),
+                       MessageUtil::getYamlStringFromMessage(listener_config_2_)},
+                      "1");
+    createRdsStream(route_table_name_);
+  };
+  initialize();
+  ENVOY_LOG_MISC(error, "listener config with on-demand filter chains: {}",
+                 listener_config_2_.DebugString());
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  // Workers not started, the LDS added listener 0 is in active_listeners_ list.
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 2);
+  registerTestServerPorts({listener_name_, listener_name_2_});
+
+  // connection will fail, listener_2 will request rebuilding, but RDS is not ready yet.
+  ENVOY_LOG(debug, "The first connection request will never succeed, since rebuilding will timeout "
+                   "because of no dependencies.");
+  // codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_2_)),
+  // absl::nullopt);
+
+  // now make RDS ready.
+  const std::string route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+)EOF";
+  sendRdsResponseV3(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
+  test_server_->waitForCounterGe(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  // Now testing-listener-0 finishes initialization, Server initManager will be ready.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+
+  test_server_->waitUntilListenersReady();
+  // NOTE: The line above doesn't tell you if listener is up and listening.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  // Request is sent to cluster_0.
+
+  // update listener.
+  auto* new_filter_chain = listener_config_2_.mutable_filter_chains()->Add();
+  *new_filter_chain = *listener_config_2_.mutable_filter_chains(0);
+  new_filter_chain->mutable_filter_chain_match()->mutable_destination_port()->set_value(9999);
+  ENVOY_LOG_MISC(error, "updated listener config with on-demand filter chains: {}",
+                 listener_config_2_.DebugString());
+  sendLdsResponseV3({MessageUtil::getYamlStringFromMessage(listener_config_),
+                     MessageUtil::getYamlStringFromMessage(listener_config_2_)},
+                    "2");
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
 
   codec_client_ = makeHttpConnection(lookupPort(listener_name_2_));
   int response_size = 800;
