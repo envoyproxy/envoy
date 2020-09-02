@@ -229,12 +229,18 @@ StatusOr<ParseContext> parsePlausibleIpV6(const ParseContext& input);
 // 3.2.2. Parsing the host rule is remarkably difficult because the host rule
 // tries to parse exactly valid IP addresses (e.g., disallowing values greater
 // than 255 in an IPv4 address or only allowing one instance of "::" in IPv6
-// addresses) and needs to deal with % escaping in names. Worse, the host rule
-// admits ',' and ';' as members of sub-delim rule inside the reg-name rule of
-// host, making parsing ambiguous in some cases!
+// addresses) and needs to deal with % escaping in names.
+
+// Worse, the uri-host reg-name rule admits ',' and ';' as members of sub-delim
+// rule, making parsing ambiguous in some cases! RFC 3986 does this in order to
+// be "future-proof" for naming schemes we haven't dreamed up yet. RFC 8586
+// says that if a CDN uses a uri-host as its cdn-id, the uri-host must be a
+// "hostname under its control". The only global naming system we have is DNS,
+// so the only really valid reg-name an Internet-facing Envoy should see is a
+// DNS name.
 //
-// Luckily, the token rule more or less covers the uri-host rule for names and
-// for IPv4 addresses. We just a new rule to parse IPv6 addresses. See
+// Luckily, the token rule more or less covers the uri-host rule for DNS names
+// and for IPv4 addresses. We just a new rule to parse IPv6 addresses. See
 // ParsePlausibleIpV6 for the rule we'll follow.
 //
 // The definition of port comes from RFC 3986 Section
