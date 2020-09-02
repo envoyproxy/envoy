@@ -26,7 +26,9 @@ void JitteredExponentialBackOffStrategy::reset() { next_interval_ = base_interva
 
 JitteredLowerBoundBackOffStrategy::JitteredLowerBoundBackOffStrategy(
     uint64_t min_interval, Random::RandomGenerator& random)
-    : min_interval_(min_interval), random_(random) {}
+    : min_interval_(min_interval), random_(random) {
+  ASSERT(min_interval_ > 1);
+}
 
 uint64_t JitteredLowerBoundBackOffStrategy::nextBackOffMs() {
   // random(min_interval_, 1.5 * min_interval_)
