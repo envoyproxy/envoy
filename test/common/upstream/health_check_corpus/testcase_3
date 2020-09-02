@@ -35,4 +35,16 @@ http_actions {
       status: "200"
     }
 }
-second_host : false
+http_actions {
+    respond {
+      headers {
+        headers {
+            key: ":status"
+            value: "200"
+        }
+      }
+      status: "200"
+      respond_on_second_host : true
+    }
+}
+second_host : true
