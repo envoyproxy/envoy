@@ -2,8 +2,6 @@
 
 #include <chrono>
 
-#include "common/http/header_utility.h"
-
 #include "test/common/upstream/utility.h"
 #include "test/fuzz/utility.h"
 
@@ -23,7 +21,7 @@ void HealthCheckFuzz::allocHealthCheckerFromProto(
 void HealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase input) {
   allocHealthCheckerFromProto(input.health_check_config());
   addCompletionCallback();
-  if (input.second_host() == true) {
+  if (input.second_host()) {
     cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
         Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80"),
         Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:81")};
@@ -33,9 +31,7 @@ void HealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase inp
   }
   expectSessionCreate();
   expectStreamCreate(0);
-  // EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  // Note: don't need these expects everywhere, just release on asserts if no longer need to fuzz
-  if (input.second_host() == true) {
+  if (input.second_host()) {
     ENVOY_LOG_MISC(trace, "Created second host.");
     second_host_ = true;
     expectSessionCreate();
@@ -45,52 +41,37 @@ void HealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase inp
   replay(input);
 }
 
-// NEW RESPOND FIELDS:
 void HealthCheckFuzz::respondHeaders(
     test::fuzz::Headers headers, absl::string_view status,
-    bool respond_on_second_host) { // input arg: fuzz headers, should I use std::string or
-                                   // absl::string()
-  // convert fuzz headers to something usable - Http::TestResponseHeaderMapImpl
+    bool respond_on_second_host) {
   std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers =
       std::make_unique<Http::TestResponseHeaderMapImpl>(
           Fuzz::fromHeaders<Http::TestResponseHeaderMapImpl>(headers, {}, {}));
-  response_headers->setStatus(
-      status); // If Fuzzer created a status header - replace it with validated status
+  
+  // If Fuzzer created a status header - replace it with validated status
+  response_headers->setStatus(status);
 
-  // TODO: Expect clauses based on whether status is within range, and also if degraded or not
-  // This will be from precedence notes
+  int index = (second_host_ && respond_on_second_host) ? 1 : 0;
 
-  if (second_host_) {
-    test_sessions_[(respond_on_second_host) ? 1 : 0]->stream_response_callbacks_->decodeHeaders(
+  test_sessions_[index]->stream_response_callbacks_->decodeHeaders(
         std::move(response_headers), true);
-  } else {
-    test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), true);
-  }
 
-  //handles what type of response it should be with asserts
-  //uint64_t response_code = Http::Utility::getResponseStatus(response_headers); //todo: remove
-    uint64_t response_code = std::stoi(static_cast<std::string>(status));
+
+  //Asserts correct response based on logic in the codebase
+  uint64_t response_code = std::stoi(static_cast<std::string>(status));
   if (!health_checker_->httpStatusChecker().inRange(response_code)) {
       ENVOY_LOG_MISC(trace, "Response code not in healthy range. Host is unhealthy");
-      ASSERT(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health() == Host::Health::Unhealthy);
+      ASSERT(cluster_->prioritySet().getMockHostSet(0)->hosts_[index]->health() == Host::Health::Unhealthy);
   }
 
   if (response_headers->EnvoyDegraded() != nullptr) {
     ENVOY_LOG_MISC(trace, "Replied that the host is degraded");
-    ASSERT(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health() == Host::Health::Degraded);
+    ASSERT(cluster_->prioritySet().getMockHostSet(0)->hosts_[index]->health() == Host::Health::Degraded);
   }
-
-  /*if (response_headers->has("degraded")) { //Seg fault here on this has call
-      if (response_headers->get_("degraded") == "1") {
-          ENVOY_LOG_MISC(trace, "Replied that the host is degraded");
-          EXPECT_EQ(Host::Health::Degraded,
-  cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health()); return;
-      }
-  }*/
 
   //No clauses that represent the host not being healthy
   ENVOY_LOG_MISC(trace, "Replied that the host is Healthy");
-  ASSERT(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health() == Host::Health::Healthy);
+  ASSERT(cluster_->prioritySet().getMockHostSet(0)->hosts_[index]->health() == Host::Health::Healthy);
 }
 
 void HealthCheckFuzz::streamCreate(bool create_stream_on_second_host) {
@@ -106,18 +87,18 @@ void HealthCheckFuzz::streamCreate(bool create_stream_on_second_host) {
 }
 
 void HealthCheckFuzz::replay(
-    test::common::upstream::HealthCheckTestCase input) { // call this with the
+    test::common::upstream::HealthCheckTestCase input) {
   for (int i = 0; i < input.http_actions().size(); ++i) {
     const auto& event = input.http_actions(i);
     ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
     switch (event.action_selector_case()) { // TODO: Once added implementations for tcp and gRPC,
                                             // move this to a seperate method, handleHttp
-    case test::common::upstream::HttpAction::kRespond: { // Respond
+    case test::common::upstream::HttpAction::kRespond: {
       respondHeaders(event.respond().headers(), event.respond().status(),
                      event.respond().respond_on_second_host());
       break;
     }
-    case test::common::upstream::HttpAction::kStreamCreate: { // Expect Stream Create
+    case test::common::upstream::HttpAction::kStreamCreate: {
       streamCreate(event.stream_create().create_stream_on_second_host());
       break;
     }

@@ -9,8 +9,7 @@ namespace Upstream {
 class HealthCheckFuzz : public HttpHealthCheckerImplTest {
 public:
   HealthCheckFuzz();
-  void initialize(test::common::upstream::HealthCheckTestCase
-                      input); // can pipe in proto configs in either/or of both of these methods
+  void initialize(test::common::upstream::HealthCheckTestCase input);
 
 private:
   void respondHeaders(test::fuzz::Headers headers, absl::string_view status,
@@ -20,8 +19,6 @@ private:
   void TestBody() override {}
 
   void replay(test::common::upstream::HealthCheckTestCase input);
-
-  // Event::SimulatedTimeSystem& time_source_; //is this the correct object?
   bool second_host_;
   Event::SimulatedTimeSystem time_system_;
 };
