@@ -40,8 +40,8 @@ const absl::optional<std::string> ApiTypeOracle::getEarlierTypeUrl(const std::st
   std::string message_type = type_url.substr(type_name_start + 1);
   absl::optional<std::string> old_message_type =
       ApiTypeOracle::getEarlierVersionMessageTypeName(message_type);
-  if (old_message_type) {
-    return "type.googleapis.com/" + *old_message_type;
+  if (old_message_type.has_value()) {
+    return "type.googleapis.com/" + old_message_type.value();
   }
   return {};
 }
