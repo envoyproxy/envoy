@@ -690,7 +690,7 @@ void Filter::onIdleTimeout() {
 
 void Filter::onMaxDownstreamConnectionDuration() {
   ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
-  getStreamInfo().setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().DurationTimeout);
+  getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::DurationTimeout);
   config_->stats().max_downstream_connection_duration_.inc();
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
