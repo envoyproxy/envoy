@@ -612,11 +612,44 @@ size_t HeaderMapImpl::remove(const LowerCaseString& key) {
   return old_size - headers_.size();
 }
 
+#if defined(HEADERMAP_TYPE_MULTIMAP) && !defined(MULTIMAP_ABSL_BTREE)
+size_t HeaderMapImpl::HeaderList::removeMultimapPrefix(absl::string_view prefix) {
+  // Calling this function assumes that the btree map is already in use.
+  ASSERT(maybeMakeMap());
+  size_t removed_bytes = 0;
+  auto map_entries_start = lazy_map_.lower_bound(prefix);
+  // Iterate over the entries until we reach the one with a different prefix,
+  // and erase each entry from the HeaderList but not from the map.
+  auto map_entry_it = map_entries_start;
+  for (;
+       map_entry_it != lazy_map_.end() && absl::StartsWith(map_entry_it->first, prefix);
+       map_entry_it++) {
+    removed_bytes += map_entry_it->first.size() + map_entry_it->second->value().size();
+    erase(map_entry_it->second, false /* remove_from_map */);
+  }
+  // Erase the range of keys that has the prefix from the map.
+  lazy_map_.erase(map_entries_start, map_entry_it);
+  return removed_bytes;
+}
+
+size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
+  if (headers_.maybeMakeMap()) {
+    const size_t old_size = headers_.size();
+    subtractSize(headers_.removeMultimapPrefix(prefix.get()));
+    return old_size - headers_.size();
+  } else {
+    return HeaderMapImpl::removeIf([&prefix](const HeaderEntry& entry) -> bool {
+      return absl::StartsWith(entry.key().getStringView(), prefix.get());
+    });
+  }
+}
+#else
 size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
   return HeaderMapImpl::removeIf([&prefix](const HeaderEntry& entry) -> bool {
     return absl::StartsWith(entry.key().getStringView(), prefix.get());
   });
 }
+#endif
 
 void HeaderMapImpl::dumpState(std::ostream& os, int indent_level) const {
   iterate([&os,

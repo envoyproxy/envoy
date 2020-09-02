@@ -10,8 +10,7 @@ namespace Http {
  * Add several dummy headers to a HeaderMap.
  * @param num_headers the number of dummy headers to add.
  */
-static void addDummyHeaders(HeaderMap& headers, size_t num_headers) {
-  const std::string prefix("dummy-key-");
+static void addDummyHeaders(HeaderMap& headers, size_t num_headers, const std::string prefix="dummy-key-") {
   for (size_t i = 0; i < num_headers; i++) {
     headers.addCopy(LowerCaseString(prefix + std::to_string(i)), "abcd");
   }
@@ -275,6 +274,25 @@ static void headerMapImplEmulateH2toH1Upgrade(benchmark::State& state) {
   benchmark::DoNotOptimize(total_len);
 }
 BENCHMARK(headerMapImplEmulateH2toH1Upgrade)->Arg(0)->Arg(1)->Arg(5)->Arg(10)->Arg(50);
+
+/**
+ * Measure the speed of removing a varying number of headers by key name prefix from
+ * a header-map that contains 80 headers that do not have that prefix.
+ */
+static void headerMapImplRemovePrefix(benchmark::State& state) {
+  const LowerCaseString prefix("X-prefix");
+  auto headers = Http::ResponseHeaderMapImpl::create();
+  addDummyHeaders(*headers, 80);
+  for (auto _ : state) { // NOLINT
+    // Add the headers with the prefix
+    state.PauseTiming();
+    addDummyHeaders(*headers, state.range(0), prefix.get());
+    state.ResumeTiming();
+    headers->removePrefix(prefix);
+  }
+  benchmark::DoNotOptimize(headers->size());
+}
+BENCHMARK(headerMapImplRemovePrefix)->Arg(0)->Arg(1)->Arg(5)->Arg(10)->Arg(50);
 
 } // namespace Http
 } // namespace Envoy

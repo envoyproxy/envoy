@@ -13,10 +13,7 @@
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 
-#ifndef HEADER_MAP_SIZE_THRESHOLD
-#define HEADER_MAP_SIZE_THRESHOLD 0
-#endif // !HEADER_MAP_SIZE_THRESHOLD
-//#define HEADERMAP_TYPE_MULTIMAP
+#define HEADERMAP_TYPE_MULTIMAP
 //#define MULTIMAP_ABSL_BTREE
 #include "absl/container/btree_map.h"
 
@@ -178,9 +175,10 @@ protected:
   /**
    * List of HeaderEntryImpl that keeps the pseudo headers (key starting with ':') in the front
    * of the list (as required by nghttp2) and otherwise maintains insertion order.
-   * When the list size is greater or equal to HEADER_MAP_SIZE_THRESHOLD, all headers are added
-   * to a map, to allow fast access given a header key. Once the map is initialized, it will be
-   * used even if the number of headers decreases below HEADER_MAP_SIZE_THRESHOLD
+   * When the list size is greater or equal to the envoy.http.headermap.lazy_map_min_size runtime
+   * feature value (or uint32_t max value if not set), all headers are added to a map, to allow
+   * fast access given a header key. Once the map is initialized, it will be used even if the number
+   * of headers decreases below the threshold.
    *
    * Note: the internal iterators held in fields make this unsafe to copy and move, since the
    * reference to end() is not preserved across a move (see Notes in
@@ -272,7 +270,8 @@ protected:
     }
 
     /*
-     * Creates and populates a map if the number of headers is at least HEADER_MAP_SIZE_THRESHOLD.
+     * Creates and populates a map if the number of headers is at least the
+     * envoy.http.headermap.lazy_map_min_size runtime feature value.
      *
      * @return if a map was created.
      */
@@ -307,6 +306,9 @@ protected:
       pseudo_headers_end_ = headers_.end();
       lazy_map_.clear();
     }
+#if defined(HEADERMAP_TYPE_MULTIMAP) && !defined(MULTIMAP_ABSL_BTREE)
+    size_t removeMultimapPrefix(absl::string_view prefix);
+#endif
 
   private:
     std::list<HeaderEntryImpl> headers_;
