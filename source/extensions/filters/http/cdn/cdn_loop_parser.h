@@ -75,8 +75,8 @@ public:
   // Move to the next character.
   constexpr void increment() { ++next_; }
 
-  // Update next from another context.
-  constexpr void update(const ParseContext& other) { next_ = other.next_; }
+  // Set next from another context.
+  constexpr void setNext(const ParseContext& other) { next_ = other.next_; }
 
   constexpr bool operator==(const ParseContext& other) const {
     return value_ == other.value_ && next_ == other.next_;

@@ -121,7 +121,7 @@ StatusOr<ParseContext> parseQuotedString(const ParseContext& input) {
         !quoted_pair_context) {
       return quoted_pair_context.status();
     } else {
-      context.update(*quoted_pair_context);
+      context.setNext(*quoted_pair_context);
       continue;
     }
   }
@@ -217,9 +217,9 @@ StatusOr<ParsedCdnId> parseCdnId(const ParseContext& input) {
   }
 
   if (StatusOr<ParseContext> ipv6 = parsePlausibleIpV6(context); ipv6) {
-    context.update(*ipv6);
+    context.setNext(*ipv6);
   } else if (StatusOr<ParseContext> token = parseToken(context); token) {
-    context.update(*token);
+    context.setNext(*token);
   } else {
     return token.status();
   }
@@ -252,7 +252,7 @@ StatusOr<ParseContext> parseParameter(const ParseContext& input) {
   if (StatusOr<ParseContext> parsed_token = parseToken(context); !parsed_token) {
     return parsed_token.status();
   } else {
-    context.update(*parsed_token);
+    context.setNext(*parsed_token);
   }
 
   if (context.atEnd()) {
@@ -284,11 +284,11 @@ StatusOr<ParsedCdnInfo> parseCdnInfo(const ParseContext& input) {
   if (StatusOr<ParsedCdnId> parsed_id = parseCdnId(input); !parsed_id) {
     return parsed_id.status();
   } else {
-    context.update(parsed_id->context());
+    context.setNext(parsed_id->context());
     cdn_id = parsed_id->cdnId();
   }
 
-  context.update(parseOptionalWhitespace(context));
+  context.setNext(parseOptionalWhitespace(context));
 
   while (!context.atEnd()) {
     if (context.peek() != ';') {
@@ -296,15 +296,15 @@ StatusOr<ParsedCdnInfo> parseCdnInfo(const ParseContext& input) {
     }
     context.increment();
 
-    context.update(parseOptionalWhitespace(context));
+    context.setNext(parseOptionalWhitespace(context));
 
     if (StatusOr<ParseContext> parameter = parseParameter(context); !parameter) {
       return parameter.status();
     } else {
-      context.update(*parameter);
+      context.setNext(*parameter);
     }
 
-    context.update(parseOptionalWhitespace(context));
+    context.setNext(parseOptionalWhitespace(context));
   }
 
   return ParsedCdnInfo(context, cdn_id);
@@ -314,7 +314,7 @@ StatusOr<ParsedCdnInfoList> parseCdnInfoList(const ParseContext& input) {
   std::vector<std::string_view> cdn_infos;
   ParseContext context = input;
 
-  context.update(parseOptionalWhitespace(context));
+  context.setNext(parseOptionalWhitespace(context));
 
   while (!context.atEnd()) {
     // Loop invariant: we're always at the beginning of a new element.
@@ -322,7 +322,7 @@ StatusOr<ParsedCdnInfoList> parseCdnInfoList(const ParseContext& input) {
     if (context.peek() == ',') {
       // Empty element case
       context.increment();
-      context.update(parseOptionalWhitespace(context));
+      context.setNext(parseOptionalWhitespace(context));
       continue;
     }
 
@@ -330,10 +330,10 @@ StatusOr<ParsedCdnInfoList> parseCdnInfoList(const ParseContext& input) {
       return parsed_cdn_info.status();
     } else {
       cdn_infos.push_back(parsed_cdn_info->cdnId());
-      context.update(parsed_cdn_info->context());
+      context.setNext(parsed_cdn_info->context());
     }
 
-    context.update(parseOptionalWhitespace(context));
+    context.setNext(parseOptionalWhitespace(context));
 
     if (context.atEnd()) {
       break;
@@ -346,7 +346,7 @@ StatusOr<ParsedCdnInfoList> parseCdnInfoList(const ParseContext& input) {
       context.increment();
     }
 
-    context.update(parseOptionalWhitespace(context));
+    context.setNext(parseOptionalWhitespace(context));
   }
 
   return ParsedCdnInfoList(context, std::move(cdn_infos));
