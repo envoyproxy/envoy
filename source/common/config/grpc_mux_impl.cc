@@ -124,13 +124,9 @@ void GrpcMuxImpl::onDiscoveryResponse(
   // If this type url is not watched(no subscriber or no watcher), try older version of type url.
   if (api_state_.count(type_url) == 0 ||
       (api_state_[type_url].watches_.empty() && !message->resources().empty())) {
-    absl::optional<std::string> old_type_url =
-        ApiTypeOracle::getEarlierTypeUrl(message->type_url());
-    if (old_type_url) {
-      ENVOY_LOG(debug, "v3 {} converted to v2 {}.", message->type_url(), *old_type_url);
-    }
-
+    absl::optional<std::string> old_type_url = ApiTypeOracle::getEarlierTypeUrl(type_url);
     if (old_type_url && api_state_.count(*old_type_url)) {
+      ENVOY_LOG(debug, "v3 {} converted to v2 {}.", message->type_url(), *old_type_url);
       type_url = *old_type_url;
     }
     if (api_state_.count(type_url) == 0) {
@@ -153,12 +149,9 @@ void GrpcMuxImpl::onDiscoveryResponse(
       api_state_[type_url].request_.set_version_info(message->version_info());
       return;
     } else {
-      bool type_match_found = false;
-      if (!type_match_found) {
-        ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
-        queueDiscoveryRequest(type_url);
-        return;
-      }
+      ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
+      queueDiscoveryRequest(type_url);
+      return;
     }
   }
   ScopedResume same_type_resume;

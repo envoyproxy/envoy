@@ -33,14 +33,8 @@ ApiTypeOracle::getEarlierVersionMessageTypeName(const std::string& message_type)
 }
 
 const absl::optional<std::string> ApiTypeOracle::getEarlierTypeUrl(const std::string& type_url) {
-  char delimeter = '/';
-  size_t type_name_start = type_url.size();
-  for (size_t i = 0; i < type_url.size(); i++) {
-    if (type_url[i] == delimeter) {
-      type_name_start = i;
-    }
-  }
-  if (type_name_start == type_url.size()) {
+  size_t type_name_start = type_url.find('/');
+  if (type_name_start == std::string::npos) {
     return {};
   }
   std::string message_type = type_url.substr(type_name_start + 1);

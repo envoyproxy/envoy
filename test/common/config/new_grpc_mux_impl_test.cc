@@ -177,7 +177,30 @@ TEST_F(NewGrpcMuxImplTest, V3ResourceResponseV2ResourceWatch) {
   auto watch = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  // Cluster is not watched, v3 resource is rejected.
   grpc_mux_->start();
+  {
+    auto unexpected_response =
+        std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    envoy::config::cluster::v3::Cluster cluster;
+    unexpected_response->set_type_url("type.googleapis.com/envoy.config.cluster.v3.Cluster");
+    unexpected_response->set_system_version_info("0");
+    unexpected_response->add_resources()->mutable_resource()->PackFrom(cluster);
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "0")).Times(0);
+    grpc_mux_->onDiscoveryResponse(std::move(unexpected_response), control_plane_stats_);
+  }
+  // Cluster is not watched, v2 resource is rejected.
+  {
+    auto unexpected_response =
+        std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    envoy::config::cluster::v3::Cluster cluster;
+    unexpected_response->set_type_url(Config::TypeUrl::get().Cluster);
+    unexpected_response->set_system_version_info("0");
+    unexpected_response->add_resources()->mutable_resource()->PackFrom(API_DOWNGRADE(cluster));
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "0")).Times(0);
+    grpc_mux_->onDiscoveryResponse(std::move(unexpected_response), control_plane_stats_);
+  }
+  // ClusterLoadAssignment v2 is watched, v3 resource will be accepted.
   {
     auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
     response->set_system_version_info("1");
