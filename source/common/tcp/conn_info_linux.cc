@@ -2,10 +2,10 @@
 #error "Linux platform file is part of non-Linux build."
 #endif
 
-#include "common/tcp/conn_info.h"
-
 #include "envoy/common/platform.h"
 #include "envoy/network/socket.h"
+
+#include "common/tcp/conn_info.h"
 
 namespace Envoy {
 namespace Tcp {

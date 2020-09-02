@@ -1,10 +1,10 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
-
-licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -78,7 +78,6 @@ envoy_cc_library(
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
-        "//source/common/tcp:conn_info_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
@@ -88,6 +87,7 @@ envoy_cc_library(
         "//source/common/event:libevent_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/common/tcp:conn_info_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
