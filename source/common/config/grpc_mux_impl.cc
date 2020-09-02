@@ -126,8 +126,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
       (api_state_[type_url].watches_.empty() && !message->resources().empty())) {
     absl::optional<std::string> old_type_url = ApiTypeOracle::getEarlierTypeUrl(type_url);
     if (old_type_url.has_value() && api_state_.count(*old_type_url)) {
-      ENVOY_LOG(debug, "v3 {} converted to v2 {}.", message->type_url(), *old_type_url);
-      type_url = *old_type_url;
+      ENVOY_LOG(debug, "v3 {} converted to v2 {}.", message->type_url(), old_type_url.value());
+      type_url = old_type_url.value();
     }
     if (api_state_.count(type_url) == 0) {
       // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
