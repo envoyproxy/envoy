@@ -12,8 +12,9 @@
 #include "common/common/non_copyable.h"
 #include "common/common/utility.h"
 #include "common/http/headers.h"
+#include "common/runtime/runtime_features.h"
 
-#define HEADERMAP_TYPE_MULTIMAP
+//#define HEADERMAP_TYPE_MULTIMAP
 //#define MULTIMAP_ABSL_BTREE
 #include "absl/container/btree_map.h"
 
@@ -200,7 +201,10 @@ protected:
     using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderNodeVector>;
 #endif
 
-    HeaderList() : pseudo_headers_end_(headers_.end()) {}
+    HeaderList()
+        : pseudo_headers_end_(headers_.end()),
+          lazy_map_min_size_(static_cast<uint32_t>(Runtime::getInteger(
+              "envoy.http.headermap.lazy_map_min_size", std::numeric_limits<uint32_t>::max()))) {}
 
     template <class Key> bool isPseudoHeader(const Key& key) {
       return !key.getStringView().empty() && key.getStringView()[0] == ':';
@@ -313,6 +317,8 @@ protected:
   private:
     std::list<HeaderEntryImpl> headers_;
     HeaderNode pseudo_headers_end_;
+    // The number of headers threshold for lazy map usage.
+    const uint32_t lazy_map_min_size_;
     HeaderLazyMap lazy_map_;
   };
 
