@@ -111,7 +111,7 @@ bool OsSysCallsImpl::supportsUdpGso() const {
 }
 
 bool OsSysCallsImpl::supportsIpTransparent() const {
-#if !defined(__linux__)
+#if !defined(__linux__) || !defined(IPV6_TRANSPARENT)
   return false;
 #else
   // The linux kernel supports IP_TRANSPARENT by following patch(starting from v2.6.28) :
