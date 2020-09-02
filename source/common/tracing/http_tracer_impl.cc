@@ -176,7 +176,8 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
 
     if (remote_address->type() == Network::Address::Type::Ip) {
       const auto remote_ip = remote_address->ip();
-      span.setTag(Tracing::Tags::get().PeerAddress, remote_ip->addressAsString());
+      span.setTag(Tracing::Tags::get().PeerAddress,
+                  absl::StrCat(remote_ip->addressAsString(), ":", remote_ip->port()));
     } else {
       span.setTag(Tracing::Tags::get().PeerAddress, remote_address->logicalName());
     }

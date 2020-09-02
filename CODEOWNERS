@@ -48,6 +48,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/tracers/datadog @cgilmour @palazzem @mattklein123
 # tracers.xray extension
 /*/extensions/tracers/xray @marcomagdy @lavignes @mattklein123
+# tracers.skywalking extension
+/*/extensions/tracers/skywalking @dio @lizan
 # mysql_proxy extension
 /*/extensions/filters/network/mysql_proxy @rshriram @venilnoronha @mattklein123
 # postgres_proxy extension

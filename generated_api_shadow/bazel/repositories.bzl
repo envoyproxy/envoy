@@ -37,6 +37,11 @@ def api_dependencies():
         locations = REPOSITORY_LOCATIONS,
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
     )
+    envoy_http_archive(
+        name = "com_github_apache_skywalking_data_collect_protocol",
+        locations = REPOSITORY_LOCATIONS,
+        build_file_content = SKYWALKING_DATA_COLLECT_PROTOCOL_BUILD_CONTENT,
+    )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
@@ -95,6 +100,20 @@ api_cc_py_proto_library(
 go_proto_library(
     name = "zipkin_go_proto",
     proto = ":zipkin",
+    visibility = ["//visibility:public"],
+)
+"""
+
+SKYWALKING_DATA_COLLECT_PROTOCOL_BUILD_CONTENT = """
+load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
+cc_proto_library(
+    name = "protocol_cc_proto",
+    srcs = [
+        "common/Common.proto",
+        "language-agent/Tracing.proto",
+    ],
+    default_runtime = "@com_google_protobuf//:protobuf",
+    protoc = "@com_google_protobuf//:protoc",
     visibility = ["//visibility:public"],
 )
 """
