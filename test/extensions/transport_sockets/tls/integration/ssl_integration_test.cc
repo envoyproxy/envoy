@@ -401,6 +401,9 @@ TEST_P(SslCertficateIntegrationTest, BothEcdsaAndRsaWithOcspResponseStaplingRequ
   checkStats();
 }
 
+// TODO(zuercher): write an additional OCSP integration test that validates behavior with an
+// expired OCSP response. (Requires OCSP client-side support in upstream TLS.)
+
 // TODO(mattklein123): Move this into a dedicated integration test for the tap transport socket as
 // well as add more tests.
 class SslTapIntegrationTest : public SslIntegrationTest {
