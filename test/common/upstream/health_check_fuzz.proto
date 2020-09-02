@@ -9,7 +9,7 @@ import "envoy/config/core/v3/health_check.proto";
 message Respond {
   test.fuzz.Headers headers = 1;
   string status =
-      2; //[(validate.rules).string = ] Add validation that all the characters are between 0 - 9, or ' ', would something like "9 00 9" pass?, and require it
+      2 [(validate.rules).string.pattern = "([0-9] | [ ])*"];
   bool respond_on_second_host =
       3; //If there's a second host, this will determine which host, if not ignore
 }
