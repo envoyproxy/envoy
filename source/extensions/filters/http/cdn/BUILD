@@ -9,18 +9,18 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "cdn_loop_parser",
+    name = "cdn_loop_parser_lib",
     srcs = ["cdn_loop_parser.cc"],
     hdrs = ["cdn_loop_parser.h"],
     deps = ["//source/common/common:statusor_lib"],
 )
 
 envoy_cc_library(
-    name = "cdn_loop_utils",
+    name = "cdn_loop_utils_lib",
     srcs = ["cdn_loop_utils.cc"],
     hdrs = ["cdn_loop_utils.h"],
     deps = [
-        ":cdn_loop_parser",
+        ":cdn_loop_parser_lib",
         "//source/common/common:statusor_lib",
     ],
 )

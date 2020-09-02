@@ -19,7 +19,7 @@ envoy_cc_test(
     srcs = ["cdn_loop_parser_test.cc"],
     deps = [
         "status_helpers",
-        "//source/extensions/filters/http/cdn:cdn_loop_parser",
+        "//source/extensions/filters/http/cdn:cdn_loop_parser_lib",
     ],
 )
 
@@ -28,6 +28,6 @@ envoy_cc_test(
     srcs = ["cdn_loop_utils_test.cc"],
     deps = [
         ":status_helpers",
-        "//source/extensions/filters/http/cdn:cdn_loop_utils",
+        "//source/extensions/filters/http/cdn:cdn_loop_utils_lib",
     ],
 )
