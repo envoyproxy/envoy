@@ -14,6 +14,7 @@ message Respond {
 }
 
 message StreamCreate {
+    bool create_stream_on_second_host = 1;
 }
 
 message AdvanceTime {
@@ -25,7 +26,7 @@ message HttpAction {
     Respond respond = 1;
     StreamCreate stream_create = 2;
     //TODO: time advancement, multiple hosts (maps to other two as well), separate respondBody, respondTrailers, nameMatcher thing
-    //AdvanceTime advance_time = 3;
+    AdvanceTime advance_time = 3;
   }
 }
 

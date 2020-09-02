@@ -78,11 +78,16 @@ void HealthCheckFuzz::respondHeaders(
   // cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
-void HealthCheckFuzz::streamCreate() {
-  ENVOY_LOG_MISC(trace, "Created a new stream.");
-  expectStreamCreate(0);
-  // EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
-  test_sessions_[0]->interval_timer_->invokeCallback();
+void HealthCheckFuzz::streamCreate(bool respond_on_second_host) {
+  ENVOY_LOG_MISC(trace, "Created a new stream on host 1.");
+  if (second_host_) {
+    int index = (respond_on_second_host) ? 1 : 0;
+    expectStreamCreate(index);
+    test_sessions_[index]->interval_timer_->invokeCallback();
+  } else {
+    expectStreamCreate(0);
+    test_sessions_[0]->interval_timer_->invokeCallback();
+  }
 }
 
 void HealthCheckFuzz::replay(
@@ -98,15 +103,15 @@ void HealthCheckFuzz::replay(
       break;
     }
     case test::common::upstream::HttpAction::kStreamCreate: { // Expect Stream Create
-      streamCreate();
+      streamCreate(event.stream_create().create_stream_on_second_host());
       break;
     }
-    /*case test::common::upstream::HttpAction::kAdvanceTime: {
+    case test::common::upstream::HttpAction::kAdvanceTime: {
         time_source_.advanceTimeAsync(
             std::chrono::milliseconds(event.advance_time().ms_advanced());
         );
-        dispatcher_
-    }*/
+        //dispatcher_
+    }
     default: {
       break;
     }

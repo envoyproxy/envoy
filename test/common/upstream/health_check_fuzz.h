@@ -23,6 +23,7 @@ private:
 
   // Event::SimulatedTimeSystem& time_source_; //is this the correct object?
   bool second_host_;
+  Event::SimulatedTimeSystem time_system_;
 };
 
 } // namespace Upstream
