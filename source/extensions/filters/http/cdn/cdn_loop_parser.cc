@@ -42,7 +42,7 @@ constexpr bool isObsText(char c) { return 0x80 & c; }
 
 // RFC 7230 Section 3.2.6 defines qdtext as:
 //
-// qdtext         = HTAB / SP /%x21 / %x23-5B / %x5D-7E / obs-text
+// qdtext         = HTAB / SP / %x21 / %x23-5B / %x5D-7E / obs-text
 constexpr bool isQdText(char c) {
   return c == '\t' || c == ' ' || c == '\x21' || ('\x23' <= c && c <= '\x5B') ||
          ('\x5D' <= c && c <= '\x7E') || isObsText(c);
@@ -59,7 +59,7 @@ constexpr bool isVChar(char c) { return '\x21' <= c && c <= '\x7e'; }
 ParseContext parseOptionalWhitespace(const ParseContext& input) {
   ParseContext context = input;
   while (!context.atEnd()) {
-    char c = context.peek();
+    const char c = context.peek();
     if (!(c == ' ' || c == '\t')) {
       break;
     }
@@ -124,9 +124,6 @@ StatusOr<ParseContext> parseQuotedString(const ParseContext& input) {
       context.update(*quoted_pair_context);
       continue;
     }
-
-    // sub-expressions have parsed as much as they can
-    break;
   }
 
   if (context.atEnd()) {
@@ -146,10 +143,12 @@ StatusOr<ParseContext> parseQuotedString(const ParseContext& input) {
 StatusOr<ParseContext> parseToken(const ParseContext& input) {
   ParseContext context = input;
   while (!context.atEnd()) {
-    char c = context.peek();
-    if (c == '!' || c == '#' || c == '$' || c == '%' || c == '&' || c == '\'' || c == '*' ||
-        c == '+' || c == '-' || c == '.' || c == '^' || c == '_' || c == '`' || c == '|' ||
-        c == '~' || isDigit(c) || isAlpha(c)) {
+    const char c = context.peek();
+    // Put alphanumeric, -, and _ characters at the head of the list since
+    // they're likely to be used most often.
+    if (isAlpha(c) || isDigit(c) || c == '-' || c == '_' || c == '!' || c == '#' || c == '$' ||
+        c == '%' || c == '&' || c == '\'' || c == '*' || c == '+' || c == '.' || c == '^' ||
+        c == '`' || c == '|' || c == '~') {
       context.increment();
     } else {
       break;
@@ -181,7 +180,7 @@ StatusOr<ParseContext> parsePlausibleIpV6(const ParseContext& input) {
     if (context.atEnd()) {
       break;
     }
-    char c = context.peek();
+    const char c = context.peek();
     if (!(isHexDigitCaseInsensitive(c) || c == ':' || c == '.')) {
       break;
     }
