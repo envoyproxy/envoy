@@ -100,7 +100,7 @@ message ValidationAssert {
   // Match the returned redirect path.
   google.protobuf.StringValue path_redirect = 6;
 
-  // Match the listed request or response header fields. (Deprecated, use *_header_matches)
+  // Match the listed request or response header fields. These fields are deprecated, use *_header_matches instead.
   repeated envoy.config.core.v3.HeaderValue request_header_fields = 9 [deprecated = true];
   repeated envoy.config.core.v3.HeaderValue response_header_fields = 10 [deprecated = true];
 
