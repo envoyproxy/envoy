@@ -100,13 +100,13 @@ public:
   const std::string& contentEncoding() { return decompressor_factory_->contentEncoding(); }
   const RequestDirectionConfig& requestDirectionConfig() { return request_direction_config_; }
   const ResponseDirectionConfig& responseDirectionConfig() { return response_direction_config_; }
-  // TODO: replace std::vector for std::pair. For some reason the macro is failing to build with a
-  // multivariate templated type.
-  const std::vector<Http::LowerCaseString>& trailersStrings() const {
-    CONSTRUCT_ON_FIRST_USE(
-        std::vector<Http::LowerCaseString>,
-        {Http::LowerCaseString(fmt::format("{}-compressed-bytes", trailers_prefix_)),
-         Http::LowerCaseString(fmt::format("{}-uncompressed-bytes", trailers_prefix_))});
+  const Http::LowerCaseString& trailersCompressedBytesString() const {
+    CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, Http::LowerCaseString(fmt::format(
+                                                      "{}-compressed-bytes", trailers_prefix_)));
+  }
+  const Http::LowerCaseString& trailersUncompressedBytesString() const {
+    CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, Http::LowerCaseString(fmt::format(
+                                                      "{}-uncompressed-bytes", trailers_prefix_)));
   }
 
 private:
