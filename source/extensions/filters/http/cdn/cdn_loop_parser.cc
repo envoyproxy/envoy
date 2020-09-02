@@ -218,12 +218,10 @@ StatusOr<ParsedCdnId> parseCdnId(const ParseContext& input) {
 
   if (StatusOr<ParseContext> ipv6 = parsePlausibleIpV6(context); ipv6) {
     context.update(*ipv6);
+  } else if (StatusOr<ParseContext> token = parseToken(context); token) {
+    context.update(*token);
   } else {
-    if (StatusOr<ParseContext> token = parseToken(context); !token) {
-      return token.status();
-    } else {
-      context.update(*token);
-    }
+    return token.status();
   }
 
   if (context.atEnd()) {
