@@ -146,6 +146,12 @@ TEST(ParseTokenTest, TwoTokens) {
   }
 }
 
+TEST(ParseTokenTest, ParseEmpty) {
+  const std::string value = "";
+  ParseContext input(value);
+  EXPECT_THAT(parseToken(input), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
 TEST(ParsePlausibleIpV6, Example) {
   const std::string value = "[2001:DB8::1]";
   ParseContext input(value);

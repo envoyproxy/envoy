@@ -155,8 +155,13 @@ StatusOr<ParseContext> parseToken(const ParseContext& input) {
     }
   }
   if (context.next() == input.next()) {
-    return absl::InvalidArgumentError(
-        absl::StrFormat("expected token starting at position %d.", input.next()));
+    if (context.atEnd()) {
+      return absl::InvalidArgumentError(absl::StrFormat(
+          "expected token starting at position %d; found end of input", input.next()));
+    } else {
+      return absl::InvalidArgumentError(absl::StrFormat(
+          "expected token starting at position %d; found %c", input.next(), context.peek()));
+    }
   }
 
   return context;
