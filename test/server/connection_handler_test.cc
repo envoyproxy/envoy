@@ -524,7 +524,7 @@ TEST_F(ConnectionHandlerTest, CloseConnectionOnEmptyFilterChain) {
 TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingNoCallback) {
   InSequence s;
 
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
@@ -546,7 +546,7 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingNoCallback) {
 }
 
 TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingSuccess) {
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
@@ -588,7 +588,7 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingSuccess) {
 TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingFail) {
   InSequence s;
 
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
@@ -623,7 +623,7 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingFail) {
 }
 
 TEST_F(ConnectionHandlerTest, OnDemandFilterChainMultipleRebuildingRequests) {
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
@@ -674,7 +674,7 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainMultipleRebuildingRequests) {
 TEST_F(ConnectionHandlerTest, ListenerUpdateDuringOnDemandFilterChainRebuilding) {
   uint64_t old_listener_tag = 1;
   uint64_t new_listener_tag = 2;
-  Network::ListenerCallbacks* old_listener_callbacks;
+  Network::TcpListenerCallbacks* old_listener_callbacks;
   auto old_listener = new NiceMock<Network::MockListener>();
   TestListener* old_test_listener = addListener(old_listener_tag, true, false, "test_listener",
                                                 old_listener, &old_listener_callbacks);
@@ -697,7 +697,7 @@ TEST_F(ConnectionHandlerTest, ListenerUpdateDuringOnDemandFilterChainRebuilding)
   on_demand_filter_chain_->storeRebuiltFilterChain(filter_chain_);
 
   // Listener update before receiveing rebuilding callback.
-  Network::ListenerCallbacks* new_listener_callbacks = nullptr;
+  Network::TcpListenerCallbacks* new_listener_callbacks = nullptr;
 
   auto overridden_filter_chain_manager =
       std::make_shared<NiceMock<Network::MockFilterChainManager>>();
