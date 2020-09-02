@@ -8,10 +8,11 @@
 #include "common/memory/stats.h"
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/ring_hash_lb.h"
+#include "common/upstream/subset_lb.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 
 #include "benchmark/benchmark.h"
 
@@ -21,14 +22,28 @@ namespace {
 
 class BaseTester {
 public:
+  static constexpr absl::string_view metadata_key = "key";
   // We weight the first weighted_subset_percent of hosts with weight.
-  BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent = 0, uint32_t weight = 0) {
+  BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent = 0, uint32_t weight = 0,
+             bool attach_metadata = false) {
     HostVector hosts;
     ASSERT(num_hosts < 65536);
     for (uint64_t i = 0; i < num_hosts; i++) {
       const bool should_weight = i < num_hosts * (weighted_subset_percent / 100.0);
-      hosts.push_back(makeTestHost(info_, fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256),
-                                   should_weight ? weight : 1));
+      const std::string url = fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256);
+      const auto effective_weight = should_weight ? weight : 1;
+      if (attach_metadata) {
+        envoy::config::core::v3::Metadata metadata;
+        ProtobufWkt::Value value;
+        value.set_number_value(i);
+        ProtobufWkt::Struct& map =
+            (*metadata.mutable_filter_metadata())[Config::MetadataFilters::get().ENVOY_LB];
+        (*map.mutable_fields())[std::string(metadata_key)] = value;
+
+        hosts.push_back(makeTestHost(info_, url, metadata, effective_weight));
+      } else {
+        hosts.push_back(makeTestHost(info_, url, effective_weight));
+      }
     }
 
     HostVectorConstSharedPtr updated_hosts = std::make_shared<HostVector>(hosts);
@@ -82,8 +97,8 @@ public:
   std::unique_ptr<LeastRequestLoadBalancer> lb_;
 };
 
-void BM_RoundRobinLoadBalancerBuild(benchmark::State& state) {
-  for (auto _ : state) {
+void benchmarkRoundRobinLoadBalancerBuild(benchmark::State& state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
     const uint64_t weighted_subset_percent = state.range(1);
@@ -105,7 +120,7 @@ void BM_RoundRobinLoadBalancerBuild(benchmark::State& state) {
     state.ResumeTiming();
   }
 }
-BENCHMARK(BM_RoundRobinLoadBalancerBuild)
+BENCHMARK(benchmarkRoundRobinLoadBalancerBuild)
     ->Args({1, 0, 1})
     ->Args({500, 0, 1})
     ->Args({500, 50, 50})
@@ -153,8 +168,8 @@ uint64_t hashInt(uint64_t i) {
   return HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i)));
 }
 
-void BM_RingHashLoadBalancerBuildRing(benchmark::State& state) {
-  for (auto _ : state) {
+void benchmarkRingHashLoadBalancerBuildRing(benchmark::State& state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
     const uint64_t min_ring_size = state.range(1);
@@ -172,7 +187,7 @@ void BM_RingHashLoadBalancerBuildRing(benchmark::State& state) {
     state.ResumeTiming();
   }
 }
-BENCHMARK(BM_RingHashLoadBalancerBuildRing)
+BENCHMARK(benchmarkRingHashLoadBalancerBuildRing)
     ->Args({100, 65536})
     ->Args({200, 65536})
     ->Args({500, 65536})
@@ -181,8 +196,8 @@ BENCHMARK(BM_RingHashLoadBalancerBuildRing)
     ->Args({500, 256000})
     ->Unit(benchmark::kMillisecond);
 
-void BM_MaglevLoadBalancerBuildTable(benchmark::State& state) {
-  for (auto _ : state) {
+void benchmarkMaglevLoadBalancerBuildTable(benchmark::State& state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
     MaglevTester tester(num_hosts);
@@ -199,7 +214,7 @@ void BM_MaglevLoadBalancerBuildTable(benchmark::State& state) {
     state.ResumeTiming();
   }
 }
-BENCHMARK(BM_MaglevLoadBalancerBuildTable)
+BENCHMARK(benchmarkMaglevLoadBalancerBuildTable)
     ->Arg(100)
     ->Arg(200)
     ->Arg(500)
@@ -233,8 +248,8 @@ void computeHitStats(benchmark::State& state,
   state.counters["relative_stddev_hits"] = (stddev / mean);
 }
 
-void BM_LeastRequestLoadBalancerChooseHost(benchmark::State& state) {
-  for (auto _ : state) {
+void benchmarkLeastRequestLoadBalancerChooseHost(benchmark::State& state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
     const uint64_t choice_count = state.range(1);
@@ -254,7 +269,7 @@ void BM_LeastRequestLoadBalancerChooseHost(benchmark::State& state) {
     state.ResumeTiming();
   }
 }
-BENCHMARK(BM_LeastRequestLoadBalancerChooseHost)
+BENCHMARK(benchmarkLeastRequestLoadBalancerChooseHost)
     ->Args({100, 1, 1000000})
     ->Args({100, 2, 1000000})
     ->Args({100, 3, 1000000})
@@ -263,8 +278,8 @@ BENCHMARK(BM_LeastRequestLoadBalancerChooseHost)
     ->Args({100, 100, 1000000})
     ->Unit(benchmark::kMillisecond);
 
-void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
-  for (auto _ : state) {
+void benchmarkRingHashLoadBalancerChooseHost(benchmark::State& state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     // Do not time the creation of the ring.
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
@@ -293,7 +308,7 @@ void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
     state.ResumeTiming();
   }
 }
-BENCHMARK(BM_RingHashLoadBalancerChooseHost)
+BENCHMARK(benchmarkRingHashLoadBalancerChooseHost)
     ->Args({100, 65536, 100000})
     ->Args({200, 65536, 100000})
     ->Args({500, 65536, 100000})
@@ -302,8 +317,8 @@ BENCHMARK(BM_RingHashLoadBalancerChooseHost)
     ->Args({500, 256000, 100000})
     ->Unit(benchmark::kMillisecond);
 
-void BM_MaglevLoadBalancerChooseHost(benchmark::State& state) {
-  for (auto _ : state) {
+void benchmarkMaglevLoadBalancerChooseHost(benchmark::State& state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     // Do not time the creation of the table.
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
@@ -329,14 +344,14 @@ void BM_MaglevLoadBalancerChooseHost(benchmark::State& state) {
     state.ResumeTiming();
   }
 }
-BENCHMARK(BM_MaglevLoadBalancerChooseHost)
+BENCHMARK(benchmarkMaglevLoadBalancerChooseHost)
     ->Args({100, 100000})
     ->Args({200, 100000})
     ->Args({500, 100000})
     ->Unit(benchmark::kMillisecond);
 
-void BM_RingHashLoadBalancerHostLoss(benchmark::State& state) {
-  for (auto _ : state) {
+void benchmarkRingHashLoadBalancerHostLoss(benchmark::State& state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     const uint64_t num_hosts = state.range(0);
     const uint64_t min_ring_size = state.range(1);
     const uint64_t hosts_to_lose = state.range(2);
@@ -375,14 +390,14 @@ void BM_RingHashLoadBalancerHostLoss(benchmark::State& state) {
         (static_cast<double>(hosts_to_lose) / num_hosts) * 100;
   }
 }
-BENCHMARK(BM_RingHashLoadBalancerHostLoss)
+BENCHMARK(benchmarkRingHashLoadBalancerHostLoss)
     ->Args({500, 256000, 1, 10000})
     ->Args({500, 256000, 2, 10000})
     ->Args({500, 256000, 3, 10000})
     ->Unit(benchmark::kMillisecond);
 
-void BM_MaglevLoadBalancerHostLoss(benchmark::State& state) {
-  for (auto _ : state) {
+void benchmarkMaglevLoadBalancerHostLoss(benchmark::State& state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     const uint64_t num_hosts = state.range(0);
     const uint64_t hosts_to_lose = state.range(1);
     const uint64_t keys_to_simulate = state.range(2);
@@ -420,14 +435,14 @@ void BM_MaglevLoadBalancerHostLoss(benchmark::State& state) {
         (static_cast<double>(hosts_to_lose) / num_hosts) * 100;
   }
 }
-BENCHMARK(BM_MaglevLoadBalancerHostLoss)
+BENCHMARK(benchmarkMaglevLoadBalancerHostLoss)
     ->Args({500, 1, 10000})
     ->Args({500, 2, 10000})
     ->Args({500, 3, 10000})
     ->Unit(benchmark::kMillisecond);
 
-void BM_MaglevLoadBalancerWeighted(benchmark::State& state) {
-  for (auto _ : state) {
+void benchmarkMaglevLoadBalancerWeighted(benchmark::State& state) {
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
     const uint64_t num_hosts = state.range(0);
     const uint64_t weighted_subset_percent = state.range(1);
     const uint64_t before_weight = state.range(2);
@@ -473,7 +488,7 @@ void BM_MaglevLoadBalancerWeighted(benchmark::State& state) {
         std::abs(weighted_hosts_percent(before_weight) - weighted_hosts_percent(after_weight));
   }
 }
-BENCHMARK(BM_MaglevLoadBalancerWeighted)
+BENCHMARK(benchmarkMaglevLoadBalancerWeighted)
     ->Args({500, 5, 1, 1, 10000})
     ->Args({500, 5, 1, 127, 1000})
     ->Args({500, 5, 127, 1, 10000})
@@ -483,6 +498,75 @@ BENCHMARK(BM_MaglevLoadBalancerWeighted)
     ->Args({500, 95, 127, 1, 10000})
     ->Args({500, 95, 25, 75, 1000})
     ->Args({500, 95, 75, 25, 10000})
+    ->Unit(benchmark::kMillisecond);
+
+class SubsetLbTester : public BaseTester {
+public:
+  SubsetLbTester(uint64_t num_hosts, bool single_host_per_subset)
+      : BaseTester(num_hosts, 0, 0, true /* attach metadata */) {
+    envoy::config::cluster::v3::Cluster::LbSubsetConfig subset_config;
+    subset_config.set_fallback_policy(
+        envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT);
+    auto* selector = subset_config.mutable_subset_selectors()->Add();
+    selector->set_single_host_per_subset(single_host_per_subset);
+    *selector->mutable_keys()->Add() = metadata_key;
+
+    subset_info_ = std::make_unique<LoadBalancerSubsetInfoImpl>(subset_config);
+    lb_ = std::make_unique<SubsetLoadBalancer>(
+        LoadBalancerType::Random, priority_set_, &local_priority_set_, stats_, stats_store_,
+        runtime_, random_, *subset_info_, absl::nullopt, absl::nullopt, common_config_);
+
+    const HostVector& hosts = priority_set_.getOrCreateHostSet(0).hosts();
+    ASSERT(hosts.size() == num_hosts);
+    orig_hosts_ = std::make_shared<HostVector>(hosts);
+    smaller_hosts_ = std::make_shared<HostVector>(hosts.begin() + 1, hosts.end());
+    ASSERT(smaller_hosts_->size() + 1 == orig_hosts_->size());
+    orig_locality_hosts_ = makeHostsPerLocality({*orig_hosts_});
+    smaller_locality_hosts_ = makeHostsPerLocality({*smaller_hosts_});
+  }
+
+  // Remove a host and add it back.
+  void update() {
+    priority_set_.updateHosts(0,
+                              HostSetImpl::partitionHosts(smaller_hosts_, smaller_locality_hosts_),
+                              nullptr, {}, host_moved_, absl::nullopt);
+    priority_set_.updateHosts(0, HostSetImpl::partitionHosts(orig_hosts_, orig_locality_hosts_),
+                              nullptr, host_moved_, {}, absl::nullopt);
+  }
+
+  std::unique_ptr<LoadBalancerSubsetInfoImpl> subset_info_;
+  std::unique_ptr<SubsetLoadBalancer> lb_;
+  HostVectorConstSharedPtr orig_hosts_;
+  HostVectorConstSharedPtr smaller_hosts_;
+  HostsPerLocalitySharedPtr orig_locality_hosts_;
+  HostsPerLocalitySharedPtr smaller_locality_hosts_;
+  HostVector host_moved_;
+};
+
+void benchmarkSubsetLoadBalancerCreate(benchmark::State& state) {
+  const bool single_host_per_subset = state.range(0);
+  const uint64_t num_hosts = state.range(1);
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
+    SubsetLbTester tester(num_hosts, single_host_per_subset);
+  }
+}
+
+BENCHMARK(benchmarkSubsetLoadBalancerCreate)
+    ->Ranges({{false, true}, {50, 2500}})
+    ->Unit(benchmark::kMillisecond);
+
+void benchmarkSubsetLoadBalancerUpdate(benchmark::State& state) {
+  const bool single_host_per_subset = state.range(0);
+  const uint64_t num_hosts = state.range(1);
+  SubsetLbTester tester(num_hosts, single_host_per_subset);
+
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
+    tester.update();
+  }
+}
+
+BENCHMARK(benchmarkSubsetLoadBalancerUpdate)
+    ->Ranges({{false, true}, {50, 2500}})
     ->Unit(benchmark::kMillisecond);
 
 } // namespace

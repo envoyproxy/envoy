@@ -12,10 +12,7 @@ envoy_cc_library(
     name = "pass_through_filter_lib",
     hdrs = ["pass_through_filter.h"],
     # A thin shim used by test and prod filters.
-    visibility = [
-        "//source:__subpackages__",
-        "//test:__subpackages__",
-    ],
+    visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/server:filter_config_interface",
     ],
@@ -24,6 +21,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "factory_base_lib",
     hdrs = ["factory_base.h"],
+    visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/server:filter_config_interface",
     ],

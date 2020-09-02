@@ -60,7 +60,8 @@ public:
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::ListenerCallbacks& cb, bool bind_to_port) override;
+                                      Network::TcpListenerCallbacks& cb, bool bind_to_port,
+                                      uint32_t backlog_size) override;
   Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
                                             Network::UdpListenerCallbacks& cb) override;
   TimerPtr createTimer(TimerCb cb) override;
@@ -80,12 +81,12 @@ public:
   void updateApproximateMonotonicTime() override;
 
   // FatalErrorInterface
-  void onFatalError() const override {
+  void onFatalError(std::ostream& os) const override {
     // Dump the state of the tracked object if it is in the current thread. This generally results
     // in dumping the active state only for the thread which caused the fatal error.
     if (isThreadSafe()) {
       if (current_object_) {
-        current_object_->dumpState(std::cerr);
+        current_object_->dumpState(os);
       }
     }
   }

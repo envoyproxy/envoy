@@ -9,8 +9,11 @@ export PPROF_PATH=/thirdparty_build/bin/pprof
 [ -z "${NUM_CPUS}" ] && NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 [ -z "${ENVOY_SRCDIR}" ] && export ENVOY_SRCDIR=/source
 [ -z "${ENVOY_BUILD_TARGET}" ] && export ENVOY_BUILD_TARGET=//source/exe:envoy-static
+[ -z "${ENVOY_BUILD_DEBUG_INFORMATION}" ] && export ENVOY_BUILD_DEBUG_INFORMATION=//source/exe:envoy-static.dwp
+[ -z "${ENVOY_BUILD_ARCH}" ] && export ENVOY_BUILD_ARCH=$(uname -m)
 echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
 echo "ENVOY_BUILD_TARGET=${ENVOY_BUILD_TARGET}"
+echo "ENVOY_BUILD_ARCH=${ENVOY_BUILD_ARCH}"
 
 function setup_gcc_toolchain() {
   if [[ ! -z "${ENVOY_STDLIB}" && "${ENVOY_STDLIB}" != "libstdc++" ]]; then
@@ -79,11 +82,10 @@ export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
 # Use https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_repository_cache_hardlinks
 # to save disk space.
 export BAZEL_BUILD_OPTIONS=" ${BAZEL_OPTIONS} --verbose_failures --show_task_finish --experimental_generate_json_trace_profile \
-  --build_event_json_file=${BUILD_DIR}/build_event.json \
   --test_output=errors --repository_cache=${BUILD_DIR}/repository_cache --experimental_repository_cache_hardlinks \
   ${BAZEL_BUILD_EXTRA_OPTIONS} ${BAZEL_EXTRA_TEST_OPTIONS}"
 
-[[ "$(uname -m)" == "aarch64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --define=hot_restart=disabled --test_env=HEAPCHECK="
+[[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --flaky_test_attempts=2 --test_env=HEAPCHECK="
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean --expunge
 

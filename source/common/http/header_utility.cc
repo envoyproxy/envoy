@@ -67,6 +67,10 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     header_match_type_ = HeaderMatchType::Suffix;
     value_ = config.suffix_match();
     break;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kContainsMatch:
+    header_match_type_ = HeaderMatchType::Contains;
+    value_ = config.contains_match();
+    break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
       HEADER_MATCH_SPECIFIER_NOT_SET:
     FALLTHRU;
@@ -132,6 +136,9 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
   case HeaderMatchType::Suffix:
     match = absl::EndsWith(header_view, header_data.value_);
     break;
+  case HeaderMatchType::Contains:
+    match = absl::StrContains(header_view, header_data.value_);
+    break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -157,9 +164,9 @@ bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
   return headers.Method() && headers.Method()->value() == Http::Headers::get().MethodValues.Connect;
 }
 
-bool HeaderUtility::isConnectResponse(const RequestHeaderMapPtr& request_headers,
+bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,
                                       const ResponseHeaderMap& response_headers) {
-  return request_headers.get() && isConnect(*request_headers) &&
+  return request_headers && isConnect(*request_headers) &&
          static_cast<Http::Code>(Http::Utility::getResponseStatus(response_headers)) ==
              Http::Code::OK;
 }

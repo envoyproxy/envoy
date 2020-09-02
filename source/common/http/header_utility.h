@@ -19,7 +19,7 @@ namespace Http {
  */
 class HeaderUtility {
 public:
-  enum class HeaderMatchType { Value, Regex, Range, Present, Prefix, Suffix };
+  enum class HeaderMatchType { Value, Regex, Range, Present, Prefix, Suffix, Contains };
 
   /**
    * Get all instances of the header key specified, and return the values in the vector provided.
@@ -120,7 +120,7 @@ public:
   /**
    * @brief a helper function to determine if the headers represent an accepted CONNECT response.
    */
-  static bool isConnectResponse(const RequestHeaderMapPtr& request_headers,
+  static bool isConnectResponse(const RequestHeaderMap* request_headers,
                                 const ResponseHeaderMap& response_headers);
 
   /**

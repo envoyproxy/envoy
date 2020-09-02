@@ -189,6 +189,18 @@ struct msghdr {
 #define IP6T_SO_ORIGINAL_DST 80
 #endif
 
+#ifndef SOL_UDP
+#define SOL_UDP 17
+#endif
+
+#ifndef UDP_GRO
+#define UDP_GRO 104
+#endif
+
+#ifndef UDP_SEGMENT
+#define UDP_SEGMENT 103
+#endif
+
 typedef int os_fd_t;
 
 #define INVALID_SOCKET -1
@@ -261,3 +273,11 @@ struct mmsghdr {
 #undef SUPPORTS_PTHREAD_NAMING
 #define SUPPORTS_PTHREAD_NAMING 1
 #endif // defined(__ANDROID_API__)
+
+#if defined(__linux__)
+// On Linux, default listen backlog size to net.core.somaxconn which is runtime configurable
+#define ENVOY_TCP_BACKLOG_SIZE -1
+#else
+// On non-Linux platforms use 128 which is libevent listener default
+#define ENVOY_TCP_BACKLOG_SIZE 128
+#endif

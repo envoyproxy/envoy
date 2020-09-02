@@ -41,6 +41,7 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "server/admin/admin_filter.h"
+#include "server/admin/clusters_handler.h"
 #include "server/admin/config_tracker_impl.h"
 #include "server/admin/listeners_handler.h"
 #include "server/admin/logs_handler.h"
@@ -256,7 +257,7 @@ private:
     struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
 
-      const OverloadActionState inactive_ = OverloadActionState::Inactive;
+      const OverloadActionState inactive_ = OverloadActionState::inactive();
     };
 
     NullOverloadManager(ThreadLocal::SlotAllocator& slot_allocator)
@@ -280,17 +281,6 @@ private:
 
     ThreadLocal::SlotPtr tls_;
   };
-
-  /**
-   * Helper methods for the /clusters url handler.
-   */
-  void addCircuitSettings(const std::string& cluster_name, const std::string& priority_str,
-                          Upstream::ResourceManager& resource_manager, Buffer::Instance& response);
-  void addOutlierInfo(const std::string& cluster_name,
-                      const Upstream::Outlier::Detector* outlier_detector,
-                      Buffer::Instance& response);
-  void writeClustersAsJson(Buffer::Instance& response);
-  void writeClustersAsText(Buffer::Instance& response);
 
   /**
    * Helper methods for the /config_dump url handler.
@@ -321,9 +311,6 @@ private:
   Http::Code handlerAdminHome(absl::string_view path_and_query,
                               Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                               AdminStream&);
-  Http::Code handlerClusters(absl::string_view path_and_query,
-                             Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                             AdminStream&);
   Http::Code handlerConfigDump(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&) const;
@@ -379,6 +366,9 @@ private:
     Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }
@@ -387,6 +377,7 @@ private:
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return empty_access_logs_;
     }
+    uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
 
     AdminImpl& parent_;
     const std::string name_;
@@ -432,6 +423,7 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   NullScopedRouteConfigProvider scoped_route_config_provider_;
+  Server::ClustersHandler clusters_handler_;
   Server::StatsHandler stats_handler_;
   Server::LogsHandler logs_handler_;
   Server::ProfilingHandler profiling_handler_;

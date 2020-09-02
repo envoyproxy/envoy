@@ -1,3 +1,5 @@
+#include <openssl/x509_vfy.h>
+
 #include <cstddef>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -7,6 +9,7 @@
 
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/ssl_utility.h"
 #include "test/test_common/utility.h"
 
 #pragma GCC diagnostic push
@@ -23,12 +26,14 @@
 
 #include "extensions/quic_listeners/quiche/envoy_quic_client_session.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_client_connection.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_fake_proof_verifier.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_proof_verifier.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 #include "test/extensions/quic_listeners/quiche/test_utils.h"
+#include "extensions/transport_sockets/tls/context_config_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -44,6 +49,47 @@ public:
   Http::StreamResetReason last_stream_reset_reason_{Http::StreamResetReason::LocalReset};
 };
 
+void updateResource(AtomicFileUpdater& updater, double pressure) {
+  updater.update(absl::StrCat(pressure));
+}
+
+std::unique_ptr<QuicClientTransportSocketFactory>
+createQuicClientTransportSocketFactory(const Ssl::ClientSslTransportOptions& options, Api::Api& api,
+                                       const std::string& san_to_match) {
+  std::string yaml_plain = R"EOF(
+  common_tls_context:
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
+)EOF";
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), tls_context);
+  auto* common_context = tls_context.mutable_common_tls_context();
+
+  if (options.alpn_) {
+    common_context->add_alpn_protocols("h3");
+  }
+  if (options.san_) {
+    common_context->mutable_validation_context()->add_match_subject_alt_names()->set_exact(
+        san_to_match);
+  }
+  for (const std::string& cipher_suite : options.cipher_suites_) {
+    common_context->mutable_tls_params()->add_cipher_suites(cipher_suite);
+  }
+  if (!options.sni_.empty()) {
+    tls_context.set_sni(options.sni_);
+  }
+
+  common_context->mutable_tls_params()->set_tls_minimum_protocol_version(options.tls_version_);
+  common_context->mutable_tls_params()->set_tls_maximum_protocol_version(options.tls_version_);
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
+  ON_CALL(mock_factory_ctx, api()).WillByDefault(testing::ReturnRef(api));
+  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
+      tls_context, options.sigalgs_, mock_factory_ctx);
+  return std::make_unique<QuicClientTransportSocketFactory>(std::move(cfg));
+}
+
 class QuicHttpIntegrationTest : public HttpIntegrationTest, public QuicMultiVersionTest {
 public:
   QuicHttpIntegrationTest()
@@ -54,15 +100,16 @@ public:
             return quic::CurrentSupportedVersionsWithQuicCrypto();
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
-          SetQuicReloadableFlag(quic_enable_version_draft_29, use_http3);
+          SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
           SetQuicReloadableFlag(quic_disable_version_draft_27, !use_http3);
           SetQuicReloadableFlag(quic_disable_version_draft_25, !use_http3);
           return quic::CurrentSupportedVersions();
         }()),
-        crypto_config_(std::make_unique<EnvoyQuicFakeProofVerifier>()), conn_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()),
-        injected_resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
-        file_updater_(injected_resource_filename_) {}
+        conn_helper_(*dispatcher_), alarm_factory_(*dispatcher_, *conn_helper_.GetClock()),
+        injected_resource_filename_1_(TestEnvironment::temporaryPath("injected_resource_1")),
+        injected_resource_filename_2_(TestEnvironment::temporaryPath("injected_resource_2")),
+        file_updater_1_(injected_resource_filename_1_),
+        file_updater_2_(injected_resource_filename_2_) {}
 
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
       uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override {
@@ -81,7 +128,7 @@ public:
         quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr);
     quic_connection_ = connection.get();
     auto session = std::make_unique<EnvoyQuicClientSession>(
-        quic_config_, supported_versions_, std::move(connection), server_id_, &crypto_config_,
+        quic_config_, supported_versions_, std::move(connection), server_id_, crypto_config_.get(),
         &push_promise_index_, *dispatcher_, 0);
     session->Initialize();
     return session;
@@ -130,64 +177,80 @@ public:
 
       bootstrap.mutable_static_resources()->mutable_listeners(0)->set_reuse_port(set_reuse_port_);
 
-      const std::string overload_config = fmt::format(R"EOF(
+      const std::string overload_config =
+          fmt::format(R"EOF(
         refresh_interval:
           seconds: 0
           nanos: 1000000
         resource_monitors:
-          - name: "envoy.resource_monitors.injected_resource"
+          - name: "envoy.resource_monitors.injected_resource_1"
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig
+              filename: "{}"
+          - name: "envoy.resource_monitors.injected_resource_2"
             typed_config:
               "@type": type.googleapis.com/envoy.config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig
               filename: "{}"
         actions:
           - name: "envoy.overload_actions.stop_accepting_requests"
             triggers:
-              - name: "envoy.resource_monitors.injected_resource"
+              - name: "envoy.resource_monitors.injected_resource_1"
                 threshold:
                   value: 0.95
-          - name: "envoy.overload_actions.disable_http_keepalive"
-            triggers:
-              - name: "envoy.resource_monitors.injected_resource"
-                threshold:
-                  value: 0.8
           - name: "envoy.overload_actions.stop_accepting_connections"
             triggers:
-              - name: "envoy.resource_monitors.injected_resource"
+              - name: "envoy.resource_monitors.injected_resource_1"
                 threshold:
                   value: 0.9
+          - name: "envoy.overload_actions.disable_http_keepalive"
+            triggers:
+              - name: "envoy.resource_monitors.injected_resource_2"
+                threshold:
+                  value: 0.8
       )EOF",
-                                                      injected_resource_filename_);
+                      injected_resource_filename_1_, injected_resource_filename_2_);
       *bootstrap.mutable_overload_manager() =
           TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(overload_config);
     });
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
+          hcm.mutable_drain_timeout()->clear_seconds();
+          hcm.mutable_drain_timeout()->set_nanos(500 * 1000 * 1000);
           EXPECT_EQ(hcm.codec_type(), envoy::extensions::filters::network::http_connection_manager::
                                           v3::HttpConnectionManager::HTTP3);
         });
 
-    updateResource(0);
+    updateResource(file_updater_1_, 0);
+    updateResource(file_updater_2_, 0);
     HttpIntegrationTest::initialize();
     registerTestServerPorts({"http"});
+    crypto_config_ =
+        std::make_unique<quic::QuicCryptoClientConfig>(std::make_unique<EnvoyQuicProofVerifier>(
+            stats_store_,
+            createQuicClientTransportSocketFactory(
+                Ssl::ClientSslTransportOptions().setAlpn(true).setSan(true), *api_, san_to_match_)
+                ->clientContextConfig(),
+            timeSystem()));
   }
-
-  void updateResource(double pressure) { file_updater_.update(absl::StrCat(pressure)); }
 
 protected:
   quic::QuicConfig quic_config_;
-  quic::QuicServerId server_id_{"example.com", 443, false};
+  quic::QuicServerId server_id_{"lyft.com", 443, false};
+  std::string san_to_match_{"spiffe://lyft.com/backend-team"};
   quic::QuicClientPushPromiseIndex push_promise_index_;
   quic::ParsedQuicVersionVector supported_versions_;
-  quic::QuicCryptoClientConfig crypto_config_;
+  std::unique_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   EnvoyQuicConnectionHelper conn_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;
   CodecClientCallbacksForTest client_codec_callback_;
   Network::Address::InstanceConstSharedPtr server_addr_;
   EnvoyQuicClientConnection* quic_connection_{nullptr};
   bool set_reuse_port_{false};
-  const std::string injected_resource_filename_;
-  AtomicFileUpdater file_updater_;
+  const std::string injected_resource_filename_1_;
+  const std::string injected_resource_filename_2_;
+  AtomicFileUpdater file_updater_1_;
+  AtomicFileUpdater file_updater_2_;
   std::list<quic::QuicConnectionId> designated_connection_ids_;
 };
 
@@ -422,14 +485,14 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Put envoy in overloaded state and check that it doesn't accept the new client connection.
-  updateResource(0.9);
+  updateResource(file_updater_1_, 0.9);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
                                1);
   codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt);
   EXPECT_TRUE(codec_client_->disconnected());
 
   // Reduce load a little to allow the connection to be accepted connection.
-  updateResource(0.8);
+  updateResource(file_updater_1_, 0.8);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
                                0);
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -438,7 +501,7 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   // Send response headers, but hold response body for now.
   upstream_request_->encodeHeaders(default_response_headers_, /*end_stream=*/false);
 
-  updateResource(0.95);
+  updateResource(file_updater_1_, 0.95);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active", 1);
   // Existing request should be able to finish.
   upstream_request_->encodeData(10, true);
@@ -457,8 +520,53 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
                   ->disconnected());
 }
 
+TEST_P(QuicHttpIntegrationTest, NoNewStreamsWhenOverloaded) {
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  updateResource(file_updater_1_, 0.7);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // Send a complete request and start a second.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+
+  // Enable the disable-keepalive overload action. This should send a shutdown notice before
+  // encoding the headers.
+  updateResource(file_updater_2_, 0.9);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.disable_http_keepalive.active", 1);
+
+  upstream_request_->encodeHeaders(default_response_headers_, /*end_stream=*/false);
+  upstream_request_->encodeData(10, true);
+
+  response2->waitForHeaders();
+  EXPECT_TRUE(codec_client_->waitForDisconnect());
+
+  EXPECT_TRUE(codec_client_->sawGoAway());
+  codec_client_->close();
+}
+
 TEST_P(QuicHttpIntegrationTest, AdminDrainDrainsListeners) {
   testAdminDrain(Http::CodecClient::Type::HTTP1);
+}
+
+TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
+  san_to_match_ = "www.random_domain.com";
+  initialize();
+  codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt);
+  EXPECT_FALSE(codec_client_->connected());
+  std::string failure_reason =
+      GetParam().second == QuicVersionType::GquicQuicCrypto
+          ? "QUIC_PROOF_INVALID with details: Proof invalid: X509_verify_cert: certificate "
+            "verification error at depth 0: ok"
+          : "QUIC_HANDSHAKE_FAILED with details: TLS handshake failure (ENCRYPTION_HANDSHAKE) 46: "
+            "certificate unknown";
+  EXPECT_EQ(failure_reason, codec_client_->connection()->transportFailureReason());
 }
 
 } // namespace Quic

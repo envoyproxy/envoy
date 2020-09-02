@@ -50,7 +50,7 @@ template <>
 TestRequestHeaderMapImpl
 fromSanitizedHeaders<TestRequestHeaderMapImpl>(const test::fuzz::Headers& headers) {
   return Fuzz::fromHeaders<TestRequestHeaderMapImpl>(headers, {"transfer-encoding"},
-                                                     {":authority"});
+                                                     {":authority", ":method", ":path"});
 }
 
 // Convert from test proto Http1ServerSettings to Http1Settings.
@@ -337,7 +337,7 @@ public:
         ENVOY_LOG_MISC(debug, "Setting dispatching action  on {} in state {} {}", stream_index_,
                        static_cast<int>(request_.stream_state_),
                        static_cast<int>(response_.stream_state_));
-        auto request_action = stream_action.request().directional_action_selector_case();
+        auto request_action = stream_action.dispatching_action().directional_action_selector_case();
         if (request_action == test::common::http::DirectionalAction::kHeaders) {
           EXPECT_CALL(request_.request_decoder_, decodeHeaders_(_, _))
               .WillOnce(InvokeWithoutArgs(

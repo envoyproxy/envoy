@@ -6,6 +6,8 @@
 
 #include "common/common/hex.h"
 
+#include "nghttp2/nghttp2.h"
+
 namespace {
 
 // Make request stream ID in the network byte order
@@ -111,6 +113,14 @@ void Http2Frame::appendHeaderWithoutIndexing(StaticHeaderIndex index, absl::stri
   appendData(value);
 }
 
+void Http2Frame::appendHeaderWithoutIndexing(const Header& header) {
+  data_.push_back(0);
+  appendHpackInt(header.key_.size(), 0x7f);
+  appendData(header.key_);
+  appendHpackInt(header.value_.size(), 0x7f);
+  appendData(header.value_);
+}
+
 void Http2Frame::appendEmptyHeader() {
   data_.push_back(0x40);
   data_.push_back(0x00);
@@ -212,6 +222,43 @@ Http2Frame Http2Frame::makeWindowUpdateFrame(uint32_t stream_index, uint32_t inc
   return frame;
 }
 
+// Note: encoder in codebase persists multiple maps, with each map representing an individual frame.
+Http2Frame Http2Frame::makeMetadataFrameFromMetadataMap(uint32_t stream_index,
+                                                        MetadataMap& metadata_map,
+                                                        MetadataFlags flags) {
+  const int numberOfNameValuePairs = metadata_map.size();
+  absl::FixedArray<nghttp2_nv> nameValues(numberOfNameValuePairs);
+  absl::FixedArray<nghttp2_nv>::iterator iterator = nameValues.begin();
+  for (const auto& metadata : metadata_map) {
+    *iterator = {const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(metadata.first.data())),
+                 const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(metadata.second.data())),
+                 metadata.first.size(), metadata.second.size(), NGHTTP2_NV_FLAG_NO_INDEX};
+    ++iterator;
+  }
+
+  nghttp2_hd_deflater* deflater;
+  // Note: this has no effect, as metadata frames do not add onto Dynamic table.
+  const int maxDynamicTableSize = 4096;
+  nghttp2_hd_deflate_new(&deflater, maxDynamicTableSize);
+
+  const size_t upperBoundBufferLength =
+      nghttp2_hd_deflate_bound(deflater, nameValues.begin(), numberOfNameValuePairs);
+
+  uint8_t* buffer = new uint8_t[upperBoundBufferLength];
+
+  const size_t numberOfBytesInMetadataPayload = nghttp2_hd_deflate_hd(
+      deflater, buffer, upperBoundBufferLength, nameValues.begin(), numberOfNameValuePairs);
+
+  Http2Frame frame;
+  frame.buildHeader(Type::Metadata, numberOfBytesInMetadataPayload, static_cast<uint8_t>(flags),
+                    makeRequestStreamId(stream_index));
+  std::vector<uint8_t> bufferVector(buffer, buffer + numberOfBytesInMetadataPayload);
+  frame.appendDataAfterHeaders(bufferVector);
+  delete[] buffer;
+  nghttp2_hd_deflate_del(deflater);
+  return frame;
+}
+
 Http2Frame Http2Frame::makeMalformedRequest(uint32_t stream_index) {
   Http2Frame frame;
   frame.buildHeader(Type::Headers, 0, orFlags(HeadersFlags::EndStream, HeadersFlags::EndHeaders),
@@ -246,6 +293,17 @@ Http2Frame Http2Frame::makeRequest(uint32_t stream_index, absl::string_view host
   frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
   frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
   frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Host, host);
+  frame.adjustPayloadSize();
+  return frame;
+}
+
+Http2Frame Http2Frame::makeRequest(uint32_t stream_index, absl::string_view host,
+                                   absl::string_view path,
+                                   const std::vector<Header> extra_headers) {
+  auto frame = makeRequest(stream_index, host, path);
+  for (const auto& header : extra_headers) {
+    frame.appendHeaderWithoutIndexing(header);
+  }
   frame.adjustPayloadSize();
   return frame;
 }

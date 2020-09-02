@@ -166,6 +166,10 @@ def runChecks():
       "Don't reference real-world time sources from production code; use injection")
   errors += checkUnfixableError("real_time_source.cc", real_time_inject_error)
   errors += checkUnfixableError("real_time_system.cc", real_time_inject_error)
+  errors += checkUnfixableError(
+      "duration_value.cc",
+      "Don't use ambiguous duration(value), use an explicit duration type, e.g. Event::TimeSystem::Milliseconds(value)"
+  )
   errors += checkUnfixableError("system_clock.cc", real_time_inject_error)
   errors += checkUnfixableError("steady_clock.cc", real_time_inject_error)
   errors += checkUnfixableError(
@@ -243,6 +247,9 @@ def runChecks():
                                 "Don't use std::optional; use absl::optional instead")
   errors += checkUnfixableError("std_variant.cc",
                                 "Don't use std::variant; use absl::variant instead")
+  errors += checkUnfixableError(
+      "throw.cc", "Don't introduce throws into exception-free files, use error statuses instead.")
+  errors += checkFileExpectingOK("commented_throw.cc")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",
@@ -282,6 +289,7 @@ def runChecks():
       "term absl::make_unique< should be replaced with standard library term std::make_unique<")
 
   errors += checkFileExpectingOK("real_time_source_override.cc")
+  errors += checkFileExpectingOK("duration_value_zero.cc")
   errors += checkFileExpectingOK("time_system_wait_for.cc")
   errors += checkFileExpectingOK("clang_format_off.cc")
   return errors

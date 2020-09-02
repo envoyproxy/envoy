@@ -493,6 +493,29 @@ TEST_P(Http2CodecImplTest, InvalidContinueWithFinAllowed) {
   expectDetailsRequest("http2.violation.of.messaging.rule");
 }
 
+TEST_P(Http2CodecImplTest, CodecHasCorrectStreamErrorIfFalse) {
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  EXPECT_FALSE(response_encoder_->streamErrorOnInvalidHttpMessage());
+}
+
+TEST_P(Http2CodecImplTest, CodecHasCorrectStreamErrorIfTrue) {
+  stream_error_on_invalid_http_messaging_ = true;
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  EXPECT_TRUE(response_encoder_->streamErrorOnInvalidHttpMessage());
+}
+
 TEST_P(Http2CodecImplTest, InvalidRepeatContinue) {
   initialize();
 
@@ -669,6 +692,65 @@ TEST_P(Http2CodecImplTest, TrailingHeaders) {
   response_encoder_->encodeData(world, false);
   EXPECT_CALL(response_decoder_, decodeTrailers_(_));
   response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{{"trailing", "header"}});
+}
+
+// When having empty trailers, codec submits empty buffer and end_stream instead.
+TEST_P(Http2CodecImplTest, IgnoreTrailingEmptyHeaders) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http2_skip_encoding_empty_trailers", "true"}});
+
+  initialize();
+
+  Buffer::OwnedImpl empty_buffer;
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  Buffer::OwnedImpl hello("hello");
+  request_encoder_->encodeData(hello, false);
+  EXPECT_CALL(request_decoder_, decodeData(BufferEqual(&empty_buffer), true));
+  request_encoder_->encodeTrailers(TestRequestTrailerMapImpl{});
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder_->encodeHeaders(response_headers, false);
+  EXPECT_CALL(response_decoder_, decodeData(_, false));
+  Buffer::OwnedImpl world("world");
+  response_encoder_->encodeData(world, false);
+  EXPECT_CALL(response_decoder_, decodeData(BufferEqual(&empty_buffer), true));
+  response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{});
+}
+
+// When having empty trailers and "envoy.reloadable_features.http2_skip_encoding_empty_trailers" is
+// turned off, codec submits empty trailers.
+TEST_P(Http2CodecImplTest, SubmitTrailingEmptyHeaders) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http2_skip_encoding_empty_trailers", "false"}});
+
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  Buffer::OwnedImpl hello("hello");
+  request_encoder_->encodeData(hello, false);
+  EXPECT_CALL(request_decoder_, decodeTrailers_(_));
+  request_encoder_->encodeTrailers(TestRequestTrailerMapImpl{});
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder_->encodeHeaders(response_headers, false);
+  EXPECT_CALL(response_decoder_, decodeData(_, false));
+  Buffer::OwnedImpl world("world");
+  response_encoder_->encodeData(world, false);
+  EXPECT_CALL(response_decoder_, decodeTrailers_(_));
+  response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{});
 }
 
 TEST_P(Http2CodecImplTest, TrailingHeadersLargeClientBody) {

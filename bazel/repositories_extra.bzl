@@ -11,6 +11,18 @@ def _python_deps():
         requirements = "@envoy//tools/config_validation:requirements.txt",
     )
     pip3_import(
+        name = "configs_pip3",
+        requirements = "@envoy//configs:requirements.txt",
+    )
+    pip3_import(
+        name = "kafka_pip3",
+        requirements = "@envoy//source/extensions/filters/network/kafka:requirements.txt",
+    )
+    pip3_import(
+        name = "headersplit_pip3",
+        requirements = "@envoy//tools/envoy_headersplit:requirements.txt",
+    )
+    pip3_import(
         name = "protodoc_pip3",
         requirements = "@envoy//tools/protodoc:requirements.txt",
     )

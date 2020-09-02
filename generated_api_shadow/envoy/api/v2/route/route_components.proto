@@ -436,7 +436,7 @@ message RouteMatch {
     type.matcher.RegexMatcher safe_regex = 10 [(validate.rules).message = {required: true}];
   }
 
-  // Indicates that prefix/path matching should be case insensitive. The default
+  // Indicates that prefix/path matching should be case sensitive. The default
   // is true.
   google.protobuf.BoolValue case_sensitive = 4;
 
