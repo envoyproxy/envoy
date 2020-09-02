@@ -13,7 +13,7 @@ sudo chmod +x /usr/local/bin/bazel
 
 On macOS, run the following command:
 ```
-brew install bazelbuild/tap/bazelisk
+brew install bazelisk
 ```
 
 On Windows, run the following commands:

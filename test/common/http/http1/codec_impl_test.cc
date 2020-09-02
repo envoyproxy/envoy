@@ -671,6 +671,72 @@ TEST_P(Http1ServerConnectionImplTest, InnerLWSIsPreserved) {
   }
 }
 
+TEST_P(Http1ServerConnectionImplTest, CodecHasCorrectStreamErrorIfTrue) {
+  codec_settings_.stream_error_on_invalid_http_message_ = true;
+  if (GetParam()) {
+    codec_ = std::make_unique<Http1::ServerConnectionImpl>(
+        connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+  } else {
+    codec_ = std::make_unique<Legacy::Http1::ServerConnectionImpl>(
+        connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+  }
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
+  NiceMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(response_encoder->streamErrorOnInvalidHttpMessage());
+}
+
+TEST_P(Http1ServerConnectionImplTest, CodecHasCorrectStreamErrorIfFalse) {
+  codec_settings_.stream_error_on_invalid_http_message_ = false;
+  if (GetParam()) {
+    codec_ = std::make_unique<Http1::ServerConnectionImpl>(
+        connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+  } else {
+    codec_ = std::make_unique<Legacy::Http1::ServerConnectionImpl>(
+        connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+  }
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
+  NiceMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  auto status = codec_->dispatch(buffer);
+  EXPECT_FALSE(response_encoder->streamErrorOnInvalidHttpMessage());
+}
+
+TEST_P(Http1ServerConnectionImplTest, CodecHasDefaultStreamErrorIfNotSet) {
+  initialize();
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
+  NiceMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  auto status = codec_->dispatch(buffer);
+  EXPECT_FALSE(response_encoder->streamErrorOnInvalidHttpMessage());
+}
+
 TEST_P(Http1ServerConnectionImplTest, Http10) {
   initialize();
 
