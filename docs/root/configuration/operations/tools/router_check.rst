@@ -152,7 +152,7 @@ validate
     *(optional, string)* Match the returned redirect path.
 
   request_header_fields, response_header_fields
-    *(optional, array, deprecated)*  Match the listed header fields. Examples header fields include the "path", "cookie",
+    *(optional, array, deprecated)*  Match the listed header fields. Example header fields include the "path", "cookie",
     and "date" fields. The header fields are checked after all other test cases. Thus, the header fields checked
     will be those of the redirected or rewritten routes when applicable.
     These fields are deprecated. Use request_header_matches, response_header_matches instead.
@@ -164,7 +164,7 @@ validate
       *(required, string)* The value of the header field to match.
 
   request_header_matches, response_header_matches
-    *(optional, array)*  Matchers for the listed headers. Examples header fields include the "path", "cookie",
+    *(optional, array)*  Matchers for the listed headers. Example header fields include the "path", "cookie",
     and "date" fields, as well as custom headers set in the input or by the route. The header fields are checked
     after all other test cases. Thus, the header fields checked will be those of the redirected or rewritten
     routes when applicable.
