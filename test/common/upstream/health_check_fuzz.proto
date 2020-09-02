@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package test.common.upstream;
+
+import "validate/validate.proto";
+import "test/fuzz/common.proto";
+import "envoy/config/core/v3/health_check.proto";
+
+message Respond {
+  test.fuzz.Headers headers = 1;
+  string status =
+      2 [(validate.rules).string.pattern = "[0-9]+$*"];
+  //If there's a second host, this will determine which host, if not ignore
+  bool respond_on_second_host = 3;
+}
+
+message StreamCreate {
+    bool create_stream_on_second_host = 1;
+}
+
+message AdvanceTime {
+  int32 ms_advanced = 1 [(validate.rules).int32 = {gt: 0 lt: 3600000}]; //Capped at one hour
+}
+
+message HttpAction {
+  oneof action_selector {
+    Respond respond = 1;
+    StreamCreate stream_create = 2;
+    //TODO: respondBody, respondTrailers
+    AdvanceTime advance_time = 3;
+  }
+}
+
+message HealthCheckTestCase {
+  envoy.config.core.v3.HealthCheck health_check_config = 1 [(validate.rules).message.required = true];
+  repeated HttpAction http_actions = 2;
+  //repeated TcpAction tcp_actions = 3;
+  //repeated GrpcAction grpc_actions = 4;
+  bool second_host = 5;
+}
