@@ -1,7 +1,5 @@
 #pragma once
 
-#include "absl/container/flat_hash_map.h"
-
 #include "envoy/api/api.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -25,6 +23,8 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/transport_sockets/well_known_names.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Upstream {
