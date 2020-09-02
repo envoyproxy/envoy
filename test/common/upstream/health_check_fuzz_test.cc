@@ -15,7 +15,7 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::HealthCheckTestCase input) {
     ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
     return;
   }
-  
+
   HealthCheckFuzz health_check_fuzz;
   health_check_fuzz.initialize(input);
 }

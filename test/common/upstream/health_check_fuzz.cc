@@ -41,20 +41,19 @@ void HealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase inp
   replay(input);
 }
 
-void HealthCheckFuzz::respondHeaders(
-    test::fuzz::Headers headers, absl::string_view status,
-    bool respond_on_second_host) {
+void HealthCheckFuzz::respondHeaders(test::fuzz::Headers headers, absl::string_view status,
+                                     bool respond_on_second_host) {
   std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers =
       std::make_unique<Http::TestResponseHeaderMapImpl>(
           Fuzz::fromHeaders<Http::TestResponseHeaderMapImpl>(headers, {}, {}));
-  
+
   // If Fuzzer created a status header - replace it with validated status
   response_headers->setStatus(status);
 
   int index = (second_host_ && respond_on_second_host) ? 1 : 0;
 
-  test_sessions_[index]->stream_response_callbacks_->decodeHeaders(
-        std::move(response_headers), true);
+  test_sessions_[index]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
+                                                                   true);
 }
 
 void HealthCheckFuzz::streamCreate(bool create_stream_on_second_host) {
@@ -69,8 +68,7 @@ void HealthCheckFuzz::streamCreate(bool create_stream_on_second_host) {
   }
 }
 
-void HealthCheckFuzz::replay(
-    test::common::upstream::HealthCheckTestCase input) {
+void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) {
   for (int i = 0; i < input.http_actions().size(); ++i) {
     const auto& event = input.http_actions(i);
     ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
@@ -86,11 +84,9 @@ void HealthCheckFuzz::replay(
       break;
     }
     case test::common::upstream::HttpAction::kAdvanceTime: {
-        time_system_.advanceTimeAsync(
-            std::chrono::milliseconds(event.advance_time().ms_advanced())
-        );
-        dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
-        break;
+      time_system_.advanceTimeAsync(std::chrono::milliseconds(event.advance_time().ms_advanced()));
+      dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+      break;
     }
     default: {
       break;
