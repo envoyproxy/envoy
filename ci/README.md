@@ -40,7 +40,6 @@ The source for these images is located in the [envoyproxy/envoy-build-tools](htt
 repository.
 
 We use the Clang compiler for all Linux CI runs with tests. We have an additional Linux CI run with GCC which builds binary only.
-Currently, Windows CI builds the static Envoy binary only.
 
 # C++ standard library
 
