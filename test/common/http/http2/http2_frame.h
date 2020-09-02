@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/http/metadata_interface.h"
+
 #include "common/common/assert.h"
 
 #include "absl/strings/string_view.h"
@@ -35,7 +37,8 @@ public:
     Ping,
     GoAway,
     WindowUpdate,
-    Continuation
+    Continuation,
+    Metadata = 77,
   };
 
   enum class SettingsFlags : uint8_t {
@@ -52,6 +55,11 @@ public:
   enum class DataFlags : uint8_t {
     None = 0,
     EndStream = 1,
+  };
+
+  enum class MetadataFlags : uint8_t {
+    None = 0,
+    EndMetadata = 4,
   };
 
   // See https://tools.ietf.org/html/rfc7541#appendix-A for static header indexes
@@ -107,6 +115,10 @@ public:
   static Http2Frame makeEmptyGoAwayFrame(uint32_t last_stream_index, ErrorCode error_code);
 
   static Http2Frame makeWindowUpdateFrame(uint32_t stream_index, uint32_t increment);
+  static Http2Frame makeMetadataFrameFromMetadataMap(uint32_t stream_index,
+                                                     MetadataMap& metadata_map,
+                                                     MetadataFlags flags);
+
   static Http2Frame makeMalformedRequest(uint32_t stream_index);
   static Http2Frame makeMalformedRequestWithZerolenHeader(uint32_t stream_index,
                                                           absl::string_view host,
@@ -166,6 +178,9 @@ private:
   void appendData(absl::string_view data) { data_.insert(data_.end(), data.begin(), data.end()); }
   void appendData(std::vector<uint8_t> data) {
     data_.insert(data_.end(), data.begin(), data.end());
+  }
+  void appendDataAfterHeaders(std::vector<uint8_t> data) {
+    std::copy(data.begin(), data.end(), data_.begin() + 9);
   }
 
   // Headers are directly encoded

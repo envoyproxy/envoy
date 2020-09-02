@@ -5,29 +5,19 @@
 #include <memory>
 #include <string>
 
-#include "envoy/event/timer.h"
-
-#include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
-#include "common/common/fmt.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http1/codec_impl_legacy.h"
-#include "common/http/http2/codec_impl.h"
 #include "common/http/http2/codec_impl_legacy.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
-#include "common/network/raw_buffer_socket.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 
 #include "server/connection_handler_impl.h"
 
-#include "extensions/transport_sockets/tls/ssl_socket.h"
-
-#include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
