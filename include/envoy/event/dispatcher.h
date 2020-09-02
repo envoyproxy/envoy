@@ -152,7 +152,7 @@ public:
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
   virtual Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                              Network::ListenerCallbacks& cb, bool bind_to_port,
+                                              Network::TcpListenerCallbacks& cb, bool bind_to_port,
                                               uint32_t backlog_size) PURE;
 
   /**
