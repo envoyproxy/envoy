@@ -153,7 +153,7 @@ private:
                         public ScopeTrackedObject,
                         public FilterManagerCallbacks {
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit);
-    ~ActiveStream() override;
+    void completeRequest();
 
     void chargeStats(const ResponseHeaderMap& headers);
     const Network::Connection* connection();

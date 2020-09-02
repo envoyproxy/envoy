@@ -780,15 +780,13 @@ void FilterManager::sendLocalReplyViaFilterChain(
   Utility::sendLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
+          modify_headers,
           [this](ResponseHeaderMap& response_headers, Code& code, std::string& body,
                  absl::string_view& content_type) -> void {
             local_reply_.rewrite(request_headers_.get(), response_headers, stream_info_, code, body,
                                  content_type);
           },
           [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-            if (modify_headers != nullptr) {
-              modify_headers(*headers);
-            }
             response_headers_ = std::move(headers);
             // TODO: Start encoding from the last decoder filter that saw the
             // request instead.
@@ -812,16 +810,13 @@ void FilterManager::sendDirectLocalReply(
   Http::Utility::sendLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
+          modify_headers,
           [&](ResponseHeaderMap& response_headers, Code& code, std::string& body,
               absl::string_view& content_type) -> void {
             local_reply_.rewrite(request_headers_.get(), response_headers, stream_info_, code, body,
                                  content_type);
           },
           [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
-            if (modify_headers != nullptr) {
-              modify_headers(*response_headers);
-            }
-
             // Move the response headers into the FilterManager to make sure they're visible to
             // access logs.
             response_headers_ = std::move(response_headers);
