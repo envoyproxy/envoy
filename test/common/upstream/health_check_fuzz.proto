@@ -2,13 +2,14 @@ syntax = "proto3";
 
 package test.common.upstream;
 
+import "validate/validate.proto";
 import "test/fuzz/common.proto";
 import "envoy/config/core/v3/health_check.proto";
 
 message Respond {
-  test.fuzz.Headers headers = 1; //TODO: Add validation for path in any case
+  test.fuzz.Headers headers = 1;
   string status =
-      2; //Add validation that all the characters are between 0 - 9, or ' ', would something like "9 00 9" pass?, and require it
+      2; //[(validate.rules).string = ] Add validation that all the characters are between 0 - 9, or ' ', would something like "9 00 9" pass?, and require it
   bool respond_on_second_host =
       3; //If there's a second host, this will determine which host, if not ignore
 }
@@ -18,7 +19,7 @@ message StreamCreate {
 }
 
 message AdvanceTime {
-  int32 ms_advanced = 1; //Cap this at something
+  int32 ms_advanced = 1 [(validate.rules).int32 = {gt: 0 lt: 3600000}]; //Capped at one hour
 }
 
 message HttpAction {

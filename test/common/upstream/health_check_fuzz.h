@@ -1,5 +1,5 @@
 #pragma once
-#include "test/common/upstream/health_check_fuzz.pb.h"
+#include "test/common/upstream/health_check_fuzz.pb.validate.h"
 #include "test/common/upstream/health_checker_impl_test_utils.h"
 #include "test/fuzz/common.pb.h"
 
@@ -15,7 +15,7 @@ public:
 private:
   void respondHeaders(test::fuzz::Headers headers, absl::string_view status,
                       bool respond_on_second_host);
-  void streamCreate();
+  void streamCreate(bool create_stream_on_second_host);
   void allocHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void TestBody() override {}
 
