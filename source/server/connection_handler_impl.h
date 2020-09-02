@@ -107,7 +107,7 @@ private:
   /**
    * Wrapper for an active tcp listener owned by this handler.
    */
-  class ActiveTcpListener : public Network::ListenerCallbacks,
+  class ActiveTcpListener : public Network::TcpListenerCallbacks,
                             public ActiveListenerImplBase,
                             public Network::BalancedConnectionHandler {
   public:
@@ -128,7 +128,7 @@ private:
       config_->openConnections().dec();
     }
 
-    // Network::ListenerCallbacks
+    // Network::TcpListenerCallbacks
     void onAccept(Network::ConnectionSocketPtr&& socket) override;
     void onReject() override { stats_.downstream_global_cx_overflow_.inc(); }
 

@@ -178,7 +178,7 @@ public:
   TestListener* addListener(
       uint64_t tag, bool bind_to_port, bool hand_off_restored_destination_connections,
       const std::string& name, Network::Listener* listener,
-      Network::ListenerCallbacks** listener_callbacks = nullptr,
+      Network::TcpListenerCallbacks** listener_callbacks = nullptr,
       Network::MockConnectionBalancer* connection_balancer = nullptr,
       Network::BalancedConnectionHandler** balanced_connection_handler = nullptr,
       Network::Socket::Type socket_type = Network::Socket::Type::Stream,
@@ -201,7 +201,7 @@ public:
     if (socket_type == Network::Socket::Type::Stream) {
       EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
           .WillOnce(Invoke([listener, listener_callbacks](Network::SocketSharedPtr&&,
-                                                          Network::ListenerCallbacks& cb, bool,
+                                                          Network::TcpListenerCallbacks& cb, bool,
                                                           uint32_t) -> Network::Listener* {
             if (listener_callbacks != nullptr) {
               *listener_callbacks = &cb;
@@ -252,7 +252,7 @@ TEST_F(ConnectionHandlerTest, RemoveListenerDuringRebalance) {
   // So we just leak the FDs for this test.
   ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
 
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   Network::MockConnectionBalancer* connection_balancer = new Network::MockConnectionBalancer();
   Network::BalancedConnectionHandler* current_handler;
@@ -291,7 +291,7 @@ TEST_F(ConnectionHandlerTest, RemoveListenerDuringRebalance) {
 }
 
 TEST_F(ConnectionHandlerTest, ListenerConnectionLimitEnforced) {
-  Network::ListenerCallbacks* listener_callbacks1;
+  Network::TcpListenerCallbacks* listener_callbacks1;
   auto listener1 = new NiceMock<Network::MockListener>();
   TestListener* test_listener1 =
       addListener(1, false, false, "test_listener1", listener1, &listener_callbacks1);
@@ -303,7 +303,7 @@ TEST_F(ConnectionHandlerTest, ListenerConnectionLimitEnforced) {
   handler_->addListener(absl::nullopt, *test_listener1);
 
   auto listener2 = new NiceMock<Network::MockListener>();
-  Network::ListenerCallbacks* listener_callbacks2;
+  Network::TcpListenerCallbacks* listener_callbacks2;
   TestListener* test_listener2 =
       addListener(2, false, false, "test_listener2", listener2, &listener_callbacks2);
   Network::Address::InstanceConstSharedPtr alt_address(
@@ -376,7 +376,7 @@ TEST_F(ConnectionHandlerTest, ListenerConnectionLimitEnforced) {
 TEST_F(ConnectionHandlerTest, RemoveListener) {
   InSequence s;
 
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
@@ -407,7 +407,7 @@ TEST_F(ConnectionHandlerTest, RemoveListener) {
 TEST_F(ConnectionHandlerTest, DisableListener) {
   InSequence s;
 
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, false, false, "test_listener", listener, &listener_callbacks);
@@ -423,7 +423,7 @@ TEST_F(ConnectionHandlerTest, DisableListener) {
 TEST_F(ConnectionHandlerTest, AddDisabledListener) {
   InSequence s;
 
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, false, false, "test_listener", listener, &listener_callbacks);
@@ -438,7 +438,7 @@ TEST_F(ConnectionHandlerTest, AddDisabledListener) {
 TEST_F(ConnectionHandlerTest, DestroyCloseConnections) {
   InSequence s;
 
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
@@ -458,7 +458,7 @@ TEST_F(ConnectionHandlerTest, DestroyCloseConnections) {
 TEST_F(ConnectionHandlerTest, CloseDuringFilterChainCreate) {
   InSequence s;
 
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
@@ -482,7 +482,7 @@ TEST_F(ConnectionHandlerTest, CloseDuringFilterChainCreate) {
 TEST_F(ConnectionHandlerTest, CloseConnectionOnEmptyFilterChain) {
   InSequence s;
 
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
@@ -504,7 +504,7 @@ TEST_F(ConnectionHandlerTest, CloseConnectionOnEmptyFilterChain) {
 }
 
 TEST_F(ConnectionHandlerTest, NormalRedirect) {
-  Network::ListenerCallbacks* listener_callbacks1;
+  Network::TcpListenerCallbacks* listener_callbacks1;
   auto listener1 = new NiceMock<Network::MockListener>();
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks1);
@@ -513,7 +513,7 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
   EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(normal_address));
   handler_->addListener(absl::nullopt, *test_listener1);
 
-  Network::ListenerCallbacks* listener_callbacks2;
+  Network::TcpListenerCallbacks* listener_callbacks2;
   auto listener2 = new NiceMock<Network::MockListener>();
   TestListener* test_listener2 =
       addListener(1, false, false, "test_listener2", listener2, &listener_callbacks2);
@@ -567,7 +567,7 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
 }
 
 TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
-  Network::ListenerCallbacks* listener_callbacks1;
+  Network::TcpListenerCallbacks* listener_callbacks1;
   auto listener1 = new NiceMock<Network::MockListener>();
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks1);
@@ -576,7 +576,7 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
   EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(normal_address));
   handler_->addListener(absl::nullopt, *test_listener1);
 
-  Network::ListenerCallbacks* listener_callbacks2;
+  Network::TcpListenerCallbacks* listener_callbacks2;
   auto listener2 = new NiceMock<Network::MockListener>();
   TestListener* test_listener2 =
       addListener(1, false, false, "test_listener2", listener2, &listener_callbacks2);
@@ -622,7 +622,7 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
 }
 
 TEST_F(ConnectionHandlerTest, WildcardListenerWithOriginalDst) {
-  Network::ListenerCallbacks* listener_callbacks1;
+  Network::TcpListenerCallbacks* listener_callbacks1;
   auto listener1 = new NiceMock<Network::MockListener>();
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks1);
@@ -665,7 +665,7 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithOriginalDst) {
 }
 
 TEST_F(ConnectionHandlerTest, WildcardListenerWithNoOriginalDst) {
-  Network::ListenerCallbacks* listener_callbacks1;
+  Network::TcpListenerCallbacks* listener_callbacks1;
   auto listener1 = new NiceMock<Network::MockListener>();
   TestListener* test_listener1 =
       addListener(1, true, true, "test_listener1", listener1, &listener_callbacks1);
@@ -701,7 +701,7 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithNoOriginalDst) {
 }
 
 TEST_F(ConnectionHandlerTest, TransportProtocolDefault) {
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
@@ -720,7 +720,7 @@ TEST_F(ConnectionHandlerTest, TransportProtocolDefault) {
 }
 
 TEST_F(ConnectionHandlerTest, TransportProtocolCustom) {
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
@@ -754,7 +754,7 @@ TEST_F(ConnectionHandlerTest, TransportProtocolCustom) {
 TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
   InSequence s;
 
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
@@ -799,7 +799,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
 TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
   InSequence s;
 
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks, nullptr, nullptr,
@@ -846,7 +846,7 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
 TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
   InSequence s;
 
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
@@ -885,7 +885,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
 TEST_F(ConnectionHandlerTest, ListenerFilterDisabledTimeout) {
   InSequence s;
 
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks, nullptr, nullptr,
@@ -916,7 +916,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterDisabledTimeout) {
 TEST_F(ConnectionHandlerTest, ListenerFilterReportError) {
   InSequence s;
 
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
@@ -982,7 +982,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
   InSequence s;
   uint64_t old_listener_tag = 1;
   uint64_t new_listener_tag = 2;
-  Network::ListenerCallbacks* old_listener_callbacks;
+  Network::TcpListenerCallbacks* old_listener_callbacks;
   auto old_listener = new NiceMock<Network::MockListener>();
   TestListener* old_test_listener = addListener(old_listener_tag, true, false, "test_listener",
                                                 old_listener, &old_listener_callbacks);
@@ -990,7 +990,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
   handler_->addListener(absl::nullopt, *old_test_listener);
   ASSERT_NE(old_test_listener, nullptr);
 
-  Network::ListenerCallbacks* new_listener_callbacks = nullptr;
+  Network::TcpListenerCallbacks* new_listener_callbacks = nullptr;
 
   auto overridden_filter_chain_manager =
       std::make_shared<NiceMock<Network::MockFilterChainManager>>();
@@ -1013,7 +1013,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
 TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChain) {
   InSequence s;
   uint64_t listener_tag = 1;
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(listener_tag, true, false, "test_listener", listener, &listener_callbacks);
@@ -1055,7 +1055,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChain) {
 
 // Listener Filter matchers works.
 TEST_F(ConnectionHandlerTest, ListenerFilterWorks) {
-  Network::ListenerCallbacks* listener_callbacks;
+  Network::TcpListenerCallbacks* listener_callbacks;
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
@@ -1122,7 +1122,7 @@ TEST_F(ConnectionHandlerTest, TcpBacklogCustom) {
   EXPECT_CALL(*socket_factory_, getListenSocket()).WillOnce(Return(listeners_.back()->socket_));
   EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
   EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
-      .WillOnce(Invoke([custom_backlog](Network::SocketSharedPtr&&, Network::ListenerCallbacks&,
+      .WillOnce(Invoke([custom_backlog](Network::SocketSharedPtr&&, Network::TcpListenerCallbacks&,
                                         bool, uint32_t backlog) -> Network::Listener* {
         EXPECT_EQ(custom_backlog, backlog);
         return nullptr;

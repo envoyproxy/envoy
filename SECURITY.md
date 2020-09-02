@@ -1,3 +1,9 @@
+# Security Reporting Process
+
+Please report any security issue or Envoy crash report to
+envoy-security@googlegroups.com where the issue will be triaged appropriately.
+Thank you in advance for helping to keep Envoy secure.
+
 # Security Release Process
 
 Envoy is a large growing community of volunteers, users, and vendors. The Envoy community has
