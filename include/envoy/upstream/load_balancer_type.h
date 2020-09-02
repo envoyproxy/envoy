@@ -48,6 +48,8 @@ public:
    * @return fallback keys subset defined for this selector, or empty set
    */
   virtual const std::set<std::string>& fallbackKeysSubset() const PURE;
+
+  virtual bool singleHostPerSubset() const PURE;
 };
 
 using SubsetSelectorPtr = std::shared_ptr<SubsetSelector>;

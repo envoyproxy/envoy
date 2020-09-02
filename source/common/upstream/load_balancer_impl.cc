@@ -846,9 +846,11 @@ SubsetSelectorImpl::SubsetSelectorImpl(
     const Protobuf::RepeatedPtrField<std::string>& selector_keys,
     envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
         LbSubsetSelectorFallbackPolicy fallback_policy,
-    const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset)
+    const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset,
+    bool single_host_per_subset)
     : selector_keys_(selector_keys.begin(), selector_keys.end()), fallback_policy_(fallback_policy),
-      fallback_keys_subset_(fallback_keys_subset.begin(), fallback_keys_subset.end()) {
+      fallback_keys_subset_(fallback_keys_subset.begin(), fallback_keys_subset.end()),
+      single_host_per_subset_(single_host_per_subset) {
 
   if (fallback_policy_ !=
       envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET) {
