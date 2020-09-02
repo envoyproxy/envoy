@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bitset>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -397,6 +398,35 @@ protected:
       FANCY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
     } else {                                                                                       \
       ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__);                                   \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_LOG_FIRST_N(LEVEL, N, ...)                                                           \
+  do {                                                                                             \
+    static auto* countdown = new std::atomic<uint64_t>();                                          \
+    if (countdown->fetch_add(1) < N) {                                                             \
+      ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_LOG_ONCE(LEVEL, ...)                                                                 \
+  do {                                                                                             \
+    ENVOY_LOG_FIRST_N(LEVEL, 1, ##__VA_ARGS__);                                                    \
+  } while (0)
+
+#define ENVOY_LOG_EVERY_NTH(LEVEL, N, ...)                                                         \
+  do {                                                                                             \
+    static auto* count = new std::atomic<uint64_t>();                                              \
+    if ((count->fetch_add(1) % N) == 0) {                                                          \
+      ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_LOG_EVERY_POW_2(LEVEL, ...)                                                          \
+  do {                                                                                             \
+    static auto* count = new std::atomic<uint64_t>();                                              \
+    if (std::bitset<64>(1 + count->fetch_add(1)).count() == 1) {                                   \
+      ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
     }                                                                                              \
   } while (0)
 
