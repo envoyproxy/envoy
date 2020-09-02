@@ -10,7 +10,8 @@ namespace Http {
  * Add several dummy headers to a HeaderMap.
  * @param num_headers the number of dummy headers to add.
  */
-static void addDummyHeaders(HeaderMap& headers, size_t num_headers, const std::string prefix="dummy-key-") {
+static void addDummyHeaders(HeaderMap& headers, size_t num_headers,
+                            const std::string prefix = "dummy-key-") {
   for (size_t i = 0; i < num_headers; i++) {
     headers.addCopy(LowerCaseString(prefix + std::to_string(i)), "abcd");
   }
