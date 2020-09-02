@@ -34,7 +34,7 @@ class JvmFilterContext {
    *
    * @param headerCount, the total number of headers included in this header block.
    * @param endStream,   whether this header block is the final remote frame.
-   * @return Object,     not used for request filter.
+   * @return Object[],   pair of HTTP filter status and optional modified headers.
    */
   public Object onRequestHeaders(long headerCount, boolean endStream) {
     assert bridgeUtility.validateCount(headerCount);
@@ -47,7 +47,7 @@ class JvmFilterContext {
    *
    * @param data,      chunk of body data from the HTTP request.
    * @param endStream, indicates this is the last remote frame of the stream.
-   * @return Object,   not used for request filter.
+   * @return Object[], pair of HTTP filter status and optional modified data.
    */
   public Object onRequestData(byte[] data, boolean endStream) {
     ByteBuffer dataBuffer = ByteBuffer.wrap(data);
@@ -58,7 +58,7 @@ class JvmFilterContext {
    * Invokes onTrailers callback using trailers passed via passHeaders.
    *
    * @param trailerCount, the total number of trailers included in this header block.
-   * @return Object,      not used for request filter.
+   * @return Object[],    pair of HTTP filter status and optional modified trailers.
    */
   public Object onRequestTrailers(long trailerCount) {
     assert bridgeUtility.validateCount(trailerCount);
@@ -71,7 +71,7 @@ class JvmFilterContext {
    *
    * @param headerCount, the total number of headers included in this header block.
    * @param endStream,   whether this header block is the final remote frame.
-   * @return Object,     not used for response filter.
+   * @return Object[],   pair of HTTP filter status and optional modified headers.
    */
   public Object onResponseHeaders(long headerCount, boolean endStream) {
     assert bridgeUtility.validateCount(headerCount);
@@ -84,7 +84,7 @@ class JvmFilterContext {
    *
    * @param data,      chunk of body data from the HTTP response.
    * @param endStream, indicates this is the last remote frame of the stream.
-   * @return Object,   not used for response filter.
+   * @return Object[], pair of HTTP filter status and optional modified data.
    */
   public Object onResponseData(byte[] data, boolean endStream) {
     ByteBuffer dataBuffer = ByteBuffer.wrap(data);
@@ -95,7 +95,7 @@ class JvmFilterContext {
    * Invokes onTrailers callback using trailers passed via passHeaders.
    *
    * @param trailerCount, the total number of trailers included in this header block.
-   * @return Object,      not used for response filter.
+   * @return Object[],    pair of HTTP filter status and optional modified trailers.
    */
   public Object onResponseTrailers(long trailerCount) {
     assert bridgeUtility.validateCount(trailerCount);
