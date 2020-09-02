@@ -154,7 +154,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       route_config_provider_(server.timeSource()),
       scoped_route_config_provider_(server.timeSource()), clusters_handler_(server),
-      config_dump_handler_(server), stats_handler_(server), logs_handler_(server),
+      config_dump_handler_(config_tracker_, server), stats_handler_(server), logs_handler_(server),
       profiling_handler_(profile_path), runtime_handler_(server), listeners_handler_(server),
       server_cmd_handler_(server), server_info_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values

@@ -18,7 +18,7 @@ namespace Server {
 class ConfigDumpHandler : public HandlerContextBase {
 
 public:
-  ConfigDumpHandler(Server::Instance& server);
+  ConfigDumpHandler(ConfigTracker& configTracker, Server::Instance& server);
 
   Http::Code handlerConfigDump(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
@@ -44,7 +44,7 @@ private:
 
   ProtobufTypes::MessagePtr dumpEndpointConfigs() const;
 
-  ConfigTrackerImpl config_tracker_;
+  ConfigTracker& config_tracker_;
 };
 
 } // namespace Server

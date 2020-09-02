@@ -111,7 +111,8 @@ bool shouldIncludeEdsInDump(const Http::Utility::QueryParams& params) {
 
 } // namespace
 
-ConfigDumpHandler::ConfigDumpHandler(Server::Instance& server) : HandlerContextBase(server) {}
+ConfigDumpHandler::ConfigDumpHandler(ConfigTracker& configTracker, Server::Instance& server)
+    : HandlerContextBase(server), config_tracker_(configTracker) {}
 
 Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
                                                 Http::ResponseHeaderMap& response_headers,
