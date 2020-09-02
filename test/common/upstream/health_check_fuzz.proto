@@ -6,7 +6,7 @@ import "test/fuzz/common.proto";
 import "envoy/config/core/v3/health_check.proto";
 
 message Respond {
-    test.Fuzz.Headers headers = 1; //TODO: Add validation for path in any case
+    test.fuzz.Headers headers = 1; //TODO: Add validation for path in any case
     string status = 2; //Add validation that all the characters are between 0 - 9, or ' ', would something like "9 00 9" pass?, and require it
 }
 
@@ -22,14 +22,14 @@ message StreamCreate {
 message HttpAction {
     oneof action_selector {
         Respond respond = 1;
-        boolean stream_create = 2;
+        StreamCreate stream_create = 2;
         //TODO: time advancement, multiple hosts (maps to other two as well), separate respondBody, respondTrailers
     }
 }
 
-message HttpHealthCheckTestCase {
-    core.HealthCheck health_check_config = 1;
-    Repeated HttpAction http_actions = 2;
-    //Repeated TcpAction tcp_actions = 3;
-    //Repeated GrpcAction grpc_actions = 4;
+message HealthCheckTestCase {
+    envoy.config.core.v3.HealthCheck health_check_config = 1;
+    repeated HttpAction http_actions = 2;
+    //repeated TcpAction tcp_actions = 3;
+    //repeated GrpcAction grpc_actions = 4;
 }

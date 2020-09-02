@@ -1,41 +1,12 @@
-#pragma once
-
 #include <vector>
+
 #include "common/upstream/health_checker_impl.h"
-#include "test/mocks/upstream/mocks.h"
 
-#include <chrono>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/health_check.pb.h"
-#include "envoy/config/core/v3/health_check.pb.validate.h"
-#include "envoy/config/endpoint/v3/endpoint_components.pb.h"
-#include "envoy/data/core/v3/health_check_event.pb.h"
-
-#include "common/buffer/buffer_impl.h"
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/grpc/common.h"
-#include "common/http/headers.h"
-#include "common/json/json_loader.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "test/common/http/common.h"
-#include "test/common/upstream/utility.h"
-#include "test/mocks/access_log/mocks.h"
-#include "test/mocks/api/mocks.h"
+#include "test/mocks/common.h"
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/upstream/mocks.h"
-#include "test/test_common/printers.h"
-#include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_runtime.h"
-#include "test/test_common/utility.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/mocks/upstream/health_check_event_logger.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -65,7 +36,6 @@ public:
 
   Http::CodecClient::Type codecClientType() { return codec_client_type_; }
 };
-
 
 class HttpHealthCheckerImplTest : public testing::Test, public HealthCheckerTestBase {
 public:
@@ -153,5 +123,5 @@ public:
   const HostWithHealthCheckMap health_checker_map_{};
 };
 
-} //namespace Upstream
-} //namespace Envoy
+} // namespace Upstream
+} // namespace Envoy

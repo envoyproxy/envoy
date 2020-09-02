@@ -11,20 +11,26 @@ health_check_config {
     interval_jitter {
         seconds: 1
     }
-    unhealthy_threshold: 2
-    healthy_threshold: 2
+    unhealthy_threshold {
+        value: 2
+    }
+    healthy_threshold: {
+        value: 2
+    }
     http_health_check {
         path: "/healthcheck"
-    }
-    service_name_matcher {
-        prefix: "locations"
+        service_name_matcher {
+            prefix: "locations"
+        }
     }
 }
 http_actions {
     respond {
       headers {
-        key: ":status"
-        value: "200"
+        headers {
+            key: ":status"
+            value: "200"
+        }
       }
       status: "200"
     }

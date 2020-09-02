@@ -1,37 +1,3 @@
-http_config {
-    config { 
-
-    }
-    http_config {
-
-    }
-    actions {
-        respond {
-            code : "200"
-            conn_close: false
-            proxy_close: false
-            body: true
-            trailers: false
-            degraded: true
-        }
-    }
-    actions {
-        stream_create {
-
-        }
-    }
-    actions {
-        respond {
-            code : "200"
-            conn_close: false
-            proxy_close: false
-            body: true
-            trailers: false
-            degraded: false
-        }
-    }
-}
-
 health_check_config {
     timeout {
         seconds: 1
@@ -45,35 +11,50 @@ health_check_config {
     interval_jitter {
         seconds: 1
     }
-    unhealthy_threshold: 2
-    healthy_threshold: 2
+    unhealthy_threshold {
+        value: 2
+    }
+    healthy_threshold: {
+        value: 2
+    }
     http_health_check {
         path: "/healthcheck"
-    }
-    service_name_matcher {
-        prefix: "locations"
+        service_name_matcher {
+            prefix: "locations"
+        }
     }
 }
 http_actions {
     respond {
       headers {
-        key: ":status"
-        value: "200"
-      }
-      headers {
-        key: ":degraded"
-        value: "1"
+        headers {
+            key: ":status"
+            value: "200"
+        }
+        headers {
+            key: ":degraded"
+            value: "1"
+        }
       }
       status: "200"
     }
+}
+http_actions {
+    stream_create {
+
+    }
+}
+http_actions {
     respond {
       headers {
-        key: ":status"
-        value: "200"
-      }
-      headers {
-        key: ":degraded"
-        value: "0"
+        headers {
+            key: ":status"
+            value: "200"
+        }
+        headers {
+            key: ":degraded"
+            value: "0"
+        }
       }
       status: "200"
     }

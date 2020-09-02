@@ -1,5 +1,5 @@
 #pragma once
-#include "test/common/upstream/health_checker_impl_test.h"
+#include "test/common/upstream/health_checker_impl_test_utils.h"
 #include "test/common/upstream/health_check_fuzz.pb.h"
 #include "test/fuzz/common.pb.h"
 
@@ -13,12 +13,13 @@ namespace Upstream {
 
 
         private:
-            void respondHeaders(test::fuzz::Headers headers, std::string status);
+            void respondHeaders(test::fuzz::Headers headers, absl::string_view status);
             void streamCreate();
-            std::string constructYamlFromProtoInput(test::common::upstream::HealthCheckTestCase input);
+            void allocHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
             void TestBody() override {
                 
             }
+
 
             void replay(test::common::upstream::HealthCheckTestCase input);
 

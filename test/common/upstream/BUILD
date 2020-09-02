@@ -134,16 +134,33 @@ envoy_benchmark_test(
     benchmark_binary = "eds_speed_test",
 )
 
+
 envoy_cc_test_library(
     name = "health_checker_impl_test_lib",
     srcs = [
-        "health_checker_impl_test.cc"
+        "health_checker_impl_test_utils.cc",
     ],
     hdrs = [
-        "health_checker_impl_test.h",
+        "health_checker_impl_test_utils.h",
     ],
     deps = [
         ":utility_lib",
+        "//test/common/http:common_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/mocks/upstream:health_check_event_logger_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "health_checker_impl_test",
+    srcs = [
+        "health_checker_impl_test.cc",
+    ],
+    deps = [
+        ":health_checker_impl_test_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:headers_lib",
@@ -153,12 +170,18 @@ envoy_cc_test_library(
         "//source/common/upstream:health_checker_lib",
         "//source/common/upstream:upstream_lib",
         "//test/common/http:common_lib",
+        "//test/mocks:common_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/mocks/upstream:health_check_event_logger_mocks",
+        "//test/mocks/upstream:host_set_mocks",
+        "//test/mocks/upstream:transport_socket_match_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
@@ -166,16 +189,6 @@ envoy_cc_test_library(
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
     ],
-)
-
-envoy_cc_test(
-    name = "health_checker_impl_test",
-    srcs = [
-        "health_checker_test.cc"
-    ],
-    deps = [
-        ":health_checker_impl_test_lib"
-    ]
 )
 
 envoy_cc_test(
@@ -600,6 +613,7 @@ envoy_cc_test_library(
         ":utility_lib",
         ":health_checker_impl_test_lib",
         ":health_check_fuzz_proto_cc_proto",
+        "//test/fuzz:utility_lib",
     ],
 )
 
@@ -618,6 +632,6 @@ envoy_cc_fuzz_test(
     corpus = "//test/common/upstream:health_check_corpus",
     deps = [
         ":health_check_fuzz_proto_cc_proto",
-        ":health_check_fuzz_lib"
+        ":health_check_fuzz_lib",
     ],
 )
