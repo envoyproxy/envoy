@@ -765,7 +765,7 @@ TEST_P(VhdsIntegrationTest, MultipleUpdates) {
     EXPECT_TRUE(
         compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
 
-    // verify that both vhosts have been updated
+    // verify that both virtual hosts have been updated
     testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/after_update", "vhost.first");
     cleanupUpstreamAndDownstream();
     ASSERT_TRUE(codec_client_->waitForDisconnect());
