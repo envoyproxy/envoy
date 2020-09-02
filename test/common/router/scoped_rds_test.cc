@@ -1453,15 +1453,17 @@ key:
                             Stats::Gauge::ImportMode::Accumulate)
                      .value());
   // All the on demand updated callbacks will be executed when the route table comes.
-  for (int i = 0; i < 5; i++) {
+  {
     ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
         TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
-    std::function<void(bool)> route_config_updated_cb = [](bool) {};
+    std::function<void(bool)> route_config_updated_cb = [](bool scope_exist) {
+      EXPECT_TRUE(scope_exist);
+    };
     getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_,
                                               std::move(route_config_updated_cb));
   }
   // After on demand request, push rds update, the callbacks will be executed.
-  EXPECT_CALL(event_dispatcher_, post(_)).Times(5);
+  EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
   pushRdsConfig({"foo_routes"}, "111");
 
   ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
@@ -1473,7 +1475,10 @@ key:
                             Stats::Gauge::ImportMode::Accumulate)
                      .value());
   EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
-  std::function<void(bool)> route_config_updated_cb = [](bool) {};
+  // Scope no longer exists after srds update.
+  std::function<void(bool)> route_config_updated_cb = [](bool scope_exist) {
+    EXPECT_FALSE(scope_exist);
+  };
   getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_,
                                             std::move(route_config_updated_cb));
 }

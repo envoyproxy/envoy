@@ -118,16 +118,17 @@ private:
                                   ActiveStream& parent)
         : route_config_provider_(route_config_provider), parent_(parent) {}
 
-    // Only on demand update for ScopeRdsConfigProvider is supported.
-    // InlineScopedRoutesConfigProvider will cast to nullptr in this ctor.
     RdsRouteConfigUpdateRequester(Config::ConfigProvider* scoped_route_config_provider,
                                   ActiveStream& parent)
+        // Only on demand update for ScopeRdsConfigProvider is supported.
+        // InlineScopedRoutesConfigProvider will cast to nullptr in this ctor.
         : scoped_route_config_provider_(
               dynamic_cast<Router::ScopedRdsConfigProvider*>(scoped_route_config_provider)),
           parent_(parent) {}
+
     void
     requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
-    void requestVhdsUpdate(const std::string host_header,
+    void requestVhdsUpdate(const std::string& host_header,
                            Event::Dispatcher& thread_local_dispatcher,
                            Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
     void requestSrdsUpdate(Router::ScopeKeyPtr scope_key,

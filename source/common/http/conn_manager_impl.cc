@@ -493,6 +493,7 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
   } else if (parent_.snapped_scoped_routes_config_ != nullptr) {
     Router::ScopeKeyPtr scope_key = parent_.snapped_scoped_routes_config_->computeScopeKey(
         *parent_.filter_manager_.requestHeaders());
+    // If scope_key is not null, the scope exists but RouteConfiguration is not initialized.
     if (scope_key != nullptr) {
       // On demand srds
       requestSrdsUpdate(std::move(scope_key), thread_local_dispatcher,
@@ -505,7 +506,7 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
 }
 
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestVhdsUpdate(
-    const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
+    const std::string& host_header, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   route_config_provider_->requestVirtualHostsUpdate(host_header, thread_local_dispatcher,
                                                     std::move(route_config_updated_cb));

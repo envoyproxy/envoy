@@ -189,6 +189,7 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConf
   }
 
   // Create a init_manager to create a rds provider.
+  // No transitive warming dependency here because only on demand update reach this point.
   std::unique_ptr<Init::ManagerImpl> srds_init_mgr =
       std::make_unique<Init::ManagerImpl>(fmt::format("SRDS on demand init manager."));
   std::unique_ptr<Cleanup> srds_initialization_continuation =
@@ -253,6 +254,9 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
               scoped_route_info->scopeName(), version_info);
   }
 
+  // scoped_route_info of both eager loading and on demand scope will be propagated to work
+  // threads. Upon a scoped RouteConfiguration miss, if the scope exists, an on demand update
+  // callback will be posted to main thread.
   if (!updated_scopes.empty()) {
     applyConfigUpdate([updated_scopes](ConfigProvider::ConfigConstSharedPtr config)
                           -> ConfigProvider::ConfigConstSharedPtr {
