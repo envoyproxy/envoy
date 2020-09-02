@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package test.common.http;
+
+import "test/fuzz/common.proto";
+
+message CanonicalPath {
+  test.fuzz.Headers request_headers = 1;
+}
+
+message MergeSlashes {
+  test.fuzz.Headers request_headers = 1;
+}
+
+message RemoveQueryAndFragment {
+  string path = 1;
+}
+
+message PathUtilityTestCase {
+  oneof path_utility_selector {
+    CanonicalPath canonical_path = 1;
+    MergeSlashes merge_slashes = 2;
+    RemoveQueryAndFragment remove_query_and_fragment = 3;
+  }
+}
