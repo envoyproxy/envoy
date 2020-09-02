@@ -194,7 +194,10 @@ for how to update or override dependencies.
     set PATH=%PATH%;%USERPROFILE%\Git\bin
     ```
 
-    Lastly, persist environment variable changes.
+    Lastly, persist environment variable changes. NOTE: The paths in this document are given as
+    examples, make sure to verify you are using the correct paths for your environment. Also note
+    that these examples assume using a `cmd.exe` shell to set environment variables etc., be sure
+    to do the equivalent if using a different shell.
     ```
     setx PATH "%PATH%"
     setx BAZEL_SH "%BAZEL_SH%"
