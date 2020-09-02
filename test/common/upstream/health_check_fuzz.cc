@@ -57,15 +57,10 @@ void HealthCheckFuzz::respondHeaders(test::fuzz::Headers headers, absl::string_v
 }
 
 void HealthCheckFuzz::streamCreate(bool create_stream_on_second_host) {
-  ENVOY_LOG_MISC(trace, "Created a new stream on host 1.");
-  if (second_host_) {
-    int index = (create_stream_on_second_host) ? 1 : 0;
-    expectStreamCreate(index);
-    test_sessions_[index]->interval_timer_->invokeCallback();
-  } else {
-    expectStreamCreate(0);
-    test_sessions_[0]->interval_timer_->invokeCallback();
-  }
+  int index = (second_host_ && create_stream_on_second_host) ? 1 : 0;
+  ENVOY_LOG_MISC(trace, "Created a new stream on host {}", index);
+  expectStreamCreate(index);
+  test_sessions_[index]->interval_timer_->invokeCallback();
 }
 
 void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) {
@@ -73,7 +68,7 @@ void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) 
     const auto& event = input.http_actions(i);
     ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
     switch (event.action_selector_case()) { // TODO: Once added implementations for tcp and gRPC,
-                                            // move this to a seperate method, handleHttp
+                                            // move this to a separate method, handleHttp
     case test::common::upstream::HttpAction::kRespond: {
       respondHeaders(event.respond().headers(), event.respond().status(),
                      event.respond().respond_on_second_host());
