@@ -106,7 +106,7 @@ TEST_P(RBACIntegrationTest, Allowed) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
 }
 
 TEST_P(RBACIntegrationTest, Denied) {
