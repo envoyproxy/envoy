@@ -45,7 +45,7 @@ class JitteredLowerBoundBackOffStrategy : public BackOffStrategy {
 public:
   /**
    * Constructs fully jittered backoff strategy.
-   * @param min_interval the lower bound on the next backoff value.
+   * @param min_interval the lower bound on the next backoff value. It must be greater than one.
    * @param random the random generator.
    */
   JitteredLowerBoundBackOffStrategy(uint64_t min_interval, Random::RandomGenerator& random);

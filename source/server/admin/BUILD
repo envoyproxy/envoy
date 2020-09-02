@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = ["admin.h"],
     deps = [
         ":admin_filter_lib",
+        ":clusters_handler_lib",
         ":config_tracker_lib",
         ":listeners_handler_lib",
         ":logs_handler_lib",
@@ -33,9 +34,6 @@ envoy_cc_library(
         "//include/envoy/server:instance_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:options_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-        "//include/envoy/upstream:resource_manager_interface",
-        "//include/envoy/upstream:upstream_interface",
         "//source/common/access_log:access_log_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
@@ -63,7 +61,6 @@ envoy_cc_library(
         "//source/common/router:config_lib",
         "//source/common/router:scoped_config_lib",
         "//source/common/stats:isolated_store_lib",
-        "//source/common/upstream:host_utility_lib",
         "//source/extensions/access_loggers/file:file_access_log_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -224,6 +221,24 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/memory:stats_lib",
         "//source/common/version:version_includes",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "clusters_handler_lib",
+    srcs = ["clusters_handler.cc"],
+    hdrs = ["clusters_handler.h"],
+    deps = [
+        ":handler_ctx_lib",
+        ":utils_lib",
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/server:admin_interface",
+        "//include/envoy/server:instance_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:codes_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/upstream:host_utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )

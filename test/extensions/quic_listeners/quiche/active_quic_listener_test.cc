@@ -136,7 +136,8 @@ protected:
     auto proof_source = std::make_unique<TestProofSource>();
     filter_chain_ = &proof_source->filterChain();
     crypto_config_peer.ResetProofSource(std::move(proof_source));
-    simulated_time_system_.advanceTimeWait(std::chrono::milliseconds(100));
+    simulated_time_system_.advanceTimeAsync(std::chrono::milliseconds(100));
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
   Network::ActiveUdpListenerFactoryPtr createQuicListenerFactory(const std::string& yaml) {

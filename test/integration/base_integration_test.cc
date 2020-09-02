@@ -1,9 +1,8 @@
-#include "test/integration/integration.h"
+#include "test/integration/base_integration_test.h"
 
 #include <chrono>
 #include <cstdint>
 #include <functional>
-#include <list>
 #include <memory>
 #include <string>
 #include <vector>
@@ -14,21 +13,14 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "envoy/http/header_map.h"
 
-#include "common/api/api_impl.h"
-#include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/api_version.h"
-#include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
-#include "common/network/connection_impl.h"
 #include "common/network/utility.h"
-#include "common/upstream/upstream_impl.h"
 
 #include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/autonomous_upstream.h"
@@ -40,228 +32,15 @@
 #include "absl/strings/str_join.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::AnyNumber;
-using testing::AssertionFailure;
-using testing::AssertionResult;
-using testing::AssertionSuccess;
-using testing::AtLeast;
-using testing::Invoke;
-using testing::IsSubstring;
-using testing::NiceMock;
-using testing::ReturnRef;
-
 namespace Envoy {
-
-IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
-    : dispatcher_(dispatcher) {}
-
-void IntegrationStreamDecoder::waitForContinueHeaders() {
-  if (!continue_headers_.get()) {
-    waiting_for_continue_headers_ = true;
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
-  }
-}
-
-void IntegrationStreamDecoder::waitForHeaders() {
-  if (!headers_.get()) {
-    waiting_for_headers_ = true;
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
-  }
-}
-
-void IntegrationStreamDecoder::waitForBodyData(uint64_t size) {
-  ASSERT(body_data_waiting_length_ == 0);
-  body_data_waiting_length_ = size;
-  body_data_waiting_length_ -=
-      std::min(body_data_waiting_length_, static_cast<uint64_t>(body_.size()));
-  if (body_data_waiting_length_ > 0) {
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
-  }
-}
-
-void IntegrationStreamDecoder::waitForEndStream() {
-  if (!saw_end_stream_) {
-    waiting_for_end_stream_ = true;
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
-  }
-}
-
-void IntegrationStreamDecoder::waitForReset() {
-  if (!saw_reset_) {
-    waiting_for_reset_ = true;
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
-  }
-}
-
-void IntegrationStreamDecoder::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
-  continue_headers_ = std::move(headers);
-  if (waiting_for_continue_headers_) {
-    dispatcher_.exit();
-  }
-}
-
-void IntegrationStreamDecoder::decodeHeaders(Http::ResponseHeaderMapPtr&& headers,
-                                             bool end_stream) {
-  saw_end_stream_ = end_stream;
-  headers_ = std::move(headers);
-  if ((end_stream && waiting_for_end_stream_) || waiting_for_headers_) {
-    dispatcher_.exit();
-  }
-}
-
-void IntegrationStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream) {
-  saw_end_stream_ = end_stream;
-  body_ += data.toString();
-
-  if (end_stream && waiting_for_end_stream_) {
-    dispatcher_.exit();
-  } else if (body_data_waiting_length_ > 0) {
-    body_data_waiting_length_ -= std::min(body_data_waiting_length_, data.length());
-    if (body_data_waiting_length_ == 0) {
-      dispatcher_.exit();
-    }
-  }
-}
-
-void IntegrationStreamDecoder::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
-  saw_end_stream_ = true;
-  trailers_ = std::move(trailers);
-  if (waiting_for_end_stream_) {
-    dispatcher_.exit();
-  }
-}
-
-void IntegrationStreamDecoder::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
-  // Combines newly received metadata with the existing metadata.
-  for (const auto& metadata : *metadata_map) {
-    duplicated_metadata_key_count_[metadata.first]++;
-    metadata_map_->insert(metadata);
-  }
-}
-
-void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason, absl::string_view) {
-  saw_reset_ = true;
-  reset_reason_ = reason;
-  if (waiting_for_reset_) {
-    dispatcher_.exit();
-  }
-}
-
-IntegrationTcpClient::IntegrationTcpClient(
-    Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
-    Network::Address::IpVersion version, bool enable_half_close,
-    const Network::ConnectionSocket::OptionsSharedPtr& options)
-    : payload_reader_(new WaitForPayloadReader(dispatcher)),
-      callbacks_(new ConnectionCallbacks(*this)) {
-  EXPECT_CALL(factory, create_(_, _, _))
-      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                           std::function<void()> above_overflow) -> Buffer::Instance* {
-        client_write_buffer_ =
-            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
-        return client_write_buffer_;
-      }));
-
-  connection_ = dispatcher.createClientConnection(
-      Network::Utility::resolveUrl(
-          fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options);
-
-  ON_CALL(*client_write_buffer_, drain(_))
-      .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::baseDrain));
-  EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AnyNumber());
-
-  connection_->enableHalfClose(enable_half_close);
-  connection_->addConnectionCallbacks(*callbacks_);
-  connection_->addReadFilter(payload_reader_);
-  connection_->connect();
-}
-
-void IntegrationTcpClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
-
-void IntegrationTcpClient::waitForData(const std::string& data, bool exact_match) {
-  auto found = payload_reader_->data().find(data);
-  if (found == 0 || (!exact_match && found != std::string::npos)) {
-    return;
-  }
-
-  payload_reader_->set_data_to_wait_for(data, exact_match);
-  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
-}
-
-AssertionResult IntegrationTcpClient::waitForData(size_t length,
-                                                  std::chrono::milliseconds timeout) {
-  if (payload_reader_->data().size() >= length) {
-    return AssertionSuccess();
-  }
-
-  return payload_reader_->waitForLength(length, timeout);
-}
-
-void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
-  Event::TimerPtr timeout_timer =
-      connection_->dispatcher().createTimer([this]() -> void { connection_->dispatcher().exit(); });
-  timeout_timer->enableTimer(TestUtility::DefaultTimeout);
-
-  if (ignore_spurious_events) {
-    while (!disconnected_ && timeout_timer->enabled()) {
-      connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
-    }
-  } else {
-    connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  }
-  EXPECT_TRUE(disconnected_);
-}
-
-void IntegrationTcpClient::waitForHalfClose() {
-  if (payload_reader_->readLastByte()) {
-    return;
-  }
-  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  EXPECT_TRUE(payload_reader_->readLastByte());
-}
-
-void IntegrationTcpClient::readDisable(bool disabled) { connection_->readDisable(disabled); }
-
-AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_stream, bool verify,
-                                            std::chrono::milliseconds timeout) {
-  Event::TestTimeSystem::RealTimeBound bound(timeout);
-  Buffer::OwnedImpl buffer(data);
-  if (verify) {
-    EXPECT_CALL(*client_write_buffer_, move(_));
-    if (!data.empty()) {
-      EXPECT_CALL(*client_write_buffer_, write(_)).Times(AtLeast(1));
-    }
-  }
-
-  int bytes_expected = client_write_buffer_->bytes_written() + data.size();
-
-  connection_->write(buffer, end_stream);
-  do {
-    connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-    if (client_write_buffer_->bytes_written() == bytes_expected || disconnected_) {
-      break;
-    }
-  } while (bound.withinBound());
-
-  if (!bound.withinBound()) {
-    return AssertionFailure() << "Timed out completing write";
-  } else if (verify && (disconnected_ || client_write_buffer_->bytes_written() != bytes_expected)) {
-    return AssertionFailure()
-           << "Failed to complete write or unexpected disconnect. disconnected_: " << disconnected_
-           << " bytes_written: " << client_write_buffer_->bytes_written()
-           << " bytes_expected: " << bytes_expected;
-  }
-
-  return AssertionSuccess();
-}
-
-void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::RemoteClose) {
-    parent_.disconnected_ = true;
-    parent_.connection_->dispatcher().exit();
-  }
-}
+using ::testing::_;
+using ::testing::AssertionFailure;
+using ::testing::AssertionResult;
+using ::testing::AssertionSuccess;
+using ::testing::Invoke;
+using ::testing::IsSubstring;
+using ::testing::NiceMock;
+using ::testing::ReturnRef;
 
 BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                                          Network::Address::IpVersion version,

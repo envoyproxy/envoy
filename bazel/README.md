@@ -13,7 +13,7 @@ sudo chmod +x /usr/local/bin/bazel
 
 On macOS, run the following command:
 ```
-brew install bazelbuild/tap/bazelisk
+brew install bazelisk
 ```
 
 On Windows, run the following commands:
@@ -504,10 +504,44 @@ If you have clang-5.0 or newer, additional checks are provided with:
 bazel test -c dbg --config=clang-asan //test/...
 ```
 
-Similarly, for [thread sanitizer (TSAN)](https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual) testing:
+[Thread sanitizer (TSAN)](https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual) tests rely on
+a TSAN-instrumented version of libc++ and can be run under the docker sandbox:
 
 ```
-bazel test -c dbg --config=clang-tsan //test/...
+bazel test -c dbg --config=docker-tsan //test/...
+```
+
+Alternatively, you can build a local copy of TSAN-instrumented libc++. Follow the [quick start](#quick-start-bazel-build-for-developers) instruction to setup Clang+LLVM environment. Download LLVM sources from the [LLVM official site](https://github.com/llvm/llvm-project)
+
+```
+curl -sSfL "https://github.com/llvm/llvm-project/archive/llvmorg-10.0.0.tar.gz" | tar zx
+
+```
+
+Configure and build a TSAN-instrumented libc++. Please note that `LLVM_USE_SANITIZER=Thread` preprocessor definition is used to enable TSAN instrumentation, and `CMAKE_INSTALL_PREFIX="/opt/libcxx_tsan"` defines the installation directory path.
+
+```
+mkdir tsan
+pushd tsan
+
+cmake -GNinja -DLLVM_ENABLE_PROJECTS="libcxxabi;libcxx" -DLLVM_USE_LINKER=lld -DLLVM_USE_SANITIZER=Thread -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_INSTALL_PREFIX="/opt/libcxx_tsan" "../llvm-project-llvmorg-10.0.0/llvm"
+ninja install-cxx install-cxxabi
+
+rm -rf /opt/libcxx_tsan/include
+```
+
+Generate local_tsan.bazelrc containing bazel configuration for tsan tests:
+
+```
+bazel/setup_local_tsan.sh </path/to/instrumented/libc++/home>
+
+```
+
+To execute TSAN tests using the local instrumented libc++ library pass `--config=local-tsan` to bazel:
+
+```
+bazel test --config=local-tsan //test/...
 ```
 
 For [memory sanitizer (MSAN)](https://github.com/google/sanitizers/wiki/MemorySanitizer) testing,
@@ -572,6 +606,8 @@ The following optional features can be enabled on the Bazel build command-line:
 * Process logging for Android applications can be enabled with `--define logger=android`.
 * Excluding assertions for known issues with `--define disable_known_issue_asserts=true`.
   A KNOWN_ISSUE_ASSERT is an assertion that should pass (like all assertions), but sometimes fails for some as-yet unidentified or unresolved reason. Because it is known to potentially fail, it can be compiled out even when DEBUG is true, when this flag is set. This allows Envoy to be run in production with assertions generally enabled, without crashing for known issues. KNOWN_ISSUE_ASSERT should only be used for newly-discovered issues that represent benign violations of expectations.
+* Envoy can be linked to [`zlib-ng`](https://github.com/zlib-ng/zlib-ng) instead of
+  [`zlib`](https://zlib.net) with `--define zlib=ng`.
 
 ## Disabling extensions
 
@@ -618,10 +654,8 @@ local_repository(
 ## Extra extensions
 
 If you are building your own Envoy extensions or custom Envoy builds and encounter visibility
-problems with, you may need to adjust the default visibility rules.
-By default, Envoy extensions are set up to only be visible to code within the
-[//source/extensions](../source/extensions/), or the Envoy server target. To adjust this,
-add any additional targets you need to `ADDITIONAL_VISIBILITY` in
+problems with, you may need to adjust the default visibility rules to be public,
+as documented in
 [extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
 See the instructions above about how to create your own custom version of
 [extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
