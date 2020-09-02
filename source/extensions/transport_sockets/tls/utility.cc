@@ -155,13 +155,13 @@ int32_t Utility::getDaysUntilExpiration(const X509* cert, TimeSource& time_sourc
 
 absl::optional<std::string>
 Utility::getCertificateExtensionValue(X509& cert, absl::string_view extension_name) {
-  ASN1_OBJECT* oid = OBJ_txt2obj(std::string(extension_name).c_str(), 1 /* don't search names */);
+  bssl::UniquePtr<ASN1_OBJECT> oid(
+      OBJ_txt2obj(std::string(extension_name).c_str(), 1 /* don't search names */));
   if (oid == nullptr) {
     return absl::nullopt;
   }
 
-  int pos = X509_get_ext_by_OBJ(&cert, oid, -1);
-  ASN1_OBJECT_free(oid);
+  int pos = X509_get_ext_by_OBJ(&cert, oid.get(), -1);
   if (pos < 0) {
     return absl::nullopt;
   }
@@ -172,9 +172,7 @@ Utility::getCertificateExtensionValue(X509& cert, absl::string_view extension_na
   }
 
   const ASN1_OCTET_STRING* octet_string = X509_EXTENSION_get_data(extension);
-  if (octet_string == nullptr) {
-    return absl::nullopt;
-  }
+  RELEASE_ASSERT(octet_string != nullptr, "");
 
   // Return the entire DER-encoded value for this extension. Correct decoding depends on
   // knowledge of the expected structure of the extension's value.
