@@ -211,6 +211,12 @@ jobs:
           BUILD_URI: $(Build.BuildUri)
 
   - job: Windows
+    strategy:
+      matrix:
+        msvc_cl:
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs)"
+        clang_cl:
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-clang-cl --jobs=$(RbeJobs)"
     dependsOn: ["format"]
     timeoutInMinutes: 360
     pool:
@@ -220,7 +226,6 @@ jobs:
         displayName: "Run Windows CI"
         env:
           ENVOY_RBE: "true"
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs)"
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
