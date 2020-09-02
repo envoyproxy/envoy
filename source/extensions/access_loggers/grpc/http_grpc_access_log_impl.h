@@ -51,12 +51,12 @@ private:
 
   Stats::Scope& scope_;
   const envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config_;
+  const ThreadLocal::SlotPtr tls_slot_;
   const GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
   std::vector<Http::LowerCaseString> request_headers_to_log_;
   std::vector<Http::LowerCaseString> response_headers_to_log_;
   std::vector<Http::LowerCaseString> response_trailers_to_log_;
   std::vector<std::string> filter_states_to_log_;
-  const ThreadLocal::SlotPtr tls_slot_; // Destruct first to flush callbacks.
 };
 
 using HttpGrpcAccessLogPtr = std::unique_ptr<HttpGrpcAccessLog>;
