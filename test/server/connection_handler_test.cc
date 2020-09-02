@@ -639,7 +639,9 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainMultipleRebuildingRequests) {
   // placeholder. Rebuilding request will be post to master thread and the currently no
   // createServerConnection will be called.
   EXPECT_CALL(dispatcher_, createServerConnection_()).Times(0);
-  EXPECT_CALL(master_dispatcher_, post(_)).Times(3);
+  // The rebuilding request will be called only once on the first request. Duplicate requests for
+  // the same filter chain will not be posted.
+  EXPECT_CALL(master_dispatcher_, post(_)).Times(1);
 
   Network::MockConnectionSocket* socket1 = new NiceMock<Network::MockConnectionSocket>();
   Network::MockConnectionSocket* socket2 = new NiceMock<Network::MockConnectionSocket>();

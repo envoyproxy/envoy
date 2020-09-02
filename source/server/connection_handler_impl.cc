@@ -489,19 +489,26 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
 
     const auto& filter_chain_message = filter_chain->getFilterChainMessage();
 
+    // No need to post duplicate rebuilding requests for the same filter chain again if this
+    // listener has already sent one and got no response yet.
+    bool should_send_request = pending_sockets_[filter_chain_message].empty();
     // Store the socket and dynamic_metadata for later connection retry.
     pending_sockets_[filter_chain_message].emplace_back(std::move(socket), dynamic_metadata);
-    // Post rebuilding request to the master thread.
-    auto& server_dispatcher = config_->dispatcher();
-    auto& worker_dispatcher = parent_.dispatcher_;
-    server_dispatcher.post([&listener = *config_, &filter_chain_message, &worker_dispatcher,
-                            &handler = parent_]() {
-      listener.rebuildFilterChain(
-          &filter_chain_message, worker_dispatcher,
-          [&handler](bool success, const envoy::config::listener::v3::FilterChain& filter_chain) {
-            handler.retryConnections(success, filter_chain);
-          });
-    });
+    // Post rebuilding request to the master thread only when there exists no unfinished rebuilding.
+    if (should_send_request) {
+      ENVOY_LOG(debug, "listener:{} post rebuilding request for filter chain on the first time",
+                listener_name);
+      auto& server_dispatcher = config_->dispatcher();
+      auto& worker_dispatcher = parent_.dispatcher_;
+      server_dispatcher.post([&listener = *config_, &filter_chain_message, &worker_dispatcher,
+                              &handler = parent_]() {
+        listener.rebuildFilterChain(
+            &filter_chain_message, worker_dispatcher,
+            [&handler](bool success, const envoy::config::listener::v3::FilterChain& filter_chain) {
+              handler.retryConnections(success, filter_chain);
+            });
+      });
+    }
     // Temporarily decrease num_listener_connections_, will increase when retry this connection. To
     // avoid assert inside listener destructor.
     decNumConnections();

@@ -234,6 +234,8 @@ protected:
 
   // The client making requests to Envoy.
   IntegrationCodecClientPtr codec_client_;
+  // Multiple clients making same requests to Envoy. Used for gauge test.
+  std::vector<IntegrationCodecClientPtr> gauge_code_clients_;
   // A placeholder for the first upstream connection.
   FakeHttpConnectionPtr fake_upstream_connection_;
   // A placeholder for the first request received at upstream.
