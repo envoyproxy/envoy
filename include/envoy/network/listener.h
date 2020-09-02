@@ -192,9 +192,9 @@ public:
 /**
  * Callbacks invoked by a listener.
  */
-class ListenerCallbacks {
+class TcpListenerCallbacks {
 public:
-  virtual ~ListenerCallbacks() = default;
+  virtual ~TcpListenerCallbacks() = default;
 
   /**
    * Called when a new connection is accepted.

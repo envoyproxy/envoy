@@ -123,10 +123,10 @@ public:
   WriteFilterCallbacks* write_callbacks_{};
 };
 
-class MockListenerCallbacks : public ListenerCallbacks {
+class MockTcpListenerCallbacks : public TcpListenerCallbacks {
 public:
-  MockListenerCallbacks();
-  ~MockListenerCallbacks() override;
+  MockTcpListenerCallbacks();
+  ~MockTcpListenerCallbacks() override;
 
   void onAccept(ConnectionSocketPtr&& socket) override { onAccept_(socket); }
 

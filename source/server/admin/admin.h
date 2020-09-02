@@ -41,6 +41,7 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "server/admin/admin_filter.h"
+#include "server/admin/clusters_handler.h"
 #include "server/admin/config_tracker_impl.h"
 #include "server/admin/listeners_handler.h"
 #include "server/admin/logs_handler.h"
@@ -282,17 +283,6 @@ private:
   };
 
   /**
-   * Helper methods for the /clusters url handler.
-   */
-  void addCircuitSettings(const std::string& cluster_name, const std::string& priority_str,
-                          Upstream::ResourceManager& resource_manager, Buffer::Instance& response);
-  void addOutlierInfo(const std::string& cluster_name,
-                      const Upstream::Outlier::Detector* outlier_detector,
-                      Buffer::Instance& response);
-  void writeClustersAsJson(Buffer::Instance& response);
-  void writeClustersAsText(Buffer::Instance& response);
-
-  /**
    * Helper methods for the /config_dump url handler.
    */
   void addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
@@ -321,9 +311,6 @@ private:
   Http::Code handlerAdminHome(absl::string_view path_and_query,
                               Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                               AdminStream&);
-  Http::Code handlerClusters(absl::string_view path_and_query,
-                             Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                             AdminStream&);
   Http::Code handlerConfigDump(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&) const;
@@ -475,6 +462,7 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   NullScopedRouteConfigProvider scoped_route_config_provider_;
+  Server::ClustersHandler clusters_handler_;
   Server::StatsHandler stats_handler_;
   Server::LogsHandler logs_handler_;
   Server::ProfilingHandler profiling_handler_;
