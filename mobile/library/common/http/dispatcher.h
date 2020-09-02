@@ -119,18 +119,20 @@ private:
     DirectStreamCallbacks(DirectStream& direct_stream, envoy_http_callbacks bridge_callbacks,
                           Dispatcher& http_dispatcher);
 
-    void onReset();
+    void closeStream();
+    void onComplete();
     void onCancel();
-    void closeRemote(bool end_stream);
+    void onReset();
+    void mapLocalResponseToError(const ResponseHeaderMap& headers);
 
     // ResponseEncoder
     void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(const ResponseTrailerMap& trailers) override;
-    Stream& getStream() override;
+    Stream& getStream() override { return direct_stream_; }
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return absl::nullopt; }
-    // TODO: implement
     void encode100ContinueHeaders(const ResponseHeaderMap&) override {
+      // TODO(goaway): implement
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
     void encodeMetadata(const MetadataMapVector&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -142,7 +144,7 @@ private:
     absl::optional<envoy_error_code_t> error_code_;
     absl::optional<envoy_data> error_message_;
     absl::optional<int32_t> error_attempt_count_;
-    bool observed_success_{};
+    bool success_{};
   };
 
   using DirectStreamCallbacksPtr = std::unique_ptr<DirectStreamCallbacks>;
@@ -171,26 +173,7 @@ private:
     // Not applicable
     void setFlushTimeout(std::chrono::milliseconds) override {}
 
-    void closeLocal(bool end_stream);
-
-    /**
-     * Return whether a callback should be allowed to continue with execution.
-     * This ensures at most one 'terminal' callback is issued for any given stream.
-     *
-     * When param `close` is false, this function returns `true` while the stream
-     * remains open and false once it's closed. When param `close` is true, this
-     * function returns `true` exactly once, if the stream is still open, and
-     * subsequently always returns false.
-     *
-     * @param close, whether the DirectStream should close if it has not closed before.
-     * @return bool, whether callbacks on this stream are dispatchable or not.
-     */
-    bool dispatchable(bool close);
-
     const envoy_stream_t stream_handle_;
-    bool closed_{};
-    bool local_closed_{};
-    bool hcm_stream_pending_destroy_{};
 
     // Used to issue outgoing HTTP stream operations.
     RequestDecoder* request_decoder_;
@@ -224,7 +207,7 @@ private:
    */
   void post(Event::PostCb callback);
   DirectStreamSharedPtr getStream(envoy_stream_t stream_handle);
-  void cleanup(envoy_stream_t stream_handle);
+  void removeStream(envoy_stream_t stream_handle);
   void setDestinationCluster(HeaderMap& headers);
 
   Thread::MutexBasicLockable ready_lock_;
