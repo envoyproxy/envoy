@@ -5,7 +5,6 @@
 #include <memory>
 #include <string>
 
-#include "bazel-out/k8-fastbuild/bin/include/envoy/http/_virtual_includes/header_map_interface/envoy/http/header_map.h"
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/event/dispatcher.h"

@@ -165,9 +165,7 @@ public:
   void set100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
     continue_headers_ = std::move(headers);
   }
-  void encode100ContinueHeaders() override {
-    encode100ContinueHeaders_(*continue_headers_);
-  }
+  void encode100ContinueHeaders() override { encode100ContinueHeaders_(*continue_headers_); }
   void setResponseHeaders(ResponseHeaderMapPtr&& headers) override {
     response_headers_ = std::move(headers);
   }
