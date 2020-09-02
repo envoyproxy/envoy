@@ -1,5 +1,7 @@
 #pragma once
 
+#include "absl/container/flat_hash_map.h"
+
 #include "envoy/api/api.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -171,10 +173,11 @@ private:
   ThreadLocal::SlotAllocator& tls_;
 
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse health_check_request_;
-  std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier> health_check_message_;
+  uint64_t specifier_hash_;
 
   std::vector<std::string> clusters_;
   std::vector<HdsClusterPtr> hds_clusters_;
+  absl::flat_hash_map<uint64_t, HdsClusterPtr> hds_clusters_map_;
 
   Event::TimerPtr hds_stream_response_timer_;
   Event::TimerPtr hds_retry_timer_;

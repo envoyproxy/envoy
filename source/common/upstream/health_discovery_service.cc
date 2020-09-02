@@ -46,8 +46,8 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
       dispatcher_(dispatcher), runtime_(runtime), store_stats_(stats),
       ssl_context_manager_(ssl_context_manager), random_(random), info_factory_(info_factory),
       access_log_manager_(access_log_manager), cm_(cm), local_info_(local_info), admin_(admin),
-      singleton_manager_(singleton_manager), tls_(tls), validation_visitor_(validation_visitor),
-      api_(api) {
+      singleton_manager_(singleton_manager), tls_(tls), specifier_hash_(0),
+      validation_visitor_(validation_visitor), api_(api) {
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       local_info_.node());
   backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
@@ -171,6 +171,14 @@ void HdsDelegate::processMessage(
   ASSERT(message);
 
   for (const auto& cluster_health_check : message->cluster_health_checks()) {
+    const uint64_t cluster_config_hash = MessageUtil::hash(cluster_health_check);
+
+    // If this cluster with the exact configuration is already being tracked, skip it.
+    if (hds_clusters_map_.contains(cluster_config_hash)) {
+      ENVOY_LOG(debug, "HDS Cluster already exists with this configuration, skipping.");
+      continue;
+    }
+
     // Create HdsCluster config
     static const envoy::config::core::v3::BindConfig bind_config;
     envoy::config::cluster::v3::Cluster cluster_config;
@@ -205,15 +213,18 @@ void HdsDelegate::processMessage(
 
     ENVOY_LOG(debug, "New HdsCluster config {} ", cluster_config.DebugString());
 
-    // Create HdsCluster
-    hds_clusters_.emplace_back(
-        new HdsCluster(admin_, runtime_, std::move(cluster_config), bind_config, store_stats_,
-                       ssl_context_manager_, false, info_factory_, cm_, local_info_, dispatcher_,
-                       random_, singleton_manager_, tls_, validation_visitor_, api_));
-    hds_clusters_.back()->initialize([] {});
+    // Create HdsCluster.
+    auto new_cluster = std::make_shared<HdsCluster>(
+        admin_, runtime_, std::move(cluster_config), bind_config, store_stats_,
+        ssl_context_manager_, false, info_factory_, cm_, local_info_, dispatcher_, random_,
+        singleton_manager_, tls_, validation_visitor_, api_);
 
-    hds_clusters_.back()->startHealthchecks(access_log_manager_, runtime_, random_, dispatcher_,
-                                            api_);
+    // Add to our two data structures.
+    hds_clusters_.push_back(new_cluster);
+    hds_clusters_map_.insert({cluster_config_hash, new_cluster});
+
+    new_cluster->initialize([] {});
+    new_cluster->startHealthchecks(access_log_manager_, runtime_, random_, dispatcher_, api_);
   }
 }
 
@@ -223,6 +234,13 @@ void HdsDelegate::onReceiveMessage(
     std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
   stats_.requests_.inc();
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
+
+  const uint64_t hash = MessageUtil::hash(*message);
+
+  if (hash == specifier_hash_) {
+    ENVOY_LOG(debug, "New health check specifier is unchanged, no action taken.");
+    return;
+  }
 
   // Validate message fields
   try {
@@ -244,6 +262,9 @@ void HdsDelegate::onReceiveMessage(
 
   // Process the HealthCheckSpecifier message.
   processMessage(std::move(message));
+
+  // Update the stored hash.
+  specifier_hash_ = hash;
 
   if (server_response_ms_ != server_response_ms) {
     server_response_ms_ = server_response_ms;
