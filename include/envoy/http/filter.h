@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "bazel-out/k8-fastbuild/bin/include/envoy/http/_virtual_includes/header_map_interface/envoy/http/header_map.h"
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/event/dispatcher.h"
@@ -357,6 +358,16 @@ public:
   virtual MetadataMapVector& addDecodedMetadata() PURE;
 
   /**
+   * Sets the 100 Continue headers to be encoded.
+   */
+  virtual void set100ContinueHeaders(ResponseHeaderMapPtr&& headers) PURE;
+
+  /**
+   * Encodes the 100 Continue headers set by set100ContinueHeaders.
+   */
+  virtual void encode100ContinueHeaders() PURE;
+
+  /**
    * Called with 100-Continue headers to be encoded.
    *
    * This is not folded into encodeHeaders because most Envoy users and filters will not be proxying
@@ -366,7 +377,22 @@ public:
    *
    * @param headers supplies the headers to be encoded.
    */
-  virtual void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) PURE;
+  void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) {
+    set100ContinueHeaders(std::move(headers));
+    encode100ContinueHeaders();
+  }
+
+  /**
+   * Sets the response headers to be used for decoding.
+   * @param headers supplies the headers to be encoded.
+   */
+  virtual void setResponseHeaders(ResponseHeaderMapPtr&& headers) PURE;
+
+  /**
+   * Encodes the last headers set by setResponseHeaders.
+   * @param end_stream supplies whether this is a header only request/response.
+   */
+  virtual void encodeHeaders(bool end_stream) PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
@@ -380,7 +406,10 @@ public:
    * @param headers supplies the headers to be encoded.
    * @param end_stream supplies whether this is a header only request/response.
    */
-  virtual void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) PURE;
+  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
+    setResponseHeaders(std::move(headers));
+    encodeHeaders(end_stream);
+  }
 
   /**
    * Called with data to be encoded, optionally indicating end of stream.
@@ -390,10 +419,24 @@ public:
   virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
+   * Set the response trailers to be encoded.
+   * @param trailers supplies the trailers to encode.
+   */
+  virtual void setResponseTrailers(ResponseTrailerMapPtr&& trailers) PURE;
+
+  /**
+   * Encode the last trailers set by setResponseTrailers. This implicitly ends the stream.
+   */
+  virtual void encodeTrailers() PURE;
+
+  /**
    * Called with trailers to be encoded. This implicitly ends the stream.
    * @param trailers supplies the trailers to encode.
    */
-  virtual void encodeTrailers(ResponseTrailerMapPtr&& trailers) PURE;
+  void encodeTrailers(ResponseTrailerMapPtr&& trailers) {
+    setResponseTrailers(std::move(trailers));
+    encodeTrailers();
+  }
 
   /**
    * Called with metadata to be encoded.

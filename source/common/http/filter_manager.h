@@ -171,10 +171,13 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
-  void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override;
-  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
+  void set100ContinueHeaders(ResponseHeaderMapPtr&& headers) override;
+  void encode100ContinueHeaders() override;
+  void setResponseHeaders(ResponseHeaderMapPtr&& headers) override;
+  void encodeHeaders(bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
-  void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
+  void setResponseTrailers(ResponseTrailerMapPtr&& trailers) override;
+  void encodeTrailers() override;
   void encodeMetadata(MetadataMapPtr&& metadata_map_ptr) override;
   void onDecoderFilterAboveWriteBufferHighWatermark() override;
   void onDecoderFilterBelowWriteBufferLowWatermark() override;

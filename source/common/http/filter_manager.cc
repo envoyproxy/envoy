@@ -331,18 +331,27 @@ void ActiveStreamDecoderFilter::sendLocalReply(
   parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, grpc_status, details);
 }
 
-void ActiveStreamDecoderFilter::encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) {
+void ActiveStreamDecoderFilter::set100ContinueHeaders(ResponseHeaderMapPtr&& headers) {
+  // If we don't want to proxy the headers just throw them away.
+  if (parent_.proxy_100_continue_) {
+    parent_.filter_manager_callbacks_.setContinueHeaders(std::move(headers));
+  }
+}
+
+void ActiveStreamDecoderFilter::encode100ContinueHeaders() {
   // If Envoy is not configured to proxy 100-Continue responses, swallow the 100 Continue
   // here. This avoids the potential situation where Envoy strips Expect: 100-Continue and sends a
   // 100-Continue, then proxies a duplicate 100 Continue from upstream.
   if (parent_.proxy_100_continue_) {
-    parent_.filter_manager_callbacks_.setContinueHeaders(std::move(headers));
     parent_.encode100ContinueHeaders(nullptr, *parent_.filter_manager_callbacks_.continueHeaders());
   }
 }
 
-void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
+void ActiveStreamDecoderFilter::setResponseHeaders(ResponseHeaderMapPtr&& headers) {
   parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
+}
+
+void ActiveStreamDecoderFilter::encodeHeaders(bool end_stream) {
   parent_.encodeHeaders(nullptr, *parent_.filter_manager_callbacks_.responseHeaders(), end_stream);
 }
 
@@ -351,8 +360,11 @@ void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stre
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
 
-void ActiveStreamDecoderFilter::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
+void ActiveStreamDecoderFilter::setResponseTrailers(ResponseTrailerMapPtr&& trailers) {
   parent_.filter_manager_callbacks_.setResponseTrailers(std::move(trailers));
+}
+
+void ActiveStreamDecoderFilter::encodeTrailers() {
   parent_.encodeTrailers(nullptr, *parent_.filter_manager_callbacks_.responseTrailers());
 }
 

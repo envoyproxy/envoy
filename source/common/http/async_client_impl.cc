@@ -94,12 +94,12 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   // TODO(mattklein123): Correctly set protocol in stream info when we support access logging.
 }
 
-void AsyncStreamImpl::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
+void AsyncStreamImpl::encodeHeaders(bool end_stream) {
   ENVOY_LOG(debug, "async http request response headers (end_stream={}):\n{}", end_stream,
-            *headers);
+            *response_headers_);
   ASSERT(!remote_closed_);
   encoded_response_headers_ = true;
-  stream_callbacks_.onHeaders(std::move(headers), end_stream);
+  stream_callbacks_.onHeaders(std::move(response_headers_), end_stream);
   closeRemote(end_stream);
   // At present, the router cleans up stream state as soon as the remote is closed, making a
   // half-open local stream unsupported and dangerous. Ensure we close locally to trigger completion
@@ -122,10 +122,10 @@ void AsyncStreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   closeLocal(end_stream);
 }
 
-void AsyncStreamImpl::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
-  ENVOY_LOG(debug, "async http request response trailers:\n{}", *trailers);
+void AsyncStreamImpl::encodeTrailers() {
+  ENVOY_LOG(debug, "async http request response trailers:\n{}", *response_trailers_);
   ASSERT(!remote_closed_);
-  stream_callbacks_.onTrailers(std::move(trailers));
+  stream_callbacks_.onTrailers(std::move(response_trailers_));
   closeRemote(true);
   // Ensure we close locally on receiving a complete response; see comment in encodeHeaders for
   // rationale.

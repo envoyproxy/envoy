@@ -380,7 +380,7 @@ private:
               if (modify_headers != nullptr) {
                 modify_headers(*headers);
               }
-              encodeHeaders(std::move(headers), end_stream);
+              StreamDecoderFilterCallbacks::encodeHeaders(std::move(headers), end_stream);
             },
             [this](Buffer::Instance& data, bool end_stream) -> void {
               encodeData(data, end_stream);
@@ -389,10 +389,17 @@ private:
   }
   // The async client won't pause if sending an Expect: 100-Continue so simply
   // swallows any incoming encode100Continue.
-  void encode100ContinueHeaders(ResponseHeaderMapPtr&&) override {}
-  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
+  void set100ContinueHeaders(ResponseHeaderMapPtr&&) override {}
+  void encode100ContinueHeaders() override {}
+  void setResponseHeaders(ResponseHeaderMapPtr&& headers) override {
+    response_headers_ = std::move(headers);
+  }
+  void encodeHeaders(bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
-  void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
+  void setResponseTrailers(ResponseTrailerMapPtr&& trailers) override {
+    response_trailers_ = std::move(trailers);
+  }
+  void encodeTrailers() override;
   void encodeMetadata(MetadataMapPtr&&) override {}
   void onDecoderFilterAboveWriteBufferHighWatermark() override { ++high_watermark_calls_; }
   void onDecoderFilterBelowWriteBufferLowWatermark() override {
@@ -430,6 +437,9 @@ private:
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool send_xff_{true};
+
+  ResponseHeaderMapPtr response_headers_;
+  ResponseTrailerMapPtr response_trailers_;
 
   friend class AsyncClientImpl;
   friend class AsyncClientImplUnitTest;

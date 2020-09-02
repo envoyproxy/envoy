@@ -12,6 +12,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 #include "envoy/ssl/connection.h"
 
 #include "common/http/header_map_impl.h"
@@ -161,13 +162,20 @@ public:
                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                        absl::string_view details);
 
-  void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
-    encode100ContinueHeaders_(*headers);
+  void set100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
+    continue_headers_ = std::move(headers);
   }
-  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override {
-    encodeHeaders_(*headers, end_stream);
+  void encode100ContinueHeaders() override {
+    encode100ContinueHeaders_(*continue_headers_);
   }
-  void encodeTrailers(ResponseTrailerMapPtr&& trailers) override { encodeTrailers_(*trailers); }
+  void setResponseHeaders(ResponseHeaderMapPtr&& headers) override {
+    response_headers_ = std::move(headers);
+  }
+  void encodeHeaders(bool end_stream) override { encodeHeaders_(*response_headers_, end_stream); }
+  void setResponseTrailers(ResponseTrailerMapPtr&& trailers) override {
+    response_trailers_ = std::move(trailers);
+  }
+  void encodeTrailers() override { encodeTrailers_(*response_trailers_); }
   void encodeMetadata(MetadataMapPtr&& metadata_map) override {
     encodeMetadata_(std::move(metadata_map));
   }
@@ -190,7 +198,10 @@ public:
                const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                absl::string_view details));
 
+  ResponseHeaderMapPtr continue_headers_;
+  ResponseHeaderMapPtr response_headers_;
   Buffer::InstancePtr buffer_;
+  ResponseTrailerMapPtr response_trailers_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
