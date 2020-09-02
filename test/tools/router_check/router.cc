@@ -429,7 +429,7 @@ bool RouterCheckTool::compareResponseHeaderFields(
   if (expected.response_header_fields().data()) {
     for (const envoy::config::core::v3::HeaderValue& header : expected.response_header_fields()) {
       if (!compareHeaderField(*tool_config.response_headers_, header.key(), header.value(),
-                              "response_header_fields", true)) {
+                              "response_header_fields", /*expect_match=*/true)) {
         no_failures = false;
       }
     }
@@ -437,8 +437,8 @@ bool RouterCheckTool::compareResponseHeaderFields(
   return no_failures;
 }
 
-template <typename HM>
-bool RouterCheckTool::matchHeaderField(const HM& header_map,
+template <typename HeaderMapType>
+bool RouterCheckTool::matchHeaderField(const HeaderMapType& header_map,
                                        const envoy::config::route::v3::HeaderMatcher& header,
                                        const std::string test_type) {
   switch (header.header_match_specifier_case()) {
@@ -465,16 +465,16 @@ bool RouterCheckTool::matchHeaderField(const HM& header_map,
   return false;
 }
 
-template <typename HM>
-bool RouterCheckTool::compareHeaderField(const HM& header_map, const std::string& field,
+template <typename HeaderMapType>
+bool RouterCheckTool::compareHeaderField(const HeaderMapType& header_map, const std::string& field,
                                          const std::string& expected, const std::string& test_type,
                                          const bool expect_match) {
   std::string actual = header_map.get_(field);
   return compareResults(actual, expected, test_type, expect_match);
 }
 
-template <typename HM>
-bool RouterCheckTool::expectHeaderField(const HM& header_map, const std::string& field,
+template <typename HeaderMapType>
+bool RouterCheckTool::expectHeaderField(const HeaderMapType& header_map, const std::string& field,
                                         const std::string& test_type, const bool expect_present) {
   if (header_map.has(field) != expect_present) {
     std::string expected{expect_present ? "true" : "false"};
