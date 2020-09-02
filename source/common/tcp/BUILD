@@ -10,14 +10,12 @@ envoy_package()
 
 envoy_cc_library(
     name = "conn_info_lib",
-    hdrs = ["conn_info.h"],
     srcs = select({
         "//bazel:linux": ["conn_info_linux.cc"],
         "//conditions:default": ["conn_info_default.cc"],
     }),
-    deps = [
-        "//include/envoy/network:socket_interface",
-    ],
+    hdrs = ["conn_info.h"],
+    deps = ["//include/envoy/network:socket_interface"],
 )
 
 envoy_cc_library(
