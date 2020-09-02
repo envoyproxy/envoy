@@ -28,6 +28,20 @@ namespace Envoy {
     }                                                                                              \
   } while (false)
 
+// Macro assumes local member variables
+// os (ostream)
+// indent_level (int)
+#define DUMP_OPT_REF_DETAILS(member)                                                               \
+  do {                                                                                             \
+    os << spaces << #member ": ";                                                                  \
+    if ((member).has_value()) {                                                                    \
+      os << "\n";                                                                                  \
+      (member)->get().dumpState(os, indent_level + 1);                                             \
+    } else {                                                                                       \
+      os << spaces << "empty\n";                                                                   \
+    }                                                                                              \
+  } while (false)
+
 // Return the const char* equivalent of string(level*2, ' '), without dealing
 // with string creation overhead. Cap arbitrarily at 6 as we're (hopefully)
 // not going to have nested objects deeper than that.
