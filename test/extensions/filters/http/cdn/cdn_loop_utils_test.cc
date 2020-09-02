@@ -1,6 +1,6 @@
 #include "extensions/filters/http/cdn/cdn_loop_utils.h"
 
-#include "test/extensions/filters/http/cdn/status_helpers.h"
+#include "test/test_common/status_utility.h"
 
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
@@ -13,8 +13,8 @@ namespace HttpFilters {
 namespace Cdn {
 namespace {
 
-using StatusHelpers::IsOkAndHolds;
-using StatusHelpers::StatusIs;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
+using ::Envoy::StatusHelpers::StatusIs;
 
 TEST(CountCdnLoopOccurrencesTest, EmptyHeader) {
   EXPECT_THAT(countCdnLoopOccurrences("", "cdn"), IsOkAndHolds(0));

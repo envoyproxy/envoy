@@ -274,6 +274,11 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "status_utility_lib",
+    hdrs = ["status_utility.h"],
+)
+
 envoy_cc_test(
     name = "simulated_time_system_test",
     srcs = ["simulated_time_system_test.cc"],

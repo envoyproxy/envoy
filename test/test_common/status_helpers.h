@@ -1,12 +1,17 @@
+#pragma once
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace HttpFilters {
-namespace Cdn {
 namespace StatusHelpers {
 
+// Check that a StatusOr is OK and has a value equal to its argument.
+//
+// For example:
+//
+// StatusOr<int> status(3);
+// EXPECT_THAT(status, IsOkAndHolds(3));
 MATCHER_P(IsOkAndHolds, expected, "") {
   if (!arg) {
     *result_listener << "which has unexpected status: " << arg.status();
@@ -19,6 +24,12 @@ MATCHER_P(IsOkAndHolds, expected, "") {
   return true;
 }
 
+// Check that a StatusOr as a status code equal to its argument.
+//
+// For example:
+//
+// StatusOr<int> status(absl::InvalidArgumentError("bad argument!"));
+// EXPECT_THAT(status, StatusIs(absl::StatusCode::kInvalidArgument));
 MATCHER_P(StatusIs, expected_code, "") {
   if (arg.status().code() != expected_code) {
     *result_listener << "which has unexpected status: " << arg.status();
@@ -28,7 +39,4 @@ MATCHER_P(StatusIs, expected_code, "") {
 }
 
 } // namespace StatusHelpers
-} // namespace Cdn
-} // namespace HttpFilters
-} // namespace Extensions
 } // namespace Envoy

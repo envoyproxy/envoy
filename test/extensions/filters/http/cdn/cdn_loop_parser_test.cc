@@ -1,6 +1,6 @@
 #include "extensions/filters/http/cdn/cdn_loop_parser.h"
 
-#include "test/extensions/filters/http/cdn/status_helpers.h"
+#include "test/test_common/status_utility.h"
 
 #include "absl/status/status.h"
 #include "gmock/gmock.h"
@@ -13,8 +13,8 @@ namespace Cdn {
 namespace CdnLoopParser {
 namespace {
 
-using StatusHelpers::IsOkAndHolds;
-using StatusHelpers::StatusIs;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
+using ::Envoy::StatusHelpers::StatusIs;
 
 TEST(ParseOptionalWhitespaceTest, TestEmpty) {
   const std::string value = "";
@@ -237,6 +237,13 @@ TEST(ParseCdnIdTest, UriHostName) {
   ParseContext input(value);
   EXPECT_THAT(parseCdnId(input),
               IsOkAndHolds(ParsedCdnId(ParseContext(value, 15), "www.example.com")));
+}
+
+TEST(ParseCdnIdTest, UriHostPercentEncoded) {
+  const std::string value = "%ba%ba.example.com";
+  ParseContext input(value);
+  EXPECT_THAT(parseCdnId(input),
+              IsOkAndHolds(ParsedCdnId(ParseContext(value, 18), "%ba%ba.example.com")));
 }
 
 TEST(ParseCdnIdTest, UriHostNamePort) {
