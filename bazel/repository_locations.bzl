@@ -141,7 +141,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         version = "1.16.1",
         sha256 = "d08312d0ecc3bd48eee0a4cc0d2137c9f194e0a28de2028928c0f6cae85f86ce",
         strip_prefix = "c-ares-{version}",
-        urls = ["https://github.com/c-ares/c-ares/releases/download/cares-{version}.replace('.','_')/c-ares-{version}.tar.gz"],
+        urls = ["https://github.com/c-ares/c-ares/releases/download/cares-{underscore_version}/c-ares-{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:c-ares_project:c-ares:*",
     ),
@@ -535,7 +535,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         version = "7.69.1",
         sha256 = "01ae0c123dee45b01bbaef94c0bc00ed2aec89cb2ee0fd598e0d302a6b5e0a98",
         strip_prefix = "curl-{version}",
-        urls = ["https://github.com/curl/curl/releases/download/curl-{version}.replace('.','_')/curl-{version}.tar.gz"],
+        urls = ["https://github.com/curl/curl/releases/download/curl-{underscore_version}/curl-{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
@@ -658,10 +658,10 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     org_unicode_icuuc = dict(
         project_name = "International Components for Unicode",
         project_url = "https://github.com/unicode-org/icu",
-        version = "67-1",
+        version = "67.1",
         strip_prefix = "icu",
         sha256 = "94a80cd6f251a53bd2a997f6f1b5ac6653fe791dfab66e1eb0227740fb86d5dc",
-        urls = ["https://github.com/unicode-org/icu/releases/download/release-{version}/icu4c-{version}.replace('-','_')-src.tgz"],
+        urls = ["https://github.com/unicode-org/icu/releases/download/release-{dash_version}/icu4c-{underscore_version}-src.tgz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:icu-project:international_components_for_unicode",
     ),
@@ -718,6 +718,9 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     ),
 )
 
+def _format_version(s, version):
+    return s.format(version = version, dash_version = version.replace(".", "-"), underscore_version = version.replace(".", "_"))
+
 # Interpolate {version} in the above dependency specs. This code should be capable of running in both Python
 # and Starlark.
 def _dependency_repositories():
@@ -729,8 +732,8 @@ def _dependency_repositories():
         # Fixup with version information.
         if "version" in location:
             if "strip_prefix" in location:
-                mutable_location["strip_prefix"] = location["strip_prefix"].format(version = location["version"])
-            mutable_location["urls"] = [url.format(version = location["version"]) for url in location["urls"]]
+                mutable_location["strip_prefix"] = _format_version(location["strip_prefix"], location["version"])
+            mutable_location["urls"] = [_format_version(url, location["version"]) for url in location["urls"]]
     return locations
 
 DEPENDENCY_REPOSITORIES = _dependency_repositories()
