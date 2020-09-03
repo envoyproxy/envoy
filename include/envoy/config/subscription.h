@@ -148,7 +148,7 @@ public:
    * @throw EnvoyException with reason if the config changes are rejected. Otherwise the changes
    * @param use_namespace_matching if the resources should me matched on their namespaces, rather
    * than unique names. This is used when a collection of resources (e.g. virtual hosts in VHDS) is
-   * being updated. are accepted. Accepted changes have their version_info reflected in subsequent
+   * being updated. Accepted changes have their version_info reflected in subsequent
    * requests.
    */
   virtual void onConfigUpdate(
