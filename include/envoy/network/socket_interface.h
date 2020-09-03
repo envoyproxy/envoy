@@ -56,10 +56,6 @@ using SocketInterfacePtr = std::unique_ptr<SocketInterface>;
  */
 static inline IoHandlePtr ioHandleForAddr(Socket::Type type,
                                           const Address::InstanceConstSharedPtr addr) {
-  // Cannot create IoHandle for internal address yet.
-  if (addr->envoyInternalAddress()) {
-    return nullptr;
-  }
   return addr->socketInterface().socket(type, addr);
 }
 

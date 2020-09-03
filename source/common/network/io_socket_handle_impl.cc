@@ -490,13 +490,12 @@ Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {
   return Api::OsSysCallsSingleton::get().shutdown(fd_, how);
 }
 
-NullIoSocketHandleImpl::~NullIoSocketHandleImpl() = default;
-
 Api::IoCallUint64Result NullIoSocketHandleImpl::close() {
+  closed_ = true;
   return IoSocketError::ioResultSocketInvalidAddress();
 }
 
-bool NullIoSocketHandleImpl::isOpen() const { return false; }
+bool NullIoSocketHandleImpl::isOpen() const { return !closed_; }
 
 Api::IoCallUint64Result NullIoSocketHandleImpl::readv(uint64_t, Buffer::RawSlice*, uint64_t) {
   return IoSocketError::ioResultSocketInvalidAddress();
