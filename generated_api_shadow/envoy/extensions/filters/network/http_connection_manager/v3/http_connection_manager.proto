@@ -300,7 +300,7 @@ message HttpConnectionManager {
 
   // An optional override that the connection manager will write to the server
   // header in responses. If not set, the default is *envoy*.
-  string server_name = 10;
+  string server_name = 10 [(validate.rules).string = {pattern: "^[^\000\r\n]*$"}];
 
   // Defines the action to be applied to the Server header on the response path.
   // By default, Envoy will overwrite the header with the value specified in
