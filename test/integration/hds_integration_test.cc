@@ -3,7 +3,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/service/health/v3/hds.pb.h"
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/upstream/upstream.h"
@@ -13,10 +12,6 @@
 #include "common/protobuf/utility.h"
 #include "common/upstream/health_checker_impl.h"
 #include "common/upstream/health_discovery_service.h"
-
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/config/utility.h"
@@ -66,10 +61,12 @@ public:
 
     // Endpoint connections
     if (use_tls) {
-      host_upstream_ = std::make_unique<FakeUpstream>(createUpstreamTlsContext(), 0, http_conn_type,
-                                                      version_, timeSystem());
-      host2_upstream_ = std::make_unique<FakeUpstream>(createUpstreamTlsContext(), 0,
-                                                       http_conn_type, version_, timeSystem());
+      host_upstream_ =
+          std::make_unique<FakeUpstream>(HttpIntegrationTest::createUpstreamTlsContext(), 0,
+                                         http_conn_type, version_, timeSystem());
+      host2_upstream_ =
+          std::make_unique<FakeUpstream>(HttpIntegrationTest::createUpstreamTlsContext(), 0,
+                                         http_conn_type, version_, timeSystem());
     } else {
       host_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type, version_, timeSystem());
       host2_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type, version_, timeSystem());
@@ -85,29 +82,6 @@ public:
     RELEASE_ASSERT(result, result.message());
     result = hds_fake_connection_->waitForNewStream(*dispatcher_, hds_stream_);
     RELEASE_ASSERT(result, result.message());
-  }
-
-  Network::TransportSocketFactoryPtr createUpstreamTlsContext() {
-    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-    const std::string yaml = absl::StrFormat(
-        R"EOF(
-common_tls_context:
-  tls_certificates:
-  - certificate_chain: { filename: "%s" }
-    private_key: { filename: "%s" }
-  validation_context:
-    trusted_ca: { filename: "%s" }
-require_client_certificate: true
-)EOF",
-        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"),
-        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"),
-        TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-    TestUtility::loadFromYaml(yaml, tls_context);
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-        tls_context, factory_context_);
-    static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
-    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
   }
 
   // Envoy sends health check messages to the endpoints

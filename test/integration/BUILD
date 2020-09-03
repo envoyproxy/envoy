@@ -373,12 +373,10 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
-        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/common/upstream:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -493,6 +491,9 @@ envoy_cc_test_library(
     hdrs = [
         "http_integration.h",
     ],
+    data = [
+        "//test/config/integration/certs",
+    ],
     deps = [
         ":integration_lib",
         ":test_host_predicate_lib",
@@ -501,6 +502,7 @@ envoy_cc_test_library(
         "//source/extensions/filters/http/on_demand:config",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/common/upstream:utility_lib",
         "//test/integration/filters:add_body_filter_config_lib",
         "//test/integration/filters:add_trailers_filter_config_lib",
@@ -994,14 +996,12 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/upstream:health_checker_lib",
         "//source/common/upstream:health_discovery_service_lib",
-        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:resources_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/health/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],

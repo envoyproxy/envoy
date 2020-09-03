@@ -562,7 +562,8 @@ transport_socket:
 
   // Check that our match hits.
   HealthCheckerImplBase* health_checker_base = dynamic_cast<HealthCheckerImplBase*>(hcs[0].get());
-  auto match = socket_matcher->resolve(health_checker_base->transportSocketMatchMetadata().get());
+  const auto match =
+      socket_matcher->resolve(health_checker_base->transportSocketMatchMetadata().get());
   EXPECT_EQ(match.name_, "test_socket");
 }
 
