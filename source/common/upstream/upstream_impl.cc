@@ -707,6 +707,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       source_address_(getSourceAddress(config, bind_config)),
       lb_least_request_config_(config.least_request_lb_config()),
       lb_ring_hash_config_(config.ring_hash_lb_config()),
+      lb_maglev_config_(config.maglev_lb_config()),
       lb_original_dst_config_(config.original_dst_lb_config()),
       upstream_config_(config.has_upstream_config()
                            ? absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>(

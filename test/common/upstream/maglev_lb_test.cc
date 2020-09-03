@@ -43,9 +43,16 @@ class MaglevLoadBalancerTest : public testing::Test {
 public:
   MaglevLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
 
-  void init(uint32_t table_size) {
+  void createLb() {
     lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, stats_store_, runtime_,
-                                               random_, common_config_, table_size);
+                                               random_, config_, common_config_);
+  }
+
+  void init(uint64_t table_size) {
+    config_ = envoy::config::cluster::v3::Cluster::MaglevLbConfig();
+    config_.value().mutable_table_size()->set_value(table_size);
+
+    createLb();
     lb_->initialize();
   }
 
@@ -54,6 +61,7 @@ public:
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
+  absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> config_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
@@ -64,6 +72,25 @@ public:
 TEST_F(MaglevLoadBalancerTest, NoHost) {
   init(7);
   EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
+};
+
+// Throws an exception if table size is not a prime number.
+TEST_F(MaglevLoadBalancerTest, NoPrimeNumber) {
+  EXPECT_THROW_WITH_MESSAGE(init(8), EnvoyException,
+                            "The table size of maglev must be prime number");
+};
+
+// Check it has default table size if config is null or table size has invalid value.
+TEST_F(MaglevLoadBalancerTest, DefaultMaglevTableSize) {
+  const uint64_t defaultValue = MaglevTable::DefaultTableSize;
+
+  config_ = envoy::config::cluster::v3::Cluster::MaglevLbConfig();
+  createLb();
+  EXPECT_EQ(defaultValue, lb_->tableSize());
+
+  config_ = absl::nullopt;
+  createLb();
+  EXPECT_EQ(defaultValue, lb_->tableSize());
 };
 
 // Basic sanity tests.

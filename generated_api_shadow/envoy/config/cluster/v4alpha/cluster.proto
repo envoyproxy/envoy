@@ -45,7 +45,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 52]
+// [#next-free-field: 53]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.cluster.v3.Cluster";
 
@@ -411,6 +411,19 @@ message Cluster {
     // to further constrain resource use. See also
     // :ref:`minimum_ring_size<envoy_api_field_config.cluster.v4alpha.Cluster.RingHashLbConfig.minimum_ring_size>`.
     google.protobuf.UInt64Value maximum_ring_size = 4 [(validate.rules).uint64 = {lte: 8388608}];
+  }
+
+  // Specific configuration for the :ref:`Maglev<arch_overview_load_balancing_types_maglev>`
+  // load balancing policy.
+  message MaglevLbConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.cluster.v3.Cluster.MaglevLbConfig";
+
+    // The table size for Maglev hashing. The Maglev aims for ‘minimal disruption’ rather than an absolute guarantee.
+    // Minimal disruption means that when the set of upstreams changes, a connection will likely be sent to the same
+    // upstream as it was before. Increasing the table size reduces the amount of disruption.
+    // The table size must be prime number. If it is not specified, the default is 65537.
+    google.protobuf.UInt64Value table_size = 1;
   }
 
   // Specific configuration for the
@@ -837,14 +850,18 @@ message Cluster {
 
   // Optional configuration for the load balancing algorithm selected by
   // LbPolicy. Currently only
-  // :ref:`RING_HASH<envoy_api_enum_value_config.cluster.v4alpha.Cluster.LbPolicy.RING_HASH>` and
+  // :ref:`RING_HASH<envoy_api_enum_value_config.cluster.v4alpha.Cluster.LbPolicy.RING_HASH>`,
+  // :ref:`MAGLEV<envoy_api_enum_value_config.cluster.v4alpha.Cluster.LbPolicy.MAGLEV>` and
   // :ref:`LEAST_REQUEST<envoy_api_enum_value_config.cluster.v4alpha.Cluster.LbPolicy.LEAST_REQUEST>`
   // has additional configuration options.
-  // Specifying ring_hash_lb_config or least_request_lb_config without setting the corresponding
+  // Specifying ring_hash_lb_config or maglev_lb_config or least_request_lb_config without setting the corresponding
   // LbPolicy will generate an error at runtime.
   oneof lb_config {
     // Optional configuration for the Ring Hash load balancing policy.
     RingHashLbConfig ring_hash_lb_config = 23;
+
+    // Optional configuration for the Maglev load balancing policy.
+    MaglevLbConfig maglev_lb_config = 52;
 
     // Optional configuration for the Original Destination load balancing policy.
     OriginalDstLbConfig original_dst_lb_config = 34;
