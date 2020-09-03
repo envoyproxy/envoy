@@ -12,6 +12,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -90,7 +91,8 @@ public:
     // Setup filter config for Lua filter.
     config_ = std::make_shared<FilterConfig>(proto_config, tls_, cluster_manager_, api_);
     // Setup per route config for Lua filter.
-    per_route_config_ = std::make_shared<FilterConfigPerRoute>(per_route_proto_config, tls_, api_);
+    per_route_config_ =
+        std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
   }
 
   void setupFilter() {
@@ -111,6 +113,7 @@ public:
         .WillOnce(testing::ReturnRef(metadata_));
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Api::MockApi> api_;
   Upstream::MockClusterManager cluster_manager_;
