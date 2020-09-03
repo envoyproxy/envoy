@@ -30,6 +30,7 @@ envoy_cc_library(
     deps = [
         "//source/common/grpc:common_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/stream_info:utility_lib",
         "@com_google_cel_cpp//eval/public:cel_value",

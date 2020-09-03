@@ -44,6 +44,10 @@ TEST_F(LuaHeaderMapWrapperTest, Methods) {
       for key, value in pairs(object) do
         testPrint(string.format("'%s' '%s'", key, value))
       end
+
+      object:add("header3", "foo")
+      object:add("header3", "bar")
+      testPrint(object:get("header3"))
     end
   )EOF"};
 
@@ -58,6 +62,7 @@ TEST_F(LuaHeaderMapWrapperTest, Methods) {
   EXPECT_CALL(*this, testPrint("'header2' 'foo'"));
   EXPECT_CALL(*this, testPrint("'hello' 'WORLD'"));
   EXPECT_CALL(*this, testPrint("'header2' 'foo'"));
+  EXPECT_CALL(*this, testPrint("foo,bar"));
   start("callMe");
 }
 

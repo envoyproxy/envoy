@@ -82,6 +82,7 @@ public:
   void setCopy(const LowerCaseString& key, absl::string_view value) override;
   uint64_t byteSize() const override;
   const HeaderEntry* get(const LowerCaseString& key) const override;
+  HeaderMap::GetResult getAll(const LowerCaseString& key) const override;
   void iterate(ConstIterateCb cb, void* context) const override;
   void iterateReverse(ConstIterateCb cb, void* context) const override;
   Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const override;
@@ -213,8 +214,9 @@ protected:
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);
-  HeaderEntry* getExisting(const LowerCaseString& key);
+  HeaderMap::NonConstGetResult getExisting(const LowerCaseString& key);
   HeaderEntryImpl* getExistingInline(absl::string_view key);
+
   size_t removeInline(HeaderEntryImpl** entry);
   void updateSize(uint64_t from_size, uint64_t to_size);
   void addSize(uint64_t size);

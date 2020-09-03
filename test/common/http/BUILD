@@ -275,6 +275,7 @@ envoy_cc_test(
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -316,6 +317,7 @@ envoy_cc_test(
     srcs = ["header_utility_test.cc"],
     deps = [
         "//source/common/http:header_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],

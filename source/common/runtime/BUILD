@@ -17,6 +17,8 @@ envoy_cc_library(
         "runtime_features.h",
     ],
     deps = [
+        "//include/envoy/runtime:runtime_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/singleton:const_singleton",
     ],
