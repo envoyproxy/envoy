@@ -537,7 +537,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         strip_prefix = "curl-{version}",
         urls = ["https://github.com/curl/curl/releases/download/curl-7_69_1/curl-{version}.tar.gz"],
         use_category = ["dataplane"],
-        cpe = "N/Atest",
+        cpe = "N/A",
     ),
     com_googlesource_chromium_v8 = dict(
         project_name = "V8",
