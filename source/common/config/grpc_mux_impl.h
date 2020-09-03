@@ -65,6 +65,9 @@ public:
   grpcStreamForTest() {
     return grpc_stream_;
   }
+  absl::optional<std::string> getEarlierTypeUrl(const std::string& type_url) override {
+    return ApiTypeOracle::getEarlierTypeUrl(type_url);
+  }
 
 private:
   void drainRequests();
@@ -168,6 +171,9 @@ public:
   void onEstablishmentFailure() override {}
   void onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&&,
                            ControlPlaneStats&) override {}
+  absl::optional<std::string> getEarlierTypeUrl(const std::string& type_url) override {
+    return ApiTypeOracle::getEarlierTypeUrl(type_url);
+  }
 };
 
 } // namespace Config

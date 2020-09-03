@@ -131,7 +131,7 @@ TEST_P(AdsIntegrationTest, MixV2V3TypeUrlInDiscoveryResponse) {
       "type.googleapis.com/envoy.config.listener.v3.Listener",
       {buildListener("listener_0", "route_config_0")},
       {buildListener("listener_0", "route_config_0")}, {}, "1", false);
-  // Discovery response with v2 type url.
+  // Discovery response with v3 type url.
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
       "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
       {buildRouteConfig("route_config_0", "cluster_0")},

@@ -52,11 +52,10 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   auto sub = subscriptions_.find(message->type_url());
   // If this type url is not watched, try older version type url.
   if (sub == subscriptions_.end()) {
-    absl::optional<std::string> old_type_url =
-        ApiTypeOracle::getEarlierTypeUrl(message->type_url());
-    if (old_type_url.has_value()) {
-      sub = subscriptions_.find(old_type_url.value());
-      ENVOY_LOG(debug, "v3 {} converted to v2 {}.", message->type_url(), old_type_url.value());
+    const std::string& type_url = message->type_url();
+    registerVersionedTypeUrl(type_url);
+    if (type_url_mapping_.find(type_url) != type_url_mapping_.end()) {
+      sub = subscriptions_.find(type_url_mapping_[type_url]);
     }
   }
   if (sub == subscriptions_.end()) {
@@ -125,6 +124,7 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
+    registerVersionedTypeUrl(type_url);
     addSubscription(type_url);
     return addWatch(type_url, resources, callbacks, resource_decoder);
   }

@@ -77,6 +77,10 @@ public:
     return subscriptions_;
   }
 
+  absl::optional<std::string> getEarlierTypeUrl(const std::string& type_url) override {
+    return ApiTypeOracle::getEarlierTypeUrl(type_url);
+  }
+
 private:
   class WatchImpl : public GrpcMuxWatch {
   public:

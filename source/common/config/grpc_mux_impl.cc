@@ -76,6 +76,7 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
     api_state_[type_url].request_.mutable_node()->MergeFrom(local_info_.node());
     api_state_[type_url].subscribed_ = true;
     subscriptions_.emplace_back(type_url);
+    registerVersionedTypeUrl(type_url);
   }
 
   // This will send an updated request on each subscription.
@@ -124,10 +125,9 @@ void GrpcMuxImpl::onDiscoveryResponse(
   // If this type url is not watched(no subscriber or no watcher), try older version of type url.
   if (api_state_.count(type_url) == 0 ||
       (api_state_[type_url].watches_.empty() && !message->resources().empty())) {
-    absl::optional<std::string> old_type_url = ApiTypeOracle::getEarlierTypeUrl(type_url);
-    if (old_type_url.has_value() && api_state_.count(*old_type_url)) {
-      ENVOY_LOG(debug, "v3 {} converted to v2 {}.", message->type_url(), old_type_url.value());
-      type_url = old_type_url.value();
+    registerVersionedTypeUrl(type_url);
+    if (type_url_mapping_.find(type_url) != type_url_mapping_.end()) {
+      type_url = type_url_mapping_[type_url];
     }
     if (api_state_.count(type_url) == 0) {
       // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
@@ -147,12 +147,11 @@ void GrpcMuxImpl::onDiscoveryResponse(
       // xDS server sends an empty list of ClusterLoadAssignment resources. we'll accept
       // this update. no need to send a discovery request, as we don't watch for anything.
       api_state_[type_url].request_.set_version_info(message->version_info());
-      return;
     } else {
       ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
       queueDiscoveryRequest(type_url);
-      return;
     }
+    return;
   }
   ScopedResume same_type_resume;
   // We pause updates of the same type. This is necessary for SotW and GrpcMuxImpl, since unlike
