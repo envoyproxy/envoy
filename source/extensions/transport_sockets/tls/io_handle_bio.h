@@ -9,9 +9,10 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-// NOLINTNEXTLINE(readability-identifier-naming)
-const BIO_METHOD* BIO_s_io_handle(void);
-
+/**
+ * Creates a custom BIO that can read from/write to an IoHandle. It's equivalent to a socket BIO
+ * but instead of relying on access to an fd, it relies on IoHandle APIs for all interactions.
+ */
 // NOLINTNEXTLINE(readability-identifier-naming)
 BIO* BIO_new_io_handle(Envoy::Network::IoHandle* io_handle);
 

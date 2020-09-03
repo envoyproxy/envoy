@@ -55,7 +55,8 @@ int io_handle_read(BIO* b, char* out, int outl) {
   auto result = bio_io_handle(b)->readv(outl, &slice, 1);
   BIO_clear_retry_flags(b);
   if (!result.ok()) {
-    if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+    auto err = result.err_->getErrorCode();
+    if (err == Api::IoError::IoErrorCode::Again || err == Api::IoError::IoErrorCode::Interrupt) {
       BIO_set_retry_read(b);
     }
     return -1;
@@ -71,7 +72,8 @@ int io_handle_write(BIO* b, const char* in, int inl) {
   auto result = bio_io_handle(b)->writev(&slice, 1);
   BIO_clear_retry_flags(b);
   if (!result.ok()) {
-    if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+    auto err = result.err_->getErrorCode();
+    if (err == Api::IoError::IoErrorCode::Again || err == Api::IoError::IoErrorCode::Interrupt) {
       BIO_set_retry_write(b);
     }
     return -1;
@@ -80,20 +82,15 @@ int io_handle_write(BIO* b, const char* in, int inl) {
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-long io_handle_ctrl(BIO* b, int cmd, long num, void* ptr) {
+long io_handle_ctrl(BIO* b, int cmd, long num, void*) {
   long ret = 1;
 
   switch (cmd) {
   case BIO_C_SET_FD:
-    io_handle_free(b);
-    b->num = -1;
-    b->ptr = ptr;
-    b->shutdown = int(num);
-    b->init = 1;
+    RELEASE_ASSERT(false, "should not be called");
     break;
   case BIO_C_GET_FD:
-    ret = -1;
-    *reinterpret_cast<void**>(ptr) = b->ptr;
+    RELEASE_ASSERT(false, "should not be called");
     break;
   case BIO_CTRL_GET_CLOSE:
     ret = b->shutdown;
@@ -119,19 +116,25 @@ const BIO_METHOD methods_io_handlep = {
     io_handle_free,     nullptr /* callback_ctrl */,
 };
 
-} // namespace
-
 // NOLINTNEXTLINE(readability-identifier-naming)
 const BIO_METHOD* BIO_s_io_handle(void) { return &methods_io_handlep; }
 
+} // namespace
+
 // NOLINTNEXTLINE(readability-identifier-naming)
 BIO* BIO_new_io_handle(Envoy::Network::IoHandle* io_handle) {
-  BIO* ret;
+  BIO* b;
 
-  ret = BIO_new(BIO_s_io_handle());
-  RELEASE_ASSERT(ret != nullptr, "");
-  BIO_ctrl(ret, BIO_C_SET_FD, 0, io_handle);
-  return ret;
+  b = BIO_new(BIO_s_io_handle());
+  RELEASE_ASSERT(b != nullptr, "");
+
+  // Initialize the BIO
+  b->num = -1;
+  b->ptr = io_handle;
+  b->shutdown = 0;
+  b->init = 1;
+
+  return b;
 }
 
 } // namespace Tls
