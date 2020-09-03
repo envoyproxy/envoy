@@ -50,7 +50,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
   auto sub = subscriptions_.find(message->type_url());
-  // If this type url is not watched, try older version type url.
+  // If this type url is not watched, try another version type url.
   if (sub == subscriptions_.end()) {
     const std::string& type_url = message->type_url();
     registerVersionedTypeUrl(type_url);
