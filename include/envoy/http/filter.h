@@ -33,8 +33,7 @@ enum class FilterHeadersStatus {
   // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
   StopIteration,
   // Continue headers iteration to remaining filters, but ignore any subsequent data or trailers.
-  // This
-  // results in creating a header only request/response.
+  // This results in creating a header only request/response.
   // This status MUST NOT be returned by decodeHeaders() when end_stream is set to true.
   ContinueAndEndStream,
   // Continue headers iteration to remaining filters, but delay ending the stream. This status MUST
@@ -50,7 +49,10 @@ enum class FilterHeadersStatus {
   // watermark events when injecting a body, see:
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/flow_control.md.
   //
-  // The last call to inject a body MUST have end_stream set to true to conclude the stream.
+  // To properly conclude the stream, the filter MUST either:
+  // 1. If there are no trailers, set end_stream argument to true in the last call to inject data.
+  // 2. If there are trailers, add them using addDecodedTrailers()/addEncodedTrailers().
+  //
   // If the filter cannot provide a body the stream should be reset.
   //
   // Adding a body through calling addDecodedData()/addEncodedData() then
