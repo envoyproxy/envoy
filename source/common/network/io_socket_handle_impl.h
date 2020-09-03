@@ -93,5 +93,54 @@ protected:
                            CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(uint16_t))};
 };
 
+class NullIoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
+public:
+  NullIoSocketHandleImpl() {
+    ENVOY_LOG(debug,
+              "creating socket to invalid address. Please update envoy to support this address.");
+  }
+  ~NullIoSocketHandleImpl() override;
+
+  os_fd_t fdDoNotUse() const override { return INVALID_SOCKET; }
+
+  Api::IoCallUint64Result close() override;
+
+  bool isOpen() const override;
+
+  Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
+                                uint64_t num_slice) override;
+
+  Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
+
+  Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
+                                  const Address::Ip* self_ip,
+                                  const Address::Instance& peer_address) override;
+
+  Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
+                                  uint32_t self_port, RecvMsgOutput& output) override;
+
+  Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                   RecvMsgOutput& output) override;
+  Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override;
+
+  bool supportsMmsg() const override;
+  bool supportsUdpGro() const override;
+
+  Api::SysCallIntResult bind(Address::InstanceConstSharedPtr address) override;
+  Api::SysCallIntResult listen(int backlog) override;
+  IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
+  Api::SysCallIntResult connect(Address::InstanceConstSharedPtr address) override;
+  Api::SysCallIntResult setOption(int level, int optname, const void* optval,
+                                  socklen_t optlen) override;
+  Api::SysCallIntResult getOption(int level, int optname, void* optval, socklen_t* optlen) override;
+  Api::SysCallIntResult setBlocking(bool blocking) override;
+  absl::optional<int> domain() override;
+  Address::InstanceConstSharedPtr localAddress() override;
+  Address::InstanceConstSharedPtr peerAddress() override;
+  Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                      Event::FileTriggerType trigger, uint32_t events) override;
+  Api::SysCallIntResult shutdown(int how) override;
+};
+
 } // namespace Network
 } // namespace Envoy

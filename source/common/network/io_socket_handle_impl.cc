@@ -4,6 +4,7 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/utility.h"
+#include "common/event/file_event_impl.h"
 #include "common/network/address_impl.h"
 
 #include "absl/container/fixed_array.h"
@@ -488,6 +489,96 @@ Event::FileEventPtr IoSocketHandleImpl::createFileEvent(Event::Dispatcher& dispa
 Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {
   return Api::OsSysCallsSingleton::get().shutdown(fd_, how);
 }
+
+NullIoSocketHandleImpl::~NullIoSocketHandleImpl() = default;
+
+Api::IoCallUint64Result NullIoSocketHandleImpl::close() {
+  return IoSocketError::ioResultSocketInvalidAddress();
+}
+
+bool NullIoSocketHandleImpl::isOpen() const { return false; }
+
+Api::IoCallUint64Result NullIoSocketHandleImpl::readv(uint64_t, Buffer::RawSlice*, uint64_t) {
+  return IoSocketError::ioResultSocketInvalidAddress();
+}
+
+Api::IoCallUint64Result NullIoSocketHandleImpl::writev(const Buffer::RawSlice*, uint64_t) {
+  return IoSocketError::ioResultSocketInvalidAddress();
+}
+
+Api::IoCallUint64Result NullIoSocketHandleImpl::sendmsg(const Buffer::RawSlice*, uint64_t, int,
+                                                        const Address::Ip*,
+                                                        const Address::Instance&) {
+  return IoSocketError::ioResultSocketInvalidAddress();
+}
+
+Api::IoCallUint64Result NullIoSocketHandleImpl::recvmsg(Buffer::RawSlice*, const uint64_t, uint32_t,
+                                                        RecvMsgOutput&) {
+  return IoSocketError::ioResultSocketInvalidAddress();
+}
+
+Api::IoCallUint64Result NullIoSocketHandleImpl::recvmmsg(RawSliceArrays&, uint32_t,
+                                                         RecvMsgOutput&) {
+  return IoSocketError::ioResultSocketInvalidAddress();
+}
+
+Api::IoCallUint64Result NullIoSocketHandleImpl::recv(void*, size_t, int) {
+  return IoSocketError::ioResultSocketInvalidAddress();
+}
+
+bool NullIoSocketHandleImpl::supportsMmsg() const { return false; }
+
+bool NullIoSocketHandleImpl::supportsUdpGro() const { return false; }
+
+Api::SysCallIntResult makeInvalidSyscall() {
+  return Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP /*SOCKET_ERROR_NOT_SUP*/};
+}
+
+Api::SysCallIntResult NullIoSocketHandleImpl::bind(Address::InstanceConstSharedPtr) {
+  return makeInvalidSyscall();
+}
+
+Api::SysCallIntResult NullIoSocketHandleImpl::listen(int) { return makeInvalidSyscall(); }
+
+IoHandlePtr NullIoSocketHandleImpl::accept(struct sockaddr*, socklen_t*) {
+
+  return std::make_unique<NullIoSocketHandleImpl>();
+}
+
+Api::SysCallIntResult NullIoSocketHandleImpl::connect(Address::InstanceConstSharedPtr) {
+  return makeInvalidSyscall();
+}
+
+Api::SysCallIntResult NullIoSocketHandleImpl::setOption(int, int, const void*, socklen_t) {
+  return makeInvalidSyscall();
+}
+
+Api::SysCallIntResult NullIoSocketHandleImpl::getOption(int, int, void*, socklen_t*) {
+  return makeInvalidSyscall();
+}
+
+Api::SysCallIntResult NullIoSocketHandleImpl::setBlocking(bool) { return makeInvalidSyscall(); }
+
+absl::optional<int> NullIoSocketHandleImpl::domain() { return absl::nullopt; }
+
+Address::InstanceConstSharedPtr NullIoSocketHandleImpl::localAddress() {
+  throw EnvoyException(fmt::format("getsockname failed for NullIoSocketHandleImpl"));
+}
+
+Address::InstanceConstSharedPtr NullIoSocketHandleImpl::peerAddress() {
+
+  throw EnvoyException(fmt::format("getsockname failed for NullIoSocketHandleImpl"));
+}
+
+Event::FileEventPtr NullIoSocketHandleImpl::createFileEvent(Event::Dispatcher& dispatcher,
+                                                            Event::FileReadyCb cb,
+                                                            Event::FileTriggerType,
+                                                            uint32_t events) {
+  return std::make_unique<Event::TimerWrappedFileEventImpl>(
+      dispatcher.createSchedulableCallback([cb, events]() -> void { cb(events); }));
+}
+
+Api::SysCallIntResult NullIoSocketHandleImpl::shutdown(int) { return makeInvalidSyscall(); }
 
 } // namespace Network
 } // namespace Envoy

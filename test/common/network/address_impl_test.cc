@@ -154,6 +154,8 @@ TEST(Ipv4InstanceTest, SocketAddress) {
   EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("1.2.3.4"), address));
   EXPECT_EQ(nullptr, address.ip()->ipv6());
   EXPECT_TRUE(address.ip()->isUnicastAddress());
+  EXPECT_EQ(nullptr, address.pipe());
+  EXPECT_EQ(nullptr, address.envoyInternalAddress());
 }
 
 TEST(Ipv4InstanceTest, AddressOnly) {
@@ -241,6 +243,8 @@ TEST(Ipv6InstanceTest, SocketAddress) {
   EXPECT_TRUE(addressesEqual(Network::Utility::parseInternetAddress("1:0023::0Ef"), address));
   EXPECT_EQ(nullptr, address.ip()->ipv4());
   EXPECT_TRUE(address.ip()->isUnicastAddress());
+  EXPECT_EQ(nullptr, address.pipe());
+  EXPECT_EQ(nullptr, address.envoyInternalAddress());
 }
 
 TEST(Ipv6InstanceTest, AddressOnly) {
@@ -317,6 +321,7 @@ TEST(PipeInstanceTest, Basic) {
   EXPECT_EQ("/foo", address.asString());
   EXPECT_EQ(Type::Pipe, address.type());
   EXPECT_EQ(nullptr, address.ip());
+  EXPECT_EQ(nullptr, address.envoyInternalAddress());
 }
 
 TEST(InteralInstanceTest, Basic) {

@@ -71,6 +71,14 @@ TEST(ResolverTest, InternalListenerNameFromProtoAddress) {
             resolveProtoAddress(internal_listener_address)->asString());
 }
 
+TEST(ResolverTest, UnsupportedInternalAddressFromProtoAddress) {
+  envoy::config::core::v3::Address internal_address;
+  internal_address.mutable_envoy_internal_address();
+  EXPECT_THROW_WITH_MESSAGE(
+      resolveProtoAddress(internal_address), EnvoyException,
+      "Internal address must be a server listener name: envoy_internal_address {\n}\n");
+}
+
 // Validate correct handling of ipv4_compat field.
 TEST(ResolverTest, FromProtoAddressV4Compat) {
   {
