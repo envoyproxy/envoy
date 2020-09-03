@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Network {
 
 /**
- * IoHandle derivative for sockets
+ * IoHandle derivative for sockets.
  */
 class IoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
 public:
@@ -93,13 +93,18 @@ protected:
                            CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(uint16_t))};
 };
 
+/**
+ * IoHandle for invalid socket. This is rquired because Envoy expects IoHandle creation never fail.
+ * This NullIoSocketHandleImpl allows Envoy surives on unsupported socket options.
+ */
 class NullIoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
 public:
-  NullIoSocketHandleImpl() {
+  NullIoSocketHandleImpl() : closed_{false} {
     ENVOY_LOG(debug,
               "creating socket to invalid address. Please update envoy to support this address.");
   }
-  ~NullIoSocketHandleImpl() override;
+
+  ~NullIoSocketHandleImpl() override { ASSERT(closed_); }
 
   os_fd_t fdDoNotUse() const override { return INVALID_SOCKET; }
 
@@ -140,6 +145,11 @@ public:
   Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                                       Event::FileTriggerType trigger, uint32_t events) override;
   Api::SysCallIntResult shutdown(int how) override;
+
+private:
+  // Support isOpen() and close(). IoHandle owner must invoke close() to avoid potential resource
+  // leak.
+  bool closed_;
 };
 
 } // namespace Network

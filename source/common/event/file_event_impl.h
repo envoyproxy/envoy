@@ -53,8 +53,8 @@ public:
     }
   }
   // Event::FileEvent
-  void activate(uint32_t) override {}
-  void setEnabled(uint32_t) override {}
+  void activate(uint32_t) override { schedulable_->scheduleCallbackNextIteration(); }
+  void setEnabled(uint32_t) override { schedulable_->scheduleCallbackNextIteration(); }
 
 private:
   SchedulableCallbackPtr schedulable_;

@@ -87,5 +87,29 @@ TEST_P(SocketInterfaceIntegrationTest, AddressWithSocketInterface) {
   client_->close(Network::ConnectionCloseType::FlushWrite);
 }
 
+// Test that connecting to internal address should always followed by disconnection with no crash.
+TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
+  BaseIntegrationTest::initialize();
+
+  ConnectionStatusCallbacks connect_callbacks_;
+  Network::ClientConnectionPtr client_;
+  const Network::SocketInterface* sock_interface = Network::socketInterface(
+      "envoy.extensions.network.socket_interface.default_socket_interface");
+  Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
+
+  client_ = dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                                Network::Test::createRawBufferSocket(), nullptr);
+
+  client_->addConnectionCallbacks(connect_callbacks_);
+  client_->connect();
+
+  while (!connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  client_->close(Network::ConnectionCloseType::FlushWrite);
+}
+
 } // namespace
 } // namespace Envoy
