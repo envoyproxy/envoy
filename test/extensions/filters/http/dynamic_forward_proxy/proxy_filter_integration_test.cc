@@ -310,9 +310,6 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsInvalidSAN) {
   upstream_tls_ = true;
   upstream_cert_name_ = "upstream";
   setup();
-  // The upstream connection is going to fail handshake so make sure it can read and we expect
-  // it to disconnect.
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   fake_upstreams_[0]->setReadDisableOnNewConnection(false);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

@@ -259,7 +259,6 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyClose) {
       request_bytes_.toString().substr(0, request_bytes_.length() - 5);
 
   FakeUpstream* expected_upstream = getExpectedUpstream(false);
-  expected_upstream->set_allow_unexpected_disconnects(true);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write(partial_request));
@@ -377,7 +376,6 @@ TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClosePartialRequest) {
       request_bytes_.toString().substr(0, request_bytes_.length() - 1);
 
   FakeUpstream* expected_upstream = getExpectedUpstream(true);
-  expected_upstream->set_allow_unexpected_disconnects(true);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write(partial_request));

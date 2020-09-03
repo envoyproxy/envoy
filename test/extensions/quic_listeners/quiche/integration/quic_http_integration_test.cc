@@ -325,8 +325,6 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
 
   initialize();
 
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto encoder_decoder =
@@ -482,7 +480,6 @@ TEST_P(QuicHttpIntegrationTest, ConnectionMigration) {
 
 TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Put envoy in overloaded state and check that it doesn't accept the new client connection.
   updateResource(file_updater_1_, 0.9);
@@ -522,7 +519,6 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
 
 TEST_P(QuicHttpIntegrationTest, NoNewStreamsWhenOverloaded) {
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   updateResource(file_updater_1_, 0.7);
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));

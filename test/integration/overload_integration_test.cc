@@ -61,7 +61,6 @@ INSTANTIATE_TEST_SUITE_P(Protocols, OverloadIntegrationTest,
 
 TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Put envoy in overloaded state and check that it drops new requests.
   // Test both header-only and header+body requests since the code paths are slightly different.
@@ -108,7 +107,6 @@ TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
   }
 
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Put envoy in overloaded state and check that it disables keepalive
   updateResource(0.8);
@@ -138,7 +136,6 @@ TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
 
 TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Put envoy in overloaded state and check that it doesn't accept the new client connection.
   updateResource(0.95);

@@ -447,8 +447,8 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       api_(Api::createApiForTest(stats_store_)), time_system_(time_system),
       dispatcher_(api_->allocateDispatcher("fake_upstream")),
       handler_(new Server::ConnectionHandlerImpl(*dispatcher_)),
-      allow_unexpected_disconnects_(false), read_disable_on_new_connection_(true),
-      enable_half_close_(enable_half_close), listener_(*this),
+      read_disable_on_new_connection_(true), enable_half_close_(enable_half_close),
+      listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();
@@ -470,8 +470,7 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
   if (read_disable_on_new_connection_) {
     connection.readDisable(true);
   }
-  auto connection_wrapper =
-      std::make_unique<SharedConnectionWrapper>(connection, allow_unexpected_disconnects_);
+  auto connection_wrapper = std::make_unique<SharedConnectionWrapper>(connection);
   LinkedList::moveIntoListBack(std::move(connection_wrapper), new_connections_);
   return true;
 }

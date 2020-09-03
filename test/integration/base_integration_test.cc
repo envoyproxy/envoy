@@ -386,8 +386,6 @@ void BaseIntegrationTest::createXdsUpstream() {
         std::move(context), 0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
   xds_upstream_ = fake_upstreams_[1].get();
-  // Don't ASSERT fail if an xDS reconnect ends up unparented.
-  xds_upstream_->set_allow_unexpected_disconnects(true);
 }
 
 void BaseIntegrationTest::createXdsConnection() {

@@ -416,8 +416,6 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
   // the initial LDS file has loaded.
   EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
 
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-
   // HTTP 1.0 is disabled by default.
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, true);

@@ -118,7 +118,6 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.set_via("via_value"); });
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -153,7 +152,6 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.set_via("via_value"); });
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -199,7 +197,6 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithBody) {
     "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -249,7 +246,6 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByPreviousRoutesPredica
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.set_via("via_value"); });
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -307,7 +303,6 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByAllowListedRoutesPred
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.set_via("via_value"); });
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -367,7 +362,6 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedBySafeCrossSchemePredic
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.set_via("via_value"); });
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 

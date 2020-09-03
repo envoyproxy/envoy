@@ -164,7 +164,6 @@ void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCas
                                    bool ignore_response) {
   PERSISTENT_FUZZ_VAR bool initialized = [this]() -> bool {
     initialize();
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
     return true;
   }();
   UNREFERENCED_PARAMETER(initialized);

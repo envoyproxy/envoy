@@ -262,8 +262,6 @@ protected:
                              const std::string& auth_password = "") {
     std::string cluster_slot_request = makeBulkStringArray({"CLUSTER", "SLOTS"});
 
-    fake_upstreams_[stream_index]->set_allow_unexpected_disconnects(true);
-
     std::string proxied_cluster_slot_request;
 
     FakeRawConnectionPtr fake_upstream_connection_;

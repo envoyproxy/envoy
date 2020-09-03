@@ -171,7 +171,6 @@ public:
     result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
     RELEASE_ASSERT(result, result.message());
     xds_stream_->startGrpcStream();
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
     EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
                                             {"my_route"}, true));
@@ -294,7 +293,6 @@ public:
     result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
     RELEASE_ASSERT(result, result.message());
     xds_stream_->startGrpcStream();
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
     EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
                                             {"my_route"}, true));

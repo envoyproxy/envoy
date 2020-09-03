@@ -547,7 +547,6 @@ TEST_P(TcpProxyIntegrationTest, TestCloseOnHealthFailure) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(10));
 
   ASSERT_TRUE(fake_upstream_health_connection->waitForData(8));
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   ASSERT_TRUE(fake_upstream_health_connection->close());
   ASSERT_TRUE(fake_upstream_health_connection->waitForDisconnect());
 
