@@ -9,19 +9,19 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "cdn_loop_parser_test",
-    srcs = ["cdn_loop_parser_test.cc"],
+    name = "parser_test",
+    srcs = ["parser_test.cc"],
     deps = [
-        "//source/extensions/filters/http/cdn_loop:cdn_loop_parser_lib",
+        "//source/extensions/filters/http/cdn_loop:parser_lib",
         "//test/test_common:status_utility_lib",
     ],
 )
 
 envoy_cc_test(
-    name = "cdn_loop_utils_test",
-    srcs = ["cdn_loop_utils_test.cc"],
+    name = "utils_test",
+    srcs = ["utils_test.cc"],
     deps = [
-        "//source/extensions/filters/http/cdn_loop:cdn_loop_utils_lib",
+        "//source/extensions/filters/http/cdn_loop:utils_lib",
         "//test/test_common:status_utility_lib",
     ],
 )

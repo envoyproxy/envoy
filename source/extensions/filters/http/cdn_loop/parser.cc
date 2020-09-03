@@ -1,4 +1,4 @@
-#include "extensions/filters/http/cdn_loop/cdn_loop_parser.h"
+#include "extensions/filters/http/cdn_loop/parser.h"
 
 #include "common/common/statusor.h"
 
