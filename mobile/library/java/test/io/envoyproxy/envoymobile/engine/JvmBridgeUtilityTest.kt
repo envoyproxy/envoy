@@ -48,7 +48,7 @@ class JvmBridgeUtilityTest {
     utility.passHeader("test-1".toByteArray(), "value-2".toByteArray(), false)
     assertThat(utility.validateCount(3)).isTrue()
 
-    val headers = utility.retrieveHeaders()
+    utility.retrieveHeaders()
     assertThat(utility.validateCount(0)).isTrue()
 
     utility.passHeader("test-2".toByteArray(), "value-3".toByteArray(), true)
