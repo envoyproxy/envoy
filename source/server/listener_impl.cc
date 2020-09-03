@@ -276,7 +276,7 @@ void PerFilterChainRebuilder::callbackWorkers(bool success) {
           });
     }
   }
-  workers_to_callback_.clear();
+  // workers_to_callback_.clear();
 }
 
 void PerFilterChainRebuilder::startRebuilding() {
