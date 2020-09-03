@@ -38,7 +38,7 @@ public:
   }
 
 private:
-  std::string body_ = "body";
+  constexpr static absl::string_view body_ = "body";
 };
 
 static Registry::RegisterFactory<SimpleFilterConfig<ContinueHeadersOnlyInjectBodyFilter>,

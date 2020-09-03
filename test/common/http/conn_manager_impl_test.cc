@@ -5187,7 +5187,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamTrailers) {
   decoder_filters_[1]->callbacks_->encodeTrailers(std::move(response_trailers));
 }
 
-// filter continues headers iteration without ending the stream, then injects a body later.
+// Filter continues headers iteration without ending the stream, then injects a body later.
 TEST_F(HttpConnectionManagerImplTest, FilterContinueDontEndStreamInjectBody) {
   InSequence s;
   setup(false, "");
