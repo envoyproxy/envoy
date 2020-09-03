@@ -1,4 +1,4 @@
 #!/bin/bash
 
-cd /etc/envoy
+cd /etc/envoy || exit
 envoy "$@"
