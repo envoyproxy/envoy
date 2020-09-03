@@ -160,18 +160,20 @@ public:
     http_health_check->set_path("/healthcheck");
     http_health_check->set_codec_client_type(codec_type);
     if (use_tls) {
-      // set bool for use in struct.
-      ProtobufWkt::Value v;
-      v.set_string_value("true");
+      // Map our transport socket matches with our matcher.
+      const std::string criteria_yaml = absl::StrFormat(
+          R"EOF(
+transport_socket_match_criteria:
+  good_match: "true"
+)EOF");
+      health_check->MergeFrom(
+          TestUtility::parseYaml<envoy::config::core::v3::HealthCheck>(criteria_yaml));
 
-      // map our transport socket matches with our matcher.
-      auto* match_filter = health_check->mutable_transport_socket_match_criteria();
-      match_filter->mutable_fields()->insert({"good_match", v});
-
-      // create the list of all possible matches.
+      // Create the list of all possible matches.
       const std::string match_yaml = absl::StrFormat(
           R"EOF(
-  name: "tls_socket"
+transport_socket_matches:
+- name: "tls_socket"
   match:
     good_match: "true"
   transport_socket:
@@ -185,8 +187,8 @@ public:
   )EOF",
           TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"),
           TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
-      auto* transport_socket_match = cluster_health_check->add_transport_socket_matches();
-      TestUtility::loadFromYaml(match_yaml, *transport_socket_match);
+      cluster_health_check->MergeFrom(
+          TestUtility::parseYaml<envoy::service::health::v3::ClusterHealthCheck>(match_yaml));
     }
     return server_health_check_specifier_;
   }

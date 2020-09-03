@@ -499,22 +499,25 @@ TEST_F(HdsTest, TestSocketContext) {
   // Add transport socket matches to message.
   const std::string match_yaml = absl::StrFormat(
       R"EOF(
-name: "test_socket"
-match:
-  test_match: "true"
-transport_socket:
-  name: "envoy.transport_sockets.raw_buffer"
- )EOF");
+transport_socket_matches:
+- name: "test_socket"
+  match:
+    test_match: "true"
+  transport_socket:
+    name: "envoy.transport_sockets.raw_buffer"
+)EOF");
   auto* cluster_health_check = message->mutable_cluster_health_checks(0);
-  auto* transport_socket_match = cluster_health_check->add_transport_socket_matches();
-  TestUtility::loadFromYaml(match_yaml, *transport_socket_match);
+  cluster_health_check->MergeFrom(
+      TestUtility::parseYaml<envoy::service::health::v3::ClusterHealthCheck>(match_yaml));
 
   // Add transport socket match criteria to our health check, for filtering matches.
-  auto* health_check = cluster_health_check->mutable_health_checks(0);
-  auto* transport_socket_match_criteria = health_check->mutable_transport_socket_match_criteria();
-  ProtobufWkt::Value v;
-  v.set_string_value("true");
-  transport_socket_match_criteria->mutable_fields()->insert({"test_match", v});
+  const std::string criteria_yaml = absl::StrFormat(
+      R"EOF(
+transport_socket_match_criteria:
+  test_match: "true"
+)EOF");
+  cluster_health_check->mutable_health_checks(0)->MergeFrom(
+      TestUtility::parseYaml<envoy::config::core::v3::HealthCheck>(criteria_yaml));
 
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection));
