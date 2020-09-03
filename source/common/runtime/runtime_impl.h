@@ -23,15 +23,13 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/init/target_impl.h"
+#include "common/runtime/runtime_features.h"
 #include "common/singleton/threadsafe_singleton.h"
 
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Runtime {
-
-bool runtimeFeatureEnabled(absl::string_view feature);
-uint64_t getInteger(absl::string_view feature, uint64_t default_value);
 
 using RuntimeSingleton = ThreadSafeSingleton<Loader>;
 

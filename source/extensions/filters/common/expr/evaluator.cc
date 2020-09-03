@@ -48,27 +48,27 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
   return std::move(cel_expression_status.ValueOrDie());
 }
 
-absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena,
+absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena,
                                   const StreamInfo::StreamInfo& info,
                                   const Http::HeaderMap* request_headers,
                                   const Http::HeaderMap* response_headers,
                                   const Http::HeaderMap* response_trailers) {
   google::api::expr::runtime::Activation activation;
-  const RequestWrapper request(request_headers, info);
-  const ResponseWrapper response(response_headers, response_trailers, info);
+  const RequestWrapper request(arena, request_headers, info);
+  const ResponseWrapper response(arena, response_headers, response_trailers, info);
   const ConnectionWrapper connection(info);
   const UpstreamWrapper upstream(info);
   const PeerWrapper source(info, false);
   const PeerWrapper destination(info, true);
   activation.InsertValue(Request, CelValue::CreateMap(&request));
   activation.InsertValue(Response, CelValue::CreateMap(&response));
-  activation.InsertValue(Metadata, CelValue::CreateMessage(&info.dynamicMetadata(), arena));
+  activation.InsertValue(Metadata, CelValue::CreateMessage(&info.dynamicMetadata(), &arena));
   activation.InsertValue(Connection, CelValue::CreateMap(&connection));
   activation.InsertValue(Upstream, CelValue::CreateMap(&upstream));
   activation.InsertValue(Source, CelValue::CreateMap(&source));
   activation.InsertValue(Destination, CelValue::CreateMap(&destination));
 
-  auto eval_status = expr.Evaluate(activation, arena);
+  auto eval_status = expr.Evaluate(activation, &arena);
   if (!eval_status.ok()) {
     return {};
   }
@@ -79,7 +79,7 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
              const Http::HeaderMap& headers) {
   Protobuf::Arena arena;
-  auto eval_status = Expr::evaluate(expr, &arena, info, &headers, nullptr, nullptr);
+  auto eval_status = Expr::evaluate(expr, arena, info, &headers, nullptr, nullptr);
   if (!eval_status.has_value()) {
     return false;
   }

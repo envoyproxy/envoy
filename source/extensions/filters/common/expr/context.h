@@ -2,6 +2,8 @@
 
 #include "envoy/stream_info/stream_info.h"
 
+#include "common/grpc/status.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 
 #include "eval/public/cel_value.h"
@@ -65,7 +67,8 @@ class RequestWrapper;
 
 class HeadersWrapper : public google::api::expr::runtime::CelMap {
 public:
-  HeadersWrapper(const Http::HeaderMap* value) : value_(value) {}
+  HeadersWrapper(Protobuf::Arena& arena, const Http::HeaderMap* value)
+      : arena_(arena), value_(value) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
   int size() const override { return value_ == nullptr ? 0 : value_->size(); }
   bool empty() const override { return value_ == nullptr ? true : value_->empty(); }
@@ -75,6 +78,7 @@ public:
 
 private:
   friend class RequestWrapper;
+  Protobuf::Arena& arena_;
   const Http::HeaderMap* value_;
 };
 
@@ -89,8 +93,9 @@ public:
 
 class RequestWrapper : public BaseWrapper {
 public:
-  RequestWrapper(const Http::HeaderMap* headers, const StreamInfo::StreamInfo& info)
-      : headers_(headers), info_(info) {}
+  RequestWrapper(Protobuf::Arena& arena, const Http::HeaderMap* headers,
+                 const StreamInfo::StreamInfo& info)
+      : headers_(arena, headers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
@@ -100,9 +105,9 @@ private:
 
 class ResponseWrapper : public BaseWrapper {
 public:
-  ResponseWrapper(const Http::HeaderMap* headers, const Http::HeaderMap* trailers,
-                  const StreamInfo::StreamInfo& info)
-      : headers_(headers), trailers_(trailers), info_(info) {}
+  ResponseWrapper(Protobuf::Arena& arena, const Http::HeaderMap* headers,
+                  const Http::HeaderMap* trailers, const StreamInfo::StreamInfo& info)
+      : headers_(arena, headers), trailers_(arena, trailers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:

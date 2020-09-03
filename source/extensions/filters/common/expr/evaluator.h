@@ -16,10 +16,19 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 
+using Activation = google::api::expr::runtime::Activation;
+using ActivationPtr = std::unique_ptr<Activation>;
 using Builder = google::api::expr::runtime::CelExpressionBuilder;
 using BuilderPtr = std::unique_ptr<Builder>;
 using Expression = google::api::expr::runtime::CelExpression;
 using ExpressionPtr = std::unique_ptr<Expression>;
+
+// Creates an activation providing the common context attributes.
+// The activation lazily creates wrappers during an evaluation using the evaluation arena.
+ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info,
+                               const Http::HeaderMap* request_headers,
+                               const Http::HeaderMap* response_headers,
+                               const Http::HeaderMap* response_trailers);
 
 // Creates an expression builder. The optional arena is used to enable constant folding
 // for intermediate evaluation results.
@@ -32,7 +41,7 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
 
 // Evaluates an expression for a request. The arena is used to hold intermediate computational
 // results and potentially the final value.
-absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena,
+absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena,
                                   const StreamInfo::StreamInfo& info,
                                   const Http::HeaderMap* request_headers,
                                   const Http::HeaderMap* response_headers,

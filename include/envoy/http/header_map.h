@@ -15,6 +15,7 @@
 #include "common/common/hash.h"
 #include "common/common/macros.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -506,6 +507,31 @@ public:
    */
   virtual const HeaderEntry* get(const LowerCaseString& key) const PURE;
   virtual HeaderEntry* get(const LowerCaseString& key) PURE;
+
+  /**
+   * This is a wrapper for the return result from getAll(). It avoids a copy when translating from
+   * non-const HeaderEntry to const HeaderEntry and only provides const access to the result.
+   */
+  using NonConstGetResult = absl::InlinedVector<HeaderEntry*, 1>;
+  class GetResult {
+  public:
+    GetResult() = default;
+    explicit GetResult(NonConstGetResult&& result) : result_(std::move(result)) {}
+
+    bool empty() const { return result_.empty(); }
+    size_t size() const { return result_.size(); }
+    const HeaderEntry* operator[](size_t i) const { return result_[i]; }
+
+  private:
+    NonConstGetResult result_;
+  };
+
+  /**
+   * Get a header by key.
+   * @param key supplies the header key.
+   * @return all header entries matching the key.
+   */
+  virtual GetResult getAll(const LowerCaseString& key) const PURE;
 
   // aliases to make iterate() and iterateReverse() callbacks easier to read
   enum class Iterate { Continue, Break };

@@ -18,6 +18,19 @@ absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header) {
   return CelValue::CreateString(header->value().getStringView());
 }
 
+absl::optional<CelValue>
+convertHeaderEntry(Protobuf::Arena& arena,
+                   Http::HeaderUtility::GetAllOfHeaderAsStringResult&& result) {
+  if (!result.result().has_value()) {
+    return {};
+  } else if (!result.backingString().empty()) {
+    return CelValue::CreateString(
+        Protobuf::Arena::Create<std::string>(&arena, result.backingString()));
+  } else {
+    return CelValue::CreateString(result.result().value());
+  }
+}
+
 absl::optional<CelValue> extractSslInfo(const Ssl::ConnectionInfo& ssl_info,
                                         absl::string_view value) {
   if (value == TLSVersion) {
@@ -52,8 +65,9 @@ absl::optional<CelValue> HeadersWrapper::operator[](CelValue key) const {
   if (value_ == nullptr || !key.IsString()) {
     return {};
   }
-  auto out = value_->get(Http::LowerCaseString(std::string(key.StringOrDie().value())));
-  return convertHeaderEntry(out);
+  return convertHeaderEntry(
+      arena_, Http::HeaderUtility::getAllOfHeaderAsString(
+                  *value_, Http::LowerCaseString(std::string(key.StringOrDie().value()))));
 }
 
 absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {

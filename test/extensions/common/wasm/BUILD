@@ -12,6 +12,9 @@ envoy_package()
 envoy_cc_test(
     name = "wasm_vm_test",
     srcs = ["wasm_vm_test.cc"],
+    tags = [
+        "manual",
+    ],
     deps = [
         "//source/extensions/common/wasm:wasm_vm_lib",
         "//test/test_common:utility_lib",

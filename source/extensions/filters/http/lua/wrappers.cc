@@ -1,5 +1,6 @@
 #include "extensions/filters/http/lua/wrappers.h"
 
+#include "common/http/header_utility.h"
 #include "common/http/utility.h"
 
 #include "extensions/filters/common/lua/wrappers.h"
@@ -45,10 +46,10 @@ int HeaderMapWrapper::luaAdd(lua_State* state) {
 
 int HeaderMapWrapper::luaGet(lua_State* state) {
   const char* key = luaL_checkstring(state, 2);
-  const Http::HeaderEntry* entry = headers_.get(Http::LowerCaseString(key));
-  if (entry != nullptr) {
-    lua_pushlstring(state, entry->value().getStringView().data(),
-                    entry->value().getStringView().length());
+  const auto value =
+      Http::HeaderUtility::getAllOfHeaderAsString(headers_, Http::LowerCaseString(key));
+  if (value.result().has_value()) {
+    lua_pushlstring(state, value.result().value().data(), value.result().value().length());
     return 1;
   } else {
     return 0;

@@ -505,13 +505,12 @@ uint64_t HeaderMapImpl::byteSizeInternal() const {
 }
 
 const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
-  for (const HeaderEntryImpl& header : headers_) {
-    if (header.key() == key.get().c_str()) {
-      return &header;
-    }
-  }
+  const auto result = getAll(key);
+  return result.empty() ? nullptr : result[0];
+}
 
-  return nullptr;
+HeaderMap::GetResult HeaderMapImpl::getAll(const LowerCaseString& key) const {
+  return HeaderMap::GetResult(const_cast<HeaderMapImpl*>(this)->getExisting(key));
 }
 
 HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) {
@@ -521,8 +520,36 @@ HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) {
       return &header;
     }
   }
-
   return nullptr;
+}
+
+HeaderMap::NonConstGetResult HeaderMapImpl::getExisting(const LowerCaseString& key) {
+  // Attempt a trie lookup first to see if the user is requesting an O(1) header. This may be
+  // relatively common in certain header matching / routing patterns.
+  // TODO(mattklein123): Add inline handle support directly to the header matcher code to support
+  // this use case more directly.
+  HeaderMap::NonConstGetResult ret;
+
+  EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get());
+  if (cb) {
+    StaticLookupResponse ref_lookup_response = cb(*this);
+    if (*ref_lookup_response.entry_) {
+      ret.push_back(*ref_lookup_response.entry_);
+    }
+    return ret;
+  }
+  // If the requested header is not an O(1) header we do a full scan. Doing the trie lookup is
+  // wasteful in the miss case, but is present for code consistency with other functions that do
+  // similar things.
+  // TODO(mattklein123): The full scan here and in remove() are the biggest issues with this
+  // implementation for certain use cases. We can either replace this with a totally different
+  // implementation or potentially create a lazy map if the size of the map is above a threshold.
+  for (HeaderEntryImpl& header : headers_) {
+    if (header.key() == key.get().c_str()) {
+      ret.push_back(&header);
+    }
+  }
+  return ret;
 }
 
 void HeaderMapImpl::iterate(ConstIterateCb cb, void* context) const {

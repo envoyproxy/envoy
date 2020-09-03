@@ -5,6 +5,7 @@
 #include "common/http/header_utility.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

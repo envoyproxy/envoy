@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "common/common/utility.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/singleton/const_singleton.h"
@@ -180,9 +181,11 @@ std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& h
   // Check header locations first
   for (const auto& location_it : header_locations_) {
     const auto& location_spec = location_it.second;
-    const Http::HeaderEntry* entry = headers.get(location_spec->header_);
-    if (entry) {
-      auto value_str = entry->value().getStringView();
+    ENVOY_LOG_MISC(debug, "extract {}", location_it.first);
+    const auto result =
+        Http::HeaderUtility::getAllOfHeaderAsString(headers, location_spec->header_);
+    if (result.result().has_value()) {
+      auto value_str = result.result().value();
       if (!location_spec->value_prefix_.empty()) {
         const auto pos = value_str.find(location_spec->value_prefix_);
         if (pos == absl::string_view::npos) {

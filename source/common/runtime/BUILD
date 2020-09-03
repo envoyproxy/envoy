@@ -9,13 +9,32 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "runtime_lib",
+    name = "runtime_features_lib",
     srcs = [
         "runtime_features.cc",
-        "runtime_impl.cc",
     ],
     hdrs = [
         "runtime_features.h",
+    ],
+    deps = [
+        "//include/envoy/runtime:runtime_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:hash_lib",
+        "//source/common/protobuf:message_validator_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/singleton:const_singleton",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "runtime_lib",
+    srcs = [
+        "runtime_impl.cc",
+    ],
+    hdrs = [
         "runtime_impl.h",
     ],
     external_deps = ["ssl"],
@@ -37,6 +56,7 @@ envoy_cc_library(
         "//source/common/init:target_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",

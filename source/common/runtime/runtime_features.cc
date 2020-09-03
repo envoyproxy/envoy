@@ -1,7 +1,30 @@
 #include "common/runtime/runtime_features.h"
 
+#include "common/common/assert.h"
+
 namespace Envoy {
 namespace Runtime {
+
+bool runtimeFeatureEnabled(absl::string_view feature) {
+  if (Runtime::LoaderSingleton::getExisting()) {
+    return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->runtimeFeatureEnabled(
+        feature);
+  }
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
+                      "Unable to use runtime singleton for feature {}", feature);
+  return RuntimeFeaturesDefaults::get().enabledByDefault(feature);
+}
+
+uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
+  ASSERT(absl::StartsWith(feature, "envoy."));
+  if (Runtime::LoaderSingleton::getExisting()) {
+    return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->getInteger(
+        std::string(feature), default_value);
+  }
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
+                      "Unable to use runtime singleton for feature {}", feature);
+  return default_value;
+}
 
 // Add additional features here to enable the new code paths by default.
 //
@@ -32,6 +55,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.strict_header_validation",
     "envoy.reloadable_features.strict_authority_validation",
     "envoy.reloadable_features.fix_wildcard_matching",
+    "envoy.reloadable_features.http_match_on_all_headers",
 };
 
 // This is a list of configuration fields which are disallowed by default in Envoy

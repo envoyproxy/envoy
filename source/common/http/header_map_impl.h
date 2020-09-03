@@ -85,6 +85,7 @@ public:
   uint64_t byteSizeInternal() const override;
   const HeaderEntry* get(const LowerCaseString& key) const override;
   HeaderEntry* get(const LowerCaseString& key) override;
+  HeaderMap::GetResult getAll(const LowerCaseString& key) const override;
   void iterate(ConstIterateCb cb, void* context) const override;
   void iterateReverse(ConstIterateCb cb, void* context) const override;
   Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const override;
@@ -203,6 +204,7 @@ protected:
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);
+  HeaderMap::NonConstGetResult getExisting(const LowerCaseString& key);
   HeaderEntryImpl* getExistingInline(absl::string_view key);
 
   void removeInline(HeaderEntryImpl** entry);

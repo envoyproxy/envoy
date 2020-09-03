@@ -7,11 +7,16 @@
 
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
+#include "common/singleton/threadsafe_singleton.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/match.h"
 
 namespace Envoy {
 namespace Runtime {
+
+bool runtimeFeatureEnabled(absl::string_view feature);
+uint64_t getInteger(absl::string_view feature, uint64_t default_value);
 
 class RuntimeFeatures {
 public:
