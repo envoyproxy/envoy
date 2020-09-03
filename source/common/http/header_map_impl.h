@@ -264,9 +264,7 @@ protected:
     std::list<HeaderEntryImpl>::const_iterator end() const { return headers_.end(); }
     std::list<HeaderEntryImpl>::const_reverse_iterator rbegin() const { return headers_.rbegin(); }
     std::list<HeaderEntryImpl>::const_reverse_iterator rend() const { return headers_.rend(); }
-    HeaderLazyMap::iterator mapFind(absl::string_view key) {
-      return lazy_map_.find(key);
-    }
+    HeaderLazyMap::iterator mapFind(absl::string_view key) { return lazy_map_.find(key); }
     HeaderLazyMap::iterator mapEnd() { return lazy_map_.end(); }
     size_t size() const { return headers_.size(); }
     bool empty() const { return headers_.empty(); }
