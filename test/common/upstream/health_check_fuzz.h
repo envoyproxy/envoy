@@ -8,7 +8,7 @@ namespace Upstream {
 
 class HealthCheckFuzz : public HttpHealthCheckerImplTest {
 public:
-  HealthCheckFuzz();
+  HealthCheckFuzz() = default;
   void initialize(test::common::upstream::HealthCheckTestCase input);
 
 private:

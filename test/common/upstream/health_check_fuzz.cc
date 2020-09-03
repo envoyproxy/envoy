@@ -8,8 +8,6 @@
 namespace Envoy {
 namespace Upstream {
 
-HealthCheckFuzz::HealthCheckFuzz() {}
-
 void HealthCheckFuzz::allocHealthCheckerFromProto(
     const envoy::config::core::v3::HealthCheck& config) {
   health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
