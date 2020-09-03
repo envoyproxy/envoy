@@ -51,14 +51,15 @@ enum class FilterHeadersStatus {
   //
   // To properly conclude the stream, the filter MUST either:
   // 1. If there are no trailers, set end_stream argument to true in the last call to inject data.
-  // 2. If there are trailers, add them using addDecodedTrailers()/addEncodedTrailers().
+  // 2. If there are trailers, add them using addDecodedTrailers()/addEncodedTrailers() after
+  //    injecting the body and then call continueDecoding()/continueEncoding().
   //
   // If the filter cannot provide a body the stream should be reset.
   //
   // Adding a body through calling addDecodedData()/addEncodedData() then
   // continueDecoding()/continueEncoding() is currently NOT supported and causes an assert failure.
   //
-  // The filter MUST NOT attempt to continue the stream without providing a body using
+  // The filter MUST NOT attempt to continue the stream without providing a body or trailers using
   // continueDecoding()/continueEncoding().
   //
   // TODO(yosrym93): Support adding a body in this case by calling addDecodedData()/addEncodedData()
