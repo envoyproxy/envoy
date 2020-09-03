@@ -370,6 +370,7 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   echo "check_format_test..."
   ./tools/code_format/check_format_test_helper.sh --log=WARN
   echo "check_format..."
+  ./tools/code_format/check_shellcheck_format.sh
   ./tools/code_format/check_format.py check
   ./tools/code_format/format_python_tools.sh check
   ./tools/proto_format/proto_format.sh check --test
