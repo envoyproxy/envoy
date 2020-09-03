@@ -1082,7 +1082,6 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
@@ -1239,7 +1238,6 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecClient::Type admin_request_t
                                                  {":authority", "host"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest(0);
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
@@ -1281,7 +1279,6 @@ void HttpIntegrationTest::testMaxStreamDuration() {
   });
 
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
@@ -1314,7 +1311,6 @@ void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstr
       {":method", "POST"},    {":path", "/test/long/url"},     {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"x-envoy-retry-on", "5xx"}};
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto encoder_decoder = codec_client_->startRequest(retriable_header);

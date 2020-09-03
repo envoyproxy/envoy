@@ -729,12 +729,14 @@ public:
   INLINE_REQ_HEADERS(DEFINE_INLINE_HEADER)
 };
 using RequestHeaderMapPtr = std::unique_ptr<RequestHeaderMap>;
+using RequestHeaderMapOptRef = absl::optional<std::reference_wrapper<RequestHeaderMap>>;
 
 // Request trailers.
 class RequestTrailerMap
     : public HeaderMap,
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestTrailers> {};
 using RequestTrailerMapPtr = std::unique_ptr<RequestTrailerMap>;
+using RequestTrailerMapOptRef = absl::optional<std::reference_wrapper<RequestTrailerMap>>;
 
 // Base class for both response headers and trailers.
 class ResponseHeaderOrTrailerMap {
@@ -753,6 +755,7 @@ public:
   INLINE_RESP_HEADERS(DEFINE_INLINE_HEADER)
 };
 using ResponseHeaderMapPtr = std::unique_ptr<ResponseHeaderMap>;
+using ResponseHeaderMapOptRef = absl::optional<std::reference_wrapper<ResponseHeaderMap>>;
 
 // Response trailers.
 class ResponseTrailerMap
@@ -760,6 +763,7 @@ class ResponseTrailerMap
       public HeaderMap,
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::ResponseTrailers> {};
 using ResponseTrailerMapPtr = std::unique_ptr<ResponseTrailerMap>;
+using ResponseTrailerMapOptRef = absl::optional<std::reference_wrapper<ResponseTrailerMap>>;
 
 /**
  * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.

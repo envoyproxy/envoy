@@ -309,7 +309,7 @@ RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& re
   // response.
   if (would_retry && !reset_headers_.empty()) {
     const auto backoff_interval = parseResetInterval(response_headers);
-    if (backoff_interval.has_value()) {
+    if (backoff_interval.has_value() && (backoff_interval.value().count() > 1L)) {
       ratelimited_backoff_strategy_ = std::make_unique<JitteredLowerBoundBackOffStrategy>(
           backoff_interval.value().count(), random_);
     }

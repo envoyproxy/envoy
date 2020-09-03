@@ -1277,6 +1277,8 @@ ConnectionImpl::Http2Options::Http2Options(
 
   if (http2_options.allow_metadata()) {
     nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
+  } else {
+    ENVOY_LOG(trace, "Codec does not have Metadata frame support.");
   }
 
   // nghttp2 v1.39.2 lowered the internal flood protection limit from 10K to 1K of ACK frames.
