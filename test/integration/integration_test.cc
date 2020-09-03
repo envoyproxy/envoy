@@ -1573,4 +1573,68 @@ TEST_P(IntegrationTest, QuitQuitQuit) {
   test_server_->useAdminInterfaceToQuit(true);
 }
 
+// override_stream_error_on_invalid_http_message=true and HCM
+// stream_error_on_invalid_http_message=false: test that HTTP/1.1 connection is left open on invalid
+// HTTP message (missing :host header)
+TEST_P(IntegrationTest, ConnectionIsLeftOpenIfHCMStreamErrorIsFalseAndOverrideIsTrue) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        hcm.mutable_stream_error_on_invalid_http_message()->set_value(false);
+        hcm.mutable_http_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/test/long/url"}, {"content-length", "0"}});
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_FALSE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
+// override_stream_error_on_invalid_http_message is not set and HCM
+// stream_error_on_invalid_http_message=true: test that HTTP/1.1 connection is left open on invalid
+// HTTP message (missing :host header)
+TEST_P(IntegrationTest, ConnectionIsLeftOpenIfHCMStreamErrorIsTrueAndOverrideNotSet) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void { hcm.mutable_stream_error_on_invalid_http_message()->set_value(true); });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/test/long/url"}, {"content-length", "0"}});
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_FALSE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
+// override_stream_error_on_invalid_http_message is not set and HCM
+// stream_error_on_invalid_http_message=false: test that HTTP/1.1 connection is terminated on
+// invalid HTTP message (missing :host header)
+TEST_P(IntegrationTest, ConnectionIsTerminatedIfHCMStreamErrorIsFalseAndOverrideNotSet) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        hcm.mutable_stream_error_on_invalid_http_message()->set_value(false);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/test/long/url"}, {"content-length", "0"}});
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
 } // namespace Envoy
