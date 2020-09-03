@@ -178,7 +178,6 @@ struct ResponseMetadata {
   // https://httpwg.org/specs/rfc7234.html#age.calculations
   SystemTime response_time_;
 };
-using ResponseMetadataPtr = std::unique_ptr<ResponseMetadata>;
 
 // LookupRequest holds everything about a request that's needed to look for a
 // response in a cache, to evaluate whether an entry from a cache is usable, and
