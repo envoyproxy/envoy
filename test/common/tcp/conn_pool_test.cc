@@ -87,6 +87,7 @@ public:
 
   MOCK_METHOD(void, onConnReleasedForTest, ());
   MOCK_METHOD(void, onConnDestroyedForTest, ());
+  bool maybePrefetch(float) override { return false; }
 
   struct TestConnection {
     Network::MockClientConnection* connection_;
