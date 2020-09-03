@@ -63,6 +63,7 @@ filter_disabled:
       *alpn = "envoyalpn";
     });
     config_helper_.addSslConfig();
+    useListenerAccessLog("%RESPONSE_CODE_DETAILS%");
     BaseIntegrationTest::initialize();
 
     context_manager_ =
@@ -109,11 +110,14 @@ filter_disabled:
 TEST_P(ListenerFilterIntegrationTest, AllListenerFiltersAreEnabledByDefault) {
   setupConnections(/*listener_filter_disabled=*/false, /*expect_connection_open=*/true);
   ssl_client_->close(Network::ConnectionCloseType::NoFlush);
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::Eq("-"));
 }
 
 // The tls_inspector is disabled. The ALPN won't be sniffed out and no filter chain is matched.
 TEST_P(ListenerFilterIntegrationTest, DisabledTlsInspectorFailsFilterChainFind) {
   setupConnections(/*listener_filter_disabled=*/true, /*expect_connection_open=*/false);
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
+              testing::Eq(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerFilterIntegrationTest,
