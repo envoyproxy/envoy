@@ -11,10 +11,8 @@ namespace Config {
 
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
-                                               const LocalInfo::LocalInfo& local_info,
-                                               const bool use_namespace_matching)
-    : type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),
-      use_namespace_matching_(use_namespace_matching) {}
+                                               const LocalInfo::LocalInfo& local_info)
+    : type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info) {}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
                                                         const std::set<std::string>& cur_removed) {
@@ -84,7 +82,7 @@ void DeltaSubscriptionState::handleGoodResponse(
     }
   }
   watch_map_.onConfigUpdate(message.resources(), message.removed_resources(),
-                            message.system_version_info(), use_namespace_matching_);
+                            message.system_version_info());
   for (const auto& resource : message.resources()) {
     setResourceVersion(resource.name(), resource.version());
   }

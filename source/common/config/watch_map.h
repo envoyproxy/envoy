@@ -60,7 +60,7 @@ struct Watch {
 // A WatchMap is assumed to be dedicated to a single type_url type of resource (EDS, CDS, etc).
 class WatchMap : public UntypedConfigUpdateCallbacks, public Logger::Loggable<Logger::Id::config> {
 public:
-  WatchMap() = default;
+  WatchMap(const bool use_namespace_matching) : use_namespace_matching_(use_namespace_matching) {}
 
   // Adds 'callbacks' to the WatchMap, with every possible resource being watched.
   // (Use updateWatchInterest() to narrow it down to some specific names).
@@ -85,7 +85,7 @@ public:
   void onConfigUpdate(
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& system_version_info, const bool use_namespace_matching) override;
+      const std::string& system_version_info) override;
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 
   WatchMap(const WatchMap&) = delete;
@@ -105,15 +105,7 @@ private:
                                      Watch* watch);
 
   // Returns the union of watch_interest_[resource_name] and wildcard_watches_.
-  absl::flat_hash_set<Watch*> watchesInterestedIn(const std::string& resource_name,
-                                                  const bool use_namespace_matching);
-
-  // Returns the namespace part (if there's any) in the resource name.
-  std::string namespaceFromName(const std::string& resource_name) {
-    const auto pos = resource_name.find_last_of('/');
-    // we are not interested in the "/" character in the namespace
-    return pos == std::string::npos ? "" : resource_name.substr(0, pos);
-  }
+  absl::flat_hash_set<Watch*> watchesInterestedIn(const std::string& resource_name);
 
   absl::flat_hash_set<std::unique_ptr<Watch>> watches_;
 
@@ -129,6 +121,8 @@ private:
   // 1) Acts as a reference count; no watches care anymore ==> the resource can be removed.
   // 2) Enables efficient lookup of all interested watches when a resource has been updated.
   absl::flat_hash_map<std::string, absl::flat_hash_set<Watch*>> watch_interest_;
+
+  const bool use_namespace_matching_;
 };
 
 } // namespace Config

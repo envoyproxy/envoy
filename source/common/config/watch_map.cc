@@ -8,6 +8,15 @@
 namespace Envoy {
 namespace Config {
 
+namespace {
+// Returns the namespace part (if there's any) in the resource name.
+std::string namespaceFromName(const std::string& resource_name) {
+  const auto pos = resource_name.find_last_of('/');
+  // we are not interested in the "/" character in the namespace
+  return pos == std::string::npos ? "" : resource_name.substr(0, pos);
+}
+} // namespace
+
 Watch* WatchMap::addWatch(SubscriptionCallbacks& callbacks,
                           OpaqueResourceDecoder& resource_decoder) {
   auto watch = std::make_unique<Watch>(callbacks, resource_decoder);
@@ -58,15 +67,14 @@ AddedRemoved WatchMap::updateWatchInterest(Watch* watch,
                       findRemovals(newly_removed_from_watch, watch));
 }
 
-absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name,
-                                                          const bool use_namespace_matching) {
+absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name) {
   absl::flat_hash_set<Watch*> ret;
-  if (!use_namespace_matching) {
+  if (!use_namespace_matching_) {
     ret = wildcard_watches_;
   }
 
   const auto prefix = namespaceFromName(resource_name);
-  const auto resource_key = use_namespace_matching && !prefix.empty() ? prefix : resource_name;
+  const auto resource_key = use_namespace_matching_ && !prefix.empty() ? prefix : resource_name;
   const auto watches_interested = watch_interest_.find(resource_key);
   if (watches_interested != watch_interest_.end()) {
     for (const auto& watch : watches_interested->second) {
@@ -95,7 +103,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
     decoded_resources.emplace_back(
         new DecodedResourceImpl((*watches_.begin())->resource_decoder_, r, version_info));
     const absl::flat_hash_set<Watch*>& interested_in_r =
-        watchesInterestedIn(decoded_resources.back()->name(), false);
+        watchesInterestedIn(decoded_resources.back()->name());
     for (const auto& interested_watch : interested_in_r) {
       per_watch_updates[interested_watch].emplace_back(*decoded_resources.back());
     }
@@ -130,7 +138,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
 void WatchMap::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-    const std::string& system_version_info, const bool use_namespace_matching) {
+    const std::string& system_version_info) {
   // Track any removals triggered by earlier watch updates.
   ASSERT(deferred_removed_during_update_ == nullptr);
   deferred_removed_during_update_ = std::make_unique<absl::flat_hash_set<Watch*>>();
@@ -141,8 +149,7 @@ void WatchMap::onConfigUpdate(
   std::vector<DecodedResourceImplPtr> decoded_resources;
   absl::flat_hash_map<Watch*, std::vector<DecodedResourceRef>> per_watch_added;
   for (const auto& r : added_resources) {
-    const absl::flat_hash_set<Watch*>& interested_in_r =
-        watchesInterestedIn(r.name(), use_namespace_matching);
+    const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r.name());
     // If there are no watches, then we don't need to decode. If there are watches, they should all
     // be for the same resource type, so we can just use the callbacks of the first watch to decode.
     if (interested_in_r.empty()) {
@@ -156,8 +163,7 @@ void WatchMap::onConfigUpdate(
   }
   absl::flat_hash_map<Watch*, Protobuf::RepeatedPtrField<std::string>> per_watch_removed;
   for (const auto& r : removed_resources) {
-    const absl::flat_hash_set<Watch*>& interested_in_r =
-        watchesInterestedIn(r, use_namespace_matching);
+    const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r);
     for (const auto& interested_watch : interested_in_r) {
       *per_watch_removed[interested_watch].Add() = r;
     }

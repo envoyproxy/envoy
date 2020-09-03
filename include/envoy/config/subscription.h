@@ -154,7 +154,7 @@ public:
   virtual void onConfigUpdate(
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& system_version_info, const bool use_namespace_matching) PURE;
+      const std::string& system_version_info) PURE;
 
   /**
    * Called when either the Subscription is unable to fetch a config update or when onConfigUpdate
