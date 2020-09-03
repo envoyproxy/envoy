@@ -169,19 +169,9 @@ void HdsDelegate::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata
   UNREFERENCED_PARAMETER(metadata);
 }
 
-HdsClusterPtr HdsDelegate::tryUpdateHdsCluster(
-    HdsClusterPtr cluster,
-    const envoy::service::health::v3::ClusterHealthCheck& cluster_health_check) {
-  // TODO(drewsortega)
-  UNREFERENCED_PARAMETER(cluster_health_check);
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  return cluster;
-}
-
-HdsClusterPtr HdsDelegate::createHdsCluster(
+envoy::config::cluster::v3::Cluster HdsDelegate::createClusterConfig(
     const envoy::service::health::v3::ClusterHealthCheck& cluster_health_check) {
   // Create HdsCluster config
-  static const envoy::config::core::v3::BindConfig bind_config;
   envoy::config::cluster::v3::Cluster cluster_config;
 
   cluster_config.set_name(cluster_health_check.cluster_name());
@@ -214,6 +204,22 @@ HdsClusterPtr HdsDelegate::createHdsCluster(
 
   ENVOY_LOG(debug, "New HdsCluster config {} ", cluster_config.DebugString());
 
+  return cluster_config;
+}
+
+HdsClusterPtr
+HdsDelegate::tryUpdateHdsCluster(HdsClusterPtr cluster,
+                                 const envoy::config::cluster::v3::Cluster& cluster_config) {
+  // TODO(drewsortega)
+  UNREFERENCED_PARAMETER(cluster_config);
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  return cluster;
+}
+
+HdsClusterPtr
+HdsDelegate::createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster_config) {
+  static const envoy::config::core::v3::BindConfig bind_config;
+
   // Create HdsCluster.
   auto new_cluster = std::make_shared<HdsCluster>(
       admin_, runtime_, std::move(cluster_config), bind_config, store_stats_, ssl_context_manager_,
@@ -232,6 +238,7 @@ void HdsDelegate::processMessage(
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
   ASSERT(message);
 
+  // Maps to replace the current member variable versions.
   std::unique_ptr<absl::flat_hash_map<uint64_t, HdsClusterPtr>> new_hds_clusters_hash_map =
       std::make_unique<absl::flat_hash_map<uint64_t, HdsClusterPtr>>();
   std::unique_ptr<absl::flat_hash_map<std::string, HdsClusterPtr>> new_hds_clusters_name_map =
@@ -247,25 +254,30 @@ void HdsDelegate::processMessage(
       // This cluster with the exact same configuration already exists, so just reuse it.
       ENVOY_LOG(debug, "HDS Cluster already exists with this configuration, skipping.");
       cluster_ptr = cluster_map_pair->second;
-    } else if (!cluster_health_check.cluster_name().empty()) {
-      // If this particular cluster configuration happens to have a name, try to match and
-      // check to see if a cluster with this name already exists. If it does, reconfigure.
-      // If not, then just create a new one.
-      auto cluster_map_pair = hds_clusters_name_map_->find(cluster_health_check.cluster_name());
+    } else {
+      // Create a new configuration for a cluster based on our different or new config.
+      auto cluster_config = createClusterConfig(cluster_health_check);
 
+      // If this particular cluster configuration happens to have a name, then it is possible
+      // this particular cluster exists in the name map. We check and if we found a match,
+      // attempt to update this cluster. If no match was found, either the cluster name is empty
+      // or we have not seen a cluster by this name before. In either case, create a new cluster.
+      auto cluster_map_pair = hds_clusters_name_map_->find(cluster_health_check.cluster_name());
       if (cluster_map_pair != hds_clusters_name_map_->end()) {
         // We have a previous cluster with this name, update.
-        cluster_ptr = tryUpdateHdsCluster(cluster_map_pair->second, cluster_health_check);
+        cluster_ptr = tryUpdateHdsCluster(cluster_map_pair->second, cluster_config);
       } else {
-        // There is no cluster with this name previously, so just create a new cluster.
-        cluster_ptr = createHdsCluster(cluster_health_check);
+        // There is no cluster with this name previously or its an empty string, so just create a
+        // new cluster.
+        cluster_ptr = createHdsCluster(cluster_config);
       }
+    }
 
+    // If this had a non-empty name, add this cluster to the name map so it can be updated in the
+    // future.
+    if (!cluster_health_check.cluster_name().empty()) {
       // Since this cluster has a name, add it to our by-name map.
       hds_clusters_name_map_->insert({cluster_health_check.cluster_name(), cluster_ptr});
-    } else {
-      // If no name or hash matches, then just create a new one.
-      cluster_ptr = createHdsCluster(cluster_health_check);
     }
 
     // Add to our remaining data structures.
