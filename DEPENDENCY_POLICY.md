@@ -4,6 +4,11 @@ Envoy has an evolving policy on external dependencies, tracked at
 https://github.com/envoyproxy/envoy/issues/10471. This will become stricter over time, below we
 detail the policy as it currently applies.
 
+## External dependencies dashboard
+
+The list of external dependencies in Envoy with their current version is available at
+https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/external_deps
+
 ## Declaring external dependencies
 
 In general, all external dependencies for the Envoy proxy binary build and test should be declared
@@ -33,6 +38,8 @@ Dependency declarations must:
   and `urls` to reference the version. If you need to reference version `X.Y.Z` as `X_Y_Z`, this
   may appear in a string as `{underscore_version}`, similarly for `X-Y-Z` you can use
   `{dash_version}`.
+* Versions should prefer release versions over master branch GitHub SHA tarballs. A comment is
+  necessary if the latter is used.
 * Provide accurate entries for `use_category`. Please think carefully about whether there are data
   or control plane implications of the dependency.
 * CPEs are compulsory for all dependencies that are not purely build/test.
@@ -55,8 +62,8 @@ Pure developer tooling and documentation builds may reference Python via standal
 ## New external dependencies
 
 * Any new dependency on the Envoy data or control plane that impacts Envoy core (i.e. is not
-  specific to a single non-core extension) must be cleared with the OSS Envoy security team, please
-  file an issue and tag
+  specific to a single non-core extension) must be cleared with the Envoy security team, please file
+  an issue and tag
   [@envoyproxy/security-team](https://github.com/orgs/envoyproxy/teams/security-team). While policy
   is still [evolving](robust_to_untrusted_downstream_and_upstream), criteria that will be used in
   evaluation include:
@@ -81,6 +88,9 @@ basis:
 * Core Envoy dependencies will be updated by the Envoy maintainers/security team.
 
 * Extension [CODEOWNERS](CODEOWNERS) should update extension specific dependencies.
+
+Where possible, we prefer the latest release version for external dependencies, rather than master
+branch GitHub SHA tarballs.
 
 ## Policy exceptions
 
