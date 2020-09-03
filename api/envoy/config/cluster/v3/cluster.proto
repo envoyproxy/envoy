@@ -577,9 +577,9 @@ message Cluster {
 
   // [#not-implemented-hide:]
   message PrefetchPolicy {
-    // Indicates how many many streams (rounded up) can be anticipated per-upstream for each
-    // stream, useful for high-QPS or latency-sensitive services. Prefetching will only be done if
-    // the upstream is healthy.
+    // Indicates how many streams (rounded up) can be anticipated per-upstream for each
+    // incoming stream. This is useful for high-QPS or latency-sensitive services. Prefetching
+    // will only be done if the upstream is healthy.
     //
     // For example if this is 2, for an incoming HTTP/1.1 stream, 2 connections will be
     // established, one for the new incoming stream, and one for a presumed follow-up stream. For
