@@ -297,9 +297,6 @@ envoy_cc_library(
     name = "header_map_lib",
     srcs = ["header_map_impl.cc"],
     hdrs = ["header_map_impl.h"],
-    external_deps = [
-        "abseil_btree",
-    ],
     deps = [
         ":headers_lib",
         "//include/envoy/http:header_map_interface",

@@ -185,13 +185,8 @@ bool HeaderMapImpl::HeaderList::maybeMakeMap() {
     }
     // Add all entries from the list into the map.
     for (auto node = headers_.begin(); node != headers_.end(); ++node) {
-#ifdef HEADERMAP_TYPE_MULTIMAP
-      // Adds node after the last value with the same key (if exists).
-      lazy_map_.insert(std::make_pair(node->key().getStringView(), node));
-#else
       HeaderNodeVector& v = lazy_map_[node->key().getStringView()];
       v.push_back(node);
-#endif
     }
   }
   return true;
@@ -200,18 +195,6 @@ bool HeaderMapImpl::HeaderList::maybeMakeMap() {
 size_t HeaderMapImpl::HeaderList::remove(absl::string_view key) {
   size_t removed_bytes = 0;
   if (maybeMakeMap()) {
-#ifdef HEADERMAP_TYPE_MULTIMAP
-    auto map_entries_range = lazy_map_.equal_range(key);
-    // Erase each entry from the HeaderList, but not from the map.
-    for (auto map_entry = map_entries_range.first; map_entry != map_entries_range.second;
-         map_entry++) {
-      ASSERT(map_entry->first == key);
-      removed_bytes += key.size() + map_entry->second->value().size();
-      erase(map_entry->second, false /* remove_from_map */);
-    }
-    // Erase the range in the map.
-    lazy_map_.erase(map_entries_range.first, map_entries_range.second);
-#else
     auto iter = lazy_map_.find(key);
     if (iter != lazy_map_.end()) {
       // Erase from the map, and all same key entries from the list.
@@ -223,7 +206,6 @@ size_t HeaderMapImpl::HeaderList::remove(absl::string_view key) {
         erase(node, false /* remove_from_map */);
       }
     }
-#endif
   } else {
     // Erase all same key entries from the list.
     for (auto i = headers_.begin(); i != headers_.end();) {
@@ -511,22 +493,12 @@ HeaderEntry* HeaderMapImpl::getExisting(const LowerCaseString& key) {
   // trie lookup first for the common O(1) headers.
   if (headers_.maybeMakeMap()) {
     HeaderList::HeaderLazyMap::iterator iter = headers_.mapFind(key.get());
-#ifdef HEADERMAP_TYPE_MULTIMAP
-    if ((iter != headers_.mapEnd()) && (iter->first == key.get())) {
-      if (iter->first != key.get()) {
-        return nullptr;
-      }
-      HeaderEntryImpl& header_entry = *iter->second;
-      return &header_entry;
-    }
-#else
     if (iter != headers_.mapEnd()) {
       const HeaderList::HeaderNodeVector& v = iter->second;
       ASSERT(!v.empty()); // It's impossible to have a map entry with an empty vector as its value.
       HeaderEntryImpl& header_entry = *v[0];
       return &header_entry;
     }
-#endif
     return nullptr;
   }
 
@@ -599,43 +571,11 @@ size_t HeaderMapImpl::remove(const LowerCaseString& key) {
   return old_size - headers_.size();
 }
 
-#if defined(HEADERMAP_TYPE_MULTIMAP) && !defined(MULTIMAP_ABSL_BTREE)
-size_t HeaderMapImpl::HeaderList::removeMultimapPrefix(absl::string_view prefix) {
-  // Calling this function assumes that the multi-map is already in use.
-  ASSERT(maybeMakeMap());
-  size_t removed_bytes = 0;
-  auto map_entries_start = lazy_map_.lower_bound(prefix);
-  // Iterate over the entries until we reach the one with a different prefix,
-  // and erase each entry from the HeaderList but not from the map.
-  auto map_entry_it = map_entries_start;
-  for (; map_entry_it != lazy_map_.end() && absl::StartsWith(map_entry_it->first, prefix);
-       map_entry_it++) {
-    removed_bytes += map_entry_it->first.size() + map_entry_it->second->value().size();
-    erase(map_entry_it->second, false /* remove_from_map */);
-  }
-  // Erase the range of keys that has the prefix from the map.
-  lazy_map_.erase(map_entries_start, map_entry_it);
-  return removed_bytes;
-}
-
-size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
-  if (headers_.maybeMakeMap()) {
-    const size_t old_size = headers_.size();
-    subtractSize(headers_.removeMultimapPrefix(prefix.get()));
-    return old_size - headers_.size();
-  } else {
-    return HeaderMapImpl::removeIf([&prefix](const HeaderEntry& entry) -> bool {
-      return absl::StartsWith(entry.key().getStringView(), prefix.get());
-    });
-  }
-}
-#else
 size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
   return HeaderMapImpl::removeIf([&prefix](const HeaderEntry& entry) -> bool {
     return absl::StartsWith(entry.key().getStringView(), prefix.get());
   });
 }
-#endif
 
 void HeaderMapImpl::dumpState(std::ostream& os, int indent_level) const {
   iterate([&os,
