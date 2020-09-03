@@ -49,17 +49,15 @@ enum class FilterHeadersStatus {
   // watermark events when injecting a body, see:
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/flow_control.md.
   //
-  // To properly conclude the stream, the filter MUST either:
-  // 1. If there are no trailers, set end_stream argument to true in the last call to inject data.
-  // 2. If there are trailers, add them using addDecodedTrailers()/addEncodedTrailers() after
-  //    injecting the body and then call continueDecoding()/continueEncoding().
-  //
+  // The last call to inject data MUST have end_stream set to true to conclude the stream.
   // If the filter cannot provide a body the stream should be reset.
   //
   // Adding a body through calling addDecodedData()/addEncodedData() then
   // continueDecoding()/continueEncoding() is currently NOT supported and causes an assert failure.
   //
-  // The filter MUST NOT attempt to continue the stream without providing a body or trailers using
+  // Adding trailers in this scenario is currently NOT supported.
+  //
+  // The filter MUST NOT attempt to continue the stream without providing a body using
   // continueDecoding()/continueEncoding().
   //
   // TODO(yosrym93): Support adding a body in this case by calling addDecodedData()/addEncodedData()
@@ -71,6 +69,9 @@ enum class FilterHeadersStatus {
   // due to trying to continue iteration when the IterationState is already Continue.
   // In this case, a different ASSERT will be needed to make sure the filter does not try to
   // continue without adding a body first.
+  //
+  // TODO(yosrym93): Support adding trailers in this case by implementing new functions to inject
+  // trailers, similar to the inject data functions.
   ContinueAndDontEndStream,
   // Do not iterate for headers as well as data and trailers for the current filter and the filters
   // following, and buffer body data for later dispatching. ContinueDecoding() MUST
