@@ -30,7 +30,9 @@ namespace {
 class HdsIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                            public HttpIntegrationTest {
 public:
-  HdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+  HdsIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()),
+        http_conn_type_(FakeHttpConnection::Type::HTTP1), tls_hosts_(false) {}
 
   void createUpstreams() override {
     fake_upstreams_.emplace_back(
@@ -39,8 +41,7 @@ public:
     hds_upstream_->set_allow_unexpected_disconnects(true);
     HttpIntegrationTest::createUpstreams();
   }
-  void initialize() override { initialize(Envoy::FakeHttpConnection::Type::HTTP1); }
-  void initialize(FakeHttpConnection::Type http_conn_type, bool use_tls = false) {
+  void initialize() override {
     setUpstreamCount(upstream_endpoints_);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Setup hds and corresponding gRPC cluster.
@@ -60,16 +61,16 @@ public:
     HttpIntegrationTest::initialize();
 
     // Endpoint connections
-    if (use_tls) {
+    if (tls_hosts_) {
       host_upstream_ =
           std::make_unique<FakeUpstream>(HttpIntegrationTest::createUpstreamTlsContext(), 0,
-                                         http_conn_type, version_, timeSystem());
+                                         http_conn_type_, version_, timeSystem());
       host2_upstream_ =
           std::make_unique<FakeUpstream>(HttpIntegrationTest::createUpstreamTlsContext(), 0,
-                                         http_conn_type, version_, timeSystem());
+                                         http_conn_type_, version_, timeSystem());
     } else {
-      host_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type, version_, timeSystem());
-      host2_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type, version_, timeSystem());
+      host_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type_, version_, timeSystem());
+      host2_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type_, version_, timeSystem());
     }
     host_upstream_->set_allow_unexpected_disconnects(true);
     host2_upstream_->set_allow_unexpected_disconnects(true);
@@ -133,9 +134,8 @@ public:
 
   // Creates a basic HealthCheckSpecifier message containing one endpoint and
   // one HTTP health_check
-  envoy::service::health::v3::HealthCheckSpecifier makeHttpHealthCheckSpecifier(
-      envoy::type::v3::CodecClientType codec_type = envoy::type::v3::CodecClientType::HTTP1,
-      bool use_tls = false) {
+  envoy::service::health::v3::HealthCheckSpecifier
+  makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType codec_type, bool use_tls) {
     envoy::service::health::v3::HealthCheckSpecifier server_health_check_specifier_;
     server_health_check_specifier_.mutable_interval()->set_nanos(100000000); // 0.1 seconds
 
@@ -343,6 +343,8 @@ transport_socket_matches:
   FakeHttpConnectionPtr host_fake_connection_;
   FakeHttpConnectionPtr host2_fake_connection_;
   FakeRawConnectionPtr host_fake_raw_connection_;
+  FakeHttpConnection::Type http_conn_type_;
+  bool tls_hosts_;
 
   static constexpr int MaxTimeout = 100;
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse envoy_msg_;
@@ -365,7 +367,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttp) {
             envoy::service::health::v3::Capability::HTTP);
 
   // Server asks for health checking
-  server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
@@ -391,7 +394,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttp) {
 // that it is unhealthy to the server.
 TEST_P(HdsIntegrationTest, SingleEndpointTimeoutHttp) {
   initialize();
-  server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
 
   server_health_check_specifier_.mutable_cluster_health_checks(0)
       ->mutable_health_checks(0)
@@ -431,7 +435,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutHttp) {
 // indeed unhealthy to the server.
 TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyHttp) {
   initialize();
-  server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
 
   // Server <--> Envoy
   waitForHdsStream();
@@ -568,7 +573,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTcp) {
 TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
   initialize();
 
-  server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
   Network::Utility::addressToProtobufAddress(
       *host2_upstream_->localAddress(),
       *server_health_check_specifier_.mutable_cluster_health_checks(0)
@@ -625,7 +631,8 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
 // different localities and report back the correct health statuses.
 TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
   initialize();
-  server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
 
   // Add endpoint
   auto* health_check = server_health_check_specifier_.mutable_cluster_health_checks(0);
@@ -692,7 +699,8 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
 // report back the correct health statuses.
 TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
   initialize();
-  server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
 
   // Add endpoint
   auto* health_check = server_health_check_specifier_.add_cluster_health_checks();
@@ -783,7 +791,8 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
 
   // Server asks for health checking
-  server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
@@ -863,7 +872,8 @@ TEST_P(HdsIntegrationTest, TestUpdateChangesTimer) {
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
 
   // Server asks for health checking
-  server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
@@ -902,7 +912,8 @@ TEST_P(HdsIntegrationTest, TestDefaultTimer) {
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
 
   // Server asks for health checking
-  server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
   server_health_check_specifier_.clear_interval();
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
@@ -921,7 +932,13 @@ TEST_P(HdsIntegrationTest, TestDefaultTimer) {
 
 // Health checks a single endpoint over TLS with HTTP/2
 TEST_P(HdsIntegrationTest, SingleEndpointHealthyTlsHttp2) {
-  initialize(FakeHttpConnection::Type::HTTP2, true);
+  // Change member variable to specify host streams to have tls transport socket.
+  tls_hosts_ = true;
+
+  // Change hosts to operate over HTTP/2 instead of default HTTP.
+  http_conn_type_ = FakeHttpConnection::Type::HTTP2;
+
+  initialize();
 
   // Server <--> Envoy
   waitForHdsStream();
@@ -955,7 +972,10 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyTlsHttp2) {
 
 // Health checks a single endpoint over TLS with HTTP/1
 TEST_P(HdsIntegrationTest, SingleEndpointHealthyTlsHttp1) {
-  initialize(FakeHttpConnection::Type::HTTP1, true);
+  // Change member variable to specify host streams to have tls transport socket.
+  tls_hosts_ = true;
+
+  initialize();
 
   // Server <--> Envoy
   waitForHdsStream();
