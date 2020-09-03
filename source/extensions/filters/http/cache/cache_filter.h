@@ -71,9 +71,12 @@ private:
   // or during encoding if a cache entry was validated successfully.
   void encodeCachedResponse();
 
-  // Precondition: finished adding a response from cache to the response encoding stream.
-  // Updates filter_state_ and continues the encoding stream if necessary.
-  void finalizeEncodingCachedResponse();
+  // Initializes remaining_ranges_. It divides the given range into several ranges, if necessary, so
+  // that each range does not exceed the encoding buffer limit. Currently, this takes in a single
+  // AdjustedByteRange, which can be either a single-part range or the entire body.
+  // TODO(yosrym93): When multi-part ranges are supported, this will need to take in multiple
+  // ranges.
+  void initRanges(AdjustedByteRange&& range);
 
   TimeSource& time_source_;
   HttpCache& cache_;
@@ -81,9 +84,8 @@ private:
   InsertContextPtr insert_;
   LookupResultPtr lookup_result_;
 
-  // Tracks what body bytes still need to be read from the cache. This is
-  // currently only one Range, but will expand when full range support is added. Initialized by
-  // onHeaders for Range Responses, otherwise initialized by encodeCachedResponse.
+  // Tracks what body bytes still need to be read from the cache.
+  // Must be initialized with initRanges.
   std::vector<AdjustedByteRange> remaining_ranges_;
 
   // TODO(#12901): The allowlist could be constructed only once directly from the config, instead of

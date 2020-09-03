@@ -260,7 +260,7 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
                        lookup_result_->content_length_));
       // We serve only the desired range, so adjust the length accordingly.
       lookup_result_->setContentLength(lookup_result_->response_ranges_[0].length());
-      remaining_ranges_ = std::move(lookup_result_->response_ranges_);
+      initRanges(std::move(lookup_result_->response_ranges_[0]));
       encodeCachedResponse();
       break;
     }
@@ -445,19 +445,31 @@ void CacheFilter::encodeCachedResponse() {
       CacheResponseCodeDetails::get().ResponseFromCacheFilter);
 
   // If the filter is encoding, 304 response headers and cached headers are merged in encodeHeaders.
-  // If the filter is decoding, we need to serve response headers from cache directly.
+  // If the filter is decoding, we need to serve cached response headers directly.
   if (filter_state_ == FilterState::DecodeServingFromCache) {
     decoder_callbacks_->encodeHeaders(std::move(lookup_result_->headers_), end_stream);
   }
 
   if (lookup_result_->content_length_ > 0) {
-    // No range has been added, so we add entire body to the response.
     if (remaining_ranges_.empty()) {
-      remaining_ranges_.emplace_back(0, lookup_result_->content_length_);
+      // This is not a range request, encode the entire body.
+      initRanges({0, lookup_result_->content_length_});
     }
     getBody();
   } else if (response_has_trailers_) {
     getTrailers();
+  }
+}
+
+void CacheFilter::initRanges(AdjustedByteRange&& range) {
+  // The body should be fetched in sequential chunks, where each chunk's size does not exceed
+  // the buffer limit.
+  uint64_t offset = range.begin();
+  uint64_t max_chunk_size = encoder_callbacks_->encoderBufferLimit();
+  while (offset < range.end()) {
+    uint64_t chunk_size = std::min(max_chunk_size, range.end() - offset);
+    remaining_ranges_.emplace_back(offset, offset + chunk_size);
+    offset += chunk_size;
   }
 }
 
