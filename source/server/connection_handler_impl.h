@@ -184,6 +184,15 @@ private:
      */
     void updateListenerConfig(Network::ListenerConfig& config);
 
+    /**
+     * The listener has stored pending sockets waiting for this filter chain to be rebuilt.
+     * All stored pending sockets will be retried if success is true, otherwise, closed.
+     * @param success indicates whether the filter chain rebuilding succeeded or failed.
+     * @param filter_chain the filter chain that the listener has requested rebuilding.
+     */
+    void retryConnections(bool success,
+                          const envoy::config::listener::v3::FilterChain& filter_chain);
+
     ConnectionHandlerImpl& parent_;
     Network::ListenerPtr listener_;
     const std::chrono::milliseconds listener_filters_timeout_;

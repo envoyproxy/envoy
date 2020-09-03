@@ -155,34 +155,33 @@ void ConnectionHandlerImpl::closeSocketsOnListenerUpdate(
 
 void ConnectionHandlerImpl::retryConnections(
     bool success, const envoy::config::listener::v3::FilterChain& filter_chain_message) {
-  ENVOY_LOG(debug, "receive callback from server, rebuilding finished with success status: {}",
-            success);
-  // Go through all listeners on this worker, if a listener has sent request to rebuild the
-  // filter chain, now retry connection with those stored sockets.
+  ENVOY_LOG(debug, "receive callback from server, rebuilding succeeded: {}", success);
   for (auto& listener : listeners_) {
     if (listener.second.tcp_listener_.has_value()) {
       auto& active_tcp_listener = listener.second.tcp_listener_->get();
-      const auto& listener_name = active_tcp_listener.config_->name();
-      ENVOY_LOG(debug, "listener {} might have pending sockets to retry.", listener_name);
-      auto& pending_sockets = active_tcp_listener.pending_sockets_;
-      // If this listener has requested rebuilding this filter chain, we retry all stored sockets
-      // waiting for this filter chain.
-      ENVOY_LOG(debug, "size of its pending sockets: {}", pending_sockets.size());
-      auto listener_sockets_map_it = pending_sockets.find(filter_chain_message);
-      if (listener_sockets_map_it != pending_sockets.end()) {
-        ENVOY_LOG(debug, "found listener: {} that has stored sockets to retry.", listener_name);
-        for (auto& [socket, metadata] : listener_sockets_map_it->second) {
-          // Retry connection with that socket on this active tcp listener.
-          if (success) {
-            active_tcp_listener.incNumConnections();
-            active_tcp_listener.newConnection(std::move(socket), metadata);
-          } else {
-            socket->close();
-          }
-        }
-        pending_sockets.erase(listener_sockets_map_it);
+      active_tcp_listener.retryConnections(success, filter_chain_message);
+    }
+  }
+}
+
+void ConnectionHandlerImpl::ActiveTcpListener::retryConnections(
+    bool success, const envoy::config::listener::v3::FilterChain& filter_chain) {
+  // Retry all stored sockets waiting for this filter chain.
+  const auto& listener_name = config_->name();
+  auto listener_sockets_map_it = pending_sockets_.find(filter_chain);
+  if (listener_sockets_map_it != pending_sockets_.end()) {
+    ENVOY_LOG(debug, "listener: {} has stored {} sockets to retry.", listener_name,
+              listener_sockets_map_it->second.size());
+    for (auto& [socket, metadata] : listener_sockets_map_it->second) {
+      // Retry connection with that socket on this active tcp listener.
+      if (success) {
+        incNumConnections();
+        newConnection(std::move(socket), metadata);
+      } else {
+        socket->close();
       }
     }
+    pending_sockets_.erase(listener_sockets_map_it);
   }
 }
 

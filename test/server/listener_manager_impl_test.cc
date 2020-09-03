@@ -4400,8 +4400,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
   listener.rebuildFilterChain(&filter_chain_message, worker_dispatcher1, nullptr);
   // On the first request, a rebuilder will be created to start rebuilding.
   // If multiple requests arrive for the same filter chain before the first rebuilding has
-  // completed, the later requests will not trigger rebuilder creation, only the worker name will be
-  // stored into the callback list.
+  // completed, the later requests will not trigger rebuilder creation, only the worker dispatcher
+  // and callback will be stored.
   listener.rebuildFilterChain(&filter_chain_message, worker_dispatcher2, nullptr);
   listener.rebuildFilterChain(&filter_chain_message, worker_dispatcher3, nullptr);
   listener.rebuildFilterChain(&filter_chain_message, worker_dispatcher4, nullptr);

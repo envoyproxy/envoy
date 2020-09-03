@@ -267,11 +267,14 @@ void PerFilterChainRebuilder::callbackWorkers(bool success) {
   ENVOY_LOG(debug, "callback to workers with success status: {}", success);
   for (const auto& [worker_dispatcher, callback] : workers_to_callback_) {
     ENVOY_LOG(debug, "rebuilding completed, callback to worker: {}", worker_dispatcher->name());
-    worker_dispatcher->post([&retry = callback, success, &filter_chain = *(this->filter_chain_)]() {
-      if (retry != nullptr) {
-        retry(success, filter_chain);
-      }
-    });
+    if (callback == nullptr) {
+      worker_dispatcher->post([] {});
+    } else {
+      worker_dispatcher->post(
+          [&retry = callback, success, &filter_chain = *(this->filter_chain_)]() {
+            retry(success, filter_chain);
+          });
+    }
   }
   workers_to_callback_.clear();
 }
