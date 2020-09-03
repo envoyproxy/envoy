@@ -14,12 +14,6 @@ namespace Filters {
 namespace Common {
 namespace Lua {
 
-namespace {
-Thread::MutexBasicLockable& luaThreadLocalLock() {
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(Thread::MutexBasicLockable);
-}
-} // namespace
-
 Coroutine::Coroutine(const std::pair<lua_State*, lua_State*>& new_thread_state)
     : coroutine_state_(new_thread_state, false) {}
 
@@ -68,11 +62,6 @@ ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAll
 
   // Now initialize on all threads.
   tls_slot_->set([code](Event::Dispatcher&) {
-    // Avoid creating lua_State in different threads at the same time. In the process of creating
-    // lua_State, some static variables are used to assist memory allocation. Creating lua_State in
-    // different threads at the same time may cause data race. Although 'LuaJIT' uses retries to
-    // ensure the final safety of the memory allocation, it may still trigger the TSAN alarm.
-    Thread::LockGuard guard(luaThreadLocalLock());
     return ThreadLocal::ThreadLocalObjectSharedPtr{new LuaThreadLocal(code)};
   });
 }

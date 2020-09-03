@@ -841,6 +841,15 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
 
 // Test whether Rds can correctly deliver LuaPerRoute configuration.
 TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
+// When the route configuration is updated dynamically via RDS and the configuration contains an
+// inline Lua code, Envoy may call lua_open in multiple threads to create new lua_State objects.
+// During lua_State creation, 'LuaJIT' uses some static local variables shared by multiple threads
+// to aid memory allocation. Although 'LuaJIT' itself guarantees that there is no thread safety
+// issue here, the use of these static local variables by multiple threads will cause a TSAN alarm.
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+  ENVOY_LOG_MISC(critical, "LuaIntegrationTest::RdsTestOfLuaPerRoute not supported by this "
+                           "compiler configuration");
+#else
   initializeWithRds(FILTER_AND_CODE, "basic_lua_routes", INITIAL_ROUTE_CONFIG);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -889,6 +898,7 @@ TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
   check_request(inline_headers, "new_inline_code_from_inline");
 
   cleanup();
+#endif
 }
 
 } // namespace
