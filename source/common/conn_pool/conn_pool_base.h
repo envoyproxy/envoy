@@ -105,7 +105,8 @@ public:
   ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   std::chrono::milliseconds pool_idle_timeout);
   virtual ~ConnPoolImplBase();
 
   // A helper function to get the specific context type from the base class context.
@@ -116,6 +117,9 @@ public:
 
   void addDrainedCallbackImpl(Instance::DrainedCb cb);
   void drainConnectionsImpl();
+
+  bool hasActiveConnectionsImpl() const;
+  void addIdlePoolTimeoutCallbackImpl(Instance::IdlePoolTimeoutCb cb);
 
   // Closes and destroys all connections. This must be called in the destructor of
   // derived classes because the derived ActiveClient will downcast parent_ to a more
@@ -147,6 +151,8 @@ public:
   void onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                          Network::ConnectionEvent event);
   void checkForDrained();
+  void checkForIdle();
+
   void onUpstreamReady();
   ConnectionPool::Cancellable* newStream(AttachContext& context);
 
@@ -188,6 +194,14 @@ protected:
 
   float prefetchRatio() const;
 
+  const auto& pendingStreams() const { return pending_streams_; }
+
+  PendingStream* addToPendingStreamsList(PendingStreamPtr&& pending_stream) {
+    LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
+    idle_timer_->disableTimer();
+    return pending_streams_.front().get();
+  }
+
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;
 
@@ -196,11 +210,9 @@ protected:
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 
   std::list<Instance::DrainedCb> drained_callbacks_;
-  std::list<PendingStreamPtr> pending_streams_;
 
-  // When calling purgePendingStreams, this list will be used to hold the streams we are about
-  // to purge. We need this if one cancelled streams cancels a different pending stream
-  std::list<PendingStreamPtr> pending_streams_to_purge_;
+  // Callbacks fired after the pool's idle timeout has been reached
+  std::list<Instance::IdlePoolTimeoutCb> idle_pool_callbacks_;
 
   // Clients that are ready to handle additional streams.
   // All entries are in state READY.
@@ -212,12 +224,27 @@ protected:
   // Clients that are not ready to handle additional streams because they are CONNECTING.
   std::list<ActiveClientPtr> connecting_clients_;
 
-  // The number of streams currently attached to clients.
-  uint64_t num_active_streams_{0};
-
   // The number of streams that can be immediately dispatched
   // if all CONNECTING connections become connected.
   uint64_t connecting_stream_capacity_{0};
+
+private:
+  std::list<PendingStreamPtr> pending_streams_;
+
+  // When calling purgePendingRequests, this list will be used to hold the streams we are about
+  // to purge. We need this if one cancelled streams cancels a different pending stream
+  std::list<PendingStreamPtr> pending_streams_to_purge_;
+
+  // After the pool enters a state in which it has no active connections, the idle timeout callbacks
+  // will be called after `idle_timeout_` milliseconds. A value of
+  // `std::chrono::milliseconds::max()` is used to disable the timeout
+  std::chrono::milliseconds idle_timeout_;
+
+  // The timer that fires to trigger the idle timeout callbacks
+  Event::TimerPtr idle_timer_;
+
+  // The number of streams currently attached to clients.
+  uint64_t num_active_streams_{0};
 };
 
 } // namespace ConnectionPool

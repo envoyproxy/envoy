@@ -72,6 +72,11 @@ void OriginalConnPoolImpl::addDrainedCallback(DrainedCb cb) {
   checkForDrained();
 }
 
+void OriginalConnPoolImpl::addIdlePoolTimeoutCallback(IdlePoolTimeoutCb cb) {
+  idle_pool_callbacks_.push_back(cb);
+  checkForIdle();
+}
+
 void OriginalConnPoolImpl::assignConnection(ActiveConn& conn,
                                             ConnectionPool::Callbacks& callbacks) {
   ASSERT(conn.wrapper_ == nullptr);
@@ -89,6 +94,18 @@ void OriginalConnPoolImpl::checkForDrained() {
     }
 
     for (const DrainedCb& cb : drained_callbacks_) {
+      cb();
+    }
+  }
+}
+
+void OriginalConnPoolImpl::checkForIdle() {
+  if (idle_pool_callbacks_.empty()) {
+    return;
+  }
+
+  if (pending_requests_.empty() && busy_conns_.empty() && pending_conns_.empty()) {
+    for (const IdlePoolTimeoutCb& cb : idle_pool_callbacks_) {
       cb();
     }
   }
@@ -313,6 +330,7 @@ void OriginalConnPoolImpl::processIdleConnection(ActiveConn& conn, bool new_conn
     upstream_ready_cb_->scheduleCallbackCurrentIteration();
   }
 
+  checkForIdle();
   checkForDrained();
 }
 

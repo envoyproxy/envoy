@@ -390,6 +390,19 @@ TEST_F(ConnPoolMapImplTest, CircuitBreakerUsesProvidedPriorityHigh) {
   test_map->getPool(2, getBasicFactory());
 }
 
+TEST_F(ConnPoolMapImplTest, ErasePool) {
+  TestMapPtr test_map = makeTestMap();
+  auto* pool_ptr = &test_map->getPool(1, getBasicFactory()).value().get();
+  EXPECT_EQ(1, test_map->size());
+  EXPECT_EQ(pool_ptr, &test_map->getPool(1, getNeverCalledFactory()).value().get());
+  EXPECT_EQ(1, test_map->size());
+  EXPECT_FALSE(test_map->erasePool(2));
+  EXPECT_EQ(1, test_map->size());
+  EXPECT_TRUE(test_map->erasePool(1));
+  EXPECT_EQ(0, test_map->size());
+  EXPECT_NE(pool_ptr, &test_map->getPool(1, getBasicFactory()).value().get());
+}
+
 // The following tests only die in debug builds, so don't run them if this isn't one.
 #if !defined(NDEBUG)
 class ConnPoolMapImplDeathTest : public ConnPoolMapImplTest {};

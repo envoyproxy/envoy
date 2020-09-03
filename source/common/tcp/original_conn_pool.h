@@ -31,6 +31,7 @@ public:
   // ConnectionPool::Instance
   void addDrainedCallback(DrainedCb cb) override;
   void drainConnections() override;
+  void addIdlePoolTimeoutCallback(IdlePoolTimeoutCb cb) override;
   void closeConnections() override;
   ConnectionPool::Cancellable* newConnection(ConnectionPool::Callbacks& callbacks) override;
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
@@ -147,6 +148,7 @@ protected:
   void onUpstreamReady();
   void processIdleConnection(ActiveConn& conn, bool new_connection, bool delay);
   void checkForDrained();
+  void checkForIdle();
 
   Event::Dispatcher& dispatcher_;
   Upstream::HostConstSharedPtr host_;
@@ -159,6 +161,7 @@ protected:
   std::list<ActiveConnPtr> busy_conns_;    // conns assigned
   std::list<PendingRequestPtr> pending_requests_;
   std::list<DrainedCb> drained_callbacks_;
+  std::list<IdlePoolTimeoutCb> idle_pool_callbacks_;
   Stats::TimespanPtr conn_connect_ms_;
   Event::SchedulableCallbackPtr upstream_ready_cb_;
   bool upstream_ready_enabled_{false};

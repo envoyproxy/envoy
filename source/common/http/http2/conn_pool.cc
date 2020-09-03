@@ -15,9 +15,10 @@ namespace Http2 {
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                            Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
-                           const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
+                           const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                           std::chrono::milliseconds pool_idle_timeout)
     : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                           transport_socket_options, Protocol::Http2) {}
+                           transport_socket_options, Protocol::Http2, pool_idle_timeout) {}
 
 ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
 
@@ -92,9 +93,10 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                  Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
-  return std::make_unique<Http::Http2::ProdConnPoolImpl>(dispatcher, host, priority, options,
-                                                         transport_socket_options);
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 std::chrono::milliseconds pool_idle_timeout) {
+  return std::make_unique<Http::Http2::ProdConnPoolImpl>(
+      dispatcher, host, priority, options, transport_socket_options, pool_idle_timeout);
 }
 
 } // namespace Http2

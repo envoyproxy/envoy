@@ -733,6 +733,11 @@ public:
   virtual const absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
+   * @return the idle timeout for upstream connection pools.
+   */
+  virtual std::chrono::milliseconds poolIdleTimeout() const PURE;
+
+  /**
    * @return how many streams should be anticipated per each current stream.
    */
   virtual float prefetchRatio() const PURE;

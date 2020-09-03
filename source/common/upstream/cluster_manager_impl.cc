@@ -1337,10 +1337,26 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   // function. Otherwise, we'd need to capture a few of these variables by value.
   ConnPoolsContainer::ConnPools::PoolOptRef pool =
       container.pools_->getPool(priority, hash_key, [&]() {
-        return parent_.parent_.factory_.allocateConnPool(
+        auto pool = parent_.parent_.factory_.allocateConnPool(
             parent_.thread_local_dispatcher_, host, priority, upstream_protocol,
             !upstream_options->empty() ? upstream_options : nullptr,
-            have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr);
+            have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
+            cluster_info_->poolIdleTimeout());
+        pool->addIdlePoolTimeoutCallback(
+            [&container, &pool_map = parent_.host_http_conn_pool_map_, host, priority, hash_key]() {
+              ENVOY_LOG(debug, "Hit idle pool timeout, erasing pool");
+              container.pools_->erasePool(priority, hash_key);
+
+              // We want to clean up after ourselves if the host isn't particularly active (i.e. we
+              // hit our configured timeout on the last pool and don't have any other pools for that
+              // host).
+              if (container.pools_->size() == 0) {
+                ENVOY_LOG(debug,
+                          "Pool container empty for host after idle timeout, erasing host entry");
+                pool_map.erase(host); // NOTE: `container` is erased after this point in the lambda.
+              }
+            });
+        return pool;
       });
 
   if (pool.has_value()) {
@@ -1348,7 +1364,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   } else {
     return nullptr;
   }
-}
+} // namespace Upstream
 
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
@@ -1385,14 +1401,29 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   }
 
   TcpConnPoolsContainer& container = parent_.host_tcp_conn_pool_map_[host];
-  if (!container.pools_[hash_key]) {
-    container.pools_[hash_key] = parent_.parent_.factory_.allocateTcpConnPool(
-        parent_.thread_local_dispatcher_, host, priority,
-        have_options ? context->downstreamConnection()->socketOptions() : nullptr,
-        have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr);
+  auto pool_iter = container.pools_.find(hash_key);
+  if (pool_iter == container.pools_.end()) {
+    std::tie(pool_iter, std::ignore) = container.pools_.emplace(
+        hash_key,
+        parent_.parent_.factory_.allocateTcpConnPool(
+            parent_.thread_local_dispatcher_, host, priority,
+            have_options ? context->downstreamConnection()->socketOptions() : nullptr,
+            have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
+            cluster_info_->poolIdleTimeout()));
+    pool_iter->second->addIdlePoolTimeoutCallback(
+        [&container, &pool_map = parent_.host_tcp_conn_pool_map_, host, hash_key]() {
+          container.pools_.erase(hash_key);
+
+          // We want to clean up after ourselves if the host isn't particularly active (i.e. we
+          // hit our configured timeout on the last pool and don't have any other pools for that
+          // host).
+          if (container.pools_.size() == 0) {
+            pool_map.erase(host); // NOTE: `container` is erased after this point in the lambda.
+          }
+        });
   }
 
-  return container.pools_[hash_key].get();
+  return pool_iter->second.get();
 }
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
@@ -1405,27 +1436,29 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
+    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    std::chrono::milliseconds pool_idle_timeout) {
   if (protocol == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::Http2::allocateConnPool(dispatcher, host, priority, options,
-                                         transport_socket_options);
+                                         transport_socket_options, pool_idle_timeout);
   } else if (protocol == Http::Protocol::Http3) {
     // Quic connection pool is not implemented.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   } else {
     return Http::Http1::allocateConnPool(dispatcher, host, priority, options,
-                                         transport_socket_options);
+                                         transport_socket_options, pool_idle_timeout);
   }
 }
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
+    Network::TransportSocketOptionsSharedPtr transport_socket_options,
+    std::chrono::milliseconds pool_idle_timeout) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_tcp_connection_pool")) {
     return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
-                                               transport_socket_options);
+                                               transport_socket_options, pool_idle_timeout);
   } else {
     return Tcp::ConnectionPool::InstancePtr{new Tcp::OriginalConnPoolImpl(
         dispatcher, host, priority, options, transport_socket_options)};

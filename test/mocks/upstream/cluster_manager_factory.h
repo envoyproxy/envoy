@@ -23,12 +23,13 @@ public:
   MOCK_METHOD(Http::ConnectionPool::InstancePtr, allocateConnPool,
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
                Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options,
-               const Network::TransportSocketOptionsSharedPtr& transport_socket_options));
+               const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+               std::chrono::milliseconds pool_idle_timeout));
 
   MOCK_METHOD(Tcp::ConnectionPool::InstancePtr, allocateTcpConnPool,
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
-               Network::TransportSocketOptionsSharedPtr));
+               Network::TransportSocketOptionsSharedPtr, std::chrono::milliseconds));
 
   MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>), clusterFromProto,
               (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,

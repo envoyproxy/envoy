@@ -22,7 +22,8 @@ public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
-               const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+               const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+               std::chrono::milliseconds pool_idle_timeout);
 
   ~ConnPoolImpl() override;
 
@@ -92,8 +93,10 @@ public:
   ProdConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                    Upstream::ResourcePriority priority,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
-      : ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options) {}
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   std::chrono::milliseconds pool_idle_timeout)
+      : ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options,
+                     pool_idle_timeout) {}
 
   // ConnPoolImpl
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
@@ -103,7 +106,8 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                  Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 std::chrono::milliseconds pool_idle_timeout);
 
 } // namespace Http1
 } // namespace Http

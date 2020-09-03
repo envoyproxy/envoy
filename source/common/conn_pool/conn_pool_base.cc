@@ -12,9 +12,17 @@ namespace ConnectionPool {
 ConnPoolImplBase::ConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
+    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    std::chrono::milliseconds pool_idle_timeout)
     : host_(host), priority_(priority), dispatcher_(dispatcher), socket_options_(options),
-      transport_socket_options_(transport_socket_options) {}
+      transport_socket_options_(transport_socket_options), idle_timeout_(pool_idle_timeout),
+      idle_timer_(dispatcher.createTimer([this]() {
+        if (!hasActiveConnectionsImpl()) {
+          for (const Instance::IdlePoolTimeoutCb& cb : idle_pool_callbacks_) {
+            cb();
+          }
+        }
+      })) {}
 
 ConnPoolImplBase::~ConnPoolImplBase() {
   ASSERT(ready_clients_.empty());
@@ -124,6 +132,8 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
       transitionActiveClientState(client, Envoy::ConnectionPool::ActiveClient::State::BUSY);
     }
 
+    idle_timer_->disableTimer();
+
     num_active_streams_++;
     host_->stats().rq_total_.inc();
     host_->stats().rq_active_.inc();
@@ -155,6 +165,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
       onUpstreamReady();
     }
   }
+  checkForIdle();
 }
 
 ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context) {
@@ -231,6 +242,15 @@ void ConnPoolImplBase::addDrainedCallbackImpl(Instance::DrainedCb cb) {
   checkForDrained();
 }
 
+bool ConnPoolImplBase::hasActiveConnectionsImpl() const {
+  return (!pending_streams_.empty() || (num_active_streams_ > 0));
+}
+
+void ConnPoolImplBase::addIdlePoolTimeoutCallbackImpl(Instance::IdlePoolTimeoutCb cb) {
+  idle_pool_callbacks_.push_back(cb);
+  checkForIdle();
+}
+
 void ConnPoolImplBase::closeIdleConnections() {
   // Create a separate list of elements to close to avoid mutate-while-iterating problems.
   std::list<ActiveClient*> to_close;
@@ -283,6 +303,15 @@ void ConnPoolImplBase::checkForDrained() {
     for (const Instance::DrainedCb& cb : drained_callbacks_) {
       cb();
     }
+  }
+}
+
+void ConnPoolImplBase::checkForIdle() {
+  if (idle_pool_callbacks_.empty() || idle_timeout_ == std::chrono::milliseconds::max()) {
+    return;
+  }
+  if (!idle_timer_->enabled() && !hasActiveConnectionsImpl()) {
+    idle_timer_->enableTimer(idle_timeout_);
   }
 }
 
@@ -356,6 +385,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     checkForDrained();
   }
 
+  checkForIdle();
+
   if (client.connect_timer_) {
     client.connect_timer_->disableTimer();
     client.connect_timer_.reset();
@@ -427,6 +458,7 @@ void ConnPoolImplBase::onPendingStreamCancel(PendingStream& stream,
 
   host_->cluster().stats().upstream_rq_cancelled_.inc();
   checkForDrained();
+  checkForIdle();
 }
 
 namespace {

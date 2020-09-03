@@ -31,7 +31,14 @@ public:
    * possible for this to fail if a limit on the number of pools allowed is reached.
    * @return The pool corresponding to `key`, or `absl::nullopt`.
    */
-  PoolOptRef getPool(KEY_TYPE key, const PoolFactory& factory);
+  PoolOptRef getPool(const KEY_TYPE& key, const PoolFactory& factory);
+
+  /**
+   * Erases an existing pool mapped to `key`.
+   *
+   * @return true if the entry exists and was removed, false otherwise
+   */
+  bool erasePool(const KEY_TYPE& key);
 
   /**
    * @return the number of pools.

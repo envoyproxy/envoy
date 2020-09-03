@@ -121,9 +121,10 @@ public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
-               Network::TransportSocketOptionsSharedPtr transport_socket_options)
+               Network::TransportSocketOptionsSharedPtr transport_socket_options,
+               std::chrono::milliseconds pool_idle_timeout)
       : Envoy::ConnectionPool::ConnPoolImplBase(host, priority, dispatcher, options,
-                                                transport_socket_options),
+                                                transport_socket_options, pool_idle_timeout),
         upstream_ready_cb_(dispatcher.createSchedulableCallback([this]() {
           upstream_ready_enabled_ = false;
           onUpstreamReady();
@@ -131,6 +132,9 @@ public:
   ~ConnPoolImpl() override { destructAllConnections(); }
 
   void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }
+  void addIdlePoolTimeoutCallback(IdlePoolTimeoutCb cb) override {
+    addIdlePoolTimeoutCallbackImpl(cb);
+  }
   void drainConnections() override {
     drainConnectionsImpl();
     // Legacy behavior for the TCP connection pool marks all connecting clients
@@ -163,8 +167,7 @@ public:
   newPendingStream(Envoy::ConnectionPool::AttachContext& context) override {
     Envoy::ConnectionPool::PendingStreamPtr pending_stream =
         std::make_unique<TcpPendingStream>(*this, typedContext<TcpAttachContext>(context));
-    LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
-    return pending_streams_.front().get();
+    return addToPendingStreamsList(std::move(pending_stream));
   }
 
   Upstream::HostDescriptionConstSharedPtr host() const override {
@@ -195,7 +198,7 @@ public:
   // These two functions exist for testing parity between old and new Tcp Connection Pools.
   virtual void onConnReleased(Envoy::ConnectionPool::ActiveClient& client) {
     if (client.state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY) {
-      if (!pending_streams_.empty() && !upstream_ready_enabled_) {
+      if (!pendingStreams().empty() && !upstream_ready_enabled_) {
         upstream_ready_cb_->scheduleCallbackCurrentIteration();
       }
     }

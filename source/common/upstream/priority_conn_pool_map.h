@@ -26,7 +26,12 @@ public:
    * is reached.
    * @return The pool corresponding to `key`, or `absl::nullopt`.
    */
-  PoolOptRef getPool(ResourcePriority priority, KEY_TYPE key, const PoolFactory& factory);
+  PoolOptRef getPool(ResourcePriority priority, const KEY_TYPE& key, const PoolFactory& factory);
+
+  /**
+   * Erase a pool for the given priority and `key` if it exists and is idle.
+   */
+  bool erasePool(ResourcePriority priority, const KEY_TYPE& key);
 
   /**
    * @return the number of pools across all priorities.
@@ -52,6 +57,8 @@ public:
   void drainConnections();
 
 private:
+  size_t getPriorityIndex(ResourcePriority priority) const;
+
   std::array<std::unique_ptr<ConnPoolMapType>, NumResourcePriorities> conn_pool_maps_;
 };
 

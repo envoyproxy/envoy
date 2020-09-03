@@ -19,6 +19,7 @@ public:
   // Http::ConnectionPool::Instance
   MOCK_METHOD(Http::Protocol, protocol, (), (const));
   MOCK_METHOD(void, addDrainedCallback, (DrainedCb cb));
+  MOCK_METHOD(void, addIdlePoolTimeoutCallback, (IdlePoolTimeoutCb cb));
   MOCK_METHOD(void, drainConnections, ());
   MOCK_METHOD(bool, hasActiveConnections, (), (const));
   MOCK_METHOD(Cancellable*, newStream, (ResponseDecoder & response_decoder, Callbacks& callbacks));

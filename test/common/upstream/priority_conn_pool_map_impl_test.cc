@@ -36,6 +36,13 @@ public:
     };
   }
 
+  TestMap::PoolFactory getNeverCalledFactory() {
+    return []() {
+      EXPECT_TRUE(false);
+      return nullptr;
+    };
+  }
+
 protected:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::vector<NiceMock<Http::ConnectionPool::MockInstance>*> mock_pools_;
@@ -102,6 +109,24 @@ TEST_F(PriorityConnPoolMapImplTest, TestClearEmptiesOut) {
   test_map->clear();
 
   EXPECT_EQ(test_map->size(), 0);
+}
+
+TEST_F(PriorityConnPoolMapImplTest, TestErase) {
+  TestMapPtr test_map = makeTestMap();
+
+  auto* pool_ptr = &test_map->getPool(ResourcePriority::High, 1, getBasicFactory()).value().get();
+  EXPECT_EQ(1, test_map->size());
+  EXPECT_EQ(pool_ptr,
+            &test_map->getPool(ResourcePriority::High, 1, getNeverCalledFactory()).value().get());
+  EXPECT_FALSE(test_map->erasePool(ResourcePriority::Default, 1));
+  EXPECT_NE(pool_ptr,
+            &test_map->getPool(ResourcePriority::Default, 1, getBasicFactory()).value().get());
+  EXPECT_EQ(2, test_map->size());
+  EXPECT_TRUE(test_map->erasePool(ResourcePriority::Default, 1));
+  EXPECT_TRUE(test_map->erasePool(ResourcePriority::High, 1));
+  EXPECT_EQ(0, test_map->size());
+  EXPECT_NE(pool_ptr,
+            &test_map->getPool(ResourcePriority::High, 1, getBasicFactory()).value().get());
 }
 
 // Show that the drained callback is invoked once for the high priority pool, and once for

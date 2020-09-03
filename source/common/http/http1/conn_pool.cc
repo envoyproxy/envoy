@@ -26,9 +26,10 @@ namespace Http1 {
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                            Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
-                           const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
+                           const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                           std::chrono::milliseconds pool_idle_timeout)
     : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                           transport_socket_options, Protocol::Http11),
+                           transport_socket_options, Protocol::Http11, pool_idle_timeout),
       upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() {
         upstream_ready_enabled_ = false;
         onUpstreamReady();
@@ -57,7 +58,7 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
   } else {
     client.stream_wrapper_.reset();
 
-    if (!pending_streams_.empty() && !upstream_ready_enabled_) {
+    if (!pendingStreams().empty() && !upstream_ready_enabled_) {
       upstream_ready_enabled_ = true;
       upstream_ready_cb_->scheduleCallbackCurrentIteration();
     }
@@ -140,9 +141,10 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                  Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
-  return std::make_unique<Http::Http1::ProdConnPoolImpl>(dispatcher, host, priority, options,
-                                                         transport_socket_options);
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 std::chrono::milliseconds pool_idle_timeout) {
+  return std::make_unique<Http::Http1::ProdConnPoolImpl>(
+      dispatcher, host, priority, options, transport_socket_options, pool_idle_timeout);
 }
 
 } // namespace Http1

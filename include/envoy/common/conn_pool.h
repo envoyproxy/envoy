@@ -65,6 +65,18 @@ public:
   virtual void drainConnections() PURE;
 
   /**
+   * Called when a connection pool has no pending requests or busy connections for a configured
+   * timeout duration.
+   */
+  using IdlePoolTimeoutCb = std::function<void()>;
+
+  /**
+   * Register a callback that gets called when the connection pool has had no pending requests or
+   * busy connections for a configured timeout duration.
+   */
+  virtual void addIdlePoolTimeoutCallback(IdlePoolTimeoutCb cb) PURE;
+
+  /**
    * @return Upstream::HostDescriptionConstSharedPtr the host for which connections are pooled.
    */
   virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;

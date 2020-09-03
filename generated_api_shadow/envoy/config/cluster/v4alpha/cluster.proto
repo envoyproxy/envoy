@@ -45,7 +45,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 53]
+// [#next-free-field: 54]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.cluster.v3.Cluster";
 
@@ -980,6 +980,11 @@ message Cluster {
   // If `connection_pool_per_downstream_connection` is true, the cluster will use a separate
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
+
+  // If `connection_pool_idle_timeout`is set, the cluster will remove connection pools
+  // that have not had active connections for the specified timeout duration.
+  google.protobuf.Duration connection_pool_idle_timeout = 53
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.

@@ -48,20 +48,16 @@ HttpConnPoolImplBase::HttpConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-    Http::Protocol protocol)
+    Http::Protocol protocol, std::chrono::milliseconds pool_idle_timeout)
     : Envoy::ConnectionPool::ConnPoolImplBase(
           host, priority, dispatcher, options,
-          wrapTransportSocketOptions(transport_socket_options, protocol)) {}
+          wrapTransportSocketOptions(transport_socket_options, protocol), pool_idle_timeout) {}
 
 ConnectionPool::Cancellable*
 HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
                                 Http::ConnectionPool::Callbacks& callbacks) {
   HttpAttachContext context({&response_decoder, &callbacks});
   return Envoy::ConnectionPool::ConnPoolImplBase::newStream(context);
-}
-
-bool HttpConnPoolImplBase::hasActiveConnections() const {
-  return (!pending_streams_.empty() || (num_active_streams_ > 0));
 }
 
 ConnectionPool::Cancellable*
@@ -71,8 +67,7 @@ HttpConnPoolImplBase::newPendingStream(Envoy::ConnectionPool::AttachContext& con
   ENVOY_LOG(debug, "queueing stream due to no available connections");
   Envoy::ConnectionPool::PendingStreamPtr pending_stream(
       new HttpPendingStream(*this, decoder, callbacks));
-  LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
-  return pending_streams_.front().get();
+  return addToPendingStreamsList(std::move(pending_stream));
 }
 
 void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& client,

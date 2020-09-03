@@ -318,7 +318,8 @@ public:
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, Http::Protocol protocol,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options) PURE;
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   std::chrono::milliseconds pool_idle_timeout) PURE;
 
   /**
    * Allocate a TCP connection pool for the host. Pools are separated by 'priority' and
@@ -328,7 +329,8 @@ public:
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                      Network::TransportSocketOptionsSharedPtr transport_socket_options) PURE;
+                      Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                      std::chrono::milliseconds pool_idle_timeout) PURE;
 
   /**
    * Allocate a cluster from configuration proto.

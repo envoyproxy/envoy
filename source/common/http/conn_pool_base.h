@@ -43,7 +43,7 @@ public:
                        Event::Dispatcher& dispatcher,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                       Http::Protocol protocol);
+                       Http::Protocol protocol, std::chrono::milliseconds pool_idle_timeout);
 
   // ConnectionPool::Instance
   void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }
@@ -51,7 +51,11 @@ public:
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          Http::ConnectionPool::Callbacks& callbacks) override;
-  bool hasActiveConnections() const override;
+
+  bool hasActiveConnections() const override { return hasActiveConnectionsImpl(); }
+  void addIdlePoolTimeoutCallback(IdlePoolTimeoutCb cb) override {
+    addIdlePoolTimeoutCallbackImpl(cb);
+  }
 
   // Creates a new PendingStream and enqueues it into the queue.
   ConnectionPool::Cancellable*

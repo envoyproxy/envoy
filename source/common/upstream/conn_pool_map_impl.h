@@ -21,7 +21,7 @@ template <typename KEY_TYPE, typename POOL_TYPE> ConnPoolMap<KEY_TYPE, POOL_TYPE
 
 template <typename KEY_TYPE, typename POOL_TYPE>
 typename ConnPoolMap<KEY_TYPE, POOL_TYPE>::PoolOptRef
-ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, const PoolFactory& factory) {
+ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(const KEY_TYPE& key, const PoolFactory& factory) {
   Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
   // TODO(klarose): Consider how we will change the connection pool's configuration in the future.
   // The plan is to change the downstream socket options... We may want to take those as a parameter
@@ -58,6 +58,20 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, const PoolFactory& facto
 
   auto inserted = active_pools_.emplace(key, std::move(new_pool));
   return std::ref(*inserted.first->second);
+}
+
+template <typename KEY_TYPE, typename POOL_TYPE>
+bool ConnPoolMap<KEY_TYPE, POOL_TYPE>::erasePool(const KEY_TYPE& key) {
+  Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
+  auto pool_iter = active_pools_.find(key);
+
+  if (pool_iter != active_pools_.end()) {
+    thread_local_dispatcher_.deferredDelete(std::move(pool_iter->second));
+    active_pools_.erase(pool_iter);
+    return true;
+  } else {
+    return false;
+  }
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>

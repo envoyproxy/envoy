@@ -79,6 +79,9 @@ public:
 
   void addDrainedCallback(DrainedCb cb) override { conn_pool_->addDrainedCallback(cb); }
   void drainConnections() override { conn_pool_->drainConnections(); }
+  void addIdlePoolTimeoutCallback(IdlePoolTimeoutCb cb) override {
+    conn_pool_->addIdlePoolTimeoutCallback(cb);
+  }
   void closeConnections() override { conn_pool_->closeConnections(); }
   ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) override {
     return conn_pool_->newConnection(callbacks);
@@ -128,7 +131,8 @@ protected:
   public:
     ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                         ConnPoolBase& parent)
-        : ConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, nullptr, nullptr),
+        : ConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, nullptr, nullptr,
+                       std::chrono::milliseconds(0)),
           parent_(parent) {}
 
     void onConnReleased(Envoy::ConnectionPool::ActiveClient& client) override {
@@ -240,8 +244,9 @@ public:
         upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)) {
     host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000");
     if (test_new_connection_pool_) {
-      conn_pool_ = std::make_unique<ConnPoolImpl>(
-          dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr);
+      conn_pool_ =
+          std::make_unique<ConnPoolImpl>(dispatcher_, host_, Upstream::ResourcePriority::Default,
+                                         nullptr, nullptr, std::chrono::milliseconds::max());
     } else {
       conn_pool_ = std::make_unique<OriginalConnPoolImpl>(
           dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr);

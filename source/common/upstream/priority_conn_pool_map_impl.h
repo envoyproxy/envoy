@@ -20,11 +20,15 @@ PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::~PriorityConnPoolMap() = default;
 
 template <typename KEY_TYPE, typename POOL_TYPE>
 typename PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::PoolOptRef
-PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(ResourcePriority priority, KEY_TYPE key,
+PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(ResourcePriority priority, const KEY_TYPE& key,
                                                   const PoolFactory& factory) {
-  size_t index = static_cast<size_t>(priority);
-  ASSERT(index < conn_pool_maps_.size());
-  return conn_pool_maps_[index]->getPool(key, factory);
+  return conn_pool_maps_[getPriorityIndex(priority)]->getPool(key, factory);
+}
+
+template <typename KEY_TYPE, typename POOL_TYPE>
+bool PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::erasePool(ResourcePriority priority,
+                                                         const KEY_TYPE& key) {
+  return conn_pool_maps_[getPriorityIndex(priority)]->erasePool(key);
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
@@ -55,6 +59,13 @@ void PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnections() {
   for (auto& pool_map : conn_pool_maps_) {
     pool_map->drainConnections();
   }
+}
+
+template <typename KEY_TYPE, typename POOL_TYPE>
+size_t PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::getPriorityIndex(ResourcePriority priority) const {
+  size_t index = static_cast<size_t>(priority);
+  ASSERT(index < conn_pool_maps_.size());
+  return index;
 }
 
 } // namespace Upstream
