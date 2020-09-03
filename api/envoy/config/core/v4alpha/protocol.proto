@@ -100,7 +100,6 @@ message HttpProtocolOptions {
   HeadersWithUnderscoresAction headers_with_underscores_action = 5;
 }
 
-
 // [#next-free-field: 8]
 message Http1ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
