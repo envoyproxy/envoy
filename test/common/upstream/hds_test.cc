@@ -555,9 +555,9 @@ transport_socket:
   connection->raiseEvent(Network::ConnectionEvent::Connected);
 
   // Get our health checker to match against.
-  auto clusters = hds_delegate_->hdsClusters();
+  const auto clusters = hds_delegate_->hdsClusters();
   ASSERT_EQ(clusters.size(), 1);
-  auto hcs = clusters[0]->healthCheckers();
+  const auto hcs = clusters[0]->healthCheckers();
   ASSERT_EQ(hcs.size(), 1);
 
   // Check that our match hits.

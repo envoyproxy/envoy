@@ -191,10 +191,8 @@ void HdsDelegate::processMessage(
 
       // add all endpoints for this locality group to the config
       for (const auto& endpoint : locality_endpoints.endpoints()) {
-        auto* new_lb_endpoint = endpoints->add_lb_endpoints();
-        auto* new_endpoint = new_lb_endpoint->mutable_endpoint();
-
-        new_endpoint->mutable_address()->MergeFrom(endpoint.address());
+        endpoints->add_lb_endpoints()->mutable_endpoint()->mutable_address()->MergeFrom(
+            endpoint.address());
       }
     }
 
@@ -206,9 +204,8 @@ void HdsDelegate::processMessage(
     }
 
     // Add transport_socket_match to cluster for use in host connections.
-    for (auto& transport_socket_match : cluster_health_check.transport_socket_matches()) {
-      cluster_config.add_transport_socket_matches()->MergeFrom(transport_socket_match);
-    }
+    cluster_config.mutable_transport_socket_matches()->MergeFrom(
+        cluster_health_check.transport_socket_matches());
 
     ENVOY_LOG(debug, "New HdsCluster config {} ", cluster_config.DebugString());
 
