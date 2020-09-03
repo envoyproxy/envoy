@@ -413,7 +413,7 @@ bool RouterCheckTool::compareRequestHeaderFields(
   if (expected.request_header_fields().data()) {
     for (const envoy::config::core::v3::HeaderValue& header : expected.request_header_fields()) {
       auto actual = tool_config.request_headers_->get_(header.key());
-      auto const &expected = header.value();
+      auto const& expected = header.value();
       if (!compareResults(actual, expected, "request_header_fields")) {
         no_failures = false;
       }
@@ -437,7 +437,7 @@ bool RouterCheckTool::compareResponseHeaderFields(
   if (expected.response_header_fields().data()) {
     for (const envoy::config::core::v3::HeaderValue& header : expected.response_header_fields()) {
       auto actual = tool_config.response_headers_->get_(header.key());
-      auto const &expected = header.value();
+      auto const& expected = header.value();
       if (!compareResults(actual, expected, "response_header_fields")) {
         no_failures = false;
       }
