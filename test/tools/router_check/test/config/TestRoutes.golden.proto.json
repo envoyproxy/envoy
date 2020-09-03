@@ -281,6 +281,57 @@
       "validate": {"virtual_cluster_name": "other"}
     },
     {
+      "test_name": "RequestHeaderFields Deprecated",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/host/rewrite/me",
+        "method": "GET"
+      },
+      "validate": {
+        "host_rewrite": "new_host",
+        "request_header_fields": [
+          {
+            "key": ":authority",
+            "value": "new_host"
+          },
+          {
+            "key": ":path",
+            "value": "/host/rewrite/me"
+          },
+          {
+            "key": ":method",
+            "value": "GET"
+          },
+          {
+            "key": ":cookie",
+            "value": ""
+          }
+        ]
+      }
+    },
+    {
+      "test_name": "ResponseHeaderFields Deprecated",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/ping",
+        "method": "GET"
+      },
+      "validate": {
+        "cluster_name": "",
+        "host_rewrite": "",
+        "path_redirect": "http://www.lyft.com/ping",
+        "path_rewrite": "",
+        "virtual_cluster_name": "",
+        "virtual_host_name": "",
+        "response_header_fields": [
+          {
+            "key": "content-type",
+            "value": "text/plain"
+          }
+        ]
+      }
+    },
+    {
       "test_name": "RequestHeaderMatches 1",
       "input": {
         "authority": "api.lyft.com",
@@ -304,7 +355,7 @@
           },
           {
             "name": ":cookie",
-            "exact_match": ""
+            "invert_match": true
           }
         ]
       }
@@ -345,6 +396,14 @@
             "exact_match": "text/plain"
           },
           {
+            "name": "content-length",
+            "range_match": 
+            {
+              "start": 0,
+              "end": 100
+            }
+          },
+          {
             "name": "x-ping-response",
             "exact_match": "yes"
           },
@@ -353,10 +412,10 @@
             "present_match": true
           },
           {
-            "name": "x-ping-response",
-            "present_match": false,
+            "name": "x-pong-response",
+            "present_match": true,
             "invert_match": true
-          }
+          },
         ]
       }
     }

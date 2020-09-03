@@ -168,19 +168,7 @@ validate
     and "date" fields, as well as custom headers set in the input or by the route. The header fields are checked
     after all other test cases. Thus, the header fields checked will be those of the redirected or rewritten
     routes when applicable.
-    - Matchers are specified as :ref:`HeaderMatchers <envoy_api_msg_route.HeaderMatcher>`, but not all options are supported in this tool.
-
-    name
-      *(required, string)* The name of the header field to match.
-
-    exact_match
-      *(optional, string)* The exact value of the header field to match.
-
-    present_match
-      *(optional, boolean)* If true, checks only for header presence.
-
-    invert_match
-      *(optional, boolean)* If true, the match will pass when it would fail, and fail when it would pass.
+    - Matchers are specified as :ref:`HeaderMatchers <envoy_api_msg_route.HeaderMatcher>`, and behave the same way.
 
 Coverage
 --------
