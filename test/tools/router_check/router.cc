@@ -1,3 +1,5 @@
+#include "test/tools/router_check/router.h"
+
 #include <functional>
 #include <memory>
 #include <string>
@@ -13,7 +15,6 @@
 #include "common/stream_info/stream_info_impl.h"
 
 #include "test/test_common/printers.h"
-#include "test/tools/router_check/router.h"
 
 namespace {
 const std::string
