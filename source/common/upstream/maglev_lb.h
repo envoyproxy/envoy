@@ -68,14 +68,17 @@ private:
 /**
  * Thread aware load balancer implementation for Maglev.
  */
-class MaglevLoadBalancer : public ThreadAwareLoadBalancerBase {
+class MaglevLoadBalancer : public ThreadAwareLoadBalancerBase,
+                           Logger::Loggable<Logger::Id::upstream> {
 public:
-  MaglevLoadBalancer(const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
-                     Runtime::Loader& runtime, Random::RandomGenerator& random,
-                     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-                     uint64_t table_size = MaglevTable::DefaultTableSize);
+  MaglevLoadBalancer(
+      const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
+      Runtime::Loader& runtime, Random::RandomGenerator& random,
+      const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>& config,
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
   const MaglevLoadBalancerStats& stats() const { return stats_; }
+  uint64_t tableSize() const { return table_size_; }
 
 private:
   // ThreadAwareLoadBalancerBase
