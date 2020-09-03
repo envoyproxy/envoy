@@ -23,7 +23,7 @@ namespace HttpFilters {
 namespace Cache {
 
 LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
-                             const std::vector<Matchers::StringMatcherPtr>& vary_allowlist)
+                             const VaryHeader& vary_allowlist)
     : timestamp_(timestamp) {
   // These ASSERTs check prerequisites. A request without these headers can't be looked up in cache;
   // CacheFilter doesn't create LookupRequests for such requests.
@@ -53,7 +53,7 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   key_.set_path(std::string(request_headers.getPathValue()));
   key_.set_clear_http(forwarded_proto == scheme_values.Http);
 
-  vary_headers_ = VaryHeader::possibleVariedHeaders(vary_allowlist, request_headers);
+  vary_headers_ = vary_allowlist.possibleVariedHeaders(request_headers);
 }
 
 // Unless this API is still alpha, calls to stableHashKey() must always return

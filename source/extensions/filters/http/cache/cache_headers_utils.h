@@ -114,10 +114,6 @@ public:
 
 class VaryHeader {
 public:
-  // Checks if the headers contain an allowed value in the Vary header.
-  static bool isAllowed(const std::vector<Matchers::StringMatcherPtr>& allowlist,
-                        const Http::ResponseHeaderMap& headers);
-
   // Checks if the headers contain a non-empty value in the Vary header.
   static bool hasVary(const Http::ResponseHeaderMap& headers);
 
@@ -128,16 +124,24 @@ public:
   // Parses the header names that are in the Vary header value.
   static std::vector<std::string> parseHeaderValue(const Http::HeaderEntry* vary_header);
 
+  // Parses the allowlist from the Cache Config into the object's private allowlist_.
+  VaryHeader(const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allowlist);
+
+  // Checks if the headers contain an allowed value in the Vary header.
+  bool isAllowed(const Http::ResponseHeaderMap& headers) const;
+
   // Returns a header map containing the subset of the original headers that can be varied from the
   // request.
-  static Http::RequestHeaderMapPtr
-  possibleVariedHeaders(const std::vector<Matchers::StringMatcherPtr>& allowlist,
-                        const Http::RequestHeaderMap& request_headers);
-
+  Http::RequestHeaderMapPtr
+  possibleVariedHeaders(const Http::RequestHeaderMap& request_headers) const;
   // Parses the allowlist of matching rules that define header names that can be used to create
   // varied responses.
   static std::vector<Matchers::StringMatcherPtr> parseAllowlist(
       const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allowlist);
+
+private:
+  // Stores the matching rules that define whether a header is allowed to be varied.
+  std::vector<Matchers::StringMatcherPtr> allowlist_;
 };
 
 } // namespace Cache

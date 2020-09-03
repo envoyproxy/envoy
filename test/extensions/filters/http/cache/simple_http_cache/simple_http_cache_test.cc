@@ -20,9 +20,17 @@ namespace {
 
 const std::string EpochDate = "Thu, 01 Jan 1970 00:00:00 GMT";
 
+envoy::extensions::filters::http::cache::v3alpha::CacheConfig getConfig() {
+  // Allows 'accept' to be varied in the tests.
+  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
+  const auto& add_accept = config.mutable_allowed_vary_headers()->Add();
+  add_accept->set_exact("accept");
+  return config;
+}
+
 class SimpleHttpCacheTest : public testing::Test {
 protected:
-  SimpleHttpCacheTest() {
+  SimpleHttpCacheTest() : vary_allowlist_(getConfig().allowed_vary_headers()) {
     request_headers_.setMethod("GET");
     request_headers_.setHost("example.com");
     request_headers_.setForwardedProto("https");
@@ -94,7 +102,7 @@ protected:
   Event::SimulatedTimeSystem time_source_;
   SystemTime current_time_ = time_source_.systemTime();
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
-  std::vector<Matchers::StringMatcherPtr> vary_allowlist_;
+  VaryHeader vary_allowlist_;
 };
 
 // Simple flow of putting in an item, getting it, deleting it.
@@ -218,11 +226,7 @@ TEST(Registration, GetFactory) {
 }
 
 TEST_F(SimpleHttpCacheTest, VaryResponses) {
-  // Responses will vary on accept, so we add a rule to the allowlist that accepts that header.
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_exact("accept");
-  vary_allowlist_.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
-
+  // Responses will vary on accept.
   const std::string RequestPath("some-resource");
   Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
                                                    {"cache-control", "public,max-age=3600"},

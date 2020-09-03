@@ -32,7 +32,7 @@ CacheFilter::CacheFilter(
     const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config, const std::string&,
     Stats::Scope&, TimeSource& time_source, HttpCache& http_cache)
     : time_source_(time_source), cache_(http_cache),
-      vary_allowlist_(VaryHeader::parseAllowlist(config.allowed_vary_headers())) {}
+      vary_allowlist_(config.allowed_vary_headers()) {}
 
 void CacheFilter::onDestroy() {
   filter_state_ = FilterState::Destroyed;

@@ -89,7 +89,7 @@ private:
   // TODO(#12901): The allowlist could be constructed only once directly from the config, instead of
   // doing it per-request.
   // Stores the allowlist rules that decide if a header can be varied upon.
-  std::vector<Matchers::StringMatcherPtr> vary_allowlist_;
+  VaryHeader vary_allowlist_;
 
   // True if the response has trailers.
   // TODO(toddmgreer): cache trailers.

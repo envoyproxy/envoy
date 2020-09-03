@@ -194,9 +194,12 @@ std::vector<Matchers::StringMatcherPtr> VaryHeader::parseAllowlist(
   return ruleset;
 }
 
-bool VaryHeader::isAllowed(const std::vector<Matchers::StringMatcherPtr>& allowlist,
-                           const Http::ResponseHeaderMap& headers) {
-  if (!hasVary(headers)) {
+VaryHeader::VaryHeader(
+    const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allowlist)
+    : allowlist_(VaryHeader::parseAllowlist(allowlist)) {}
+
+bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) const {
+  if (!VaryHeader::hasVary(headers)) {
     return true;
   }
 
@@ -212,7 +215,7 @@ bool VaryHeader::isAllowed(const std::vector<Matchers::StringMatcherPtr>& allowl
       return false;
     }
 
-    for (const auto& rule : allowlist) {
+    for (const auto& rule : allowlist_) {
       if (rule->match(header)) {
         valid = true;
         break;
@@ -294,13 +297,12 @@ std::vector<std::string> VaryHeader::parseHeaderValue(const Http::HeaderEntry* v
 }
 
 Http::RequestHeaderMapPtr
-VaryHeader::possibleVariedHeaders(const std::vector<Matchers::StringMatcherPtr>& allowlist,
-                                  const Http::RequestHeaderMap& request_headers) {
+VaryHeader::possibleVariedHeaders(const Http::RequestHeaderMap& request_headers) const {
   Http::RequestHeaderMapPtr possible_headers =
       Http::createHeaderMap<Http::RequestHeaderMapImpl>({});
 
   absl::flat_hash_set<absl::string_view> header_names;
-  CacheHeadersUtils::getAllMatchingHeaderNames(request_headers, allowlist, header_names);
+  CacheHeadersUtils::getAllMatchingHeaderNames(request_headers, allowlist_, header_names);
 
   for (const absl::string_view& header : header_names) {
     std::vector<absl::string_view> values;
