@@ -32,7 +32,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/mongo_proxy:94.0"
 "source/extensions/filters/network/common:96.1"
 "source/extensions/filters/network/common/redis:96.2"
-"source/extensions/filters/http/dynamic_forward_proxy:92.1"
 "source/extensions/filters/http/cache:80.7"
 "source/extensions/filters/http/cache/simple_http_cache:84.5"
 "source/extensions/filters/http/ip_tagging:91.2"
