@@ -6,7 +6,6 @@
 #include "common/router/config_impl.h"
 
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
@@ -27,8 +26,6 @@ namespace Router {
  * the request headers once.
  * */
 static void manyCountryRoutesLongHeaders(benchmark::State& state) {
-  TestScopedRuntime scoped_runtime;
-
   // Add a route configuration with multiple route, each has a different
   // x-country<N> header required to that route.
   const size_t countries_num = 250;

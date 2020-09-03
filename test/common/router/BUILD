@@ -52,7 +52,6 @@ envoy_cc_benchmark_binary(
         "//source/common/http:header_map_lib",
         "//source/common/router:config_lib",
         "//test/mocks/server:server_mocks",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
