@@ -21,24 +21,24 @@ DEPENDENCY_ANNOTATIONS = [
 # NOTE: If a dependency use case is either dataplane or controlplane, the other uses are not needed
 # to be declared.
 USE_CATEGORIES = [
-    # This dependency is used in build process.
-    "build",
-    # This dependency is used for unit tests.
-    "test",
     # This dependency is used in API protos.
     "api",
-    # This dependency is used in processing downstream or upstream requests.
-    "dataplane",
+    # This dependency is used in build process.
+    "build",
     # This dependency is used to process xDS requests.
     "controlplane",
+    # This dependency is used in processing downstream or upstream requests.
+    "dataplane",
     # This dependecy is used for logging, metrics or tracing. It may process unstrusted input.
     "observability",
     # This dependency does not handle untrusted data and is used for various utility purposes.
     "other",
+    # This dependency is used for unit tests.
+    "test",
 ]
 
 # Components with these use categories are not required to specify the 'cpe' annotation.
-USE_CATEGORIES_WITH_CPE_OPTIONAL = ["build", "test", "other"]
+USE_CATEGORIES_WITH_CPE_OPTIONAL = ["build", "other", "test"]
 
 DEPENDENCY_REPOSITORIES_SPEC = dict(
     bazel_compdb = dict(
@@ -53,16 +53,16 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     bazel_gazelle = dict(
         project_name = "Gazelle",
         project_url = "https://github.com/bazelbuild/bazel-gazelle",
-        version = "0.19.1",
-        sha256 = "86c6d481b3f7aedc1d60c1c211c6f76da282ae197c3b3160f54bd3a8f847896f",
+        version = "0.21.1",
+        sha256 = "cdb02a887a7187ea4d5a27452311a75ed8637379a1287d8eeb952138ea485f7d",
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v{version}/bazel-gazelle-v{version}.tar.gz"],
         use_category = ["build"],
     ),
     bazel_toolchains = dict(
         project_name = "bazel-toolchains",
         project_url = "https://github.com/bazelbuild/bazel-toolchains",
-        version = "3.4.0",
-        sha256 = "882fecfc88d3dc528f5c5681d95d730e213e39099abff2e637688a91a9619395",
+        version = "3.4.1",
+        sha256 = "7ebb200ed3ca3d1f7505659c7dfed01c4b5cb04c3a6f34140726fe22f5d35e86",
         strip_prefix = "bazel-toolchains-{version}",
         urls = [
             "https://github.com/bazelbuild/bazel-toolchains/releases/download/{version}/bazel-toolchains-{version}.tar.gz",
@@ -81,26 +81,26 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     envoy_build_tools = dict(
         project_name = "envoy-build-tools",
         project_url = "https://github.com/envoyproxy/envoy-build-tools",
-        version = "1d6573e60207efaae6436b25ecc594360294f63a",
-        sha256 = "88e58fdb42021e64a0b35ae3554a82e92f5c37f630a4dab08a132fc77f8db4b7",
+        version = "2d13ad4157997715a4939bd218a89c81c26ff28e",
+        sha256 = "0dc8ce5eb645ae069ce710c1010975456f723ffd4fc788a03dacfcd0647b05b9",
         strip_prefix = "envoy-build-tools-{version}",
-        # 2020-07-18
+        # 2020-08-21
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/{version}.tar.gz"],
         use_category = ["build"],
     ),
     boringssl = dict(
         project_name = "BoringSSL",
         project_url = "https://github.com/google/boringssl",
-        version = "a0899df79b3a63e606448c72d63a090d86bdb75b",
-        sha256 = "07f1524766b9ed1543674b48e7fce7e3569b6e2b6c0c43ec124dedee9b60f641",
+        version = "597b810379e126ae05d32c1d94b1a9464385acd0",
+        sha256 = "1ea42456c020daf0a9b0f9e8d8bc3a403c9314f4f54230c617257af996cd5fa6",
         strip_prefix = "boringssl-{version}",
         # To update BoringSSL, which tracks Chromium releases:
         # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/stable release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-84.0.4147.45(beta)
-        # 2020-05-14
+        # chromium-85.0.4183.83
+        # 2020-06-23
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
@@ -189,19 +189,18 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_github_fmtlib_fmt = dict(
         project_name = "fmt",
         project_url = "https://fmt.dev",
-        # 2020-04-29
-        version = "e2ff910675c7800e5c4e28e1509ca6a50bdceafa",
-        sha256 = "5014aacf55285bf79654539791de0d6925063fddf4dfdd597ef76b53eb994f86",
+        version = "7.0.3",
+        sha256 = "decfdf9ad274070fa85f26407b816f5a4d82205ae86bac1990be658d0795ea4d",
         strip_prefix = "fmt-{version}",
-        urls = ["https://github.com/fmtlib/fmt/archive/{version}.tar.gz"],
+        urls = ["https://github.com/fmtlib/fmt/releases/download/{version}/fmt-{version}.zip"],
         use_category = ["observability"],
         cpe = "N/A",
     ),
     com_github_gabime_spdlog = dict(
         project_name = "spdlog",
         project_url = "https://github.com/gabime/spdlog",
-        version = "1.6.1",
-        sha256 = "378a040d91f787aec96d269b0c39189f58a6b852e4cbf9150ccfacbe85ebbbfc",
+        version = "1.7.0",
+        sha256 = "f0114a4d3c88be9e696762f37a7c379619443ce9d668546c61b21d41affe5b62",
         strip_prefix = "spdlog-{version}",
         urls = ["https://github.com/gabime/spdlog/archive/v{version}.tar.gz"],
         use_category = ["observability"],
@@ -210,9 +209,9 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_github_google_libprotobuf_mutator = dict(
         project_name = "libprotobuf-mutator",
         project_url = "https://github.com/google/libprotobuf-mutator",
-        # 2020-06-25
-        version = "7a2ed51a6b682a83e345ff49fc4cfd7ca47550db",
-        sha256 = "d51365191580c4bf5e9ff104eebcfe34f7ff5f471006d7a460c15dcb3657501c",
+        # 2020-08-18
+        version = "8942a9ba43d8bb196230c321d46d6a137957a719",
+        sha256 = "49a26dbe77c75f2eca1dd8a9fbdb31c4496d9af42df027ff57569c5a7a5d980d",
         strip_prefix = "libprotobuf-mutator-{version}",
         urls = ["https://github.com/google/libprotobuf-mutator/archive/{version}.tar.gz"],
         use_category = ["test"],
@@ -282,9 +281,9 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_lightstep_tracer_cpp = dict(
         project_name = "lightstep-tracer-cpp",
         project_url = "https://github.com/lightstep/lightstep-tracer-cpp",
-        # 2020-03-24
-        version = "3efe2372ee3d7c2138d6b26e542d757494a7938d",
-        sha256 = "0e99716598c010e56bc427ea3482be5ad2c534be8b039d172564deec1264a213",
+        # 2020-08-24
+        version = "1942b3f142e218ebc143a043f32e3278dafec9aa",
+        sha256 = "3238921a8f578beb26c2215cd277e8f6752f3d29b020b881d60d96a240a38aed",
         strip_prefix = "lightstep-tracer-cpp-{version}",
         urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/{version}.tar.gz"],
         use_category = ["observability"],
@@ -344,6 +343,17 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:gnu:zlib:*",
     ),
+    com_github_zlib_ng_zlib_ng = dict(
+        project_name = "zlib-ng",
+        project_url = "https://github.com/zlib-ng/zlib-ng",
+        version = "193d8fd7dfb7927facab7a3034daa27ad5b9df1c",
+        sha256 = "5fe543e8d007b9e7b729f3d6b3a5ee1f9b68d0eef5f6af1393745a4dcd472a98",
+        strip_prefix = "zlib-ng-193d8fd7dfb7927facab7a3034daa27ad5b9df1c",
+        # 2020-08-16 develop branch.
+        urls = ["https://github.com/zlib-ng/zlib-ng/archive/193d8fd7dfb7927facab7a3034daa27ad5b9df1c.tar.gz"],
+        use_category = ["dataplane"],
+        cpe = "N/A",
+    ),
     com_github_jbeder_yaml_cpp = dict(
         project_name = "yaml-cpp",
         project_url = "https://github.com/jbeder/yaml-cpp",
@@ -358,8 +368,8 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_github_msgpack_msgpack_c = dict(
         project_name = "msgpack for C/C++",
         project_url = "https://github.com/msgpack/msgpack-c",
-        version = "3.2.1",
-        sha256 = "433cbcd741e1813db9ae4b2e192b83ac7b1d2dd7968a3e11470eacc6f4ab58d2",
+        version = "3.3.0",
+        sha256 = "6e114d12a5ddb8cb11f669f83f32246e484a8addd0ce93f274996f1941c1f07b",
         strip_prefix = "msgpack-{version}",
         urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-{version}/msgpack-{version}.tar.gz"],
         use_category = ["observability"],
@@ -379,30 +389,15 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_github_nodejs_http_parser = dict(
         project_name = "HTTP Parser",
         project_url = "https://github.com/nodejs/http-parser",
-        version = "2.9.3",
-        sha256 = "8fa0ab8770fd8425a9b431fdbf91623c4d7a9cdb842b9339289bd2b0b01b0d3d",
+        # 2020-07-10
+        # This SHA includes fix for https://github.com/nodejs/http-parser/issues/517 which allows (opt-in) to serve
+        # requests with both Content-Legth and Transfer-Encoding: chunked headers set.
+        version = "4f15b7d510dc7c6361a26a7c6d2f7c3a17f8d878",
+        sha256 = "6a12896313ce1ca630cf516a0ee43a79b5f13f5a5d8143f56560ac0b21c98fac",
         strip_prefix = "http-parser-{version}",
-        urls = ["https://github.com/nodejs/http-parser/archive/v{version}.tar.gz"],
+        urls = ["https://github.com/nodejs/http-parser/archive/{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:nodejs:node.js:*",
-    ),
-    com_github_pallets_jinja = dict(
-        project_name = "https://palletsprojects.com/p/jinja",
-        project_url = "Jinja",
-        version = "2.10.3",
-        sha256 = "db49236731373e4f3118af880eb91bb0aa6978bc0cf8b35760f6a026f1a9ffc4",
-        strip_prefix = "jinja-{version}",
-        urls = ["https://github.com/pallets/jinja/archive/{version}.tar.gz"],
-        use_category = ["build"],
-    ),
-    com_github_pallets_markupsafe = dict(
-        project_name = "MarkupSafe",
-        project_url = "https://github.com/pallets/markupsafe",
-        version = "1.1.1",
-        sha256 = "222a10e3237d92a9cd45ed5ea882626bc72bc5e0264d3ed0f2c9129fa69fc167",
-        strip_prefix = "markupsafe-{version}/src",
-        urls = ["https://github.com/pallets/markupsafe/archive/{version}.tar.gz"],
-        use_category = ["build"],
     ),
     com_github_tencent_rapidjson = dict(
         project_name = "RapidJSON",
@@ -497,9 +492,9 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     rules_foreign_cc = dict(
         project_name = "Rules for using foreign build systems in Bazel",
         project_url = "https://github.com/bazelbuild/rules_foreign_cc",
-        # 2020-06-09
-        version = "f54b7ae56dcf1b81bcafed3a08d58fc08ac095a7",
-        sha256 = "7ca49ac5b0bc8f5a2c9a7e87b7f86aca604bda197259c9b96f8b7f0a4f38b57b",
+        # 2020-08-21
+        version = "594bf4d7731e606a705f3ad787dd0a70c5a28b30",
+        sha256 = "2b1cf88de0b6e0195f6571cfde3a5bd406d11b42117d6adef2395c9525a1902e",
         strip_prefix = "rules_foreign_cc-{version}",
         urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/{version}.tar.gz"],
         use_category = ["build"],
@@ -547,11 +542,11 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_googlesource_chromium_v8 = dict(
         project_name = "V8",
         project_url = "https://v8.dev",
-        version = "8.3",
+        version = "8.5.210.20",
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
         # and contains complete checkout of V8 with all dependencies necessary to build wee8.
-        sha256 = "cc6f5357cd10922bfcf667bd882624ad313e21b009b919ce00f322f390012476",
-        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.110.9.tar.gz"],
+        sha256 = "ef404643d7da6854b76b9fb9950a79a1acbd037b7a26f02c585ac379b0f7dee1",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
@@ -635,8 +630,8 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     kafka_source = dict(
         project_name = "Kafka (source)",
         project_url = "https://kafka.apache.org",
-        version = "2.4.0",
-        sha256 = "e7b748a62e432b5770db6dbb3b034c68c0ea212812cb51603ee7f3a8a35f06be",
+        version = "2.4.1",
+        sha256 = "740236f44d66e33ea83382383b4fb7eabdab7093a644b525dd5ec90207f933bd",
         strip_prefix = "kafka-{version}/clients/src/main/resources/common/message",
         urls = ["https://github.com/apache/kafka/archive/{version}.zip"],
         use_category = ["dataplane"],
@@ -645,8 +640,8 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     kafka_server_binary = dict(
         project_name = "Kafka (server binary)",
         project_url = "https://kafka.apache.org",
-        version = "2.4.0",
-        sha256 = "b9582bab0c3e8d131953b1afa72d6885ca1caae0061c2623071e7f396f2ccfee",
+        version = "2.4.1",
+        sha256 = "2177cbd14118999e1d76fec628ca78ace7e6f841219dbc6035027c796bbe1a2a",
         strip_prefix = "kafka_2.12-{version}",
         urls = ["http://us.mirrors.quenda.co/apache/kafka/{version}/kafka_2.12-{version}.tgz"],
         use_category = ["test"],
@@ -654,8 +649,8 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     kafka_python_client = dict(
         project_name = "Kafka (Python client)",
         project_url = "https://kafka.apache.org",
-        version = "2.0.0",
-        sha256 = "454bf3aafef9348017192417b7f0828a347ec2eaf3efba59336f3a3b68f10094",
+        version = "2.0.1",
+        sha256 = "05f7c6eecb402f11fcb7e524c903f1ba1c38d3bdc9bf42bc8ec3cf7567b9f979",
         strip_prefix = "kafka-python-{version}",
         urls = ["https://github.com/dpkp/kafka-python/archive/{version}.tar.gz"],
         use_category = ["test"],

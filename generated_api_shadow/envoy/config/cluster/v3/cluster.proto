@@ -44,7 +44,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 51]
+// [#next-free-field: 52]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -245,6 +245,20 @@ message Cluster {
 
       // List of keys to match with the weighted cluster metadata.
       repeated string keys = 1;
+
+      // Selects a mode of operation in which each subset has only one host. This mode uses the same rules for
+      // choosing a host, but updating hosts is faster, especially for large numbers of hosts.
+      //
+      // If a match is found to a host, that host will be used regardless of priority levels, unless the host is unhealthy.
+      //
+      // Currently, this mode is only supported if `subset_selectors` has only one entry, and `keys` contains
+      // only one entry.
+      //
+      // When this mode is enabled, configurations that contain more than one host with the same metadata value for the single key in `keys`
+      // will use only one of the hosts with the given key; no requests will be routed to the others. The cluster gauge
+      // :ref:`lb_subsets_single_host_per_subset_duplicate<config_cluster_manager_cluster_stats_subset_lb>` indicates how many duplicates are
+      // present in the current configuration.
+      bool single_host_per_subset = 4;
 
       // The behavior used when no endpoint subset matches the selected route's
       // metadata.
@@ -462,6 +476,26 @@ message Cluster {
       // If set to `true`, the cluster will use hostname instead of the resolved
       // address as the key to consistently hash to an upstream host. Only valid for StrictDNS clusters with hostnames which resolve to a single IP address.
       bool use_hostname_for_hashing = 1;
+
+      // Configures percentage of average cluster load to bound per upstream host. For example, with a value of 150
+      // no upstream host will get a load more than 1.5 times the average load of all the hosts in the cluster.
+      // If not specified, the load is not bounded for any upstream host. Typical value for this parameter is between 120 and 200.
+      // Minimum is 100.
+      //
+      // Applies to both Ring Hash and Maglev load balancers.
+      //
+      // This is implemented based on the method described in the paper https://arxiv.org/abs/1608.01350. For the specified
+      // `hash_balance_factor`, requests to any upstream host are capped at `hash_balance_factor/100` times the average number of requests
+      // across the cluster. When a request arrives for an upstream host that is currently serving at its max capacity, linear probing
+      // is used to identify an eligible host. Further, the linear probe is implemented using a random jump in hosts ring/table to identify
+      // the eligible host (this technique is as described in the paper https://arxiv.org/abs/1908.08762 - the random jump avoids the
+      // cascading overflow effect when choosing the next host in the ring/table).
+      //
+      // If weights are specified on the hosts, they are respected.
+      //
+      // This is an O(N) algorithm, unlike other load balancers. Using a lower `hash_balance_factor` results in more hosts
+      // being probed, so use a higher value if you require better performance.
+      google.protobuf.UInt32Value hash_balance_factor = 2 [(validate.rules).uint32 = {gte: 100}];
     }
 
     // Configures the :ref:`healthy panic threshold <arch_overview_load_balancing_panic_threshold>`.
@@ -519,7 +553,7 @@ message Cluster {
     // connections to upstream hosts whenever hosts are added or removed from the cluster.
     bool close_connections_on_host_set_change = 6;
 
-    //Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
+    // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
     ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
   }
 
@@ -544,7 +578,8 @@ message Cluster {
   // [#not-implemented-hide:]
   message PrefetchPolicy {
     // Indicates how many many streams (rounded up) can be anticipated per-upstream for each
-    // stream, useful for high-QPS or latency-sensitive services.
+    // stream, useful for high-QPS or latency-sensitive services. Prefetching will only be done if
+    // the upstream is healthy.
     //
     // For example if this is 2, for an incoming HTTP/1.1 stream, 2 connections will be
     // established, one for the new incoming stream, and one for a presumed follow-up stream. For
@@ -915,6 +950,10 @@ message Cluster {
   // [#not-implemented-hide:]
   // Prefetch configuration for this cluster.
   PrefetchPolicy prefetch_policy = 50;
+
+  // If `connection_pool_per_downstream_connection` is true, the cluster will use a separate
+  // connection pool for every downstream connection
+  bool connection_pool_per_downstream_connection = 51;
 
   repeated core.v3.Address hidden_envoy_deprecated_hosts = 7 [deprecated = true];
 

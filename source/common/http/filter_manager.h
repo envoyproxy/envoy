@@ -1,8 +1,10 @@
 #pragma once
 
 #include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 
 #include "common/buffer/watermark_buffer.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/grpc/common.h"
@@ -305,6 +307,62 @@ public:
   virtual void encodeMetadata(MetadataMapVector& metadata) PURE;
 
   /**
+   * Injects request trailers into a stream that originally did not have request trailers.
+   */
+  virtual void setRequestTrailers(RequestTrailerMapPtr&& request_trailers) PURE;
+
+  /**
+   * Passes ownership of received continue headers to the parent. This may be called multiple times
+   * in the case of multiple upstream calls.
+   */
+  virtual void setContinueHeaders(ResponseHeaderMapPtr&& response_headers) PURE;
+
+  /**
+   * Passes ownership of received response headers to the parent. This may be called multiple times
+   * in the case of multiple upstream calls.
+   */
+  virtual void setResponseHeaders(ResponseHeaderMapPtr&& response_headers) PURE;
+
+  /**
+   * Passes ownership of received response trailers to the parent. This may be called multiple times
+   * in the case of multiple upstream calls.
+   */
+  virtual void setResponseTrailers(ResponseTrailerMapPtr&& response_trailers) PURE;
+
+  // TODO(snowp): We should consider moving filter access to headers/trailers to happen via the
+  // callbacks instead of via the encode/decode callbacks on the filters.
+
+  /**
+   * The downstream request headers if set.
+   */
+  virtual RequestHeaderMapOptRef requestHeaders() PURE;
+
+  /**
+   * The downstream request trailers if present.
+   */
+  virtual RequestTrailerMapOptRef requestTrailers() PURE;
+
+  /**
+   * Retrieves a pointer to the continue headers set via the call to setContinueHeaders.
+   */
+  virtual ResponseHeaderMapOptRef continueHeaders() PURE;
+
+  /**
+   * Retrieves a pointer to the response headers set via the last call to setResponseHeaders.
+   * Note that response headers might be set multiple times (e.g. if a local reply is issued after
+   * headers have been received but before headers have been encoded), so it is not safe in general
+   * to assume that any set of headers will be valid for the duration of a stream.
+   */
+  virtual ResponseHeaderMapOptRef responseHeaders() PURE;
+
+  /**
+   * Retrieves a pointer to the last response trailers set via setResponseTrailers.
+   * Note that response trailers might be set multiple times, so it is not safe in general to assume
+   * that any set of trailers will be valid for the duration of the stream.
+   */
+  virtual ResponseTrailerMapOptRef responseTrailers() PURE;
+
+  /**
    * Called after encoding has completed.
    */
   virtual void endStream() PURE;
@@ -337,8 +395,7 @@ public:
   /**
    * Called when the stream should be re-created, e.g. for an internal redirect.
    */
-  virtual void recreateStream(RequestHeaderMapPtr&& request_headers,
-                              StreamInfo::FilterStateSharedPtr filter_state) PURE;
+  virtual void recreateStream(StreamInfo::FilterStateSharedPtr filter_state) PURE;
 
   /**
    * Called when the stream should be reset.
@@ -436,11 +493,7 @@ public:
         local_reply_(local_reply),
         stream_info_(protocol, time_source, parent_filter_state, filter_state_life_span) {}
   ~FilterManager() override {
-    for (const auto& log_handler : access_log_handlers_) {
-      log_handler->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
-                       stream_info_);
-    }
-
+    ASSERT(state_.destroyed_);
     ASSERT(state_.filter_call_state_ == 0);
   }
 
@@ -451,10 +504,10 @@ public:
        << DUMP_MEMBER(state_.decoding_headers_only_) << DUMP_MEMBER(state_.encoding_headers_only_)
        << "\n";
 
-    DUMP_DETAILS(request_headers_);
-    DUMP_DETAILS(request_trailers_);
-    DUMP_DETAILS(response_headers_);
-    DUMP_DETAILS(response_trailers_);
+    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.requestHeaders());
+    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.requestTrailers());
+    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.responseHeaders());
+    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.responseTrailers());
     DUMP_DETAILS(&stream_info_);
   }
 
@@ -470,6 +523,25 @@ public:
     addStreamEncoderFilterWorker(filter, true);
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
+
+  void log() {
+    RequestHeaderMap* request_headers = nullptr;
+    if (filter_manager_callbacks_.requestHeaders()) {
+      request_headers = &filter_manager_callbacks_.requestHeaders()->get();
+    }
+    ResponseHeaderMap* response_headers = nullptr;
+    if (filter_manager_callbacks_.responseHeaders()) {
+      response_headers = &filter_manager_callbacks_.responseHeaders()->get();
+    }
+    ResponseTrailerMap* response_trailers = nullptr;
+    if (filter_manager_callbacks_.responseTrailers()) {
+      response_trailers = &filter_manager_callbacks_.responseTrailers()->get();
+    }
+
+    for (const auto& log_handler : access_log_handlers_) {
+      log_handler->log(request_headers, response_headers, response_trailers, stream_info_);
+    }
+  }
 
   void destroyFilters() {
     state_.destroyed_ = true;
@@ -508,12 +580,7 @@ public:
    * Decodes the provided trailers starting at the first filter in the chain.
    * @param trailers the trailers to decode.
    */
-  void decodeTrailers(RequestTrailerMapPtr&& trailers) {
-    ASSERT(request_trailers_ == nullptr);
-
-    request_trailers_ = std::move(trailers);
-    decodeTrailers(nullptr, *request_trailers_);
-  }
+  void decodeTrailers(RequestTrailerMap& trailers) { decodeTrailers(nullptr, trailers); }
 
   /**
    * Decodes the provided metadata starting at the first filter in the chain.
@@ -574,18 +641,11 @@ public:
   void callHighWatermarkCallbacks();
   void callLowWatermarkCallbacks();
 
-  void setRequestHeaders(RequestHeaderMapPtr&& request_headers) {
-    if (Http::Headers::get().MethodValues.Head == request_headers->getMethodValue()) {
+  void requestHeadersInitialized() {
+    if (Http::Headers::get().MethodValues.Head ==
+        filter_manager_callbacks_.requestHeaders()->get().getMethodValue()) {
       state_.is_head_request_ = true;
     }
-
-    // TODO(snowp): Ideally we don't need this function, but during decodeHeaders we might issue
-    // local replies before the FilterManager::decodeData has been called. We could likely get rid
-    // of this by updating the calls to sendLocalReply to pass ownership over the headers + adding
-    // asserts that we don't call the overload that doesn't pass ownership unless decodeData has
-    // been called.
-    ASSERT(request_headers_ == nullptr);
-    request_headers_ = std::move(request_headers);
   }
 
   /**
@@ -611,26 +671,6 @@ public:
     ASSERT(!state_.created_filter_chain_);
     state_.created_filter_chain_ = true;
   }
-
-  /**
-   * Returns the current request headers, or nullptr if header decoding hasn't started yet.
-   */
-  RequestHeaderMap* requestHeaders() const { return request_headers_.get(); }
-
-  /**
-   * Returns the current request trailers, or nullptr if trailer decoding hasn't started yet.
-   */
-  RequestTrailerMap* requestTrailers() const { return request_trailers_.get(); }
-
-  /**
-   * Returns the current response headers, or nullptr if header encoding hasn't started yet.
-   */
-  ResponseHeaderMap* responseHeaders() const { return response_headers_.get(); }
-
-  /**
-   * Returns the current response trailers, or nullptr if trailer encoding hasn't started yet.
-   */
-  ResponseTrailerMap* responseTrailers() const { return response_trailers_.get(); }
 
   // TODO(snowp): This should probably return a StreamInfo instead of the impl.
   StreamInfo::StreamInfoImpl& streamInfo() { return stream_info_; }
@@ -713,11 +753,6 @@ private:
   std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
   std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
 
-  ResponseHeaderMapPtr continue_headers_;
-  ResponseHeaderMapPtr response_headers_;
-  ResponseTrailerMapPtr response_trailers_;
-  RequestHeaderMapPtr request_headers_;
-  RequestTrailerMapPtr request_trailers_;
   // Stores metadata added in the decoding filter that is being processed. Will be cleared before
   // processing the next filter. The storage is created on demand. We need to store metadata
   // temporarily in the filter in case the filter has stopped all while processing headers.

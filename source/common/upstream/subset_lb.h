@@ -197,6 +197,9 @@ private:
   // Called by HostSet::MemberUpdateCb
   void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed);
 
+  // Rebuild the map for single_host_per_subset mode.
+  void rebuildSingle();
+
   void updateFallbackSubset(uint32_t priority, const HostVector& hosts_added,
                             const HostVector& hosts_removed);
   void
@@ -205,6 +208,9 @@ private:
                  std::function<void(LbSubsetEntryPtr, HostPredicate, const SubsetMetadata&)> cb);
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
+  HostConstSharedPtr
+  tryChooseHostFromMetadataMatchCriteriaSingle(const Router::MetadataMatchCriteria& match_criteria,
+                                               bool& host_chosen);
 
   absl::optional<SubsetSelectorFallbackParamsRef>
   tryFindSelectorFallbackParams(LoadBalancerContext* context);
@@ -236,7 +242,7 @@ private:
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
       fallback_policy_;
   const SubsetMetadata default_subset_metadata_;
-  const std::vector<SubsetSelectorPtr> subset_selectors_;
+  std::vector<SubsetSelectorPtr> subset_selectors_;
 
   const PrioritySet& original_priority_set_;
   const PrioritySet* original_local_priority_set_;
@@ -253,6 +259,10 @@ private:
   // Forms a trie-like structure of lexically sorted keys+fallback policy from subset
   // selectors configuration
   SubsetSelectorMapPtr selectors_;
+
+  std::string single_key_;
+  absl::flat_hash_map<HashedValue, HostConstSharedPtr> single_host_per_subset_map_;
+  Stats::Gauge* single_duplicate_stat_{};
 
   const bool locality_weight_aware_;
   const bool scale_locality_weight_;

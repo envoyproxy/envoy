@@ -140,7 +140,7 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   check_listener_stats(0, 1);
 }
 
-TEST_P(IntegrationTest, RouterDirectResponse) {
+TEST_P(IntegrationTest, RouterDirectResponseWithBody) {
   const std::string body = "Response body";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", body);
   static const std::string domain("direct.example.com");
@@ -157,6 +157,11 @@ TEST_P(IntegrationTest, RouterDirectResponse) {
         header_value_option = route_config->mutable_response_headers_to_add()->Add();
         header_value_option->mutable_header()->set_key("content-type");
         header_value_option->mutable_header()->set_value("text/html");
+        header_value_option->mutable_append()->set_value(false);
+        // Add a wrong content-length.
+        header_value_option = route_config->mutable_response_headers_to_add()->Add();
+        header_value_option->mutable_header()->set_key("content-length");
+        header_value_option->mutable_header()->set_value("2000");
         header_value_option->mutable_append()->set_value(false);
         auto* virtual_host = route_config->add_virtual_hosts();
         virtual_host->set_name(domain);
@@ -178,7 +183,53 @@ TEST_P(IntegrationTest, RouterDirectResponse) {
                                  ->value()
                                  .getStringView());
   EXPECT_EQ("text/html", response->headers().getContentTypeValue());
+  // Verify content-length is correct.
+  EXPECT_EQ(fmt::format("{}", body.size()), response->headers().getContentLengthValue());
   EXPECT_EQ(body, response->body());
+}
+
+TEST_P(IntegrationTest, RouterDirectResponseEmptyBody) {
+  static const std::string domain("direct.example.com");
+  static const std::string prefix("/");
+  static const Http::Code status(Http::Code::OK);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* route_config = hcm.mutable_route_config();
+        auto* header_value_option = route_config->mutable_response_headers_to_add()->Add();
+        header_value_option->mutable_header()->set_key("x-additional-header");
+        header_value_option->mutable_header()->set_value("example-value");
+        header_value_option->mutable_append()->set_value(false);
+        header_value_option = route_config->mutable_response_headers_to_add()->Add();
+        header_value_option->mutable_header()->set_key("content-type");
+        header_value_option->mutable_header()->set_value("text/html");
+        header_value_option->mutable_append()->set_value(false);
+        // Add a wrong content-length.
+        header_value_option = route_config->mutable_response_headers_to_add()->Add();
+        header_value_option->mutable_header()->set_key("content-length");
+        header_value_option->mutable_header()->set_value("2000");
+        header_value_option->mutable_append()->set_value(false);
+        auto* virtual_host = route_config->add_virtual_hosts();
+        virtual_host->set_name(domain);
+        virtual_host->add_domains(domain);
+        virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
+        virtual_host->mutable_routes(0)->mutable_direct_response()->set_status(
+            static_cast<uint32_t>(status));
+      });
+  initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "direct.example.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("example-value", response->headers()
+                                 .get(Envoy::Http::LowerCaseString("x-additional-header"))
+                                 ->value()
+                                 .getStringView());
+  // Content-type header is removed.
+  EXPECT_EQ(nullptr, response->headers().ContentType());
+  // Content-length header is correct.
+  EXPECT_EQ("0", response->headers().getContentLengthValue());
 }
 
 TEST_P(IntegrationTest, ConnectionClose) {
@@ -429,6 +480,78 @@ TEST_P(IntegrationTest, TestSmuggling) {
   }
 }
 
+TEST_P(IntegrationTest, TestServerAllowChunkedLength) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_http_protocol_options()->set_allow_chunked_length(true);
+      });
+  initialize();
+
+  auto tcp_client = makeTcpConnection(lookupPort("http"));
+  ASSERT_TRUE(tcp_client->write("POST / HTTP/1.1\r\n"
+                                "Host: host\r\n"
+                                "Content-length: 100\r\n"
+                                "Transfer-Encoding: chunked\r\n\r\n"
+                                "4\r\nbody\r\n"
+                                "0\r\n\r\n"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
+
+  ASSERT_THAT(data, HasSubstr("POST / HTTP/1.1"));
+  ASSERT_THAT(data, HasSubstr("transfer-encoding: chunked"));
+  // verify no 'content-length' header
+  ASSERT_THAT(data, Not(HasSubstr("ontent-length")));
+
+  ASSERT_TRUE(
+      fake_upstream_connection->write("HTTP/1.1 200 OK\r\nTransfer-encoding: chunked\r\n\r\n"));
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->close();
+}
+
+TEST_P(IntegrationTest, TestClientAllowChunkedLength) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
+    if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      cluster->mutable_http_protocol_options()->set_allow_chunked_length(true);
+    }
+  });
+
+  initialize();
+
+  auto tcp_client = makeTcpConnection(lookupPort("http"));
+  ASSERT_TRUE(tcp_client->write("GET / HTTP/1.1\r\nHost: host\r\n\r\n"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
+
+  ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 200 OK\r\n"
+                                              "Transfer-encoding: chunked\r\n"
+                                              "Content-Length: 100\r\n\r\n"
+                                              "4\r\nbody\r\n"
+                                              "0\r\n\r\n"));
+  tcp_client->waitForData("\r\n\r\n", false);
+  std::string response = tcp_client->data();
+
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+  EXPECT_THAT(response, Not(HasSubstr("content-length")));
+  EXPECT_THAT(response, HasSubstr("transfer-encoding: chunked\r\n"));
+  EXPECT_THAT(response, EndsWith("\r\n\r\n"));
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->close();
+}
+
 TEST_P(IntegrationTest, BadFirstline) {
   initialize();
   std::string response;
@@ -437,13 +560,16 @@ TEST_P(IntegrationTest, BadFirstline) {
 }
 
 TEST_P(IntegrationTest, MissingDelimiter) {
-  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "GET / HTTP/1.1\r\nHost: host\r\nfoo bar\r\n\r\n", &response);
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http1.codec_error"));
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr("http1.codec_error"));
+  EXPECT_THAT(log, HasSubstr("DPE"));
+  EXPECT_THAT(log, Not(HasSubstr("DC")));
 }
 
 TEST_P(IntegrationTest, InvalidCharacterInFirstline) {
@@ -1445,6 +1571,70 @@ TEST_P(IntegrationTest, Response204WithBody) {
 TEST_P(IntegrationTest, QuitQuitQuit) {
   initialize();
   test_server_->useAdminInterfaceToQuit(true);
+}
+
+// override_stream_error_on_invalid_http_message=true and HCM
+// stream_error_on_invalid_http_message=false: test that HTTP/1.1 connection is left open on invalid
+// HTTP message (missing :host header)
+TEST_P(IntegrationTest, ConnectionIsLeftOpenIfHCMStreamErrorIsFalseAndOverrideIsTrue) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        hcm.mutable_stream_error_on_invalid_http_message()->set_value(false);
+        hcm.mutable_http_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/test/long/url"}, {"content-length", "0"}});
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_FALSE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
+// override_stream_error_on_invalid_http_message is not set and HCM
+// stream_error_on_invalid_http_message=true: test that HTTP/1.1 connection is left open on invalid
+// HTTP message (missing :host header)
+TEST_P(IntegrationTest, ConnectionIsLeftOpenIfHCMStreamErrorIsTrueAndOverrideNotSet) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void { hcm.mutable_stream_error_on_invalid_http_message()->set_value(true); });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/test/long/url"}, {"content-length", "0"}});
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_FALSE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
+// override_stream_error_on_invalid_http_message is not set and HCM
+// stream_error_on_invalid_http_message=false: test that HTTP/1.1 connection is terminated on
+// invalid HTTP message (missing :host header)
+TEST_P(IntegrationTest, ConnectionIsTerminatedIfHCMStreamErrorIsFalseAndOverrideNotSet) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        hcm.mutable_stream_error_on_invalid_http_message()->set_value(false);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/test/long/url"}, {"content-length", "0"}});
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
 } // namespace Envoy
