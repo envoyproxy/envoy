@@ -1,3 +1,4 @@
+#include <functional>
 #include <iostream>
 #include <string>
 
@@ -8,6 +9,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/logging.h"
 
+#include "absl/synchronization/barrier.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -116,6 +118,78 @@ TEST(Logger, checkLoggerLevel) {
 
   test_obj.setLevel(spdlog::level::info);
   EXPECT_THAT(test_obj.executeAtTraceLevel(), testing::Eq(2));
+}
+
+void spamCall(std::function<void()>&& call_to_spam, const uint32_t num_threads) {
+  std::vector<std::thread> threads(num_threads);
+  auto barrier = std::make_unique<absl::Barrier>(num_threads);
+
+  for (auto& thread : threads) {
+    thread = std::thread([&call_to_spam, &barrier] {
+      // Allow threads to accrue, to maximize concurrency on the call we are testing.
+      if (barrier->Block()) {
+        barrier.reset();
+      }
+      call_to_spam();
+    });
+  }
+  for (std::thread& thread : threads) {
+    thread.join();
+  }
+}
+
+TEST(Logger, SparseLogMacros) {
+  class SparseLogMacrosTestHelper : public Logger::Loggable<Logger::Id::filter> {
+  public:
+    SparseLogMacrosTestHelper() { ENVOY_LOGGER().set_level(spdlog::level::info); }
+    void logSomething() { ENVOY_LOG_ONCE(error, "foo1 '{}'", evaluations()++); }
+    void logSomethingElse() { ENVOY_LOG_ONCE(error, "foo2 '{}'", evaluations()++); }
+    void logSomethingBelowLogLevelOnce() { ENVOY_LOG_ONCE(debug, "foo3 '{}'", evaluations()++); }
+    void logSomethingThrice() { ENVOY_LOG_FIRST_N(error, 3, "foo4 '{}'", evaluations()++); }
+    void logEverySeventh() { ENVOY_LOG_EVERY_NTH(error, 7, "foo5 '{}'", evaluations()++); }
+    void logEveryPow2() { ENVOY_LOG_EVERY_POW_2(error, "foo6 '{}'", evaluations()++); }
+    std::atomic<int32_t>& evaluations() { MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<int32_t>); };
+  };
+  constexpr uint32_t kNumThreads = 100;
+  SparseLogMacrosTestHelper helper;
+  spamCall(
+      [&helper]() {
+        helper.logSomething();
+        helper.logSomething();
+      },
+      kNumThreads);
+  EXPECT_EQ(1, helper.evaluations());
+  spamCall(
+      [&helper]() {
+        helper.logSomethingElse();
+        helper.logSomethingElse();
+      },
+      kNumThreads);
+  // Two distinct log lines ought to result in two evaluations, and no more.
+  EXPECT_EQ(2, helper.evaluations());
+
+  spamCall([&helper]() { helper.logSomethingThrice(); }, kNumThreads);
+  // Single log line should be emitted 3 times.
+  EXPECT_EQ(5, helper.evaluations());
+
+  spamCall([&helper]() { helper.logEverySeventh(); }, kNumThreads);
+  // (100 threads / log every 7th) + 1s = 15 more evaluations upon logging very 7th.
+  EXPECT_EQ(20, helper.evaluations());
+
+  helper.logEveryPow2();
+  // First call ought to propagate.
+  EXPECT_EQ(21, helper.evaluations());
+
+  spamCall([&helper]() { helper.logEveryPow2(); }, kNumThreads);
+  // 64 is the highest power of two that fits when kNumThreads == 100.
+  // We should log on 2, 4, 8, 16, 32, 64, which means we can expect to add 6 more evaluations.
+  EXPECT_EQ(27, helper.evaluations());
+
+  spamCall([&helper]() { helper.logSomethingBelowLogLevelOnce(); }, kNumThreads);
+  // Without fine-grained logging, we shouldn't observe additional argument evaluations
+  // for log lines below the configured log level.
+  // TODO(#12885): fancy logger shouldn't always evaluate variadic macro arguments.
+  EXPECT_EQ(::Envoy::Logger::Context::useFancyLogger() ? 28 : 27, helper.evaluations());
 }
 
 TEST(RegistryTest, LoggerWithName) {
