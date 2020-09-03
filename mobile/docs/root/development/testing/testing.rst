@@ -3,6 +3,11 @@
 Testing
 =======
 
+.. toctree::
+  :maxdepth: 2
+
+  local_stats
+
 Envoy Mobile strives to have a high standard of code quality and test coverage for the entire
 project.
 
