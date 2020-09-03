@@ -12,23 +12,21 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Cdn {
+namespace CdnLoop {
 
 StatusOr<int> countCdnLoopOccurrences(absl::string_view header, absl::string_view cdn_id) {
   if (cdn_id.empty()) {
     return absl::InvalidArgumentError("cdn_id cannot be empty");
   }
 
-  if (absl::StatusOr<CdnLoopParser::ParsedCdnInfoList> parsed =
-          CdnLoopParser::parseCdnInfoList(header);
-      parsed) {
+  if (absl::StatusOr<Parser::ParsedCdnInfoList> parsed = Parser::parseCdnInfoList(header); parsed) {
     return std::count(parsed->cdnIds().begin(), parsed->cdnIds().end(), cdn_id);
   } else {
     return parsed.status();
   }
 }
 
-} // namespace Cdn
+} // namespace CdnLoop
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

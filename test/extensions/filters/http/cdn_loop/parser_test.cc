@@ -9,8 +9,8 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Cdn {
-namespace CdnLoopParser {
+namespace CdnLoop {
+namespace Parser {
 namespace {
 
 using ::Envoy::StatusHelpers::IsOkAndHolds;
@@ -448,8 +448,8 @@ TEST(ParseCdnInfoListTest, Rfc7230Section7Tests) {
 }
 
 } // namespace
-} // namespace CdnLoopParser
-} // namespace Cdn
+} // namespace Parser
+} // namespace CdnLoop
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

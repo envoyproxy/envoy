@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Cdn {
+namespace CdnLoop {
 
 // Count the number of times cdn_id appears as a cdn-id element in header.
 //
@@ -18,7 +18,7 @@ namespace Cdn {
 // will return an InvalidArgument status.
 StatusOr<int> countCdnLoopOccurrences(absl::string_view header, absl::string_view cdn_id);
 
-} // namespace Cdn
+} // namespace CdnLoop
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

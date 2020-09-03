@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Cdn {
+namespace CdnLoop {
 namespace {
 
 using ::Envoy::StatusHelpers::IsOkAndHolds;
@@ -134,7 +134,7 @@ TEST(CountCdnLoopOccurrencesTest, BadHeader) {
 }
 
 } // namespace
-} // namespace Cdn
+} // namespace CdnLoop
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

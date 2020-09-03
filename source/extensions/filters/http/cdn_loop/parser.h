@@ -47,8 +47,8 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Cdn {
-namespace CdnLoopParser {
+namespace CdnLoop {
+namespace Parser {
 
 // A ParseContext contains the state of the recursive descent parser and some
 // helper methods.
@@ -292,8 +292,8 @@ StatusOr<ParsedCdnInfo> parseCdnInfo(const ParseContext& input);
 // and will return an error if there is something it cannot parse.
 StatusOr<ParsedCdnInfoList> parseCdnInfoList(const ParseContext& input);
 
-} // namespace CdnLoopParser
-} // namespace Cdn
+} // namespace Parser
+} // namespace CdnLoop
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

@@ -9,8 +9,8 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Cdn {
-namespace CdnLoopParser {
+namespace CdnLoop {
+namespace Parser {
 
 namespace {
 
@@ -352,8 +352,8 @@ StatusOr<ParsedCdnInfoList> parseCdnInfoList(const ParseContext& input) {
   return ParsedCdnInfoList(context, std::move(cdn_infos));
 }
 
-} // namespace CdnLoopParser
-} // namespace Cdn
+} // namespace Parser
+} // namespace CdnLoop
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
