@@ -28,7 +28,8 @@ use(
     },
     {
       "owner": "envoyproxy/dependency-watchers",
-      "path": "(bazel/repository_locations.bzl)|(api/bazel/repository_locations.bzl)",
+      "path":
+      "(bazel/repository_locations\.bzl)|(api/bazel/repository_locations\.bzl)|(.*/requirements\.txt)",
     },
   ],
 )
