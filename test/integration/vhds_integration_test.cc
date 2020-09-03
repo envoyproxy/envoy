@@ -82,7 +82,7 @@ static_resources:
                   envoy_grpc:
                     cluster_name: xds_cluster
 )EOF",
-                                                  platform::null_device_path));
+                                                  Platform::null_device_path));
 }
 
 // TODO (dmitri-d) move config yaml into ConfigHelper

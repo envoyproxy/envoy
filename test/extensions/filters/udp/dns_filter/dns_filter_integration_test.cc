@@ -50,7 +50,7 @@ static_resources:
                 address: {}
                 port_value: 0
     )EOF",
-                       platform::null_device_path,
+                       Platform::null_device_path,
                        Network::Test::getLoopbackAddressString(GetParam()));
   }
 

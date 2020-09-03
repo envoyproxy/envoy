@@ -53,7 +53,7 @@ WatcherImpl::~WatcherImpl() {
 }
 
 void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) {
-  if (path == platform::null_device_path) {
+  if (path == Platform::null_device_path) {
     return;
   }
 
