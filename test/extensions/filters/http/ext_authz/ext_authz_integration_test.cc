@@ -1,4 +1,5 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
@@ -35,6 +36,10 @@ public:
         new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
 
+  void fillRequestBody(uint64_t request_body_length) {
+    TestUtility::feedBufferWithRandomCharacters(request_body_, request_body_length);
+  }
+
   void initializeConfig() {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -68,8 +73,14 @@ public:
     }
   }
 
-  void initiateClientConnection(uint64_t request_body_length,
-                                const Headers& headers_to_add = Headers{},
+  void setMatchRequestBody() {
+    envoy::config::common::matcher::v3::MatchPredicate match;
+    match.mutable_http_request_generic_body_match()->add_patterns()->set_string_match(
+        request_body_.toString());
+    proto_config_.mutable_match()->MergeFrom(match);
+  }
+
+  void initiateClientConnection(const Headers& headers_to_add = Headers{},
                                 const Headers& headers_to_append = Headers{}) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
@@ -89,7 +100,6 @@ public:
       headers.addCopy(headers_to_append.first, headers_to_append.second);
     }
 
-    TestUtility::feedBufferWithRandomCharacters(request_body_, request_body_length);
     response_ = codec_client_->makeRequestWithBody(headers, request_body_.toString());
   }
 
@@ -299,20 +309,30 @@ attributes:
 
   void expectCheckRequestWithBody(Http::CodecClient::Type downstream_protocol,
                                   uint64_t request_size) {
-    expectCheckRequestWithBodyWithHeaders(downstream_protocol, request_size, Headers{}, Headers{},
+    fillRequestBody(request_size);
+    expectCheckRequestWithBodyWithHeaders(downstream_protocol, Headers{}, Headers{},
+                                          Http::TestRequestHeaderMapImpl{},
+                                          Http::TestRequestHeaderMapImpl{});
+  }
+
+  void expectCheckRequestWithBodyAndMatch(Http::CodecClient::Type downstream_protocol,
+                                          uint64_t request_size) {
+    fillRequestBody(request_size);
+    setMatchRequestBody();
+    expectCheckRequestWithBodyWithHeaders(downstream_protocol, Headers{}, Headers{},
                                           Http::TestRequestHeaderMapImpl{},
                                           Http::TestRequestHeaderMapImpl{});
   }
 
   void expectCheckRequestWithBodyWithHeaders(
-      Http::CodecClient::Type downstream_protocol, uint64_t request_size,
-      const Headers& headers_to_add, const Headers& headers_to_append,
+      Http::CodecClient::Type downstream_protocol, const Headers& headers_to_add,
+      const Headers& headers_to_append,
       const Http::TestRequestHeaderMapImpl& new_headers_from_upstream,
       const Http::TestRequestHeaderMapImpl& headers_to_append_multiple) {
     initializeConfig();
     setDownstreamProtocol(downstream_protocol);
     HttpIntegrationTest::initialize();
-    initiateClientConnection(request_size, headers_to_add, headers_to_append);
+    initiateClientConnection(headers_to_add, headers_to_append);
     waitForExtAuthzRequest(expectedCheckRequest(downstream_protocol));
 
     Headers updated_headers_to_add;
@@ -334,11 +354,12 @@ attributes:
   }
 
   void expectFilterDisableCheck(bool deny_at_disable, const std::string& expected_status) {
+    fillRequestBody(4);
     initializeConfig();
     setDenyAtDisableRuntimeConfig(deny_at_disable);
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
     HttpIntegrationTest::initialize();
-    initiateClientConnection(4);
+    initiateClientConnection();
     if (!deny_at_disable) {
       waitForSuccessfulUpstreamResponse(expected_status);
     }
@@ -543,11 +564,40 @@ TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithLargeBody) {
   expectCheckRequestWithBody(Http::CodecClient::Type::HTTP2, 2048);
 }
 
+// Verifies that the request body is included in the CheckRequest when the downstream protocol is
+// HTTP/1.1.
+// The http_request_generic_body_match is configured to match the full request body.
+TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithBodyAndMatch) {
+  expectCheckRequestWithBodyAndMatch(Http::CodecClient::Type::HTTP1, 4);
+}
+
+// Verifies that the request body is included in the CheckRequest when the downstream protocol is
+// HTTP/1.1 and the size of the request body is larger than max_request_bytes.
+// The http_request_generic_body_match is configured to match the full request body.
+TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithLargeBodyAndMatch) {
+  expectCheckRequestWithBodyAndMatch(Http::CodecClient::Type::HTTP1, 2048);
+}
+
+// Verifies that the request body is included in the CheckRequest when the downstream protocol is
+// HTTP/2.
+// The http_request_generic_body_match is configured to match the full request body.
+TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithBodyAndMatch) {
+  expectCheckRequestWithBodyAndMatch(Http::CodecClient::Type::HTTP2, 4);
+}
+
+// Verifies that the request body is included in the CheckRequest when the downstream protocol is
+// HTTP/2 and the size of the request body is larger than max_request_bytes.
+// The http_request_generic_body_match is configured to match the full request body.
+TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithLargeBodyAndMatch) {
+  expectCheckRequestWithBodyAndMatch(Http::CodecClient::Type::HTTP2, 2048);
+}
+
 // Verifies that the original request headers will be added and appended when the authorization
 // server returns headers_to_add and headers_to_append in OkResponse message.
 TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
+  fillRequestBody(4);
   expectCheckRequestWithBodyWithHeaders(
-      Http::CodecClient::Type::HTTP1, 4,
+      Http::CodecClient::Type::HTTP1,
       /*headers_to_add=*/Headers{{"header1", "header1"}},
       /*headers_to_append=*/Headers{{"header2", "header2"}},
       /*new_headers_from_upstream=*/Http::TestRequestHeaderMapImpl{{"new1", "new1"}},
@@ -559,6 +609,42 @@ TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
 TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisable) { expectFilterDisableCheck(false, "200"); }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisable) { expectFilterDisableCheck(true, "403"); }
+
+TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisableForNotMatched) {
+  envoy::config::common::matcher::v3::MatchPredicate match;
+  match.mutable_not_match()->set_any_match(true);
+  proto_config_.mutable_match()->MergeFrom(match);
+
+  expectFilterDisableCheck(true, "200");
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisableForNotMatchedHeader) {
+  envoy::config::common::matcher::v3::MatchPredicate match;
+  auto* header = match.mutable_http_request_headers_match()->add_headers();
+  header->set_name(":path");
+  header->set_exact_match("/bad");
+  proto_config_.mutable_match()->MergeFrom(match);
+
+  expectFilterDisableCheck(true, "200");
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisableForMatched) {
+  envoy::config::common::matcher::v3::MatchPredicate match;
+  match.set_any_match(true);
+  proto_config_.mutable_match()->MergeFrom(match);
+
+  expectFilterDisableCheck(true, "403");
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisableForMatchedHeader) {
+  envoy::config::common::matcher::v3::MatchPredicate match;
+  auto* header = match.mutable_http_request_headers_match()->add_headers();
+  header->set_name(":path");
+  header->set_exact_match("/test");
+  proto_config_.mutable_match()->MergeFrom(match);
+
+  expectFilterDisableCheck(true, "403");
+}
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzHttpIntegrationTest,
                          ValuesIn(TestEnvironment::getIpVersionsForTest()),

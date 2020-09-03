@@ -33,6 +33,19 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
 
 void Filter::initiateCall(const Http::RequestHeaderMap& headers,
                           const Router::RouteConstSharedPtr& route) {
+  if (config_->hasMatcher()) {
+    if (config_->rootMatcher().matchStatus(statuses_).matches_) {
+      ENVOY_STREAM_LOG(debug, "ext_authz filter request matched", *callbacks_);
+      stats_.matched_.inc();
+    } else {
+      ENVOY_STREAM_LOG(debug, "ext_authz filter disabled, request not matched", *callbacks_);
+      stats_.not_matched_.inc();
+      // Request not matched, cancel the external authorization and continue the filter chain.
+      filter_return_ = FilterReturn::ContinueDecoding;
+      return;
+    }
+  }
+
   if (filter_return_ == FilterReturn::StopDecoding) {
     return;
   }
@@ -92,8 +105,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::Continue;
   }
 
+  bool might_match_later;
+  if (config_->hasMatcher()) {
+    const auto& matcher = config_->rootMatcher();
+    matcher.onNewStream(statuses_);
+    matcher.onHttpRequestHeaders(headers, statuses_);
+    const auto& current_status = matcher.matchStatus(statuses_);
+    might_match_later = !current_status.matches_ && current_status.might_change_status_;
+  }
   request_headers_ = &headers;
-  buffer_data_ = config_->withRequestBody() &&
+  buffer_data_ = (config_->withRequestBody() || might_match_later) &&
                  !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers) ||
                    Http::Utility::isH2UpgradeRequest(headers));
   if (buffer_data_) {
@@ -121,6 +142,15 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
         // Make sure data is available in initiateCall.
         callbacks_->addDecodedData(data, true);
       }
+
+      if (config_->hasMatcher()) {
+        // streaming is not supported so just call onRequestBody() once on all buffered data.
+        const auto* buffer = callbacks_->decodingBuffer();
+        if (buffer != nullptr) {
+          config_->rootMatcher().onRequestBody(*buffer, statuses_);
+        }
+      }
+
       initiateCall(*request_headers_, callbacks_->route());
       return filter_return_ == FilterReturn::StopDecoding
                  ? Http::FilterDataStatus::StopIterationAndWatermark
@@ -133,7 +163,10 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
+Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& request_trailers) {
+  if (config_->hasMatcher()) {
+    config_->rootMatcher().onHttpRequestTrailers(request_trailers, statuses_);
+  }
   if (buffer_data_ && !skip_check_) {
     if (filter_return_ != FilterReturn::StopDecoding) {
       ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request", *callbacks_);
@@ -285,6 +318,13 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 }
 
 bool Filter::isBufferFull() const {
+  if (config_->hasMatcher()) {
+    const auto& current_status = config_->rootMatcher().matchStatus(statuses_);
+    if (!current_status.matches_ && current_status.might_change_status_) {
+      // Buffer as much as possible since the request could be matched later.
+      return false;
+    }
+  }
   const auto* buffer = callbacks_->decodingBuffer();
   if (config_->allowPartialMessage() && buffer != nullptr) {
     return buffer->length() >= config_->maxRequestBytes();

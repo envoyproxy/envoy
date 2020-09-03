@@ -7,7 +7,9 @@ External Authorization
 * This filter should be configured with the name *envoy.filters.http.ext_authz*.
 
 The external authorization filter calls an external gRPC or HTTP service to check whether an incoming
-HTTP request is authorized or not.
+HTTP request is authorized or not. The ext_authz filter can be configured to enable for specifc
+requests based on the header and body matching.
+
 If the request is deemed unauthorized, then the request will be denied normally with 403 (Forbidden) response.
 Note that sending additional custom metadata from the authorization service to the upstream, to the downstream or to the authorization service is
 also possible. This is explained in more details at :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`.
@@ -60,7 +62,11 @@ A sample filter configuration for a gRPC authorization server:
       # entire request.
       connect_timeout: 0.25s
 
-A sample filter configuration for a raw HTTP authorization server:
+A sample filter configuration for a raw HTTP authorization server. The filter is enabled only if
+the ":path" header has value "/admin" and the request body includes string "ext_authz".
+
+If the ":path" header is not "/admin" or the request body doesn't include "ext_authz", the ext_authz
+filter will be disabed as if it doesn't exist and the request will be allowed (no external authorization check made):
 
 .. code-block:: yaml
 
@@ -75,6 +81,16 @@ A sample filter configuration for a raw HTTP authorization server:
               timeout: 0.25s
               failure_mode_allow: false
         include_peer_certificate: true
+        match:
+          and_match:
+            rules:
+            - http_request_headers_match:
+                headers:
+                - name: ":path"
+                  exact_match: "/admin"
+            - http_request_generic_body_match:
+                patterns:
+                - string_match: "ext_authz"
 
 .. code-block:: yaml
 
@@ -137,6 +153,8 @@ The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_au
   denied, Counter, Total responses from the authorizations service that were to deny the traffic.
   failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
   of failure_mode_allow set to true."
+  matched, Counter, Total requests matched (only when the match field is configured).
+  not_matched, Counter, Total requests not matched (only when the match field is configured).
 
 Dynamic Metadata
 ----------------

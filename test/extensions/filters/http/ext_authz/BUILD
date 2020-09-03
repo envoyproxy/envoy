@@ -62,6 +62,7 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",

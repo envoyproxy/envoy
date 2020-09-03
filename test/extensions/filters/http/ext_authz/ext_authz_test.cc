@@ -972,6 +972,250 @@ TEST_F(HttpFilterTest, FilterAllowAtDisable) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
+// Checks that filter initiates the authorization request if it is always matched.
+TEST_F(HttpFilterTest, AlwaysMatched) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  match:
+    any_match: true
+  )EOF");
+
+  // Make sure check is called.
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(1);
+
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(1U, config_->stats().matched_.value());
+  EXPECT_EQ(0U, config_->stats().not_matched_.value());
+}
+
+// Checks that filter does not initiate the authorization request if the header is not matched.
+TEST_F(HttpFilterTest, HeaderNotMatched) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  match:
+    http_request_headers_match:
+      headers:
+      - name: "foo"
+        exact_match: "ext_authz"
+  )EOF");
+
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+
+  // Engage the filter.
+  request_headers_.addCopy("foo", "bla");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(0U, config_->stats().matched_.value());
+  EXPECT_EQ(1U, config_->stats().not_matched_.value());
+}
+
+// Checks that filter initiates the authorization request if the header is matched.
+TEST_F(HttpFilterTest, HeaderMatched) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  match:
+    http_request_headers_match:
+      headers:
+      - name: "foo"
+        exact_match: "ext_authz"
+  )EOF");
+
+  // Make sure check is called.
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(1);
+
+  // Engage the filter.
+  request_headers_.addCopy("foo", "ext_authz");
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(1U, config_->stats().matched_.value());
+  EXPECT_EQ(0U, config_->stats().not_matched_.value());
+}
+
+// Checks that filter does not initiate the authorization request if the body is not matched.
+TEST_F(HttpFilterTest, BodyNotMatched) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  match:
+    http_request_generic_body_match:
+      patterns:
+      - string_match: "ext_authz"
+  )EOF");
+
+  ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  data_.add("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  // "EXT_AUTHZ" will not match because the match is case-sensitive.
+  data_.add("EXT_AUTHZ");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  data_.add("some more data");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, true));
+  EXPECT_EQ(0U, config_->stats().matched_.value());
+  EXPECT_EQ(1U, config_->stats().not_matched_.value());
+}
+
+// Checks that the filter initiates an authorization request if the body is matched.
+TEST_F(HttpFilterTest, BodyMatched) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  match:
+    http_request_generic_body_match:
+      patterns:
+      - string_match: "ext_authz"
+  )EOF");
+
+  ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+
+  // Make sure check is called.
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(1);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  data_.add("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  data_.add("ext_authz");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  data_.add("some more data");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
+  EXPECT_EQ(1U, config_->stats().matched_.value());
+  EXPECT_EQ(0U, config_->stats().not_matched_.value());
+}
+
+// Checks that the filter initiates an authorization request if the body is matched after the
+// max_request_bytes.
+TEST_F(HttpFilterTest, BodyMatchedAfterMaxRequestBytes) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  with_request_body:
+    max_request_bytes: 10
+    allow_partial_message: true
+  match:
+    http_request_generic_body_match:
+      patterns:
+      - string_match: "ext_authz"
+  )EOF");
+
+  ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(1);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  data_.add("foo foo foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  data_.add("bar bar bar");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  // At this point it is already after the max_request_bytes.
+  data_.add("ext_authz");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  data_.add("more data after watermark is set is possible");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
+  EXPECT_EQ(1U, config_->stats().matched_.value());
+  EXPECT_EQ(0U, config_->stats().not_matched_.value());
+}
+
+// Checks that filter does not initiate the authorization request if the trailer is not matched.
+TEST_F(HttpFilterTest, TrailerNotMatched) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  match:
+    http_request_trailers_match:
+      headers:
+      - name: "foo"
+        exact_match: "ext_authz"
+  )EOF");
+
+  ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+
+  // Engage the filter.
+  request_headers_.addCopy("foo", "ext_authz");
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  data_.add("foo foo foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  request_trailers_.addCopy("foo", "EXT_AUTHZ");
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(0U, config_->stats().matched_.value());
+  EXPECT_EQ(1U, config_->stats().not_matched_.value());
+}
+
+// Checks that filter initiates the authorization request if the trailer is matched.
+TEST_F(HttpFilterTest, TrailerMatched) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  match:
+    http_request_trailers_match:
+      headers:
+      - name: "foo"
+        exact_match: "ext_authz"
+  )EOF");
+
+  ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+
+  // Make sure check is called.
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(1);
+
+  // Engage the filter.
+  request_headers_.addCopy("foo", "ext_authz");
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  data_.add("foo foo foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  request_trailers_.addCopy("foo", "ext_authz");
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(1U, config_->stats().matched_.value());
+  EXPECT_EQ(0U, config_->stats().not_matched_.value());
+}
+
 // -------------------
 // Parameterized Tests
 // -------------------

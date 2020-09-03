@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ext_authz.v4alpha;
 
+import "envoy/config/common/matcher/v4alpha/matcher.proto";
 import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/config/core/v4alpha/grpc_service.proto";
@@ -23,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.ext_authz.v3.ExtAuthz";
@@ -117,6 +118,32 @@ message ExtAuthz {
   // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
   // :ref:`certificate<envoy_api_field_service.auth.v4alpha.AttributeContext.Peer.certificate>`.
   bool include_peer_certificate = 10;
+
+  // Specifies when to enable the ext_authz filter.
+  // If specified, the ext_authz filter is enabled if the incoming request is matched. If not matched,
+  // the incoming request will be allowed as if the ext_authz filter doesn't exist (no authorization check request sent).
+  //
+  // For example, the following config enables ext_authz filter if the request has header "foo: bar"
+  // and the body includes the string "ext_authz".
+  //
+  // .. code-block:: yaml
+  //
+  //    match:
+  //      and_match:
+  //        rules:
+  //        - http_request_headers_match:
+  //            headers:
+  //            - name: "foo"
+  //              exact_match: "bar"
+  //        - http_request_generic_body_match:
+  //            patterns:
+  //            - string_match: "ext_authz"
+  //
+  // .. warning::
+  //
+  //   The `http_response_headers_match`, `http_response_trailers_match` and `http_response_generic_body_match`
+  //   rule is not supported.
+  config.common.matcher.v4alpha.MatchPredicate match = 13;
 }
 
 // Configuration for buffering the request data.

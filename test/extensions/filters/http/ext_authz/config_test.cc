@@ -51,7 +51,52 @@ void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
   cb(filter_callback);
 }
 
+void expectBadMatcher(const std::string& matcher) {
+  const std::string yaml = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+    {}
+  )EOF";
+
+  ExtAuthzFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(fmt::format(yaml, matcher), *proto_config);
+  testing::StrictMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor()).Times(1);
+  EXPECT_THROW(factory.createFilterFactoryFromProto(*proto_config, "stats", context),
+               EnvoyException);
+}
+
 } // namespace
+
+TEST(HttpExtAuthzConfigTest, BadMatcher) {
+  const std::string response_header = R"EOF(
+  match:
+    http_response_headers_match:
+      headers:
+      - name: "foo"
+        exact_match: "ext_authz"
+  )EOF";
+  expectBadMatcher(response_header);
+
+  const std::string response_trailer = R"EOF(
+  match:
+    http_response_trailers_match:
+      headers:
+      - name: "foo"
+        exact_match: "ext_authz"
+  )EOF";
+  expectBadMatcher(response_trailer);
+
+  const std::string response_body = R"EOF(
+  match:
+    http_response_generic_body_match:
+      patterns:
+      - string_match: "ext_authz"
+  )EOF";
+  expectBadMatcher(response_body);
+}
 
 TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
   expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::AUTO);

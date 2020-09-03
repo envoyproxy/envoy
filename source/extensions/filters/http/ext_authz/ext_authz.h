@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/local_info/local_info.h"
@@ -21,6 +22,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/runtime/runtime_protos.h"
 
+#include "extensions/common/matcher/matcher.h"
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
@@ -43,7 +45,9 @@ enum class FilterRequestType { Internal, External, Both };
   COUNTER(ok)                                                                                      \
   COUNTER(denied)                                                                                  \
   COUNTER(error)                                                                                   \
-  COUNTER(failure_mode_allowed)
+  COUNTER(failure_mode_allowed)                                                                    \
+  COUNTER(matched)                                                                                 \
+  COUNTER(not_matched)
 
 /**
  * Wrapper struct for ext_authz filter stats. @see stats_macros.h
@@ -81,7 +85,11 @@ public:
         stats_(generateStats(stats_prefix, scope)), ext_authz_ok_(pool_.add("ext_authz.ok")),
         ext_authz_denied_(pool_.add("ext_authz.denied")),
         ext_authz_error_(pool_.add("ext_authz.error")),
-        ext_authz_failure_mode_allowed_(pool_.add("ext_authz.failure_mode_allowed")) {}
+        ext_authz_failure_mode_allowed_(pool_.add("ext_authz.failure_mode_allowed")) {
+    if (config.has_match()) {
+      Envoy::Extensions::Common::Matcher::buildMatcher(config.match(), matchers_);
+    }
+  }
 
   bool allowPartialMessage() const { return allow_partial_message_; }
 
@@ -116,6 +124,10 @@ public:
   }
 
   bool includePeerCertificate() const { return include_peer_certificate_; }
+
+  bool hasMatcher() const { return !matchers_.empty(); }
+
+  Envoy::Extensions::Common::Matcher::Matcher& rootMatcher() const { return *matchers_[0]; }
 
 private:
   static Http::Code toErrorCode(uint64_t status) {
@@ -160,6 +172,7 @@ public:
   const Stats::StatName ext_authz_denied_;
   const Stats::StatName ext_authz_error_;
   const Stats::StatName ext_authz_failure_mode_allowed_;
+  std::vector<Envoy::Extensions::Common::Matcher::MatcherPtr> matchers_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -206,7 +219,8 @@ class Filter : public Logger::Loggable<Logger::Id::filter>,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
   Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client)
-      : config_(config), client_(std::move(client)), stats_(config->stats()) {}
+      : config_(config), client_(std::move(client)), stats_(config->stats()),
+        statuses_(config_->matchers_.size()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -255,6 +269,7 @@ private:
   bool buffer_data_{};
   bool skip_check_{false};
   envoy::service::auth::v3::CheckRequest check_request_{};
+  Envoy::Extensions::Common::Matcher::Matcher::MatchStatusVector statuses_;
 };
 
 } // namespace ExtAuthz
