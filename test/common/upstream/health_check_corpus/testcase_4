@@ -22,19 +22,21 @@ health_check_config {
         path: "/healthcheck"
     }
 }
-http_actions {
+actions {
     respond {
-      headers {
-        headers {
-            key: ":status"
-            value: "200"
+        http_respond {
+            headers {
+                headers {
+                    key: ":status"
+                    value: "200"
+                }
+                headers {
+                    key: "-upstream-healthchecked-cluster"
+                    value: "locations-production-iad"
+                }
+            }
+            status: "200"
         }
-        headers {
-            key: "-upstream-healthchecked-cluster"
-            value: "locations-production-iad"
-        }
-      }
-      status: "200"
     }
 }
-second_host : false
+create_second_host : false

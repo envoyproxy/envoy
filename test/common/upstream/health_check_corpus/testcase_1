@@ -24,15 +24,17 @@ health_check_config {
         }
     }
 }
-http_actions {
+actions {
     respond {
-      headers {
-        headers {
-            key: ":status"
-            value: "200"
+        http_respond {
+            headers {
+                headers {
+                    key: ":status"
+                    value: "200"
+                }
+            }
+            status: "200"
         }
-      }
-      status: "200"
     }
 }
-second_host : false
+create_second_host : false

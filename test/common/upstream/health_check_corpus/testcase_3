@@ -25,27 +25,31 @@ health_check_config {
         }
     }
 }
-http_actions {
+actions {
     respond {
-      headers {
-        headers {
-            key: ":status"
-            value: "200"
+        http_respond {
+            headers {
+                headers {
+                    key: ":status"
+                    value: "200"
+                }
+            }
+            status: "200"
         }
-      }
-      status: "200"
     }
 }
-http_actions {
+actions {
     respond {
-      headers {
-        headers {
-            key: ":status"
-            value: "200"
+        http_respond {
+            headers {
+                headers {
+                    key: ":status"
+                    value: "200"
+                }
+            }
+            status: "200"
         }
-      }
-      status: "200"
-      respond_on_second_host : true
+        second_host: true
     }
 }
-second_host : true
+create_second_host : true

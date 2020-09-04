@@ -37,7 +37,7 @@ public:
   Http::CodecClient::Type codecClientType() { return codec_client_type_; }
 };
 
-class HttpHealthCheckerImplTest : public testing::Test, public HealthCheckerTestBase {
+class HttpHealthCheckerImplTestBase: public HealthCheckerTestBase {
 public:
   struct TestSession {
     Event::MockTimer* interval_timer_{};
@@ -53,6 +53,25 @@ public:
   using HostWithHealthCheckMap =
       absl::node_hash_map<std::string,
                           const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig>;
+
+  void expectSessionCreate(const HostWithHealthCheckMap& health_check_map);
+
+  void expectClientCreate(size_t index, const HostWithHealthCheckMap& health_check_map);
+
+  void expectStreamCreate(size_t index);
+
+  void expectSessionCreate();
+  void expectClientCreate(size_t index);
+
+  std::vector<TestSessionPtr> test_sessions_;
+  std::shared_ptr<TestHttpHealthCheckerImpl> health_checker_;
+  std::list<uint32_t> connection_index_{};
+  std::list<uint32_t> codec_index_{};
+  const HostWithHealthCheckMap health_checker_map_{};
+};
+
+class HttpHealthCheckerImplTest : public testing::Test, public HttpHealthCheckerImplTestBase {
+public:
 
   void allocHealthChecker(const std::string& yaml, bool avoid_boosting = true);
 
@@ -97,30 +116,15 @@ public:
 
   void setupServiceValidationWithoutUserAgent();
 
-  void expectSessionCreate(const HostWithHealthCheckMap& health_check_map);
-
-  void expectClientCreate(size_t index, const HostWithHealthCheckMap& health_check_map);
-
-  void expectStreamCreate(size_t index);
-
   void respond(size_t index, const std::string& code, bool conn_close, bool proxy_close = false,
                bool body = false, bool trailers = false,
                const absl::optional<std::string>& service_cluster = absl::optional<std::string>(),
                bool degraded = false);
 
-  void expectSessionCreate();
-  void expectClientCreate(size_t index);
-
   void expectSuccessStartFailedFailFirst(
       const absl::optional<std::string>& health_checked_cluster = absl::optional<std::string>());
 
   MOCK_METHOD(void, onHostStatus, (HostSharedPtr host, HealthTransition changed_state));
-
-  std::vector<TestSessionPtr> test_sessions_;
-  std::shared_ptr<TestHttpHealthCheckerImpl> health_checker_;
-  std::list<uint32_t> connection_index_{};
-  std::list<uint32_t> codec_index_{};
-  const HostWithHealthCheckMap health_checker_map_{};
 };
 
 } // namespace Upstream

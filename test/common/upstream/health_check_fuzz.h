@@ -6,17 +6,23 @@
 namespace Envoy {
 namespace Upstream {
 
-class HealthCheckFuzz : public HttpHealthCheckerImplTest {
+class HealthCheckFuzz : public HttpHealthCheckerImplTestBase {
 public:
   HealthCheckFuzz() = default;
-  void initialize(test::common::upstream::HealthCheckTestCase input);
+  void initializeAndReplay(test::common::upstream::HealthCheckTestCase input);
+  enum class Type {
+    HTTP,
+    TCP,
+    GRPC,
+  };
+
+  Type type_;
 
 private:
-  void respondHeaders(test::fuzz::Headers headers, absl::string_view status,
+  void respondHttp(test::fuzz::Headers headers, absl::string_view status,
                       bool respond_on_second_host);
   void streamCreate(bool create_stream_on_second_host);
   void allocHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
-  void TestBody() override {}
 
   void replay(test::common::upstream::HealthCheckTestCase input);
   bool second_host_;

@@ -369,7 +369,7 @@ void HttpHealthCheckerImplTest::setupServiceValidationWithoutUserAgent() {
   addCompletionCallback();
 }
 
-void HttpHealthCheckerImplTest::expectSessionCreate(
+void HttpHealthCheckerImplTestBase::expectSessionCreate(
     const HostWithHealthCheckMap& health_check_map) {
   // Expectations are in LIFO order.
   TestSessionPtr new_test_session(new TestSession());
@@ -380,7 +380,7 @@ void HttpHealthCheckerImplTest::expectSessionCreate(
   expectClientCreate(test_sessions_.size() - 1, health_check_map);
 }
 
-void HttpHealthCheckerImplTest::expectClientCreate(size_t index,
+void HttpHealthCheckerImplTestBase::expectClientCreate(size_t index,
                                                    const HostWithHealthCheckMap& health_check_map) {
   TestSession& test_session = *test_sessions_[index];
   test_session.codec_ = new NiceMock<Http::MockClientConnection>();
@@ -419,7 +419,7 @@ void HttpHealthCheckerImplTest::expectClientCreate(size_t index,
           }));
 }
 
-void HttpHealthCheckerImplTest::expectStreamCreate(size_t index) {
+void HttpHealthCheckerImplTestBase::expectStreamCreate(size_t index) {
   test_sessions_[index]->request_encoder_.stream_.callbacks_.clear();
   EXPECT_CALL(*test_sessions_[index]->codec_, newStream(_))
       .WillOnce(DoAll(SaveArgAddress(&test_sessions_[index]->stream_response_callbacks_),
@@ -461,8 +461,8 @@ void HttpHealthCheckerImplTest::respond(size_t index, const std::string& code, b
   }
 }
 
-void HttpHealthCheckerImplTest::expectSessionCreate() { expectSessionCreate(health_checker_map_); }
-void HttpHealthCheckerImplTest::expectClientCreate(size_t index) {
+void HttpHealthCheckerImplTestBase::expectSessionCreate() { expectSessionCreate(health_checker_map_); }
+void HttpHealthCheckerImplTestBase::expectClientCreate(size_t index) {
   expectClientCreate(index, health_checker_map_);
 }
 

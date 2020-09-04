@@ -24,39 +24,39 @@ health_check_config {
         }
     }
 }
-http_actions {
+actions {
     respond {
-      headers {
-        headers {
-            key: ":status"
-            value: "200"
+        http_respond {
+            headers {
+                headers {
+                    key: ":status"
+                    value: "200"
+                }
+                headers {
+                    key: ":degraded"
+                    value: "1"
+                }
+            }
+            status: "200"
         }
-        headers {
-            key: ":degraded"
-            value: "1"
-        }
-      }
-      status: "200"
     }
 }
-http_actions {
+actions {
     stream_create {
 
     }
 }
-http_actions {
+actions {
     respond {
-      headers {
-        headers {
-            key: ":status"
-            value: "200"
+        http_respond {
+            headers {
+                headers {
+                    key: ":status"
+                    value: "200"
+                }
+            }
+            status: "200"
         }
-        headers {
-            key: ":degraded"
-            value: "0"
-        }
-      }
-      status: "200"
     }
 }
-second_host : false
+create_second_host : false
