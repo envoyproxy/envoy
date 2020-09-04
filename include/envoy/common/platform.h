@@ -8,7 +8,7 @@
 // The goal is to eventually not require this file of envoy header declarations,
 // but limit the use of these architecture-specific types and declarations
 // to the corresponding .cc implementation files.
-#include <absl/strings/string_view.h>
+#include "absl/strings/string_view.h"
 
 #ifdef _MSC_VER
 
