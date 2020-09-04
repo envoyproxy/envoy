@@ -405,7 +405,7 @@ protected:
 #define ENVOY_LOG_FIRST_N(LEVEL, N, ...)                                                           \
   do {                                                                                             \
     if (ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)) {                                             \
-      static auto* countdown = new std::atomic<uint64_t>();                                        \
+      static auto* countdown = new std::atomic<int64_t>();                                         \
       if (countdown->fetch_add(1) < N) {                                                           \
         ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                           \
       }                                                                                            \
@@ -420,7 +420,7 @@ protected:
 #define ENVOY_LOG_EVERY_NTH(LEVEL, N, ...)                                                         \
   do {                                                                                             \
     if (ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)) {                                             \
-      static auto* count = new std::atomic<uint64_t>();                                            \
+      static auto* count = new std::atomic<int64_t>();                                             \
       if ((count->fetch_add(1) % N) == 0) {                                                        \
         ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                           \
       }                                                                                            \
@@ -431,7 +431,7 @@ protected:
   do {                                                                                             \
     if (ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)) {                                             \
       static auto* count = new std::atomic<uint64_t>();                                            \
-      if (std::bitset<64>(1 + count->fetch_add(1)).count() == 1) {                                 \
+      if (std::bitset<64>(1 /* for the first hit*/ + count->fetch_add(1)).count() == 1) {          \
         ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                           \
       }                                                                                            \
     }                                                                                              \
@@ -445,7 +445,7 @@ using t_logclock = std::chrono::steady_clock; // NOLINT
 #define ENVOY_LOG_PERIODIC(LEVEL, CHRONO_DURATION, ...)                                            \
   do {                                                                                             \
     if (ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)) {                                             \
-      static auto* last_hit = new std::atomic<uint64_t>();                                         \
+      static auto* last_hit = new std::atomic<int64_t>();                                          \
       auto last = last_hit->load();                                                                \
       const auto now = t_logclock::now().time_since_epoch().count();                               \
       if ((now - last) >                                                                           \
