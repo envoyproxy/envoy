@@ -6,6 +6,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 #include "common/http/utility.h"
+#include "envoy/http/header_map.h"
 
 namespace Envoy {
 namespace Http {
@@ -333,16 +334,21 @@ void ActiveStreamDecoderFilter::setResponseTrailers(
     Http::ResponseTrailerMapPtr&& response_trailers) {
   parent_.filter_manager_callbacks_.setResponseTrailers(std::move(response_trailers));
 }
-// Http::RequestHeaderMap* requestHeaders() override {
-// parent_.filter_manager_callbacks_.requestHeaders(); } Http::RequestTrailerMap* requestTrailers()
-// override { parent_.filter_manager_callbacks_.requestTrailers(); }
-Http::ResponseHeaderMap* ActiveStreamDecoderFilter::continueHeaders() {
+
+// Http::RequestHeaderMapOptRef ActiveStreamDecoderFilter::requestHeaders() {
+//   parent_.filter_manager_callbacks_.requestHeaders();
+// }
+// Http::RequestTrailerMapOptRef ActiveStreamDecoderFilter::requestTrailers() {
+//   parent_.filter_manager_callbacks_.requestTrailers();
+// }
+
+Http::ResponseHeaderMapOptRef ActiveStreamDecoderFilter::continueHeaders() {
   return parent_.filter_manager_callbacks_.continueHeaders();
 }
-Http::ResponseHeaderMap* ActiveStreamDecoderFilter::responseHeaders() {
+Http::ResponseHeaderMapOptRef ActiveStreamDecoderFilter::responseHeaders() {
   return parent_.filter_manager_callbacks_.responseHeaders();
 }
-Http::ResponseTrailerMap* ActiveStreamDecoderFilter::responseTrailers() {
+Http::ResponseTrailerMapOptRef ActiveStreamDecoderFilter::responseTrailers() {
   return parent_.filter_manager_callbacks_.responseTrailers();
 }
 

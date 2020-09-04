@@ -12,6 +12,7 @@
 #include "envoy/grpc/status.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stream_info/filter_state.h"
@@ -103,8 +104,8 @@ UpstreamRequest::~UpstreamRequest() {
   }
 
   if (span_ != nullptr) {
-    Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, responseHeaders(),
-                                                     responseTrailers(), filter_manager_.streamInfo(),
+    Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, responseHeaders() ? &responseHeaders()->get() : nullptr,
+                                                     responseTrailers() ? &responseTrailers()->get() : nullptr, filter_manager_.streamInfo(),
                                                      Tracing::EgressConfig::get());
   }
 
@@ -115,8 +116,8 @@ UpstreamRequest::~UpstreamRequest() {
   filter_manager_.streamInfo().setUpstreamTiming(upstream_timing_);
   filter_manager_.streamInfo().onRequestComplete();
   for (const auto& upstream_log : parent_.config().upstream_logs_) {
-    upstream_log->log(parent_.downstreamHeaders(), responseHeaders(),
-                      responseTrailers(), filter_manager_.streamInfo());
+    upstream_log->log(parent_.downstreamHeaders(), responseHeaders() ? &responseHeaders()->get() : nullptr,
+                      responseTrailers() ? &responseTrailers()->get() : nullptr, filter_manager_.streamInfo());
   }
 }
 
@@ -128,7 +129,7 @@ void UpstreamRequest::onDecoderFilterAboveWriteBufferHighWatermark() {
   parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
 }
   void UpstreamRequest::setContinueHeaders(Http::ResponseHeaderMapPtr&& response_headers) {
-    parent_.callbacks()->setContinueHeaders(std::move(response_headers));
+    continue_to_encode_ = std::move(response_headers);
   }
   void UpstreamRequest::setResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers) {
     parent_.callbacks()->setResponseHeaders(std::move(response_headers));
@@ -136,21 +137,21 @@ void UpstreamRequest::onDecoderFilterAboveWriteBufferHighWatermark() {
   void UpstreamRequest::setResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers) {
     parent_.callbacks()->setResponseTrailers(std::move(response_trailers));
   }
-  Http::RequestHeaderMap* UpstreamRequest::requestHeaders() {
-    return parent_.downstreamHeaders();
+  Http::RequestHeaderMapOptRef UpstreamRequest::requestHeaders() {
+    return parent_.downstreamHeaders() ? std::make_optional(std::ref(*parent_.downstreamHeaders())) : absl::nullopt;
   }
-  Http::RequestTrailerMap* UpstreamRequest::requestTrailers() {
-    return parent_.downstreamTrailers();
+  Http::RequestTrailerMapOptRef UpstreamRequest::requestTrailers() {
+    return parent_.downstreamTrailers() ? std::make_optional(std::ref(*parent_.downstreamTrailers())) : absl::nullopt;
   }
 
-  Http::ResponseHeaderMap* UpstreamRequest::continueHeaders() {
-    return parent_.callbacks()->continueHeaders();
+  Http::ResponseHeaderMapOptRef UpstreamRequest::continueHeaders() {
+    return continue_to_encode_ ? std::make_optional(std::ref(*continue_to_encode_)) : parent_.callbacks()->continueHeaders();
   }
-  Http::ResponseHeaderMap* UpstreamRequest::responseHeaders() {
-    return parent_.callbacks()->responseHeaders();
+  Http::ResponseHeaderMapOptRef UpstreamRequest::responseHeaders() {
+    return headers_to_encode_ ? std::make_optional(std::ref(*headers_to_encode_)) : parent_.callbacks()->responseHeaders();
   }
-  Http::ResponseTrailerMap* UpstreamRequest::responseTrailers() {
-    return parent_.callbacks()->responseTrailers();
+  Http::ResponseTrailerMapOptRef UpstreamRequest::responseTrailers() {
+    return trailers_to_encode_ ? std::make_optional(std::ref(*trailers_to_encode_)) : parent_.callbacks()->responseTrailers();
   }
 
 void UpstreamRequest::encode100ContinueHeaders(Http::ResponseHeaderMap& headers) {
@@ -204,8 +205,60 @@ void UpstreamRequest::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_s
   parent_.onUpstreamHeaders(response_code, headers, *this, end_stream);
 }
 
+void UpstreamRequest::encodeTrailers(Http::ResponseTrailerMap &trailers) {
+  parent_.onUpstreamTrailers(trailers, *this);
+}
 void UpstreamRequest::encodeMetadata(Http::MetadataMapVector &metadata) {
   parent_.onUpstreamMetadata(metadata);
+}
+
+void UpstreamRequestFilter::ActiveUpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
+  ScopeTrackerScopeState scope(&parent_.parent_.parent_.callbacks()->scope(), parent_.parent_.parent_.callbacks()->dispatcher());
+
+  parent_.decoder_callbacks_->encode100ContinueHeaders(std::move(headers));
+}
+ 
+ void UpstreamRequestFilter::disableDataFromDownstreamForFlowControl() {
+  // If there is only one upstream request, we can be assured that
+  // disabling reads will not slow down other upstream requests. If we've
+  // already seen the full downstream request (downstream_end_stream_) then
+  // disabling reads is a noop.
+  // This assert condition must be true because
+  // parent_.upstreamRequests().size() can only be greater than 1 in the
+  // case of a per-try-timeout with hedge_on_per_try_timeout enabled, and
+  // the per try timeout timer is started only after downstream_end_stream_
+  // is true.
+  ASSERT(parent_.parent_.upstreamRequests().size() == 1 || parent_.parent_.downstreamEndStream());
+  parent_.parent_.cluster()->stats().upstream_flow_control_backed_up_total_.inc();
+  parent_.parent_.callbacks()->onDecoderFilterAboveWriteBufferHighWatermark();
+  ++downstream_data_disabled_;
+}
+ void UpstreamRequestFilter::enableDataFromDownstreamForFlowControl() {
+  // If there is only one upstream request, we can be assured that
+  // disabling reads will not overflow any write buffers in other upstream
+  // requests. If we've already seen the full downstream request
+  // (downstream_end_stream_) then enabling reads is a noop.
+  // This assert condition must be true because
+  // parent_.upstreamRequests().size() can only be greater than 1 in the
+  // case of a per-try-timeout with hedge_on_per_try_timeout enabled, and
+  // the per try timeout timer is started only after downstream_end_stream_
+  // is true.
+  ASSERT(parent_.parent_.upstreamRequests().size() == 1 || parent_.parent_.downstreamEndStream());
+  parent_.parent_.cluster()->stats().upstream_flow_control_drained_total_.inc();
+  parent_.parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
+  ASSERT(downstream_data_disabled_ != 0);
+  if (downstream_data_disabled_ > 0) {
+    --downstream_data_disabled_;
+  }
+}
+
+void UpstreamRequestFilter::ActiveUpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
+  ScopeTrackerScopeState scope(&parent_.parent_.parent_.callbacks()->scope(), parent_.parent_.parent_.callbacks()->dispatcher());
+
+  if (!parent_.parent_.parent_.config().upstream_logs_.empty()) {
+    parent_.parent_.upstream_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*headers);
+  }
+  parent_.decoder_callbacks_->encodeHeaders(std::move(headers), end_stream);
 }
 
 void UpstreamRequestFilter::ActiveUpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -436,7 +489,7 @@ void UpstreamRequestFilter::onPoolReady(
   parent_.parent_.callbacks()->addDownstreamWatermarkCallbacks(downstream_watermark_manager_);
 
   calling_encode_headers_ = true;
-  auto* headers = parent_.requestHeaders();
+  auto headers = parent_.requestHeaders();
   if (parent_.parent_.routeEntry()->autoHostRewrite() && !host->hostname().empty()) {
     parent_.parent_.downstreamHeaders()->setHost(host->hostname());
   }
@@ -450,7 +503,7 @@ void UpstreamRequestFilter::onPoolReady(
   // Make sure that when we are forwarding CONNECT payload we do not do so until
   // the upstream has accepted the CONNECT request.
   if (conn_pool_->protocol().has_value() &&
-      headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
+      headers->get().getMethodValue() == Http::Headers::get().MethodValues.Connect) {
     paused_for_connect_ = true;
   }
 

@@ -174,11 +174,11 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void setContinueHeaders(Http::ResponseHeaderMapPtr&& response_headers) override;
   void setResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers) override;
   void setResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers) override;
-  // Http::RequestHeaderMap* requestHeaders() override { parent_.filter_manager_callbacks_.requestHeaders(); }
-  // Http::RequestTrailerMap* requestTrailers() override { parent_.filter_manager_callbacks_.requestTrailers(); }
-  Http::ResponseHeaderMap* continueHeaders() override;
-  Http::ResponseHeaderMap* responseHeaders() override;
-  Http::ResponseTrailerMap* responseTrailers() override;
+  // Http::RequestHeaderMapOptRef requestHeaders() override;
+  // Http::RequestTrailerMapOptRef requestTrailers() override;
+  Http::ResponseHeaderMapOptRef continueHeaders() override;
+  Http::ResponseHeaderMapOptRef responseHeaders() override;
+  Http::ResponseTrailerMapOptRef responseTrailers() override;
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override;
   void encode100ContinueHeaders(ResponseHeaderMap& headers) override;
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;

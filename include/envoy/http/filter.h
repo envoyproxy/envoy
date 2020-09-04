@@ -360,9 +360,9 @@ public:
   virtual void setResponseHeaders(ResponseHeaderMapPtr&& response_headers) PURE;
   virtual void setResponseTrailers(ResponseTrailerMapPtr&& response_trailers) PURE;
 
-  virtual ResponseHeaderMap* continueHeaders() PURE;
-  virtual ResponseHeaderMap* responseHeaders() PURE;
-  virtual ResponseTrailerMap* responseTrailers() PURE;
+  virtual ResponseHeaderMapOptRef continueHeaders() PURE;
+  virtual ResponseHeaderMapOptRef responseHeaders() PURE;
+  virtual ResponseTrailerMapOptRef responseTrailers() PURE;
 
   /**
    * Called with 100-Continue headers to be encoded.

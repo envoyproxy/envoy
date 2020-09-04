@@ -139,6 +139,7 @@ private:
   ActiveUpstreamRequest active_request_{*this};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   std::unique_ptr<GenericUpstream> upstream_;
+  uint32_t downstream_data_disabled_{};
 };
 
 // The base request for Upstream.
@@ -172,11 +173,11 @@ public:
   void setContinueHeaders(Http::ResponseHeaderMapPtr&& response_headers) override;
   void setResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers) override;
   void setResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers) override;
-  Http::RequestHeaderMap* requestHeaders() override;
-  Http::RequestTrailerMap* requestTrailers() override;
-  Http::ResponseHeaderMap* continueHeaders() override;
-  Http::ResponseHeaderMap* responseHeaders() override;
-  Http::ResponseTrailerMap* responseTrailers() override;
+  Http::RequestHeaderMapOptRef requestHeaders() override;
+  Http::RequestTrailerMapOptRef requestTrailers() override;
+  Http::ResponseHeaderMapOptRef continueHeaders() override;
+  Http::ResponseHeaderMapOptRef responseHeaders() override;
+  Http::ResponseTrailerMapOptRef responseTrailers() override;
 
   void onDecoderFilterBelowWriteBufferLowWatermark() override;
   void onDecoderFilterAboveWriteBufferHighWatermark() override;
@@ -260,6 +261,10 @@ private:
   bool awaiting_headers_ : 1;
   bool encode_complete_ : 1;
   bool decode_complete_ : 1;
+
+Http::ResponseHeaderMapPtr continue_to_encode_;
+  Http::ResponseHeaderMapPtr headers_to_encode_;
+  Http::ResponseTrailerMapPtr trailers_to_encode_;
 
   // Copies of upstream headers/trailers. These are only set if upstream
   // access logging is configured.

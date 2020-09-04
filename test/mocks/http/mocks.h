@@ -166,9 +166,9 @@ void setContinueHeaders(ResponseHeaderMapPtr&& ) override {}
 void setResponseHeaders(ResponseHeaderMapPtr&& ) override {}
 void setResponseTrailers(ResponseTrailerMapPtr&& ) override {}
 
-  MOCK_METHOD(ResponseHeaderMap*, continueHeaders, ());
-  MOCK_METHOD(ResponseHeaderMap*, responseHeaders, ());
-  MOCK_METHOD(ResponseTrailerMap*, responseTrailers, ());
+  MOCK_METHOD(ResponseHeaderMapOptRef, continueHeaders, ());
+  MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, ());
+  MOCK_METHOD(ResponseTrailerMapOptRef, responseTrailers, ());
 
   MOCK_METHOD(void, encode100ContinueHeaders, (ResponseHeaderMap&));
   MOCK_METHOD(void, encodeHeaders, (ResponseHeaderMap&, bool));

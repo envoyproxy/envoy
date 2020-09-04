@@ -265,7 +265,7 @@ public:
                               bool end_stream) PURE;
   virtual void onUpstreamTrailers(Http::ResponseTrailerMap& trailers,
                                   UpstreamRequest& upstream_request) PURE;
-  virtual void onUpstreamMetadata(Http::MetadataMap& metadata_map) PURE;
+  virtual void onUpstreamMetadata(Http::MetadataMapVector& metadata_map) PURE;
   virtual void onUpstreamReset(Http::StreamResetReason reset_reason,
                                absl::string_view transport_failure,
                                UpstreamRequest& upstream_request) PURE;
@@ -437,7 +437,7 @@ public:
                       bool end_stream) override;
   void onUpstreamTrailers(Http::ResponseTrailerMap& trailers,
                           UpstreamRequest& upstream_request) override;
-  void onUpstreamMetadata(Http::MetadataMap& metadata_map) override;
+  void onUpstreamMetadata(Http::MetadataMapVector& metadata_map) override;
   void onUpstreamReset(Http::StreamResetReason reset_reason, absl::string_view transport_failure,
                        UpstreamRequest& upstream_request) override;
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override;

@@ -391,9 +391,9 @@ private:
   void setResponseHeaders(ResponseHeaderMapPtr&&) override {}
   void setResponseTrailers(ResponseTrailerMapPtr&&) override {}
 
-  ResponseHeaderMap* continueHeaders() override { return nullptr; }
-  ResponseHeaderMap* responseHeaders() override { return nullptr; }
-  ResponseTrailerMap* responseTrailers() override { return nullptr; }
+  ResponseHeaderMapOptRef continueHeaders() override { return absl::nullopt; }
+  ResponseHeaderMapOptRef responseHeaders() override { return absl::nullopt; }
+  ResponseTrailerMapOptRef responseTrailers() override { return absl::nullopt; }
   // The async client won't pause if sending an Expect: 100-Continue so simply
   // swallows any incoming encode100Continue.
   void encode100ContinueHeaders(ResponseHeaderMapPtr&&) override {}

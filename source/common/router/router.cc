@@ -1345,7 +1345,9 @@ void Filter::onUpstreamTrailers(Http::ResponseTrailerMap& trailers,
 }
 
 void Filter::onUpstreamMetadata(Http::MetadataMapVector& metadata) {
-  callbacks_->encodeMetadata(metadata);
+  for (auto& m : metadata) {
+    callbacks_->encodeMetadata(std::move(m));
+  }
 }
 
 void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
