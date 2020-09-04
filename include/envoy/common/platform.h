@@ -180,6 +180,9 @@ struct msghdr {
 
 #if defined(__linux__)
 #include <linux/netfilter_ipv4.h>
+#ifndef IPV6_TRANSPARENT
+#include <linux/in6.h>
+#endif
 #endif
 
 #define PACKED_STRUCT(definition, ...) definition, ##__VA_ARGS__ __attribute__((packed))
