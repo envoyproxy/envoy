@@ -1020,7 +1020,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTlsMissingSocketMatch) {
   EXPECT_EQ(envoy_msg_.health_check_request().capability().health_check_protocols(0),
             envoy::service::health::v3::Capability::HTTP);
 
-  // Make the specifer not have the TLS socket matches, so it will try to connect over plaintext.
+  // Make the specifier not have the TLS socket matches, so it will try to connect over plaintext.
   server_health_check_specifier_ =
       makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
   server_health_check_specifier_.mutable_cluster_health_checks(0)
