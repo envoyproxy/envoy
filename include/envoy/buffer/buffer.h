@@ -257,7 +257,7 @@ public:
    * deduced from the size of the type T
    */
   template <typename T, ByteOrder Endianness = ByteOrder::Host, size_t Size = sizeof(T)>
-  T peekInt(uint64_t start = 0) {
+  T peekInt(uint64_t start = 0) const {
     static_assert(Size <= sizeof(T), "requested size is bigger than integer being read");
 
     if (length() < start + Size) {
@@ -293,7 +293,7 @@ public:
    * @param start supplies the buffer index to start copying from.
    * @param Size how many bytes to read out of the buffer.
    */
-  template <typename T, size_t Size = sizeof(T)> T peekLEInt(uint64_t start = 0) {
+  template <typename T, size_t Size = sizeof(T)> T peekLEInt(uint64_t start = 0) const {
     return peekInt<T, ByteOrder::LittleEndian, Size>(start);
   }
 
@@ -302,7 +302,7 @@ public:
    * @param start supplies the buffer index to start copying from.
    * @param Size how many bytes to read out of the buffer.
    */
-  template <typename T, size_t Size = sizeof(T)> T peekBEInt(uint64_t start = 0) {
+  template <typename T, size_t Size = sizeof(T)> T peekBEInt(uint64_t start = 0) const {
     return peekInt<T, ByteOrder::BigEndian, Size>(start);
   }
 
