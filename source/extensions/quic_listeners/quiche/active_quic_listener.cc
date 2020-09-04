@@ -14,7 +14,6 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_source.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
-#include "extensions/quic_listeners/quiche/udp_gso_batch_writer.h"
 
 namespace Envoy {
 namespace Quic {
@@ -74,11 +73,14 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
       listener_config.udpPacketWriterFactory()->get().createUdpPacketWriter(
           listen_socket_.ioHandle(), listener_config.listenerScope());
   udp_packet_writer_ = udp_packet_writer.get();
-  if (udp_packet_writer->isBatchMode()) {
-    // UdpPacketWriter* can be downcasted to UdpGsoBatchWriter*, which indirectly inherits
-    // from the quic::QuicPacketWriter class and can be passed to InitializeWithWriter().
-    quic_dispatcher_->InitializeWithWriter(
-        dynamic_cast<Quic::UdpGsoBatchWriter*>(udp_packet_writer.release()));
+
+  // Some packet writers (like `UdpGsoBatchWriter`) already directly implement
+  // `quic::QuicPacketWriter` and can be used directly here. Other types need
+  // `EnvoyQuicPacketWriter` as an adapter.
+  auto* quic_packet_writer = dynamic_cast<quic::QuicPacketWriter*>(udp_packet_writer.get());
+  if (quic_packet_writer != nullptr) {
+    quic_dispatcher_->InitializeWithWriter(quic_packet_writer);
+    udp_packet_writer.release();
   } else {
     quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(std::move(udp_packet_writer)));
   }

@@ -194,6 +194,7 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "conn_manager_impl_test",
     srcs = ["conn_manager_impl_test.cc"],
+    shard_count = 3,
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
@@ -404,5 +405,25 @@ envoy_cc_test(
     srcs = ["status_test.cc"],
     deps = [
         "//source/common/http:status_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "path_utility_fuzz_proto",
+    srcs = ["path_utility_fuzz.proto"],
+    deps = [
+        "//test/fuzz:common_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "path_utility_fuzz_test",
+    srcs = ["path_utility_fuzz_test.cc"],
+    corpus = "path_utility_corpus",
+    deps = [
+        ":path_utility_fuzz_proto_cc_proto",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:path_utility_lib",
+        "//test/fuzz:utility_lib",
     ],
 )
