@@ -1007,7 +1007,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyTlsHttp1) {
   cleanupHdsConnection();
 }
 
-// Health checks a single endpoint over TLS with HTTP/1
+// Attempts to health check a TLS endpoint over plaintext, which should fail.
 TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTlsMissingSocketMatch) {
   // Make the endpoints expect communication over TLS.
   tls_hosts_ = true;
