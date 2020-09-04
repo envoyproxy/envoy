@@ -94,8 +94,8 @@ protected:
 };
 
 /**
- * IoHandle for invalid socket. This is rquired because Envoy expects IoHandle creation never fail.
- * This NullIoSocketHandleImpl allows Envoy surives on unsupported socket options.
+ * IoHandle for invalid socket. This is required because Envoy expects IoHandle creation never fail.
+ * This NullIoSocketHandleImpl allows Envoy surviving on unsupported socket options.
  */
 class NullIoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
 public:
