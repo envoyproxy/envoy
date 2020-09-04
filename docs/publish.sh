@@ -11,7 +11,7 @@ set -e
 
 DOCS_DIR=generated/docs
 CHECKOUT_DIR=../envoy-docs
-BUILD_SHA=`git rev-parse HEAD`
+BUILD_SHA=$(git rev-parse HEAD)
 
 if [ -n "$CIRCLE_TAG" ]
 then

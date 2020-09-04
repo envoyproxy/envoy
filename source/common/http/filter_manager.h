@@ -4,6 +4,7 @@
 #include "envoy/http/header_map.h"
 
 #include "common/buffer/watermark_buffer.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/grpc/common.h"
@@ -339,30 +340,38 @@ public:
    */
   virtual void setResponseTrailers(ResponseTrailerMapPtr&& response_trailers) PURE;
 
+  // TODO(snowp): We should consider moving filter access to headers/trailers to happen via the
+  // callbacks instead of via the encode/decode callbacks on the filters.
+
   /**
    * The downstream request headers if set.
    */
-  virtual RequestHeaderMap* requestHeaders() PURE;
+  virtual RequestHeaderMapOptRef requestHeaders() PURE;
 
   /**
    * The downstream request trailers if present.
    */
-  virtual RequestTrailerMap* requestTrailers() PURE;
+  virtual RequestTrailerMapOptRef requestTrailers() PURE;
 
   /**
-   * Retrieves a pointer to the continue headers set via setResponseHeaders.
+   * Retrieves a pointer to the continue headers set via the call to setContinueHeaders.
    */
-  virtual ResponseHeaderMap* continueHeaders() PURE;
+  virtual ResponseHeaderMapOptRef continueHeaders() PURE;
 
   /**
-   * Retrieves a pointer to the response headers set via setResponseHeaders.
+   * Retrieves a pointer to the response headers set via the last call to setResponseHeaders.
+   * Note that response headers might be set multiple times (e.g. if a local reply is issued after
+   * headers have been received but before headers have been encoded), so it is not safe in general
+   * to assume that any set of headers will be valid for the duration of a stream.
    */
-  virtual ResponseHeaderMap* responseHeaders() PURE;
+  virtual ResponseHeaderMapOptRef responseHeaders() PURE;
 
   /**
-   * Retrieves a pointer to the response trailers set via setResponseTrailers.
+   * Retrieves a pointer to the last response trailers set via setResponseTrailers.
+   * Note that response trailers might be set multiple times, so it is not safe in general to assume
+   * that any set of trailers will be valid for the duration of the stream.
    */
-  virtual ResponseTrailerMap* responseTrailers() PURE;
+  virtual ResponseTrailerMapOptRef responseTrailers() PURE;
 
   /**
    * Called after encoding has completed.
@@ -496,12 +505,6 @@ public:
         stream_info_(protocol, time_source, parent_filter_state, filter_state_life_span) {}
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
-    for (const auto& log_handler : access_log_handlers_) {
-      log_handler->log(filter_manager_callbacks_.requestHeaders(),
-                       filter_manager_callbacks_.responseHeaders(),
-                       filter_manager_callbacks_.responseTrailers(), stream_info_);
-    }
-
     ASSERT(state_.filter_call_state_ == 0);
   }
 
@@ -517,10 +520,10 @@ public:
        << DUMP_MEMBER(state_.decoding_headers_only_) << DUMP_MEMBER(state_.encoding_headers_only_)
        << "\n";
 
-    DUMP_DETAILS(filter_manager_callbacks_.requestHeaders());
-    DUMP_DETAILS(filter_manager_callbacks_.requestTrailers());
-    DUMP_DETAILS(filter_manager_callbacks_.responseHeaders());
-    DUMP_DETAILS(filter_manager_callbacks_.responseTrailers());
+    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.requestHeaders());
+    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.requestTrailers());
+    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.responseHeaders());
+    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.responseTrailers());
     DUMP_DETAILS(&stream_info_);
   }
 
@@ -536,6 +539,25 @@ public:
     addStreamEncoderFilterWorker(filter, true);
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
+
+  void log() {
+    RequestHeaderMap* request_headers = nullptr;
+    if (filter_manager_callbacks_.requestHeaders()) {
+      request_headers = &filter_manager_callbacks_.requestHeaders()->get();
+    }
+    ResponseHeaderMap* response_headers = nullptr;
+    if (filter_manager_callbacks_.responseHeaders()) {
+      response_headers = &filter_manager_callbacks_.responseHeaders()->get();
+    }
+    ResponseTrailerMap* response_trailers = nullptr;
+    if (filter_manager_callbacks_.responseTrailers()) {
+      response_trailers = &filter_manager_callbacks_.responseTrailers()->get();
+    }
+
+    for (const auto& log_handler : access_log_handlers_) {
+      log_handler->log(request_headers, response_headers, response_trailers, stream_info_);
+    }
+  }
 
   void destroyFilters() {
     state_.destroyed_ = true;
@@ -637,7 +659,7 @@ public:
 
   void requestHeadersInitialized() {
     if (Http::Headers::get().MethodValues.Head ==
-        filter_manager_callbacks_.requestHeaders()->getMethodValue()) {
+        filter_manager_callbacks_.requestHeaders()->get().getMethodValue()) {
       state_.is_head_request_ = true;
     }
   }
