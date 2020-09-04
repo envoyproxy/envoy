@@ -201,8 +201,8 @@ TEST(Logger, SparseLogMacros) {
   EXPECT_EQ(29, helper.evaluations());
 
   spamCall([&helper]() { helper.logSomethingBelowLogLevelOnce(); }, kNumThreads);
-  // Without fine-grained logging, we shouldn't observe additional argument evaluations
-  // for log lines below the configured log level.
+  // We shouldn't observe additional argument evaluations for log lines below the configured
+  // log level.
   EXPECT_EQ(29, helper.evaluations());
 }
 

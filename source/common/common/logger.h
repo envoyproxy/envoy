@@ -439,7 +439,7 @@ protected:
 
 // This is to get us to pass the format check. We reference a real-world time source here.
 // We'd have to introduce a singleton for a time source here, and consensus was that avoiding
-// that is preferrable.
+// that is preferable.
 using t_logclock = std::chrono::steady_clock; // NOLINT
 
 #define ENVOY_LOG_PERIODIC(LEVEL, CHRONO_DURATION, ...)                                            \
