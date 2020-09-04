@@ -415,6 +415,10 @@ The following command operators are supported:
     JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
     length is ignored
 
+%DYNAMIC_METADATA_UNQUOTED(NAMESPACE:KEY*):Z%
+  Same as DYNAMIC_METADATA, but with quotes removed. Useful when you want to log a plain string or you want to
+  compose the JSON emitted by DYNAMIC_METADATA.
+
 .. _config_access_log_format_filter_state:
 
 %FILTER_STATE(KEY:F):Z%

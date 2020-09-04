@@ -1233,6 +1233,11 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
                 ProtoEq(ValueUtil::stringValue("test_value")));
   }
   {
+    DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>(), true);
+    EXPECT_EQ("test_value", formatter.format(request_headers, response_headers, response_trailers,
+                                             stream_info, body));
+  }
+  {
     DynamicMetadataFormatter formatter("com.test", {"test_obj"}, absl::optional<size_t>());
     EXPECT_EQ(
         "{\"inner_key\":\"inner_value\"}",

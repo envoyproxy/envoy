@@ -307,7 +307,7 @@ private:
 class MetadataFormatter {
 public:
   MetadataFormatter(const std::string& filter_namespace, const std::vector<std::string>& path,
-                    absl::optional<size_t> max_length);
+                    absl::optional<size_t> max_length, bool unquoted = false);
 
 protected:
   absl::optional<std::string>
@@ -318,6 +318,7 @@ private:
   std::string filter_namespace_;
   std::vector<std::string> path_;
   absl::optional<size_t> max_length_;
+  const bool unquoted_{};
 };
 
 /**
@@ -326,7 +327,8 @@ private:
 class DynamicMetadataFormatter : public FormatterProvider, MetadataFormatter {
 public:
   DynamicMetadataFormatter(const std::string& filter_namespace,
-                           const std::vector<std::string>& path, absl::optional<size_t> max_length);
+                           const std::vector<std::string>& path, absl::optional<size_t> max_length,
+                           bool unquoted = false);
 
   // FormatterProvider
   absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
