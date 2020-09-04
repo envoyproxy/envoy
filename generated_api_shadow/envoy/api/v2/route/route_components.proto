@@ -1128,10 +1128,12 @@ message HedgePolicy {
   // Indicates that a hedged request should be sent when the per-try timeout
   // is hit. This will only occur if the retry policy also indicates that a
   // timed out request should be retried.
-  // Once a timed out request is retried due to per try timeout, the router
-  // filter will ensure that it is not retried again even if the returned
-  // response headers would otherwise be retried according the specified
-  // :ref:`RetryPolicy <envoy_api_msg_route.RetryPolicy>`.
+  // If a response to the hedged-against request arrives, it will be evaluated
+  // according to the :ref:`RetryPolicy <envoy_api_msg_route.RetryPolicy>`.
+  // If per policy it would normally be retried (e.g. status code 409 with
+  // retriable-4xx policy), it would be discarded since a retry
+  // is already in progress. Otherwise, it would be returned to the caller,
+  // and the hedged request would be aborted and its result discarded.
   // Defaults to false.
   bool hedge_on_per_try_timeout = 3;
 }
