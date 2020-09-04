@@ -567,6 +567,7 @@ TEST_F(HttpFilterTest, HeaderOnlyRequestWithStream) {
 // 1. is an OK response.
 // 2. has headers to append.
 // 3. has headers to add.
+// 4. has headers to remove.
 TEST_F(HttpFilterTest, ClearCache) {
   InSequence s;
 
@@ -598,6 +599,7 @@ TEST_F(HttpFilterTest, ClearCache) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"bar"}, "foo"}};
+  response.headers_to_remove = std::vector<Http::LowerCaseString>{Http::LowerCaseString{"remove-me"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromString("ext_authz.ok").value());
@@ -608,6 +610,7 @@ TEST_F(HttpFilterTest, ClearCache) {
 // 1. is an OK response.
 // 2. has headers to append.
 // 3. has NO headers to add.
+// 4. has NO headers to remove.
 TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
   InSequence s;
 
@@ -646,8 +649,9 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
 
 // Verifies that the filter clears the route cache when an authorization response:
 // 1. is an OK response.
-// 2. has headers to add.
-// 3. has NO headers to append.
+// 2. has NO headers to append.
+// 3. has headers to add.
+// 4. has NO headers to remove.
 TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
   InSequence s;
 
@@ -684,9 +688,52 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
   EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
+// Verifies that the filter clears the route cache when an authorization response:
+// 1. is an OK response.
+// 2. has NO headers to append.
+// 3. has NO headers to add.
+// 4. has headers to remove.
+TEST_F(HttpFilterTest, ClearCacheRouteHeadersToRemoveOnly) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  clear_route_cache: true
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+  EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(1);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+      .Times(0);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_remove = std::vector<Http::LowerCaseString>{Http::LowerCaseString{"remove-me"}};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(
+      1U, filter_callbacks_.clusterInfo()->statsScope().counterFromString("ext_authz.ok").value());
+  EXPECT_EQ(1U, config_->stats().ok_.value());
+}
+
 // Verifies that the filter DOES NOT clear the route cache when an authorization response:
 // 1. is an OK response.
-// 2. has NO headers to add or to append.
+// 2. has NO headers to append.
+// 3. has NO headers to add.
+// 4. has NO headers to remove.
 TEST_F(HttpFilterTest, NoClearCacheRoute) {
   InSequence s;
 
