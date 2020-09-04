@@ -143,8 +143,7 @@ public:
 
   void waitForSuccessfulUpstreamResponse(
       const std::string& expected_response_code, const Headers& headers_to_add = Headers{},
-      const Headers& headers_to_append = Headers{},
-      const Headers& headers_to_remove = Headers{},
+      const Headers& headers_to_append = Headers{}, const Headers& headers_to_remove = Headers{},
       const Http::TestRequestHeaderMapImpl& new_headers_from_upstream =
           Http::TestRequestHeaderMapImpl{},
       const Http::TestRequestHeaderMapImpl& headers_to_append_multiple =
@@ -207,7 +206,8 @@ public:
 
     for (const auto& header_to_remove : headers_to_remove) {
       // The headers that were originally present in the request have now been removed.
-      EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString{header_to_remove.first}), nullptr);
+      EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString{header_to_remove.first}),
+                nullptr);
     }
 
     response_->waitForEndStream();
