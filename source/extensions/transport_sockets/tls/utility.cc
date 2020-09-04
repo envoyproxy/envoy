@@ -153,22 +153,22 @@ int32_t Utility::getDaysUntilExpiration(const X509* cert, TimeSource& time_sourc
   return 0;
 }
 
-absl::optional<std::string>
-Utility::getCertificateExtensionValue(X509& cert, absl::string_view extension_name) {
+absl::string_view Utility::getCertificateExtensionValue(X509& cert,
+                                                        absl::string_view extension_name) {
   bssl::UniquePtr<ASN1_OBJECT> oid(
       OBJ_txt2obj(std::string(extension_name).c_str(), 1 /* don't search names */));
   if (oid == nullptr) {
-    return absl::nullopt;
+    return {};
   }
 
   int pos = X509_get_ext_by_OBJ(&cert, oid.get(), -1);
   if (pos < 0) {
-    return absl::nullopt;
+    return {};
   }
 
   X509_EXTENSION* extension = X509_get_ext(&cert, pos);
   if (extension == nullptr) {
-    return absl::nullopt;
+    return {};
   }
 
   const ASN1_OCTET_STRING* octet_string = X509_EXTENSION_get_data(extension);
@@ -179,7 +179,8 @@ Utility::getCertificateExtensionValue(X509& cert, absl::string_view extension_na
   const unsigned char* octet_string_data = ASN1_STRING_get0_data(octet_string);
   const int octet_string_length = ASN1_STRING_length(octet_string);
 
-  return std::string(reinterpret_cast<const char*>(octet_string_data), octet_string_length);
+  return {reinterpret_cast<const char*>(octet_string_data),
+          static_cast<absl::string_view::size_type>(octet_string_length)};
 }
 
 SystemTime Utility::getValidFrom(const X509& cert) {
