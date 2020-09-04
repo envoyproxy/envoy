@@ -8,7 +8,7 @@
 // The goal is to eventually not require this file of envoy header declarations,
 // but limit the use of these architecture-specific types and declarations
 // to the corresponding .cc implementation files.
-#include <string_view>
+#include "absl/strings/string_view.h"
 
 #ifdef _MSC_VER
 
@@ -144,7 +144,7 @@ struct msghdr {
 #define SOCKET_ERROR_ADDR_IN_USE WSAEADDRINUSE
 
 namespace Platform {
-constexpr std::string_view null_device_path{"NUL"};
+constexpr absl::string_view null_device_path{"NUL"};
 }
 #else // POSIX
 
@@ -232,7 +232,7 @@ typedef int os_fd_t;
 #define SOCKET_ERROR_ADDR_IN_USE EADDRINUSE
 
 namespace Platform {
-constexpr std::string_view null_device_path{"/dev/null"};
+constexpr absl::string_view null_device_path{"/dev/null"};
 }
 #endif
 
