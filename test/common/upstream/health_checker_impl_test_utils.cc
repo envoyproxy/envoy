@@ -380,8 +380,8 @@ void HttpHealthCheckerImplTestBase::expectSessionCreate(
   expectClientCreate(test_sessions_.size() - 1, health_check_map);
 }
 
-void HttpHealthCheckerImplTestBase::expectClientCreate(size_t index,
-                                                   const HostWithHealthCheckMap& health_check_map) {
+void HttpHealthCheckerImplTestBase::expectClientCreate(
+    size_t index, const HostWithHealthCheckMap& health_check_map) {
   TestSession& test_session = *test_sessions_[index];
   test_session.codec_ = new NiceMock<Http::MockClientConnection>();
   ON_CALL(*test_session.codec_, protocol()).WillByDefault(testing::Return(Http::Protocol::Http11));
@@ -461,7 +461,9 @@ void HttpHealthCheckerImplTest::respond(size_t index, const std::string& code, b
   }
 }
 
-void HttpHealthCheckerImplTestBase::expectSessionCreate() { expectSessionCreate(health_checker_map_); }
+void HttpHealthCheckerImplTestBase::expectSessionCreate() {
+  expectSessionCreate(health_checker_map_);
+}
 void HttpHealthCheckerImplTestBase::expectClientCreate(size_t index) {
   expectClientCreate(index, health_checker_map_);
 }

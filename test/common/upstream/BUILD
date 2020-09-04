@@ -680,5 +680,6 @@ envoy_cc_fuzz_test(
     deps = [
         ":health_check_fuzz_lib",
         ":health_check_fuzz_proto_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

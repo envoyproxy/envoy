@@ -18,12 +18,15 @@ void HealthCheckFuzz::allocHealthCheckerFromProto(
 
 void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTestCase input) {
   allocHealthCheckerFromProto(input.health_check_config());
+  ON_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+      .WillByDefault(testing::Return(input.http_verify_cluster()));
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-    makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();
   expectStreamCreate(0);
   if (input.create_second_host()) {
-    cluster_->prioritySet().getMockHostSet(0)->hosts_.push_back(makeTestHost(cluster_->info_, "tcp://127.0.0.1:81"));
+    cluster_->prioritySet().getMockHostSet(0)->hosts_.push_back(
+        makeTestHost(cluster_->info_, "tcp://127.0.0.1:81"));
     ENVOY_LOG_MISC(trace, "Created second host.");
     second_host_ = true;
     expectSessionCreate();
@@ -44,7 +47,7 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
 }
 
 void HealthCheckFuzz::respondHttp(test::fuzz::Headers headers, absl::string_view status,
-                                     bool second_host) {
+                                  bool second_host) {
   std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers =
       std::make_unique<Http::TestResponseHeaderMapImpl>(
           Fuzz::fromHeaders<Http::TestResponseHeaderMapImpl>(headers, {}, {}));
@@ -72,14 +75,14 @@ void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) 
                                             // move this to a separate method, handleHttp
     case test::common::upstream::Action::kRespond: {
       switch (type_) {
-        case HealthCheckFuzz::Type::HTTP: {
-          respondHttp(event.respond().http_respond().headers(), event.respond().http_respond().status(),
-                     event.respond().second_host());
-          break;
-        }
-        //TODO: TCP and gRPC
-        default:
-          break;
+      case HealthCheckFuzz::Type::HTTP: {
+        respondHttp(event.respond().http_respond().headers(),
+                    event.respond().http_respond().status(), event.respond().second_host());
+        break;
+      }
+      // TODO: TCP and gRPC
+      default:
+        break;
       }
       break;
     }

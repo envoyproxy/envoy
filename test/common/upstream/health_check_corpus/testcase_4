@@ -40,3 +40,4 @@ actions {
     }
 }
 create_second_host : false
+http_verify_cluster : true

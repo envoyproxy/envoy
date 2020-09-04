@@ -37,7 +37,7 @@ public:
   Http::CodecClient::Type codecClientType() { return codec_client_type_; }
 };
 
-class HttpHealthCheckerImplTestBase: public HealthCheckerTestBase {
+class HttpHealthCheckerImplTestBase : public HealthCheckerTestBase {
 public:
   struct TestSession {
     Event::MockTimer* interval_timer_{};
@@ -72,7 +72,6 @@ public:
 
 class HttpHealthCheckerImplTest : public testing::Test, public HttpHealthCheckerImplTestBase {
 public:
-
   void allocHealthChecker(const std::string& yaml, bool avoid_boosting = true);
 
   void addCompletionCallback();

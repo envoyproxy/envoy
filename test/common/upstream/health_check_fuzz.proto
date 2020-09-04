@@ -8,8 +8,8 @@ import "envoy/config/core/v3/health_check.proto";
 
 message HttpRespond { //TODO: Split this across headers, body, and trailers?
   test.fuzz.Headers headers = 1;
+  //https://github.com/nodejs/http-parser/blob/master/http_parser.c#L852
   string status = 2 [(validate.rules).string.pattern = "[0-9]+$*"];
-  //If there's a second host, this will determine which host, if not ignore
 }
 
 message Respond {
@@ -40,4 +40,5 @@ message HealthCheckTestCase {
       [(validate.rules).message.required = true];
   repeated Action actions = 2;
   bool create_second_host = 3;
+  bool http_verify_cluster = 4; //Determines if verify cluster setting is on
 }
