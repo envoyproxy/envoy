@@ -6,6 +6,7 @@
 #include "common/http/exception.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
+#include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
@@ -15,7 +16,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -347,7 +348,7 @@ protected:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Network::ListenerPtr upstream_listener_;
-  Network::MockListenerCallbacks listener_callbacks_;
+  Network::MockTcpListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
   Network::Address::InstanceConstSharedPtr source_address_;
   Http::MockClientConnection* codec_;

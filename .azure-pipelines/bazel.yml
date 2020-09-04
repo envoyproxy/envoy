@@ -16,7 +16,7 @@ parameters:
     default: true
   - name: bazelBuildExtraOptions
     type: string
-    default: ""
+    default: "--flaky_test_attempts=2"
 
 steps:
   - task: Cache@2
@@ -48,6 +48,9 @@ steps:
     workingDirectory: $(Build.SourcesDirectory)
     env:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+      SLACK_TOKEN: $(SLACK_TOKEN)
+      REPO_URI: $(Build.Repository.Uri)
+      BUILD_URI: $(Build.BuildUri)
       ${{ if parameters.rbe }}:
         ENVOY_RBE: "1"
         BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs) ${{ parameters.bazelBuildExtraOptions }}"

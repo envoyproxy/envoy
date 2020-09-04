@@ -28,12 +28,11 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
-    security_posture = "unknown",
     # TODO(#9953) move echo integration test to extensions.
-    visibility = [
-        "//:extension_config",
+    extra_visibility = [
         "//test/integration:__subpackages__",
     ],
+    security_posture = "unknown",
     deps = [
         ":echo",
         "//include/envoy/registry",

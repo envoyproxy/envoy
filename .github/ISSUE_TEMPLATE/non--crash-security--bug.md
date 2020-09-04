@@ -1,20 +1,15 @@
+---
+name: Non-{crash,security} bug
+about: Bugs which are not crashes, DoS or other security issue
+title: ''
+labels: bug,triage
+assignees: ''
+
+---
+
 **If you are reporting *any* crash or *any* potential security issue, *do not*
 open an issue in this repo. Please report the issue via emailing
 envoy-security@googlegroups.com where the issue will be triaged appropriately.**
-
-**Issue Template**
-
-*Title*: *One line description*
-
-*Description*:
->Describe the issue. Please be detailed. If a feature request, please
-describe the desired behaviour, what scenario it enables and how it
-would be used.
-
-[optional *Relevant Links*:]
->Any extra documentation required to understand the issue.
-
-**Bug Template**
 
 *Title*: *One line description*
 
