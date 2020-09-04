@@ -745,8 +745,8 @@ TEST_P(AdminInstanceTest, ConfigDumpResourceNotRepeated) {
             getCallback("/config_dump?resource=version_info", header_map, response));
 }
 
-// Test Using /config_dump?include_unready_targets to dump configs of all unready targets.
-TEST_P(AdminInstanceTest, UnreadyTargetsConfigDump) {
+// Test Using /init_dump to dump information of all unready targets.
+TEST_P(AdminInstanceTest, UnreadyTargetsDump) {
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
 
@@ -771,28 +771,22 @@ TEST_P(AdminInstanceTest, UnreadyTargetsConfigDump) {
   EXPECT_CALL(listener_manager, isWorkerStarted()).WillRepeatedly(Return(true));
   EXPECT_CALL(listener_manager, listeners(_)).WillOnce(Return(listeners));
 
-  EXPECT_EQ(Http::Code::OK,
-            getCallback("/config_dump?include_unready_targets", header_map, response));
+  EXPECT_EQ(Http::Code::OK, getCallback("/init_dump", header_map, response));
   std::string output = response.toString();
   // The expected value should be updated when ProtobufTypes::MessagePtr
-  // AdminImpl::dumpUnreadyTargetsConfigs function includes more dump when mask has no value.
+  // AdminImpl::dumpListenerUnreadyTargets function includes more dump when mask has no value.
   const std::string expected_json = R"EOF({
- "configs": [
+ "unready_targets_dumps": [
   {
-   "@type": "type.googleapis.com/envoy.admin.v3.UnreadyTargetsConfigDumpList",
-   "unready_targets_configs": [
-    {
-     "name": "init manager test_init_manager_1",
-     "target_names": [
-      "target test_target_1"
-     ]
-    },
-    {
-     "name": "init manager test_init_manager_2",
-     "target_names": [
-      "target test_target_2"
-     ]
-    }
+   "name": "init manager test_init_manager_1",
+   "target_names": [
+    "target test_target_1"
+   ]
+  },
+  {
+   "name": "init manager test_init_manager_2",
+   "target_names": [
+    "target test_target_2"
    ]
   }
  ]
@@ -801,9 +795,8 @@ TEST_P(AdminInstanceTest, UnreadyTargetsConfigDump) {
   EXPECT_EQ(output, expected_json);
 }
 
-// Test Using /config_dump?include_unready_targets&mask=listener to dump configs of listener unready
-// targets.
-TEST_P(AdminInstanceTest, ListenerUnreadyTargetsConfigDump) {
+// Test Using /init_dump?listener to dump unready targets of listeners.
+TEST_P(AdminInstanceTest, ListenerUnreadyTargetsDump) {
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
 
@@ -828,26 +821,20 @@ TEST_P(AdminInstanceTest, ListenerUnreadyTargetsConfigDump) {
   EXPECT_CALL(listener_manager, isWorkerStarted()).WillRepeatedly(Return(true));
   EXPECT_CALL(listener_manager, listeners(_)).WillOnce(Return(listeners));
 
-  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?include_unready_targets&mask=listener",
-                                        header_map, response));
+  EXPECT_EQ(Http::Code::OK, getCallback("/init_dump?mask=listener", header_map, response));
   std::string output = response.toString();
   const std::string expected_json = R"EOF({
- "configs": [
+ "unready_targets_dumps": [
   {
-   "@type": "type.googleapis.com/envoy.admin.v3.UnreadyTargetsConfigDumpList",
-   "unready_targets_configs": [
-    {
-     "name": "init manager test_init_manager_1",
-     "target_names": [
-      "target test_target_1"
-     ]
-    },
-    {
-     "name": "init manager test_init_manager_2",
-     "target_names": [
-      "target test_target_2"
-     ]
-    }
+   "name": "init manager test_init_manager_1",
+   "target_names": [
+    "target test_target_1"
+   ]
+  },
+  {
+   "name": "init manager test_init_manager_2",
+   "target_names": [
+    "target test_target_2"
    ]
   }
  ]

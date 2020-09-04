@@ -9,6 +9,7 @@
 
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/admin/v3/init_dump.pb.h"
 #include "envoy/admin/v3/metrics.pb.h"
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
@@ -134,11 +135,6 @@ bool shouldIncludeEdsInDump(const Http::Utility::QueryParams& params) {
   return Utility::queryParam(params, "include_eds") != absl::nullopt;
 }
 
-// Helper method to get the unready_targets parameter.
-bool shouldIncludeUnreadyTargetsInDump(const Http::Utility::QueryParams& params) {
-  return Utility::queryParam(params, "include_unready_targets") != absl::nullopt;
-}
-
 // Apply a field mask to a resource message. A simple field mask might look
 // like "cluster.name,cluster.alt_stat_name,last_updated" for a StaticCluster
 // resource. Unfortunately, since the "cluster" field is Any and the in-built
@@ -226,8 +222,8 @@ void trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
 } // namespace
 
 void AdminImpl::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
-                                   const absl::optional<std::string>& mask, bool include_eds,
-                                   bool include_unready_targets) const {
+                                   const absl::optional<std::string>& mask,
+                                   bool include_eds) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     if (!server_.clusterManager().clusters().empty()) {
@@ -235,15 +231,10 @@ void AdminImpl::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
     }
   }
 
-  if (include_unready_targets) {
-    callbacks_map.emplace("unreadytargets",
-                          [this, &mask] { return dumpUnreadyTargetsConfigs(mask); });
-  }
-
   for (const auto& [name, callback] : callbacks_map) {
     ProtobufTypes::MessagePtr message = callback();
     ASSERT(message);
-    if (name != "unreadytargets" && mask.has_value()) {
+    if (mask.has_value()) {
       Protobuf::FieldMask field_mask;
       ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
       // We don't use trimMessage() above here since masks don't support
@@ -259,17 +250,12 @@ void AdminImpl::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
 absl::optional<std::pair<Http::Code, std::string>>
 AdminImpl::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
                              const absl::optional<std::string>& mask, const std::string& resource,
-                             bool include_eds, bool include_unready_targets) const {
+                             bool include_eds) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     if (!server_.clusterManager().clusters().empty()) {
       callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
     }
-  }
-
-  if (include_unready_targets) {
-    callbacks_map.emplace("unreadytargets",
-                          [this, &mask] { return dumpUnreadyTargetsConfigs(mask); });
   }
 
   for (const auto& [name, callback] : callbacks_map) {
@@ -289,7 +275,7 @@ AdminImpl::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
 
     auto repeated = reflection->GetRepeatedPtrField<Protobuf::Message>(*message, field_descriptor);
     for (Protobuf::Message& msg : repeated) {
-      if (name != "unreadytargets" && mask.has_value()) {
+      if (mask.has_value()) {
         Protobuf::FieldMask field_mask;
         ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
         trimResourceMessage(field_mask, msg);
@@ -398,26 +384,51 @@ ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
   return endpoint_config_dump;
 }
 
-ProtobufTypes::MessagePtr
-AdminImpl::dumpUnreadyTargetsConfigs(const absl::optional<std::string>& target) const {
-  auto unready_targets_config_dump_list =
-      std::make_unique<envoy::admin::v3::UnreadyTargetsConfigDumpList>();
+Http::Code AdminImpl::handlerConfigDump(absl::string_view url,
+                                        Http::ResponseHeaderMap& response_headers,
+                                        Buffer::Instance& response, AdminStream&) const {
+  Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
+  const auto resource = resourceParam(query_params);
+  const auto mask = maskParam(query_params);
+  const bool include_eds = shouldIncludeEdsInDump(query_params);
+
+  envoy::admin::v3::ConfigDump dump;
+
+  if (resource.has_value()) {
+    auto err = addResourceToDump(dump, mask, resource.value(), include_eds);
+    if (err.has_value()) {
+      response.add(err.value().second);
+      return err.value().first;
+    }
+  } else {
+    addAllConfigToDump(dump, mask, include_eds);
+  }
+  MessageUtil::redact(dump);
+
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+  response.add(MessageUtil::getJsonStringFromMessage(dump, true)); // pretty-print
+  return Http::Code::OK;
+}
+
+std::unique_ptr<envoy::admin::v3::UnreadyTargetsDumps>
+AdminImpl::dumpUnreadyTargets(const absl::optional<std::string>& target) const {
+  auto unready_targets_dumps = std::make_unique<envoy::admin::v3::UnreadyTargetsDumps>();
 
   if (target.has_value()) {
     if (target.value() == "listener") {
-      dumpListenerUnreadyTargetsConfigs(*unready_targets_config_dump_list);
+      dumpListenerUnreadyTargets(*unready_targets_dumps);
     }
     // More options for unready targets config dump.
   } else {
     // Dump all possible information of unready targets.
-    dumpListenerUnreadyTargetsConfigs(*unready_targets_config_dump_list);
+    dumpListenerUnreadyTargets(*unready_targets_dumps);
     // More unready targets to add into config dump.
   }
-  return unready_targets_config_dump_list;
+  return unready_targets_dumps;
 }
 
-void AdminImpl::dumpListenerUnreadyTargetsConfigs(
-    envoy::admin::v3::UnreadyTargetsConfigDumpList& unready_targets_config_dump_list) const {
+void AdminImpl::dumpListenerUnreadyTargets(
+    envoy::admin::v3::UnreadyTargetsDumps& unready_targets_dumps) const {
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
   if (server_.listenerManager().isWorkerStarted()) {
     listeners = server_.listenerManager().listeners(ListenerManager::WARMING);
@@ -427,31 +438,17 @@ void AdminImpl::dumpListenerUnreadyTargetsConfigs(
 
   for (const auto& listener_config : listeners) {
     auto& listener = listener_config.get();
-    listener.initManager().dumpUnreadyTargetsConfig(unready_targets_config_dump_list);
+    listener.initManager().dumpUnreadyTargets(unready_targets_dumps);
   }
 }
 
-Http::Code AdminImpl::handlerConfigDump(absl::string_view url,
-                                        Http::ResponseHeaderMap& response_headers,
-                                        Buffer::Instance& response, AdminStream&) const {
+Http::Code AdminImpl::handlerInitDump(absl::string_view url,
+                                      Http::ResponseHeaderMap& response_headers,
+                                      Buffer::Instance& response, AdminStream&) const {
   Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
-  const auto resource = resourceParam(query_params);
   const auto mask = maskParam(query_params);
-  const bool include_eds = shouldIncludeEdsInDump(query_params);
-  const bool include_unready_targets = shouldIncludeUnreadyTargetsInDump(query_params);
 
-  envoy::admin::v3::ConfigDump dump;
-
-  if (resource.has_value()) {
-    auto err =
-        addResourceToDump(dump, mask, resource.value(), include_eds, include_unready_targets);
-    if (err.has_value()) {
-      response.add(err.value().second);
-      return err.value().first;
-    }
-  } else {
-    addAllConfigToDump(dump, mask, include_eds, include_unready_targets);
-  }
+  envoy::admin::v3::UnreadyTargetsDumps dump = *dumpUnreadyTargets(mask);
   MessageUtil::redact(dump);
 
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
@@ -511,6 +508,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            MAKE_ADMIN_HANDLER(clusters_handler_.handlerClusters), false, false},
           {"/config_dump", "dump current Envoy configs (experimental)",
            MAKE_ADMIN_HANDLER(handlerConfigDump), false, false},
+          {"/init_dump", "dump current Envoy init manager information (experimental)",
+           MAKE_ADMIN_HANDLER(handlerInitDump), false, false},
           {"/contention", "dump current Envoy mutex contention stats (if enabled)",
            MAKE_ADMIN_HANDLER(stats_handler_.handlerContention), false, false},
           {"/cpuprofiler", "enable/disable the CPU profiler",

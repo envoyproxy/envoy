@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/admin/v3/init_dump.pb.h"
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
@@ -286,8 +287,7 @@ private:
    * Helper methods for the /config_dump url handler.
    */
   void addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
-                          const absl::optional<std::string>& mask, bool include_eds,
-                          bool include_listener_unready_targets) const;
+                          const absl::optional<std::string>& mask, bool include_eds) const;
   /**
    * Add the config matching the passed resource to the passed config dump.
    * @return absl::nullopt on success, else the Http::Code and an error message that should be added
@@ -295,8 +295,7 @@ private:
    */
   absl::optional<std::pair<Http::Code, std::string>>
   addResourceToDump(envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
-                    const std::string& resource, bool include_eds,
-                    bool include_listener_unready_targets) const;
+                    const std::string& resource, bool include_eds) const;
 
   std::vector<const UrlHandler*> sortedHandlers() const;
   envoy::admin::v3::ServerInfo::State serverState();
@@ -309,16 +308,15 @@ private:
   ProtobufTypes::MessagePtr dumpEndpointConfigs() const;
 
   /**
-   * Helper methods for the /config_dump url handler to add unready targets config.
+   * Helper methods for the /init_dump url handler to add unready targets information.
    */
-  ProtobufTypes::MessagePtr
-  dumpUnreadyTargetsConfigs(const absl::optional<std::string>& mask) const;
+  std::unique_ptr<envoy::admin::v3::UnreadyTargetsDumps>
+  dumpUnreadyTargets(const absl::optional<std::string>& mask) const;
 
   /**
-   * Helper methods for the /config_dump url handler to add unready targets config of listeners.
+   * Helper methods for the /init_dump url handler to add unready targets config of listeners.
    */
-  void dumpListenerUnreadyTargetsConfigs(
-      envoy::admin::v3::UnreadyTargetsConfigDumpList& config_dump_list) const;
+  void dumpListenerUnreadyTargets(envoy::admin::v3::UnreadyTargetsDumps& config_dump_list) const;
 
   /**
    * URL handlers.
@@ -329,6 +327,8 @@ private:
   Http::Code handlerConfigDump(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&) const;
+  Http::Code handlerInitDump(absl::string_view url, Http::ResponseHeaderMap& response_headers,
+                             Buffer::Instance& response, AdminStream&) const;
   Http::Code handlerHelp(absl::string_view path_and_query,
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream&);

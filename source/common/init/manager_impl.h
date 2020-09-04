@@ -3,6 +3,7 @@
 #include <list>
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/admin/v3/init_dump.pb.h"
 #include "envoy/init/manager.h"
 
 #include "common/common/logger.h"
@@ -38,8 +39,7 @@ public:
   void add(const Target& target) override;
   void initialize(const Watcher& watcher) override;
   const absl::flat_hash_map<std::string, uint32_t>& unreadyTargets() const override;
-  void dumpUnreadyTargetsConfig(
-      envoy::admin::v3::UnreadyTargetsConfigDumpList& config_dump_list) override;
+  void dumpUnreadyTargets(envoy::admin::v3::UnreadyTargetsDumps& dumps) override;
 
 private:
   // Callback function with an additional target_name parameter, decrease unready targets count by

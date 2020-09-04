@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/admin/v3/init_dump.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/init/target.h"
 #include "envoy/init/watcher.h"
@@ -85,8 +86,7 @@ struct Manager {
   /**
    * Add unready targets information into the config dump.
    */
-  virtual void
-  dumpUnreadyTargetsConfig(envoy::admin::v3::UnreadyTargetsConfigDumpList& config_dump_list) PURE;
+  virtual void dumpUnreadyTargets(envoy::admin::v3::UnreadyTargetsDumps& dumps) PURE;
 };
 
 } // namespace Init
