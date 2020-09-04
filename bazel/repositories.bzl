@@ -96,22 +96,6 @@ _default_envoy_build_config = repository_rule(
 def _python_deps():
     # TODO(htuch): convert these to pip3_import.
     _repository_impl(
-        name = "com_github_pallets_markupsafe",
-        build_file = "@envoy//bazel/external:markupsafe.BUILD",
-    )
-    native.bind(
-        name = "markupsafe",
-        actual = "@com_github_pallets_markupsafe//:markupsafe",
-    )
-    _repository_impl(
-        name = "com_github_pallets_jinja",
-        build_file = "@envoy//bazel/external:jinja.BUILD",
-    )
-    native.bind(
-        name = "jinja2",
-        actual = "@com_github_pallets_jinja//:jinja2",
-    )
-    _repository_impl(
         name = "com_github_apache_thrift",
         build_file = "@envoy//bazel/external:apache_thrift.BUILD",
     )
