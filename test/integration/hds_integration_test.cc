@@ -1007,5 +1007,54 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyTlsHttp1) {
   cleanupHdsConnection();
 }
 
+// Health checks a single endpoint over TLS with HTTP/1
+TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTlsMissingSocketMatch) {
+  // Make the endpoints expect communication over TLS.
+  tls_hosts_ = true;
+
+  initialize();
+
+  // Server <--> Envoy
+  waitForHdsStream();
+  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
+  EXPECT_EQ(envoy_msg_.health_check_request().capability().health_check_protocols(0),
+            envoy::service::health::v3::Capability::HTTP);
+
+  // Make the specifer not have the TLS socket matches, so it will try to connect over plaintext.
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
+  server_health_check_specifier_.mutable_cluster_health_checks(0)
+      ->mutable_health_checks(0)
+      ->mutable_timeout()
+      ->set_seconds(0);
+  server_health_check_specifier_.mutable_cluster_health_checks(0)
+      ->mutable_health_checks(0)
+      ->mutable_timeout()
+      ->set_nanos(100000000); // 0.1 seconds
+
+  hds_stream_->startGrpcStream();
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
+
+  // Envoy sends a health check message to an endpoint
+  ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
+
+  // Endpoint doesn't respond to the health check
+  ASSERT_TRUE(host_fake_raw_connection_->waitForDisconnect());
+
+  // Receive updates until the one we expect arrives. This should be UNHEALTHY and not TIMEOUT,
+  // because TIMEOUT occurs in the situation where there is no response from the endpoint. In this
+  // case, the endpoint does respond but it is over TLS, and HDS is trying to parse it as plaintext.
+  // It does not recognize the malformed plaintext, so it is considered a failure and UNHEALTHY is
+  // set.
+  waitForEndpointHealthResponse(envoy::config::core::v3::UNHEALTHY);
+
+  checkCounters(1, 2, 0, 1);
+
+  // Clean up connections
+  cleanupHostConnections();
+  cleanupHdsConnection();
+}
+
 } // namespace
 } // namespace Envoy
