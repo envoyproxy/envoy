@@ -1208,12 +1208,17 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   const Http::LowerCaseString key_to_override{"foobar"};
   request_headers_.addCopy("foobar", "foo");
 
+  // `remove-me` will be removed
+  const Http::LowerCaseString key_to_remove("remove-me");
+  request_headers_.addCopy(key_to_remove, "upstream-should-not-see-me");
+
   prepareCheck();
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_append = Http::HeaderVector{{request_header_key, "bar"}};
   response.headers_to_set = Http::HeaderVector{{key_to_add, "foo"}, {key_to_override, "bar"}};
+  response.headers_to_remove = std::vector<Http::LowerCaseString>{key_to_remove};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -1230,6 +1235,7 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   EXPECT_EQ(request_headers_.get_(request_header_key), "foo,bar");
   EXPECT_EQ(request_headers_.get_(key_to_add), "foo");
   EXPECT_EQ(request_headers_.get_(key_to_override), "bar");
+  EXPECT_EQ(request_headers_.has(key_to_remove), false);
 }
 
 // Test that an synchronous denied response from the authorization service, on the call stack,
