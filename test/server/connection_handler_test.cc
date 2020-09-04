@@ -592,6 +592,7 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingSuccess) {
   handler_->retryConnections(true, on_demand_filter_chain_message_);
   EXPECT_EQ(1UL, handler_->numConnections());
 
+  EXPECT_CALL(*access_log_, log(_, _, _, _)).Times(1);
   connection->close(Network::ConnectionCloseType::NoFlush);
   dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0UL, handler_->numConnections());
@@ -682,6 +683,7 @@ TEST_F(ConnectionHandlerTest, OnDemandFilterChainMultipleRebuildingRequests) {
   // createServerConnection.
   handler_->retryConnections(true, on_demand_filter_chain_message_);
   EXPECT_EQ(3UL, handler_->numConnections());
+  EXPECT_CALL(*access_log_, log(_, _, _, _)).Times(3);
 
   EXPECT_CALL(*listener, onDestroy());
 }
