@@ -6,7 +6,9 @@
 #include "common/common/empty_string.h"
 #include "common/common/hex.h"
 #include "common/http/headers.h"
+#include "common/runtime/runtime_features.h"
 
+#include "extensions/transport_sockets/tls/io_handle_bio.h"
 #include "extensions/transport_sockets/tls/utility.h"
 
 #include "absl/strings/str_replace.h"
@@ -67,9 +69,14 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
     provider->registerPrivateKeyMethod(rawSsl(), *this, callbacks_->connection().dispatcher());
   }
 
-  // TODO(fcoras): consider using BIO_s_mem or a BIO with custom read/write functions instead of a
-  // socket BIO which relies on access to a file descriptor.
-  BIO* bio = BIO_new_socket(callbacks_->ioHandle().fdDoNotUse(), 0);
+  BIO* bio;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_use_io_handle_bio")) {
+    // Use custom BIO that reads from/writes to IoHandle
+    bio = BIO_new_io_handle(&callbacks_->ioHandle());
+  } else {
+    // TODO(fcoras): remove once the io_handle_bio proves to be stable
+    bio = BIO_new_socket(callbacks_->ioHandle().fdDoNotUse(), 0);
+  }
   SSL_set_bio(rawSsl(), bio, bio);
 }
 
