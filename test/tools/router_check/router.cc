@@ -44,8 +44,8 @@ toString(envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase speci
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSuffixMatch:
     return "suffix_match";
     break;
-  default:
-    return "HEADER_MATCH_SPECIFIER_NOT_SET";
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kContainsMatch:
+    return "contains_match";
     break;
   }
 }
