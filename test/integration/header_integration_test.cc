@@ -188,8 +188,6 @@ public:
 
   void TearDown() override {
     if (eds_connection_ != nullptr) {
-      // Don't ASSERT fail if an EDS reconnect ends up unparented.
-      fake_upstreams_[1]->set_allow_unexpected_disconnects(true);
       AssertionResult result = eds_connection_->close();
       RELEASE_ASSERT(result, result.message());
       result = eds_connection_->waitForDisconnect();

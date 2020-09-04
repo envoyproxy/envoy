@@ -22,6 +22,7 @@ envoy_extension_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
