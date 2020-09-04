@@ -36,9 +36,11 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
       ASSERT(version == Address::IpVersion::v4);
       domain = AF_INET;
     }
-  } else {
-    ASSERT(addr_type == Address::Type::Pipe);
+  } else if (addr_type == Address::Type::Pipe) {
     domain = AF_UNIX;
+  } else {
+    ASSERT(addr_type == Address::Type::EnvoyInternal);
+    return std::make_unique<NullIoSocketHandleImpl>();
   }
 
   const Api::SysCallSocketResult result = Api::OsSysCallsSingleton::get().socket(domain, flags, 0);

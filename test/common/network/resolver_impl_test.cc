@@ -63,6 +63,22 @@ TEST(ResolverTest, FromProtoAddress) {
   EXPECT_EQ("/foo/bar", resolveProtoAddress(pipe_address)->asString());
 }
 
+TEST(ResolverTest, InternalListenerNameFromProtoAddress) {
+  envoy::config::core::v3::Address internal_listener_address;
+  internal_listener_address.mutable_envoy_internal_address()->set_server_listener_name(
+      "internal_listener_foo");
+  EXPECT_EQ("envoy://internal_listener_foo",
+            resolveProtoAddress(internal_listener_address)->asString());
+}
+
+TEST(ResolverTest, UnsupportedInternalAddressFromProtoAddress) {
+  envoy::config::core::v3::Address internal_address;
+  internal_address.mutable_envoy_internal_address();
+  EXPECT_THROW_WITH_MESSAGE(
+      resolveProtoAddress(internal_address), EnvoyException,
+      "Internal address must be a server listener name: envoy_internal_address {\n}\n");
+}
+
 // Validate correct handling of ipv4_compat field.
 TEST(ResolverTest, FromProtoAddressV4Compat) {
   {

@@ -55,11 +55,8 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Addres
         kServerListenerName:
       return std::make_shared<EnvoyInternalInstance>(
           address.envoy_internal_address().server_listener_name());
-    case envoy::config::core::v3::EnvoyInternalAddress::AddressNameSpecifierCase::kClientAddressId:
-      return std::make_shared<EnvoyInternalInstance>(
-          address.envoy_internal_address().client_address_id());
     default:
-      throw EnvoyException("Internal address must be a server listener name or client address id" +
+      throw EnvoyException("Internal address must be a server listener name: " +
                            address.DebugString());
     }
   default:

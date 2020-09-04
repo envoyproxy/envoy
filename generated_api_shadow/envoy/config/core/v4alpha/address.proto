@@ -30,7 +30,7 @@ message Pipe {
   uint32 mode = 2 [(validate.rules).uint32 = {lte: 511}];
 }
 
-// [#not-implemented-hide:] The address representing an envoy internal listener, or a client connecting to that listener.
+// The address represents an envoy internal listener.
 message EnvoyInternalAddress {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.EnvoyInternalAddress";
@@ -38,10 +38,8 @@ message EnvoyInternalAddress {
   oneof address_name_specifier {
     option (validate.required) = true;
 
-    // The address is the name of a internal listener.
+    // The :ref:`listener name <envoy_api_field_config.listener.v4alpha.Listener.name>` of the destination internal listener.
     string server_listener_name = 1;
-
-    string client_address_id = 2;
   }
 }
 

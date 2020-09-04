@@ -536,6 +536,19 @@ filter_chains:
   EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.127.0.0.1_1234.foo").value());
 }
 
+TEST_F(ListenerManagerImplTest, UnsupportedInternalListener) {
+  const std::string yaml = R"EOF(
+address:
+  envoy_internal_address:
+    server_listener_name: a_listener_name  
+filter_chains:
+- filters: []
+  )EOF";
+
+  EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true));
+  EXPECT_EQ(0U, manager_->listeners().size());
+}
+
 TEST_F(ListenerManagerImplTest, NotDefaultListenerFiltersTimeout) {
   const std::string yaml = R"EOF(
     name: "foo"

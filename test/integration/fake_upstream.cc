@@ -5,29 +5,19 @@
 #include <memory>
 #include <string>
 
-#include "envoy/event/timer.h"
-
-#include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
-#include "common/common/fmt.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http1/codec_impl_legacy.h"
-#include "common/http/http2/codec_impl.h"
 #include "common/http/http2/codec_impl_legacy.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
-#include "common/network/raw_buffer_socket.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 
 #include "server/connection_handler_impl.h"
 
-#include "extensions/transport_sockets/tls/ssl_socket.h"
-
-#include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -457,8 +447,8 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       api_(Api::createApiForTest(stats_store_)), time_system_(time_system),
       dispatcher_(api_->allocateDispatcher("fake_upstream")),
       handler_(new Server::ConnectionHandlerImpl(*dispatcher_)),
-      allow_unexpected_disconnects_(false), read_disable_on_new_connection_(true),
-      enable_half_close_(enable_half_close), listener_(*this),
+      read_disable_on_new_connection_(true), enable_half_close_(enable_half_close),
+      listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();
@@ -480,8 +470,7 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
   if (read_disable_on_new_connection_) {
     connection.readDisable(true);
   }
-  auto connection_wrapper =
-      std::make_unique<SharedConnectionWrapper>(connection, allow_unexpected_disconnects_);
+  auto connection_wrapper = std::make_unique<SharedConnectionWrapper>(connection);
   LinkedList::moveIntoListBack(std::move(connection_wrapper), new_connections_);
   return true;
 }

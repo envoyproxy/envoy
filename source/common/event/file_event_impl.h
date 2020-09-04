@@ -42,5 +42,23 @@ private:
   const bool activate_fd_events_next_event_loop_;
 };
 
+class TimerWrappedFileEventImpl : public FileEvent {
+public:
+  TimerWrappedFileEventImpl(SchedulableCallbackPtr schedulable)
+      : schedulable_(std::move(schedulable)) {}
+
+  ~TimerWrappedFileEventImpl() {
+    if (schedulable_->enabled()) {
+      schedulable_->cancel();
+    }
+  }
+  // Event::FileEvent
+  void activate(uint32_t) override { schedulable_->scheduleCallbackNextIteration(); }
+  void setEnabled(uint32_t) override { schedulable_->scheduleCallbackNextIteration(); }
+
+private:
+  SchedulableCallbackPtr schedulable_;
+};
+
 } // namespace Event
 } // namespace Envoy
