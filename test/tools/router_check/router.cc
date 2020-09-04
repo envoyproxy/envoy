@@ -47,9 +47,8 @@ toString(envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase speci
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kContainsMatch:
     return "contains_match";
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 const std::string toString(const Envoy::Http::HeaderEntry* entry) {
