@@ -50,7 +50,7 @@ const std::regex& getStartTimeNewlinePattern() {
 const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
 
 template <class... Ts> struct JsonFormatMapVisitor : Ts... { using Ts::operator()...; };
-template <class... Ts> JsonFormatMapVisitor(Ts...)->JsonFormatMapVisitor<Ts...>;
+template <class... Ts> JsonFormatMapVisitor(Ts...) -> JsonFormatMapVisitor<Ts...>;
 
 } // namespace
 
