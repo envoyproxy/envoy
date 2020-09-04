@@ -77,6 +77,8 @@ envoy_cc_test(
         "//test/extensions/transport_sockets/tls/ocsp:gen_ocsp_data",
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
+    # Fails intermittantly on local build
+    tags = ["flaky_on_windows"],
     deps = [
         ":ssl_test_utils",
         "//source/common/common:base64_lib",
@@ -98,6 +100,17 @@ envoy_cc_test(
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "io_handle_bio_test",
+    srcs = ["io_handle_bio_test.cc"],
+    external_deps = ["ssl"],
+    deps = [
+        ":ssl_test_utils",
+        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//test/mocks/network:io_handle_mocks",
     ],
 )
 

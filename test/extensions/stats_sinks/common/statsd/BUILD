@@ -32,7 +32,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "udp_statsd_test",
     srcs = ["udp_statsd_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",

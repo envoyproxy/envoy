@@ -41,8 +41,13 @@ function exclude_macos_impl() {
 }
 
 # Do not run incremental clang-tidy on check_format testdata files.
-function exclude_testdata() {
+function exclude_check_format_testdata() {
   grep -v tools/testdata/check_format/
+}
+
+# Do not run clang-tidy on envoy_headersplit testdata files.
+function exclude_headersplit_testdata() {
+  grep -v tools/envoy_headersplit/
 }
 
 # Exclude files in third_party which are temporary forks from other OSS projects.
@@ -51,7 +56,7 @@ function exclude_third_party() {
 }
 
 function filter_excludes() {
-  exclude_testdata | exclude_win32_impl | exclude_macos_impl | exclude_third_party
+  exclude_check_format_testdata | exclude_headersplit_testdata | exclude_win32_impl | exclude_macos_impl | exclude_third_party
 }
 
 function run_clang_tidy() {

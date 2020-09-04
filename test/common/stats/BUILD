@@ -71,6 +71,7 @@ envoy_cc_test_binary(
         "benchmark",
     ],
     deps = [
+        "//source/common/common:random_generator_lib",
         "//source/common/common:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:recent_lookups_lib",

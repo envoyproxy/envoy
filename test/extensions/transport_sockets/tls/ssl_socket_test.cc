@@ -28,6 +28,8 @@
 #include "test/extensions/transport_sockets/tls/test_data/no_san_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/password_protected_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_dns2_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/san_dns3_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/san_dns4_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_dns_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_uri_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert_info.h"
@@ -325,7 +327,7 @@ void testUtil(const TestUtilOptions& options) {
   Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(options.version()), nullptr, true);
-  Network::MockListenerCallbacks callbacks;
+  Network::MockTcpListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher->createListener(socket, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
@@ -642,7 +644,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(options.version()), nullptr, true);
-  NiceMock<Network::MockListenerCallbacks> callbacks;
+  NiceMock<Network::MockTcpListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher->createListener(socket, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
@@ -2434,7 +2436,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
 
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-  Network::MockListenerCallbacks callbacks;
+  Network::MockTcpListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher_->createListener(socket, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
@@ -2491,7 +2493,7 @@ TEST_P(SslSocketTest, HalfClose) {
 
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-  Network::MockListenerCallbacks listener_callbacks;
+  Network::MockTcpListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher_->createListener(socket, listener_callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
@@ -2574,7 +2576,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
 
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-  Network::MockListenerCallbacks callbacks;
+  Network::MockTcpListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher_->createListener(socket, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
@@ -2672,7 +2674,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
       Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr, true);
   auto socket2 = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr, true);
-  NiceMock<Network::MockListenerCallbacks> callbacks;
+  NiceMock<Network::MockTcpListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
   Network::ListenerPtr listener1 =
@@ -2810,7 +2812,7 @@ void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml
                                                    server_stats_store, {});
   auto tcp_socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr, true);
-  NiceMock<Network::MockListenerCallbacks> callbacks;
+  NiceMock<Network::MockTcpListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
   Network::ListenerPtr listener =
@@ -3254,7 +3256,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   auto socket2 = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-  Network::MockListenerCallbacks callbacks;
+  Network::MockTcpListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher_->createListener(socket, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
@@ -3369,7 +3371,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
 
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(version), nullptr, true);
-  NiceMock<Network::MockListenerCallbacks> callbacks;
+  NiceMock<Network::MockTcpListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   Api::ApiPtr api = Api::createApiForTest(server_stats_store, time_system_);
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
@@ -3632,7 +3634,7 @@ TEST_P(SslSocketTest, SslError) {
 
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-  Network::MockListenerCallbacks callbacks;
+  Network::MockTcpListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher_->createListener(socket, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
@@ -4199,6 +4201,180 @@ TEST_P(SslSocketTest, RevokedCertificateCRLInTrustedCA) {
   testUtil(successful_test_options.setExpectedSerialNumber(TEST_SAN_DNS2_CERT_SERIAL));
 }
 
+TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
+
+  // This should succeed, since the crl chain is complete.
+  //
+  // Trust chain contains:
+  //  - Root authority certificate (i.e., ca_cert.pem)
+  //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //
+  // Certificate revocation list contains:
+  //  - Root authority certificate revocation list (i.e., ca_cert.crl)
+  //  - Intermediate authority certificate revocation list (i.e., intermediate_ca_cert.crl)
+  const std::string complete_server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/intermediate_ca_cert_chain.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/intermediate_ca_cert_chain.crl"
+)EOF";
+
+  // This should fail, since the crl chain is incomplete.
+  //
+  // Trust chain contains:
+  //  - Root authority certificate (i.e., ca_cert.pem)
+  //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //
+  // Certificate revocation list contains:
+  //  - Root authority certificate revocation list (i.e., ca_cert.crl)
+  //
+  // Certificate revocation list omits:
+  //  - Root authority certificate revocation list (i.e., ca_cert.crl)
+  const std::string incomplete_server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/intermediate_ca_cert_chain.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/intermediate_ca_cert.crl"
+)EOF";
+
+  // This should fail, since the certificate has been revoked.
+  const std::string revoked_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem"
+)EOF";
+
+  // This should succeed, since the certificate has not been revoked.
+  const std::string unrevoked_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns4_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns4_key.pem"
+)EOF";
+
+  // Ensure that incomplete crl chains fail with revoked certificates.
+  TestUtilOptions incomplete_revoked_test_options(revoked_client_ctx_yaml,
+                                                  incomplete_server_ctx_yaml, false, GetParam());
+  testUtil(incomplete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error"));
+
+  // Ensure that incomplete crl chains fail with unrevoked certificates.
+  TestUtilOptions incomplete_unrevoked_test_options(unrevoked_client_ctx_yaml,
+                                                    incomplete_server_ctx_yaml, false, GetParam());
+  testUtil(incomplete_unrevoked_test_options.setExpectedServerStats("ssl.fail_verify_error"));
+
+  // Ensure that complete crl chains fail with revoked certificates.
+  TestUtilOptions complete_revoked_test_options(revoked_client_ctx_yaml, complete_server_ctx_yaml,
+                                                false, GetParam());
+  testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error"));
+
+  // Ensure that complete crl chains succeed with unrevoked certificates.
+  TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
+                                                  complete_server_ctx_yaml, true, GetParam());
+  testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
+}
+
+TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
+
+  // This should succeed, since the crl chain is complete.
+  //
+  // Trust chain contains:
+  //  - Root authority certificate (i.e., ca_cert.pem)
+  //  - Root authority certificate revocation list (i.e., ca_cert.crl)
+  //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //  - Intermediate authority certificate revocation list (i.e., intermediate_ca_cert.crl)
+  const std::string complete_server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/intermediate_ca_cert_chain_with_crl_chain.pem"
+)EOF";
+
+  // This should fail, since the crl chain is incomplete.
+  //
+  // Trust chain contains:
+  //  - Root authority certificate (i.e., ca_cert.pem)
+  //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //  - Intermediate authority certificate revocation list (i.e., intermediate_ca_cert.crl)
+  //
+  // Trust chain omits:
+  //  - Root authority certificate revocation list (i.e., ca_cert.crl)
+  const std::string incomplete_server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/intermediate_ca_cert_chain_with_crl.pem"
+)EOF";
+
+  // This should fail, since the certificate has been revoked.
+  const std::string revoked_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem"
+)EOF";
+
+  // This should succeed, since the certificate has not been revoked.
+  const std::string unrevoked_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns4_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns4_key.pem"
+)EOF";
+
+  // Ensure that incomplete crl chains fail with revoked certificates.
+  TestUtilOptions incomplete_revoked_test_options(revoked_client_ctx_yaml,
+                                                  incomplete_server_ctx_yaml, false, GetParam());
+  testUtil(incomplete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error"));
+
+  // Ensure that incomplete crl chains fail with unrevoked certificates.
+  TestUtilOptions incomplete_unrevoked_test_options(unrevoked_client_ctx_yaml,
+                                                    incomplete_server_ctx_yaml, false, GetParam());
+  testUtil(incomplete_unrevoked_test_options.setExpectedServerStats("ssl.fail_verify_error"));
+
+  // Ensure that complete crl chains fail with revoked certificates.
+  TestUtilOptions complete_revoked_test_options(revoked_client_ctx_yaml, complete_server_ctx_yaml,
+                                                false, GetParam());
+  testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error"));
+
+  // Ensure that complete crl chains succeed with unrevoked certificates.
+  TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
+                                                  complete_server_ctx_yaml, true, GetParam());
+  testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
+}
+
 TEST_P(SslSocketTest, GetRequestedServerName) {
   envoy::config::listener::v3::Listener listener;
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
@@ -4540,7 +4716,7 @@ protected:
   Stats::TestUtil::TestStore server_stats_store_;
   Stats::TestUtil::TestStore client_stats_store_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
-  Network::MockListenerCallbacks listener_callbacks_;
+  Network::MockTcpListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
   const std::string server_ctx_yaml_ = R"EOF(
   common_tls_context:
