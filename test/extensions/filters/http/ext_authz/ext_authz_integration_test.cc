@@ -70,7 +70,8 @@ public:
 
   void initiateClientConnection(uint64_t request_body_length,
                                 const Headers& headers_to_add = Headers{},
-                                const Headers& headers_to_append = Headers{}) {
+                                const Headers& headers_to_append = Headers{},
+                                const Headers& headers_to_remove = Headers{}) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers{
@@ -87,6 +88,12 @@ public:
     // of value in headers_to_append, it will be appended.
     for (const auto& headers_to_append : headers_to_append) {
       headers.addCopy(headers_to_append.first, headers_to_append.second);
+    }
+
+    // Initialize headers to remove. If the authorization server returns any of
+    // these as a header to remove, it will be removed.
+    for (const auto& header_to_remove : headers_to_remove) {
+      headers.addCopy(header_to_remove.first, header_to_remove.second);
     }
 
     TestUtility::feedBufferWithRandomCharacters(request_body_, request_body_length);
@@ -137,6 +144,7 @@ public:
   void waitForSuccessfulUpstreamResponse(
       const std::string& expected_response_code, const Headers& headers_to_add = Headers{},
       const Headers& headers_to_append = Headers{},
+      const Headers& headers_to_remove = Headers{},
       const Http::TestRequestHeaderMapImpl& new_headers_from_upstream =
           Http::TestRequestHeaderMapImpl{},
       const Http::TestRequestHeaderMapImpl& headers_to_append_multiple =
@@ -197,6 +205,11 @@ public:
                   Http::HeaderValueOf("multiple", "multiple-first,multiple-second"));
     }
 
+    for (const auto& header_to_remove : headers_to_remove) {
+      // The headers that were originally present in the request have now been removed.
+      EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString{header_to_remove.first}), nullptr);
+    }
+
     response_->waitForEndStream();
 
     EXPECT_TRUE(upstream_request_->complete());
@@ -208,6 +221,7 @@ public:
   }
 
   void sendExtAuthzResponse(const Headers& headers_to_add, const Headers& headers_to_append,
+                            const Headers& headers_to_remove,
                             const Http::TestRequestHeaderMapImpl& new_headers_from_upstream,
                             const Http::TestRequestHeaderMapImpl& headers_to_append_multiple) {
     ext_authz_request_->startGrpcStream();
@@ -226,6 +240,11 @@ public:
       entry->mutable_append()->set_value(true);
       entry->mutable_header()->set_key(header_to_append.first);
       entry->mutable_header()->set_value(header_to_append.second);
+    }
+
+    for (const auto& header_to_remove : headers_to_remove) {
+      auto* entry = check_response.mutable_ok_response()->mutable_headers_to_remove();
+      entry->Add(header_to_remove.first.c_str());
     }
 
     // Entries in this headers are not present in the original request headers.
@@ -300,19 +319,20 @@ attributes:
   void expectCheckRequestWithBody(Http::CodecClient::Type downstream_protocol,
                                   uint64_t request_size) {
     expectCheckRequestWithBodyWithHeaders(downstream_protocol, request_size, Headers{}, Headers{},
-                                          Http::TestRequestHeaderMapImpl{},
+                                          Headers{}, Http::TestRequestHeaderMapImpl{},
                                           Http::TestRequestHeaderMapImpl{});
   }
 
   void expectCheckRequestWithBodyWithHeaders(
       Http::CodecClient::Type downstream_protocol, uint64_t request_size,
       const Headers& headers_to_add, const Headers& headers_to_append,
+      const Headers& headers_to_remove,
       const Http::TestRequestHeaderMapImpl& new_headers_from_upstream,
       const Http::TestRequestHeaderMapImpl& headers_to_append_multiple) {
     initializeConfig();
     setDownstreamProtocol(downstream_protocol);
     HttpIntegrationTest::initialize();
-    initiateClientConnection(request_size, headers_to_add, headers_to_append);
+    initiateClientConnection(request_size, headers_to_add, headers_to_append, headers_to_remove);
     waitForExtAuthzRequest(expectedCheckRequest(downstream_protocol));
 
     Headers updated_headers_to_add;
@@ -325,11 +345,12 @@ attributes:
       updated_headers_to_append.push_back(
           std::make_pair(header_to_append.first, header_to_append.second + "-appended"));
     }
-    sendExtAuthzResponse(updated_headers_to_add, updated_headers_to_append,
+    sendExtAuthzResponse(updated_headers_to_add, updated_headers_to_append, headers_to_remove,
                          new_headers_from_upstream, headers_to_append_multiple);
 
     waitForSuccessfulUpstreamResponse("200", updated_headers_to_add, updated_headers_to_append,
-                                      new_headers_from_upstream, headers_to_append_multiple);
+                                      headers_to_remove, new_headers_from_upstream,
+                                      headers_to_append_multiple);
     cleanup();
   }
 
@@ -550,6 +571,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
       Http::CodecClient::Type::HTTP1, 4,
       /*headers_to_add=*/Headers{{"header1", "header1"}},
       /*headers_to_append=*/Headers{{"header2", "header2"}},
+      /*headers_to_remove=*/Headers{{"remove-me", "upstream-should-not-see-me"}},
       /*new_headers_from_upstream=*/Http::TestRequestHeaderMapImpl{{"new1", "new1"}},
       /*headers_to_append_multiple=*/
       Http::TestRequestHeaderMapImpl{{"multiple", "multiple-first"},
