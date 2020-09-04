@@ -63,7 +63,7 @@ private:
 class ClientConfig {
 public:
   ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-               uint32_t timeout, absl::string_view path_prefix);
+               bool internal_timeout, uint32_t timeout, absl::string_view path_prefix);
 
   /**
    * Returns the name of the authorization cluster.

@@ -126,7 +126,7 @@ bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher
 
 // Config
 ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-                           uint32_t timeout, absl::string_view path_prefix)
+                           bool internal_timeout, uint32_t timeout, absl::string_view path_prefix)
     : enable_case_sensitive_string_matcher_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher")),
       request_header_matchers_(
@@ -142,8 +142,7 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           config.http_service().authorization_response().allowed_upstream_headers_to_append(),
           enable_case_sensitive_string_matcher_)),
       cluster_name_(config.http_service().server_uri().cluster()),
-      internal_timeout_(config.measure_timeout_on_check_created()), timeout_(timeout),
-      path_prefix_(path_prefix),
+      internal_timeout_(internal_timeout), timeout_(timeout), path_prefix_(path_prefix),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
       request_headers_parser_(Router::HeaderParser::configure(
           config.http_service().authorization_request().headers_to_add(), false)) {}

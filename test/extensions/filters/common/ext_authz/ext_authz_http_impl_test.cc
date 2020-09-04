@@ -99,8 +99,7 @@ public:
     } else {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    proto_config.set_measure_timeout_on_check_created(internal_timeout);
-    return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix);
+    return std::make_shared<ClientConfig>(proto_config, internal_timeout, timeout, path_prefix);
   }
 
   Http::RequestMessagePtr sendRequest(absl::node_hash_map<std::string, std::string>&& headers) {
