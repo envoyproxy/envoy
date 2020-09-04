@@ -271,12 +271,12 @@ void PerFilterChainRebuilder::callbackWorkers(bool success) {
       worker_dispatcher->post([] {});
     } else {
       worker_dispatcher->post(
-          [&retry = callback, success, &filter_chain = *(this->filter_chain_)]() {
+          [retry = callback, success, &filter_chain = *(this->filter_chain_)]() {
             retry(success, filter_chain);
           });
     }
   }
-  // workers_to_callback_.clear();
+  workers_to_callback_.clear();
 }
 
 void PerFilterChainRebuilder::startRebuilding() {

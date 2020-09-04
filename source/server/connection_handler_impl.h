@@ -206,7 +206,7 @@ private:
     bool is_deleting_{false};
 
     using SocketMetadataPair =
-        std::pair<Network::ConnectionSocketPtr, const envoy::config::core::v3::Metadata>;
+        std::pair<Network::ConnectionSocketPtr, std::unique_ptr<StreamInfo::StreamInfo>>;
 
     // Pending sockets waiting for filter chains to be rebuilt.
     absl::flat_hash_map<envoy::config::listener::v3::FilterChain, std::list<SocketMetadataPair>,

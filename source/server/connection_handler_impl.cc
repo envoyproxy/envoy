@@ -181,11 +181,11 @@ void ConnectionHandlerImpl::ActiveTcpListener::retryConnections(
   if (listener_sockets_map_it != pending_sockets_.end()) {
     ENVOY_LOG(debug, "listener: {} has stored {} sockets to retry.", listener_name,
               listener_sockets_map_it->second.size());
-    for (auto& [socket, metadata] : listener_sockets_map_it->second) {
+    for (auto& [socket, stream_info] : listener_sockets_map_it->second) {
       // Retry connection with that socket on this active tcp listener.
       if (success) {
         incNumConnections();
-        newConnection(std::move(socket), metadata);
+        newConnection(std::move(socket), std::move(stream_info));
       } else {
         socket->close();
       }
@@ -491,7 +491,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     // listener has already sent one and got no response yet.
     bool should_send_request = pending_sockets_[filter_chain_message].empty();
     // Store the socket and dynamic_metadata for later connection retry.
-    pending_sockets_[filter_chain_message].emplace_back(std::move(socket), dynamic_metadata);
+    pending_sockets_[filter_chain_message].emplace_back(std::move(socket), std::move(stream_info));
     // Post rebuilding request to the master thread only when there exists no unfinished rebuilding.
     if (should_send_request) {
       ENVOY_LOG(debug, "listener:{} post rebuilding request for filter chain on the first time",
