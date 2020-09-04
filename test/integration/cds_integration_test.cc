@@ -73,10 +73,8 @@ public:
     // cluster in the bootstrap config - which we don't want since we're testing dynamic CDS!
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
                                                   timeSystem(), enable_half_close_));
-    fake_upstreams_[UpstreamIndex1]->set_allow_unexpected_disconnects(false);
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
                                                   timeSystem(), enable_half_close_));
-    fake_upstreams_[UpstreamIndex2]->set_allow_unexpected_disconnects(false);
     cluster1_ = ConfigHelper::buildStaticCluster(
         ClusterName1, fake_upstreams_[UpstreamIndex1]->localAddress()->ip()->port(),
         Network::Test::getLoopbackAddressString(ipVersion()));
@@ -122,7 +120,6 @@ public:
     RELEASE_ASSERT(result, result.message());
     xds_stream_->startGrpcStream();
     verifyGrpcServiceMethod();
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   }
 
   envoy::config::cluster::v3::Cluster cluster1_;

@@ -40,7 +40,6 @@ public:
   void createUpstreams() override {
     fake_upstreams_.emplace_back(new FakeUpstream(
         createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   }
 
   Network::TransportSocketFactoryPtr createUpstreamSslContext() {
