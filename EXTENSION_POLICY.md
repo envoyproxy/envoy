@@ -71,7 +71,10 @@ The `status` is one of:
   production use.
 
 The extension status may be adjusted by the extension [CODEOWNERS](./CODEOWNERS) and/or Envoy
-maintainers based on an assessment of the above criteria.
+maintainers based on an assessment of the above criteria. Note that the status of the extension
+reflects the implementation status. It is orthogonal to the API stability, for example, an extension
+with configuration `envoy.foo.v3alpha.Bar` might have a `stable` implementation and
+`envoy.foo.v3.Baz` can have a `wip` implementation.
 
 The `security_posture` is one of:
 * `robust_to_untrusted_downstream`: The extension is hardened against untrusted downstream traffic. It
