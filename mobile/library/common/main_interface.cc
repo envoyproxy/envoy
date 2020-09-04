@@ -10,6 +10,7 @@
 
 // NOLINT(namespace-envoy)
 
+static std::shared_ptr<Envoy::Engine> strong_engine_;
 static std::weak_ptr<Envoy::Engine> engine_;
 static std::atomic<envoy_stream_t> current_stream_handle_{0};
 static std::atomic<envoy_network_t> preferred_network_{ENVOY_NET_GENERIC};
@@ -95,12 +96,14 @@ envoy_status_t run_engine(envoy_engine_t, envoy_engine_callbacks callbacks, cons
   // https://github.com/lyft/envoy-mobile/issues/332
 
   // The shared pointer created here will keep the engine alive until static destruction occurs.
-  static auto strong_ref =
+  strong_engine_ =
       std::make_shared<Envoy::Engine>(callbacks, config, log_level, preferred_network_);
 
   // The weak pointer we actually expose allows calling threads to atomically check if the engine
   // still exists and acquire a shared pointer to it - ensuring the engine persists at least for
   // the duration of the call.
-  engine_ = strong_ref;
+  engine_ = strong_engine_;
   return ENVOY_SUCCESS;
 }
+
+void terminate_engine(envoy_engine_t) { strong_engine_.reset(); }
