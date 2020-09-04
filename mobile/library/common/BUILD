@@ -6,6 +6,15 @@ envoy_package()
 
 envoy_cc_library(
     name = "envoy_main_interface_lib",
+    repository = "@envoy",
+    deps = [
+        ":envoy_main_interface_lib_no_stamp",
+        ":envoy_mobile_main_common_lib_stamped",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_main_interface_lib_no_stamp",
     srcs = [
         "certificates.inc",
         "config_template.cc",
@@ -16,7 +25,7 @@ envoy_cc_library(
     hdrs = ["main_interface.h"],
     repository = "@envoy",
     deps = [
-        ":envoy_mobile_main_common_lib_stamped",
+        ":envoy_mobile_main_common_lib",
         "//library/common/buffer:utility_lib",
         "//library/common/http:dispatcher_lib",
         "//library/common/http:header_utility_lib",

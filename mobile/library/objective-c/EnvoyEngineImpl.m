@@ -7,7 +7,7 @@
 
 #import <UIKit/UIKit.h>
 
-static void ios_on_exit() {
+static void ios_on_exit(void *context) {
   // Currently nothing needs to happen in iOS on exit. Just log.
   NSLog(@"[Envoy] library is exiting");
 }
@@ -164,13 +164,12 @@ static void ios_http_filter_release(const void *context) {
 }
 
 - (int)runWithConfigYAML:(NSString *)configYAML logLevel:(NSString *)logLevel {
-  // re-enable lifecycle-based stat flushing when https://github.com/lyft/envoy-mobile/issues/748
-  // gets fixed. [self startObservingLifecycleNotifications];
+  [self startObservingLifecycleNotifications];
 
   // Envoy exceptions will only be caught here when compiled for 64-bit arches.
   // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Exceptions/Articles/Exceptions64Bit.html
   @try {
-    envoy_engine_callbacks native_callbacks = {ios_on_exit};
+    envoy_engine_callbacks native_callbacks = {ios_on_exit, NULL};
     return (int)run_engine(_engineHandle, native_callbacks, configYAML.UTF8String,
                            logLevel.UTF8String);
   } @catch (NSException *exception) {
@@ -192,20 +191,18 @@ static void ios_http_filter_release(const void *context) {
 #pragma mark - Private
 
 - (void)startObservingLifecycleNotifications {
+  // re-enable lifecycle-based stat flushing when https://github.com/lyft/envoy-mobile/issues/748
+  // gets fixed.
   NSNotificationCenter *notificationCenter = [NSNotificationCenter defaultCenter];
   [notificationCenter addObserver:self
-                         selector:@selector(lifecycleDidChangeWithNotification:)
-                             name:UIApplicationWillResignActiveNotification
-                           object:nil];
-  [notificationCenter addObserver:self
-                         selector:@selector(lifecycleDidChangeWithNotification:)
+                         selector:@selector(terminateNotification:)
                              name:UIApplicationWillTerminateNotification
                            object:nil];
 }
 
-- (void)lifecycleDidChangeWithNotification:(NSNotification *)notification {
-  NSLog(@"[Envoy] triggering stats flush (%@)", notification.name);
-  flush_stats();
+- (void)terminateNotification:(NSNotification *)notification {
+  NSLog(@"[Envoy %ld] terminating engine (%@)", _engineHandle, notification.name);
+  terminate_engine(_engineHandle);
 }
 
 @end
