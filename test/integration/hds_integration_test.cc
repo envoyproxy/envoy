@@ -30,9 +30,7 @@ namespace {
 class HdsIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                            public HttpIntegrationTest {
 public:
-  HdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()),
-        http_conn_type_(FakeHttpConnection::Type::HTTP1), tls_hosts_(false) {}
+  HdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
     fake_upstreams_.emplace_back(
@@ -340,8 +338,8 @@ transport_socket_matches:
   FakeHttpConnectionPtr host_fake_connection_;
   FakeHttpConnectionPtr host2_fake_connection_;
   FakeRawConnectionPtr host_fake_raw_connection_;
-  FakeHttpConnection::Type http_conn_type_;
-  bool tls_hosts_;
+  FakeHttpConnection::Type http_conn_type_{FakeHttpConnection::Type::HTTP1};
+  bool tls_hosts_{false};
 
   static constexpr int MaxTimeout = 100;
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse envoy_msg_;
