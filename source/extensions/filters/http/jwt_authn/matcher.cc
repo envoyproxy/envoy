@@ -159,8 +159,6 @@ MatcherConstPtr Matcher::create(const RequirementRule& rule) {
     // matching in the filter fuzzer implementation:
     // //test/extensions/filters/http/common/fuzz/uber_per_filter.cc
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  // path specifier is required.
-  case RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
