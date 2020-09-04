@@ -21,13 +21,15 @@ C/C++ code completion.
 ## Generate debug config
 
 `tools/vscode/generate_debug_config.py` is a script to generate VSCode debug config in `.vscode/launch.json`.
+The generated config will be named `<debugger type> <bazel target>`.
 
 For example:
 ```
 tools/vscode/generate_debug_config.py //source/exe:envoy-static --args "-c envoy.yaml"
 ```
 
-Generates an entry for gdb in `launch.json`. It can be also used to generate config for tests.
+Generates an entry named `gdb //source/exe:envoy-static` for GDB in `launch.json`. It can be
+used to generate config for tests also.
 
 The generated `gdb` config are compatible with [Native Debug](https://marketplace.visualstudio.com/items?itemName=webfreak.debug) extension,
 `lldb` config are compatible with [VSCode LLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb) extension.

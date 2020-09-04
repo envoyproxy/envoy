@@ -21,7 +21,7 @@ def getWorkspace():
 
 
 def getExecutionRoot(workspace):
-  # If compilation database exists, use its executiron root
+  # If compilation database exists, use its execution root
   try:
     compdb = pathlib.Path(workspace, "compile_commands.json").read_text()
     return json.loads(compdb)[0]['directory']
@@ -43,14 +43,14 @@ def buildBinaryWithDebugInfo(target):
   return binaryPath(bazel_bin, target)
 
 
-def getLauchJson(workspace):
+def getLaunchJson(workspace):
   try:
     return json.loads(pathlib.Path(workspace, ".vscode", "launch.json").read_text())
   except:
     return {"version": "0.2.0"}
 
 
-def writeLauchJson(workspace, launch):
+def writeLaunchJson(workspace, launch):
   launch_json = pathlib.Path(workspace, ".vscode", "launch.json")
   backup_launch_json = pathlib.Path(workspace, ".vscode", "launch.json.bak")
   if launch_json.exists():
