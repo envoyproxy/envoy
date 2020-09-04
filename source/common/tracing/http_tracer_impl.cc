@@ -169,8 +169,9 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
     span.setTag(Tracing::Tags::get().DownstreamCluster,
                 valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), "-"));
     span.setTag(Tracing::Tags::get().UserAgent, valueOrDefault(request_headers->UserAgent(), "-"));
-    span.setTag(Tracing::Tags::get().HttpProtocol,
-                Formatter::SubstitutionFormatUtils::protocolToString(stream_info.protocol()));
+    span.setTag(
+        Tracing::Tags::get().HttpProtocol,
+        Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
 
     const auto& remote_address = stream_info.downstreamDirectRemoteAddress();
 
@@ -211,8 +212,9 @@ void HttpTracerUtility::finalizeUpstreamSpan(Span& span,
                                              const Http::ResponseTrailerMap* response_trailers,
                                              const StreamInfo::StreamInfo& stream_info,
                                              const Config& tracing_config) {
-  span.setTag(Tracing::Tags::get().HttpProtocol,
-              Formatter::SubstitutionFormatUtils::protocolToString(stream_info.protocol()));
+  span.setTag(
+      Tracing::Tags::get().HttpProtocol,
+      Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
 
   if (stream_info.upstreamHost()) {
     span.setTag(Tracing::Tags::get().UpstreamAddress,

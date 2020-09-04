@@ -25,7 +25,7 @@ std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> makeJsonFormatter(bool type
     user-agent: '%REQ(USER-AGENT)%'
   )EOF";
   TestUtility::loadFromYaml(format_yaml, JsonLogFormat);
-  return std::make_unique<Envoy::Formatter::JsonFormatterImpl>(JsonLogFormat, typed);
+  return std::make_unique<Envoy::Formatter::JsonFormatterImpl>(JsonLogFormat, typed, false);
 }
 
 std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo() {
@@ -47,7 +47,7 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
       "s%RESPONSE_CODE% %BYTES_SENT% %DURATION% %REQ(REFERER)% \"%REQ(USER-AGENT)%\" - - -\n";
 
   std::unique_ptr<Envoy::Formatter::FormatterImpl> formatter =
-      std::make_unique<Envoy::Formatter::FormatterImpl>(LogFormat);
+      std::make_unique<Envoy::Formatter::FormatterImpl>(LogFormat, false);
 
   size_t output_bytes = 0;
   Http::TestRequestHeaderMapImpl request_headers;

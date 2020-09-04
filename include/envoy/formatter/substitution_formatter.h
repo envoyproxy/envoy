@@ -51,13 +51,14 @@ public:
    * @param response_trailers supplies the response trailers.
    * @param stream_info supplies the stream info.
    * @param local_reply_body supplies the local reply body.
-   * @return std::string containing a single value extracted from the given headers/trailers/stream.
+   * @return absl::optional<std::string> optional string containing a single value extracted from
+   * the given headers/trailers/stream.
    */
-  virtual std::string format(const Http::RequestHeaderMap& request_headers,
-                             const Http::ResponseHeaderMap& response_headers,
-                             const Http::ResponseTrailerMap& response_trailers,
-                             const StreamInfo::StreamInfo& stream_info,
-                             absl::string_view local_reply_body) const PURE;
+  virtual absl::optional<std::string> format(const Http::RequestHeaderMap& request_headers,
+                                             const Http::ResponseHeaderMap& response_headers,
+                                             const Http::ResponseTrailerMap& response_trailers,
+                                             const StreamInfo::StreamInfo& stream_info,
+                                             absl::string_view local_reply_body) const PURE;
   /**
    * Extract a value from the provided headers/trailers/stream, preserving the value's type.
    * @param request_headers supplies the request headers.

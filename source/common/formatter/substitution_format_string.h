@@ -25,7 +25,7 @@ public:
    * Generate a Json formatter object from proto::Struct config
    */
   static FormatterPtr createJsonFormatter(const ProtobufWkt::Struct& struct_format,
-                                          bool preserve_types);
+                                          bool preserve_types, bool omit_empty_values);
 };
 
 } // namespace Formatter

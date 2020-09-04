@@ -58,4 +58,11 @@ message SubstitutionFormatString {
     //
     google.protobuf.Struct json_format = 2 [(validate.rules).message = {required: true}];
   }
+
+  // If set to true, when command operators are evaluated to null,
+  //
+  // * for ``text_format``, the output of the empty operator is changed from ``-`` to an
+  //   empty string, so that empty values are omitted entirely.
+  // * for ``json_format`` the keys with null values are omitted in the output structure.
+  bool omit_empty_values = 3;
 }

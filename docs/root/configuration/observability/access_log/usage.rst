@@ -116,7 +116,9 @@ are noted.
 
 Note that if a value is not set/empty, the logs will contain a ``-`` character or, for JSON logs,
 the string ``"-"``. For typed JSON logs unset values are represented as ``null`` values and empty
-strings are rendered as ``""``.
+strings are rendered as ``""``. :ref:`omit_empty_values
+<envoy_v3_api_field_config.core.v3.SubstitutionFormatString.omit_empty_values>` option could be used
+to omit empty values entirely.
 
 Unless otherwise noted, command operators produce string outputs for typed JSON logs.
 
