@@ -507,7 +507,7 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
   case ConnectionPool::PoolFailureReason::Overflow:
     parent_.callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
-                     fmt::format("thrift upstream request: too many connections")),
+                     "thrift upstream request: too many connections"),
         true);
     break;
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
@@ -522,7 +522,9 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
       parent_.callbacks_->sendLocalReply(
           AppException(
               AppExceptionType::InternalError,
-              fmt::format("connection failure '{}'", upstream_host_->address()->asString())),
+              fmt::format("connection failure '{}'", (upstream_host_ != nullptr)
+                                                         ? upstream_host_->address()->asString()
+                                                         : "to upstream")),
           true);
       return;
     }

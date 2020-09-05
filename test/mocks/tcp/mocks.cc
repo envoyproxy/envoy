@@ -40,8 +40,11 @@ void MockInstance::poolFailure(PoolFailureReason reason) {
   Callbacks* cb = callbacks_.front();
   callbacks_.pop_front();
   handles_.pop_front();
-
-  cb->onPoolFailure(reason, host_);
+  if (reason == ConnectionPool::PoolFailureReason::Overflow) {
+    cb->onPoolFailure(reason, nullptr);
+  } else {
+    cb->onPoolFailure(reason, host_);
+  }
 }
 
 void MockInstance::poolReady(Network::MockClientConnection& conn) {
