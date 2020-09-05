@@ -59,6 +59,7 @@ public:
 
   Envoy::ConnectionPool::MockCancellable* newConnectionImpl(Callbacks& cb);
   void poolFailure(PoolFailureReason reason);
+  void poolFailureWithNullHost(PoolFailureReason reason);
   void poolReady(Network::MockClientConnection& conn);
 
   // Invoked when connection_data_, having been assigned via poolReady is released.
