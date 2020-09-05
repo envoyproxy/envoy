@@ -23,9 +23,10 @@ using testing::AssertionResult;
 namespace Envoy {
 namespace {
 
-const char Config[] = R"EOF(
+const std::string& config() {
+  CONSTRUCT_ON_FIRST_USE(std::string, fmt::format(R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
@@ -34,7 +35,7 @@ static_resources:
   clusters:
   - name: xds_cluster
     type: STATIC
-    http2_protocol_options: {}
+    http2_protocol_options: {{}}
     load_assignment:
       cluster_name: xds_cluster
       endpoints:
@@ -46,7 +47,7 @@ static_resources:
                 port_value: 0
   - name: my_service
     type: STATIC
-    http2_protocol_options: {}
+    http2_protocol_options: {{}}
     load_assignment:
       cluster_name: my_service
       endpoints:
@@ -80,7 +81,9 @@ static_resources:
                 grpc_services:
                   envoy_grpc:
                     cluster_name: xds_cluster
-)EOF";
+)EOF",
+                                                  Platform::null_device_path));
+}
 
 // TODO (dmitri-d) move config yaml into ConfigHelper
 const char RdsWithoutVhdsConfig[] = R"EOF(
@@ -135,7 +138,7 @@ class VhdsInitializationTest : public HttpIntegrationTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 public:
   VhdsInitializationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), Config) {
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config()) {
     use_lds_ = false;
   }
 
@@ -232,7 +235,7 @@ class VhdsIntegrationTest : public HttpIntegrationTest,
                             public Grpc::GrpcClientIntegrationParamTest {
 public:
   VhdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), Config) {
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config()) {
     use_lds_ = false;
   }
 
