@@ -281,7 +281,7 @@
       "validate": {"virtual_cluster_name": "other"}
     },
     {
-      "test_name": "RequestHeaderFields 1",
+      "test_name": "RequestHeaderMatches 1",
       "input": {
         "authority": "api.lyft.com",
         "path": "/host/rewrite/me",
@@ -289,44 +289,44 @@
       },
       "validate": {
         "host_rewrite": "new_host",
-        "request_header_fields": [
+        "request_header_matches": [
           {
-            "key": ":authority",
-            "value": "new_host"
+            "name": ":authority",
+            "exact_match": "new_host"
           },
           {
-            "key": ":path",
-            "value": "/host/rewrite/me"
+            "name": ":path",
+            "exact_match": "/host/rewrite/me"
           },
           {
-            "key": ":method",
-            "value": "GET"
+            "name": ":method",
+            "exact_match": "GET"
           },
           {
-            "key": ":cookie",
-            "value": ""
+            "name": ":cookie",
+            "invert_match": true
           }
         ]
       }
     },
     {
-      "test_name": "RequestHeaderFields 2",
+      "test_name": "RequestHeaderMatches 2",
       "input": {
         "authority": "api.lyft.com",
         "path": "/customheaders",
         "method": "GET"
       },
       "validate": {
-        "request_header_fields": [
+        "request_header_matches": [
           {
-            "key": "X-Client-IP",
-            "value": "127.0.0.1"
+            "name": "X-Client-IP",
+            "exact_match": "127.0.0.1"
           }
         ]
       }
     },
     {
-      "test_name": "ResponseHeaderFields",
+      "test_name": "ResponseHeaderMatches",
       "input": {
         "authority": "www.lyft.com",
         "path": "/ping",
@@ -339,11 +339,32 @@
         "path_rewrite": "",
         "virtual_cluster_name": "",
         "virtual_host_name": "",
-        "response_header_fields": [
+        "response_header_matches": [
           {
-            "key": "content-type",
-            "value": "text/plain"
-          }
+            "name": "content-type",
+            "exact_match": "text/plain"
+          },
+          {
+            "name": "content-length",
+            "range_match": 
+            {
+              "start": 0,
+              "end": 100
+            }
+          },
+          {
+            "name": "x-ping-response",
+            "exact_match": "yes"
+          },
+          {
+            "name": "x-ping-response",
+            "present_match": true
+          },
+          {
+            "name": "x-pong-response",
+            "present_match": true,
+            "invert_match": true
+          },
         ]
       }
     }
