@@ -1,5 +1,8 @@
 #include "server/admin/config_dump_handler.h"
 
+#include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
@@ -111,8 +114,8 @@ bool shouldIncludeEdsInDump(const Http::Utility::QueryParams& params) {
 
 } // namespace
 
-ConfigDumpHandler::ConfigDumpHandler(ConfigTracker& configTracker, Server::Instance& server)
-    : HandlerContextBase(server), config_tracker_(configTracker) {}
+ConfigDumpHandler::ConfigDumpHandler(ConfigTracker& config_tracker, Server::Instance& server)
+    : HandlerContextBase(server), config_tracker_(config_tracker) {}
 
 Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
                                                 Http::ResponseHeaderMap& response_headers,
