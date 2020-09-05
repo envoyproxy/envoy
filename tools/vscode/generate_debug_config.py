@@ -89,7 +89,7 @@ def lldbConfig(target, binary, workspace, execroot, arguments):
 
 
 def addToLaunchJson(target, binary, workspace, execroot, arguments, debugger_type):
-  launch = getLauchJson(workspace)
+  launch = getLaunchJson(workspace)
   new_config = {}
   if debugger_type == "lldb":
     new_config = lldbConfig(target, binary, workspace, execroot, arguments)
@@ -106,7 +106,7 @@ def addToLaunchJson(target, binary, workspace, execroot, arguments, debugger_typ
     configurations.append(new_config)
 
   launch["configurations"] = configurations
-  writeLauchJson(workspace, launch)
+  writeLaunchJson(workspace, launch)
 
 
 if __name__ == "__main__":
