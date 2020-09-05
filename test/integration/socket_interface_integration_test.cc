@@ -68,11 +68,12 @@ TEST_P(SocketInterfaceIntegrationTest, AddressWithSocketInterface) {
 
   ConnectionStatusCallbacks connect_callbacks_;
   Network::ClientConnectionPtr client_;
+  const Network::SocketInterface* sock_interface = Network::socketInterface(
+      "envoy.extensions.network.socket_interface.default_socket_interface");
   Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::Ipv4Instance>(
           Network::Test::getLoopbackAddressUrlString(Network::Address::IpVersion::v4),
-          lookupPort("listener_0"),
-          "envoy.extensions.network.socket_interface.default_socket_interface");
+          lookupPort("listener_0"), sock_interface);
 
   client_ = dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr);

@@ -5,6 +5,8 @@
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 
+#include "extensions/filters/http/cache/inline_headers_handles.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -30,11 +32,6 @@ const std::vector<const Http::LowerCaseString*>& conditionalHeaders() {
 }
 } // namespace
 
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    authorization_handle(Http::CustomHeaders::get().Authorization);
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    cache_control_handle(Http::CustomHeaders::get().CacheControl);
-
 bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers) {
   const absl::string_view method = headers.getMethodValue();
   const absl::string_view forwarded_proto = headers.getForwardedProtoValue();
@@ -59,19 +56,24 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
           forwarded_proto == header_values.SchemeValues.Https);
 }
 
-bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers) {
-  absl::string_view cache_control = headers.getInlineValue(cache_control_handle.handle());
+bool CacheabilityUtils::isCacheableResponse(
+    const Http::ResponseHeaderMap& headers,
+    const absl::flat_hash_set<std::string>& allowed_vary_headers) {
+  absl::string_view cache_control = headers.getInlineValue(response_cache_control_handle.handle());
   ResponseCacheControl response_cache_control(cache_control);
 
   // Only cache responses with explicit validation data, either:
-  //    max-age or s-maxage cache-control directives with date header.
-  //    expires header.
+  //    "no-cache" cache-control directive
+  //    "max-age" or "s-maxage" cache-control directives with date header
+  //    expires header
   const bool has_validation_data =
+      response_cache_control.must_validate_ ||
       (headers.Date() && response_cache_control.max_age_.has_value()) ||
       headers.get(Http::Headers::get().Expires);
 
   return !response_cache_control.no_store_ &&
-         cacheableStatusCodes().contains((headers.getStatusValue())) && has_validation_data;
+         cacheableStatusCodes().contains((headers.getStatusValue())) && has_validation_data &&
+         VaryHeader::isAllowed(allowed_vary_headers, headers);
 }
 
 } // namespace Cache

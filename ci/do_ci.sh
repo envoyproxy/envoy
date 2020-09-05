@@ -31,7 +31,6 @@ echo "building for ${ENVOY_BUILD_ARCH}"
 function collect_build_profile() {
   declare -g build_profile_count=${build_profile_count:-1}
   mv -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" || true
-  mv -f ${BUILD_DIR}/build_event.json "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.build_event.json" || true
   ((build_profile_count++))
 }
 
@@ -51,6 +50,7 @@ function bazel_with_collection() {
     exit "${BAZEL_STATUS}"
   fi
   collect_build_profile $1
+  run_process_test_result
 }
 
 function cp_binary_for_outside_access() {
@@ -60,12 +60,24 @@ function cp_binary_for_outside_access() {
     "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}"
 }
 
+function cp_debug_info_for_outside_access() {
+  DELIVERY_LOCATION="$1"
+  cp -f \
+    bazel-bin/"${ENVOY_BIN}".dwp \
+    "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}".dwp
+}
+
+
 function cp_binary_for_image_build() {
   # TODO(mattklein123): Replace this with caching and a different job which creates images.
   local BASE_TARGET_DIR="${ENVOY_SRCDIR}${BUILD_ARCH_DIR}"
   echo "Copying binary for image build..."
+  COMPILE_TYPE="$2"
   mkdir -p "${BASE_TARGET_DIR}"/build_"$1"
   cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${BASE_TARGET_DIR}"/build_"$1"
+  if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
+    cp -f "${ENVOY_DELIVERY_DIR}"/envoy.dwp "${BASE_TARGET_DIR}"/build_"$1"
+  fi
   mkdir -p "${BASE_TARGET_DIR}"/build_"$1"_stripped
   strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/build_"$1"_stripped/envoy
 
@@ -74,8 +86,8 @@ function cp_binary_for_image_build() {
 
   # Remove binaries to save space, only if BUILD_REASON exists (running in AZP)
   [[ -z "${BUILD_REASON}" ]] || \
-    rm -rf "${BASE_TARGET_DIR}"/build_"$1" "${BASE_TARGET_DIR}"/build_"$1"_stripped "${ENVOY_DELIVERY_DIR}"/envoy \
-      bazel-bin/"${ENVOY_BIN}"
+    rm -rf "${BASE_TARGET_DIR}"/build_"$1" "${BASE_TARGET_DIR}"/build_"$1"_stripped "${ENVOY_DELIVERY_DIR}"/envoy{,.dwp} \
+      bazel-bin/"${ENVOY_BIN}"{,.dwp}
 }
 
 function bazel_binary_build() {
@@ -106,7 +118,21 @@ function bazel_binary_build() {
   # container.
   cp_binary_for_outside_access envoy
 
-  cp_binary_for_image_build "${BINARY_TYPE}"
+  if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
+    # Generate dwp file for debugging since we used split DWARF to reduce binary
+    # size
+    bazel build ${BAZEL_BUILD_OPTIONS} -c "${COMPILE_TYPE}" "${ENVOY_BUILD_DEBUG_INFORMATION}" ${CONFIG_ARGS}
+    # Copy the debug information
+    cp_debug_info_for_outside_access envoy
+  fi
+
+  cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}"
+
+}
+
+function run_process_test_result() {
+  echo "running flaky test reporting script"
+  "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
 }
 
 CI_TARGET=$1
@@ -131,7 +157,7 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_MEMORY_TEST_EXACT=true"
 
   setup_clang_toolchain
-  echo "Testing ${TEST_TARGETS}"
+  echo "Testing ${TEST_TARGETS} with options: ${BAZEL_BUILD_OPTIONS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c opt ${TEST_TARGETS}
 
   echo "bazel release build with tests..."
@@ -190,13 +216,16 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
     bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${ENVOY_FILTER_EXAMPLE_TESTS}
     popd
   fi
-  # Also validate that integration test traffic tapping (useful when debugging etc.)
-  # works. This requires that we set TAP_PATH. We do this under bazel.asan to
-  # ensure a debug build in CI.
-  echo "Validating integration test traffic tapping..."
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} \
-    --run_under=@envoy//bazel/test:verify_tap_test.sh \
-    //test/extensions/transport_sockets/tls/integration:ssl_integration_test
+
+  if [ "${CI_SKIP_INTEGRATION_TEST_TRAFFIC_TAPPING}" != "1" ] ; then
+    # Also validate that integration test traffic tapping (useful when debugging etc.)
+    # works. This requires that we set TAP_PATH. We do this under bazel.asan to
+    # ensure a debug build in CI.
+    echo "Validating integration test traffic tapping..."
+    bazel_with_collection test ${BAZEL_BUILD_OPTIONS} \
+      --run_under=@envoy//bazel/test:verify_tap_test.sh \
+      //test/extensions/transport_sockets/tls/integration:ssl_integration_test
+  fi
   exit 0
 elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
   setup_clang_toolchain
@@ -218,6 +247,7 @@ elif [[ "$CI_TARGET" == "bazel.msan" ]]; then
   echo "bazel MSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${TEST_TARGETS}
+  exit 0
 elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
   setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
@@ -227,6 +257,9 @@ elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
 
   echo "Building and testing ${TEST_TARGETS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c fastbuild ${TEST_TARGETS}
+  # TODO(foreseeable): consolidate this and the API tool tests in a dedicated target.
+  bazel_with_collection //tools/envoy_headersplit:headersplit_test --spawn_strategy=local
+  bazel_with_collection //tools/envoy_headersplit:replace_includes_test --spawn_strategy=local
   exit 0
 elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
@@ -242,6 +275,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define path_normalization_by_default=true \
     --define deprecated_features=disabled \
     --define use_new_codecs_in_integration_tests=true \
+    --define zlib=ng \
   "
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
   setup_clang_toolchain
@@ -267,7 +301,6 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   echo "Building binary..."
   bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   collect_build_profile build
-
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   setup_clang_toolchain
@@ -337,6 +370,7 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   echo "check_format_test..."
   ./tools/code_format/check_format_test_helper.sh --log=WARN
   echo "check_format..."
+  ./tools/code_format/check_shellcheck_format.sh
   ./tools/code_format/check_format.py check
   ./tools/code_format/format_python_tools.sh check
   ./tools/proto_format/proto_format.sh check --test

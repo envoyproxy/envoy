@@ -3,10 +3,6 @@
 Dynamic forward proxy
 =====================
 
-.. attention::
-
-  HTTP dynamic forward proxy support should be considered alpha and not production ready.
-
 * HTTP dynamic forward proxy :ref:`architecture overview <arch_overview_http_dynamic_forward_proxy>`
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig>`
 * This filter should be configured with the name *envoy.filters.http.dynamic_forward_proxy*

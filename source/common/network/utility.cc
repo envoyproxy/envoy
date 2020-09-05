@@ -326,16 +326,17 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
     absl::uint128 addr = address.ip()->ipv6()->address();
     return 0 == memcmp(&addr, &in6addr_loopback, sizeof(in6addr_loopback));
   }
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Address::InstanceConstSharedPtr Utility::getCanonicalIpv4LoopbackAddress() {
   CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr,
-                         new Address::Ipv4Instance("127.0.0.1", 0));
+                         new Address::Ipv4Instance("127.0.0.1", 0, nullptr));
 }
 
 Address::InstanceConstSharedPtr Utility::getIpv6LoopbackAddress() {
-  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr, new Address::Ipv6Instance("::1", 0));
+  CONSTRUCT_ON_FIRST_USE(Address::InstanceConstSharedPtr,
+                         new Address::Ipv6Instance("::1", 0, nullptr));
 }
 
 Address::InstanceConstSharedPtr Utility::getIpv4AnyAddress() {

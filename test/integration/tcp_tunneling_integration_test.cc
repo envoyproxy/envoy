@@ -133,9 +133,6 @@ TEST_P(ConnectTerminationIntegrationTest, TestTimeout) {
 
 TEST_P(ConnectTerminationIntegrationTest, BuggyHeaders) {
   initialize();
-  // It's possible that the FIN is received before we set half close on the
-  // upstream connection, so allow unexpected disconnects.
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Sending a header-only request is probably buggy, but rather than having a
   // special corner case it is treated as a regular half close.
@@ -170,7 +167,6 @@ TEST_P(ConnectTerminationIntegrationTest, BasicMaxStreamDuration) {
   });
 
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   setUpConnection();
   sendBidirectionalData();
 
@@ -396,7 +392,7 @@ TEST_P(TcpTunnelingIntegrationTest, ResetStreamTest) {
 
   // Reset the stream.
   upstream_request_->encodeResetStream();
-  tcp_client->waitForDisconnect(true);
+  tcp_client->waitForDisconnect();
 }
 
 TEST_P(TcpTunnelingIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
@@ -429,7 +425,7 @@ TEST_P(TcpTunnelingIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   ASSERT_TRUE(tcp_client->write(data));
   upstream_request_->encodeData(data, false);
 
-  tcp_client->waitForDisconnect(true);
+  tcp_client->waitForDisconnect();
   ASSERT_TRUE(upstream_request_->waitForReset());
 }
 

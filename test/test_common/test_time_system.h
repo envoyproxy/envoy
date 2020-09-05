@@ -1,11 +1,13 @@
 #pragma once
 
+#include "envoy/common/time.h"
 #include "envoy/event/timer.h"
 
 #include "common/common/assert.h"
 #include "common/common/thread.h"
 
 #include "test/test_common/global.h"
+#include "test/test_common/only_one_thread.h"
 
 namespace Envoy {
 namespace Event {
@@ -14,6 +16,34 @@ namespace Event {
 class TestTimeSystem : public Event::TimeSystem {
 public:
   ~TestTimeSystem() override = default;
+
+  /**
+   * This class will use the real monotonic time regardless of the time system in use (real
+   * or simulated). This should only be used when time is needed for real timeouts that govern
+   * networking, etc. It should never be used for time that only advances explicitly for alarms.
+   */
+  class RealTimeBound {
+  public:
+    template <class D>
+    RealTimeBound(const D& duration)
+        : end_time_(std::chrono::steady_clock::now() + duration) // NO_CHECK_FORMAT(real_time)
+    {}
+
+    std::chrono::milliseconds timeLeft() {
+      const auto current_time = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
+      if (current_time > end_time_) {
+        return std::chrono::milliseconds(0);
+      }
+      return std::chrono::duration_cast<std::chrono::milliseconds>(end_time_ - current_time);
+    }
+
+    bool withinBound() {
+      return std::chrono::steady_clock::now() < end_time_; // NO_CHECK_FORMAT(real_time)
+    }
+
+  private:
+    const MonotonicTime end_time_;
+  };
 
   /**
    * Advances time forward by the specified duration, running any timers
@@ -26,9 +56,9 @@ public:
    *
    * @param duration The amount of time to sleep.
    */
-  virtual void advanceTimeWait(const Duration& duration) PURE;
-  template <class D> void advanceTimeWait(const D& duration) {
-    advanceTimeWait(std::chrono::duration_cast<Duration>(duration));
+  virtual void advanceTimeWaitImpl(const Duration& duration) PURE;
+  template <class D> void advanceTimeWait(const D& duration = false) {
+    advanceTimeWaitImpl(std::chrono::duration_cast<Duration>(duration));
   }
 
   /**
@@ -42,31 +72,46 @@ public:
    *
    * @param duration The amount of time to sleep.
    */
-  virtual void advanceTimeAsync(const Duration& duration) PURE;
-  template <class D> void advanceTimeAsync(const D& duration) {
-    advanceTimeAsync(std::chrono::duration_cast<Duration>(duration));
+  virtual void advanceTimeAsyncImpl(const Duration& duration) PURE;
+  template <class D> void advanceTimeAsync(const D& duration = false) {
+    advanceTimeAsyncImpl(std::chrono::duration_cast<Duration>(duration));
   }
 
   /**
-   * Waits for the specified duration to expire, or for a condvar to
-   * be notified, whichever comes first.
+   * Waits for the specified duration to expire, or for the condition to be satisfied, whichever
+   * comes first.
+   *
+   * NOTE: This function takes a duration parameter which is the timeout of the wait. This is *real*
+   *       time in all time systems. This is to avoid test hangs and provide a useful error message.
+   *       When using simulated time this does not advance monotonic time. Thus, to simulated time
+   *       tests all network behavior will appear instantaneous. If time needs to advance to fire
+   *       alarms advanceTimeWait() or advanceTimeAsync() should be used.
    *
    * @param mutex A mutex which must be held before calling this function.
-   * @param condvar The condition to wait on.
+   * @param condition The condition to wait on.
    * @param duration The maximum amount of time to wait.
    * @return Thread::CondVar::WaitStatus whether the condition timed out or not.
    */
-  virtual Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex,
-                                              Thread::CondVar& condvar,
-                                              const Duration& duration) noexcept
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) PURE;
-
   template <class D>
-  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-                                      const D& duration) noexcept
+  bool waitFor(absl::Mutex& mutex, const absl::Condition& condition, const D& duration) noexcept
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
-    return waitFor(mutex, condvar, std::chrono::duration_cast<Duration>(duration));
+    only_one_thread_.checkOneThread();
+    return mutex.AwaitWithTimeout(condition,
+                                  absl::FromChrono(std::chrono::duration_cast<Duration>(duration)));
   }
+
+  /**
+   * This function will perform a real sleep in all time systems (real or simulated). This function
+   * should NOT be used without a good reason. It is either for supporting old code that needs to
+   * be converted to an event based approach, simulated time, or some other solution. Be ready
+   * to explain why you are using this in code review.
+   */
+  template <class D> void realSleepDoNotUseWithoutScrutiny(const D& duration) {
+    std::this_thread::sleep_for(duration); // NO_CHECK_FORMAT(real_time)
+  }
+
+protected:
+  Thread::OnlyOneThread only_one_thread_;
 };
 
 // There should only be one instance of any time-system resident in a test
@@ -102,19 +147,12 @@ private:
 // subclass.
 template <class TimeSystemVariant> class DelegatingTestTimeSystemBase : public TestTimeSystem {
 public:
-  void advanceTimeAsync(const Duration& duration) override {
-    timeSystem().advanceTimeAsync(duration);
+  void advanceTimeAsyncImpl(const Duration& duration) override {
+    timeSystem().advanceTimeAsyncImpl(duration);
   }
-  void advanceTimeWait(const Duration& duration) override {
-    timeSystem().advanceTimeWait(duration);
+  void advanceTimeWaitImpl(const Duration& duration) override {
+    timeSystem().advanceTimeWaitImpl(duration);
   }
-
-  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-                                      const Duration& duration) noexcept
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
-    return timeSystem().waitFor(mutex, condvar, duration);
-  }
-
   SchedulerPtr createScheduler(Scheduler& base_scheduler,
                                CallbackScheduler& cb_scheduler) override {
     return timeSystem().createScheduler(base_scheduler, cb_scheduler);

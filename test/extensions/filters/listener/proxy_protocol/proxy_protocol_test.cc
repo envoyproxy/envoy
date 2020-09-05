@@ -11,8 +11,8 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/listen_socket_impl.h"
-#include "common/network/listener_impl.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/network/tcp_listener_impl.h"
 #include "common/network/utility.h"
 
 #include "server/connection_handler_impl.h"
@@ -94,6 +94,7 @@ public:
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return empty_access_logs_;
   }
+  uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -183,6 +184,7 @@ public:
 
   Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
+  BasicResourceLimitImpl open_connections_;
   Event::DispatcherPtr dispatcher_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::MockListenSocketFactory socket_factory_;
@@ -193,7 +195,6 @@ public:
   NiceMock<Network::MockConnectionCallbacks> connection_callbacks_;
   Network::Connection* server_connection_;
   Network::MockConnectionCallbacks server_callbacks_;
-  BasicResourceLimitImpl open_connections_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   Api::OsSysCallsImpl os_sys_calls_actual_;
@@ -351,15 +352,17 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, ErrorFIONREAD_1) {
-  // A well formed v4/tcp message, no extensions, but introduce an error on ioctl(...FIONREAD...)
+TEST_P(ProxyProtocolTest, ErrorRecv_1) {
+  // A well formed v4/tcp message, no extensions, but introduce an error on recv()
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
                                 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(Api::SysCallSizeResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -564,8 +567,8 @@ TEST_P(ProxyProtocolTest, V2ParseExtensions) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, V2ParseExtensionsIoctlError) {
-  // A well-formed ipv4/tcp with a TLV extension. An error is created in the ioctl(...FIONREAD...)
+TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
+  // A well-formed ipv4/tcp with a TLV extension. An error is returned on tlv recv()
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x10, 0x01, 0x02, 0x03, 0x04,
                                 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
@@ -574,12 +577,12 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsIoctlError) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
-  EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _))
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, unsigned long int request, void* argp) {
-        const Api::SysCallIntResult x = os_sys_calls_actual_.ioctl(fd, request, argp);
-        if (x.rc_ == 0 && *static_cast<int*>(argp) == sizeof(tlv)) {
-          return Api::SysCallIntResult{-1, x.errno_};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t n, int flags) {
+        const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
+        if (x.rc_ == sizeof(tlv)) {
+          return Api::SysCallSizeResult{-1, 0};
         } else {
           return x;
         }
@@ -588,11 +591,6 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsIoctlError) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
         return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
-      }));
-  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
-        return os_sys_calls_actual_.recv(fd, buf, len, flags);
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
@@ -1291,6 +1289,7 @@ public:
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return empty_access_logs_;
   }
+  uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {

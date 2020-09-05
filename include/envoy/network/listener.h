@@ -161,14 +161,19 @@ public:
    * @return std::vector<AccessLog::InstanceSharedPtr> access logs emitted by the listener.
    */
   virtual const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const PURE;
+
+  /**
+   * @return pending connection backlog for TCP listeners.
+   */
+  virtual uint32_t tcpBacklogSize() const PURE;
 };
 
 /**
  * Callbacks invoked by a listener.
  */
-class ListenerCallbacks {
+class TcpListenerCallbacks {
 public:
-  virtual ~ListenerCallbacks() = default;
+  virtual ~TcpListenerCallbacks() = default;
 
   /**
    * Called when a new connection is accepted.

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bitset>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -8,6 +9,7 @@
 #include "envoy/thread/thread.h"
 
 #include "common/common/base_logger.h"
+#include "common/common/fancy_logger.h"
 #include "common/common/fmt.h"
 #include "common/common/logger_impl.h"
 #include "common/common/macros.h"
@@ -225,23 +227,36 @@ enum class LoggerMode { Envoy, Fancy };
  * context is restored. When all contexts are destroyed, the lock is cleared,
  * and logging will remain unlocked, the same state it is in prior to
  * instantiating a Context.
+ *
+ * Settings for Fancy Logger, a file level logger without explicit implementation of
+ * Envoy::Logger:Loggable, are integrated here, as they should be updated when
+ * context switch occurs.
  */
 class Context {
 public:
   Context(spdlog::level::level_enum log_level, const std::string& log_format,
-          Thread::BasicLockable& lock, bool should_escape);
+          Thread::BasicLockable& lock, bool should_escape, bool enable_fine_grain_logging = false);
   ~Context();
+
+  /**
+   * Same as before, with boolean returned to use in log macros.
+   */
+  static bool useFancyLogger();
+
+  static void enableFancyLogger();
+  static void disableFancyLogger();
 
   static std::string getFancyLogFormat();
   static spdlog::level::level_enum getFancyDefaultLevel();
 
 private:
-  void activate(LoggerMode mode = LoggerMode::Envoy);
+  void activate();
 
   const spdlog::level::level_enum log_level_;
   const std::string log_format_;
   Thread::BasicLockable& lock_;
   bool should_escape_;
+  bool enable_fine_grain_logging_;
   Context* const save_context_;
 
   std::string fancy_log_format_ = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
@@ -352,20 +367,10 @@ protected:
 #define ENVOY_LOGGER() __log_do_not_use_read_comment()
 
 /**
- * Convenience macro to flush logger.
- */
-#define ENVOY_FLUSH_LOG() ENVOY_LOGGER().flush()
-
-/**
- * Convenience macro to log to the class' logger.
- */
-#define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
-
-/**
  * Convenience macro to log to the misc logger, which allows for logging without of direct access to
  * a logger.
  */
-#define GET_MISC_LOGGER() Logger::Registry::getLog(Logger::Id::misc)
+#define GET_MISC_LOGGER() ::Envoy::Logger::Registry::getLog(::Envoy::Logger::Id::misc)
 #define ENVOY_LOG_MISC(LEVEL, ...) ENVOY_LOG_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, ##__VA_ARGS__)
 
 /**
@@ -373,9 +378,6 @@ protected:
  */
 #define ENVOY_CONN_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, CONNECTION, ...)                           \
   ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
-
-#define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
-  ENVOY_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__)
 
 /**
  * Convenience macros for logging with a stream ID and a connection ID.
@@ -385,9 +387,74 @@ protected:
                       (STREAM).connection() ? (STREAM).connection()->id() : 0,                     \
                       (STREAM).streamId(), ##__VA_ARGS__)
 
-#define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
-  ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
-
 // TODO(danielhochman): macros(s)/function(s) for logging structures that support iteration.
+
+/**
+ * Command line options for log macros: use Fancy Logger or not.
+ */
+#define ENVOY_LOG(LEVEL, ...)                                                                      \
+  do {                                                                                             \
+    if (Envoy::Logger::Context::useFancyLogger()) {                                                \
+      FANCY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
+    } else {                                                                                       \
+      ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__);                                   \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_LOG_FIRST_N(LEVEL, N, ...)                                                           \
+  do {                                                                                             \
+    static auto* countdown = new std::atomic<uint64_t>();                                          \
+    if (countdown->fetch_add(1) < N) {                                                             \
+      ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_LOG_ONCE(LEVEL, ...)                                                                 \
+  do {                                                                                             \
+    ENVOY_LOG_FIRST_N(LEVEL, 1, ##__VA_ARGS__);                                                    \
+  } while (0)
+
+#define ENVOY_LOG_EVERY_NTH(LEVEL, N, ...)                                                         \
+  do {                                                                                             \
+    static auto* count = new std::atomic<uint64_t>();                                              \
+    if ((count->fetch_add(1) % N) == 0) {                                                          \
+      ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_LOG_EVERY_POW_2(LEVEL, ...)                                                          \
+  do {                                                                                             \
+    static auto* count = new std::atomic<uint64_t>();                                              \
+    if (std::bitset<64>(1 + count->fetch_add(1)).count() == 1) {                                   \
+      ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_FLUSH_LOG()                                                                          \
+  do {                                                                                             \
+    if (Envoy::Logger::Context::useFancyLogger()) {                                                \
+      FANCY_FLUSH_LOG();                                                                           \
+    } else {                                                                                       \
+      ENVOY_LOGGER().flush();                                                                      \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
+  do {                                                                                             \
+    if (Envoy::Logger::Context::useFancyLogger()) {                                                \
+      FANCY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__);                                    \
+    } else {                                                                                       \
+      ENVOY_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__);          \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
+  do {                                                                                             \
+    if (Envoy::Logger::Context::useFancyLogger()) {                                                \
+      FANCY_STREAM_LOG(LEVEL, FORMAT, STREAM, ##__VA_ARGS__);                                      \
+    } else {                                                                                       \
+      ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__);            \
+    }                                                                                              \
+  } while (0)
 
 } // namespace Envoy

@@ -34,7 +34,8 @@ of requests are retried, how many times the request should be retried, timeouts 
 Retries in gRPC services
 ------------------------
 
-For gRPC services, Envoy looks at the gRPC status in the response and attempts a retry based on the statuses configured in *x-retry-grpc-on*.
+For gRPC services, Envoy looks at the gRPC status in the response and attempts a retry based on the statuses configured in
+:ref:`x-envoy-retry-grpc-on <config_http_filters_router_x-envoy-retry-grpc-on>`.
 
 The following application status codes in gRPC are considered safe for automatic retry.
 

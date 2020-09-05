@@ -8,6 +8,7 @@
 // The goal is to eventually not require this file of envoy header declarations,
 // but limit the use of these architecture-specific types and declarations
 // to the corresponding .cc implementation files.
+#include "absl/strings/string_view.h"
 
 #ifdef _MSC_VER
 
@@ -142,6 +143,9 @@ struct msghdr {
 #define SOCKET_ERROR_INVAL WSAEINVAL
 #define SOCKET_ERROR_ADDR_IN_USE WSAEADDRINUSE
 
+namespace Platform {
+constexpr absl::string_view null_device_path{"NUL"};
+}
 #else // POSIX
 
 #include <arpa/inet.h>
@@ -227,6 +231,9 @@ typedef int os_fd_t;
 #define SOCKET_ERROR_INVAL EINVAL
 #define SOCKET_ERROR_ADDR_IN_USE EADDRINUSE
 
+namespace Platform {
+constexpr absl::string_view null_device_path{"/dev/null"};
+}
 #endif
 
 // Note: chromium disabled recvmmsg regardless of ndk version. However, the only Android target
@@ -273,3 +280,11 @@ struct mmsghdr {
 #undef SUPPORTS_PTHREAD_NAMING
 #define SUPPORTS_PTHREAD_NAMING 1
 #endif // defined(__ANDROID_API__)
+
+#if defined(__linux__)
+// On Linux, default listen backlog size to net.core.somaxconn which is runtime configurable
+#define ENVOY_TCP_BACKLOG_SIZE -1
+#else
+// On non-Linux platforms use 128 which is libevent listener default
+#define ENVOY_TCP_BACKLOG_SIZE 128
+#endif

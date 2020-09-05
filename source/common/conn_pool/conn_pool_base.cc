@@ -34,6 +34,13 @@ void ConnPoolImplBase::destructAllConnections() {
 }
 
 bool ConnPoolImplBase::shouldCreateNewConnection() const {
+  // If the host is not healthy, don't make it do extra work, especially as
+  // upstream selection logic may result in bypassing this upstream entirely.
+  // If an Envoy user wants prefetching for degraded upstreams this could be
+  // added later via extending the prefetch config.
+  if (host_->health() != Upstream::Host::Health::Healthy) {
+    return pending_streams_.size() > connecting_stream_capacity_;
+  }
   // The number of streams we want to be provisioned for is the number of
   // pending and active streams times the prefetch ratio.
   // The number of streams we are (theoretically) provisioned for is the
@@ -163,7 +170,6 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context)
 
   if (host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
     ConnectionPool::Cancellable* pending = newPendingRequest(context);
-
     // This must come after newPendingRequest() because this function uses the
     // length of pending_streams_ to determine if a new connection is needed.
     tryCreateNewConnections();
@@ -318,7 +324,6 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       // NOTE: We move the existing pending streams to a temporary list. This is done so that
       //       if retry logic submits a new stream to the pool, we don't fail it inline.
       purgePendingRequests(client.real_host_description_, failure_reason, reason);
-      // TODO(alyssawilk) only iff upstream is healthy.
       // See if we should prefetch another connection based on active connections.
       tryCreateNewConnections();
     }
@@ -442,7 +447,6 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint64_t lifetime_stream_li
   conn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       parent_.host()->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher().timeSource());
   connect_timer_->enableTimer(parent_.host()->cluster().connectTimeout());
-
   parent_.host()->stats().cx_total_.inc();
   parent_.host()->stats().cx_active_.inc();
   parent_.host()->cluster().stats().upstream_cx_total_.inc();

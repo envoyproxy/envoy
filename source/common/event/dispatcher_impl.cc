@@ -20,7 +20,7 @@
 #include "common/filesystem/watcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
-#include "common/network/listener_impl.h"
+#include "common/network/tcp_listener_impl.h"
 #include "common/network/udp_listener_impl.h"
 
 #include "event2/event.h"
@@ -137,10 +137,11 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
 }
 
 Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,
-                                                    Network::ListenerCallbacks& cb,
-                                                    bool bind_to_port) {
+                                                    Network::TcpListenerCallbacks& cb,
+                                                    bool bind_to_port, uint32_t backlog_size) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::ListenerImpl>(*this, std::move(socket), cb, bind_to_port);
+  return std::make_unique<Network::TcpListenerImpl>(*this, std::move(socket), cb, bind_to_port,
+                                                    backlog_size);
 }
 
 Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr&& socket,

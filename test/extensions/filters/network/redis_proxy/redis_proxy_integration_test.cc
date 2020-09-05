@@ -1,6 +1,9 @@
 #include <sstream>
 #include <vector>
 
+#include "common/common/fmt.h"
+
+#include "extensions/filters/network/common/redis/fault_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
 #include "test/integration/integration.h"
@@ -52,7 +55,7 @@ static_resources:
       filters:
         name: redis
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
           stat_prefix: redis_stats
           prefix_routes:
             catch_all_route:
@@ -60,7 +63,7 @@ static_resources:
           settings:
             op_timeout: 5s
 )EOF",
-                                       TestEnvironment::nullDevicePath());
+                                       Platform::null_device_path);
 
 // This is a configuration with command stats enabled.
 const std::string CONFIG_WITH_COMMAND_STATS = CONFIG + R"EOF(
@@ -153,7 +156,7 @@ static_resources:
           settings:
             op_timeout: 5s
 )EOF",
-                                                        TestEnvironment::nullDevicePath());
+                                                        Platform::null_device_path);
 
 const std::string CONFIG_WITH_ROUTES = CONFIG_WITH_ROUTES_BASE + R"EOF(
           prefix_routes:
@@ -194,8 +197,7 @@ const std::string CONFIG_WITH_DOWNSTREAM_AUTH_PASSWORD_SET = CONFIG + R"EOF(
           downstream_auth_password: { inline_string: somepassword }
 )EOF";
 
-const std::string CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS =
-    fmt::format(R"EOF(
+const std::string CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS = fmt::format(R"EOF(
 admin:
   access_log_path: {}
   address:
@@ -275,7 +277,28 @@ static_resources:
             - prefix: "baz:"
               cluster: cluster_2
 )EOF",
-                TestEnvironment::nullDevicePath());
+                                                                      Platform::null_device_path);
+
+// This is a configuration with fault injection enabled.
+const std::string CONFIG_WITH_FAULT_INJECTION = CONFIG + R"EOF(
+          faults:
+          - fault_type: ERROR
+            fault_enabled:
+              default_value:
+                numerator: 100
+                denominator: HUNDRED
+            commands:
+            - GET
+          - fault_type: DELAY
+            fault_enabled:
+              default_value:
+                numerator: 20
+                denominator: HUNDRED
+              runtime_key: "bogus_key"
+            delay: 2s
+            commands:
+            - SET
+)EOF";
 
 // This function encodes commands as an array of bulkstrings as transmitted by Redis clients to
 // Redis servers, according to the Redis protocol.
@@ -440,6 +463,12 @@ public:
       : RedisProxyIntegrationTest(CONFIG_WITH_COMMAND_STATS, 2) {}
 };
 
+class RedisProxyWithFaultInjectionIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyWithFaultInjectionIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_WITH_FAULT_INJECTION, 2) {}
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -469,6 +498,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithMirrorsIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithCommandStatsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithFaultInjectionIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -1064,6 +1097,26 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, EnabledViaRuntimeFraction) {
   EXPECT_TRUE(fake_upstream_connection[0]->close());
   EXPECT_TRUE(fake_upstream_connection[1]->close());
   redis_client->close();
+}
+
+TEST_P(RedisProxyWithFaultInjectionIntegrationTest, ErrorFault) {
+  std::string fault_response =
+      fmt::format("-{}\r\n", Extensions::NetworkFilters::Common::Redis::FaultMessages::get().Error);
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"get", "foo"}), fault_response);
+
+  EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.get.error")->value());
+  EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.get.error_fault")->value());
+}
+
+TEST_P(RedisProxyWithFaultInjectionIntegrationTest, DelayFault) {
+  const std::string& set_request = makeBulkStringArray({"set", "write_only:toto", "bar"});
+  const std::string& set_response = ":1\r\n";
+  initialize();
+  simpleRequestAndResponse(set_request, set_response);
+
+  EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.set.success")->value());
+  EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.set.delay_fault")->value());
 }
 
 } // namespace

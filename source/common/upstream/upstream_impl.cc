@@ -707,6 +707,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       source_address_(getSourceAddress(config, bind_config)),
       lb_least_request_config_(config.least_request_lb_config()),
       lb_ring_hash_config_(config.ring_hash_lb_config()),
+      lb_maglev_config_(config.maglev_lb_config()),
       lb_original_dst_config_(config.original_dst_lb_config()),
       upstream_config_(config.has_upstream_config()
                            ? absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
@@ -718,6 +719,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       common_lb_config_(config.common_lb_config()),
       cluster_socket_options_(parseClusterSocketOptions(config, bind_config)),
       drain_connections_on_host_removal_(config.ignore_health_on_host_removal()),
+      connection_pool_per_downstream_connection_(
+          config.connection_pool_per_downstream_connection()),
       warm_hosts_(!config.health_checks().empty() &&
                   common_lb_config_.ignore_new_hosts_until_first_hc()),
       upstream_http_protocol_options_(
