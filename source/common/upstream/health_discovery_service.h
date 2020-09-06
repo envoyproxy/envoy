@@ -70,12 +70,11 @@ public:
               Random::RandomGenerator& random, Singleton::Manager& singleton_manager,
               ThreadLocal::SlotAllocator& tls,
               ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+  void updateHealthchecks(
+      const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks);
   void
-  updateHealthchecks(const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>&
-                         health_checks);
-  void updateHosts(
-      const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
-          locality_endpoints);
+  updateHosts(const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
+                  locality_endpoints);
   // Creates healthcheckers and adds them to the list, then does initial start.
   void initHealthchecks(AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime,
                         Random::RandomGenerator& random, Event::Dispatcher& dispatcher,

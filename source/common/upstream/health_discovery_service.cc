@@ -210,16 +210,6 @@ envoy::config::cluster::v3::Cluster HdsDelegate::createClusterConfig(
 HdsClusterPtr
 HdsDelegate::tryUpdateHdsCluster(HdsClusterPtr cluster,
                                  const envoy::config::cluster::v3::Cluster& cluster_config) {
-  // TODO(drewsortega)
-  // update priority_set_
-  // - calculate hosts_added
-  // - calculate hosts_removed
-  // - calculate hosts_per_locality
-  // update health_checkers_
-  // - if only updating priority_set_, no need to have any action here. This has a callback
-  //   to any changes in priority_set_, so no need to recall startHealthchecks.
-  // - start health_checkers_
-  // Update HdsCluster::info_ member variable;
   cluster->update(admin_, cluster_config, info_factory_, cm_, local_info_, dispatcher_, random_,
                   singleton_manager_, tls_, validation_visitor_, api_);
   return cluster;
@@ -427,11 +417,51 @@ void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluste
 void HdsCluster::updateHealthchecks(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks) {
   UNREFERENCED_PARAMETER(health_checks);
+  //  create health_checkers - vector of HealthCheckSharedPtr
+  //  create health_checkers_map - map of HealthCheckSharedPtr by hash as key
+  //
+  //  health_check : health_checks:
+  //    create health_check_hash
+  //    if health_check_hash in health_checkers_map_:
+  //      - health_check_ptr = health_checkers_map_[health_check_hash]
+  //      - add health_check_ptr to health_checkers_map
+  //      - add health_check_ptr to health_checkers
+  //
+  //  replace health_checkers_ with health_checkers
+  //  replace health_checkers_map_ with health_checkers_map
 }
 void HdsCluster::updateHosts(
     const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
         locality_endpoints) {
   UNREFERENCED_PARAMETER(locality_endpoints);
+  //  create hosts - vector of HostSharedPtr
+  //  create hosts_added - vector of HostSharedPtr
+  //  create hosts_removed - vector of HostSharedPtr
+  //  create hosts_by_locality - vector of (vector of HostSharedPtr)
+  //  create hosts_map - map of HostSharedPtr with hash of config as key
+  //
+  //  endpoints : locality_endpoints:
+  //    - add new vector of hosts to hosts_by_locality
+  //    endpoint : endpoints:
+  //      create empty variable 'host'
+  //      if endpoint not in host_map_:
+  //        - host = new Host
+  //        - add host to hosts_added
+  //      else if endpoint in hosts_map_:
+  //        - host = hosts_map[hash]
+  //
+  //      - add host to this locality in hosts_by_locality
+  //      - add host to hosts
+  //      - add host to hosts_map
+  //
+  //  host : hosts_map_
+  //    if host not in hosts_map:
+  //      add host to hosts_removed
+  //
+  //  replace hosts_ with new hosts
+  //  replace hosts_map_ with hosts_map
+  //  create new hosts_per_locality_ with hosts_by_locality
+  //  update priority_set_ with hosts_added, hosts_removed_, hosts_per_locality_
 }
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
