@@ -97,6 +97,9 @@ private:
   Ssl::ContextManager& ssl_context_manager_;
   bool added_via_api_;
   bool initialized_ = false;
+  uint64_t config_hash_;
+  uint64_t endpoints_hash_;
+  uint64_t health_checkers_hash_;
 
   HostVectorSharedPtr hosts_;
   HostsPerLocalitySharedPtr hosts_per_locality_;

@@ -358,6 +358,9 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
       validation_visitor_(validation_visitor) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
+  config_hash_ = MessageUtil::hash(cluster_);
+  endpoints_hash_ = RepeatedPtrUtil::hash(cluster_.load_assignment().endpoints());
+  health_checkers_hash_ = RepeatedPtrUtil::hash(cluster_.health_checks());
 
   info_ = info_factory.createClusterInfo(
       {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
@@ -402,14 +405,30 @@ void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluste
                         Random::RandomGenerator& random, Singleton::Manager& singleton_manager,
                         ThreadLocal::SlotAllocator& tls,
                         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
-  // TODO(drewsortega): skip this entire function body if the config hash is the same
-  cluster_ = std::move(cluster);
-  info_ = info_factory.createClusterInfo(
-      {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
-       local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
+  const uint64_t config_hash = MessageUtil::hash(cluster);
+  // if this is a different config then what we already have, update the cluster.
+  if (config_hash_ != config_hash) {
+    config_hash_ = config_hash;
+    cluster_ = std::move(cluster);
 
-  updateHosts(cluster_.load_assignment().endpoints());
-  updateHealthchecks(cluster_.health_checks());
+    // always update our info_
+    info_ = info_factory.createClusterInfo(
+        {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
+         local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
+
+    const auto& endpoints = cluster.load_assignment().endpoints();
+    const uint64_t endpoints_hash = RepeatedPtrUtil::hash(endpoints);
+    if (endpoints_hash_ != endpoints_hash) {
+      endpoints_hash_ = endpoints_hash;
+      updateHosts(endpoints);
+    }
+
+    const uint64_t health_checkers_hash = RepeatedPtrUtil::hash(cluster.health_checks());
+    if (health_checkers_hash_ != health_checkers_hash) {
+      health_checkers_hash_ = health_checkers_hash;
+      updateHealthchecks(cluster_.health_checks());
+    }
+  }
 }
 
 void HdsCluster::updateHealthchecks(
