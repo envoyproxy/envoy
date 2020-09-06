@@ -103,7 +103,6 @@ void HdsDelegate::handleFailure() {
   setHdsRetryTimer();
 }
 
-// TODO(lilika): Add support for the same endpoint in different clusters/ports
 envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelegate::sendResponse() {
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse response;
 
@@ -289,8 +288,6 @@ void HdsDelegate::processMessage(
   hds_clusters_name_map_ = std::move(new_hds_clusters_name_map);
 }
 
-// TODO(lilika): Add support for subsequent HealthCheckSpecifier messages that
-// might modify the HdsClusters
 void HdsDelegate::onReceiveMessage(
     std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
   stats_.requests_.inc();
@@ -405,6 +402,7 @@ void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluste
                         Random::RandomGenerator& random, Singleton::Manager& singleton_manager,
                         ThreadLocal::SlotAllocator& tls,
                         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
+  // TODO(drewsortega): skip this entire function body if the config hash is the same
   cluster_ = std::move(cluster);
   info_ = info_factory.createClusterInfo(
       {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
@@ -416,6 +414,7 @@ void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluste
 
 void HdsCluster::updateHealthchecks(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks) {
+  // TODO(drewsortega)
   UNREFERENCED_PARAMETER(health_checks);
   //  create health_checkers - vector of HealthCheckSharedPtr
   //  create health_checkers_map - map of HealthCheckSharedPtr by hash as key
@@ -433,6 +432,7 @@ void HdsCluster::updateHealthchecks(
 void HdsCluster::updateHosts(
     const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
         locality_endpoints) {
+  // TODO(drewsortega)
   UNREFERENCED_PARAMETER(locality_endpoints);
   //  create hosts - vector of HostSharedPtr
   //  create hosts_added - vector of HostSharedPtr
