@@ -211,8 +211,17 @@ HdsClusterPtr
 HdsDelegate::tryUpdateHdsCluster(HdsClusterPtr cluster,
                                  const envoy::config::cluster::v3::Cluster& cluster_config) {
   // TODO(drewsortega)
-  UNREFERENCED_PARAMETER(cluster_config);
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  // update priority_set_
+  // - calculate hosts_added
+  // - calculate hosts_removed
+  // - calculate hosts_per_locality
+  // update health_checkers_
+  // - if only updating priority_set_, no need to have any action here. This has a callback
+  //   to any changes in priority_set_, so no need to recall startHealthchecks.
+  // - start health_checkers_
+  // Update HdsCluster::info_ member variable;
+  cluster->update(admin_, cluster_config, info_factory_, cm_, local_info_, dispatcher_, random_,
+                  singleton_manager_, tls_, validation_visitor_, api_);
   return cluster;
 }
 
@@ -228,8 +237,7 @@ HdsDelegate::createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster
 
   // Begin HCs in the background.
   new_cluster->initialize([] {});
-  new_cluster->addHealthchecks(access_log_manager_, runtime_, random_, dispatcher_, api_);
-  new_cluster->startHealthchecks();
+  new_cluster->initHealthchecks(access_log_manager_, runtime_, random_, dispatcher_, api_);
 
   return new_cluster;
 }
@@ -358,7 +366,9 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : runtime_(runtime), cluster_(std::move(cluster)), bind_config_(bind_config), stats_(stats),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
-      initial_hosts_(new HostVector()), validation_visitor_(validation_visitor) {
+      hosts_(new HostVector()),
+      hosts_map_(std::make_unique<absl::flat_hash_map<uint64_t, HostSharedPtr>>()),
+      validation_visitor_(validation_visitor) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
 
@@ -378,6 +388,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
     hosts_by_locality.back().reserve(locality_endpoints.lb_endpoints_size());
 
     for (const auto& host : locality_endpoints.lb_endpoints()) {
+      const auto endpoint_hash = MessageUtil::hash(host);
       // Initialize an endpoint host object.
       HostSharedPtr endpoint = std::make_shared<HostImpl>(
           info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()), nullptr, 1,
@@ -385,15 +396,42 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
           envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
           envoy::config::core::v3::UNKNOWN);
       // Add this host/endpoint pointer to our flat list of endpoints for health checking.
-      initial_hosts_->push_back(endpoint);
+      hosts_->push_back(endpoint);
       // Add this host/endpoint pointer to our structured list by locality so results can be
       // requested by locality.
       hosts_by_locality.back().push_back(endpoint);
+      // Add this host/endpoint pointer to our map so we can rebuild this later.
+      hosts_map_->insert({endpoint_hash, endpoint});
     }
   }
   // Create the HostsPerLocality.
-  initial_hosts_per_locality_ =
+  hosts_per_locality_ =
       std::make_shared<Envoy::Upstream::HostsPerLocalityImpl>(std::move(hosts_by_locality), false);
+}
+
+void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluster cluster,
+                        ClusterInfoFactory& info_factory, ClusterManager& cm,
+                        const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+                        Random::RandomGenerator& random, Singleton::Manager& singleton_manager,
+                        ThreadLocal::SlotAllocator& tls,
+                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
+  cluster_ = std::move(cluster);
+  info_ = info_factory.createClusterInfo(
+      {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
+       local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
+
+  updateHosts(cluster_.load_assignment().endpoints());
+  updateHealthchecks(cluster_.health_checks());
+}
+
+void HdsCluster::updateHealthchecks(
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks) {
+  UNREFERENCED_PARAMETER(health_checks);
+}
+void HdsCluster::updateHosts(
+    const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
+        locality_endpoints) {
+  UNREFERENCED_PARAMETER(locality_endpoints);
 }
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -419,19 +457,14 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
                                            params.added_via_api_, factory_context);
 }
 
-void HdsCluster::addHealthchecks(AccessLog::AccessLogManager& access_log_manager,
-                                 Runtime::Loader& runtime, Random::RandomGenerator& random,
-                                 Event::Dispatcher& dispatcher, Api::Api& api) {
+void HdsCluster::initHealthchecks(AccessLog::AccessLogManager& access_log_manager,
+                                  Runtime::Loader& runtime, Random::RandomGenerator& random,
+                                  Event::Dispatcher& dispatcher, Api::Api& api) {
   for (auto& health_check : cluster_.health_checks()) {
     health_checkers_.push_back(
         Upstream::HealthCheckerFactory::create(health_check, *this, runtime, random, dispatcher,
                                                access_log_manager, validation_visitor_, api));
-  }
-}
-
-void HdsCluster::startHealthchecks() {
-  for (auto& health_checker : health_checkers_) {
-    health_checker->start();
+    health_checkers_.back()->start();
   }
 }
 
@@ -441,13 +474,12 @@ void HdsCluster::initialize(std::function<void()> callback) {
   // If this function gets called again we do not want to touch the priority set again with the
   // initial hosts, because the hosts may have changed.
   if (!initialized_) {
-    for (const auto& host : *initial_hosts_) {
+    for (const auto& host : *hosts_) {
       host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
     }
     // Use the ungrouped and grouped hosts lists to retain locality structure in the priority set.
-    priority_set_.updateHosts(
-        0, HostSetImpl::partitionHosts(initial_hosts_, initial_hosts_per_locality_), {},
-        *initial_hosts_, {}, absl::nullopt);
+    priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
+                              *hosts_, {}, absl::nullopt);
 
     initialized_ = true;
   }
