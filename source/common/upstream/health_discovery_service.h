@@ -64,10 +64,12 @@ public:
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
 
-  // Creates and starts healthcheckers to its endpoints
-  void startHealthchecks(AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime,
-                         Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                         Api::Api& api);
+  // Creates healthcheckers and adds them to the list.
+  void addHealthchecks(AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime,
+                       Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                       Api::Api& api);
+  // Starts healthcheckers to its endpoints.
+  void startHealthchecks();
 
   std::vector<Upstream::HealthCheckerSharedPtr> healthCheckers() { return health_checkers_; };
 
@@ -85,6 +87,7 @@ private:
   Stats::Store& stats_;
   Ssl::ContextManager& ssl_context_manager_;
   bool added_via_api_;
+  bool initialized_ = false;
 
   HostVectorSharedPtr initial_hosts_;
   HostsPerLocalitySharedPtr initial_hosts_per_locality_;

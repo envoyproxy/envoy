@@ -228,7 +228,8 @@ HdsDelegate::createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster
 
   // Begin HCs in the background.
   new_cluster->initialize([] {});
-  new_cluster->startHealthchecks(access_log_manager_, runtime_, random_, dispatcher_, api_);
+  new_cluster->addHealthchecks(access_log_manager_, runtime_, random_, dispatcher_, api_);
+  new_cluster->startHealthchecks();
 
   return new_cluster;
 }
@@ -418,26 +419,38 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
                                            params.added_via_api_, factory_context);
 }
 
-void HdsCluster::startHealthchecks(AccessLog::AccessLogManager& access_log_manager,
-                                   Runtime::Loader& runtime, Random::RandomGenerator& random,
-                                   Event::Dispatcher& dispatcher, Api::Api& api) {
+void HdsCluster::addHealthchecks(AccessLog::AccessLogManager& access_log_manager,
+                                 Runtime::Loader& runtime, Random::RandomGenerator& random,
+                                 Event::Dispatcher& dispatcher, Api::Api& api) {
   for (auto& health_check : cluster_.health_checks()) {
     health_checkers_.push_back(
         Upstream::HealthCheckerFactory::create(health_check, *this, runtime, random, dispatcher,
                                                access_log_manager, validation_visitor_, api));
-    health_checkers_.back()->start();
+  }
+}
+
+void HdsCluster::startHealthchecks() {
+  for (auto& health_checker : health_checkers_) {
+    health_checker->start();
   }
 }
 
 void HdsCluster::initialize(std::function<void()> callback) {
   initialization_complete_callback_ = callback;
-  for (const auto& host : *initial_hosts_) {
-    host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+
+  // If this function gets called again we do not want to touch the priority set again with the
+  // initial hosts, because the hosts may have changed.
+  if (!initialized_) {
+    for (const auto& host : *initial_hosts_) {
+      host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+    }
+    // Use the ungrouped and grouped hosts lists to retain locality structure in the priority set.
+    priority_set_.updateHosts(
+        0, HostSetImpl::partitionHosts(initial_hosts_, initial_hosts_per_locality_), {},
+        *initial_hosts_, {}, absl::nullopt);
+
+    initialized_ = true;
   }
-  // Use the ungrouped and grouped hosts lists to retain locality structure in the priority set.
-  priority_set_.updateHosts(
-      0, HostSetImpl::partitionHosts(initial_hosts_, initial_hosts_per_locality_), {},
-      *initial_hosts_, {}, absl::nullopt);
 }
 
 void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) {
