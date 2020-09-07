@@ -182,6 +182,16 @@ scope_key_builder:
     srds_subscription_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
+  void srdsUpdateWithYaml(std::vector<std::string> const& config_yamls,
+                          std::string const& version) {
+    std::vector<envoy::config::route::v3::ScopedRouteConfiguration> resources;
+    for (std::string const& config_yaml : config_yamls) {
+      resources.push_back(parseScopedRouteConfigurationFromYaml(config_yaml));
+    }
+    const auto decoded_resources = TestUtility::decodeResources(resources);
+    EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, version));
+  }
+
   // Helper function which pushes an update to given RDS subscription, the start(_) of the
   // subscription must have been called.
   void pushRdsConfig(const std::vector<std::string>& route_config_names,
@@ -982,17 +992,18 @@ key:
 TEST_F(ScopedRdsTest, OnDemandScopeNotLoadedWithoutRequest) {
   setup();
   init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
   // Scope should be loaded eagerly by default.
-  const std::string config_yaml = R"EOF(
+  const std::string eager_resource = R"EOF(
 name: foo_scope
 route_configuration_name: foo_routes
 key:
   fragments:
     - string_key: x-foo-key
 )EOF";
-  const auto eager_resource = parseScopedRouteConfigurationFromYaml(config_yaml);
+
   // On demand scope should be loaded lazily.
-  const std::string config_yaml2 = R"EOF(
+  const std::string lazy_resource = R"EOF(
 name: foo_scope2
 route_configuration_name: foo_routes
 on_demand: true
@@ -1000,12 +1011,8 @@ key:
   fragments:
     - string_key: x-bar-key
 )EOF";
-  const auto lazy_resource = parseScopedRouteConfigurationFromYaml(config_yaml2);
 
-  // Delta API.
-  const auto decoded_resources = TestUtility::decodeResources({lazy_resource, eager_resource});
-  context_init_manager_.initialize(init_watcher_);
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
+  srdsUpdateWithYaml({lazy_resource, eager_resource}, "1");
   EXPECT_EQ(1UL,
             server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
@@ -1055,17 +1062,18 @@ key:
 TEST_F(ScopedRdsTest, PushRdsAfterOndemandRequest) {
   setup();
   init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
   // Scope should be loaded eagerly by default.
-  const std::string config_yaml = R"EOF(
+  const std::string eager_resource = R"EOF(
 name: foo_scope
 route_configuration_name: foo_routes
 key:
   fragments:
     - string_key: x-foo-key
 )EOF";
-  const auto eager_resource = parseScopedRouteConfigurationFromYaml(config_yaml);
+
   // On demand scope should be loaded lazily.
-  const std::string config_yaml2 = R"EOF(
+  const std::string lazy_resource = R"EOF(
 name: foo_scope2
 route_configuration_name: foo_routes
 on_demand: true
@@ -1073,12 +1081,8 @@ key:
   fragments:
     - string_key: x-bar-key
 )EOF";
-  const auto lazy_resource = parseScopedRouteConfigurationFromYaml(config_yaml2);
 
-  // Delta API.
-  const auto decoded_resources = TestUtility::decodeResources({lazy_resource, eager_resource});
-  context_init_manager_.initialize(init_watcher_);
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
+  srdsUpdateWithYaml({eager_resource, lazy_resource}, "1");
   EXPECT_EQ(1UL,
             server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
@@ -1140,17 +1144,18 @@ key:
 TEST_F(ScopedRdsTest, PushRdsBeforeOndemandRequest) {
   setup();
   init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
   // Scope should be loaded eagerly by default.
-  const std::string config_yaml = R"EOF(
+  const std::string eager_resource = R"EOF(
 name: foo_scope
 route_configuration_name: foo_routes
 key:
   fragments:
     - string_key: x-foo-key
 )EOF";
-  const auto eager_resource = parseScopedRouteConfigurationFromYaml(config_yaml);
+
   // On demand scope should be loaded lazily.
-  const std::string config_yaml2 = R"EOF(
+  const std::string lazy_resource = R"EOF(
 name: foo_scope2
 route_configuration_name: foo_routes
 on_demand: true
@@ -1158,12 +1163,8 @@ key:
   fragments:
     - string_key: x-bar-key
 )EOF";
-  const auto lazy_resource = parseScopedRouteConfigurationFromYaml(config_yaml2);
 
-  // Delta API.
-  const auto decoded_resources = TestUtility::decodeResources({lazy_resource, eager_resource});
-  context_init_manager_.initialize(init_watcher_);
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
+  srdsUpdateWithYaml({eager_resource, lazy_resource}, "1");
   EXPECT_EQ(1UL,
             server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
@@ -1209,9 +1210,9 @@ key:
 TEST_F(ScopedRdsTest, UpdateOnDemandScopeToEagerScope) {
   setup();
   init_watcher_.expectReady();
-  // On demand scope should be loaded lazily.
   context_init_manager_.initialize(init_watcher_);
-  const std::string config_yaml2 = R"EOF(
+  // On demand scope should be loaded lazily.
+  const std::string lazy_resource = R"EOF(
 name: foo_scope
 route_configuration_name: foo_routes
 on_demand: true
@@ -1219,11 +1220,8 @@ key:
   fragments:
     - string_key: x-foo-key
 )EOF";
-  const auto lazy_resource = parseScopedRouteConfigurationFromYaml(config_yaml2);
 
-  const auto decoded_resources1 = TestUtility::decodeResources({lazy_resource});
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources1.refvec_, "1"));
-
+  srdsUpdateWithYaml({lazy_resource}, "1");
   ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
 
@@ -1239,16 +1237,14 @@ key:
                             Stats::Gauge::ImportMode::Accumulate)
                      .value());
   // The on demand scope will be overwritten.
-  const std::string config_yaml = R"EOF(
+  const std::string eager_resource = R"EOF(
 name: foo_scope
 route_configuration_name: foo_routes
 key:
   fragments:
     - string_key: x-foo-key
 )EOF";
-  const auto eager_resource = parseScopedRouteConfigurationFromYaml(config_yaml);
-  const auto decoded_resources2 = TestUtility::decodeResources({eager_resource});
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources2.refvec_, "2"));
+  srdsUpdateWithYaml({eager_resource}, "2");
   EXPECT_EQ(1UL, server_factory_context_.scope_
                      .gauge("foo.scoped_rds.foo_scoped_routes.all_scopes",
                             Stats::Gauge::ImportMode::Accumulate)
@@ -1284,18 +1280,16 @@ TEST_F(ScopedRdsTest, UpdateEagerScopeToOnDemandScope) {
   setup();
   init_watcher_.expectReady();
   context_init_manager_.initialize(init_watcher_);
-  // On demand scope should be loaded lazily.
-  const std::string config_yaml2 = R"EOF(
+
+  const std::string eager_resource = R"EOF(
 name: foo_scope
 route_configuration_name: foo_routes
 key:
   fragments:
     - string_key: x-foo-key
 )EOF";
-  const auto eager_resource = parseScopedRouteConfigurationFromYaml(config_yaml2);
 
-  const auto decoded_resources1 = TestUtility::decodeResources({eager_resource});
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources1.refvec_, "1"));
+  srdsUpdateWithYaml({eager_resource}, "1");
   EXPECT_EQ(1UL, server_factory_context_.scope_
                      .gauge("foo.scoped_rds.foo_scoped_routes.active_scopes",
                             Stats::Gauge::ImportMode::Accumulate)
@@ -1314,7 +1308,7 @@ key:
                 ->name(),
             "foo_routes");
   // Update the scope to on demand, rds provider and the route config will be deleted.
-  const std::string config_yaml = R"EOF(
+  const std::string lazy_resource = R"EOF(
   name: foo_scope
   route_configuration_name: foo_routes
   on_demand: true
@@ -1322,9 +1316,7 @@ key:
     fragments:
       - string_key: x-bar-key
   )EOF";
-  const auto lazy_resource = parseScopedRouteConfigurationFromYaml(config_yaml);
-  const auto decoded_resources2 = TestUtility::decodeResources({lazy_resource});
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources2.refvec_, "2"));
+  srdsUpdateWithYaml({lazy_resource}, "2");
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
               IsNull());
@@ -1341,14 +1333,15 @@ key:
                      .gauge("foo.scoped_rds.foo_scoped_routes.all_scopes",
                             Stats::Gauge::ImportMode::Accumulate)
                      .value());
-}
+} // namespace
 
 // Post on demand callbacks multiple times, all should be executed after rds update.
 TEST_F(ScopedRdsTest, MultipleOnDemandUpdatedCallback) {
   setup();
   init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
   // On demand scope should be loaded lazily.
-  const std::string config_yaml2 = R"EOF(
+  const std::string lazy_resource = R"EOF(
 name: foo_scope
 route_configuration_name: foo_routes
 on_demand: true
@@ -1356,12 +1349,7 @@ key:
   fragments:
     - string_key: x-foo-key
 )EOF";
-  const auto lazy_resource = parseScopedRouteConfigurationFromYaml(config_yaml2);
-
-  // Delta API.
-  const auto decoded_resources = TestUtility::decodeResources({lazy_resource});
-  context_init_manager_.initialize(init_watcher_);
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
+  srdsUpdateWithYaml({lazy_resource}, "1");
 
   EXPECT_EQ(0UL, server_factory_context_.scope_
                      .gauge("foo.scoped_rds.foo_scoped_routes.active_scopes",
@@ -1428,8 +1416,9 @@ TEST_F(ScopedRdsTest, DanglingSubscriptionOnDemandUpdate) {
 TEST_F(ScopedRdsTest, OnDemandScopeDeleted) {
   setup();
   init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
   // On demand scope should be loaded lazily.
-  const std::string config_yaml2 = R"EOF(
+  const std::string lazy_resource = R"EOF(
 name: foo_scope
 route_configuration_name: foo_routes
 on_demand: true
@@ -1437,13 +1426,8 @@ key:
   fragments:
     - string_key: x-foo-key
 )EOF";
-  const auto lazy_resource = parseScopedRouteConfigurationFromYaml(config_yaml2);
 
-  // Delta API.
-  const auto decoded_resources = TestUtility::decodeResources({lazy_resource});
-  context_init_manager_.initialize(init_watcher_);
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
-
+  srdsUpdateWithYaml({lazy_resource}, "1");
   EXPECT_EQ(0UL, server_factory_context_.scope_
                      .gauge("foo.scoped_rds.foo_scoped_routes.active_scopes",
                             Stats::Gauge::ImportMode::Accumulate)
