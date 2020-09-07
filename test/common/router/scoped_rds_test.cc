@@ -958,7 +958,7 @@ key:
 }
 
 // Compare behavior of a lazy scope and an eager scope scopes that share that same route
-// configuration. roue config of on demand scope shouldn't be loaded.
+// configuration. Route config of on demand scope shouldn't be loaded.
 TEST_F(ScopedRdsTest, OnDemandScopeNotLoadedWithoutRequest) {
   setup();
   init_watcher_.expectReady();
