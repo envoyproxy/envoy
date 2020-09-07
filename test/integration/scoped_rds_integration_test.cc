@@ -132,7 +132,6 @@ fragments:
   void resetFakeUpstreamInfo(FakeUpstreamInfo* upstream_info) {
     ASSERT(upstream_info->upstream_ != nullptr);
 
-    upstream_info->upstream_->set_allow_unexpected_disconnects(true);
     AssertionResult result = upstream_info->connection_->close();
     RELEASE_ASSERT(result, result.message());
     result = upstream_info->connection_->waitForDisconnect();

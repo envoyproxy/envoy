@@ -444,6 +444,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/server:request_id_extension_config_interface",
+        "//source/common/common:random_generator_lib",
         "//source/common/config:utility_lib",
         "//source/common/runtime:runtime_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
