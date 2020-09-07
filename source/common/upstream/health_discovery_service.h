@@ -29,6 +29,8 @@
 namespace Envoy {
 namespace Upstream {
 
+using HostsMapKey = std::pair<uint64_t, uint64_t>;
+
 class ProdClusterInfoFactory : public ClusterInfoFactory, Logger::Loggable<Logger::Id::upstream> {
 public:
   ClusterInfoConstSharedPtr createClusterInfo(const CreateClusterInfoParams& params) override;
@@ -99,11 +101,10 @@ private:
 
   HostVectorSharedPtr hosts_;
   HostsPerLocalitySharedPtr hosts_per_locality_;
-  std::unique_ptr<absl::flat_hash_map<uint64_t, HostSharedPtr>> hosts_map_;
+  absl::flat_hash_map<HostsMapKey, HostSharedPtr> hosts_map_;
   ClusterInfoConstSharedPtr info_;
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers_;
-  std::unique_ptr<absl::flat_hash_map<uint64_t, Upstream::HealthCheckerSharedPtr>>
-      health_checkers_map_;
+  absl::flat_hash_map<uint64_t, Upstream::HealthCheckerSharedPtr> health_checkers_map_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 
   void updateHealthchecks(
@@ -204,8 +205,8 @@ private:
 
   std::vector<std::string> clusters_;
   std::vector<HdsClusterPtr> hds_clusters_;
-  std::unique_ptr<absl::flat_hash_map<uint64_t, HdsClusterPtr>> hds_clusters_hash_map_;
-  std::unique_ptr<absl::flat_hash_map<std::string, HdsClusterPtr>> hds_clusters_name_map_;
+  absl::flat_hash_map<uint64_t, HdsClusterPtr> hds_clusters_hash_map_;
+  absl::flat_hash_map<std::string, HdsClusterPtr> hds_clusters_name_map_;
 
   Event::TimerPtr hds_stream_response_timer_;
   Event::TimerPtr hds_retry_timer_;

@@ -47,10 +47,6 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
       ssl_context_manager_(ssl_context_manager), random_(random), info_factory_(info_factory),
       access_log_manager_(access_log_manager), cm_(cm), local_info_(local_info), admin_(admin),
       singleton_manager_(singleton_manager), tls_(tls), specifier_hash_(0),
-      hds_clusters_hash_map_(
-          std::make_unique<absl::flat_hash_map<uint64_t, Envoy::Upstream::HdsClusterPtr>>()),
-      hds_clusters_name_map_(
-          std::make_unique<absl::flat_hash_map<std::string, Envoy::Upstream::HdsClusterPtr>>()),
       validation_visitor_(validation_visitor), api_(api) {
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       local_info_.node());
@@ -238,18 +234,16 @@ void HdsDelegate::processMessage(
   ASSERT(message);
   std::vector<HdsClusterPtr> hds_clusters;
   // Maps to replace the current member variable versions.
-  std::unique_ptr<absl::flat_hash_map<uint64_t, HdsClusterPtr>> new_hds_clusters_hash_map =
-      std::make_unique<absl::flat_hash_map<uint64_t, HdsClusterPtr>>();
-  std::unique_ptr<absl::flat_hash_map<std::string, HdsClusterPtr>> new_hds_clusters_name_map =
-      std::make_unique<absl::flat_hash_map<std::string, HdsClusterPtr>>();
+  absl::flat_hash_map<uint64_t, HdsClusterPtr> new_hds_clusters_hash_map;
+  absl::flat_hash_map<std::string, HdsClusterPtr> new_hds_clusters_name_map;
 
   for (const auto& cluster_health_check : message->cluster_health_checks()) {
     const uint64_t cluster_config_hash = MessageUtil::hash(cluster_health_check);
     HdsClusterPtr cluster_ptr;
 
     // If this cluster with the exact configuration is already being tracked, skip it.
-    auto cluster_map_pair = hds_clusters_hash_map_->find(cluster_config_hash);
-    if (cluster_map_pair != hds_clusters_hash_map_->end()) {
+    auto cluster_map_pair = hds_clusters_hash_map_.find(cluster_config_hash);
+    if (cluster_map_pair != hds_clusters_hash_map_.end()) {
       // This cluster with the exact same configuration already exists, so just reuse it.
       ENVOY_LOG(debug, "HDS Cluster already exists with this configuration, skipping.");
       cluster_ptr = cluster_map_pair->second;
@@ -261,8 +255,8 @@ void HdsDelegate::processMessage(
       // this particular cluster exists in the name map. We check and if we found a match,
       // attempt to update this cluster. If no match was found, either the cluster name is empty
       // or we have not seen a cluster by this name before. In either case, create a new cluster.
-      auto cluster_map_pair = hds_clusters_name_map_->find(cluster_health_check.cluster_name());
-      if (cluster_map_pair != hds_clusters_name_map_->end()) {
+      auto cluster_map_pair = hds_clusters_name_map_.find(cluster_health_check.cluster_name());
+      if (cluster_map_pair != hds_clusters_name_map_.end()) {
         // We have a previous cluster with this name, update.
         cluster_ptr = tryUpdateHdsCluster(cluster_map_pair->second, cluster_config);
       } else {
@@ -276,12 +270,12 @@ void HdsDelegate::processMessage(
     // future.
     if (!cluster_health_check.cluster_name().empty()) {
       // Since this cluster has a name, add it to our by-name map.
-      hds_clusters_name_map_->insert({cluster_health_check.cluster_name(), cluster_ptr});
+      hds_clusters_name_map_.insert({cluster_health_check.cluster_name(), cluster_ptr});
     }
 
     // Add to our remaining data structures.
     hds_clusters.push_back(cluster_ptr);
-    new_hds_clusters_hash_map->insert({cluster_config_hash, cluster_ptr});
+    new_hds_clusters_hash_map.insert({cluster_config_hash, cluster_ptr});
   }
 
   // Overwrite our map data structures.
@@ -352,11 +346,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : runtime_(runtime), cluster_(std::move(cluster)), bind_config_(bind_config), stats_(stats),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
-      hosts_(new HostVector()),
-      hosts_map_(std::make_unique<absl::flat_hash_map<uint64_t, HostSharedPtr>>()),
-      health_checkers_map_(
-          std::make_unique<absl::flat_hash_map<uint64_t, Upstream::HealthCheckerSharedPtr>>()),
-      validation_visitor_(validation_visitor) {
+      hosts_(new HostVector()), validation_visitor_(validation_visitor) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
   config_hash_ = MessageUtil::hash(cluster_);
@@ -374,12 +364,13 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
 
   // Iterate over every endpoint in every cluster.
   for (const auto& locality_endpoints : cluster_.load_assignment().endpoints()) {
+    const auto locality_hash = MessageUtil::hash(locality_endpoints.locality());
     // Add a locality grouping to the hosts sorted by locality.
     hosts_by_locality.emplace_back();
     hosts_by_locality.back().reserve(locality_endpoints.lb_endpoints_size());
 
     for (const auto& host : locality_endpoints.lb_endpoints()) {
-      const auto endpoint_hash = MessageUtil::hash(host);
+      const HostsMapKey endpoint_key = {locality_hash, MessageUtil::hash(host)};
       // Initialize an endpoint host object.
       HostSharedPtr endpoint = std::make_shared<HostImpl>(
           info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()), nullptr, 1,
@@ -392,7 +383,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
       // requested by locality.
       hosts_by_locality.back().push_back(endpoint);
       // Add this host/endpoint pointer to our map so we can rebuild this later.
-      hosts_map_->insert({endpoint_hash, endpoint});
+      hosts_map_.insert({endpoint_key, endpoint});
     }
   }
   // Create the HostsPerLocality.
@@ -439,26 +430,24 @@ void HdsCluster::updateHealthchecks(
     AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime,
     Random::RandomGenerator& random, Event::Dispatcher& dispatcher, Api::Api& api) {
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers;
-  std::unique_ptr<absl::flat_hash_map<uint64_t, Upstream::HealthCheckerSharedPtr>>
-      health_checkers_map =
-          std::make_unique<absl::flat_hash_map<uint64_t, Upstream::HealthCheckerSharedPtr>>();
+  absl::flat_hash_map<uint64_t, Upstream::HealthCheckerSharedPtr> health_checkers_map;
 
   for (auto& health_check : health_checks) {
-    const uint64_t hash = MessageUtil::hash(health_check);
-
+    uint64_t health_check_hash = MessageUtil::hash(health_check);
     // Check to see if this exact same health_check config already has a health checker.
-    auto health_checker = health_checkers_map_->find(hash);
-    if (health_checker != health_checkers_map_->end()) {
+    auto health_checker = health_checkers_map_.find(health_check_hash);
+    if (health_checker != health_checkers_map_.end()) {
       // If it does, use it.
-      health_checkers_map->insert({hash, health_checker->second});
+      health_checkers_map.insert({health_check_hash, health_checker->second});
       health_checkers.push_back(health_checker->second);
     } else {
       // If it does not, create a new one.
       auto new_health_checker =
           Upstream::HealthCheckerFactory::create(health_check, *this, runtime, random, dispatcher,
                                                  access_log_manager, validation_visitor_, api);
-      health_checkers_map->insert({hash, new_health_checker});
+      health_checkers_map.insert({health_check_hash, new_health_checker});
       health_checkers.push_back(new_health_checker);
+      new_health_checker->start();
     }
   }
 
@@ -474,16 +463,17 @@ void HdsCluster::updateHosts(
   std::vector<HostSharedPtr> hosts_added;
   std::vector<HostSharedPtr> hosts_removed;
   std::vector<HostVector> hosts_by_locality;
-  std::unique_ptr<absl::flat_hash_map<uint64_t, HostSharedPtr>> hosts_map =
-      std::make_unique<absl::flat_hash_map<uint64_t, HostSharedPtr>>();
+  absl::flat_hash_map<HostsMapKey, HostSharedPtr> hosts_map;
 
   for (auto& endpoints : locality_endpoints) {
+    uint64_t locality_hash = MessageUtil::hash(endpoints.locality());
     hosts_by_locality.emplace_back();
     for (auto& endpoint : endpoints.lb_endpoints()) {
-      const uint64_t endpoint_hash = MessageUtil::hash(endpoint);
-      auto host_pair = hosts_map_->find(endpoint_hash);
+      HostsMapKey endpoint_key = {locality_hash, MessageUtil::hash(endpoint)};
+
+      auto host_pair = hosts_map_.find(endpoint_key);
       HostSharedPtr host;
-      if (host_pair != hosts_map->end()) {
+      if (host_pair != hosts_map_.end()) {
         host = host_pair->second;
       } else {
         auto new_host = std::make_shared<HostImpl>(
@@ -496,12 +486,12 @@ void HdsCluster::updateHosts(
       }
       hosts_by_locality.back().push_back(host);
       hosts->push_back(host);
-      hosts_map->insert({endpoint_hash, host});
+      hosts_map.insert({endpoint_key, host});
     }
   }
 
-  for (auto& host_pair : *hosts_map_) {
-    if (!hosts_map->contains(host_pair.first)) {
+  for (auto& host_pair : hosts_map_) {
+    if (!hosts_map.contains(host_pair.first)) {
       hosts_removed.push_back(host_pair.second);
     }
   }
@@ -542,10 +532,14 @@ void HdsCluster::initHealthchecks(AccessLog::AccessLogManager& access_log_manage
                                   Runtime::Loader& runtime, Random::RandomGenerator& random,
                                   Event::Dispatcher& dispatcher, Api::Api& api) {
   for (auto& health_check : cluster_.health_checks()) {
-    health_checkers_.push_back(
+    const uint64_t health_check_hash = MessageUtil::hash(health_check);
+    auto health_checker =
         Upstream::HealthCheckerFactory::create(health_check, *this, runtime, random, dispatcher,
-                                               access_log_manager, validation_visitor_, api));
-    health_checkers_.back()->start();
+                                               access_log_manager, validation_visitor_, api);
+
+    health_checkers_.push_back(health_checker);
+    health_checkers_map_.insert({health_check_hash, health_checker});
+    health_checker->start();
   }
 }
 
