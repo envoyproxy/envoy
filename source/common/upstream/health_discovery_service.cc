@@ -236,7 +236,7 @@ void HdsDelegate::processMessage(
     std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
   ASSERT(message);
-
+  std::vector<HdsClusterPtr> hds_clusters;
   // Maps to replace the current member variable versions.
   std::unique_ptr<absl::flat_hash_map<uint64_t, HdsClusterPtr>> new_hds_clusters_hash_map =
       std::make_unique<absl::flat_hash_map<uint64_t, HdsClusterPtr>>();
@@ -280,13 +280,14 @@ void HdsDelegate::processMessage(
     }
 
     // Add to our remaining data structures.
-    hds_clusters_.push_back(cluster_ptr);
+    hds_clusters.push_back(cluster_ptr);
     new_hds_clusters_hash_map->insert({cluster_config_hash, cluster_ptr});
   }
 
   // Overwrite our map data structures.
   hds_clusters_hash_map_ = std::move(new_hds_clusters_hash_map);
   hds_clusters_name_map_ = std::move(new_hds_clusters_name_map);
+  hds_clusters_ = std::move(hds_clusters);
 }
 
 void HdsDelegate::onReceiveMessage(
@@ -312,9 +313,6 @@ void HdsDelegate::onReceiveMessage(
     // Do not continue processing message
     return;
   }
-
-  // Reset
-  hds_clusters_.clear();
 
   // Set response
   auto server_response_ms = PROTOBUF_GET_MS_OR_DEFAULT(*message, interval, 1000);
