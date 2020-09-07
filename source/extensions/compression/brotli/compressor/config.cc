@@ -13,7 +13,7 @@ const uint32_t DefaultInputBlockBits = 24;
 // Default compression window size.
 const uint32_t DefaultWindowBits = 22;
 
-// Default quality. The actual value passed to the compressor is decrimented by
+// Default quality. The actual value passed to the compressor is decremented by
 // one.
 const uint32_t DefaultQuality = 12;
 

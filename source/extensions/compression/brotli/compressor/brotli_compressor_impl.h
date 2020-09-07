@@ -20,8 +20,8 @@ public:
    * Generic: in this mode compressor does not know anything in advance about the properties of the
    * input;
    * Text: compression mode for UTF-8 formatted text input;
-   * Font: compression mode used in WOFF 2.0;
-   * Default: compression mode used by Broli encoder by default.
+   * Font: compression mode used in `WOFF` 2.0;
+   * Default: compression mode used by `Broli` encoder by default.
    * @see BROTLI_DEFAULT_MODE in brotli manual.
    */
   enum class EncoderMode : uint32_t {
@@ -37,7 +37,7 @@ public:
    * default constructor, is desired.
    * @param quality sets compression level. The higher the quality, the slower the
    * compression. @see BROTLI_PARAM_QUALITY (brotli manual).
-   * @param window_bits sets recommended sliding LZ77 window size.
+   * @param window_bits sets recommended sliding `LZ77` window size.
    * @param input_block_bits sets recommended input block size. Bigger input block size allows
    * better compression, but consumes more memory.
    * @param disable_literal_context_modeling affects usage of "literal context modeling" format
