@@ -515,5 +515,70 @@ void HttpHealthCheckerImplTest::expectSuccessStartFailedFailFirst(
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
+void TcpHealthCheckerImplTestBase::expectClientCreate() {
+  connection_ = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+      .WillOnce(testing::Return(connection_));
+  EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(testing::SaveArg<0>(&read_filter_));
+}
+
+void TcpHealthCheckerImplTest::allocHealthChecker(const std::string& yaml, bool avoid_boosting) {
+  health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
+      *cluster_, parseHealthCheckFromV3Yaml(yaml, avoid_boosting), dispatcher_, runtime_, random_,
+      HealthCheckEventLoggerPtr(event_logger_storage_.release()));
+}
+
+void TcpHealthCheckerImplTest::setupData(unsigned int unhealthy_threshold) {
+  std::ostringstream yaml;
+  yaml << R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: )EOF"
+       << unhealthy_threshold << R"EOF(
+    healthy_threshold: 2
+    tcp_health_check:
+      send:
+        text: "01"
+      receive:
+      - text: "02"
+    )EOF";
+
+  allocHealthChecker(yaml.str());
+}
+
+void TcpHealthCheckerImplTest::setupNoData() {
+  std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    tcp_health_check: {}
+    )EOF";
+
+  allocHealthChecker(yaml);
+}
+
+void TcpHealthCheckerImplTest::setupDataDontReuseConnection() {
+  std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    reuse_connection: false
+    tcp_health_check:
+      send:
+        text: "01"
+      receive:
+      - text: "02"
+    )EOF";
+
+  allocHealthChecker(yaml);
+}
+
+void TcpHealthCheckerImplTest::expectSessionCreate() {
+  interval_timer_ = new Event::MockTimer(&dispatcher_);
+  timeout_timer_ = new Event::MockTimer(&dispatcher_);
+}
+
 } // namespace Upstream
 } // namespace Envoy

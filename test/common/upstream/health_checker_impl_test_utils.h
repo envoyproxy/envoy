@@ -126,5 +126,30 @@ public:
   MOCK_METHOD(void, onHostStatus, (HostSharedPtr host, HealthTransition changed_state));
 };
 
+class TcpHealthCheckerImplTestBase : public HealthCheckerTestBase {
+public:
+  void expectClientCreate();
+
+  std::shared_ptr<TcpHealthCheckerImpl> health_checker_;
+  Network::MockClientConnection* connection_{};
+  Network::ReadFilterSharedPtr read_filter_;
+};
+
+class TcpHealthCheckerImplTest : public testing::Test, public TcpHealthCheckerImplTestBase {
+public:
+  void allocHealthChecker(const std::string& yaml, bool avoid_boosting = true);
+
+  void setupData(unsigned int unhealthy_threshold = 2);
+
+  void setupNoData();
+
+  void setupDataDontReuseConnection();
+
+  void expectSessionCreate();
+
+  Event::MockTimer* timeout_timer_{};
+  Event::MockTimer* interval_timer_{};
+};
+
 } // namespace Upstream
 } // namespace Envoy

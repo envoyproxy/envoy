@@ -1,3 +1,4 @@
+ 
 health_check_config {
     timeout {
         seconds: 1
@@ -14,7 +15,7 @@ health_check_config {
     unhealthy_threshold {
         value: 2
     }
-    healthy_threshold: {
+    healthy_threshold {
         value: 2
     }
     http_health_check {
@@ -37,3 +38,18 @@ actions {
         }
     }
 }
+actions {
+    respond {
+        http_respond {
+            headers {
+                headers {
+                    key: ":status"
+                    value: "200"
+                }
+            }
+            status: "200"
+        }
+        second_host: true
+    }
+}
+create_second_host : true

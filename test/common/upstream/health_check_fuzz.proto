@@ -5,6 +5,7 @@ package test.common.upstream;
 import "validate/validate.proto";
 import "test/fuzz/common.proto";
 import "envoy/config/core/v3/health_check.proto";
+import "google/protobuf/empty.proto";
 
 message HttpRespond { //TODO: Split this across headers, body, and trailers?
   test.fuzz.Headers headers = 1;
@@ -12,8 +13,13 @@ message HttpRespond { //TODO: Split this across headers, body, and trailers?
   string status = 2 [(validate.rules).string.pattern = "[0-9]+$*"];
 }
 
+message TcpRespond {
+  bytes data = 1; //aribitrary length byte string
+}
+
 message Respond {
   HttpRespond http_respond = 1;
+  TcpRespond tcp_respond = 2;
   //TODO: TCP and gRPC Respond
   bool second_host = 4;
 }
@@ -26,12 +32,22 @@ message AdvanceTime {
   int32 ms_advanced = 1 [(validate.rules).int32 = {gt: 0 lt: 3600000}]; //Capped at one hour
 }
 
+message RaiseEvent {
+  oneof event_selector {
+    google.protobuf.Empty connected = 1;
+    google.protobuf.Empty remote_close = 2;
+    google.protobuf.Empty local_close = 3;
+  }
+  bool second_host = 4;
+}
+
 message Action {
   oneof action_selector {
     Respond respond = 1;
     StreamCreate stream_create = 2;
     //TODO: respondBody, respondTrailers
     AdvanceTime advance_time = 3;
+    RaiseEvent raise_event = 4;
   }
 }
 
