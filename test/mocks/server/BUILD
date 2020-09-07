@@ -76,6 +76,16 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
+    name = "watchdog_config_mocks",
+    srcs = ["watchdog_config.cc"],
+    hdrs = ["watchdog_config.h"],
+    deps = [
+        "//include/envoy/server:configuration_interface",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_mock(
     name = "guard_dog_mocks",
     srcs = ["guard_dog.cc"],
     hdrs = ["guard_dog.h"],
@@ -192,12 +202,10 @@ envoy_cc_mock(
 
 envoy_cc_mock(
     name = "main_mocks",
-    srcs = ["main.cc"],
     hdrs = ["main.h"],
     deps = [
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:overload_manager_interface",
-        "//test/test_common:utility_lib",
     ],
 )
 

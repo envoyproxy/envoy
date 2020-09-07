@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/time.h"
+#include "envoy/server/configuration.h"
 #include "envoy/server/guarddog_config.h"
 #include "envoy/server/watchdog.h"
 #include "envoy/thread/thread.h"
@@ -17,7 +18,7 @@
 #include "server/guarddog_impl.h"
 
 #include "test/mocks/common.h"
-#include "test/mocks/server/main.h"
+#include "test/mocks/server/watchdog_config.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
@@ -82,7 +83,7 @@ protected:
     return std::make_unique<Event::SimulatedTimeSystem>();
   }
 
-  void initGuardDog(Stats::Scope& stats_scope, const Server::Configuration::Main& config) {
+  void initGuardDog(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config) {
     guard_dog_ = std::make_unique<GuardDogImpl>(stats_scope, config, *api_,
                                                 std::make_unique<DebugTestInterlock>());
   }
@@ -166,9 +167,9 @@ protected:
     time_system_->advanceTimeWait(std::chrono::milliseconds(499)); // 1 ms shy of multi-death.
   }
 
-  NiceMock<Configuration::MockMain> config_kill_;
-  NiceMock<Configuration::MockMain> config_multikill_;
-  NiceMock<Configuration::MockMain> config_multikill_threshold_;
+  NiceMock<Configuration::MockWatchdog> config_kill_;
+  NiceMock<Configuration::MockWatchdog> config_multikill_;
+  NiceMock<Configuration::MockWatchdog> config_multikill_threshold_;
   NiceMock<Stats::MockStore> fakestats_;
   WatchDogSharedPtr unpet_dog_;
   WatchDogSharedPtr second_dog_;
@@ -293,8 +294,8 @@ protected:
         << descriptor;
   }
 
-  NiceMock<Configuration::MockMain> config_miss_;
-  NiceMock<Configuration::MockMain> config_mega_;
+  NiceMock<Configuration::MockWatchdog> config_miss_;
+  NiceMock<Configuration::MockWatchdog> config_mega_;
 };
 
 INSTANTIATE_TEST_SUITE_P(TimeSystemType, GuardDogMissTest,
@@ -394,27 +395,27 @@ TEST_P(GuardDogMissTest, MissCountTest) {
 
 TEST_P(GuardDogTestBase, StartStopTest) {
   NiceMock<Stats::MockStore> stats;
-  NiceMock<Configuration::MockMain> config(0, 0, 0, 0, 0, std::vector<std::string>{});
+  NiceMock<Configuration::MockWatchdog> config(0, 0, 0, 0, 0, std::vector<std::string>{});
   initGuardDog(stats, config);
 }
 
 TEST_P(GuardDogTestBase, LoopIntervalNoKillTest) {
   NiceMock<Stats::MockStore> stats;
-  NiceMock<Configuration::MockMain> config(40, 50, 0, 0, 0, std::vector<std::string>{});
+  NiceMock<Configuration::MockWatchdog> config(40, 50, 0, 0, 0, std::vector<std::string>{});
   initGuardDog(stats, config);
   EXPECT_EQ(guard_dog_->loopIntervalForTest(), std::chrono::milliseconds(40));
 }
 
 TEST_P(GuardDogTestBase, LoopIntervalTest) {
   NiceMock<Stats::MockStore> stats;
-  NiceMock<Configuration::MockMain> config(100, 90, 1000, 500, 0, std::vector<std::string>{});
+  NiceMock<Configuration::MockWatchdog> config(100, 90, 1000, 500, 0, std::vector<std::string>{});
   initGuardDog(stats, config);
   EXPECT_EQ(guard_dog_->loopIntervalForTest(), std::chrono::milliseconds(90));
 }
 
 TEST_P(GuardDogTestBase, WatchDogThreadIdTest) {
   NiceMock<Stats::MockStore> stats;
-  NiceMock<Configuration::MockMain> config(100, 90, 1000, 500, 0, std::vector<std::string>{});
+  NiceMock<Configuration::MockWatchdog> config(100, 90, 1000, 500, 0, std::vector<std::string>{});
   initGuardDog(stats, config);
   auto watched_dog =
       guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
@@ -579,7 +580,7 @@ protected:
       )EOF"};
   }
 
-  void setupFirstDog(const NiceMock<Configuration::MockMain>& config, Thread::ThreadId tid) {
+  void setupFirstDog(const NiceMock<Configuration::MockWatchdog>& config, Thread::ThreadId tid) {
     initGuardDog(fake_stats_, config);
     first_dog_ = guard_dog_->createWatchDog(tid, "test_thread");
     guard_dog_->forceCheckForTest();
@@ -600,8 +601,8 @@ INSTANTIATE_TEST_SUITE_P(TimeSystemType, GuardDogActionsTest,
                          testing::ValuesIn({TimeSystemType::Real, TimeSystemType::Simulated}));
 
 TEST_P(GuardDogActionsTest, MissShouldOnlyReportRelevantThreads) {
-  const NiceMock<Configuration::MockMain> config(100, DISABLE_MEGAMISS, DISABLE_KILL,
-                                                 DISABLE_MULTIKILL, 0, getActionsConfig());
+  const NiceMock<Configuration::MockWatchdog> config(100, DISABLE_MEGAMISS, DISABLE_KILL,
+                                                     DISABLE_MULTIKILL, 0, getActionsConfig());
   setupFirstDog(config, Thread::ThreadId(10));
   second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
   time_system_->advanceTimeWait(std::chrono::milliseconds(50));
@@ -618,8 +619,8 @@ TEST_P(GuardDogActionsTest, MissShouldOnlyReportRelevantThreads) {
 }
 
 TEST_P(GuardDogActionsTest, MissShouldBeAbleToReportMultipleThreads) {
-  const NiceMock<Configuration::MockMain> config(100, DISABLE_MEGAMISS, DISABLE_KILL,
-                                                 DISABLE_MULTIKILL, 0, getActionsConfig());
+  const NiceMock<Configuration::MockWatchdog> config(100, DISABLE_MEGAMISS, DISABLE_KILL,
+                                                     DISABLE_MULTIKILL, 0, getActionsConfig());
   initGuardDog(fake_stats_, config);
   first_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread");
   second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
@@ -639,8 +640,8 @@ TEST_P(GuardDogActionsTest, MissShouldBeAbleToReportMultipleThreads) {
 }
 
 TEST_P(GuardDogActionsTest, MissShouldSaturateOnMissEvent) {
-  const NiceMock<Configuration::MockMain> config(100, DISABLE_MISS, DISABLE_KILL, DISABLE_MULTIKILL,
-                                                 0, getActionsConfig());
+  const NiceMock<Configuration::MockWatchdog> config(100, DISABLE_MISS, DISABLE_KILL,
+                                                     DISABLE_MULTIKILL, 0, getActionsConfig());
   setupFirstDog(config, Thread::ThreadId(10));
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
@@ -661,8 +662,8 @@ TEST_P(GuardDogActionsTest, MissShouldSaturateOnMissEvent) {
 }
 
 TEST_P(GuardDogActionsTest, MegaMissShouldOnlyReportRelevantThreads) {
-  const NiceMock<Configuration::MockMain> config(DISABLE_MISS, 100, DISABLE_KILL, DISABLE_MULTIKILL,
-                                                 0, getActionsConfig());
+  const NiceMock<Configuration::MockWatchdog> config(DISABLE_MISS, 100, DISABLE_KILL,
+                                                     DISABLE_MULTIKILL, 0, getActionsConfig());
   setupFirstDog(config, Thread::ThreadId(10));
   second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
   time_system_->advanceTimeWait(std::chrono::milliseconds(50));
@@ -679,8 +680,8 @@ TEST_P(GuardDogActionsTest, MegaMissShouldOnlyReportRelevantThreads) {
 }
 
 TEST_P(GuardDogActionsTest, MegaMissShouldBeAbleToReportMultipleThreads) {
-  const NiceMock<Configuration::MockMain> config(DISABLE_MISS, 100, DISABLE_KILL, DISABLE_MULTIKILL,
-                                                 0, getActionsConfig());
+  const NiceMock<Configuration::MockWatchdog> config(DISABLE_MISS, 100, DISABLE_KILL,
+                                                     DISABLE_MULTIKILL, 0, getActionsConfig());
   initGuardDog(fake_stats_, config);
   first_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread");
   second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
@@ -701,8 +702,8 @@ TEST_P(GuardDogActionsTest, MegaMissShouldBeAbleToReportMultipleThreads) {
 }
 
 TEST_P(GuardDogActionsTest, MegaMissShouldSaturateOnMegaMissEvent) {
-  const NiceMock<Configuration::MockMain> config(DISABLE_MISS, 100, DISABLE_KILL, DISABLE_MULTIKILL,
-                                                 0, getActionsConfig());
+  const NiceMock<Configuration::MockWatchdog> config(DISABLE_MISS, 100, DISABLE_KILL,
+                                                     DISABLE_MULTIKILL, 0, getActionsConfig());
   setupFirstDog(config, Thread::ThreadId(10));
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
@@ -727,7 +728,7 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
 
   // Kill event should fire before the others
   auto kill_function = [&]() -> void {
-    const NiceMock<Configuration::MockMain> config(100, 100, 100, 100, 0, getActionsConfig());
+    const NiceMock<Configuration::MockWatchdog> config(100, 100, 100, 100, 0, getActionsConfig());
     initGuardDog(fake_stats_, config);
     auto first_dog = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread");
     auto second_dog = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
@@ -740,8 +741,8 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
 
   // Multikill event should fire before the others
   auto multikill_function = [&]() -> void {
-    const NiceMock<Configuration::MockMain> config(100, 100, DISABLE_KILL, 100, 0,
-                                                   getActionsConfig());
+    const NiceMock<Configuration::MockWatchdog> config(100, 100, DISABLE_KILL, 100, 0,
+                                                       getActionsConfig());
     initGuardDog(fake_stats_, config);
     auto first_dog = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread");
     auto second_dog = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
@@ -752,8 +753,8 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
   EXPECT_DEATH(multikill_function(), "ASSERT_GUARDDOG_ACTION");
 
   // We expect megamiss to fire before miss
-  const NiceMock<Configuration::MockMain> config(100, 100, DISABLE_KILL, DISABLE_MULTIKILL, 0,
-                                                 getActionsConfig());
+  const NiceMock<Configuration::MockWatchdog> config(100, 100, DISABLE_KILL, DISABLE_MULTIKILL, 0,
+                                                     getActionsConfig());
   setupFirstDog(config, Thread::ThreadId(10));
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
@@ -762,8 +763,8 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
 
 TEST_P(GuardDogActionsTest, KillShouldTriggerGuardDogActions) {
   auto die_function = [&]() -> void {
-    const NiceMock<Configuration::MockMain> config(DISABLE_MISS, DISABLE_MEGAMISS, 100, 0, 0,
-                                                   getActionsConfig());
+    const NiceMock<Configuration::MockWatchdog> config(DISABLE_MISS, DISABLE_MEGAMISS, 100, 0, 0,
+                                                       getActionsConfig());
     setupFirstDog(config, Thread::ThreadId(10));
     time_system_->advanceTimeWait(std::chrono::milliseconds(101));
     guard_dog_->forceCheckForTest();
@@ -774,8 +775,8 @@ TEST_P(GuardDogActionsTest, KillShouldTriggerGuardDogActions) {
 
 TEST_P(GuardDogActionsTest, MultikillShouldTriggerGuardDogActions) {
   auto die_function = [&]() -> void {
-    const NiceMock<Configuration::MockMain> config(DISABLE_MISS, DISABLE_MEGAMISS, DISABLE_KILL,
-                                                   100, 0, getActionsConfig());
+    const NiceMock<Configuration::MockWatchdog> config(DISABLE_MISS, DISABLE_MEGAMISS, DISABLE_KILL,
+                                                       100, 0, getActionsConfig());
     setupFirstDog(config, Thread::ThreadId(10));
     second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
     guard_dog_->forceCheckForTest();

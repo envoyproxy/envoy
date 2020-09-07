@@ -513,7 +513,8 @@ void InstanceImpl::initialize(const Options& options,
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, *api_);
+  guard_dog_ =
+      std::make_unique<Server::GuardDogImpl>(stats_store_, config_.watchdogConfig(), *api_);
 }
 
 void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
