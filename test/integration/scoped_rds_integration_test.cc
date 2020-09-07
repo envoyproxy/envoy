@@ -485,7 +485,6 @@ key:
   };
   initialize();
   registerTestServerPorts({"http"});
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   const std::string route_config_tmpl = R"EOF(
       name: {}
@@ -748,7 +747,6 @@ key:
   };
   initialize();
   registerTestServerPorts({"http"});
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   const std::string route_config_tmpl = R"EOF(
       name: {}
