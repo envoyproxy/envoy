@@ -365,6 +365,22 @@ elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."
   docs/build.sh
   exit 0
+elif [[ "$CI_TARGET" == "verify_examples" ]]; then
+  echo "verify examples..."
+  docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
+  images=($(docker image list --format "{{.Repository}}"))
+  tags=($(docker image list --format "{{.Tag}}"))
+  for i in "${!images[@]}"; do
+      if [[ "${images[i]}" =~ "envoy" ]]; then
+          docker tag "${images[$i]}:${tags[$i]}" "${images[$i]}:latest"
+      fi
+  done
+  docker images
+  sudo apt-get update -y
+  sudo apt-get install -y -qq --no-install-recommends redis-tools
+  export DOCKER_NO_PULL=1
+  ci/verify_examples.sh
+  exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."
   exit 1
