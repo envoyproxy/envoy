@@ -551,7 +551,8 @@ message HttpConnectionManager {
   // company-internal mesh) and false when receiving untrusted traffic (edge deployments).
   //
   // If different behaviors for invalid_http_message for HTTP/1 and HTTP/2 are
-  // desired, one *must* use the new HTTP/2 option
+  // desired, one should use the new HTTP/1 option :ref:`override_stream_error_on_invalid_http_message
+  // <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.override_stream_error_on_invalid_http_message>` or the new HTTP/2 option
   // :ref:`override_stream_error_on_invalid_http_message
   // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.override_stream_error_on_invalid_http_message>`
   // *not* the deprecated but similarly named :ref:`stream_error_on_invalid_http_messaging

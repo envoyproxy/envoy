@@ -13,7 +13,7 @@ sudo chmod +x /usr/local/bin/bazel
 
 On macOS, run the following command:
 ```
-brew install bazelbuild/tap/bazelisk
+brew install bazelisk
 ```
 
 On Windows, run the following commands:
@@ -36,6 +36,9 @@ independently sourced, the following steps should be followed:
 1. `bazel build -c opt //source/exe:envoy-static` from the repository root.
 
 ## Quick start Bazel build for developers
+
+This section describes how to and what dependencies to install to get started building Envoy with Bazel.
+If you would rather use a pre-build Docker image with required tools installed, skip to [this section](#building-envoy-with-the-ci-docker-image).
 
 As a developer convenience, a [WORKSPACE](https://github.com/envoyproxy/envoy/blob/master/WORKSPACE) and
 [rules for building a recent
@@ -112,12 +115,23 @@ for how to update or override dependencies.
     consider uninstalling binutils.
 
     ### Windows
-    On Windows, you'll need to install several dependencies manually.
 
-    [python3](https://www.python.org/downloads/): Specifically, the Windows-native flavor. The POSIX flavor
-    available via MSYS2 will not work, nor will the Windows Store flavor. You need to add a symlink for `python3.exe` pointing to
-    the installed `python.exe` for Bazel rules which follow POSIX conventions. Be sure to add
-    `pip.exe` to the PATH and install the `wheel` package.
+    Install bazelisk in the PATH using the `bazel.exe` executable name as described above in the first section.
+
+    When building Envoy, Bazel creates very long path names. One way to work around these excessive path
+    lengths is to change the output base directory for bazel to a very short root path. The CI pipeline
+    for Windows uses `C:\_eb` as the bazel base path. This and other preferences should be set up by placing
+    the following bazelrc configuration line in a system `%ProgramData%\bazel.bazelrc` file or the individual
+    user's `%USERPROFILE%\.bazelrc` file (rather than including it on every bazel command line):
+    ```
+    startup --output_base=C:/_eb
+    ```
+
+    [python3](https://www.python.org/downloads/): Specifically, the Windows-native flavor distributed
+    by python.org. The POSIX flavor available via MSYS2, the Windows Store flavor and other distributions
+    will not work. Add a symlink for `python3.exe` pointing to the installed `python.exe` for Envoy scripts
+    and Bazel rules which follow POSIX python conventions. Add `pip.exe` to the PATH and install the `wheel`
+    package.
     ```
     mklink %USERPROFILE%\Python38\python3.exe %USERPROFILE%\Python38\python.exe
     set PATH=%PATH%;%USERPROFILE%\Python38
@@ -127,19 +141,20 @@ for how to update or override dependencies.
 
     [Build Tools for Visual Studio 2019](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019):
     For building with MSVC (the `msvc-cl` config option), you must install at least the VC++ workload.
-    You may also download Visual Studio 2019 and use the Build Tools packaged with that
-    installation. Earlier versions of VC++ Build Tools/Visual Studio are not recommended at this
-    time. If installed in a non-standard filesystem location, be sure to set the `BAZEL_VC`
-    environment variable to the path of the VC++ package to allow Bazel to find your installation
-    of VC++. Use caution to ensure the `link.exe` that resolves on your PATH is from VC++ Build Tools and
-    not MSYS2.
+    You may alternately install the entire Visual Studio 2019 and use the Build Tools installed in that
+    package. Earlier versions of VC++ Build Tools/Visual Studio are not recommended or supported.
+    If installed in a non-standard filesystem location, be sure to set the `BAZEL_VC` environment variable
+    to the path of the VC++ package to allow Bazel to find your installation of VC++. NOTE: ensure that
+    the `link.exe` that resolves on your PATH is from VC++ Build Tools and not `/usr/bin/link.exe` from MSYS2.
     ```
     set BAZEL_VC=%USERPROFILE%\VSBT2019\VC
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\VC\Tools\MSVC\14.26.28801\bin\Hostx64\x64
     ```
 
     Ensure `CMake` and `ninja` binaries are on the PATH. The versions packaged with VC++ Build
-    Tools are sufficient.
+    Tools are sufficient in most cases, but are 32 bit binaries. These flavors will not run in
+    the project's GCP CI remote build environment, so 64 bit builds from the CMake and ninja
+    projects are used instead.
     ```
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja
@@ -154,29 +169,35 @@ for how to update or override dependencies.
     set BAZEL_SH=%USERPROFILE%\msys64\usr\bin\bash.exe
     set MSYS2_ARG_CONV_EXCL=*
     ```
-    In addition, because of the behavior of the `rules_foreign_cc` component of Bazel, set the
-    `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
-    `C:\Windows\TEMP`). This variable is used frequently by `mktemp` from MSYS2 in the Envoy Bazel
-    build and can cause problems if not set to a value outside the MSYS2 filesystem. Note that
-    using the `ci/windows_ci_steps.sh` script (to build and run tests) will create a directory
-    symlink linking `C:\c` to `C:\` in order to enable build scripts run via MSYS2 to access
-    dependencies in the temporary directory specified above. If you are not using that script, you
-    will need to create that symlink manually.
+
+    Set the `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
+    `C:\Windows\TEMP`), and create a directory symlink `C:\c` to `C:\`, so that the MSYS2
+    path `/c/Windows/TEMP` is equivalent to the Windows path `C:\Windows\TEMP`:
     ```
     set TMPDIR=C:\Windows\TEMP
     mklink /d C:\c C:\
     ```
+
+    The TMPDIR path and MSYS2 `mktemp` command are used frequently by the `rules_foreign_cc`
+    component of Bazel as well as Envoy's test scripts, causing problems if not set to a path
+    accessible to both Windows and msys commands. [Note the `ci/windows_ci_steps.sh` script
+    which builds envoy and run tests in CI) creates this symlink automatically.]
+
     In the MSYS2 shell, install additional packages via pacman:
     ```
     pacman -S diffutils patch unzip zip
     ```
 
-    [Git](https://git-scm.com/downloads): The version installable via MSYS2 is also sufficient.
+    [Git](https://git-scm.com/downloads): This version from the Git project, or the version
+    distributed using pacman under MSYS2 will both work, ensure one is on the PATH:.
     ```
     set PATH=%PATH%;%USERPROFILE%\Git\bin
     ```
 
-    Lastly, persist environment variable changes.
+    Lastly, persist environment variable changes. NOTE: The paths in this document are given as
+    examples, make sure to verify you are using the correct paths for your environment. Also note
+    that these examples assume using a `cmd.exe` shell to set environment variables etc., be sure
+    to do the equivalent if using a different shell.
     ```
     setx PATH "%PATH%"
     setx BAZEL_SH "%BAZEL_SH%"
@@ -203,7 +224,8 @@ On Linux, run:
 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
-On Windows:
+From a Windows host with Docker installed, the Windows containers feature enabled, and bash (installed via
+MSYS2 or Git bash), run:
 
 ```
 ./ci/run_envoy_docker_windows.sh './ci/windows_ci_steps.sh'
@@ -406,11 +428,15 @@ be installed.
 
 ```
 bazel build -c dbg //test/common/http:async_client_impl_test
+bazel build -c dbg //test/common/http:async_client_impl_test.dwp
 gdb bazel-bin/test/common/http/async_client_impl_test
 ```
 
-Without the `-c dbg` Bazel option at the end of the command line the test
-binaries will not include debugging symbols and GDB will not be very useful.
+We need to use `-c dbg` Bazel option to generate debugging symbols and without
+that GDB will not be very useful. The debugging symbols are stored as separate
+debugging information files (`.dwo` files) and we can build a DWARF package file
+with `.dwp ` target. The `.dwp` file need to be presented in the same folder with the
+binary for a full debugging experience.
 
 # Running Bazel tests requiring privileges
 
@@ -463,8 +489,8 @@ modes](https://docs.bazel.build/versions/master/user-manual.html#flag--compilati
 that Bazel supports:
 
 * `fastbuild`: `-O0`, aimed at developer speed (default).
-* `opt`: `-O2 -DNDEBUG -ggdb3`, for production builds and performance benchmarking.
-* `dbg`: `-O0 -ggdb3`, no optimization and debug symbols.
+* `opt`: `-O2 -DNDEBUG -ggdb3 -gsplit-dwarf`, for production builds and performance benchmarking.
+* `dbg`: `-O0 -ggdb3 -gsplit-dwarf`, no optimization and debug symbols.
 
 You can use the `-c <compilation_mode>` flag to control this, e.g.
 
@@ -500,10 +526,44 @@ If you have clang-5.0 or newer, additional checks are provided with:
 bazel test -c dbg --config=clang-asan //test/...
 ```
 
-Similarly, for [thread sanitizer (TSAN)](https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual) testing:
+[Thread sanitizer (TSAN)](https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual) tests rely on
+a TSAN-instrumented version of libc++ and can be run under the docker sandbox:
 
 ```
-bazel test -c dbg --config=clang-tsan //test/...
+bazel test -c dbg --config=docker-tsan //test/...
+```
+
+Alternatively, you can build a local copy of TSAN-instrumented libc++. Follow the [quick start](#quick-start-bazel-build-for-developers) instruction to setup Clang+LLVM environment. Download LLVM sources from the [LLVM official site](https://github.com/llvm/llvm-project)
+
+```
+curl -sSfL "https://github.com/llvm/llvm-project/archive/llvmorg-10.0.0.tar.gz" | tar zx
+
+```
+
+Configure and build a TSAN-instrumented libc++. Please note that `LLVM_USE_SANITIZER=Thread` preprocessor definition is used to enable TSAN instrumentation, and `CMAKE_INSTALL_PREFIX="/opt/libcxx_tsan"` defines the installation directory path.
+
+```
+mkdir tsan
+pushd tsan
+
+cmake -GNinja -DLLVM_ENABLE_PROJECTS="libcxxabi;libcxx" -DLLVM_USE_LINKER=lld -DLLVM_USE_SANITIZER=Thread -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_INSTALL_PREFIX="/opt/libcxx_tsan" "../llvm-project-llvmorg-10.0.0/llvm"
+ninja install-cxx install-cxxabi
+
+rm -rf /opt/libcxx_tsan/include
+```
+
+Generate local_tsan.bazelrc containing bazel configuration for tsan tests:
+
+```
+bazel/setup_local_tsan.sh </path/to/instrumented/libc++/home>
+
+```
+
+To execute TSAN tests using the local instrumented libc++ library pass `--config=local-tsan` to bazel:
+
+```
+bazel test --config=local-tsan //test/...
 ```
 
 For [memory sanitizer (MSAN)](https://github.com/google/sanitizers/wiki/MemorySanitizer) testing,
@@ -568,6 +628,8 @@ The following optional features can be enabled on the Bazel build command-line:
 * Process logging for Android applications can be enabled with `--define logger=android`.
 * Excluding assertions for known issues with `--define disable_known_issue_asserts=true`.
   A KNOWN_ISSUE_ASSERT is an assertion that should pass (like all assertions), but sometimes fails for some as-yet unidentified or unresolved reason. Because it is known to potentially fail, it can be compiled out even when DEBUG is true, when this flag is set. This allows Envoy to be run in production with assertions generally enabled, without crashing for known issues. KNOWN_ISSUE_ASSERT should only be used for newly-discovered issues that represent benign violations of expectations.
+* Envoy can be linked to [`zlib-ng`](https://github.com/zlib-ng/zlib-ng) instead of
+  [`zlib`](https://zlib.net) with `--define zlib=ng`.
 
 ## Disabling extensions
 
@@ -614,10 +676,8 @@ local_repository(
 ## Extra extensions
 
 If you are building your own Envoy extensions or custom Envoy builds and encounter visibility
-problems with, you may need to adjust the default visibility rules.
-By default, Envoy extensions are set up to only be visible to code within the
-[//source/extensions](../source/extensions/), or the Envoy server target. To adjust this,
-add any additional targets you need to `ADDITIONAL_VISIBILITY` in
+problems with, you may need to adjust the default visibility rules to be public,
+as documented in
 [extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
 See the instructions above about how to create your own custom version of
 [extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).

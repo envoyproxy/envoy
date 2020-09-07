@@ -146,6 +146,12 @@ struct LookupResult {
   // TODO(toddmgreer): Implement trailer support.
   // True if the cached response has trailers.
   bool has_trailers_ = false;
+
+  // Update the content length of the object and its response headers.
+  void setContentLength(uint64_t new_length) {
+    content_length_ = new_length;
+    headers_->setContentLength(new_length);
+  }
 };
 using LookupResultPtr = std::unique_ptr<LookupResult>;
 
@@ -169,10 +175,9 @@ size_t stableHashKey(const Key& key);
 // to determine what ranges are needed.
 class LookupRequest {
 public:
-  using HeaderVector = std::vector<Http::HeaderEntry>;
-
   // Prereq: request_headers's Path(), Scheme(), and Host() are non-null.
-  LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp);
+  LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
+                const absl::flat_hash_set<std::string>& allowed_vary_headers);
 
   const RequestCacheControl& requestCacheControl() const { return request_cache_control_; }
 
@@ -192,6 +197,9 @@ public:
   LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
                                 uint64_t content_length) const;
 
+  // Warning: this should not be accessed out-of-thread!
+  const Http::RequestHeaderMap& getVaryHeaders() const { return *vary_headers_; }
+
 private:
   void initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers);
   bool requiresValidation(const Http::ResponseHeaderMap& response_headers) const;
@@ -205,7 +213,7 @@ private:
   // storage implementation forwards lookup requests to a remote cache server that supports *vary*
   // headers, that server may need to see these headers. For local implementations, it may be
   // simpler to instead call makeLookupResult with each potential response.
-  HeaderVector vary_headers_;
+  Http::RequestHeaderMapPtr vary_headers_;
 
   RequestCacheControl request_cache_control_;
 };
@@ -240,6 +248,23 @@ public:
 
   // Inserts trailers into the cache.
   virtual void insertTrailers(const Http::ResponseTrailerMap& trailers) PURE;
+
+  // This routine is called prior to an InsertContext being destroyed. InsertContext is responsible
+  // for making sure that any async activities are cleaned up before returning from onDestroy().
+  // This includes timers, network calls, etc. The reason there is an onDestroy() method vs. doing
+  // this type of cleanup in the destructor is to avoid potential data races between an async
+  // callback and the destructor in case the connection terminates abruptly.
+  // Example scenario with a hypothetical cache that uses RPC:
+  // 1. [Filter's thread] CacheFilter calls InsertContext::insertBody.
+  // 2. [Filter's thread] RPCInsertContext sends RPC and returns.
+  // 3. [Filter's thread] Client disconnects; Destroying stream; CacheFilter destructor begins.
+  // 4. [Filter's thread] RPCInsertContext destructor begins.
+  // 5. [Other thread] RPC completes and calls RPCInsertContext::onRPCDone.
+  // --> RPCInsertContext's destructor and onRpcDone cause a data race in RpcInsertContext.
+  // onDestroy() should cancel any outstanding async operations and, if necessary,
+  // it should block on that cancellation to avoid data races. InsertContext must not invoke any
+  // callbacks to the CacheFilter after having onDestroy() invoked.
+  virtual void onDestroy() PURE;
 
   virtual ~InsertContext() = default;
 };
@@ -276,6 +301,23 @@ public:
   // Get the trailers from the cache. Only called if LookupResult::has_trailers == true. The
   // Http::ResponseTrailerMapPtr passed to cb must not be null.
   virtual void getTrailers(LookupTrailersCallback&& cb) PURE;
+
+  // This routine is called prior to a LookupContext being destroyed. LookupContext is responsible
+  // for making sure that any async activities are cleaned up before returning from onDestroy().
+  // This includes timers, network calls, etc. The reason there is an onDestroy() method vs. doing
+  // this type of cleanup in the destructor is to avoid potential data races between an async
+  // callback and the destructor in case the connection terminates abruptly.
+  // Example scenario with a hypothetical cache that uses RPC:
+  // 1. [Filter's thread] CacheFilter calls LookupContext::getHeaders.
+  // 2. [Filter's thread] RPCLookupContext sends RPC and returns.
+  // 3. [Filter's thread] Client disconnects; Destroying stream; CacheFilter destructor begins.
+  // 4. [Filter's thread] RPCLookupContext destructor begins.
+  // 5. [Other thread] RPC completes and calls RPCLookupContext::onRPCDone.
+  // --> RPCLookupContext's destructor and onRpcDone cause a data race in RPCLookupContext.
+  // onDestroy() should cancel any outstanding async operations and, if necessary,
+  // it should block on that cancellation to avoid data races. InsertContext must not invoke any
+  // callbacks to the CacheFilter after having onDestroy() invoked.
+  virtual void onDestroy() PURE;
 
   virtual ~LookupContext() = default;
 };
@@ -315,7 +357,7 @@ public:
 class HttpCacheFactory : public Config::TypedFactory {
 public:
   // From UntypedFactory
-  std::string category() const override { return "http_cache_factory"; }
+  std::string category() const override { return "envoy.http.cache"; }
 
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).

@@ -10,9 +10,13 @@
 #include "common/stream_info/stream_info_impl.h"
 
 #include "test/common/stream_info/test_int_accessor.h"
+#include "test/test_common/utility.h"
+
+//#include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/host.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

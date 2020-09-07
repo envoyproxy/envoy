@@ -21,3 +21,4 @@ Extensions
   endpoint/endpoint
   upstream/upstream
   wasm/wasm
+  watchdog/watchdog

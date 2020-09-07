@@ -29,7 +29,7 @@ HashPolicyImpl::HashPolicyImpl(
     hash_impl_ = std::make_unique<SourceIpHashMethod>();
     break;
   default:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
