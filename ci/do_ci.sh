@@ -12,8 +12,11 @@ if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositor
 fi
 
 SRCDIR="${PWD}"
-. "$(dirname "$0")"/setup_cache.sh
-. "$(dirname "$0")"/build_setup.sh $build_setup_args
+NO_BUILD_SETUP="${NO_BUILD_SETUP:-}"
+if [[ -z "$NO_BUILD_SETUP" ]]; then
+    . "$(dirname "$0")"/setup_cache.sh
+    . "$(dirname "$0")"/build_setup.sh $build_setup_args
+fi
 cd "${SRCDIR}"
 
 if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
