@@ -216,7 +216,7 @@ const std::string& HeaderToMetadataFilter::decideNamespace(const std::string& ns
 }
 
 // add metadata['key']= value depending on header present or missing case
-void HeaderToMetadataFilter::applyKeyValue(std::string value, const Rule& rule,
+void HeaderToMetadataFilter::applyKeyValue(std::string&& value, const Rule& rule,
                                            const KeyValuePair& keyval, StructMap& np) {
   if (!keyval.value().empty()) {
     value = keyval.value();

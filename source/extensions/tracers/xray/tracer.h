@@ -8,6 +8,7 @@
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/common/hex.h"
+#include "common/common/random_generator.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/tracers/xray/daemon_broker.h"
@@ -29,11 +30,13 @@ public:
   /**
    * Creates a new Span.
    *
-   * @param time_source A time source to create Span IDs using the monotonic clock.
+   * @param time_source A time source to get the span end time
+   * @param random random generator for generating unique child span ids
    * @param broker Facilitates communication with the X-Ray daemon.
    */
-  Span(TimeSource& time_source, DaemonBroker& broker)
-      : time_source_(time_source), broker_(broker), sampled_(true) {}
+  Span(TimeSource& time_source, Random::RandomGenerator& random, DaemonBroker& broker)
+      : time_source_(time_source), random_(random), broker_(broker),
+        id_(Hex::uint64ToHex(random_.random())), sampled_(true) {}
 
   /**
    * Sets the Span's trace ID.
@@ -64,6 +67,16 @@ public:
   void setName(absl::string_view name) { name_ = std::string(name); }
 
   /**
+   * Sets the origin of the Span.
+   */
+  void setOrigin(absl::string_view origin) { origin_ = std::string(origin); }
+
+  /**
+   * Gets the origin of the Span.
+   */
+  const std::string& origin() { return origin_; }
+
+  /**
    * Adds a key-value pair to either the Span's annotations or metadata.
    * An allowlist of keys are added to the annotations, everything else is added to the metadata.
    */
@@ -80,17 +93,24 @@ public:
   }
 
   /**
+   * Sets the aws metadata field of the Span.
+   */
+  void setAwsMetadata(const absl::flat_hash_map<std::string, ProtobufWkt::Value>& aws_metadata) {
+    aws_metadata_ = aws_metadata;
+  }
+
+  /**
+   * Gets the AWS metadata
+   * field of the Span.
+   */
+  const absl::flat_hash_map<std::string, ProtobufWkt::Value>& awsMetadata() {
+    return aws_metadata_;
+  }
+
+  /**
    * Sets the recording start time of the traced operation/request.
    */
   void setStartTime(Envoy::SystemTime start_time) { start_time_ = start_time; }
-
-  /**
-   * Sets the Span ID.
-   * This ID is used as the (sub)segment ID.
-   * A single Trace can have Multiple segments and each segment can have multiple sub-segments.
-   * The id is converted to a hexadecimal string internally.
-   */
-  void setId(uint64_t id);
 
   /**
    * Marks the span as either "sampled" or "not-sampled".
@@ -146,17 +166,20 @@ public:
                               Envoy::SystemTime start_time) override;
 
 private:
+  Envoy::TimeSource& time_source_;
+  Random::RandomGenerator& random_;
+  DaemonBroker& broker_;
   Envoy::SystemTime start_time_;
   std::string operation_name_;
   std::string id_;
   std::string trace_id_;
   std::string parent_segment_id_;
   std::string name_;
+  std::string origin_;
+  absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_request_annotations_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_response_annotations_;
   absl::flat_hash_map<std::string, std::string> custom_annotations_;
-  Envoy::TimeSource& time_source_;
-  DaemonBroker& broker_;
   bool sampled_;
 };
 
@@ -164,10 +187,11 @@ using SpanPtr = std::unique_ptr<Span>;
 
 class Tracer {
 public:
-  Tracer(absl::string_view segment_name, DaemonBrokerPtr daemon_broker, TimeSource& time_source)
-      : segment_name_(segment_name), daemon_broker_(std::move(daemon_broker)),
-        time_source_(time_source) {}
-
+  Tracer(absl::string_view segment_name, absl::string_view origin,
+         const absl::flat_hash_map<std::string, ProtobufWkt::Value>& aws_metadata,
+         DaemonBrokerPtr daemon_broker, TimeSource& time_source, Random::RandomGenerator& random)
+      : segment_name_(segment_name), origin_(origin), aws_metadata_(aws_metadata),
+        daemon_broker_(std::move(daemon_broker)), time_source_(time_source), random_(random) {}
   /**
    * Starts a tracing span for X-Ray
    */
@@ -183,8 +207,11 @@ public:
 
 private:
   const std::string segment_name_;
+  const std::string origin_;
+  const absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
   const DaemonBrokerPtr daemon_broker_;
   Envoy::TimeSource& time_source_;
+  Random::RandomGenerator& random_;
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;

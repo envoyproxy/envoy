@@ -119,7 +119,7 @@ using CustomHeaders = ConstSingleton<CustomHeaderValues>;
  */
 class HeaderValues {
 public:
-  const char* prefix() { return ThreadSafeSingleton<PrefixValue>::get().prefix(); }
+  const char* prefix() const { return ThreadSafeSingleton<PrefixValue>::get().prefix(); }
 
   const LowerCaseString Age{"age"};
   const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};
@@ -127,6 +127,7 @@ public:
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
   const LowerCaseString ContentLength{"content-length"};
+  const LowerCaseString ContentRange{"content-range"};
   const LowerCaseString ContentType{"content-type"};
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
@@ -208,6 +209,7 @@ public:
   const LowerCaseString TE{"te"};
   const LowerCaseString Upgrade{"upgrade"};
   const LowerCaseString UserAgent{"user-agent"};
+  const LowerCaseString Vary{"vary"};
   const LowerCaseString Via{"via"};
   const LowerCaseString WWWAuthenticate{"www-authenticate"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};

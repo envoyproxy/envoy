@@ -93,7 +93,7 @@ would be rendered as the number ``123``.
 Format dictionaries have the following restrictions:
 
 * The dictionary must map strings to strings (specifically, strings to command operators). Nesting
-  is not currently supported.
+  is supported.
 * When using the ``typed_json_format`` command operators will only produce typed output if the
   command operator is the only string that appears in the dictionary value. For example,
   ``"%DURATION%"`` will log a numeric duration value, but ``"%DURATION%.0"`` will log a string
@@ -116,7 +116,9 @@ are noted.
 
 Note that if a value is not set/empty, the logs will contain a ``-`` character or, for JSON logs,
 the string ``"-"``. For typed JSON logs unset values are represented as ``null`` values and empty
-strings are rendered as ``""``.
+strings are rendered as ``""``. :ref:`omit_empty_values
+<envoy_v3_api_field_config.core.v3.SubstitutionFormatString.omit_empty_values>` option could be used
+to omit empty values entirely.
 
 Unless otherwise noted, command operators produce string outputs for typed JSON logs.
 

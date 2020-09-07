@@ -50,7 +50,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 
   // Create a socket on which we'll listen for connections from clients.
   SocketImpl sock(Socket::Type::Stream, addr_port);
-  ASSERT_GE(sock.ioHandle().fd(), 0) << addr_port->asString();
+  EXPECT_TRUE(sock.ioHandle().isOpen()) << addr_port->asString();
 
   // Check that IPv6 sockets accept IPv6 connections only.
   if (addr_port->ip()->version() == IpVersion::v6) {
@@ -73,7 +73,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
     // Create a client socket and connect to the server.
     SocketImpl client_sock(Socket::Type::Stream, addr_port);
 
-    ASSERT_GE(client_sock.ioHandle().fd(), 0) << addr_port->asString();
+    EXPECT_TRUE(client_sock.ioHandle().isOpen()) << addr_port->asString();
 
     // Instance::socket creates a non-blocking socket, which that extends all the way to the
     // operation of ::connect(), so connect returns with errno==EWOULDBLOCK before the tcp
@@ -328,7 +328,7 @@ TEST(PipeInstanceTest, BasicPermission) {
   InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
   SocketImpl sock(Socket::Type::Stream, address);
 
-  ASSERT_GE(sock.ioHandle().fd(), 0) << pipe.asString();
+  EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
 
   Api::SysCallIntResult result = sock.bind(address);
   ASSERT_EQ(result.rc_, 0) << pipe.asString() << "\nerror: " << errorDetails(result.errno_)
@@ -355,7 +355,7 @@ TEST(PipeInstanceTest, PermissionFail) {
   InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
   SocketImpl sock(Socket::Type::Stream, address);
 
-  ASSERT_GE(sock.ioHandle().fd(), 0) << pipe.asString();
+  EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
 
   EXPECT_CALL(os_sys_calls, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   EXPECT_CALL(os_sys_calls, chmod(_, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
@@ -427,7 +427,7 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
     InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
     SocketImpl sock(Socket::Type::Stream, address);
 
-    ASSERT_GE(sock.ioHandle().fd(), 0) << pipe.asString();
+    EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
 
     const Api::SysCallIntResult result = sock.bind(address);
 

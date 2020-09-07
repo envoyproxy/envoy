@@ -19,18 +19,25 @@ Running the Sandbox
 ~~~~~~~~~~~~~~~~~~~
 
 The following documentation runs through the setup of an Envoy cluster organized
-as is described in the image above.
+as is described above.
 
 **Step 1: Install Docker**
 
-Ensure that you have a recent version of ``docker`` and ``docker-compose`` installed.
+Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
 
 A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
 
-**Step 2: Clone the Envoy repo, and start all of our containers**
+**Step 2: Clone the Envoy repo**
 
-If you have not cloned the Envoy repo, clone it with ``git clone git@github.com:envoyproxy/envoy``
-or ``git clone https://github.com/envoyproxy/envoy.git``
+If you have not cloned the Envoy repo, clone it with:
+
+``git clone git@github.com:envoyproxy/envoy``
+
+or
+
+``git clone https://github.com/envoyproxy/envoy.git``
+
+**Step 3: Build the sandbox**
 
 Terminal 1 ::
 
@@ -52,7 +59,7 @@ Terminal 2 ::
     load-reporting-service_http_service_2   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:81->80/tcp, 0.0.0.0:8082->8081/tcp
     load-reporting-service_lrs_server_1     go run main.go                   Up      0.0.0.0:18000->18000/tcp
 
-**Step 3: Start sending stream of HTTP requests**
+**Step 4: Start sending stream of HTTP requests**
 
 Terminal 2 ::
 
@@ -62,7 +69,7 @@ Terminal 2 ::
 
 The script above (``send_requests.sh``) sends requests randomly to each Envoy, which in turn forwards the requests to the backend service.
 
-**Step 4: See Envoy Stats**
+**Step 5: See Envoy Stats**
 
 You should see
 
@@ -84,4 +91,3 @@ Terminal 1 ::
     ............................
     lrs_server_1    | 2020/02/12 17:09:09 Got stats from cluster `http_service` node `0022a319e1e2` - cluster_name:"local_service" upstream_locality_stats:<locality:<> total_successful_requests:3 total_issued_requests:3 > load_report_interval:<seconds:2 nanos:2458000 >
     lrs_server_1    | 2020/02/12 17:09:09 Got stats from cluster `http_service` node `2417806c9d9a` - cluster_name:"local_service" upstream_locality_stats:<locality:<> total_successful_requests:9 total_issued_requests:9 > load_report_interval:<seconds:2 nanos:6487000 >
-

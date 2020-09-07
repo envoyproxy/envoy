@@ -36,6 +36,9 @@ public:
                                                   {"x-forwarded-proto", "https"},
                                                   {":authority", "example.com"}};
 
+  // Using 'accept' as an allowed header to be varied for testing-purpose.
+  absl::flat_hash_set<std::string> allowed_vary_headers_{"accept"};
+
   static const SystemTime& currentTime() {
     CONSTRUCT_ON_FIRST_USE(SystemTime, Event::SimulatedTimeSystem().systemTime());
   }
@@ -164,7 +167,7 @@ TEST_P(LookupRequestTest, ResultWithoutBodyMatchesExpectation) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
                                    GetParam().request_cache_control);
   const SystemTime request_time = GetParam().request_time, response_time = GetParam().response_time;
-  const LookupRequest lookup_request(request_headers_, request_time);
+  const LookupRequest lookup_request(request_headers_, request_time, allowed_vary_headers_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"cache-control", GetParam().response_cache_control},
        {"date", formatter_.fromTime(response_time)}});
@@ -182,7 +185,7 @@ TEST_P(LookupRequestTest, ResultWithBodyMatchesExpectation) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
                                    GetParam().request_cache_control);
   const SystemTime request_time = GetParam().request_time, response_time = GetParam().response_time;
-  const LookupRequest lookup_request(request_headers_, request_time);
+  const LookupRequest lookup_request(request_headers_, request_time, allowed_vary_headers_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"cache-control", GetParam().response_cache_control},
        {"date", formatter_.fromTime(response_time)}});
@@ -199,7 +202,7 @@ TEST_P(LookupRequestTest, ResultWithBodyMatchesExpectation) {
 }
 
 TEST_F(LookupRequestTest, ExpiredViaFallbackheader) {
-  const LookupRequest lookup_request(request_headers_, currentTime());
+  const LookupRequest lookup_request(request_headers_, currentTime(), allowed_vary_headers_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"expires", formatter_.fromTime(currentTime() - Seconds(5))},
        {"date", formatter_.fromTime(currentTime())}});
@@ -209,7 +212,7 @@ TEST_F(LookupRequestTest, ExpiredViaFallbackheader) {
 }
 
 TEST_F(LookupRequestTest, NotExpiredViaFallbackheader) {
-  const LookupRequest lookup_request(request_headers_, currentTime());
+  const LookupRequest lookup_request(request_headers_, currentTime(), allowed_vary_headers_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"expires", formatter_.fromTime(currentTime() + Seconds(5))},
        {"date", formatter_.fromTime(currentTime())}});
@@ -222,7 +225,7 @@ TEST_F(LookupRequestTest, NotExpiredViaFallbackheader) {
 // https://httpwg.org/specs/rfc7234.html#header.pragma
 TEST_F(LookupRequestTest, PragmaNoCacheFallback) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma, "no-cache");
-  const LookupRequest lookup_request(request_headers_, currentTime());
+  const LookupRequest lookup_request(request_headers_, currentTime(), allowed_vary_headers_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
@@ -233,7 +236,7 @@ TEST_F(LookupRequestTest, PragmaNoCacheFallback) {
 TEST_F(LookupRequestTest, PragmaNoCacheFallbackExtraDirectivesIgnored) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma,
                                    "no-cache, custom-directive=custom-value");
-  const LookupRequest lookup_request(request_headers_, currentTime());
+  const LookupRequest lookup_request(request_headers_, currentTime(), allowed_vary_headers_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
@@ -243,7 +246,8 @@ TEST_F(LookupRequestTest, PragmaNoCacheFallbackExtraDirectivesIgnored) {
 
 TEST_F(LookupRequestTest, PragmaFallbackOtherValuesIgnored) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma, "max-age=0");
-  const LookupRequest lookup_request(request_headers_, currentTime() + std::chrono::seconds(5));
+  const LookupRequest lookup_request(request_headers_, currentTime() + std::chrono::seconds(5),
+                                     allowed_vary_headers_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
@@ -254,7 +258,8 @@ TEST_F(LookupRequestTest, PragmaFallbackOtherValuesIgnored) {
 TEST_F(LookupRequestTest, PragmaNoFallback) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma, "no-cache");
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "max-age=10");
-  const LookupRequest lookup_request(request_headers_, currentTime() + std::chrono::seconds(5));
+  const LookupRequest lookup_request(request_headers_, currentTime() + std::chrono::seconds(5),
+                                     allowed_vary_headers_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
@@ -262,10 +267,10 @@ TEST_F(LookupRequestTest, PragmaNoFallback) {
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
 }
 
-TEST_F(LookupRequestTest, SatisfiableRange) {
-  // add range to headers
-  request_headers_.addReference(Http::Headers::get().Range, "bytes=1-99,3-,-2");
-  const LookupRequest lookup_request(request_headers_, currentTime());
+TEST_F(LookupRequestTest, SingleSatisfiableRange) {
+  // add range info to headers
+  request_headers_.addReference(Http::Headers::get().Range, "bytes=1-99");
+  const LookupRequest lookup_request(request_headers_, currentTime(), allowed_vary_headers_);
 
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())},
@@ -281,28 +286,49 @@ TEST_F(LookupRequestTest, SatisfiableRange) {
   EXPECT_EQ(lookup_response.content_length_, 4);
 
   // checks that the ranges have been adjusted to the content's length
-  EXPECT_EQ(lookup_response.response_ranges_.size(), 3);
+  EXPECT_EQ(lookup_response.response_ranges_.size(), 1);
 
   EXPECT_EQ(lookup_response.response_ranges_[0].begin(), 1);
   EXPECT_EQ(lookup_response.response_ranges_[0].end(), 4);
   EXPECT_EQ(lookup_response.response_ranges_[0].length(), 3);
 
-  EXPECT_EQ(lookup_response.response_ranges_[1].begin(), 3);
-  EXPECT_EQ(lookup_response.response_ranges_[1].end(), 4);
-  EXPECT_EQ(lookup_response.response_ranges_[1].length(), 1);
+  EXPECT_FALSE(lookup_response.has_trailers_);
+}
 
-  EXPECT_EQ(lookup_response.response_ranges_[2].begin(), 2);
-  EXPECT_EQ(lookup_response.response_ranges_[2].end(), 4);
-  EXPECT_EQ(lookup_response.response_ranges_[2].length(), 2);
+TEST_F(LookupRequestTest, MultipleSatisfiableRanges) {
+  // Because we do not support multi-part responses for now, we are limiting parsing of a single
+  // range. Thus, multiple ranges are ignored, and a usual "::Ok" should be expected. If multi-part
+  // responses are implemented (and the parsing limit is changed), this test should be adjusted.
 
+  // add range info to headers
+  request_headers_.addCopy(Http::Headers::get().Range.get(), "bytes=1-99,3-,-3");
+
+  const LookupRequest lookup_request(request_headers_, currentTime(), allowed_vary_headers_);
+
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"date", formatter_.fromTime(currentTime())},
+       {"cache-control", "public, max-age=3600"},
+       {"content-length", "4"}});
+  const uint64_t content_length = 4;
+  const LookupResult lookup_response =
+      makeLookupResult(lookup_request, response_headers, content_length);
+
+  ASSERT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
+
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 4);
+
+  // Check that the ranges have been ignored since we don't support multi-part responses.
+  EXPECT_EQ(lookup_response.response_ranges_.size(), 0);
   EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
 TEST_F(LookupRequestTest, NotSatisfiableRange) {
-  // add range headers
-  request_headers_.addReference(Http::Headers::get().Range, "bytes=5-99,100-");
+  // add range info to headers
+  request_headers_.addReference(Http::Headers::get().Range, "bytes=100-");
 
-  const LookupRequest lookup_request(request_headers_, currentTime());
+  const LookupRequest lookup_request(request_headers_, currentTime(), allowed_vary_headers_);
 
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())},
@@ -572,6 +598,15 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(ParseInvalidRangeHeaderTest, InvalidRangeReturnsEmpty) {
   std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(range(), 5);
   ASSERT_EQ(0, result_vector.size());
+}
+
+TEST_F(LookupRequestTest, VariedHeaders) {
+  request_headers_.addCopy("accept", "image/*");
+  const LookupRequest lookup_request(request_headers_, currentTime(), allowed_vary_headers_);
+  const Http::RequestHeaderMap& result = lookup_request.getVaryHeaders();
+
+  ASSERT_TRUE(result.get(Http::LowerCaseString("accept")));
+  ASSERT_EQ(result.get(Http::LowerCaseString("accept"))->value().getStringView(), "image/*");
 }
 
 } // namespace

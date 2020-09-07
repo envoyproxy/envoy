@@ -23,6 +23,8 @@ build --enable_platform_specific_config
 build:linux --copt=-fPIC
 build:linux --cxxopt=-std=c++17
 build:linux --conlyopt=-fexceptions
+build:linux --fission=dbg,opt
+build:linux --features=per_object_debug_info
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
@@ -182,6 +184,11 @@ build:rbe-toolchain-msvc-cl --platforms=@rbe_windows_msvc_cl//config:platform
 build:rbe-toolchain-msvc-cl --crosstool_top=@rbe_windows_msvc_cl//cc:toolchain
 build:rbe-toolchain-msvc-cl --extra_toolchains=@rbe_windows_msvc_cl//config:cc-toolchain
 
+build:rbe-toolchain-clang-cl --host_platform=@rbe_windows_clang_cl//config:platform
+build:rbe-toolchain-clang-cl --platforms=@rbe_windows_clang_cl//config:platform
+build:rbe-toolchain-clang-cl --crosstool_top=@rbe_windows_clang_cl//cc:toolchain
+build:rbe-toolchain-clang-cl --extra_toolchains=@rbe_windows_clang_cl//config:cc-toolchain
+
 build:remote --spawn_strategy=remote,sandboxed,local
 build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
@@ -213,11 +220,16 @@ build:remote-msan --config=rbe-toolchain-clang-libc++
 build:remote-msan --config=rbe-toolchain-msan
 
 build:remote-msvc-cl --config=remote-windows
+build:remote-msvc-cl --config=msvc-cl
 build:remote-msvc-cl --config=rbe-toolchain-msvc-cl
+
+build:remote-clang-cl --config=remote-windows
+build:remote-clang-cl --config=clang-cl
+build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:923df85a4ba7f30dcd0cb6b0c6d8d604f0e20f48
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:e7ea4e81bbd5028abb9d3a2f2c0afe063d9b62c0
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -310,3 +322,4 @@ build:windows --dynamic_mode=off
 
 try-import %workspace%/clang.bazelrc
 try-import %workspace%/user.bazelrc
+try-import %workspace%/local_tsan.bazelrc
