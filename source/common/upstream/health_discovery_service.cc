@@ -202,13 +202,11 @@ envoy::config::cluster::v3::Cluster HdsDelegate::createClusterConfig(
   return cluster_config;
 }
 
-HdsClusterPtr
-HdsDelegate::tryUpdateHdsCluster(HdsClusterPtr cluster,
-                                 const envoy::config::cluster::v3::Cluster& cluster_config) {
+void HdsDelegate::updateHdsCluster(HdsClusterPtr cluster,
+                                   const envoy::config::cluster::v3::Cluster& cluster_config) {
   cluster->update(admin_, cluster_config, info_factory_, cm_, local_info_, dispatcher_, random_,
                   singleton_manager_, tls_, validation_visitor_, api_, access_log_manager_,
                   runtime_);
-  return cluster;
 }
 
 HdsClusterPtr
@@ -258,7 +256,8 @@ void HdsDelegate::processMessage(
       auto cluster_map_pair = hds_clusters_name_map_.find(cluster_health_check.cluster_name());
       if (cluster_map_pair != hds_clusters_name_map_.end()) {
         // We have a previous cluster with this name, update.
-        cluster_ptr = tryUpdateHdsCluster(cluster_map_pair->second, cluster_config);
+        cluster_ptr = cluster_map_pair->second;
+        updateHdsCluster(cluster_ptr, cluster_config);
       } else {
         // There is no cluster with this name previously or its an empty string, so just create a
         // new cluster.
