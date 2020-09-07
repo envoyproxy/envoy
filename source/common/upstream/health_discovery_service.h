@@ -69,12 +69,8 @@ public:
               const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
               Random::RandomGenerator& random, Singleton::Manager& singleton_manager,
               ThreadLocal::SlotAllocator& tls,
-              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
-  void updateHealthchecks(
-      const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks);
-  void
-  updateHosts(const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
-                  locality_endpoints);
+              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+              AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime);
   // Creates healthcheckers and adds them to the list, then does initial start.
   void initHealthchecks(AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime,
                         Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
@@ -106,7 +102,17 @@ private:
   std::unique_ptr<absl::flat_hash_map<uint64_t, HostSharedPtr>> hosts_map_;
   ClusterInfoConstSharedPtr info_;
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers_;
+  std::unique_ptr<absl::flat_hash_map<uint64_t, Upstream::HealthCheckerSharedPtr>>
+      health_checkers_map_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+
+  void updateHealthchecks(
+      const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks,
+      AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime,
+      Random::RandomGenerator& random, Event::Dispatcher& dispatcher, Api::Api& api);
+  void
+  updateHosts(const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
+                  locality_endpoints);
 };
 
 using HdsClusterPtr = std::shared_ptr<HdsCluster>;

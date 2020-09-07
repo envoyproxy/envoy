@@ -210,7 +210,8 @@ HdsClusterPtr
 HdsDelegate::tryUpdateHdsCluster(HdsClusterPtr cluster,
                                  const envoy::config::cluster::v3::Cluster& cluster_config) {
   cluster->update(admin_, cluster_config, info_factory_, cm_, local_info_, dispatcher_, random_,
-                  singleton_manager_, tls_, validation_visitor_, api_);
+                  singleton_manager_, tls_, validation_visitor_, api_, access_log_manager_,
+                  runtime_);
   return cluster;
 }
 
@@ -355,6 +356,8 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       hosts_(new HostVector()),
       hosts_map_(std::make_unique<absl::flat_hash_map<uint64_t, HostSharedPtr>>()),
+      health_checkers_map_(
+          std::make_unique<absl::flat_hash_map<uint64_t, Upstream::HealthCheckerSharedPtr>>()),
       validation_visitor_(validation_visitor) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
@@ -404,7 +407,8 @@ void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluste
                         const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                         Random::RandomGenerator& random, Singleton::Manager& singleton_manager,
                         ThreadLocal::SlotAllocator& tls,
-                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
+                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                        AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime) {
   const uint64_t config_hash = MessageUtil::hash(cluster);
   // if this is a different config then what we already have, update the cluster.
   if (config_hash_ != config_hash) {
@@ -426,27 +430,43 @@ void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluste
     const uint64_t health_checkers_hash = RepeatedPtrUtil::hash(cluster.health_checks());
     if (health_checkers_hash_ != health_checkers_hash) {
       health_checkers_hash_ = health_checkers_hash;
-      updateHealthchecks(cluster_.health_checks());
+      updateHealthchecks(cluster_.health_checks(), access_log_manager, runtime, random, dispatcher,
+                         api);
     }
   }
 }
 
 void HdsCluster::updateHealthchecks(
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks) {
-  // TODO(drewsortega)
-  UNREFERENCED_PARAMETER(health_checks);
-  //  create health_checkers - vector of HealthCheckSharedPtr
-  //  create health_checkers_map - map of HealthCheckSharedPtr by hash as key
-  //
-  //  health_check : health_checks:
-  //    create health_check_hash
-  //    if health_check_hash in health_checkers_map_:
-  //      - health_check_ptr = health_checkers_map_[health_check_hash]
-  //      - add health_check_ptr to health_checkers_map
-  //      - add health_check_ptr to health_checkers
-  //
-  //  replace health_checkers_ with health_checkers
-  //  replace health_checkers_map_ with health_checkers_map
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks,
+    AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime,
+    Random::RandomGenerator& random, Event::Dispatcher& dispatcher, Api::Api& api) {
+  std::vector<Upstream::HealthCheckerSharedPtr> health_checkers;
+  std::unique_ptr<absl::flat_hash_map<uint64_t, Upstream::HealthCheckerSharedPtr>>
+      health_checkers_map =
+          std::make_unique<absl::flat_hash_map<uint64_t, Upstream::HealthCheckerSharedPtr>>();
+
+  for (auto& health_check : health_checks) {
+    const uint64_t hash = MessageUtil::hash(health_check);
+
+    // Check to see if this exact same health_check config already has a health checker.
+    auto health_checker = health_checkers_map_->find(hash);
+    if (health_checker != health_checkers_map_->end()) {
+      // If it does, use it.
+      health_checkers_map->insert({hash, health_checker->second});
+      health_checkers.push_back(health_checker->second);
+    } else {
+      // If it does not, create a new one.
+      auto new_health_checker =
+          Upstream::HealthCheckerFactory::create(health_check, *this, runtime, random, dispatcher,
+                                                 access_log_manager, validation_visitor_, api);
+      health_checkers_map->insert({hash, new_health_checker});
+      health_checkers.push_back(new_health_checker);
+    }
+  }
+
+  // replace our member data structures with our newly created ones.
+  health_checkers_ = std::move(health_checkers);
+  health_checkers_map_ = std::move(health_checkers_map);
 }
 void HdsCluster::updateHosts(
     const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
