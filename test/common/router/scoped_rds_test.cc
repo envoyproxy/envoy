@@ -185,6 +185,7 @@ scope_key_builder:
   void srdsUpdateWithYaml(std::vector<std::string> const& config_yamls,
                           std::string const& version) {
     std::vector<envoy::config::route::v3::ScopedRouteConfiguration> resources;
+    resources.reserve(config_yamls.size());
     for (std::string const& config_yaml : config_yamls) {
       resources.push_back(parseScopedRouteConfigurationFromYaml(config_yaml));
     }
