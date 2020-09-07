@@ -470,35 +470,49 @@ void HdsCluster::updateHosts(
     const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
         locality_endpoints) {
   // TODO(drewsortega)
-  UNREFERENCED_PARAMETER(locality_endpoints);
-  //  create hosts - vector of HostSharedPtr
-  //  create hosts_added - vector of HostSharedPtr
-  //  create hosts_removed - vector of HostSharedPtr
-  //  create hosts_by_locality - vector of (vector of HostSharedPtr)
-  //  create hosts_map - map of HostSharedPtr with hash of config as key
-  //
-  //  endpoints : locality_endpoints:
-  //    - add new vector of hosts to hosts_by_locality
-  //    endpoint : endpoints:
-  //      create empty variable 'host'
-  //      if endpoint not in host_map_:
-  //        - host = new Host
-  //        - add host to hosts_added
-  //      else if endpoint in hosts_map_:
-  //        - host = hosts_map[hash]
-  //
-  //      - add host to this locality in hosts_by_locality
-  //      - add host to hosts
-  //      - add host to hosts_map
-  //
-  //  host : hosts_map_
-  //    if host not in hosts_map:
-  //      add host to hosts_removed
-  //
-  //  replace hosts_ with new hosts
-  //  replace hosts_map_ with hosts_map
-  //  create new hosts_per_locality_ with hosts_by_locality
-  //  update priority_set_ with hosts_added, hosts_removed_, hosts_per_locality_
+  HostVectorSharedPtr hosts;
+  std::vector<HostSharedPtr> hosts_added;
+  std::vector<HostSharedPtr> hosts_removed;
+  std::vector<HostVector> hosts_by_locality;
+  std::unique_ptr<absl::flat_hash_map<uint64_t, HostSharedPtr>> hosts_map =
+      std::make_unique<absl::flat_hash_map<uint64_t, HostSharedPtr>>();
+
+  for (auto& endpoints : locality_endpoints) {
+    hosts_by_locality.emplace_back();
+    for (auto& endpoint : endpoints.lb_endpoints()) {
+      const uint64_t endpoint_hash = MessageUtil::hash(endpoint);
+      auto host_pair = hosts_map_->find(endpoint_hash);
+      HostSharedPtr host;
+      if (host_pair != hosts_map->end()) {
+        host = host_pair->second;
+      } else {
+        auto new_host = std::make_shared<HostImpl>(
+            info_, "", Network::Address::resolveProtoAddress(endpoint.endpoint().address()),
+            nullptr, 1, endpoints.locality(),
+            envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
+            envoy::config::core::v3::UNKNOWN);
+        hosts_added.push_back(host);
+        host = new_host;
+      }
+      hosts_by_locality.back().push_back(host);
+      hosts->push_back(host);
+      hosts_map->insert({endpoint_hash, host});
+    }
+  }
+
+  for (auto& host_pair : *hosts_map_) {
+    if (!hosts_map->contains(host_pair.first)) {
+      hosts_removed.push_back(host_pair.second);
+    }
+  }
+
+  hosts_ = std::move(hosts);
+  hosts_map_ = std::move(hosts_map);
+
+  hosts_per_locality_ =
+      std::make_shared<Envoy::Upstream::HostsPerLocalityImpl>(std::move(hosts_by_locality), false);
+  priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
+                            hosts_added, hosts_removed, absl::nullopt);
 }
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
