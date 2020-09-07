@@ -468,7 +468,6 @@ key:
 }
 
 // Test that a scoped route config update is performed on demand and http request will succeed.
-
 TEST_P(ScopedRdsIntegrationTest, OnDemandUpdateSuccess) {
   config_helper_.addFilter(R"EOF(
     name: envoy.filters.http.on_demand

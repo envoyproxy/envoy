@@ -17,14 +17,14 @@ Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeader
     return filter_iteration_state_;
   }
   // decodeHeaders() is interrupted.
-  decode_header_interrupted_ = true;
+  decode_headers_active_ = true;
   route_config_updated_callback_ =
       std::make_shared<Http::RouteConfigUpdatedCallback>(Http::RouteConfigUpdatedCallback(
           [this](bool route_exists) -> void { onRouteConfigUpdateCompletion(route_exists); }));
   filter_iteration_state_ = Http::FilterHeadersStatus::StopIteration;
   callbacks_->requestRouteConfigUpdate(route_config_updated_callback_);
   // decodeHeaders() is completed.
-  decode_header_interrupted_ = false;
+  decode_headers_active_ = false;
   return filter_iteration_state_;
 }
 
@@ -54,7 +54,7 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
 
   // Don't call continueDecoding in the middle of decodeHeaders()
-  if (decode_header_interrupted_) {
+  if (decode_headers_active_) {
     return;
   }
 
