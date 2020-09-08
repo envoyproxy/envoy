@@ -1018,14 +1018,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTlsMissingSocketMatch) {
   // Make the specifier not have the TLS socket matches, so it will try to connect over plaintext.
   server_health_check_specifier_ =
       makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
-  server_health_check_specifier_.mutable_cluster_health_checks(0)
-      ->mutable_health_checks(0)
-      ->mutable_timeout()
-      ->set_seconds(0);
-  server_health_check_specifier_.mutable_cluster_health_checks(0)
-      ->mutable_health_checks(0)
-      ->mutable_timeout()
-      ->set_nanos(100000000); // 0.1 seconds
 
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
