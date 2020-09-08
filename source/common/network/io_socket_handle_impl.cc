@@ -573,7 +573,7 @@ Event::FileEventPtr NullIoSocketHandleImpl::createFileEvent(Event::Dispatcher& d
                                                             Event::FileReadyCb cb,
                                                             Event::FileTriggerType,
                                                             uint32_t events) {
-  return std::make_unique<Event::TimerWrappedFileEventImpl>(
+  return std::make_unique<Event::AlwaysActiveFileEventImpl>(
       dispatcher.createSchedulableCallback([cb, events]() -> void { cb(events); }));
 }
 

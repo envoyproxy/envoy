@@ -99,7 +99,7 @@ protected:
  */
 class NullIoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
 public:
-  NullIoSocketHandleImpl() : closed_{false} {
+  NullIoSocketHandleImpl() {
     ENVOY_LOG(debug,
               "creating socket to invalid address. Please update envoy to support this address.");
   }
@@ -149,7 +149,7 @@ public:
 private:
   // Support isOpen() and close(). IoHandle owner must invoke close() to avoid potential resource
   // leak.
-  bool closed_;
+  bool closed_{false};
 };
 
 } // namespace Network

@@ -42,12 +42,16 @@ private:
   const bool activate_fd_events_next_event_loop_;
 };
 
-class TimerWrappedFileEventImpl : public FileEvent {
+/**
+ * This file event is a helper event to be always active. It works with NullIoSocketHandleImpl so
+ * that the socket handle will call io methods ASAP and obtain the error code.
+ */
+class AlwaysActiveFileEventImpl : public FileEvent {
 public:
-  TimerWrappedFileEventImpl(SchedulableCallbackPtr schedulable)
+  AlwaysActiveFileEventImpl(SchedulableCallbackPtr schedulable)
       : schedulable_(std::move(schedulable)) {}
 
-  ~TimerWrappedFileEventImpl() {
+  ~AlwaysActiveFileEventImpl() override {
     if (schedulable_->enabled()) {
       schedulable_->cancel();
     }
