@@ -9,9 +9,10 @@
  *
  */
 
-// Modified to have api-version renderer.
+// Modified from https://raw.githubusercontent.com/sphinx-doc/sphinx/3.x/sphinx/themes/basic/static/searchtools.js
+// to have renderApiVersionLabel to render the API version of each search result item.
 
-// This renders API version of a search result as shown in:
+// This renders API version of a search result item as shown in:
 // https://user-images.githubusercontent.com/73152/92435318-3ac78c80-f1cc-11ea-86ff-8f11922527ed.png.
 function renderApiVersionLabel(linkUrl) {
   const filtered = linkUrl.split("/").filter((i) => i.startsWith("api-v"));
