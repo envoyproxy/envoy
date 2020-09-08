@@ -9,6 +9,7 @@
 #include "common/common/dump_state_utils.h"
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/singleton/const_singleton.h"
 
 #include "absl/strings/match.h"
@@ -471,9 +472,9 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, absl::string_view value)
 
 void HeaderMapImpl::appendCopy(const LowerCaseString& key, absl::string_view value) {
   // TODO(#9221): converge on and document a policy for coalescing multiple headers.
-  auto* entry = getExisting(key);
-  if (entry) {
-    const uint64_t added_size = appendToHeader(entry->value(), value);
+  auto entry = getExisting(key);
+  if (!entry.empty()) {
+    const uint64_t added_size = appendToHeader(entry[0]->value(), value);
     addSize(added_size);
   } else {
     addCopy(key, value);
@@ -483,31 +484,27 @@ void HeaderMapImpl::appendCopy(const LowerCaseString& key, absl::string_view val
 }
 
 void HeaderMapImpl::setReference(const LowerCaseString& key, absl::string_view value) {
-  HeaderString ref_key(key);
-  HeaderString ref_value(value);
   remove(key);
-  insertByKey(std::move(ref_key), std::move(ref_value));
-  verifyByteSize();
+  addReference(key, value);
 }
 
 void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, absl::string_view value) {
-  HeaderString ref_key(key);
-  HeaderString new_value;
-  new_value.setCopy(value);
   remove(key);
-  insertByKey(std::move(ref_key), std::move(new_value));
-  ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
-  verifyByteSize();
+  addReferenceKey(key, value);
 }
 
 void HeaderMapImpl::setCopy(const LowerCaseString& key, absl::string_view value) {
-  // Replaces the first occurrence of a header if it exists, otherwise adds by copy.
-  // TODO(#9221): converge on and document a policy for coalescing multiple headers.
-  auto* entry = getExisting(key);
-  if (entry) {
-    updateSize(entry->value().size(), value.size());
-    entry->value(value);
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http_set_copy_replace_all_headers")) {
+    auto entry = getExisting(key);
+    if (!entry.empty()) {
+      updateSize(entry[0]->value().size(), value.size());
+      entry[0]->value(value);
+    } else {
+      addCopy(key, value);
+    }
   } else {
+    remove(key);
     addCopy(key, value);
   }
   verifyByteSize();
@@ -526,23 +523,41 @@ uint64_t HeaderMapImpl::byteSizeInternal() const {
 }
 
 const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
-  for (const HeaderEntryImpl& header : headers_) {
-    if (header.key() == key.get().c_str()) {
-      return &header;
-    }
-  }
-
-  return nullptr;
+  const auto result = getAll(key);
+  return result.empty() ? nullptr : result[0];
 }
 
-HeaderEntry* HeaderMapImpl::getExisting(const LowerCaseString& key) {
+HeaderMap::GetResult HeaderMapImpl::getAll(const LowerCaseString& key) const {
+  return HeaderMap::GetResult(const_cast<HeaderMapImpl*>(this)->getExisting(key));
+}
+
+HeaderMap::NonConstGetResult HeaderMapImpl::getExisting(const LowerCaseString& key) {
+  // Attempt a trie lookup first to see if the user is requesting an O(1) header. This may be
+  // relatively common in certain header matching / routing patterns.
+  // TODO(mattklein123): Add inline handle support directly to the header matcher code to support
+  // this use case more directly.
+  HeaderMap::NonConstGetResult ret;
+
+  EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get());
+  if (cb) {
+    StaticLookupResponse ref_lookup_response = cb(*this);
+    if (*ref_lookup_response.entry_) {
+      ret.push_back(*ref_lookup_response.entry_);
+    }
+    return ret;
+  }
+  // If the requested header is not an O(1) header we do a full scan. Doing the trie lookup is
+  // wasteful in the miss case, but is present for code consistency with other functions that do
+  // similar things.
+  // TODO(mattklein123): The full scan here and in remove() are the biggest issues with this
+  // implementation for certain use cases. We can either replace this with a totally different
+  // implementation or potentially create a lazy map if the size of the map is above a threshold.
   for (HeaderEntryImpl& header : headers_) {
     if (header.key() == key.get().c_str()) {
-      return &header;
+      ret.push_back(&header);
     }
   }
-
-  return nullptr;
+  return ret;
 }
 
 void HeaderMapImpl::iterate(ConstIterateCb cb, void* context) const {

@@ -105,36 +105,65 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
   return true;
 }
 
-bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderData& header_data) {
-  const HeaderEntry* header = request_headers.get(header_data.name_);
+HeaderUtility::GetAllOfHeaderAsStringResult
+HeaderUtility::getAllOfHeaderAsString(const HeaderMap& headers, const Http::LowerCaseString& key) {
+  GetAllOfHeaderAsStringResult result;
+  const auto header_value = headers.getAll(key);
 
-  if (header == nullptr) {
+  if (header_value.empty()) {
+    // Empty for clarity. Avoid handling the empty case in the block below if the runtime feature
+    // is disabled.
+  } else if (header_value.size() == 1 ||
+             !Runtime::runtimeFeatureEnabled(
+                 "envoy.reloadable_features.http_match_on_all_headers")) {
+    result.result_ = header_value[0]->value().getStringView();
+  } else {
+    // In this case we concatenate all found headers using a ',' delimiter before performing the
+    // final match. We use an InlinedVector of absl::string_view to invoke the optimized join
+    // algorithm. This requires a copying phase before we invoke join. The 3 used as the inline
+    // size has been arbitrarily chosen.
+    // TODO(mattklein123): Do we need to normalize any whitespace here?
+    absl::InlinedVector<absl::string_view, 3> string_view_vector;
+    string_view_vector.reserve(header_value.size());
+    for (size_t i = 0; i < header_value.size(); i++) {
+      string_view_vector.push_back(header_value[i]->value().getStringView());
+    }
+    result.result_backing_string_ = absl::StrJoin(string_view_vector, ",");
+  }
+
+  return result;
+}
+
+bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderData& header_data) {
+  const auto header_value = getAllOfHeaderAsString(request_headers, header_data.name_);
+
+  if (!header_value.result().has_value()) {
     return header_data.invert_match_ && header_data.header_match_type_ == HeaderMatchType::Present;
   }
 
   bool match;
-  const absl::string_view header_view = header->value().getStringView();
   switch (header_data.header_match_type_) {
   case HeaderMatchType::Value:
-    match = header_data.value_.empty() || header_view == header_data.value_;
+    match = header_data.value_.empty() || header_value.result().value() == header_data.value_;
     break;
   case HeaderMatchType::Regex:
-    match = header_data.regex_->match(header_view);
+    match = header_data.regex_->match(header_value.result().value());
     break;
   case HeaderMatchType::Range: {
-    int64_t header_value = 0;
-    match = absl::SimpleAtoi(header_view, &header_value) &&
-            header_value >= header_data.range_.start() && header_value < header_data.range_.end();
+    int64_t header_int_value = 0;
+    match = absl::SimpleAtoi(header_value.result().value(), &header_int_value) &&
+            header_int_value >= header_data.range_.start() &&
+            header_int_value < header_data.range_.end();
     break;
   }
   case HeaderMatchType::Present:
     match = true;
     break;
   case HeaderMatchType::Prefix:
-    match = absl::StartsWith(header_view, header_data.value_);
+    match = absl::StartsWith(header_value.result().value(), header_data.value_);
     break;
   case HeaderMatchType::Suffix:
-    match = absl::EndsWith(header_view, header_data.value_);
+    match = absl::EndsWith(header_value.result().value(), header_data.value_);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

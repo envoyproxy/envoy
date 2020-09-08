@@ -100,6 +100,24 @@ TEST_F(HeaderToMetadataTest, BasicRequestTest) {
   filter_->onDestroy();
 }
 
+// Verify concatenation works.
+TEST_F(HeaderToMetadataTest, BasicRequestDoubleHeadersTest) {
+  initializeFilter(request_config_yaml);
+  Http::TestHeaderMapImpl incoming_headers{{"X-VERSION", "foo"}, {"X-VERSION", "bar"}};
+  std::map<std::string, std::string> expected = {{"version", "foo,bar"}};
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(incoming_headers, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+  Buffer::OwnedImpl data("data");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  Http::TestHeaderMapImpl incoming_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(incoming_trailers));
+  filter_->onDestroy();
+}
+
 /**
  * X-version not set, the on missing value should be set.
  */
@@ -398,6 +416,27 @@ request_rules:
 )EOF";
   initializeFilter(config);
   Http::TestHeaderMapImpl headers{{"x-version", ""}};
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
+/**
+ * Missing case is not executed when header is present.
+ */
+TEST_F(HeaderToMetadataTest, NoMissingWhenHeaderIsPresent) {
+  const std::string config = R"EOF(
+request_rules:
+  - header: x-version
+    on_header_missing:
+      metadata_namespace: envoy.lb
+      key: version
+      value: some_value
+      type: STRING
+)EOF";
+  initializeFilter(config);
+  Http::TestHeaderMapImpl headers{{"x-version", "19"}};
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);

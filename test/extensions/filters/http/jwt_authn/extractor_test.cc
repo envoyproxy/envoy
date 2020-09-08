@@ -170,6 +170,14 @@ TEST_F(ExtractorTest, TestCustomHeaderToken) {
   EXPECT_FALSE(headers.get(Http::LowerCaseString("token-header")));
 }
 
+// Make sure a double custom header concatenates the token
+TEST_F(ExtractorTest, TestDoubleCustomHeaderToken) {
+  auto headers = TestHeaderMapImpl{{"token-header", "jwt_token"}, {"token-header", "foo"}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 1);
+  EXPECT_EQ(tokens[0]->token(), "jwt_token,foo");
+}
+
 // Test extracting token from the custom header: "prefix-header"
 // value prefix doesn't match. It has to be either "AAA" or "AAABBB".
 TEST_F(ExtractorTest, TestPrefixHeaderNotMatch) {

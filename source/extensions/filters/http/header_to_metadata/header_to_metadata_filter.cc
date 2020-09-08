@@ -4,6 +4,8 @@
 
 #include "common/common/base64.h"
 #include "common/config/well_known_names.h"
+#include "common/http/header_utility.h"
+#include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/filters/http/well_known_names.h"
@@ -157,13 +159,12 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
   for (const auto& rulePair : rules) {
     const auto& header = rulePair.first;
     const auto& rule = rulePair.second;
-    const Http::HeaderEntry* header_entry = headers.get(header);
+    const auto header_value = Http::HeaderUtility::getAllOfHeaderAsString(headers, header);
 
-    if (header_entry != nullptr && rule.has_on_header_present()) {
+    if (header_value.result().has_value() && rule.has_on_header_present()) {
       const auto& keyval = rule.on_header_present();
-      absl::string_view value = keyval.value().empty() ? header_entry->value().getStringView()
+      absl::string_view value = keyval.value().empty() ? header_value.result().value()
                                                        : absl::string_view(keyval.value());
-
       if (!value.empty()) {
         const auto& nspace = decideNamespace(keyval.metadata_namespace());
         addMetadata(structs_by_namespace, nspace, keyval.key(), value, keyval.type(),
@@ -175,7 +176,8 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
       if (rule.remove()) {
         headers.remove(header);
       }
-    } else if (rule.has_on_header_missing()) {
+    }
+    if (!header_value.result().has_value() && rule.has_on_header_missing()) {
       // Add metadata for the header missing case.
       const auto& keyval = rule.on_header_missing();
 

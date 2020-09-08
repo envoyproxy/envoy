@@ -64,6 +64,33 @@ typed_config:
           - any: true
 )EOF";
 
+const std::string RBAC_CONFIG_HEADER_MATCH_CONDITION = R"EOF(
+name: envoy.filters.http.rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
+  rules:
+    policies:
+      foo:
+        permissions:
+          - any: true
+        principals:
+          - any: true
+        condition:
+          call_expr:
+            function: _==_
+            args:
+            - select_expr:
+                operand:
+                  select_expr:
+                    operand:
+                      ident_expr:
+                        name: request
+                    field: headers
+                field: xxx
+            - const_expr:
+               string_value: {}
+)EOF";
+
 using RBACIntegrationTest = HttpProtocolIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, RBACIntegrationTest,
@@ -275,6 +302,79 @@ TEST_P(RBACIntegrationTest, PathIgnoreCase) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   }
+}
+
+// Basic CEL match on a header value.
+TEST_P(RBACIntegrationTest, HeaderMatchCondition) {
+  config_helper_.addFilter(fmt::format(RBAC_CONFIG_HEADER_MATCH_CONDITION, "yyy"));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/path"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"xxx", "yyy"},
+      },
+      1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+// CEL match on a header value in which the header is a duplicate. Verifies we handle string
+// copying correctly inside the CEL expression.
+TEST_P(RBACIntegrationTest, HeaderMatchConditionDuplicateHeaderNoMatch) {
+  config_helper_.addFilter(fmt::format(RBAC_CONFIG_HEADER_MATCH_CONDITION, "yyy"));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/path"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"xxx", "yyy"},
+          {"xxx", "zzz"},
+      },
+      1024);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().Status()->value().getStringView());
+}
+
+// CEL match on a header value in which the header is a duplicate. Verifies we handle string
+// copying correctly inside the CEL expression.
+TEST_P(RBACIntegrationTest, HeaderMatchConditionDuplicateHeaderMatch) {
+  config_helper_.addFilter(fmt::format(RBAC_CONFIG_HEADER_MATCH_CONDITION, "yyy,zzz"));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/path"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"xxx", "yyy"},
+          {"xxx", "zzz"},
+      },
+      1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 } // namespace

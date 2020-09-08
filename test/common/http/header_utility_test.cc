@@ -7,6 +7,7 @@
 #include "common/http/header_utility.h"
 #include "common/json/json_loader.h"
 
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -18,6 +19,65 @@ envoy::config::route::v3::HeaderMatcher parseHeaderMatcherFromYaml(const std::st
   envoy::config::route::v3::HeaderMatcher header_matcher;
   TestUtility::loadFromYaml(yaml, header_matcher);
   return header_matcher;
+}
+
+class HeaderUtilityTest : public testing::Test {
+public:
+  const HeaderEntry& hostHeaderEntry(const std::string& host_value, bool set_connect = false) {
+    headers_.setHost(host_value);
+    if (set_connect) {
+      headers_.setMethod(Http::Headers::get().MethodValues.Connect);
+    }
+    return *headers_.Host();
+  }
+  TestHeaderMapImpl headers_;
+};
+
+TEST(GetAllOfHeaderAsStringTest, All) {
+  const LowerCaseString test_header("test");
+  {
+    TestHeaderMapImpl headers;
+    const auto ret = HeaderUtility::getAllOfHeaderAsString(headers, test_header);
+    EXPECT_FALSE(ret.result().has_value());
+    EXPECT_TRUE(ret.backingString().empty());
+  }
+  {
+    TestHeaderMapImpl headers{{"test", "foo"}};
+    const auto ret = HeaderUtility::getAllOfHeaderAsString(headers, test_header);
+    EXPECT_EQ("foo", ret.result().value());
+    EXPECT_TRUE(ret.backingString().empty());
+  }
+  {
+    TestHeaderMapImpl headers{{"test", "foo"}, {"test", "bar"}};
+    const auto ret = HeaderUtility::getAllOfHeaderAsString(headers, test_header);
+    EXPECT_EQ("foo,bar", ret.result().value());
+    EXPECT_EQ("foo,bar", ret.backingString());
+  }
+  {
+    TestHeaderMapImpl headers{{"test", ""}, {"test", "bar"}};
+    const auto ret = HeaderUtility::getAllOfHeaderAsString(headers, test_header);
+    EXPECT_EQ(",bar", ret.result().value());
+    EXPECT_EQ(",bar", ret.backingString());
+  }
+  {
+    TestHeaderMapImpl headers{{"test", ""}, {"test", ""}};
+    const auto ret = HeaderUtility::getAllOfHeaderAsString(headers, test_header);
+    EXPECT_EQ(",", ret.result().value());
+    EXPECT_EQ(",", ret.backingString());
+  }
+  {
+    TestHeaderMapImpl headers{
+        {"test", "a"}, {"test", "b"}, {"test", "c"}, {"test", ""}, {"test", ""}};
+    const auto ret = HeaderUtility::getAllOfHeaderAsString(headers, test_header);
+    EXPECT_EQ("a,b,c,,", ret.result().value());
+    EXPECT_EQ("a,b,c,,", ret.backingString());
+    // Make sure copying the return value works correctly.
+    const auto ret2 = ret; // NOLINT(performance-unnecessary-copy-initialization)
+    EXPECT_EQ(ret2.result(), ret.result());
+    EXPECT_EQ(ret2.backingString(), ret.backingString());
+    EXPECT_EQ(ret2.result().value().data(), ret2.backingString().data());
+    EXPECT_NE(ret2.result().value().data(), ret.backingString().data());
+  }
 }
 
 TEST(HeaderDataConstructorTest, NoSpecifierSet) {
@@ -170,8 +230,32 @@ regex_match: (a|b)
   EXPECT_FALSE(HeaderUtility::matchHeaders(headers, header_data));
 
   headers.addCopy("match-header", "a");
+  // With a single "match-header" this regex will match.
   EXPECT_TRUE(HeaderUtility::matchHeaders(headers, header_data));
+
   headers.addCopy("match-header", "b");
+  // With two "match-header" we now logically have "a,b" as the value, so the regex will not match.
+  EXPECT_FALSE(HeaderUtility::matchHeaders(headers, header_data));
+
+  header_data[0] = std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(R"EOF(
+name: match-header
+exact_match: a,b
+  )EOF"));
+  // Make sure that an exact match on "a,b" does in fact work.
+  EXPECT_TRUE(HeaderUtility::matchHeaders(headers, header_data));
+
+  TestScopedRuntime runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http_match_on_all_headers", "false"}});
+  // Flipping runtime to false should make "a,b" no longer match because we will match on the first
+  // header only.
+  EXPECT_FALSE(HeaderUtility::matchHeaders(headers, header_data));
+
+  header_data[0] = std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(R"EOF(
+name: match-header
+exact_match: a
+  )EOF"));
+  // With runtime off, exact match on "a" should pass.
   EXPECT_TRUE(HeaderUtility::matchHeaders(headers, header_data));
 }
 
