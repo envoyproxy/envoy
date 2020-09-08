@@ -58,7 +58,7 @@ double AdmissionControlFilterConfig::successRateThreshold() const {
 AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
                                                const std::string& stats_prefix)
     : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)),
-      expect_grpc_status_in_trailer_(false), record_request_(true) {}
+      record_request_(true) {}
 
 Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   if (!config_->filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
