@@ -23,11 +23,10 @@ void HealthCheckFuzz::allocTcpHealthCheckerFromProto(
       *TcpHealthCheckerImplTestBase::cluster_, config, TcpHealthCheckerImplTestBase::dispatcher_,
       TcpHealthCheckerImplTestBase::runtime_, TcpHealthCheckerImplTestBase::random_,
       HealthCheckEventLoggerPtr(TcpHealthCheckerImplTestBase::event_logger_storage_.release()));
-    ENVOY_LOG_MISC(trace, "Created Test Tcp Health Checker");
+  ENVOY_LOG_MISC(trace, "Created Test Tcp Health Checker");
 }
 
-void HealthCheckFuzz::initializeAndReplay(
-    test::common::upstream::HealthCheckTestCase input) { // Also Splits the two
+void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTestCase input) {
   switch (input.health_check_config().health_checker_case()) {
   case envoy::config::core::v3::HealthCheck::kHttpHealthCheck: {
     type_ = HealthCheckFuzz::Type::HTTP;
@@ -75,7 +74,6 @@ void HealthCheckFuzz::initializeAndReplayTcp(test::common::upstream::HealthCheck
                    "tcp://127.0.0.1:80")}; // TODO: Support multiple hosts?
   TcpHealthCheckerImplTestBase::expectClientCreate();
 
-  // connection_->....
   TcpHealthCheckerImplTestBase::health_checker_->start();
   TcpHealthCheckerImplTestBase::connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
@@ -95,10 +93,6 @@ void HealthCheckFuzz::respondHttp(test::fuzz::Headers headers, absl::string_view
   test_sessions_[index]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
                                                                    true);
 }
-
-/*void HealthCheckFuzz::respondTcp(string ) {
-  read_filter_->onData(, false);
-}*/
 
 void HealthCheckFuzz::streamCreate(bool second_host) {
   const int index = (second_host_ && second_host) ? 1 : 0;
@@ -127,6 +121,7 @@ void HealthCheckFuzz::raiseEvent(test::common::upstream::RaiseEvent event, bool 
   default:
     break;
   }
+
   const int index = (second_host_ && second_host) ? 1 : 0;
   switch (type_) {
   case HealthCheckFuzz::Type::HTTP: {
@@ -144,8 +139,7 @@ void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) 
   for (int i = 0; i < input.actions().size(); ++i) {
     const auto& event = input.actions(i);
     ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
-    switch (event.action_selector_case()) { // TODO: Once added implementations for tcp and gRPC,
-                                            // move this to a separate method, handleHttp
+    switch (event.action_selector_case()) {
     case test::common::upstream::Action::kRespond: {
       switch (type_) {
       case HealthCheckFuzz::Type::HTTP: {
@@ -153,11 +147,13 @@ void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) 
                     event.respond().http_respond().status(), event.respond().second_host());
         break;
       }
-      // TODO: TCP and gRPC
       case HealthCheckFuzz::Type::TCP: {
-        ENVOY_LOG_MISC(trace, "Responded with {}. Length (in bytes) = {}.", event.respond().tcp_respond().data(), event.respond().tcp_respond().data().length());
+        ENVOY_LOG_MISC(trace, "Responded with {}. Length (in bytes) = {}.",
+                       event.respond().tcp_respond().data(),
+                       event.respond().tcp_respond().data().length());
         Buffer::OwnedImpl response;
-        response.add(&event.respond().tcp_respond().data(), event.respond().tcp_respond().data().length());
+        response.add(&event.respond().tcp_respond().data(),
+                     event.respond().tcp_respond().data().length());
         read_filter_->onData(response, false);
         break;
       }
@@ -166,8 +162,7 @@ void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) 
       }
       break;
     }
-    case test::common::upstream::Action::kStreamCreate: { // TODO: Map to client create for TCP
-                                                          // across a switch
+    case test::common::upstream::Action::kStreamCreate: {
       switch (type_) {
       case HealthCheckFuzz::Type::HTTP: {
         streamCreate(event.stream_create().second_host());
@@ -195,9 +190,7 @@ void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) 
         break;
       }
       case HealthCheckFuzz::Type::TCP: {
-        //TcpHealthCheckerImplTestBase::time_system_.advanceTimeAsync(
-        //    std::chrono::milliseconds(event.advance_time().ms_advanced()));
-        //TcpHealthCheckerImplTestBase::dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+        // TODO: No time system?
         break;
       }
       default:

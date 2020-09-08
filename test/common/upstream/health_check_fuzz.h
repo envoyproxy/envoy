@@ -15,7 +15,6 @@ public:
     TCP,
     GRPC,
   };
-
   Type type_;
 
 private:

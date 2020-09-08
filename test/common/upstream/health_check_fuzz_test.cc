@@ -11,20 +11,17 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::HealthCheckTestCase input) {
   try {
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {
-    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
+    ENVOY_LOG_MISC(trace, "ProtoValidationException: {}", e.what());
     return;
   }
 
   HealthCheckFuzz health_check_fuzz;
 
   if (input.health_check_config().health_checker_case() ==
-      envoy::config::core::v3::HealthCheck::kGrpcHealthCheck) { // Temporary because HTTP is only
-                                                                // one implemented
+      envoy::config::core::v3::HealthCheck::kGrpcHealthCheck) {
     ENVOY_LOG_MISC(trace, "Fuzz engine created Grpc Health Checker");
     return;
   }
-
-  //health_check_fuzz.type_ = HealthCheckFuzz::Type::HTTP;
 
   health_check_fuzz.initializeAndReplay(input);
 }
