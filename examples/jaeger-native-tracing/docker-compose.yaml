@@ -20,10 +20,9 @@ services:
   service1:
     build:
       context: ../front-proxy
-      dockerfile: Dockerfile-service
+      dockerfile: Dockerfile-jaeger-service
     volumes:
       - ./service1-envoy-jaeger.yaml:/etc/service-envoy.yaml
-      - ./libjaegertracing.so.0.4.2:/usr/local/lib/libjaegertracing_plugin.so
     networks:
       envoymesh:
         aliases:
@@ -39,10 +38,9 @@ services:
   service2:
     build:
       context: ../front-proxy
-      dockerfile: Dockerfile-service
+      dockerfile: Dockerfile-jaeger-service
     volumes:
       - ./service2-envoy-jaeger.yaml:/etc/service-envoy.yaml
-      - ./libjaegertracing.so.0.4.2:/usr/local/lib/libjaegertracing_plugin.so
     networks:
       envoymesh:
         aliases:

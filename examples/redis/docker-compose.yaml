@@ -5,8 +5,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-proxy
-    volumes:
-      - ./envoy.yaml:/etc/envoy.yaml
     networks:
       - envoymesh
     expose:
