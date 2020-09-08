@@ -5,6 +5,7 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -153,7 +154,7 @@ private:
                         public ScopeTrackedObject,
                         public FilterManagerCallbacks {
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit);
-    ~ActiveStream() override;
+    void completeRequest();
 
     void chargeStats(const ResponseHeaderMap& headers);
     const Network::Connection* connection();
@@ -209,6 +210,40 @@ private:
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(ResponseTrailerMap& trailers) override;
     void encodeMetadata(MetadataMapVector& metadata) override;
+    void setRequestTrailers(Http::RequestTrailerMapPtr&& request_trailers) override {
+      ASSERT(!request_trailers_);
+      request_trailers_ = std::move(request_trailers);
+    }
+    void setContinueHeaders(Http::ResponseHeaderMapPtr&& continue_headers) override {
+      ASSERT(!continue_headers_);
+      continue_headers_ = std::move(continue_headers);
+    }
+    void setResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers) override {
+      // We'll overwrite the headers in the case where we fail the stream after upstream headers
+      // have begun filter processing but before they have been sent downstream.
+      response_headers_ = std::move(response_headers);
+    }
+    void setResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers) override {
+      response_trailers_ = std::move(response_trailers);
+    }
+
+    // TODO(snowp): Create shared OptRef/OptConstRef helpers
+    Http::RequestHeaderMapOptRef requestHeaders() override {
+      return request_headers_ ? std::make_optional(std::ref(*request_headers_)) : absl::nullopt;
+    }
+    Http::RequestTrailerMapOptRef requestTrailers() override {
+      return request_trailers_ ? std::make_optional(std::ref(*request_trailers_)) : absl::nullopt;
+    }
+    Http::ResponseHeaderMapOptRef continueHeaders() override {
+      return continue_headers_ ? std::make_optional(std::ref(*continue_headers_)) : absl::nullopt;
+    }
+    Http::ResponseHeaderMapOptRef responseHeaders() override {
+      return response_headers_ ? std::make_optional(std::ref(*response_headers_)) : absl::nullopt;
+    }
+    Http::ResponseTrailerMapOptRef responseTrailers() override {
+      return response_trailers_ ? std::make_optional(std::ref(*response_trailers_)) : absl::nullopt;
+    }
+
     void endStream() override {
       ASSERT(!state_.codec_saw_local_complete_);
       state_.codec_saw_local_complete_ = true;
@@ -225,8 +260,7 @@ private:
     }
     void disarmRequestTimeout() override;
     void resetIdleTimer() override;
-    void recreateStream(RequestHeaderMapPtr&& request_headers,
-                        StreamInfo::FilterStateSharedPtr filter_state) override;
+    void recreateStream(StreamInfo::FilterStateSharedPtr filter_state) override;
     void resetStream() override;
     const Router::RouteEntry::UpgradeMap* upgradeMap() override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
@@ -300,7 +334,18 @@ private:
     // TODO(snowp): It might make sense to move this to the FilterManager to avoid storing it in
     // both locations, then refer to the FM when doing stream logs.
     const uint64_t stream_id_;
+
+    RequestHeaderMapPtr request_headers_;
+    RequestTrailerMapPtr request_trailers_;
+
+    ResponseHeaderMapPtr continue_headers_;
+    ResponseHeaderMapPtr response_headers_;
+    ResponseTrailerMapPtr response_trailers_;
+
+    // Note: The FM must outlive the above headers, as they are possibly accessed during filter
+    // destruction.
     FilterManager filter_manager_;
+
     Router::ConfigConstSharedPtr snapped_route_config_;
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     Tracing::SpanPtr active_span_;
@@ -355,8 +400,8 @@ private:
   enum class DrainState { NotDraining, Draining, Closing };
 
   ConnectionManagerConfig& config_;
-  ConnectionManagerStats& stats_; // We store a reference here to avoid an extra stats() call on the
-                                  // config in the hot path.
+  ConnectionManagerStats& stats_; // We store a reference here to avoid an extra stats() call on
+                                  // the config in the hot path.
   ServerConnectionPtr codec_;
   std::list<ActiveStreamPtr> streams_;
   Stats::TimespanPtr conn_length_;
@@ -377,8 +422,8 @@ private:
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   ConnectionManagerListenerStats& listener_stats_;
-  // References into the overload manager thread local state map. Using these lets us avoid a map
-  // lookup in the hot path of processing each request.
+  // References into the overload manager thread local state map. Using these lets us avoid a
+  // map lookup in the hot path of processing each request.
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
