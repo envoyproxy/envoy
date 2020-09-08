@@ -88,6 +88,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
   ON_CALL(*this, lbSubsetInfo()).WillByDefault(ReturnRef(lb_subset_));
   ON_CALL(*this, lbRingHashConfig()).WillByDefault(ReturnRef(lb_ring_hash_config_));
+  ON_CALL(*this, lbMaglevConfig()).WillByDefault(ReturnRef(lb_maglev_config_));
   ON_CALL(*this, lbOriginalDstConfig()).WillByDefault(ReturnRef(lb_original_dst_config_));
   ON_CALL(*this, upstreamConfig()).WillByDefault(ReturnRef(upstream_config_));
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));

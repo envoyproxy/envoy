@@ -647,8 +647,16 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
 
 FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
-    ThreadLocal::SlotAllocator&, Api::Api&)
-    : disabled_(config.disabled()), name_(config.name()) {}
+    Server::Configuration::ServerFactoryContext& context)
+    : main_thread_dispatcher_(context.dispatcher()), disabled_(config.disabled()),
+      name_(config.name()) {
+  if (disabled_ || !name_.empty()) {
+    return;
+  }
+  // Read and parse the inline Lua code defined in the route configuration.
+  const std::string code_str = Config::DataSource::read(config.source_code(), true, context.api());
+  per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());
+}
 
 void Filter::onDestroy() {
   destroyed_ = true;
