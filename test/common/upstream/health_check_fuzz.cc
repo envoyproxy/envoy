@@ -17,6 +17,7 @@ void HealthCheckFuzz::allocHealthCheckerFromProto(
 }
 
 void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTestCase input) {
+  second_host_ = false;
   allocHealthCheckerFromProto(input.health_check_config());
   ON_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillByDefault(testing::Return(input.http_verify_cluster()));
