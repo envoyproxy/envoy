@@ -100,6 +100,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "io_handle_bio_test",
+    srcs = ["io_handle_bio_test.cc"],
+    external_deps = ["ssl"],
+    deps = [
+        ":ssl_test_utils",
+        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//test/mocks/network:io_handle_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "utility_test",
     srcs = [
         "utility_test.cc",
