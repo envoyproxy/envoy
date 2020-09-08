@@ -157,7 +157,10 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::addOnDemandUpdat
     return;
   }
   on_demand_update_callbacks_.push_back(callback);
-  // Initialize the rds provider if it has not been initialized.
+  // Initialize the rds provider if it has not been initialized. There is potential race here
+  // because other worker threads may also post callback to on demand update the RouteConfiguration
+  // associated with this scope. If rds provider has been initialized, just wait for
+  // RouteConfiguration to be updated.
   maybeInitRdsConfigProvider();
 }
 
@@ -241,7 +244,7 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
       // For on demand scopes, create a rds helper with rds provider uninitialized.
       rds_config_provider_helper =
           std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name);
-      // scope_route_info->routeConfig() will be nullptr
+      // scope_route_info->routeConfig() will be nullptr, because RouteConfiguration is not loaded.
       scoped_route_info =
           std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config), nullptr);
     }
