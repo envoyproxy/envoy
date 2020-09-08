@@ -515,11 +515,9 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestVhdsUpdate(
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
     Router::ScopeKeyPtr scope_key, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  // If it is inline scope_route_config_provider, will be cast to nullptr.
-  if (scoped_route_config_provider_ == nullptr) {
-    (*route_config_updated_cb)(false);
-    return;
-  }
+  // since inline scope_route_config_provider is not fully implemented and never used,
+  // dynamic cast in constructor always succeed and the pointer should not be null here.
+  ASSERT(scoped_route_config_provider_ != nullptr);
   Http::RouteConfigUpdatedCallback scoped_route_config_updated_cb =
       Http::RouteConfigUpdatedCallback(
           [this, weak_route_config_updated_cb = std::weak_ptr<Http::RouteConfigUpdatedCallback>(
