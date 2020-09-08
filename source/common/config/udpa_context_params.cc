@@ -41,7 +41,7 @@ const NodeContextRenderers& nodeParamCbs() {
 
 void mergeMetadataJson(Protobuf::Map<std::string, std::string>& params,
                        const ProtobufWkt::Struct& metadata, const std::string& prefix) {
-  for (const auto it : metadata.fields()) {
+  for (const auto& it : metadata.fields()) {
     params[prefix + it.first] = MessageUtil::getJsonStringFromMessage(it.second);
   }
 }
@@ -70,7 +70,7 @@ udpa::core::v1::ContextParams UdpaContextParams::encode(
   }
 
   // 2. Overlay with context parameters from resource name.
-  for (const auto it : resource_context_params.params()) {
+  for (const auto& it : resource_context_params.params()) {
     mutable_params[it.first] = it.second;
   }
 
@@ -80,7 +80,7 @@ udpa::core::v1::ContextParams UdpaContextParams::encode(
   }
 
   // 4. Overlay with per-resource well-known attributes.
-  for (const auto it : extra_resource_params) {
+  for (const auto& it : extra_resource_params) {
     mutable_params["udpa.resource." + it.first] = it.second;
   }
 
