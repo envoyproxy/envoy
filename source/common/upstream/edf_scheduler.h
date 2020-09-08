@@ -38,7 +38,7 @@ public:
         queue_.pop();
       } else if (hasEntry()) {
         prepick_list_.push_back(std::move(queue_.top().entry_));
-        std::shared_ptr<C> ret{queue_.top().entry_};
+        std::shared_ptr<C> ret{prepick_list_.back()};
         add(calculate_weight(*ret), ret);
         queue_.pop();
         return ret;

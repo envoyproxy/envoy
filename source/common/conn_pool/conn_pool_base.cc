@@ -46,7 +46,7 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_prefetch_ratio) co
   // prefetch limit, prefetch.
   // We may eventually want to track prefetch_attempts to allow more prefetching for
   // heavily weighted upstreams or sticky picks.
-  if (global_prefetch_ratio != 0 &&
+  if (global_prefetch_ratio > 1.0 &&
       ((pending_streams_.size() + 1 + num_active_streams_) * global_prefetch_ratio >
        (connecting_stream_capacity_ + num_active_streams_))) {
     return true;

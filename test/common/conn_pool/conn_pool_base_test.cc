@@ -146,13 +146,14 @@ TEST_F(ConnPoolImplBaseTest, ExplicitPrefetch) {
 
   // With global prefetch off, we won't prefetch.
   EXPECT_FALSE(pool_.maybePrefetch(0));
-  // With prefetch ratio of 1, we'll prefetch a single connection.
-  // Currently, even multiple calls to prefetch won't increase that.
-  EXPECT_TRUE(pool_.maybePrefetch(1));
-  EXPECT_FALSE(pool_.maybePrefetch(1));
+  // With prefetch ratio of 1.1, we'll prefetch two connections.
+  // Currently, no number of subsequent calls to prefetch will increase that.
+  EXPECT_TRUE(pool_.maybePrefetch(1.1));
+  EXPECT_TRUE(pool_.maybePrefetch(1.1));
+  EXPECT_FALSE(pool_.maybePrefetch(1.1));
 
-  // With a higher prefetch ratio, multiple connections may be prefetched.
-  EXPECT_TRUE(pool_.maybePrefetch(1.4));
+  // With a higher prefetch ratio, more connections may be prefetched.
+  EXPECT_TRUE(pool_.maybePrefetch(3));
 
   pool_.destructAllConnections();
 }
