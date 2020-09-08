@@ -16,7 +16,7 @@ BrotliDecompressorImpl::BrotliDecompressorImpl(Stats::Scope& scope, const std::s
                                                uint64_t chunk_size,
                                                bool disable_ring_buffer_reallocation)
     : chunk_size_{chunk_size},
-      state_(BrotliDecoderCreateInstance(NULL, NULL, NULL), &BrotliDecoderDestroyInstance),
+      state_(BrotliDecoderCreateInstance(nullptr, nullptr, nullptr), &BrotliDecoderDestroyInstance),
       stats_(generateStats(stats_prefix, scope)) {
   BROTLI_BOOL result =
       BrotliDecoderSetParameter(state_.get(), BROTLI_DECODER_PARAM_DISABLE_RING_BUFFER_REALLOCATION,
