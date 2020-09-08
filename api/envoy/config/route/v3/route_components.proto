@@ -777,9 +777,8 @@ message RouteAction {
     // subtracting the provided duration from the header. This is useful for allowing Envoy to set
     // its global timeout to be less than that of the deadline imposed by the calling client, which
     // makes it more likely that Envoy will handle the timeout instead of having the call canceled
-    // by the client. The offset will be applied only if the provided `grpc-timeout` header is
-    // greater than the offset. This ensures that the offset will only ever decrease the timeout and
-    // never set it to 0 (meaning infinity).
+    // by the client. If, after applying the offset, the resulting timeout is zero or negative,
+    // the stream will timeout immediately.
     google.protobuf.Duration grpc_timeout_offset = 3;
   }
 

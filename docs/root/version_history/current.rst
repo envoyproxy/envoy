@@ -96,10 +96,10 @@ New Features
 * router: added new :ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_path_regex>`
   option, which allows rewriting Host header based on path.
 * router: added support for DYNAMIC_METADATA :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
-* router_check_tool: added support for `request_header_matches`, `response_header_matches` to :ref:`router check tool <config_tools_router_check_tool>`.
 * router: added new :ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.max_stream_duration>`
   to override HTTP connection manager option :ref:`max_stream_duration
   <envoy_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>`.
+* router_check_tool: added support for `request_header_matches`, `response_header_matches` to :ref:`router check tool <config_tools_router_check_tool>`.
 * signal: added support for calling fatal error handlers without envoy's signal handler, via FatalErrorHandler::callFatalErrorHandlers().
 * stats: added optional histograms to :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>`
   that track headers and body sizes of requests and responses.
