@@ -123,8 +123,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_TRUE(options->useDynamicBaseId());
   EXPECT_EQ("/foo/baz", options->baseIdPath());
   EXPECT_EQ("/foo/envoy_domain_socket", options->socketPath());
-  // Decimal value of 644 is 420
-  EXPECT_EQ(420, options->socketMode());
+  EXPECT_EQ(0644, options->socketMode());
 
   options = createOptionsImpl("envoy --mode init_only");
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
@@ -185,7 +184,7 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setRejectUnknownFieldsDynamic(true);
   options->setFakeSymbolTableEnabled(!options->fakeSymbolTableEnabled());
   options->setSocketPath("/foo/envoy_domain_socket");
-  options->setSocketMode(644);
+  options->setSocketMode(0644);
 
   EXPECT_EQ(109876, options->baseId());
   EXPECT_EQ(42U, options->concurrency());
@@ -215,7 +214,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_TRUE(options->rejectUnknownDynamicFields());
   EXPECT_EQ(!fake_symbol_table_enabled, options->fakeSymbolTableEnabled());
   EXPECT_EQ("/foo/envoy_domain_socket", options->socketPath());
-  EXPECT_EQ(644, options->socketMode());
+  EXPECT_EQ(0644, options->socketMode());
 
   // Validate that CommandLineOptions is constructed correctly.
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();

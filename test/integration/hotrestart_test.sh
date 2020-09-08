@@ -83,6 +83,13 @@ TEST_INDEX=0
 function run_testsuite() {
   local HOT_RESTART_JSON="$1"
   local FAKE_SYMBOL_TABLE="$2"
+  local SOCKET_PATH=@envoy_domain_socket
+  local SOCKET_MODE=0
+  if [ ! -z $3 ] &&  [ ! -z $4 ]
+  then
+     SOCKET_PATH=$3
+     SOCKET_MODE=$4
+  fi
 
   start_test validation
   check "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" --mode validate --service-cluster cluster \
@@ -99,7 +106,8 @@ function run_testsuite() {
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
       --restart-epoch 0  --use-dynamic-base-id --base-id-path "${BASE_ID_PATH}" \
       --service-cluster cluster --service-node node --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" \
-      --admin-address-path "${ADMIN_ADDRESS_PATH_0}"
+      --admin-address-path "${ADMIN_ADDRESS_PATH_0}" \
+      --socket-path "${SOCKET_PATH}" --socket-mode "${SOCKET_MODE}"
 
   local BASE_ID=$(cat "${BASE_ID_PATH}")
   while [ -z "${BASE_ID}" ]; do
@@ -169,7 +177,8 @@ function run_testsuite() {
   ADMIN_ADDRESS_PATH_1="${TEST_TMPDIR}"/admin.1."${TEST_INDEX}".address
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
       --restart-epoch 1 --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
-      --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --admin-address-path "${ADMIN_ADDRESS_PATH_1}"
+      --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --admin-address-path "${ADMIN_ADDRESS_PATH_1}" \
+      --socket-path "${SOCKET_PATH}" --socket-mode "${SOCKET_MODE}"
 
   SERVER_1_PID=$BACKGROUND_PID
 
@@ -210,7 +219,8 @@ function run_testsuite() {
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
       --restart-epoch 2  --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
       --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --admin-address-path "${ADMIN_ADDRESS_PATH_2}" \
-      --parent-shutdown-time-s 3
+      --parent-shutdown-time-s 3 \
+      --socket-path "${SOCKET_PATH}" --socket-mode "${SOCKET_MODE}"
 
   SERVER_2_PID=$BACKGROUND_PID
 
@@ -262,6 +272,7 @@ function run_testsuite() {
   [[ $? == 0 ]]
 }
 
+# Hotrestart in abstract namespace
 for HOT_RESTART_JSON in "${JSON_TEST_ARRAY[@]}"
 do
   # Run one of the tests with real symbol tables. No need to do all of them.
@@ -272,11 +283,22 @@ do
   run_testsuite "$HOT_RESTART_JSON" "1" || exit 1
 done
 
+# Hotrestart in specified UDS
+for HOT_RESTART_JSON in "${JSON_TEST_ARRAY[@]}"
+do
+  # Run one of the tests with real symbol tables. No need to do all of them.
+  if [ "$TEST_INDEX" = "0" ]; then
+    run_testsuite "$HOT_RESTART_JSON" "0" "/tmp/envoy_domain_socket" "600" || exit 1
+  fi
+
+  run_testsuite "$HOT_RESTART_JSON" "1" "/tmp/envoy_domain_socket" "600" || exit 1
+done
+
 start_test disabling hot_restart by command line.
 CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --disable-hot-restart 2>&1)
 check [ "disabled" = "${CLI_HOT_RESTART_VERSION}" ]
 
-#Validate socket mode
+# Validating socket-path permission
 start_test socket-mode for socket path
 run_in_background_saving_pid "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
       --restart-epoch 0  --base-id 0 --base-id-path "${BASE_ID_PATH}" \
@@ -289,4 +311,5 @@ check [ "644" = "${EXPECTED_SOCKET_MODE}" ]
 kill ${BACKGROUND_PID}
 wait ${BACKGROUND_PID}
   [[ $? == 0 ]]
+
 echo "PASS"
