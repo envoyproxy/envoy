@@ -20,7 +20,7 @@ class BrotliDecompressorImplTest : public testing::Test {
 protected:
   void drainBuffer(Buffer::OwnedImpl& buffer) { buffer.drain(buffer.length()); }
 
-  static constexpr uint32_t default_quality{11};
+  static constexpr uint32_t default_quality{2};
   static constexpr uint32_t default_window_bits{22};
   static constexpr uint32_t default_input_block_bits{22};
   static constexpr uint32_t default_input_size{796};
