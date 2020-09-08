@@ -33,14 +33,6 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
     expectStreamCreate(1);
   }
   health_checker_->start();
-  /*if (input.create_second_host()) {
-    EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
-      .Times(2)
-      .WillRepeatedly(Return(45000));
-  } else {
-    EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
-      .WillOnce(Return(45000));
-  }*/
   ON_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillByDefault(testing::Return(45000));
   replay(input);
