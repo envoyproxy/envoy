@@ -128,7 +128,7 @@ TEST_P(RBACIntegrationTest, Denied) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
-  EXPECT_EQ(waitForAccessLog(access_log_name_), "RBAC \n");
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("RBAC "));
 }
 
 TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
