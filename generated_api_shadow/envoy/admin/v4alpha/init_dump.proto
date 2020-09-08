@@ -14,8 +14,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 
 // Dumps of unready targets of envoy init managers. Envoy's admin fills this message with init managers,
 // which provides the information of their unready targets.
-// :ref:`/init_dump` will by default dump all unready targets information.
-// :ref:`/init_dump?mask=listener` will dump unready targets of listeners.
+// The :ref:`/init_dump <operations_admin_interface_init_dump>` will dump all unready targets information.
 message UnreadyTargetsDumps {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v3.UnreadyTargetsDumps";
 
@@ -31,6 +30,8 @@ message UnreadyTargetsDumps {
     repeated string target_names = 2;
   }
 
+  // You can choose specific component to dump unready targets with mask query parameter.
+  // See :ref:`/init_dump?mask={} <operations_admin_interface_init_dump_by_mask>` for more information.
   // The dumps of unready targets of all init managers.
   repeated UnreadyTargetsDump unready_targets_dumps = 1;
 }
