@@ -25,6 +25,10 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();
   expectStreamCreate(0);
+  if (input.start_failed()) {
+    cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
+        Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
   if (input.create_second_host()) {
     cluster_->prioritySet().getMockHostSet(0)->hosts_.push_back(
         makeTestHost(cluster_->info_, "tcp://127.0.0.1:81"));
@@ -32,6 +36,10 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
     second_host_ = true;
     expectSessionCreate();
     expectStreamCreate(1);
+    if (input.start_failed()) {
+      cluster_->prioritySet().getMockHostSet(0)->hosts_[1]->healthFlagSet(
+          Host::HealthFlag::FAILED_ACTIVE_HC);
+    }
   }
   health_checker_->start();
   ON_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))

@@ -41,4 +41,5 @@ message HealthCheckTestCase {
   repeated Action actions = 2;
   bool create_second_host = 3;
   bool http_verify_cluster = 4; //Determines if verify cluster setting is on
+  bool start_failed = 5;
 }

@@ -33,7 +33,7 @@ actions {
                     value: "200"
                 }
                 headers {
-                    key: "-degraded"
+                    key: "x-envoy-degraded"
                     value: "true"
                 }
             }
