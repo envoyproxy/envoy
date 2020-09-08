@@ -273,7 +273,7 @@ message ResponseFlags {
   // Indicates that a filter configuration is not available.
   bool no_filter_config_found = 22;
 
-  // Indicates that Request or connection exceeded the downstream connection duration.
+  // Indicates that request or connection exceeded the downstream connection duration.
   bool duration_timeout = 23;
 }
 

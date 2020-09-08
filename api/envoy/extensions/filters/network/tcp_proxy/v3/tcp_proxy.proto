@@ -135,7 +135,7 @@ message TcpProxy {
   // will be proxied upstream as per usual.
   TunnelingConfig tunneling_config = 12;
 
-  // The maximum duration of a connection. The duration is defined as a period since a connection
+  // The maximum duration of a connection. The duration is defined as the period since a connection
   // was established. If not set, there is no max duration. When max_connection_duration is reached
   // the connection will be closed. Duration must be at least 1ms.
   google.protobuf.Duration max_downstream_connection_duration = 13
