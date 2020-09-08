@@ -10,8 +10,8 @@ BrotliCompressorImpl::BrotliCompressorImpl(const uint32_t quality, const uint32_
                                            const uint32_t input_block_bits,
                                            const bool disable_literal_context_modeling,
                                            const EncoderMode mode, const uint32_t chunk_size)
-    : chunk_size_{chunk_size},
-      state_(BrotliEncoderCreateInstance(nullptr, nullptr, nullptr), &BrotliEncoderDestroyInstance) {
+    : chunk_size_{chunk_size}, state_(BrotliEncoderCreateInstance(nullptr, nullptr, nullptr),
+                                      &BrotliEncoderDestroyInstance) {
   RELEASE_ASSERT(quality <= BROTLI_MAX_QUALITY, "");
   BROTLI_BOOL result = BrotliEncoderSetParameter(state_.get(), BROTLI_PARAM_QUALITY, quality);
   RELEASE_ASSERT(result == BROTLI_TRUE, "");
