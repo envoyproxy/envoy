@@ -12,6 +12,7 @@ index 6586469..31838f1 100644
      /* At least one bit per literal is needed. */
      retval = (double)sum;
    }
+# https://github.com/google/brotli/pull/840
 diff --git a/BUILD b/BUILD
 index 4c9b57a..f53ec8f 100644
 --- a/BUILD
