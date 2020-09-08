@@ -340,6 +340,7 @@ int HessianUtils::peekInt(Buffer::Instance& buffer, size_t* size, uint64_t offse
   case 0xc9:
   case 0xca:
   case 0xcb:
+  case 0xcc:
   case 0xcd:
   case 0xce:
   case 0xcf:
