@@ -488,9 +488,8 @@ HeaderEntry* HeaderMapImpl::getExisting(const LowerCaseString& key) {
     return *lookup.value().entry_;
   }
 
-  // If the lazy map is used, search it instead of iterating the headers list.
-  // TODO(adisuissa): Depending on the key length, it might be faster to do the
-  // trie lookup first for the common O(1) headers.
+  // If the requested header is not an O(1) header try using the lazy map to
+  // search for it instead of iterating the headers list.
   if (headers_.maybeMakeMap()) {
     HeaderList::HeaderLazyMap::iterator iter = headers_.mapFind(key.get());
     if (iter != headers_.mapEnd()) {
@@ -502,9 +501,9 @@ HeaderEntry* HeaderMapImpl::getExisting(const LowerCaseString& key) {
     return nullptr;
   }
 
-  // If the requested header is not an O(1) header we do a full scan. Doing the trie lookup is
-  // wasteful in the miss case, but is present for code consistency with other functions that do
-  // similar things.
+  // If the requested header is not an O(1) header and the lazy map is not in use, we do a full
+  // scan. Doing the trie lookup is wasteful in the miss case, but is present for code consistency
+  // with other functions that do similar things.
   for (HeaderEntryImpl& header : headers_) {
     if (header.key() == key.get().c_str()) {
       return &header;

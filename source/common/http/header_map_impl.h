@@ -229,13 +229,27 @@ protected:
             pseudo_headers_end_++;
           }
           if (!lazy_map_.empty()) {
+            ASSERT(lazy_map_.find(entry.key().getStringView()) != lazy_map_.end());
             auto& values_vec = lazy_map_[entry.key().getStringView()];
             if (values_vec.size() == 1) {
+              // If the map contains a single value with the same key of the entry, it is certain
+              // that this is the only value that needs to be removed, and can be erased from the
+              // map.
               lazy_map_.erase(entry.key().getStringView());
             } else {
-              values_vec.erase(std::remove_if(values_vec.begin(), values_vec.end(),
-                                              [&](HeaderNode it) { return it == entry.entry_; }),
-                               values_vec.end());
+              // Otherwise, find the exact element that is removed from headers_ (entry) in the
+              // vector, and remove it. This keeps an invariant that only the element that is
+              // currently removed from the headers list will also be removed from the map.
+              // Note: it is possible to remove all elements in the vector that satisfy the
+              // predicate during this iteration, but it will complicate the code by requiring
+              // handling of missing values in the lazy map.
+
+              // The call to std::remove_if removes the elements that satisfy the predicate and
+              // shifts the vector elements, but does not resize the vector. The call to erase that
+              // follows erases the unneeded cells (from remove_pos to the end) and modifies the
+              // vector's size.
+              const auto remove_pos = std::remove_if(values_vec.begin(), values_vec.end(), [&](HeaderNode it) { return it == entry.entry_; });
+              values_vec.erase(remove_pos, values_vec.end());
             }
           }
         }
