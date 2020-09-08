@@ -21,7 +21,7 @@ The ``counter`` method from stats client takes a variable number of elements and
 
 Store the counter instance, and call the ``increment`` method to increment the counter wherever it applies.
 
-The count argument of ``increment`` is defauled with value 1.
+The count argument of ``increment`` is defaulted with a value of ``1``.
 
 **Example**::
 

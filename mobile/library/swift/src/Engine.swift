@@ -4,9 +4,9 @@ import Foundation
 /// that instance.
 @objc
 public protocol Engine: AnyObject {
-  /// A client for opening and managing HTTP streams
-  var streamClient: StreamClient { get }
+  /// - returns: A client for opening and managing HTTP streams.
+  func streamClient() -> StreamClient
 
   /// A client for recording time series metrics.
-  var statsClient: StatsClient { get }
+  func statsClient() -> StatsClient
 }

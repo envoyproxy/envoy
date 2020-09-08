@@ -19,7 +19,7 @@ final class ViewController: UITableViewController {
       self.client = try EngineBuilder()
         .addFilter(factory: DemoFilter.init)
         .build()
-        .streamClient
+        .streamClient()
     } catch let error {
       NSLog("starting Envoy failed: \(error)")
     }
