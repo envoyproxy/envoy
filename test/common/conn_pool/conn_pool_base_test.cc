@@ -19,7 +19,7 @@ public:
   using ActiveClient::ActiveClient;
   void close() override { onEvent(Network::ConnectionEvent::LocalClose); }
   uint64_t id() const override { return 1; }
-  bool closingWithIncompleteRequest() const override { return false; }
+  bool closingWithIncompleteStream() const override { return false; }
   size_t numActiveStreams() const override { return 1; }
 };
 
