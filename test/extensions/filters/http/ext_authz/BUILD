@@ -28,7 +28,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ext_authz",
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/tracing:tracing_mocks",
