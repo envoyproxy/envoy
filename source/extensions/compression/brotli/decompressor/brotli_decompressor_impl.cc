@@ -2,10 +2,6 @@
 
 #include <memory>
 
-//#include "envoy/common/exception.h"
-
-//#include "common/common/assert.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Compression {
