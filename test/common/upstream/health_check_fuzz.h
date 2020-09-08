@@ -23,6 +23,7 @@ private:
 
   void respondHttp(test::fuzz::Headers headers, absl::string_view status,
                    bool respond_on_second_host);
+  void respondTcp(std::string data);
   void streamCreate(bool create_stream_on_second_host);
   void clientCreate();
   void allocHttpHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);

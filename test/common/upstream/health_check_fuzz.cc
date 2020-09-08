@@ -94,6 +94,13 @@ void HealthCheckFuzz::respondHttp(test::fuzz::Headers headers, absl::string_view
                                                                    true);
 }
 
+void HealthCheckFuzz::respondTcp(std::string data) {
+  ENVOY_LOG_MISC(trace, "Responded with {}. Length (in bytes) = {}.", data, data.length());
+  Buffer::OwnedImpl response;
+  response.add(&data, data.length());
+  read_filter_->onData(response, false);
+}
+
 void HealthCheckFuzz::streamCreate(bool second_host) {
   const int index = (second_host_ && second_host) ? 1 : 0;
   ENVOY_LOG_MISC(trace, "Created a new stream on host {}", index);
@@ -148,13 +155,7 @@ void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) 
         break;
       }
       case HealthCheckFuzz::Type::TCP: {
-        ENVOY_LOG_MISC(trace, "Responded with {}. Length (in bytes) = {}.",
-                       event.respond().tcp_respond().data(),
-                       event.respond().tcp_respond().data().length());
-        Buffer::OwnedImpl response;
-        response.add(&event.respond().tcp_respond().data(),
-                     event.respond().tcp_respond().data().length());
-        read_filter_->onData(response, false);
+        respondTcp(event.respond().tcp_respond().data());
         break;
       }
       default:
