@@ -253,13 +253,13 @@ var Search = {
     //console.info('search results:', Search.lastresults);
 
     // renderApiVersionLabel renders API version for each search result item as shown in:
-    // https://user-images.githubusercontent.com/73152/92435318-3ac78c80-f1cc-11ea-86ff-8f11922527ed.png.
+    // https://user-images.githubusercontent.com/73152/92459079-6ceae580-f1f0-11ea-8d53-3073bd508532.png.
     function renderApiVersionLabel(linkUrl) {
       const filtered = linkUrl
         .split("/")
         .filter((part) => part.startsWith("api-v"));
       return filtered.length === 1
-        ? "&nbsp;<sup><b>" + filtered.pop() + "</b></sup>"
+        ? '&nbsp;<sup class="api-version-label">' + filtered.pop() + "</sup>"
         : "";
     }
 
