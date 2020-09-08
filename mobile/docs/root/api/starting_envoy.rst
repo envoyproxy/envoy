@@ -11,7 +11,7 @@ Starting an instance of Envoy Mobile is done by building the ``Engine`` instance
 
 To obtain a ``StatsClient``, call ``streamClient()`` on the ``Engine`` instance (see below).
 
-After the stream client is obtain, it should be stored and used to start network requests/streams.
+After the stream client is obtained, it should be stored and used to start network requests/streams.
 
 **Kotlin example**::
 
