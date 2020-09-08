@@ -557,7 +557,7 @@ message CorsPolicy {
       [deprecated = true, (validate.rules).repeated = {items {string {max_bytes: 1024}}}];
 }
 
-// [#next-free-field: 36]
+// [#next-free-field: 37]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -769,6 +769,29 @@ message RouteAction {
     // Note that CONNECT support is currently considered alpha in Envoy.
     // [#comment:TODO(htuch): Replace the above comment with an alpha tag.
     ConnectConfig connect_config = 3;
+  }
+
+  message MaxStreamDuration {
+    // Specifies the maximum duration allowed for streams on the route. If not specified, the
+    // value from :ref:`max_stream_duration
+    // <envoy_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>` is used.
+    google.protobuf.Duration max_stream_duration = 1;
+
+    // If present, and the request is a gRPC request, use the
+    // `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_,
+    // or its default value (infinity) as the max_stream_duration, but limit the applied timeout to
+    // the maximum value specified here. If configured as 0, the maximum allowed timeout for gRPC
+    // requests is infinity.
+    google.protobuf.Duration grpc_max_timeout = 2;
+
+    // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by
+    // subtracting the provided duration from the header. This is useful for allowing Envoy to set
+    // its global timeout to be less than that of the deadline imposed by the calling client, which
+    // makes it more likely that Envoy will handle the timeout instead of having the call canceled
+    // by the client. The offset will only be applied if the provided `grpc-timeout` header is
+    // greater than the offset. This ensures that the offset will only ever decrease the timeout and
+    // never set it to 0 (meaning infinity).
+    google.protobuf.Duration grpc_timeout_offset = 3;
   }
 
   reserved 12, 18, 19, 16, 22, 21;
@@ -996,35 +1019,13 @@ message RouteAction {
   // Indicates that the route has a CORS policy.
   CorsPolicy cors = 17;
 
-  // If present, and the request is a gRPC request, use the
-  // `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_,
-  // or its default value (infinity) instead of
-  // :ref:`timeout <envoy_api_field_config.route.v3.RouteAction.timeout>`, but limit the applied timeout
-  // to the maximum value specified here. If configured as 0, the maximum allowed timeout for
-  // gRPC requests is infinity. If not configured at all, the `grpc-timeout` header is not used
-  // and gRPC requests time out like any other requests using
-  // :ref:`timeout <envoy_api_field_config.route.v3.RouteAction.timeout>` or its default.
-  // This can be used to prevent unexpected upstream request timeouts due to potentially long
-  // time gaps between gRPC request and response in gRPC streaming mode.
-  //
-  // .. note::
-  //
-  //    If a timeout is specified using :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`, it takes
-  //    precedence over `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_, when
-  //    both are present. See also
-  //    :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`,
-  //    :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`, and the
-  //    :ref:`retry overview <arch_overview_http_routing_retry>`.
-  google.protobuf.Duration max_grpc_timeout = 23;
+  // Deprecated; use :ref:`grpc_max_timeout
+  // <envoy_api_field_config.route.v3.RouteAction.max_stream_duration.grpc_max_timeout>` instead.
+  google.protobuf.Duration max_grpc_timeout = 23 [deprecated = true];
 
-  // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by subtracting
-  // the provided duration from the header. This is useful in allowing Envoy to set its global
-  // timeout to be less than that of the deadline imposed by the calling client, which makes it more
-  // likely that Envoy will handle the timeout instead of having the call canceled by the client.
-  // The offset will only be applied if the provided grpc_timeout is greater than the offset. This
-  // ensures that the offset will only ever decrease the timeout and never set it to 0 (meaning
-  // infinity).
-  google.protobuf.Duration grpc_timeout_offset = 28;
+  // Deprecated; use :ref:`grpc_timeout_offset
+  // <envoy_api_field_config.route.v3.RouteAction.max_stream_duration.grpc_timeout_offset>` instead.
+  google.protobuf.Duration grpc_timeout_offset = 28 [deprecated = true];
 
   repeated UpgradeConfig upgrade_configs = 25;
 
@@ -1056,6 +1057,9 @@ message RouteAction {
   // it'll take precedence over the virtual host level hedge policy entirely
   // (e.g.: policies are not merged, most internal one becomes the enforced policy).
   HedgePolicy hedge_policy = 27;
+
+  // Specifies the maximum stream duration. If set, *timeout* is ignored.
+  MaxStreamDuration max_stream_duration = 36;
 
   RequestMirrorPolicy hidden_envoy_deprecated_request_mirror_policy = 10 [deprecated = true];
 }

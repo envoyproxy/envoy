@@ -97,6 +97,9 @@ New Features
   option, which allows rewriting Host header based on path.
 * router: added support for DYNAMIC_METADATA :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
 * router_check_tool: added support for `request_header_matches`, `response_header_matches` to :ref:`router check tool <config_tools_router_check_tool>`.
+* router: added new :ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.max_stream_duration>`
+  to override HTTP connection manager option :ref:`max_stream_duration
+  <envoy_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>`.
 * signal: added support for calling fatal error handlers without envoy's signal handler, via FatalErrorHandler::callFatalErrorHandlers().
 * stats: added optional histograms to :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>`
   that track headers and body sizes of requests and responses.
@@ -128,3 +131,9 @@ Deprecated
 * ext_authz: the :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.OkHttpResponse.dynamic_metadata>` field in :ref:`OkHttpResponse <envoy_v3_api_msg_service.auth.v3.OkHttpResponse>`
   has been deprecated in favor of :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` field in :ref:`CheckResponse <envoy_v3_api_msg_service.auth.v3.CheckResponse>`.
 * router_check_tool: `request_header_fields`, `response_header_fields` config deprecated in favor of `request_header_matches`, `response_header_matches`.
+* router: the :ref:`max_grpc_timeout <envoy_api_field_config.route.v3.RouteAction.max_grpc_timeout>`
+  field has been deprecated in favor of :ref:`grpc_max_timeout
+  <envoy_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_max_timeout>`.
+* router: the :ref:`grpc_timeout_offset <envoy_api_field_config.route.v3.RouteAction.grpc_timeout_offset>`
+  field has been deprecated in favor of :ref:`grpc_timeout_offset
+  <envoy_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_offset>`.

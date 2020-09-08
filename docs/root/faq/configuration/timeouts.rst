@@ -88,6 +88,10 @@ stream timeouts already introduced above.
   is sent to the downstream, which normally happens after the upstream has sent response headers.
   This timeout can be used with streaming endpoints to retry if the upstream fails to begin a
   response within the timeout.
+* The route :ref:`max_stream_duration <envoy_v3_api_field_config.route.v3.RouteAction.max_stream_duration>`
+  can be used to override :ref:`max_stream_duration
+  <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>` used by the HTTP
+  connection manager as well to as configure timeouts specific for gRPC requests and responses.
 
 TCP
 ---
