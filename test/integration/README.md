@@ -100,7 +100,7 @@ cluster:
 In addition to the existing test framework, which allows for carefully timed interaction and ordering of events between downstream, Envoy, and Upstream, there is now an “autonomous” framework which simplifies the common case where the timing is not essential (or bidirectional streaming is desired). When AutonomousUpstream is used, by setting `autonomous_upstream_ = true` before `initialize()`, upstream will by default create AutonomousHttpConnections for each incoming connection and AutonomousStreams for each incoming stream. By default, the streams will respond to each complete request with “200 OK” and 10 bytes of payload, but this behavior can be altered by setting various request headers, as documented in [`autonomous_upstream.h`](autonomous_upstream.h)
 
 ## Common Problems
-- If a response body length does not match the `content-length` header (or there is no header at all), any mock calls to wait for the response completion such as `sendRequestAndWaitForResponse` or `response_->waitForEndStream` could time out. Also, any asserts that the response was completed such as `EXPECT_TRUE(response_->complete())` could fail. Make sure that the response body length matches the `content-length` header.
+- If a response body length does not match the `content-length` header, any mock calls to wait for the response completion such as `sendRequestAndWaitForResponse` or `response_->waitForEndStream` could time out. Also, any asserts that the response was completed such as `EXPECT_TRUE(response_->complete())` could fail. Make sure that the response body length matches the `content-length` header.
 
 # Extending the test framework
 
