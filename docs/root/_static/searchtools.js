@@ -12,15 +12,6 @@
 // Modified from https://raw.githubusercontent.com/sphinx-doc/sphinx/3.x/sphinx/themes/basic/static/searchtools.js
 // to have renderApiVersionLabel to render the API version for each search result item.
 
-// renderApiVersionLabel renders API version for each search result item as shown in:
-// https://user-images.githubusercontent.com/73152/92435318-3ac78c80-f1cc-11ea-86ff-8f11922527ed.png.
-function renderApiVersionLabel(linkUrl) {
-  const filtered = linkUrl.split("/").filter((i) => i.startsWith("api-v"));
-  return filtered.length === 1
-    ? "&nbsp;<sup><b>" + filtered.pop() + "</b></sup>"
-    : "";
-}
-
 if (!Scorer) {
   /**
    * Simple result scoring code.
@@ -260,6 +251,17 @@ var Search = {
     // for debugging
     //Search.lastresults = results.slice();  // a copy
     //console.info('search results:', Search.lastresults);
+
+    // renderApiVersionLabel renders API version for each search result item as shown in:
+    // https://user-images.githubusercontent.com/73152/92435318-3ac78c80-f1cc-11ea-86ff-8f11922527ed.png.
+    function renderApiVersionLabel(linkUrl) {
+      const filtered = linkUrl
+        .split("/")
+        .filter((part) => part.startsWith("api-v"));
+      return filtered.length === 1
+        ? "&nbsp;<sup><b>" + filtered.pop() + "</b></sup>"
+        : "";
+    }
 
     // print the results
     var resultCount = results.length;
