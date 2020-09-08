@@ -137,8 +137,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     control_plane_stats.identifier_.set(message->control_plane().identifier());
   }
   // If this type url is not watched(no subscriber or no watcher), try another version of type url.
-  if (api_state_.count(type_url) == 0 ||
-      (api_state_[type_url].watches_.empty() && !message->resources().empty())) {
+  if (api_state_.count(type_url) == 0) {
     registerVersionedTypeUrl(type_url);
     if (type_url_mapping_.find(type_url) != type_url_mapping_.end()) {
       type_url = type_url_mapping_[type_url];

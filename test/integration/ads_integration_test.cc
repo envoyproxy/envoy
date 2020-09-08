@@ -118,25 +118,24 @@ TEST_P(AdsIntegrationTest, Failure) {
 // Validate that xds can support a mix of v2 and v3 type url.
 TEST_P(AdsIntegrationTest, MixV2V3TypeUrlInDiscoveryResponse) {
   initialize();
+
+  // Send initial configuration.
   // Discovery response with v3 type url.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       "type.googleapis.com/envoy.config.cluster.v3.Cluster", {buildCluster("cluster_0")},
       {buildCluster("cluster_0")}, {}, "1", false);
-  // Discovery response with v2 type url.
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "1");
-  // Discovery response with v3 type url.
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
       "type.googleapis.com/envoy.config.listener.v3.Listener",
       {buildListener("listener_0", "route_config_0")},
       {buildListener("listener_0", "route_config_0")}, {}, "1", false);
-  // Discovery response with v3 type url.
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
-      {buildRouteConfig("route_config_0", "cluster_0")},
-      {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1", false);
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
   // Validate that we can process a request.
   makeSingleRequest();
 }
