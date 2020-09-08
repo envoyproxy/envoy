@@ -44,6 +44,8 @@ public:
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
 
+  void registerVersionedTypeUrl(const std::string& type_url);
+
   void onDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
       ControlPlaneStats& control_plane_stats) override;
@@ -75,10 +77,6 @@ public:
   // for use in tests only
   const absl::flat_hash_map<std::string, SubscriptionStuffPtr>& subscriptions() {
     return subscriptions_;
-  }
-
-  absl::optional<std::string> getEarlierTypeUrl(const std::string& type_url) override {
-    return ApiTypeOracle::getEarlierTypeUrl(type_url);
   }
 
 private:

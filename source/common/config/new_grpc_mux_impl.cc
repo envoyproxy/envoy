@@ -44,6 +44,19 @@ ScopedResume NewGrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
   });
 }
 
+void NewGrpcMuxImpl::registerVersionedTypeUrl(const std::string& type_url) {
+  if (type_url_mapping_.find(type_url) != type_url_mapping_.end()) {
+    return;
+  }
+  // If type_url is v3, earlier_type_url will contain v2 type url.
+  absl::optional<std::string> earlier_type_url = ApiTypeOracle::getEarlierTypeUrl(type_url);
+  // Register v2 to v3 and v3 to v2 type_url mapping in the hash map.
+  if (earlier_type_url.has_value()) {
+    type_url_mapping_[earlier_type_url.value()] = type_url;
+    type_url_mapping_[type_url] = earlier_type_url.value();
+  }
+}
+
 void NewGrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
     ControlPlaneStats&) {

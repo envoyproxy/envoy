@@ -55,6 +55,7 @@ public:
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override;
   void onEstablishmentFailure() override;
+  void registerVersionedTypeUrl(const std::string& type_url);
   void
   onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
                       ControlPlaneStats& control_plane_stats) override;
@@ -64,9 +65,6 @@ public:
              envoy::service::discovery::v3::DiscoveryResponse>&
   grpcStreamForTest() {
     return grpc_stream_;
-  }
-  absl::optional<std::string> getEarlierTypeUrl(const std::string& type_url) override {
-    return ApiTypeOracle::getEarlierTypeUrl(type_url);
   }
 
 private:
@@ -171,9 +169,6 @@ public:
   void onEstablishmentFailure() override {}
   void onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&&,
                            ControlPlaneStats&) override {}
-  absl::optional<std::string> getEarlierTypeUrl(const std::string& type_url) override {
-    return ApiTypeOracle::getEarlierTypeUrl(type_url);
-  }
 };
 
 } // namespace Config
