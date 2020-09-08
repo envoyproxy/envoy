@@ -675,13 +675,18 @@ void InstanceImpl::run() {
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
-  auto watchdog =
-      guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "main_thread");
+  GuardDog* guard_dog;
+  if (config_.multiWatchdog()) {
+    guard_dog = aux_guard_dog_.get();
+  } else {
+    guard_dog = guard_dog_.get();
+  }
+  auto watchdog = guard_dog->createWatchDog(api_->threadFactory().currentThreadId(), "main_thread");
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");
-  guard_dog_->stopWatching(watchdog);
+  guard_dog->stopWatching(watchdog);
   watchdog.reset();
 
   terminate();
