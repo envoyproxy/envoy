@@ -101,7 +101,27 @@ public:
   Upstream::ClusterManager* clusterManager() override { return cluster_manager_.get(); }
   std::list<Stats::SinkPtr>& statsSinks() override { return stats_sinks_; }
   std::chrono::milliseconds statsFlushInterval() const override { return stats_flush_interval_; }
-  const Watchdog& watchdogConfig() const override { return *watchdog_; }
+  WatchdogOptConstRef watchdogConfig() const override {
+    if (multi_watchdog_) {
+      return absl::nullopt;
+    }
+    return std::cref(*watchdog_);
+  }
+
+  WatchdogOptConstRef auxWatchdogConfig() const override {
+    if (multi_watchdog_) {
+      return std::cref(*aux_watchdog_);
+    }
+    return absl::nullopt;
+  }
+
+  WatchdogOptConstRef workerWatchdogConfig() const override {
+    if (multi_watchdog_) {
+      return std::cref(*worker_watchdog_);
+    }
+    return absl::nullopt;
+  }
+  bool multiWatchdog() const override { return multi_watchdog_; }
 
 private:
   /**
@@ -111,6 +131,9 @@ private:
 
   void initializeStatsSinks(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                             Instance& server);
+  /**
+   * Initialize watchdog(s). Call before accessing any watchdog configuration.
+   */
   void initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                            Instance& server);
 
@@ -118,6 +141,9 @@ private:
   std::list<Stats::SinkPtr> stats_sinks_;
   std::chrono::milliseconds stats_flush_interval_;
   std::unique_ptr<Watchdog> watchdog_;
+  std::unique_ptr<Watchdog> aux_watchdog_;
+  std::unique_ptr<Watchdog> worker_watchdog_;
+  bool multi_watchdog_;
 };
 
 class WatchdogImpl : public Watchdog {

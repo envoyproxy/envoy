@@ -131,8 +131,16 @@ void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v3::Bootstra
 
 void MainImpl::initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                    Instance& server) {
-  // TODO(kbaichoo): modify this to handle additional watchdogs
-  watchdog_ = std::make_unique<WatchdogImpl>(bootstrap.watchdog(), server);
+  if (bootstrap.has_multi_watchdog()) {
+    multi_watchdog_ = true;
+    aux_watchdog_ =
+        std::make_unique<WatchdogImpl>(bootstrap.multi_watchdog().aux_watchdog(), server);
+    worker_watchdog_ =
+        std::make_unique<WatchdogImpl>(bootstrap.multi_watchdog().worker_watchdog(), server);
+  } else {
+    multi_watchdog_ = false;
+    watchdog_ = std::make_unique<WatchdogImpl>(bootstrap.watchdog(), server);
+  }
 }
 
 WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdog,

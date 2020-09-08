@@ -1252,6 +1252,16 @@ TEST_P(ServerInstanceImplTest, DisabledExtension) {
   ASSERT_TRUE(disabled_filter_found);
 }
 
+TEST_P(ServerInstanceImplTest, MultiWatchdogTest) {
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/multiwatchdog_bootstrap.yaml"));
+
+  // Should have separate aux and workers counters
+  EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "aux.watchdog_miss"));
+  EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "workers.watchdog_miss"));
+
+  server_->shutdown();
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy
