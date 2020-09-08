@@ -766,10 +766,10 @@ message RouteAction {
     // <envoy_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>` is used.
     google.protobuf.Duration max_stream_duration = 1;
 
-    // If present, and the request is a gRPC request, use the
-    // `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_,
-    // or its default value (infinity) as the max_stream_duration, but limit the applied timeout to
-    // the maximum value specified here. If configured as 0, the maximum allowed timeout for gRPC
+    // If present, and the request contains a `grpc-timeout` header
+    // <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_, use that value or its
+    // default value (infinity) as the *max_stream_duration*, but limit the applied timeout to the
+    // maximum value specified here. If configured as 0, the maximum allowed timeout for gRPC
     // requests is infinity.
     google.protobuf.Duration grpc_max_timeout = 2;
 
@@ -777,7 +777,7 @@ message RouteAction {
     // subtracting the provided duration from the header. This is useful for allowing Envoy to set
     // its global timeout to be less than that of the deadline imposed by the calling client, which
     // makes it more likely that Envoy will handle the timeout instead of having the call canceled
-    // by the client. The offset will only be applied if the provided `grpc-timeout` header is
+    // by the client. The offset will be applied only if the provided `grpc-timeout` header is
     // greater than the offset. This ensures that the offset will only ever decrease the timeout and
     // never set it to 0 (meaning infinity).
     google.protobuf.Duration grpc_timeout_offset = 3;
