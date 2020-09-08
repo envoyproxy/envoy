@@ -106,18 +106,18 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
       config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine != nullptr) {
     std::string effective_policy_id;
-    if (engine->handleAction(*callbacks_->connection(), headers, callbacks_->streamInfo(),
-                             &effective_policy_id)) {
-      ENVOY_LOG(debug, "enforced allowed, matched policy {}",
-                effective_policy_id.empty() ? "none" : effective_policy_id);
+    bool allowed = engine->handleAction(*callbacks_->connection(), headers,
+                                        callbacks_->streamInfo(), &effective_policy_id);
+    std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
+    if (allowed) {
+      ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
       config_->stats().allowed_.inc();
       return Http::FilterHeadersStatus::Continue;
     } else {
-      ENVOY_LOG(debug, "enforced denied, matched policy {}",
-                effective_policy_id.empty() ? "none" : effective_policy_id);
+      ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UnauthorizedRBAC);
       callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr,
-                                 absl::nullopt, effective_policy_id);
+                                 absl::nullopt, log_policy_id);
       config_->stats().denied_.inc();
       return Http::FilterHeadersStatus::StopIteration;
     }

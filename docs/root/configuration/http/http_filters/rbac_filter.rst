@@ -13,7 +13,7 @@ work before rolling out to production.
 
 When a request is denied, the access log will set the flag `RBAC`, this helps to distinguish the
 deny from Envoy RBAC filter and the upstream backend. The :ref:`RESPONSE_CODE_DETAILS<config_access_log_format_response_code_details>`
-will include the name of the matched policy that caused the deny (empty if none matched).
+will include the name of the matched policy that caused the deny ("none" if none matched).
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBAC>`
 * This filter should be configured with the name *envoy.filters.http.rbac*.

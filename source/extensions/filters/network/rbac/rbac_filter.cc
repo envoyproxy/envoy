@@ -39,7 +39,7 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
                 : "none",
             callbacks_->connection().streamInfo().dynamicMetadata().DebugString());
 
-  std::string effective_policy_id;
+  std::string log_policy_id = "none";
   // When the enforcement type is continuous always do the RBAC checks. If it is a one time check,
   // run the check once and skip it for subsequent onData calls.
   if (config_->enforcementType() ==
@@ -47,7 +47,7 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
     shadow_engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Shadow).first;
     auto result = checkEngine(Filters::Common::RBAC::EnforcementMode::Enforced);
     engine_result_ = result.first;
-    effective_policy_id = result.second;
+    log_policy_id = result.second;
   } else {
     if (shadow_engine_result_ == Unknown) {
       // TODO(quanlin): Pass the shadow engine results to other filters.
@@ -57,7 +57,7 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
     if (engine_result_ == Unknown) {
       auto result = checkEngine(Filters::Common::RBAC::EnforcementMode::Enforced);
       engine_result_ = result.first;
-      effective_policy_id = result.second;
+      log_policy_id = result.second;
     }
   }
 
@@ -66,7 +66,7 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
   } else if (engine_result_ == Deny) {
     callbacks_->connection().streamInfo().setResponseFlag(
         StreamInfo::ResponseFlag::UnauthorizedRBAC);
-    callbacks_->connection().streamInfo().setResponseCodeDetails(effective_policy_id);
+    callbacks_->connection().streamInfo().setResponseCodeDetails(log_policy_id);
     callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
@@ -94,38 +94,36 @@ RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode
   std::string effective_policy_id;
   if (engine != nullptr) {
     // Check authorization decision and do Action operations
-    if (engine->handleAction(callbacks_->connection(), callbacks_->connection().streamInfo(),
-                             &effective_policy_id)) {
+    bool allowed = engine->handleAction(
+        callbacks_->connection(), callbacks_->connection().streamInfo(), &effective_policy_id);
+    std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
+    if (allowed) {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
-        ENVOY_LOG(debug, "shadow allowed, matched policy {}",
-                  effective_policy_id.empty() ? "none" : effective_policy_id);
+        ENVOY_LOG(debug, "shadow allowed, matched policy {}", log_policy_id);
         config_->stats().shadow_allowed_.inc();
         setDynamicMetadata(
             Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed,
             effective_policy_id);
       } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
-        ENVOY_LOG(debug, "enforced allowed, matched policy {}",
-                  effective_policy_id.empty() ? "none" : effective_policy_id);
+        ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
         config_->stats().allowed_.inc();
       }
       return std::make_pair(Allow, effective_policy_id);
     } else {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
-        ENVOY_LOG(debug, "shadow denied, matched policy {}",
-                  effective_policy_id.empty() ? "none" : effective_policy_id);
+        ENVOY_LOG(debug, "shadow denied, matched policy {}", log_policy_id);
         config_->stats().shadow_denied_.inc();
         setDynamicMetadata(
             Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied,
             effective_policy_id);
       } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
-        ENVOY_LOG(debug, "enforced denied, matched policy {}",
-                  effective_policy_id.empty() ? "none" : effective_policy_id);
+        ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
         config_->stats().denied_.inc();
       }
-      return std::make_pair(Deny, effective_policy_id);
+      return std::make_pair(Deny, log_policy_id);
     }
   }
-  return std::make_pair(None, effective_policy_id);
+  return std::make_pair(None, "none");
 }
 
 } // namespace RBACFilter
