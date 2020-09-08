@@ -1454,6 +1454,19 @@ TEST_F(Http2ConnPoolImplTest, CloseExcessWithPrefetch) {
   closeAllClients();
 }
 
+// Test that maybePrefetch is passed up to the base class implementation.
+TEST_F(Http2ConnPoolImplTest, MaybePrefetch) {
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
+
+  EXPECT_FALSE(pool_->maybePrefetch(0));
+
+  expectClientsCreate(1);
+  EXPECT_TRUE(pool_->maybePrefetch(2));
+
+  pool_->drainConnections();
+  closeAllClients();
+}
+
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy
