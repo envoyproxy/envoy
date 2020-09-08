@@ -5,6 +5,7 @@
 #include "common/common/base64.h"
 #include "common/common/regex.h"
 #include "common/config/well_known_names.h"
+#include "common/http/header_utility.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -180,11 +181,11 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
   for (const auto& rule : rules) {
     const auto& header = rule.header();
     const auto& proto_rule = rule.rule();
-    const Http::HeaderEntry* header_entry = headers.get(header);
+    const auto header_value = Http::HeaderUtility::getAllOfHeaderAsString(headers, header);
 
-    if (header_entry != nullptr && proto_rule.has_on_header_present()) {
+    if (header_value.result().has_value() && proto_rule.has_on_header_present()) {
       const auto& keyval = proto_rule.on_header_present();
-      absl::string_view value = header_entry->value().getStringView();
+      absl::string_view value = header_value.result().value();
       // This is used to hold the rewritten header value, so that it can
       // be bound to value without going out of scope.
       std::string rewritten_value;
@@ -211,7 +212,7 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
         headers.remove(header);
       }
     }
-    if (header_entry == nullptr && proto_rule.has_on_header_missing()) {
+    if (!header_value.result().has_value() && proto_rule.has_on_header_missing()) {
       // Add metadata for the header missing case.
       const auto& keyval = proto_rule.on_header_missing();
 

@@ -10,7 +10,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/common/wasm/null:77.8"
 "source/extensions/common/wasm/v8:85.4"
 "source/extensions/filters/common:94.6"
-"source/extensions/filters/common/expr:92.2"
+"source/extensions/filters/common/expr:91.8"
 "source/extensions/filters/common/fault:95.8"
 "source/extensions/filters/common/lua:95.9"
 "source/extensions/filters/common/rbac:87.2"

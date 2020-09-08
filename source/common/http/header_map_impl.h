@@ -86,6 +86,7 @@ public:
   void setCopy(const LowerCaseString& key, absl::string_view value);
   uint64_t byteSize() const;
   const HeaderEntry* get(const LowerCaseString& key) const;
+  HeaderMap::GetResult getAll(const LowerCaseString& key) const;
   void iterate(HeaderMap::ConstIterateCb cb, void* context) const;
   void iterateReverse(HeaderMap::ConstIterateCb cb, void* context) const;
   void clear();
@@ -240,7 +241,7 @@ protected:
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);
-  HeaderEntry* getExisting(const LowerCaseString& key);
+  HeaderMap::NonConstGetResult getExisting(const LowerCaseString& key);
   size_t removeInline(HeaderEntryImpl** entry);
   void updateSize(uint64_t from_size, uint64_t to_size);
   void addSize(uint64_t size);
@@ -297,6 +298,9 @@ public:
   uint64_t byteSize() const override { return HeaderMapImpl::byteSize(); }
   const HeaderEntry* get(const LowerCaseString& key) const override {
     return HeaderMapImpl::get(key);
+  }
+  HeaderMap::GetResult getAll(const LowerCaseString& key) const override {
+    return HeaderMapImpl::getAll(key);
   }
   void iterate(HeaderMap::ConstIterateCb cb, void* context) const override {
     HeaderMapImpl::iterate(cb, context);
