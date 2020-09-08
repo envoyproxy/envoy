@@ -8,8 +8,8 @@
 #include "common/http/headers.h"
 #include "common/runtime/runtime_features.h"
 
-#include "extensions/transport_sockets/tls/ssl_handshaker.h"
 #include "extensions/transport_sockets/tls/io_handle_bio.h"
+#include "extensions/transport_sockets/tls/ssl_handshaker.h"
 #include "extensions/transport_sockets/tls/utility.h"
 
 #include "absl/strings/str_replace.h"
