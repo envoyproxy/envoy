@@ -46,9 +46,9 @@ using RawKafkaProducerConfig = std::map<std::string, std::string>;
 /**
  * Helper class to wrap RdKafka::Producer so that in tests we do not need to mock the whole API.
  */
-class KPW {
+class KafkaProducerWrapper {
 public:
-  virtual ~KPW(){};
+  virtual ~KafkaProducerWrapper(){};
   virtual RdKafka::ErrorCode produce(const std::string topic_name, int32_t partition, int msgflags,
                                      void* payload, size_t len, const void* key, size_t key_len,
                                      int64_t timestamp, void* msg_opaque) PURE;
@@ -67,7 +67,23 @@ public:
   virtual RdKafka::Conf::ConfResult setConfDeliveryCallback(RdKafka::Conf& conf,
                                                             RdKafka::DeliveryReportCb* dr_cb,
                                                             std::string& errstr) const PURE;
-  virtual std::unique_ptr<KPW> createProducer(RdKafka::Conf* conf, std::string& errstr) const PURE;
+  virtual std::unique_ptr<KafkaProducerWrapper> createProducer(RdKafka::Conf* conf,
+                                                               std::string& errstr) const PURE;
+};
+
+/**
+ * Filter facing interface.
+ * A thing that takes records and sends them to upstream Kafka.
+ * IMPL note: this interface has been extracted because users will not care how this thing works
+ * (i.e. RichKafkaProducer callback etc.).
+ */
+class RecordSink {
+public:
+  virtual ~RecordSink(){};
+
+  virtual void send(const ProduceFinishCbSharedPtr origin, const std::string& topic,
+                    const int32_t partition, const absl::string_view key,
+                    const absl::string_view value) PURE;
 };
 
 /**
@@ -76,22 +92,23 @@ public:
  * Independently running monitoring thread picks up delivery confirmations from producer and uses
  * Dispatcher to notify itself about delivery in worker thread.
  */
-class KafkaProducerWrapper : public RdKafka::DeliveryReportCb,
-                             private Logger::Loggable<Logger::Id::kafka> {
+class RichKafkaProducer : public RecordSink,
+                          public RdKafka::DeliveryReportCb,
+                          private Logger::Loggable<Logger::Id::kafka> {
 public:
   // Usual constructor.
-  KafkaProducerWrapper(Event::Dispatcher& dispatcher, Thread::ThreadFactory& thread_factory,
-                       const RawKafkaProducerConfig& configuration);
+  RichKafkaProducer(Event::Dispatcher& dispatcher, Thread::ThreadFactory& thread_factory,
+                    const RawKafkaProducerConfig& configuration);
 
   // Visible for testing (allows injection of LibRdKafkaUtils).
-  KafkaProducerWrapper(Event::Dispatcher& dispatcher, Thread::ThreadFactory& thread_factory,
-                       const RawKafkaProducerConfig& configuration, const LibRdKafkaUtils& utils);
+  RichKafkaProducer(Event::Dispatcher& dispatcher, Thread::ThreadFactory& thread_factory,
+                    const RawKafkaProducerConfig& configuration, const LibRdKafkaUtils& utils);
 
   /**
    * More complex than usual.
    * Marks that monitoring thread should finish and waits for it to join.
    */
-  ~KafkaProducerWrapper() override;
+  ~RichKafkaProducer() override;
 
   /**
    * Submits given payload to be sent to given topic:partition.
@@ -107,7 +124,8 @@ public:
    * @param value Kafka message value.
    */
   void send(const ProduceFinishCbSharedPtr origin, const std::string& topic,
-            const int32_t partition, const absl::string_view key, const absl::string_view value);
+            const int32_t partition, const absl::string_view key,
+            const absl::string_view value) override;
 
   void processDelivery(const DeliveryMemento& memento);
 
@@ -128,7 +146,7 @@ private:
   // Real Kafka producer (thread-safe).
   // Invoked by Envoy handler thread (to produce), and internal monitoring thread
   // (to poll for delivery events).
-  std::unique_ptr<KPW> producer_;
+  std::unique_ptr<KafkaProducerWrapper> producer_;
 
   // Flag controlling monitoring threads's execution.
   volatile bool poller_thread_active_;
@@ -137,7 +155,7 @@ private:
   Thread::ThreadPtr poller_thread_;
 };
 
-using KafkaProducerWrapperPtr = std::unique_ptr<KafkaProducerWrapper>;
+using RichKafkaProducerPtr = std::unique_ptr<RichKafkaProducer>;
 
 } // namespace Mesh
 } // namespace Kafka

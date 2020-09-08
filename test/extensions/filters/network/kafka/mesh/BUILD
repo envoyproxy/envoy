@@ -70,3 +70,12 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/kafka/mesh:clustering_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "abstract_command_unit_test",
+    srcs = ["abstract_command_unit_test.cc"],
+    extension_name = "envoy.filters.network.kafka_mesh",
+    deps = [
+        "//source/extensions/filters/network/kafka/mesh:abstract_command_lib",
+    ],
+)

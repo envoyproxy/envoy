@@ -69,6 +69,7 @@ public:
 protected:
   /**
    * Notify the originating filter that this request has an answer ready.
+   * This method is to be invoked by each request after it has finished processing.
    */
   void notifyFilter();
 

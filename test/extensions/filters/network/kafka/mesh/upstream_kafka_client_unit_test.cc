@@ -16,7 +16,7 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-class MockKPW : public KPW {
+class MockKafkaProducerWrapper : public KafkaProducerWrapper {
 public:
   MOCK_METHOD(RdKafka::ErrorCode, produce,
               (const std::string, int32_t, int, void*, size_t, const void*, size_t, int64_t,
@@ -30,8 +30,8 @@ public:
               (RdKafka::Conf&, const std::string&, const std::string&, std::string&), (const));
   MOCK_METHOD(RdKafka::Conf::ConfResult, setConfDeliveryCallback,
               (RdKafka::Conf&, RdKafka::DeliveryReportCb*, std::string&), (const));
-  MOCK_METHOD((std::unique_ptr<KPW>), createProducer, (RdKafka::Conf*, std::string& errstr),
-              (const));
+  MOCK_METHOD((std::unique_ptr<KafkaProducerWrapper>), createProducer,
+              (RdKafka::Conf*, std::string& errstr), (const));
 };
 
 TEST(UpstreamKafkaClientTest, shouldThrowIfBadBootstrapServers) {
@@ -45,14 +45,15 @@ TEST(UpstreamKafkaClientTest, shouldThrowIfBadBootstrapServers) {
   EXPECT_CALL(utils, setConfProperty(_, "key2", "value2", _))
       .WillOnce(Return(RdKafka::Conf::CONF_OK));
   EXPECT_CALL(utils, setConfDeliveryCallback(_, _, _)).WillOnce(Return(RdKafka::Conf::CONF_OK));
-  std::unique_ptr<MockKPW> producer_ptr = std::make_unique<MockKPW>();
-  MockKPW& producer = *producer_ptr;
+  std::unique_ptr<MockKafkaProducerWrapper> producer_ptr =
+      std::make_unique<MockKafkaProducerWrapper>();
+  MockKafkaProducerWrapper& producer = *producer_ptr;
   EXPECT_CALL(producer, poll(_)).Times(AnyNumber());
   EXPECT_CALL(utils, createProducer(_, _))
       .WillOnce(Return(testing::ByMove(std::move(producer_ptr))));
 
   // when
-  KafkaProducerWrapper testee = {dispatcher, thread_factory, config, utils};
+  RichKafkaProducer testee = {dispatcher, thread_factory, config, utils};
 
   // then
   // put something nice here

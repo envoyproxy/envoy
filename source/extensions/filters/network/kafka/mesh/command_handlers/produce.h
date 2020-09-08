@@ -9,6 +9,30 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
+struct RecordFootmark {
+
+  std::string topic_;
+  int32_t partition_;
+  absl::string_view key_;
+  absl::string_view value_;
+
+  int16_t error_code_;
+  uint32_t saved_offset_;
+
+  RecordFootmark(const std::string& topic, const int32_t partition, const absl::string_view key,
+                 const absl::string_view value)
+      : topic_{topic}, partition_{partition}, key_{key}, value_{value}, error_code_{0},
+        saved_offset_{0} {};
+};
+
+class RecordExtractor {
+public:
+  virtual ~RecordExtractor(){};
+
+  virtual std::vector<RecordFootmark>
+  computeFootmarks(const std::vector<TopicProduceData>& data) const PURE;
+};
+
 /**
  * Kafka 'Produce' request, that is aimed at particular cluster.
  * A single Produce request coming from downstream can map into multiple entries,
@@ -19,6 +43,10 @@ class ProduceRequestHolder : public BaseInFlightRequest,
                              public std::enable_shared_from_this<ProduceRequestHolder> {
 public:
   ProduceRequestHolder(AbstractRequestListener& filter,
+                       const std::shared_ptr<Request<ProduceRequest>> request);
+
+  // Visible for testing.
+  ProduceRequestHolder(AbstractRequestListener& filter, const RecordExtractor& record_extractor,
                        const std::shared_ptr<Request<ProduceRequest>> request);
 
   // AbstractInFlightRequest
@@ -34,28 +62,6 @@ public:
   bool accept(const DeliveryMemento& memento) override;
 
 private:
-  struct RecordFootmark {
-
-    std::string topic_;
-    int32_t partition_;
-    absl::string_view key_;
-    absl::string_view value_;
-
-    int16_t error_code_;
-    uint32_t saved_offset_;
-
-    RecordFootmark(const std::string& topic, const int32_t partition, const absl::string_view key,
-                   const absl::string_view value)
-        : topic_{topic}, partition_{partition}, key_{key}, value_{value}, error_code_{0},
-          saved_offset_{0} {};
-  };
-
-  static std::vector<RecordFootmark>
-  computeFootmarks(const std::string& topic, const int32_t partition, const Bytes& records);
-
-  static std::vector<RecordFootmark> processMagic2(const std::string& topic,
-                                                   const int32_t partition, absl::string_view sv);
-
   // Original request.
   const std::shared_ptr<Request<ProduceRequest>> request_;
 

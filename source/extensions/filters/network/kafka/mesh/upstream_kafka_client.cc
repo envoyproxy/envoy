@@ -6,9 +6,9 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-class KPWImpl : public KPW {
+class KafkaProducerWrapperImpl : public KafkaProducerWrapper {
 public:
-  KPWImpl(RdKafka::Producer* arg) : producer_{arg} {};
+  KafkaProducerWrapperImpl(RdKafka::Producer* arg) : producer_{arg} {};
 
   virtual RdKafka::ErrorCode produce(const std::string topic_name, int32_t partition, int msgflags,
                                      void* payload, size_t len, const void* key, size_t key_len,
@@ -36,20 +36,21 @@ class LibRdKafkaUtilsImpl : public LibRdKafkaUtils {
     return conf.set("dr_cb", dr_cb, errstr);
   }
 
-  std::unique_ptr<KPW> createProducer(RdKafka::Conf* conf, std::string& errstr) const override {
-    return std::make_unique<KPWImpl>(RdKafka::Producer::create(conf, errstr));
+  std::unique_ptr<KafkaProducerWrapper> createProducer(RdKafka::Conf* conf,
+                                                       std::string& errstr) const override {
+    return std::make_unique<KafkaProducerWrapperImpl>(RdKafka::Producer::create(conf, errstr));
   }
 };
 
-KafkaProducerWrapper::KafkaProducerWrapper(Event::Dispatcher& dispatcher,
-                                           Thread::ThreadFactory& thread_factory,
-                                           const RawKafkaProducerConfig& configuration)
-    : KafkaProducerWrapper(dispatcher, thread_factory, configuration, LibRdKafkaUtilsImpl{}){};
+RichKafkaProducer::RichKafkaProducer(Event::Dispatcher& dispatcher,
+                                     Thread::ThreadFactory& thread_factory,
+                                     const RawKafkaProducerConfig& configuration)
+    : RichKafkaProducer(dispatcher, thread_factory, configuration, LibRdKafkaUtilsImpl{}){};
 
-KafkaProducerWrapper::KafkaProducerWrapper(Event::Dispatcher& dispatcher,
-                                           Thread::ThreadFactory& thread_factory,
-                                           const RawKafkaProducerConfig& configuration,
-                                           const LibRdKafkaUtils& utils)
+RichKafkaProducer::RichKafkaProducer(Event::Dispatcher& dispatcher,
+                                     Thread::ThreadFactory& thread_factory,
+                                     const RawKafkaProducerConfig& configuration,
+                                     const LibRdKafkaUtils& utils)
     : dispatcher_{dispatcher} {
 
   std::unique_ptr<RdKafka::Conf> conf =
@@ -77,7 +78,7 @@ KafkaProducerWrapper::KafkaProducerWrapper(Event::Dispatcher& dispatcher,
   poller_thread_ = thread_factory.createThread(thread_routine);
 }
 
-KafkaProducerWrapper::~KafkaProducerWrapper() {
+RichKafkaProducer::~RichKafkaProducer() {
   ENVOY_LOG(warn, "Shutting down worker thread");
   // Impl note: this could be optimized by having flag flipped by owning Facade for all of its
   // clients so shutdowns happen in parallel.
@@ -86,9 +87,9 @@ KafkaProducerWrapper::~KafkaProducerWrapper() {
   ENVOY_LOG(warn, "Worker thread shut down successfully");
 }
 
-void KafkaProducerWrapper::send(const ProduceFinishCbSharedPtr origin, const std::string& topic,
-                                const int32_t partition, const absl::string_view key,
-                                const absl::string_view value) {
+void RichKafkaProducer::send(const ProduceFinishCbSharedPtr origin, const std::string& topic,
+                             const int32_t partition, const absl::string_view key,
+                             const absl::string_view value) {
   {
     ENVOY_LOG(warn, "Sending {} value-bytes to [{}/{}] (data = {})", value.size(), topic, partition,
               reinterpret_cast<long>(value.data()));
@@ -110,7 +111,7 @@ void KafkaProducerWrapper::send(const ProduceFinishCbSharedPtr origin, const std
   }
 }
 
-void KafkaProducerWrapper::checkDeliveryReports() {
+void RichKafkaProducer::checkDeliveryReports() {
   while (poller_thread_active_) {
     // We are going to wait for 1000ms, returning when an event (message delivery) happens or
     // producer is closed. Unfortunately we do not have any ability to interrupt this call, so every
@@ -120,8 +121,8 @@ void KafkaProducerWrapper::checkDeliveryReports() {
   ENVOY_LOG(warn, "Poller thread finished");
 }
 
-void KafkaProducerWrapper::dr_cb(RdKafka::Message& message) {
-  ENVOY_LOG(warn, "KafkaProducerWrapper - dr_cb: [{}] {}/{} -> {} (data = {})", message.err(),
+void RichKafkaProducer::dr_cb(RdKafka::Message& message) {
+  ENVOY_LOG(warn, "RichKafkaProducer - dr_cb: [{}] {}/{} -> {} (data = {})", message.err(),
             message.topic_name(), message.partition(), message.offset(),
             reinterpret_cast<long>(message.payload()));
   const DeliveryMemento memento = {message.payload(), message.err(), message.offset()};
@@ -129,13 +130,13 @@ void KafkaProducerWrapper::dr_cb(RdKafka::Message& message) {
   dispatcher_.post(callback);
 }
 
-void KafkaProducerWrapper::processDelivery(const DeliveryMemento& memento) {
-  ENVOY_LOG(trace, "KafkaProducerWrapper - processDelivery - entry [{}]",
+void RichKafkaProducer::processDelivery(const DeliveryMemento& memento) {
+  ENVOY_LOG(trace, "RichKafkaProducer - processDelivery - entry [{}]",
             reinterpret_cast<long>(memento.data_));
   for (auto it = unfinished_produce_requests_.begin(); it != unfinished_produce_requests_.end();) {
     bool accepted = (*it)->accept(memento);
     if (accepted) {
-      ENVOY_LOG(trace, "KafkaProducerWrapper - processDelivery - accepted [{}]",
+      ENVOY_LOG(trace, "RichKafkaProducer - processDelivery - accepted [{}]",
                 reinterpret_cast<long>(memento.data_));
       unfinished_produce_requests_.erase(it);
       break; // This is important - a single request can be mapped into multiple callbacks here.
@@ -146,7 +147,7 @@ void KafkaProducerWrapper::processDelivery(const DeliveryMemento& memento) {
   }
 }
 
-void KafkaProducerWrapper::markFinished() { poller_thread_active_ = false; }
+void RichKafkaProducer::markFinished() { poller_thread_active_ = false; }
 
 } // namespace Mesh
 } // namespace Kafka

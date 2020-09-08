@@ -20,7 +20,7 @@ namespace Mesh {
 class UpstreamKafkaFacade {
 public:
   virtual ~UpstreamKafkaFacade(){};
-  virtual KafkaProducerWrapper& getProducerForTopic(const std::string& topic) PURE;
+  virtual RecordSink& getProducerForTopic(const std::string& topic) PURE;
 };
 
 using UpstreamKafkaFacadeSharedPtr = std::shared_ptr<UpstreamKafkaFacade>;
@@ -37,7 +37,7 @@ public:
                           Thread::ThreadFactory& thread_factory);
 
   // WRITE DOC
-  KafkaProducerWrapper& getProducerForTopic(const std::string& topic) override;
+  RecordSink& getProducerForTopic(const std::string& topic) override;
 
   size_t getProducerCountForTest();
 

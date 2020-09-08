@@ -18,19 +18,19 @@ public:
                          Event::Dispatcher& dispatcher, Thread::ThreadFactory& thread_factory);
   ~ThreadLocalKafkaFacade() override;
 
-  KafkaProducerWrapper& getProducerForTopic(const std::string& topic);
+  RecordSink& getProducerForTopic(const std::string& topic);
 
   size_t getProducerCountForTest() const;
 
 private:
   // Mutates 'cluster_to_kafka_client_'.
-  KafkaProducerWrapper& registerNewProducer(const ClusterConfig& cluster_config);
+  RichKafkaProducer& registerNewProducer(const ClusterConfig& cluster_config);
 
   const ClusteringConfiguration& clustering_configuration_;
   Event::Dispatcher& dispatcher_;
   Thread::ThreadFactory& thread_factory_;
 
-  std::map<std::string, KafkaProducerWrapperPtr> cluster_to_kafka_client_;
+  std::map<std::string, RichKafkaProducerPtr> cluster_to_kafka_client_;
 };
 
 ThreadLocalKafkaFacade::ThreadLocalKafkaFacade(
@@ -45,7 +45,7 @@ ThreadLocalKafkaFacade::~ThreadLocalKafkaFacade() {
   }
 }
 
-KafkaProducerWrapper& ThreadLocalKafkaFacade::getProducerForTopic(const std::string& topic) {
+RecordSink& ThreadLocalKafkaFacade::getProducerForTopic(const std::string& topic) {
   const absl::optional<ClusterConfig> cluster_config =
       clustering_configuration_.computeClusterConfigForTopic(topic);
   if (cluster_config) {
@@ -58,10 +58,10 @@ KafkaProducerWrapper& ThreadLocalKafkaFacade::getProducerForTopic(const std::str
   }
 }
 
-KafkaProducerWrapper&
+RichKafkaProducer&
 ThreadLocalKafkaFacade::registerNewProducer(const ClusterConfig& cluster_config) {
   ENVOY_LOG(info, "Register new Kafka producer for cluster [{}]", cluster_config.name_);
-  KafkaProducerWrapperPtr new_producer = std::make_unique<KafkaProducerWrapper>(
+  RichKafkaProducerPtr new_producer = std::make_unique<RichKafkaProducer>(
       dispatcher_, thread_factory_, cluster_config.upstream_producer_properties_);
   auto result = cluster_to_kafka_client_.emplace(cluster_config.name_, std::move(new_producer));
   return *(result.first->second);
@@ -86,7 +86,7 @@ UpstreamKafkaFacadeImpl::UpstreamKafkaFacadeImpl(
 }
 
 // Return Producer instance that is local to given thread, via ThreadLocalKafkaFacade.
-KafkaProducerWrapper& UpstreamKafkaFacadeImpl::getProducerForTopic(const std::string& topic) {
+RecordSink& UpstreamKafkaFacadeImpl::getProducerForTopic(const std::string& topic) {
   return tls_->getTyped<ThreadLocalKafkaFacade>().getProducerForTopic(topic);
 }
 

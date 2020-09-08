@@ -25,7 +25,7 @@ public:
 
 class MockUpstreamKafkaFacade : public UpstreamKafkaFacade {
 public:
-  MOCK_METHOD(KafkaProducerWrapper&, getProducerForTopic, (const std::string&));
+  MOCK_METHOD(RichKafkaProducer&, getProducerForTopic, (const std::string&));
 };
 
 class MockRequestDecoder : public RequestDecoder {

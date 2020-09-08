@@ -8,21 +8,68 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-ProduceRequestHolder::ProduceRequestHolder(AbstractRequestListener& filter,
-                                           const std::shared_ptr<Request<ProduceRequest>> request)
-    : BaseInFlightRequest{filter}, request_{request} {
-  for (auto const& topic_data : request_->data_.topics_) {
+class RecordExtractorImpl : public RecordExtractor {
+public:
+  std::vector<RecordFootmark>
+  computeFootmarks(const std::vector<TopicProduceData>& data) const override;
+
+private:
+  std::vector<RecordFootmark> computeFootmarksForTopic(const std::string& topic,
+                                                       const int32_t partition,
+                                                       const Bytes& records) const;
+  std::vector<RecordFootmark> processMagic2(const std::string& topic, const int32_t partition,
+                                            absl::string_view sv) const;
+};
+
+std::vector<RecordFootmark>
+RecordExtractorImpl::computeFootmarks(const std::vector<TopicProduceData>& data) const {
+  std::vector<RecordFootmark> result;
+  for (auto const& topic_data : data) {
     for (auto const& partition_data : topic_data.partitions_) {
       if (partition_data.records_) {
-        const auto footmarks = computeFootmarks(topic_data.name_, partition_data.partition_index_,
-                                                *(partition_data.records_));
-        footmarks_.insert(footmarks_.end(), footmarks.begin(), footmarks.end());
+        const auto topic_result = computeFootmarksForTopic(
+            topic_data.name_, partition_data.partition_index_, *(partition_data.records_));
+        result.insert(result.end(), topic_result.begin(), topic_result.end());
       }
     }
   }
-  expected_responses_ = footmarks_.size();
+  return result;
 }
 
+std::vector<RecordFootmark>
+RecordExtractorImpl::computeFootmarksForTopic(const std::string& topic, const int32_t partition,
+                                              const Bytes& records) const {
+  // org.apache.kafka.common.record.DefaultRecordBatch.writeHeader(ByteBuffer, long, int, int, byte,
+  // CompressionType, TimestampType, long, long, long, short, int, boolean, boolean, int, int)
+  const char* ptr = reinterpret_cast<const char*>(records.data());
+  absl::string_view sv = {ptr, records.size()};
+
+  unsigned int step = /* BaseOffset */ 8 + /* Length */ 4 + /* PartitionLeaderEpoch */ 4;
+  if (sv.length() < step) {
+    return {};
+  }
+  sv = {sv.data() + step, sv.length() - step};
+
+  /* Magic */
+  Int8Deserializer magic_deserializer;
+  magic_deserializer.feed(sv);
+
+  if (magic_deserializer.ready()) {
+    int8_t magic = magic_deserializer.get();
+    switch (magic) {
+    case 0:
+    case 1:
+      return {};
+    case 2:
+      return processMagic2(topic, partition, sv);
+    default:
+      return {};
+    }
+  }
+  return {};
+}
+
+// Helper function to get the data (key, value) out of record.
 absl::string_view comsumeBytes(absl::string_view& input) {
   VarInt32Deserializer length_deserializer;
   length_deserializer.feed(input);
@@ -37,63 +84,22 @@ absl::string_view comsumeBytes(absl::string_view& input) {
   }
 }
 
-std::vector<ProduceRequestHolder::RecordFootmark>
-ProduceRequestHolder::computeFootmarks(const std::string& topic, const int32_t partition,
-                                       const Bytes& records) {
-  // org.apache.kafka.common.record.DefaultRecordBatch.writeHeader(ByteBuffer, long, int, int, byte,
-  // CompressionType, TimestampType, long, long, long, short, int, boolean, boolean, int, int)
-  const char* ptr = reinterpret_cast<const char*>(records.data());
-  absl::string_view sv = {ptr, records.size()};
-
-  unsigned int step = /* BaseOffset */ 8 + /* Length */ 4 + /* PartitionLeaderEpoch */ 4;
-  if (sv.length() < step) {
-    ENVOY_LOG(error, "bad data 1");
-    return {};
-  }
-  sv = {sv.data() + step, sv.length() - step};
-
-  /* Magic */
-  Int8Deserializer magic_deserializer;
-  magic_deserializer.feed(sv);
-
-  if (magic_deserializer.ready()) {
-    int8_t magic = magic_deserializer.get();
-    switch (magic) {
-    case 0:
-    case 1:
-      ENVOY_LOG(error, "bad data 2 - magic not equal to 2: {}", magic);
-      return {};
-    case 2:
-      return processMagic2(topic, partition, sv);
-    default:
-      ENVOY_LOG(error, "bad data 2 - magic not equal to 2: {}", magic);
-      return {};
-    }
-  }
-
-  ENVOY_LOG(error, "bad data 3 - no magic present");
-  return {};
-}
-
-std::vector<ProduceRequestHolder::RecordFootmark>
-ProduceRequestHolder::processMagic2(const std::string& topic, const int32_t partition,
-                                    absl::string_view sv) {
+std::vector<RecordFootmark> RecordExtractorImpl::processMagic2(const std::string& topic,
+                                                               const int32_t partition,
+                                                               absl::string_view sv) const {
 
   unsigned int step2 = /* CRC */ 4 + /* Attributes */ 2 + /* LastOffsetDelta */ 4 +
                        /* FirstTimestamp */ 8 + /* MaxTimestamp */ 8 + /* ProducerId */ 8 +
                        /* ProducerEpoch */ 2 + /* BaseSequence */ 4;
   if (sv.length() < step2) {
-    ENVOY_LOG(error, "bad data 3");
     return {};
   }
   sv = {sv.data() + step2, sv.length() - step2};
 
   Int32Deserializer count_des;
   count_des.feed(sv);
-  const int32_t record_count = count_des.get();
-  ENVOY_LOG(trace, "found {} records in records byte-array", record_count);
 
-  std::vector<ProduceRequestHolder::RecordFootmark> result;
+  std::vector<RecordFootmark> result;
   while (!sv.empty()) {
 
     // org.apache.kafka.common.record.DefaultRecord.writeTo(DataOutputStream, int, long, ByteBuffer,
@@ -127,11 +133,7 @@ ProduceRequestHolder::processMagic2(const std::string& topic, const int32_t part
       comsumeBytes(sv); // header value
     }
 
-    // ENVOY_LOG(trace, "key = [{}], value = [{}]", key, value);
-
     if (sv != expected_end_of_record) {
-      ENVOY_LOG(error, "bad data 4 - they differ {} {}", sv.length(),
-                expected_end_of_record.length());
       return {};
     }
 
@@ -140,10 +142,28 @@ ProduceRequestHolder::processMagic2(const std::string& topic, const int32_t part
   return result;
 }
 
+ProduceRequestHolder::ProduceRequestHolder(AbstractRequestListener& filter,
+                                           const std::shared_ptr<Request<ProduceRequest>> request)
+    : ProduceRequestHolder{filter, RecordExtractorImpl{}, request} {};
+
+ProduceRequestHolder::ProduceRequestHolder(AbstractRequestListener& filter,
+                                           const RecordExtractor& record_extractor,
+                                           const std::shared_ptr<Request<ProduceRequest>> request)
+    : BaseInFlightRequest{filter}, request_{request} {
+  footmarks_ = record_extractor.computeFootmarks(request_->data_.topics_);
+  expected_responses_ = footmarks_.size();
+}
+
 void ProduceRequestHolder::invoke(UpstreamKafkaFacade& kafka_facade) {
   for (auto& fm : footmarks_) {
-    KafkaProducerWrapper& producer = kafka_facade.getProducerForTopic(fm.topic_);
+    RecordSink& producer = kafka_facade.getProducerForTopic(fm.topic_);
     producer.send(shared_from_this(), fm.topic_, fm.partition_, fm.key_, fm.value_);
+  }
+  // Corner case handling:
+  // If we ever receive produce request without records, we need to notify the filter we are ready,
+  // because otherwise no notification will ever come from the real Kafka producer.
+  if (0 == expected_responses_) {
+    notifyFilter();
   }
 }
 
