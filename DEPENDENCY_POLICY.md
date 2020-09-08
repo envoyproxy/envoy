@@ -39,7 +39,8 @@ Dependency declarations must:
   may appear in a string as `{underscore_version}`, similarly for `X-Y-Z` you can use
   `{dash_version}`.
 * Versions should prefer release versions over master branch GitHub SHA tarballs. A comment is
-  necessary if the latter is used.
+  necessary if the latter is used. This comment should contain the reason that a non-release
+  version is being used and the YYYY-MM-DD when the last update was performed.
 * Provide accurate entries for `use_category`. Please think carefully about whether there are data
   or control plane implications of the dependency.
 * CPEs are compulsory for all dependencies that are not purely build/test.
