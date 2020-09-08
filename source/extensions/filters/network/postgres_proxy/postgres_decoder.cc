@@ -20,8 +20,6 @@ void DecoderImpl::initialize() {
   // Setup handlers for known messages.
   absl::flat_hash_map<char, MsgProcessor>& FE_known_msgs = FE_messages_.messages_;
 
-  // auto f = std::bind(createMsg<Int32>);
-
   // Handler for know messages.
   FE_known_msgs['B'] = MsgProcessor{
       "Bind", BODY_FORMAT(String, String, Array<Int16>, Array<VarByteN>, Array<Int16>), {}};
@@ -187,10 +185,10 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
   // The 1 byte message type and message length should be in the buffer
   // Check if the entire message has been read.
   std::string message;
-  uint32_t length = data.peekBEInt<uint32_t>(startup_ ? 0 : 1);
-  if (data.length() < (length + (startup_ ? 0 : 1))) {
+  message_len_ = data.peekBEInt<uint32_t>(startup_ ? 0 : 1);
+  if (data.length() < (message_len_ + (startup_ ? 0 : 1))) {
     ENVOY_LOG(trace, "postgres_proxy: cannot parse message. Need {} bytes in buffer",
-              length + (startup_ ? 0 : 1));
+              message_len_ + (startup_ ? 0 : 1));
     // Not enough data in the buffer.
     return false;
   }
@@ -211,11 +209,11 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
     }
   }
 
-  setMessageLength(length);
+  //  setMessageLength(length);
 
   data.drain(startup_ ? 4 : 5); // Length plus optional 1st byte.
 
-  auto bytesToRead = length - 4;
+  auto bytesToRead = message_len_ - 4;
   message.assign(std::string(static_cast<char*>(data.linearize(bytesToRead)), bytesToRead));
   // data.drain(bytesToRead);
   setMessage(message);
@@ -265,20 +263,21 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
     action(this);
   }
 
-  auto f = std::get<1>(msg.get());
-  std::string message = "Unrecognized";
-  if (f != nullptr) {
-    auto msgParser = f();
-    msgParser->read(data);
-    message = msgParser->to_string();
-  }
-
   ENVOY_LOG(debug, "({}) command = {} ({})", msg_processor.direction_, command_,
             std::get<0>(msg.get()));
-  ENVOY_LOG(debug, "({}) length = {}", msg_processor.direction_, getMessageLength());
-  ENVOY_LOG(debug, "({}) message = {}", msg_processor.direction_, message);
+  ENVOY_LOG(debug, "({}) length = {}", msg_processor.direction_, message_len_);
+  if (ENVOY_LOG_CHECK_LEVEL(debug)) {
+    auto f = std::get<1>(msg.get());
+    std::string message = "Unrecognized";
+    if (f != nullptr) {
+      auto msgParser = f();
+      msgParser->read(data, message_len_ - 4);
+      message = msgParser->toString();
+    }
+    ENVOY_LOG(debug, "({}) message = {}", msg_processor.direction_, message);
+  }
 
-  data.drain(getMessageLength() - 4);
+  data.drain(message_len_ - 4);
   ENVOY_LOG(trace, "postgres_proxy: {} bytes remaining in buffer", data.length());
 
   return true;

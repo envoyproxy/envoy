@@ -63,9 +63,6 @@ public:
   void setMessage(std::string message) { message_ = message; }
   std::string getMessage() { return message_; }
 
-  void setMessageLength(uint32_t message_len) { message_len_ = message_len; }
-  uint32_t getMessageLength() { return message_len_; }
-
   void setStartup(bool startup) { startup_ = startup; }
   void initialize();
 

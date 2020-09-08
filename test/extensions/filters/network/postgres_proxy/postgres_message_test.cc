@@ -30,7 +30,7 @@ TYPED_TEST(IntTest, BasicRead) {
   uint64_t left = this->data_.length();
   auto result = this->field_.read(this->data_, pos, left);
   ASSERT_TRUE(result);
-  auto out = this->field_.to_string();
+  auto out = this->field_.toString();
 
   sprintf(this->buf_, this->field_.getFormat(), 12);
   ASSERT_THAT(out, this->buf_);
@@ -49,7 +49,7 @@ TYPED_TEST(IntTest, ReadWithLeftovers) {
   uint64_t left = this->data_.length();
   auto result = this->field_.read(this->data_, pos, left);
   ASSERT_TRUE(result);
-  auto out = this->field_.to_string();
+  auto out = this->field_.toString();
   sprintf(this->buf_, this->field_.getFormat(), 12);
   ASSERT_THAT(out, this->buf_);
   // pos should be moved forward by the number of bytes read
@@ -67,7 +67,7 @@ TYPED_TEST(IntTest, ReadAtOffset) {
   uint64_t left = this->data_.length() - 1;
   auto result = this->field_.read(this->data_, pos, left);
   ASSERT_TRUE(result);
-  auto out = this->field_.to_string();
+  auto out = this->field_.toString();
   sprintf(this->buf_, this->field_.getFormat(), 12);
   ASSERT_THAT(out, this->buf_);
   // pos should be moved forward by the number of bytes read
@@ -81,8 +81,7 @@ TYPED_TEST(IntTest, NotEnoughData) {
   // Start from offset 1. There is not enough data in the buffer for the required type.
   uint64_t pos = 1;
   uint64_t left = this->data_.length() - pos;
-  auto result = this->field_.read(this->data_, pos, left);
-  ASSERT_FALSE(result);
+  ASSERT_FALSE(this->field_.read(this->data_, pos, left));
 }
 
 // Tests for String type.
@@ -99,7 +98,7 @@ TEST(StringType, SingleString) {
   ASSERT_THAT(pos, 5);
   ASSERT_THAT(left, 0);
 
-  auto out = field.to_string();
+  auto out = field.toString();
   ASSERT_THAT(out, "[test]");
 }
 
@@ -122,7 +121,7 @@ TEST(StringType, MultipleStrings) {
   ASSERT_TRUE(result);
   ASSERT_THAT(pos, 1 * 6);
   ASSERT_THAT(left, 2 * 6);
-  auto out = field.to_string();
+  auto out = field.toString();
   ASSERT_THAT(out, "[test1]");
 
   // Read the second string.
@@ -130,7 +129,7 @@ TEST(StringType, MultipleStrings) {
   ASSERT_TRUE(result);
   ASSERT_THAT(pos, 2 * 6);
   ASSERT_THAT(left, 1 * 6);
-  out = field.to_string();
+  out = field.toString();
   ASSERT_THAT(out, "[test2]");
 
   // Read the third string.
@@ -138,7 +137,7 @@ TEST(StringType, MultipleStrings) {
   ASSERT_TRUE(result);
   ASSERT_THAT(pos, 3 * 6);
   ASSERT_THAT(left, 0);
-  out = field.to_string();
+  out = field.toString();
   ASSERT_THAT(out, "[test3]");
 }
 
@@ -149,8 +148,7 @@ TEST(StringType, NoTerminatingByte) {
   data.add("test");
   uint64_t pos = 0;
   uint64_t left = 4;
-  auto result = field.read(data, pos, left);
-  ASSERT_FALSE(result);
+  ASSERT_FALSE(field.read(data, pos, left));
 }
 
 // ByteN type is always placed at the end of Postgres message.
@@ -172,8 +170,21 @@ TEST(ByteN, BasicTest) {
   ASSERT_THAT(pos, 10);
   ASSERT_THAT(len, 0);
 
-  auto out = field.to_string();
+  auto out = field.toString();
   ASSERT_THAT(out, "[00 01 02 03 04 05 06 07 08 09]");
+}
+
+TEST(ByteN, Empty) {
+  ByteN field;
+
+  Buffer::OwnedImpl data;
+  // Write nothing to data buffer.
+  uint64_t pos = 0;
+  uint64_t len = 0;
+  ASSERT_TRUE(field.read(data, pos, len));
+
+  auto out = field.toString();
+  ASSERT_THAT(out, "[]");
 }
 
 // VarByteN type. It contains 4 bytes length field with value which follows.
@@ -203,7 +214,7 @@ TEST(VarByteN, BasicTest) {
   ASSERT_THAT(pos, 4);
   expected_len -= 4;
   ASSERT_THAT(len, expected_len);
-  auto out = field.to_string();
+  auto out = field.toString();
   ASSERT_TRUE(out.find("0 bytes") != std::string::npos);
 
   // Read the second value.
@@ -212,7 +223,7 @@ TEST(VarByteN, BasicTest) {
   ASSERT_THAT(pos, 4 + 4 + 5);
   expected_len -= (4 + 5);
   ASSERT_THAT(len, expected_len);
-  out = field.to_string();
+  out = field.toString();
   ASSERT_TRUE(out.find("5 bytes") != std::string::npos);
   ASSERT_TRUE(out.find("10 11 12 13 14") != std::string::npos);
 
@@ -222,7 +233,7 @@ TEST(VarByteN, BasicTest) {
   ASSERT_THAT(pos, 4 + 4 + 5 + 4);
   expected_len -= 4;
   ASSERT_THAT(len, expected_len);
-  out = field.to_string();
+  out = field.toString();
   ASSERT_TRUE(out.find("-1 bytes") != std::string::npos);
 }
 
@@ -237,8 +248,7 @@ TEST(VarByteN, NotEnoughLengthData) {
 
   uint64_t pos = 0;
   uint64_t len = 3;
-  auto result = field.read(data, pos, len);
-  ASSERT_FALSE(result);
+  ASSERT_FALSE(field.read(data, pos, len));
 }
 
 TEST(VarByteN, NotEnoughValueData) {
@@ -254,202 +264,196 @@ TEST(VarByteN, NotEnoughValueData) {
 
   uint64_t pos = 0;
   uint64_t len = 5 + 4;
+  ASSERT_FALSE(field.read(data, pos, len));
+}
+
+// Array composite type tests.
+TEST(Array, SingleInt) {
+  Array<Int32> field;
+
+  Buffer::OwnedImpl data;
+  // Write the number of elements in the array.
+  data.writeBEInt<uint16_t>(1);
+  data.writeBEInt<uint32_t>(123);
+
+  uint64_t pos = 0;
+  uint64_t len = 2 + 4;
   auto result = field.read(data, pos, len);
-  ASSERT_FALSE(result);
+  ASSERT_TRUE(result);
+  ASSERT_THAT(pos, 6);
+  ASSERT_THAT(len, 0);
+
+  auto out = field.toString();
+  ASSERT_TRUE(out.find("Array of 1") != std::string::npos);
+  ASSERT_TRUE(out.find("123") != std::string::npos);
 }
 
-// Test basic 2 fields message
-TEST(PostgresMessage, DISABLED_Basic) {
-  Sequence<> msg;
+TEST(Array, MultipleInts) {
+  Array<Int8> field;
 
-  auto out = msg.to_string();
-  ASSERT_THAT(out, "");
+  Buffer::OwnedImpl data;
+  // Write 3 elements into array.
+  data.writeBEInt<uint16_t>(3);
+  data.writeBEInt<uint8_t>(211);
+  data.writeBEInt<uint8_t>(212);
+  data.writeBEInt<uint8_t>(213);
+
+  uint64_t pos = 0;
+  uint64_t len = 2 + 3 * 1;
+  auto result = field.read(data, pos, len);
+  ASSERT_TRUE(result);
+  ASSERT_THAT(pos, 5);
+  ASSERT_THAT(len, 0);
+
+  auto out = field.toString();
+  ASSERT_TRUE(out.find("Array of 3") != std::string::npos);
+  ASSERT_TRUE(out.find("211") != std::string::npos);
+  ASSERT_TRUE(out.find("212") != std::string::npos);
+  ASSERT_TRUE(out.find("213") != std::string::npos);
 }
 
+TEST(Array, Empty) {
+  Array<Int16> field;
+
+  Buffer::OwnedImpl data;
+  // Write 0 elements into array.
+  data.writeBEInt<uint16_t>(0);
+
+  uint64_t pos = 0;
+  uint64_t len = 2;
+  auto result = field.read(data, pos, len);
+  ASSERT_TRUE(result);
+  ASSERT_THAT(pos, 2);
+  ASSERT_THAT(len, 0);
+
+  auto out = field.toString();
+  ASSERT_TRUE(out.find("Array of 0") != std::string::npos);
+}
+
+// Test situation when there is not enough data to read the length of the Array.
+TEST(Array, NotEnoughDataForLength) {
+  Array<Int16> field;
+
+  Buffer::OwnedImpl data;
+  // Data field is 2 bytes long. Write just one byte.
+  data.writeBEInt<uint8_t>(1);
+
+  uint64_t pos = 0;
+  uint64_t len = 1;
+  ASSERT_FALSE(field.read(data, pos, len));
+}
+
+// Test situation when there is not enough data in the buffer to read one of the elements
+// in the array.
+TEST(Array, NotEnoughDataForValues) {
+  Array<Int32> field;
+
+  Buffer::OwnedImpl data;
+  // There will be 2 elements in the array.
+  // The first element is 4 bytes long.
+  // The second element should be 4 bytes long but is only 2 bytes long.
+  data.writeBEInt<uint16_t>(2);
+  data.writeBEInt<uint32_t>(101);
+  data.writeBEInt<uint16_t>(102);
+
+  uint64_t pos = 0;
+  uint64_t len = 2 + 4 + 2;
+  ASSERT_FALSE(field.read(data, pos, len));
+}
+
+// Sequence composite type tests.
+TEST(Sequence, BasicSingleValue) {
+  Sequence<Int32> field;
+
+  Buffer::OwnedImpl data;
+  data.writeBEInt<uint32_t>(101);
+
+  uint64_t pos = 0;
+  uint64_t len = 4;
+  auto result = field.read(data, pos, len);
+  ASSERT_TRUE(result);
+  ASSERT_THAT(pos, 4);
+  ASSERT_THAT(len, 0);
+
+  auto out = field.toString();
+  ASSERT_TRUE(out.find("101") != std::string::npos);
+}
+
+TEST(Sequence, BasicMultipleValues) {
+  Sequence<Int32, String> field;
+
+  Buffer::OwnedImpl data;
+  data.writeBEInt<uint32_t>(101);
+  data.add("test");
+  data.writeBEInt<uint8_t>(0);
+
+  uint64_t pos = 0;
+  uint64_t len = 4 + 5;
+  auto result = field.read(data, pos, len);
+  ASSERT_TRUE(result);
+  ASSERT_THAT(pos, 4 + 5);
+  ASSERT_THAT(len, 0);
+
+  auto out = field.toString();
+  ASSERT_TRUE(out.find("101") != std::string::npos);
+  ASSERT_TRUE(out.find("test") != std::string::npos);
+}
+
+// Test versifies that read fails when reading of one element
+// fails.
+TEST(Sequence, NotEnoughData) {
+  Sequence<Int32, String> field;
+
+  Buffer::OwnedImpl data;
+  data.writeBEInt<uint32_t>(101);
+  // Do not write terminating zero for the string.
+  data.add("test");
+
+  uint64_t pos = 0;
+  uint64_t len = 4 + 4;
+  ASSERT_FALSE(field.read(data, pos, len));
+}
+
+// Tests for MessageI interface and helper function createMsg.
 TEST(PostgresMessage, SingleField) {
-  // Sequence<Int32> msg('B', 5);
-
-  // std::unique_ptr<MessageI> msg = std::make_unique<Sequence<Int32>>('B', 5);
   std::unique_ptr<MessageI> msg = createMsg<Int32>();
 
   Buffer::OwnedImpl data;
   data.writeBEInt<uint32_t>(12);
-  msg->read(data);
-  auto out = msg->to_string();
+  auto result = msg->read(data, 4);
+  ASSERT_TRUE(result);
+  auto out = msg->toString();
   ASSERT_THAT(out, "[12]");
-}
-
-TEST(PostgresMessage, SingleStringViaBind) {
-  auto f = std::bind(createMsg<Int32>);
-
-  std::unique_ptr<MessageI> msg = f();
-  Buffer::OwnedImpl data;
-  data.writeBEInt<uint32_t>(12);
-  msg->read(data);
-  auto out = msg->to_string();
-  ASSERT_THAT(out, "[12]");
-}
-
-TEST(PostgresMessage, SingleByte1) {
-  auto f = std::bind(createMsg<Byte1>);
-
-  std::unique_ptr<MessageI> msg = f();
-  Buffer::OwnedImpl data;
-  data.writeBEInt<uint8_t>('S');
-  msg->read(data);
-  auto out = msg->to_string();
-  ASSERT_THAT(out, "[S]");
 }
 
 TEST(PostgresMessage, SingleByteN) {
-  auto f = std::bind(createMsg<ByteN>);
+  std::unique_ptr<MessageI> msg = createMsg<ByteN>();
 
-  std::unique_ptr<MessageI> msg = f();
   Buffer::OwnedImpl data;
   data.writeBEInt<uint8_t>(0);
   data.writeBEInt<uint8_t>(1);
   data.writeBEInt<uint8_t>(2);
   data.writeBEInt<uint8_t>(3);
   data.writeBEInt<uint8_t>(4);
-  msg->read(data);
-  auto out = msg->to_string();
-  ASSERT_THAT(out, "[00 01 02 03 04]");
+  auto result = msg->read(data, 5 * 1);
+  ASSERT_TRUE(result);
+  auto out = msg->toString();
+  ASSERT_TRUE(out.find("00") != std::string::npos);
+  ASSERT_TRUE(out.find("01") != std::string::npos);
+  ASSERT_TRUE(out.find("02") != std::string::npos);
+  ASSERT_TRUE(out.find("03") != std::string::npos);
+  ASSERT_TRUE(out.find("04") != std::string::npos);
 }
 
-TEST(PostgresMessage, EmptyArray) {
-  auto f = std::bind(createMsg<Array<Int32>>);
-
-  std::unique_ptr<MessageI> msg = f();
+TEST(PostgresMessage, NotEnoughData) {
+  std::unique_ptr<MessageI> msg = createMsg<Int32, String>();
   Buffer::OwnedImpl data;
-
-  data.writeBEInt<uint16_t>(0);
-  msg->read(data);
-  auto out = msg->to_string();
-  ASSERT_THAT(out, "[Array of 0:{}]");
-}
-
-TEST(PostgresMessage, NoEmptyArrayOf32bitInts) {
-  auto f = std::bind(createMsg<Array<Int32>>);
-
-  std::unique_ptr<MessageI> msg = f();
-  Buffer::OwnedImpl data;
-
-  // Add 5 Int32 elements
-  data.writeBEInt<uint16_t>(5);
-  // Elements
-  data.writeBEInt<uint32_t>(0);
-  data.writeBEInt<uint32_t>(1);
-  data.writeBEInt<uint32_t>(2);
-  data.writeBEInt<uint32_t>(3);
-  data.writeBEInt<uint32_t>(4);
-  msg->read(data);
-  auto out = msg->to_string();
-  ASSERT_THAT(out, "[Array of 5:{[[00]][[01]][[02]][[03]][[04]]}]");
-}
-
-TEST(PostgresMessage, NoEmptyArrayOf16bitInts) {
-  auto f = std::bind(createMsg<Array<Int16>>);
-
-  std::unique_ptr<MessageI> msg = f();
-  Buffer::OwnedImpl data;
-
-  // Add 5 Int32 elements
-  data.writeBEInt<uint16_t>(5);
-  // Elements
-  data.writeBEInt<uint16_t>(0);
-  data.writeBEInt<uint16_t>(1);
-  data.writeBEInt<uint16_t>(2);
-  data.writeBEInt<uint16_t>(3);
-  data.writeBEInt<uint16_t>(4);
-  msg->read(data);
-  auto out = msg->to_string();
-  ASSERT_THAT(out, "[Array of 5:{[[00]][[01]][[02]][[03]][[04]]}]");
-}
-
-TEST(PostgresMessage, NoEmptyArrayOf8bitInts) {
-  auto f = std::bind(createMsg<Array<Int8>>);
-
-  std::unique_ptr<MessageI> msg = f();
-  Buffer::OwnedImpl data;
-
-  // Add 5 Int32 elements
-  data.writeBEInt<uint16_t>(5);
-  // Elements
+  // Write only 3 bytes into the buffer.
   data.writeBEInt<uint8_t>(0);
   data.writeBEInt<uint8_t>(1);
   data.writeBEInt<uint8_t>(2);
-  data.writeBEInt<uint8_t>(3);
-  data.writeBEInt<uint8_t>(4);
-  msg->read(data);
-  auto out = msg->to_string();
-  ASSERT_THAT(out, "[Array of 5:{[[00]][[01]][[02]][[03]][[04]]}]");
-}
 
-TEST(PostgresMessage, NoEmptyArrayOfStruct) {
-  auto f = std::bind(createMsg<Array<Sequence<Int8>>>);
-  // std::unique_ptr<MessageI> msg = std::make_unique<Array<Sequence<Int32>>>('B', 5);
-
-  std::unique_ptr<MessageI> msg = f();
-  Buffer::OwnedImpl data;
-
-  // Add 5 Int32 elements
-  data.writeBEInt<uint16_t>(5);
-  // Elements
-  data.writeBEInt<uint8_t>(0);
-  data.writeBEInt<uint8_t>(1);
-  data.writeBEInt<uint8_t>(2);
-  data.writeBEInt<uint8_t>(3);
-  data.writeBEInt<uint8_t>(4);
-  msg->read(data);
-  auto out = msg->to_string();
-  ASSERT_THAT(out, "[Array of 5:{[[00]][[01]][[02]][[03]][[04]]}]");
-}
-
-TEST(PostgresMessage, NoEmptyArrayOfStruct1) {
-  auto f = std::bind(createMsg<Array<Sequence<Int8, Int16>>>);
-  // std::unique_ptr<MessageI> msg = std::make_unique<Array<Sequence<Int32>>>('B', 5);
-
-  std::unique_ptr<MessageI> msg = f();
-  Buffer::OwnedImpl data;
-
-  // Add 5 Int32 elements
-  data.writeBEInt<uint16_t>(5);
-  // Elements
-  data.writeBEInt<uint8_t>(0);
-  data.writeBEInt<uint16_t>(100);
-  data.writeBEInt<uint8_t>(1);
-  data.writeBEInt<uint16_t>(101);
-  data.writeBEInt<uint8_t>(2);
-  data.writeBEInt<uint16_t>(102);
-  data.writeBEInt<uint8_t>(3);
-  data.writeBEInt<uint16_t>(103);
-  data.writeBEInt<uint8_t>(4);
-  data.writeBEInt<uint16_t>(104);
-  msg->read(data);
-  auto out = msg->to_string();
-  ASSERT_THAT(out, "[Array of 5:{[[00][100]][[01][101]][[02][102]][[03][103]][[04][104]]}]");
-}
-
-TEST(PostgresMessage, EmptySingleByteN) {
-  auto f = std::bind(createMsg<ByteN>);
-
-  std::unique_ptr<MessageI> msg = f();
-  Buffer::OwnedImpl data;
-  msg->read(data);
-  auto out = msg->to_string();
-  ASSERT_THAT(out, "[]");
-}
-TEST(PostgresMessage, Byte1AndString) {
-  auto f = std::bind(createMsg<Byte1, String>);
-
-  std::unique_ptr<MessageI> msg = f();
-  Buffer::OwnedImpl data;
-  data.writeBEInt<uint8_t>('S');
-  data.add("test");
-  data.writeBEInt<uint32_t>(0);
-  msg->read(data);
-  auto out = msg->to_string();
-  ASSERT_THAT(out, "[S][test]");
+  ASSERT_FALSE(msg->read(data, 3));
 }
 
 } // namespace PostgresProxy

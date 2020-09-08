@@ -1,5 +1,7 @@
 #include "common/buffer/buffer_impl.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -19,7 +21,7 @@ namespace PostgresProxy {
  *
  * Each structure has the following methods:
  * read - to read number bytes from received buffer. The number of bytes depends on structure type.
- * to_string - method returns displayable representation of the structure value.
+ * toString - method returns displayable representation of the structure value.
  *
  */
 
@@ -39,7 +41,7 @@ public:
     return true;
   }
 
-  std::string to_string() const {
+  std::string toString() const {
     char buf[32];
     sprintf(buf, getFormat(), value_);
     return std::string(buf);
@@ -83,7 +85,7 @@ public:
     return true;
   }
 
-  std::string to_string() const { return "[" + value_ + "]"; }
+  std::string toString() const { return absl::StrCat("[", value_, "]"); }
 };
 
 // ByteN type is used as the last type in the Postgres message and contains
@@ -103,7 +105,7 @@ public:
     return true;
   }
 
-  std::string to_string() const {
+  std::string toString() const {
     std::string out = "[";
     out.reserve(value_.size() * 3);
     bool first = true;
@@ -115,9 +117,9 @@ public:
       } else {
         sprintf(buf, " %02d", i);
       }
-      out += buf;
+      absl::StrAppend(&out, buf);
     }
-    out += "]";
+    absl::StrAppend(&out, "]");
     return out;
   }
 };
@@ -161,7 +163,7 @@ public:
     return true;
   }
 
-  std::string to_string() const {
+  std::string toString() const {
     char buf[16];
     sprintf(buf, "[(%d bytes):", len_);
 
@@ -175,13 +177,14 @@ public:
       } else {
         sprintf(buf, " %02d", i);
       }
-      out += buf;
+      absl::StrAppend(&out, buf);
     }
-    out += "]";
+    absl::StrAppend(&out, "]");
     return out;
   }
 };
 
+// Array contains one or more values of the same type.
 template <typename T> class Array {
   std::vector<std::unique_ptr<T>> value_;
 
@@ -189,29 +192,34 @@ public:
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
     // First read the 16 bits value which indicates how many
     // elements there are in the array.
+    if ((data.length() < sizeof(uint16_t)) || (left < sizeof(uint16_t))) {
+      return false;
+    }
     uint16_t num = data.peekBEInt<uint16_t>(pos);
     pos += sizeof(uint16_t);
+    left -= sizeof(uint16_t);
     if (num != 0) {
       for (auto i = 0; i < num; i++) {
         auto item = std::make_unique<T>();
-        item->read(data, pos, left);
+        if (!item->read(data, pos, left)) {
+          return false;
+        }
         value_.push_back(std::move(item));
       }
     }
     return true;
   }
-  std::string to_string() const {
+
+  std::string toString() const {
     std::string out;
     char buf[128];
     sprintf(buf, "[Array of %zu:{", value_.size());
     out = buf;
 
     for (const auto& i : value_) {
-      out += "[";
-      out += i->to_string();
-      out += "]";
+      absl::StrAppend(&out, i->toString());
     }
-    out += "}]";
+    absl::StrAppend(&out, "}]");
 
     return out;
   }
@@ -221,10 +229,20 @@ public:
 class MessageI {
 public:
   virtual ~MessageI() {}
-  virtual void read(const Buffer::Instance& data) = 0;
-  virtual std::string to_string() const = 0;
+
+  // read method should read only as many bytes from data
+  // buffer as it is indicated in message's length field.
+  // "length" parameter indicates how many bytes were indicated in Postgres message's
+  // length field. "data" parameter may contain more bytes than "length".
+  virtual bool read(const Buffer::Instance& data, const uint64_t length) = 0;
+
+  // toString method provides displayable representation of
+  // the Postgres message.
+  virtual std::string toString() const = 0;
 };
 
+// Sequence is tuple like structure, which binds together
+// set of several fields of different types.
 template <typename... Types> class Sequence;
 
 template <typename FirstField, typename... Remaining>
@@ -234,32 +252,36 @@ class Sequence<FirstField, Remaining...> : public MessageI {
 
 public:
   Sequence() {}
-  std::string to_string() const override { return first_.to_string() + remaining_.to_string(); }
-
-  void read(const Buffer::Instance& data) override {
-    uint64_t pos = 0;
-    uint64_t left = data.length();
-    read(data, pos, left);
-    // TODO return number of bytes read from data.
-    // return pos
+  std::string toString() const override {
+    return absl::StrCat(first_.toString(), remaining_.toString());
   }
 
-  void read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
-    first_.read(data, pos, left);
-    if (data.length() > 0) {
-      remaining_.read(data, pos, left);
+  bool read(const Buffer::Instance& data, const uint64_t length) override {
+    uint64_t pos = 0;
+    uint64_t left = length;
+    return read(data, pos, left);
+  }
+
+  bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
+    auto result = first_.read(data, pos, left);
+    if (!result) {
+      return false;
     }
+    return remaining_.read(data, pos, left);
   }
 };
 
+// Terminal template definition for variadic Sequence template.
 template <> class Sequence<> : public MessageI {
 public:
   Sequence<>() {}
-  std::string to_string() const override { return ""; }
-  void read(const Buffer::Instance&, uint64_t&, uint64_t&) {}
-  void read(const Buffer::Instance&) override {}
+  std::string toString() const override { return ""; }
+  bool read(const Buffer::Instance&, uint64_t&, uint64_t&) { return true; }
+  bool read(const Buffer::Instance&, const uint64_t) override { return true; }
 };
 
+// Helper function to create pointer to a Sequence structure and is used by Postgres
+// decoder after learning the type of Postgres message.
 template <typename... Types> std::unique_ptr<MessageI> createMsg() {
   return std::make_unique<Sequence<Types...>>();
 }
