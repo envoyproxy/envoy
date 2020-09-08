@@ -248,7 +248,9 @@ protected:
               // shifts the vector elements, but does not resize the vector. The call to erase that
               // follows erases the unneeded cells (from remove_pos to the end) and modifies the
               // vector's size.
-              const auto remove_pos = std::remove_if(values_vec.begin(), values_vec.end(), [&](HeaderNode it) { return it == entry.entry_; });
+              const auto remove_pos =
+                  std::remove_if(values_vec.begin(), values_vec.end(),
+                                 [&](HeaderNode it) { return it == entry.entry_; });
               values_vec.erase(remove_pos, values_vec.end());
             }
           }
