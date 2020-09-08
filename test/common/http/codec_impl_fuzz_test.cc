@@ -385,7 +385,7 @@ public:
 // the buffer via swap() or modified with mutate().
 class ReorderBuffer {
 public:
-  ReorderBuffer(Connection& connection) : connection_(connection) {}
+  ReorderBuffer(Connection& connection) : connection_(connection), can_dispatch_(true) {}
 
   void add(Buffer::Instance& data) {
     bufs_.emplace_back();
@@ -397,6 +397,10 @@ public:
     while (!bufs_.empty()) {
       Buffer::OwnedImpl& buf = bufs_.front();
       while (buf.length() > 0) {
+        if (!can_dispatch_) {
+          ENVOY_LOG_MISC(trace, "Buffer dispatch disabled, stopping drain");
+          return codecClientError("preventing buffer drain due to connection reset");
+        }
         status = connection_.dispatch(buf);
         if (!status.ok()) {
           ENVOY_LOG_MISC(trace, "Error status: {}", status.message());
@@ -437,8 +441,12 @@ public:
 
   bool empty() const { return bufs_.empty(); }
 
+  void disableDispatch() { can_dispatch_ = false; }
+
   Connection& connection_;
   std::deque<Buffer::OwnedImpl> bufs_;
+  // Indicating whether the reorder buffer is allowed to dispatch data over the connection.
+  bool can_dispatch_;
 };
 
 using HttpStreamPtr = std::unique_ptr<HttpStream>;
@@ -574,10 +582,11 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
       HttpStreamPtr stream = std::make_unique<HttpStream>(
           *client,
           fromSanitizedHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers()),
-          action.new_stream().end_stream(), [&should_close_connection, http2]() {
+          action.new_stream().end_stream(), [&should_close_connection, http2, &client_write_buf]() {
             // HTTP/1 codec has stream reset implying connection close.
             if (!http2) {
               should_close_connection = true;
+              client_write_buf.disableDispatch();
             }
           });
       LinkedList::moveIntoListBack(std::move(stream), pending_streams);
