@@ -1010,11 +1010,11 @@ message RouteAction {
   CorsPolicy cors = 17;
 
   // Deprecated; use :ref:`grpc_max_timeout
-  // <envoy_api_field_config.route.v3.RouteAction.max_stream_duration.grpc_max_timeout>` instead.
+  // <envoy_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_max_timeout>` instead.
   google.protobuf.Duration max_grpc_timeout = 23 [deprecated = true];
 
   // Deprecated; use :ref:`grpc_timeout_offset
-  // <envoy_api_field_config.route.v3.RouteAction.max_stream_duration.grpc_timeout_offset>` instead.
+  // <envoy_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_offset>` instead.
   google.protobuf.Duration grpc_timeout_offset = 28 [deprecated = true];
 
   repeated UpgradeConfig upgrade_configs = 25;
