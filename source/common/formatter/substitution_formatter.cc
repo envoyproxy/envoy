@@ -990,7 +990,7 @@ GrpcStatusFormatter::formatValue(const Http::RequestHeaderMap&,
 
 MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
                                      const std::vector<std::string>& path,
-                                     absl::optional<size_t> max_length, const bool unquoted)
+                                     absl::optional<size_t> max_length, bool unquoted)
     : filter_namespace_(filter_namespace), path_(path), max_length_(max_length),
       unquoted_(unquoted) {}
 
@@ -1041,8 +1041,7 @@ MetadataFormatter::formatMetadataValue(const envoy::config::core::v3::Metadata& 
 // See: https://github.com/envoyproxy/envoy/issues/3006
 DynamicMetadataFormatter::DynamicMetadataFormatter(const std::string& filter_namespace,
                                                    const std::vector<std::string>& path,
-                                                   absl::optional<size_t> max_length,
-                                                   const bool unquoted)
+                                                   absl::optional<size_t> max_length, bool unquoted)
     : MetadataFormatter(filter_namespace, path, max_length, unquoted) {}
 
 absl::optional<std::string> DynamicMetadataFormatter::format(

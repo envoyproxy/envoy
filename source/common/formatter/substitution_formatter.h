@@ -318,7 +318,7 @@ private:
   std::string filter_namespace_;
   std::vector<std::string> path_;
   absl::optional<size_t> max_length_;
-  const bool unquoted_{};
+  const bool unquoted_;
 };
 
 /**
