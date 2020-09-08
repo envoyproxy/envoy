@@ -39,6 +39,11 @@ Envoy::Config::ConfigProviderPtr create(
 class ScopedRoutesConfigProviderManager;
 
 // A ConfigProvider for inline scoped routing configuration.
+// InlineScopedRoutesConfigProvider is not fully implemented at this point. It doesn't load
+// ScopedRouteConfigurations and propagate them to worker threads. If
+// InlineScopedRoutesConfigProvider is fully implemented, when it is loading
+// ScopedRouteConfiguration, the on demand field should be ignored and all scopes should be loaded
+// eagerly.
 class InlineScopedRoutesConfigProvider : public Envoy::Config::ImmutableConfigProviderBase {
 public:
   InlineScopedRoutesConfigProvider(ProtobufTypes::ConstMessagePtrVector&& config_protos,

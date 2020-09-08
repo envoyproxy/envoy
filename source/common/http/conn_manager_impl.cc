@@ -515,7 +515,7 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestVhdsUpdate(
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
     Router::ScopeKeyPtr scope_key, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  // since inline scope_route_config_provider is not fully implemented and never used,
+  // Since inline scope_route_config_provider is not fully implemented and never used,
   // dynamic cast in constructor always succeed and the pointer should not be null here.
   ASSERT(scoped_route_config_provider_ != nullptr);
   Http::RouteConfigUpdatedCallback scoped_route_config_updated_cb =
