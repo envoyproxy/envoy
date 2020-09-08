@@ -36,6 +36,5 @@ envoy_cc_library(
         ":watcher_lib",
         "//include/envoy/init:manager_interface",
         "//source/common/common:logger_lib",
-        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )

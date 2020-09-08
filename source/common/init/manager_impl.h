@@ -2,8 +2,6 @@
 
 #include <list>
 
-#include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/admin/v3/init_dump.pb.h"
 #include "envoy/init/manager.h"
 
 #include "common/common/logger.h"

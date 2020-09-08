@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/admin/v3/init_dump.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/init/target.h"
