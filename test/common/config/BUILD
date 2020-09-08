@@ -275,6 +275,7 @@ envoy_cc_test(
     srcs = ["subscription_factory_impl_test.cc"],
     deps = [
         "//source/common/config:subscription_factory_lib",
+        "//source/common/config:udpa_resource_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",

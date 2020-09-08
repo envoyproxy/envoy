@@ -17,7 +17,7 @@ namespace Config {
  * lists of xDS resources.
  */
 class FilesystemSubscriptionImpl : public Config::Subscription,
-                                   Logger::Loggable<Logger::Id::config> {
+                                   protected Logger::Loggable<Logger::Id::config> {
 public:
   FilesystemSubscriptionImpl(Event::Dispatcher& dispatcher, absl::string_view path,
                              SubscriptionCallbacks& callbacks,
@@ -30,8 +30,8 @@ public:
   void start(const std::set<std::string>&) override;
   void updateResourceInterest(const std::set<std::string>&) override;
 
-private:
-  void refresh();
+protected:
+  virtual void refresh();
   void configRejected(const EnvoyException& e, const std::string& message);
 
   bool started_{};
@@ -42,6 +42,20 @@ private:
   SubscriptionStats stats_;
   Api::Api& api_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+};
+
+// Currently a FilesystemSubscriptionImpl subclass, but this will need to change when we support
+// non-inline collection resources.
+class FilesystemCollectionSubscriptionImpl : public FilesystemSubscriptionImpl {
+public:
+  FilesystemCollectionSubscriptionImpl(Event::Dispatcher& dispatcher, absl::string_view path,
+                                       SubscriptionCallbacks& callbacks,
+                                       OpaqueResourceDecoder& resource_decoder,
+                                       SubscriptionStats stats,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                                       Api::Api& api);
+
+  void refresh() override;
 };
 
 } // namespace Config

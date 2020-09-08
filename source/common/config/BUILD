@@ -66,6 +66,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/config:subscription_interface",
         "//source/common/protobuf:utility_lib",
+        "@com_github_cncf_udpa//udpa/core/v1:pkg_cc_proto",
     ],
 )
 
@@ -303,6 +304,7 @@ envoy_cc_library(
         ":http_subscription_lib",
         ":new_grpc_mux_lib",
         ":type_to_endpoint_lib",
+        ":udpa_resource_lib",
         ":utility_lib",
         "//include/envoy/config:subscription_factory_interface",
         "//include/envoy/config:subscription_interface",
