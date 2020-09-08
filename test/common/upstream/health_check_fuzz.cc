@@ -68,6 +68,43 @@ void HealthCheckFuzz::streamCreate(bool second_host) {
   test_sessions_[index]->interval_timer_->invokeCallback();
 }
 
+void HealthCheckFuzz::raiseEvent(test::common::upstream::RaiseEvent event, bool second_host,
+                                 bool last_action) {
+  Network::ConnectionEvent eventType;
+  switch (event.event_selector_case()) {
+  case test::common::upstream::RaiseEvent::kConnected: {
+    eventType = Network::ConnectionEvent::Connected;
+    break;
+  }
+  case test::common::upstream::RaiseEvent::kRemoteClose: {
+    eventType = Network::ConnectionEvent::RemoteClose;
+    break;
+  }
+  case test::common::upstream::RaiseEvent::kLocalClose: {
+    eventType = Network::ConnectionEvent::LocalClose;
+    break;
+  }
+  default:
+    break;
+  }
+
+  const int index = (second_host_ && second_host) ? 1 : 0;
+  switch (type_) {
+  case HealthCheckFuzz::Type::HTTP: {
+    test_sessions_[index]->client_connection_->raiseEvent(eventType);
+    if (!last_action && eventType != Network::ConnectionEvent::Connected) {
+      ENVOY_LOG_MISC(trace, "Creating client and stream from close event.");
+      expectClientCreate(index);
+      expectStreamCreate(index);
+      test_sessions_[index]->interval_timer_->invokeCallback();
+    }
+    break;
+  }
+  default:
+    break;
+  }
+}
+
 void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) {
   for (int i = 0; i < input.actions().size(); ++i) {
     const auto& event = input.actions(i);
@@ -89,6 +126,11 @@ void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) 
     }
     case test::common::upstream::Action::kStreamCreate: {
       streamCreate(event.stream_create().second_host());
+      break;
+    }
+    case test::common::upstream::Action::kRaiseEvent: {
+      bool last_action = i == input.actions().size() - 1;
+      raiseEvent(event.raise_event(), event.raise_event().second_host(), last_action);
       break;
     }
     case test::common::upstream::Action::kAdvanceTime: {

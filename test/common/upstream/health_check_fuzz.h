@@ -23,6 +23,7 @@ private:
                    bool respond_on_second_host);
   void streamCreate(bool create_stream_on_second_host);
   void allocHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
+  void raiseEvent(test::common::upstream::RaiseEvent event, bool second_host, bool last_action);
 
   void replay(test::common::upstream::HealthCheckTestCase input);
   bool second_host_;
