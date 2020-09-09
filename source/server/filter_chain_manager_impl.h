@@ -252,7 +252,7 @@ public:
       FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& context_creator);
 
   // Rebuild the filter chain. Invoked only if the filter chain is on-demand.
-  void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
+  void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const filter_chain,
                           FilterChainFactoryBuilder& b,
                           FilterChainFactoryContextCreator& context_creator);
 

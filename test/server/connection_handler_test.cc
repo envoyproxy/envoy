@@ -123,7 +123,7 @@ public:
       return access_logs_;
     }
     Event::Dispatcher& dispatcher() override { return parent_.master_dispatcher_; }
-    void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const&,
+    void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const,
                             Event::Dispatcher&, Network::FilterChainRebuildCallback) override {}
 
     bool containFilterChain(const envoy::config::listener::v3::FilterChain&) const override {

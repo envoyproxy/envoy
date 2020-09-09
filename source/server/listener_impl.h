@@ -381,7 +381,7 @@ public:
     return access_logs_;
   }
   Event::Dispatcher& dispatcher() override;
-  void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
+  void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const filter_chain,
                           Event::Dispatcher& worker_dispatcher,
                           Network::FilterChainRebuildCallback callback) override;
 

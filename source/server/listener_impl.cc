@@ -576,7 +576,7 @@ void ListenerImpl::buildFilterChains() {
 Event::Dispatcher& ListenerImpl::dispatcher() { return parent_.server_.dispatcher(); }
 
 void ListenerImpl::rebuildFilterChain(
-    const envoy::config::listener::v3::FilterChain* const& filter_chain_message,
+    const envoy::config::listener::v3::FilterChain* const filter_chain_message,
     Event::Dispatcher& worker_dispatcher, Network::FilterChainRebuildCallback callback) {
   ENVOY_LOG(debug, "receive rebuilding request from worker: {}", worker_dispatcher.name());
   if (filter_chain_message == nullptr) {

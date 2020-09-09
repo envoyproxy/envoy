@@ -227,7 +227,7 @@ void FilterChainManagerImpl::addFilterChain(
 }
 
 void FilterChainManagerImpl::rebuildFilterChain(
-    const envoy::config::listener::v3::FilterChain* const& filter_chain,
+    const envoy::config::listener::v3::FilterChain* const filter_chain,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
 

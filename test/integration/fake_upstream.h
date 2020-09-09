@@ -697,7 +697,7 @@ private:
     void clearMaxConnections() { connection_resource_.resetMax(); }
 
     Event::Dispatcher& dispatcher() override { return *parent_.dispatcher_; }
-    void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const&,
+    void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const,
                             Event::Dispatcher&, Network::FilterChainRebuildCallback) override {}
     bool containFilterChain(const envoy::config::listener::v3::FilterChain&) const override {
       return false;
