@@ -523,15 +523,6 @@ public:
    */
   virtual void
   requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
-
-  /**
-   *
-   * @return absl::optional<Router::ConfigConstSharedPtr>. Contains a value if a non-scoped RDS
-   * route config provider is used. Scoped RDS provides are not supported at the moment, as
-   * retrieval of a route configuration in their case requires passing of http request headers
-   * as a parameter.
-   */
-  virtual absl::optional<Router::ConfigConstSharedPtr> routeConfig() PURE;
 };
 
 /**
