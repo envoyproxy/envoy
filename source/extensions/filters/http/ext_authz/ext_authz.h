@@ -120,6 +120,8 @@ public:
 
   bool includePeerCertificate() const { return include_peer_certificate_; }
 
+  std::size_t matcherSize() const { return matchers_.size(); }
+
   bool hasMatcher() const { return !matchers_.empty(); }
 
   Envoy::Extensions::Common::Matcher::Matcher& rootMatcher() const { return *matchers_[0]; }
@@ -160,6 +162,8 @@ private:
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
 
+  std::vector<Envoy::Extensions::Common::Matcher::MatcherPtr> matchers_{};
+
 public:
   // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats
   // (ExtAuthzFilterStats stats_).
@@ -167,7 +171,6 @@ public:
   const Stats::StatName ext_authz_denied_;
   const Stats::StatName ext_authz_error_;
   const Stats::StatName ext_authz_failure_mode_allowed_;
-  std::vector<Envoy::Extensions::Common::Matcher::MatcherPtr> matchers_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -215,7 +218,7 @@ class Filter : public Logger::Loggable<Logger::Id::filter>,
 public:
   Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
-        statuses_(config_->matchers_.size()) {}
+        statuses_(config_->matcherSize()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;
