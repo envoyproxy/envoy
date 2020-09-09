@@ -41,28 +41,5 @@ private:
   // polling and activating new fd events.
   const bool activate_fd_events_next_event_loop_;
 };
-
-/**
- * This file event is a helper event to be always active. It works with NullIoSocketHandleImpl so
- * that the socket handle will call io methods ASAP and obtain the error code.
- */
-class AlwaysActiveFileEventImpl : public FileEvent {
-public:
-  AlwaysActiveFileEventImpl(SchedulableCallbackPtr schedulable)
-      : schedulable_(std::move(schedulable)) {}
-
-  ~AlwaysActiveFileEventImpl() override {
-    if (schedulable_->enabled()) {
-      schedulable_->cancel();
-    }
-  }
-  // Event::FileEvent
-  void activate(uint32_t) override { schedulable_->scheduleCallbackNextIteration(); }
-  void setEnabled(uint32_t) override { schedulable_->scheduleCallbackNextIteration(); }
-
-private:
-  SchedulableCallbackPtr schedulable_;
-};
-
 } // namespace Event
 } // namespace Envoy

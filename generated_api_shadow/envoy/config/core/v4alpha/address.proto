@@ -30,7 +30,8 @@ message Pipe {
   uint32 mode = 2 [(validate.rules).uint32 = {lte: 511}];
 }
 
-// The address represents an envoy internal listener.
+// [#not-implemented-hide:] The address represents an envoy internal listener.
+// TODO(lambdai): Make this address available for listener and endpoint.
 message EnvoyInternalAddress {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.EnvoyInternalAddress";
