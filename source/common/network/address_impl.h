@@ -263,8 +263,8 @@ public:
   const Ip* ip() const override { return nullptr; }
   const Pipe* pipe() const override { return nullptr; }
   const EnvoyInternalAddress* envoyInternalAddress() const override { return &internal_address_; }
-  const sockaddr* sockAddr() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  socklen_t sockAddrLen() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  const sockaddr* sockAddr() const override { return nullptr; }
+  socklen_t sockAddrLen() const override { return 0; }
 
 private:
   struct EnvoyInternalAddressImpl : public EnvoyInternalAddress {

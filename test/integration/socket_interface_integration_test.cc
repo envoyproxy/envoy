@@ -1,4 +1,5 @@
 #include "common/buffer/buffer_impl.h"
+#include "common/network/address_impl.h"
 #include "common/network/socket_interface.h"
 
 #include "test/integration/integration.h"
@@ -112,8 +113,8 @@ TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   client_->close(Network::ConnectionCloseType::FlushWrite);
 }
 
-// Test that connecting to internal address should always followed by disconnection with no crash.
-TEST_P(SocketInterfaceIntegrationTest, UdpOpOntInternalAddressWithSocketInterface) {
+// Test that recv from internal address should return io error.
+TEST_P(SocketInterfaceIntegrationTest, UdpRecvFromInternalAddressWithSocketInterface) {
   BaseIntegrationTest::initialize();
 
   const Network::SocketInterface* sock_interface = Network::socketInterface(
@@ -137,5 +138,28 @@ TEST_P(SocketInterfaceIntegrationTest, UdpOpOntInternalAddressWithSocketInterfac
   EXPECT_FALSE(socket->isOpen());
 }
 
+// Test that send to internal address should return io error.
+TEST_P(SocketInterfaceIntegrationTest, UdpSendToInternalAddressWithSocketInterface) {
+  BaseIntegrationTest::initialize();
+
+  const Network::SocketInterface* sock_interface = Network::socketInterface(
+      "envoy.extensions.network.socket_interface.default_socket_interface");
+  Network::Address::InstanceConstSharedPtr peer_internal_address =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
+  Network::Address::InstanceConstSharedPtr local_valid_address =
+      Network::Test::getCanonicalLoopbackAddress(version_);
+
+  auto socket =
+      std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, local_valid_address);
+
+  Buffer::OwnedImpl buffer;
+  Buffer::RawSlice iovec;
+  buffer.reserve(100, &iovec, 1);
+
+  auto result =
+      socket->ioHandle().sendmsg(&iovec, 1, 0, local_valid_address->ip(), *peer_internal_address);
+  ASSERT_FALSE(result.ok());
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::NoSupport);
+}
 } // namespace
 } // namespace Envoy

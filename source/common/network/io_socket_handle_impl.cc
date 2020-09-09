@@ -72,7 +72,10 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
                                                     const Address::Instance& peer_address) {
   const auto* address_base = dynamic_cast<const Address::InstanceBase*>(&peer_address);
   sockaddr* sock_addr = const_cast<sockaddr*>(address_base->sockAddr());
-
+  if (sock_addr == nullptr) {
+    // Unlikely to happen unless the wrong peer address is passed.
+    return sysCallResultToIoCallResult(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_NOT_SUP});
+  }
   absl::FixedArray<iovec> iov(num_slice);
   uint64_t num_slices_to_write = 0;
   for (uint64_t i = 0; i < num_slice; i++) {
