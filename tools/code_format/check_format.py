@@ -691,12 +691,12 @@ def checkSourceLine(line, file_path, reportError):
   # See: https://github.com/envoyproxy/envoy/issues/12341
   if tokenInLine("std::any", line):
     reportError("Don't use std::any; use absl::any instead")
+  if tokenInLine("std::make_optional", line):
+    reportError("Don't use std::make_optional; use absl::make_optional instead")
   if tokenInLine("std::optional", line):
     reportError("Don't use std::optional; use absl::optional instead")
   if tokenInLine("std::variant", line):
     reportError("Don't use std::variant; use absl::variant instead")
-  if tokenInLine("std::visit", line):
-    reportError("Don't use std::visit; use absl::visit instead")
   if "__attribute__((packed))" in line and file_path != "./include/envoy/common/platform.h":
     # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
     # can be used instead
