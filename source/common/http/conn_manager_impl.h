@@ -243,7 +243,8 @@ private:
       return response_headers_ ? absl::make_optional(std::ref(*response_headers_)) : absl::nullopt;
     }
     Http::ResponseTrailerMapOptRef responseTrailers() override {
-      return response_trailers_ ? absl::make_optional(std::ref(*response_trailers_)) : absl::nullopt;
+      return response_trailers_ ? absl::make_optional(std::ref(*response_trailers_))
+                                : absl::nullopt;
     }
 
     void endStream() override {
