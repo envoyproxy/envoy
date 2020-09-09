@@ -28,7 +28,7 @@ namespace PostgresProxy {
 // Template for integer types.
 // Size of integer types is fixed and depends on the type of integer.
 template <typename T> class Int {
-  T value_;
+  T value_{};
 
 public:
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
@@ -110,7 +110,7 @@ public:
     out.reserve(value_.size() * 3);
     bool first = true;
     for (const auto& i : value_) {
-      char buf[4];
+      char buf[16];
       if (first) {
         sprintf(buf, "%02d", i);
         first = false;
@@ -228,7 +228,7 @@ public:
 // Interface to Postgres message class.
 class MessageI {
 public:
-  virtual ~MessageI() {}
+  virtual ~MessageI() = default;
 
   // read method should read only as many bytes from data
   // buffer as it is indicated in message's length field.
@@ -251,7 +251,7 @@ class Sequence<FirstField, Remaining...> : public MessageI {
   Sequence<Remaining...> remaining_;
 
 public:
-  Sequence() {}
+  Sequence() = default;
   std::string toString() const override {
     return absl::StrCat(first_.toString(), remaining_.toString());
   }
@@ -274,7 +274,7 @@ public:
 // Terminal template definition for variadic Sequence template.
 template <> class Sequence<> : public MessageI {
 public:
-  Sequence<>() {}
+  Sequence<>() = default;
   std::string toString() const override { return ""; }
   bool read(const Buffer::Instance&, uint64_t&, uint64_t&) { return true; }
   bool read(const Buffer::Instance&, const uint64_t) override { return true; }

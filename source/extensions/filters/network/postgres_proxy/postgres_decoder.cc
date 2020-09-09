@@ -9,7 +9,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace PostgresProxy {
 
-#define BODY_FORMAT(x...) []() -> std::unique_ptr<MessageI> { return createMsg<x>(); }
+#define BODY_FORMAT(...) []() -> std::unique_ptr<MessageI> { return createMsg<__VA_ARGS__>(); }
 #define NO_BODY BODY_FORMAT()
 
 void DecoderImpl::initialize() {
