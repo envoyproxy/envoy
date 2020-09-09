@@ -136,8 +136,10 @@ void FilesystemCollectionSubscriptionImpl::refresh() {
     ENVOY_LOG(debug, "Filesystem config update accepted for {}: {}", path_,
               resource_message.DebugString());
   } catch (const ProtobufMessage::UnknownProtoFieldException& e) {
+    ENVOY_LOG_MISC(debug, "HTD foo");
     configRejected(e, resource_message.DebugString());
   } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "HTD bar");
     if (config_update_available) {
       configRejected(e, resource_message.DebugString());
     } else {
