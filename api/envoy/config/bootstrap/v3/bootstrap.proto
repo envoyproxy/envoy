@@ -113,7 +113,18 @@ message Bootstrap {
   // *UdpaResourceLocator* that is sent in a discovery request when resource
   // locators are used for LDS/CDS. Any non-string field will have its JSON
   // encoding set as the context parameter value, with the exception of
-  // metadata, which will be flattened (see example below).
+  // metadata, which will be flattened (see example below). The supported field
+  // names are:
+  // - "cluster"
+  // - "id"
+  // - "locality.region"
+  // - "locality.sub_zone"
+  // - "locality.zone"
+  // - "metadata"
+  // - "user_agent_build_version.metadata"
+  // - "user_agent_build_version.version"
+  // - "user_agent_name"
+  // - "user_agent_version"
   //
   // The node context parameters act as a base layer dictionary for the context
   // parameters (i.e. more specific resource specific context parameters will
