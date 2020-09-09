@@ -33,6 +33,8 @@ The following procedure will be used when proposing new extensions for inclusion
   4. Any extension added via this process becomes a full part of the repository. This means that any
   API breaking changes in the core code will be automatically fixed as part of the normal PR process
   by other contributors.
+  5. Any new dependencies added for this extension must comply with
+  [DEPENDENCY_POLICY.md](DEPENDENCY_POLICY.md), please follow the steps detailed there.
 
 ## Removing existing extensions
 
