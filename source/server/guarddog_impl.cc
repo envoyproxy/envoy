@@ -54,7 +54,7 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
           Stats::StatNameManagedStorage(absl::StrCat(name, ".watchdog_mega_miss"),
                                         stats_scope.symbolTable())
               .statName())),
-      dispatcher_(api.allocateDispatcher(absl::StrCat(name, ".guarddog_thread"))),
+      dispatcher_(api.allocateDispatcher(absl::StrCat(name, "_guarddog_thread"))),
       loop_timer_(dispatcher_->createTimer([this]() { step(); })),
       events_to_actions_([&](const Server::Configuration::Watchdog& config) -> EventToActionsMap {
         EventToActionsMap map;
