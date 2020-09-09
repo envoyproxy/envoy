@@ -117,6 +117,37 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
                                                          std::move(transport_socket), options);
 }
 
+Network::ClientConnectionPtr
+DispatcherImpl::createInternalConnection(Network::Address::InstanceConstSharedPtr internal_address,
+                                         Network::Address::InstanceConstSharedPtr) {
+  ASSERT(isThreadSafe());
+  if (internal_address == nullptr) {
+    return nullptr;
+  }
+  // Find the internal listener callback. The listener will setup the server connection.
+  auto iter = internal_listeners_.find(internal_address->asString());
+  for (const auto& [name, _] : internal_listeners_) {
+    ENVOY_LOG_MISC(debug, "lambdai: p listener {}", name);
+  }
+  if (iter == internal_listeners_.end()) {
+    ENVOY_LOG_MISC(debug, "lambdai: no valid listener registered for envoy internal address {}",
+                   internal_address->asString());
+    return nullptr;
+  }
+  Network::ConnectionPtr server_conn{};
+  Network::ClientConnectionPtr client_conn{};
+
+  (iter->second)(internal_address, std::move(server_conn));
+  return client_conn;
+}
+
+void DispatcherImpl::registerInternalListener(
+    const std::string& internal_listener_id,
+    DispatcherImpl::InternalConnectionCallback internal_conn_callback) {
+  ENVOY_LOG_MISC(debug, "lambdai: register pipe factory on address {}", internal_listener_id);
+  internal_listeners_[internal_listener_id] = internal_conn_callback;
+}
+
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
     const bool use_tcp_for_dns_lookups) {

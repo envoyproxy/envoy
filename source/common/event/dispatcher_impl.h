@@ -34,7 +34,8 @@ public:
   DispatcherImpl(const std::string& name, Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
                  Event::TimeSystem& time_system);
   ~DispatcherImpl() override;
-
+  using InternalConnectionCallback = std::function<void(
+      const Network::Address::InstanceConstSharedPtr& address, Network::ConnectionPtr server_conn)>;
   /**
    * @return event_base& the libevent base.
    */
@@ -53,6 +54,12 @@ public:
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
+  void registerInternalListener(const std::string& internal_listener_id,
+                                InternalConnectionCallback internal_conn_callback);
+
+  Network::ClientConnectionPtr
+  createInternalConnection(Network::Address::InstanceConstSharedPtr internal_address,
+                           Network::Address::InstanceConstSharedPtr local_address) override;
   Network::DnsResolverSharedPtr
   createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
                     const bool use_tcp_for_dns_lookups) override;
@@ -121,6 +128,7 @@ private:
   const ScopeTrackedObject* current_object_{};
   bool deferred_deleting_{};
   MonotonicTime approximate_monotonic_time_;
+  absl::flat_hash_map<std::string, InternalConnectionCallback> internal_listeners_;
 };
 
 } // namespace Event

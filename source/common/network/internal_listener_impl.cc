@@ -18,7 +18,7 @@ namespace Network {
 
 void InternalListenerImpl::setupInternalListener(Event::DispatcherImpl& dispatcher,
                                                  const std::string& listener_id) {
-  dispatcher.registerPipeFactory(
+  dispatcher.registerInternalListener(
       absl::StrCat("envoy://", pipe_listener_id),
       [this](const Address::InstanceConstSharedPtr& address, Network::ConnectionPtr server_conn) {
         Network::ConnectionSocketPtr socket = std::make_unique<Network::ConnectionSocketImpl>(

@@ -114,6 +114,16 @@ public:
                          const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
 
   /**
+   * Creates an client internal connection. Does NOT initiate the connection;
+   * the caller must then call connect() on the returned Network::ClientConnection.
+   * @param internal_address supplies the internal address to connect to.
+   * @param local_address supplies an address to bind to or nullptr if no bind is necessary.
+   * @return Network::ClientConnectionPtr a client connection that is owned by the caller.
+   */
+  virtual Network::ClientConnectionPtr
+  createInternalConnection(Network::Address::InstanceConstSharedPtr internal_address,
+                           Network::Address::InstanceConstSharedPtr local_address) PURE;
+  /**
    * Creates an async DNS resolver. The resolver should only be used on the thread that runs this
    * dispatcher.
    * @param resolvers supplies the addresses of DNS resolvers that this resolver should use. If left

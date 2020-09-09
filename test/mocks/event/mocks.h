@@ -17,6 +17,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
 
+#include "common/common/assert.h"
 #include "common/common/scope_tracker.h"
 
 #include "test/mocks/buffer/mocks.h"
@@ -52,6 +53,12 @@ public:
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override {
     return Network::ClientConnectionPtr{
         createClientConnection_(address, source_address, transport_socket, options)};
+  }
+
+  Network::ClientConnectionPtr
+  createInternalConnection(Network::Address::InstanceConstSharedPtr internal_address,
+                           Network::Address::InstanceConstSharedPtr local_address) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,

@@ -23,6 +23,9 @@ public:
   createClientConnection(Network::Address::InstanceConstSharedPtr,
                          Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&&,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
+  Network::ClientConnectionPtr
+  createInternalConnection(Network::Address::InstanceConstSharedPtr internal_address,
+                           Network::Address::InstanceConstSharedPtr local_address) override;
   Network::DnsResolverSharedPtr
   createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
                     const bool use_tcp_for_dns_lookups) override;
