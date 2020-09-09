@@ -2,6 +2,7 @@
 #include <functional>
 #include <iostream>
 #include <string>
+#include <thread>
 
 #include "common/common/fancy_logger.h"
 #include "common/common/logger.h"
@@ -196,7 +197,7 @@ TEST(Logger, SparseLogMacros) {
   // We expect one log entry / second. Therefore each spamCall ought to result in one
   // more evaluation. This depends on real time and not sim time, hopefully 1 second
   // is enough to not introduce flakes in practice.
-  sleep(1);
+  std::this_thread::sleep_for(1s); // NOLINT
   spamCall([&helper]() { helper.logEverySecond(); }, kNumThreads);
   EXPECT_EQ(29, helper.evaluations());
 
