@@ -546,7 +546,8 @@ public:
   SubsetSelectorImpl(const Protobuf::RepeatedPtrField<std::string>& selector_keys,
                      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
                          LbSubsetSelectorFallbackPolicy fallback_policy,
-                     const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset);
+                     const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset,
+                     bool single_host_per_subset);
 
   // SubsetSelector
   const std::set<std::string>& selectorKeys() const override { return selector_keys_; }
@@ -556,12 +557,14 @@ public:
     return fallback_policy_;
   }
   const std::set<std::string>& fallbackKeysSubset() const override { return fallback_keys_subset_; }
+  bool singleHostPerSubset() const override { return single_host_per_subset_; }
 
 private:
   const std::set<std::string> selector_keys_;
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
       LbSubsetSelectorFallbackPolicy fallback_policy_;
   const std::set<std::string> fallback_keys_subset_;
+  const bool single_host_per_subset_;
 };
 
 /**
@@ -580,7 +583,8 @@ public:
     for (const auto& subset : subset_config.subset_selectors()) {
       if (!subset.keys().empty()) {
         subset_selectors_.emplace_back(std::make_shared<SubsetSelectorImpl>(
-            subset.keys(), subset.fallback_policy(), subset.fallback_keys_subset()));
+            subset.keys(), subset.fallback_policy(), subset.fallback_keys_subset(),
+            subset.single_host_per_subset()));
       }
     }
   }

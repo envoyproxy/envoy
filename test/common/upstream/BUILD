@@ -142,11 +142,32 @@ envoy_benchmark_test(
     benchmark_binary = "eds_speed_test",
 )
 
-envoy_cc_test(
-    name = "health_checker_impl_test",
-    srcs = ["health_checker_impl_test.cc"],
+envoy_cc_test_library(
+    name = "health_checker_impl_test_lib",
+    srcs = [
+        "health_checker_impl_test_utils.cc",
+    ],
+    hdrs = [
+        "health_checker_impl_test_utils.h",
+    ],
     deps = [
         ":utility_lib",
+        "//test/common/http:common_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/mocks/upstream:health_check_event_logger_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "health_checker_impl_test",
+    srcs = [
+        "health_checker_impl_test.cc",
+    ],
+    deps = [
+        ":health_checker_impl_test_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:headers_lib",
@@ -262,6 +283,8 @@ envoy_cc_test(
     srcs = ["hds_test.cc"],
     deps = [
         "//source/common/upstream:health_discovery_service_lib",
+        "//source/common/upstream:transport_socket_match_lib",
+        "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
@@ -274,6 +297,8 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_info_factory_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -417,6 +442,18 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "bounded_load_hlb_test",
+    srcs = ["bounded_load_hlb_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//source/common/upstream:thread_aware_lb_lib",
+        "//source/common/upstream:upstream_includes",
+        "//test/mocks/upstream:upstream_mocks",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_benchmark_binary(
     name = "load_balancer_benchmark",
     srcs = ["load_balancer_benchmark.cc"],
@@ -427,6 +464,7 @@ envoy_cc_benchmark_binary(
         "//source/common/memory:stats_lib",
         "//source/common/upstream:maglev_lb_lib",
         "//source/common/upstream:ring_hash_lb_lib",
+        "//source/common/upstream:subset_lb_lib",
         "//source/common/upstream:upstream_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/upstream:cluster_info_mocks",

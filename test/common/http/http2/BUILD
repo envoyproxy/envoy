@@ -94,7 +94,12 @@ envoy_cc_test_library(
     name = "http2_frame",
     srcs = ["http2_frame.cc"],
     hdrs = ["http2_frame.h"],
+    external_deps = [
+        "nghttp2",
+    ],
     deps = [
+        "//include/envoy/http:metadata_interface_with_external_headers",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:macros",
@@ -144,8 +149,19 @@ envoy_cc_test(
         "//source/common/http/http2:metadata_decoder_lib",
         "//source/common/http/http2:metadata_encoder_lib",
         "//source/common/runtime:runtime_lib",
+        "//test/common/http/http2:http2_frame",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "http2_frame_test",
+    srcs = ["http2_frame_test.cc"],
+    deps = [
+        "//include/envoy/http:metadata_interface",
+        "//source/common/http/http2:metadata_encoder_lib",
+        "//test/common/http/http2:http2_frame",
     ],
 )
 
