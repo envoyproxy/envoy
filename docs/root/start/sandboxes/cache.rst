@@ -18,7 +18,7 @@ This file is mounted to both services' containers, so any changes made to the st
 For the purposes of the demo, a response's date of creation is appended to its body before being served. 
 An Etag is computed for every response for validation purposes, which only depends on the response body in the yaml file (i.e. the appended date is not taken into account). 
 Cached responses can be identified by having an ``age`` header. Validated responses can be identified by having a generation date older than the ``date`` header;
-as when a response is validated the ``date`` header is updated, while the body stays the same.
+as when a response is validated the ``date`` header is updated, while the body stays the same. Validated responses do not have an ``age`` header.
 
 Running the Sandbox
 ~~~~~~~~~~~~~~~~~~~
@@ -264,12 +264,12 @@ After a few seconds:
     < x-envoy-upstream-service-time: 7
     < content-length: 130
     < content-type: text/html; charset=utf-8
-    < age: 6
     < 
+    This response can be cached, but it has to be validated on each request
     Response body generated at: Mon, 31 Aug 2020 18:48:42 GMT
     * Connection #0 to host localhost left intact
 
-You will receive a cached response, identified by the ``age`` header and the same generation time. 
+You will receive a cached response that has the same generation time. 
 However, the ``date`` header will always be updated as this response will always be validated first.
 
 If you change the response body in the yaml file:
