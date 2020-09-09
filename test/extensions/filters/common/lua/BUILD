@@ -24,7 +24,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "wrappers_test",
     srcs = ["wrappers_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         ":lua_wrappers_lib",
         "//source/common/buffer:buffer_lib",
