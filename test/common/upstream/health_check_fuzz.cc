@@ -61,11 +61,23 @@ void HealthCheckFuzz::respondHttp(test::fuzz::Headers headers, absl::string_view
                                                                    true);
 }
 
-void HealthCheckFuzz::streamCreate(bool second_host) {
+void HealthCheckFuzz::triggerIntervalTimer(bool second_host) {
   const int index = (second_host_ && second_host) ? 1 : 0;
-  ENVOY_LOG_MISC(trace, "Created a new stream on host {}", index);
+  ENVOY_LOG_MISC(trace, "Triggered interval timer on host {}", index);
   expectStreamCreate(index);
   test_sessions_[index]->interval_timer_->invokeCallback();
+}
+
+void HealthCheckFuzz::triggerTimeoutTimer(bool second_host, bool last_action) {
+  const int index = (second_host_ && second_host) ? 1 : 0;
+  ENVOY_LOG_MISC(trace, "Triggered timeout timer on host {}", index);
+  test_sessions_[index]->timeout_timer_->invokeCallback();
+  if (!last_action) {
+    ENVOY_LOG_MISC(trace, "Creating client and stream from network timeout.");
+    expectClientCreate(index);
+    expectStreamCreate(index);
+    test_sessions_[index]->interval_timer_->invokeCallback();
+  }
 }
 
 void HealthCheckFuzz::raiseEvent(test::common::upstream::RaiseEvent event, bool second_host,
@@ -108,6 +120,7 @@ void HealthCheckFuzz::raiseEvent(test::common::upstream::RaiseEvent event, bool 
 void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) {
   for (int i = 0; i < input.actions().size(); ++i) {
     const auto& event = input.actions(i);
+    bool last_action = i == input.actions().size() - 1;
     ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
     switch (event.action_selector_case()) { // TODO: Once added implementations for tcp and gRPC,
                                             // move this to a separate method, handleHttp
@@ -124,18 +137,16 @@ void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) 
       }
       break;
     }
-    case test::common::upstream::Action::kStreamCreate: {
-      streamCreate(event.stream_create().second_host());
+    case test::common::upstream::Action::kTriggerIntervalTimer: {
+      triggerIntervalTimer(event.trigger_interval_timer().second_host());
+      break;
+    }
+    case test::common::upstream::Action::kTriggerTimeoutTimer: {
+      triggerTimeoutTimer(event.trigger_timeout_timer().second_host(), last_action);
       break;
     }
     case test::common::upstream::Action::kRaiseEvent: {
-      bool last_action = i == input.actions().size() - 1;
       raiseEvent(event.raise_event(), event.raise_event().second_host(), last_action);
-      break;
-    }
-    case test::common::upstream::Action::kAdvanceTime: {
-      time_system_.advanceTimeAsync(std::chrono::milliseconds(event.advance_time().ms_advanced()));
-      dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
       break;
     }
     default:

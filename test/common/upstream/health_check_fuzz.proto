@@ -19,12 +19,12 @@ message Respond {
   bool second_host = 4;
 }
 
-message StreamCreate {
+message TriggerIntervalTimer {
   bool second_host = 1;
 }
 
-message AdvanceTime {
-  int32 ms_advanced = 1 [(validate.rules).int32 = {gt: 0 lt: 3600000}]; //Capped at one hour
+message TriggerTimeoutTimer {
+  bool second_host = 1;
 }
 
 message RaiseEvent {
@@ -40,9 +40,9 @@ message RaiseEvent {
 message Action {
   oneof action_selector {
     Respond respond = 1;
-    StreamCreate stream_create = 2;
+    TriggerIntervalTimer trigger_interval_timer = 2;
     //TODO: respondBody, respondTrailers
-    AdvanceTime advance_time = 3;
+    TriggerTimeoutTimer trigger_timeout_timer = 3;
     RaiseEvent raise_event = 4;
   }
 }

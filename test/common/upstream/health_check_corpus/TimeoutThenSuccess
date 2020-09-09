@@ -25,24 +25,7 @@ health_check_config {
     }
 }
 actions {
-    respond {
-        http_respond {
-            headers {
-                headers {
-                    key: ":status"
-                    value: "200"
-                }
-                headers {
-                    key: "x-envoy-degraded"
-                    value: "true"
-                }
-            }
-            status: "200"
-        }
-    }
-}
-actions {
-    trigger_interval_timer {
+    trigger_timeout_timer {
 
     }
 }
@@ -59,4 +42,3 @@ actions {
         }
     }
 }
-create_second_host : false

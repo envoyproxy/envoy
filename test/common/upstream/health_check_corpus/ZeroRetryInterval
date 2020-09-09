@@ -1,4 +1,3 @@
- 
 health_check_config {
     timeout {
         seconds: 1
