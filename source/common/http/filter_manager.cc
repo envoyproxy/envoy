@@ -51,7 +51,8 @@ void ActiveStreamFilterBase::commonContinue() {
 
   ENVOY_STREAM_LOG(trace, "continuing filter chain: filter={}", *this,
                    static_cast<const void*>(this));
-  ASSERT(!canIterate());
+  ASSERT(!canIterate(),
+         "Attempting to continue iteration while the IterationState is already Continue");
   // If iteration has stopped for all frame types, set iterate_from_current_filter_ to true so the
   // filter iteration starts with the current filter instead of the next one.
   if (stoppedAll()) {
@@ -108,24 +109,36 @@ bool ActiveStreamFilterBase::commonHandleAfter100ContinueHeadersCallback(
 }
 
 bool ActiveStreamFilterBase::commonHandleAfterHeadersCallback(FilterHeadersStatus status,
+                                                              bool& end_stream,
                                                               bool& headers_only) {
   ASSERT(!headers_continued_);
   ASSERT(canIterate());
 
-  if (status == FilterHeadersStatus::StopIteration) {
+  switch (status) {
+  case FilterHeadersStatus::StopIteration:
     iteration_state_ = IterationState::StopSingleIteration;
-  } else if (status == FilterHeadersStatus::StopAllIterationAndBuffer) {
+    break;
+  case FilterHeadersStatus::StopAllIterationAndBuffer:
     iteration_state_ = IterationState::StopAllBuffer;
-  } else if (status == FilterHeadersStatus::StopAllIterationAndWatermark) {
+    break;
+  case FilterHeadersStatus::StopAllIterationAndWatermark:
     iteration_state_ = IterationState::StopAllWatermark;
-  } else if (status == FilterHeadersStatus::ContinueAndEndStream) {
+    break;
+  case FilterHeadersStatus::ContinueAndEndStream:
     // Set headers_only to true so we know to end early if necessary,
     // but continue filter iteration so we actually write the headers/run the cleanup code.
     headers_only = true;
     ENVOY_STREAM_LOG(debug, "converting to headers only", parent_);
-  } else {
-    ASSERT(status == FilterHeadersStatus::Continue);
+    break;
+  case FilterHeadersStatus::ContinueAndDontEndStream:
+    headers_only = false;
+    end_stream = false;
     headers_continued_ = true;
+    ENVOY_STREAM_LOG(debug, "converting to headers and body (body not available yet)", parent_);
+    break;
+  case FilterHeadersStatus::Continue:
+    headers_continued_ = true;
+    break;
   }
 
   handleMetadataAfterHeadersCallback();
@@ -436,10 +449,27 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
                             (end_stream && continue_data_entry == decoder_filters_.end());
     FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
 
-    ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && (*entry)->end_stream_));
+    ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && (*entry)->end_stream_),
+           "Filters should not return FilterHeadersStatus::ContinueAndEndStream from decodeHeaders "
+           "when end_stream is already true");
+    ASSERT(!(status == FilterHeadersStatus::ContinueAndDontEndStream && !(*entry)->end_stream_),
+           "Filters should not return FilterHeadersStatus::ContinueAndDontEndStream from "
+           "decodeHeaders when end_stream is already false");
+
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
+
+    (*entry)->decode_headers_called_ = true;
+
+    // decoding_headers_only_ is set if the filter returns ContinueAndEndStream.
+    const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(
+        status, end_stream, state_.decoding_headers_only_);
+
+    // If this filter ended the stream, decodeComplete() should be called for it.
+    if ((*entry)->end_stream_ || state_.decoding_headers_only_) {
+      (*entry)->handle_->decodeComplete();
+    }
 
     const bool new_metadata_added = processNewlyAddedMetadata();
     // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
@@ -454,9 +484,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       addDecodedData(*((*entry).get()), empty_data, true);
     }
 
-    (*entry)->decode_headers_called_ = true;
-    if (!(*entry)->commonHandleAfterHeadersCallback(status, state_.decoding_headers_only_) &&
-        std::next(entry) != decoder_filters_.end()) {
+    if (!continue_iteration && std::next(entry) != decoder_filters_.end()) {
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
       // processing since we need to handle the case where a terminal filter wants to buffer, but
       // a previous filter has added body.
@@ -642,7 +670,6 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
     if ((*entry)->stoppedAll()) {
       return;
     }
-
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeTrailers));
     state_.filter_call_state_ |= FilterCallState::DecodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
@@ -905,16 +932,28 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     (*entry)->end_stream_ = state_.encoding_headers_only_ ||
                             (end_stream && continue_data_entry == encoder_filters_.end());
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, (*entry)->end_stream_);
-    if ((*entry)->end_stream_) {
-      (*entry)->handle_->encodeComplete();
-    }
+
+    ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && (*entry)->end_stream_),
+           "Filters should not return FilterHeadersStatus::ContinueAndEndStream from encodeHeaders "
+           "when end_stream is already true");
+    ASSERT(!(status == FilterHeadersStatus::ContinueAndDontEndStream && !(*entry)->end_stream_),
+           "Filters should not return FilterHeadersStatus::ContinueAndDontEndStream from "
+           "encodeHeaders when end_stream is already false");
+
     state_.filter_call_state_ &= ~FilterCallState::EncodeHeaders;
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
     (*entry)->encode_headers_called_ = true;
-    const auto continue_iteration =
-        (*entry)->commonHandleAfterHeadersCallback(status, state_.encoding_headers_only_);
+
+    // encoding_headers_only_ is set if the filter returns ContinueAndEndStream.
+    const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(
+        status, end_stream, state_.encoding_headers_only_);
+
+    // If this filter ended the stream, encodeComplete() should be called for it.
+    if ((*entry)->end_stream_ || state_.encoding_headers_only_) {
+      (*entry)->handle_->encodeComplete();
+    }
 
     // If we're encoding a headers only response, then mark the local as complete. This ensures
     // that we don't attempt to reset the downstream request in doEndStream.
@@ -1269,8 +1308,7 @@ Network::Socket::OptionsSharedPtr ActiveStreamDecoderFilter::getUpstreamSocketOp
 
 void ActiveStreamDecoderFilter::requestRouteConfigUpdate(
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  parent_.filter_manager_callbacks_.requestRouteConfigUpdate(dispatcher(),
-                                                             std::move(route_config_updated_cb));
+  parent_.filter_manager_callbacks_.requestRouteConfigUpdate(std::move(route_config_updated_cb));
 }
 
 absl::optional<Router::ConfigConstSharedPtr> ActiveStreamDecoderFilter::routeConfig() {
@@ -1335,6 +1373,8 @@ void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool stre
 
 void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
+  // TODO(yosrym93): Check if this filter had previously stopped headers iteration.
+  // If so, it should be continued before injecting data.
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }

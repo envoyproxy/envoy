@@ -73,7 +73,7 @@ ConfigUtility::parsePriority(const envoy::config::core::v3::RoutingPriority& pri
   case envoy::config::core::v3::HIGH:
     return Upstream::ResourcePriority::High;
   default:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -103,7 +103,7 @@ Http::Code ConfigUtility::parseRedirectResponseCode(
   case envoy::config::route::v3::RedirectAction::PERMANENT_REDIRECT:
     return Http::Code::PermanentRedirect;
   default:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -156,7 +156,7 @@ Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
   case envoy::config::route::v3::RouteAction::NOT_FOUND:
     return Http::Code::NotFound;
   default:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
