@@ -29,6 +29,7 @@ message AdvanceTime {
 
 message RaiseEvent {
   oneof event_selector {
+    option (validate.required) = true;
     google.protobuf.Empty connected = 1;
     google.protobuf.Empty remote_close = 2;
     google.protobuf.Empty local_close = 3;
