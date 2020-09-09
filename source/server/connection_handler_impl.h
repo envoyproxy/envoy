@@ -82,8 +82,8 @@ public:
   void disableListeners() override;
   void enableListeners() override;
   const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
-  void closeSocketsOnListenerUpdate(const Network::ListenerConfig& old_config,
-                                    const Network::ListenerConfig& new_config) override;
+  void closePendingSocketsOnListenerUpdate(const Network::ListenerConfig& old_config,
+                                           const Network::ListenerConfig& new_config) override;
 
   void
   retryConnections(bool success,

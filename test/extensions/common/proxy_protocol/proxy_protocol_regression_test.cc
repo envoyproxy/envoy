@@ -82,8 +82,8 @@ public:
   uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
 
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
-  void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const,
-                          Event::Dispatcher&, Network::FilterChainRebuildCallback) override {}
+  void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const, Event::Dispatcher&,
+                          Network::FilterChainRebuildCallback) override {}
   bool containFilterChain(const envoy::config::listener::v3::FilterChain&) const override {
     return false;
   }

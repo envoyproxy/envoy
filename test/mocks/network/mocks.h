@@ -414,7 +414,7 @@ public:
   MOCK_METHOD(void, disableListeners, ());
   MOCK_METHOD(void, enableListeners, ());
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
-  MOCK_METHOD(void, closeSocketsOnListenerUpdate,
+  MOCK_METHOD(void, closePendingSocketsOnListenerUpdate,
               (const Network::ListenerConfig&, const Network::ListenerConfig&));
   MOCK_METHOD(void, retryConnections,
               (bool success, const envoy::config::listener::v3::FilterChain& filter_chain_message));

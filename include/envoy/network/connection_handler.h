@@ -99,8 +99,8 @@ public:
    * new listener does not include filter chains as the old listener does, those stored sockets
    * waiting for this filter chain will be closed.
    */
-  virtual void closeSocketsOnListenerUpdate(const Network::ListenerConfig& old_config,
-                                            const Network::ListenerConfig& new_config) PURE;
+  virtual void closePendingSocketsOnListenerUpdate(const Network::ListenerConfig& old_config,
+                                                   const Network::ListenerConfig& new_config) PURE;
 
   /**
    * Retry all stored sockets that require a filter chain after it is rebuilt successfully or not.

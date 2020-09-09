@@ -46,9 +46,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     if (overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
         if (listener.second.listener_->listenerTag() == overridden_listener) {
-          // TODO(ASOPVII): delay this to the drain timeout.
           const auto& old_config = *listener.second.tcp_listener_->get().config_;
-          closeSocketsOnListenerUpdate(old_config, config);
+          closePendingSocketsOnListenerUpdate(old_config, config);
           listener.second.tcp_listener_->get().updateListenerConfig(config);
           return;
         }
@@ -121,7 +120,7 @@ void ConnectionHandlerImpl::enableListeners() {
   }
 }
 
-void ConnectionHandlerImpl::closeSocketsOnListenerUpdate(
+void ConnectionHandlerImpl::closePendingSocketsOnListenerUpdate(
     const Network::ListenerConfig& old_config, const Network::ListenerConfig& new_config) {
   const std::string& listener_name = new_config.name();
   const std::string& old_listener_name = old_config.name();
@@ -144,13 +143,13 @@ void ConnectionHandlerImpl::closeSocketsOnListenerUpdate(
           auto cur_pending_sockets_it = pending_sockets_it++;
           // If the updated listener does not have a filter chain that the old listener had
           // requested rebuilding, we close those sockets.
-          auto& [filter_chain_message, socket_metadata_pairs] = *cur_pending_sockets_it;
+          auto& [filter_chain_message, socket_stream_info_pairs] = *cur_pending_sockets_it;
           if (old_config.containFilterChain(filter_chain_message) &&
               !new_config.containFilterChain(filter_chain_message)) {
             ENVOY_LOG(debug, "close sockets because the updated listener does not have the filter "
                              "chain that the old listener had.");
-            for (auto& [socket, metadata] : socket_metadata_pairs) {
-              ENVOY_LOG(debug, "close sockets");
+            for (auto& [socket, stream_info] : socket_stream_info_pairs) {
+              ENVOY_LOG(debug, "socket closed");
               socket->close();
             }
             pending_sockets.erase(cur_pending_sockets_it);

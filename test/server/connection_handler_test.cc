@@ -723,7 +723,7 @@ TEST_F(ConnectionHandlerTest, ListenerUpdateDuringOnDemandFilterChainRebuilding)
                   &new_listener_callbacks, nullptr, nullptr, Network::Socket::Type::Stream,
                   std::chrono::milliseconds(15000), false, overridden_filter_chain_manager);
   // Will close some sockets of the old listener when listener is updated.
-  // EXPECT_CALL(handler_, closeSocketsOnListenerUpdate(_).Times(1));
+  // EXPECT_CALL(handler_, closePendingSocketsOnListenerUpdate(_).Times(1));
   handler_->addListener(old_listener_tag, *new_test_listener);
 
   ASSERT_EQ(new_listener_callbacks, nullptr)
