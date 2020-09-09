@@ -136,6 +136,8 @@ public:
 
   void markFinished();
 
+  std::list<ProduceFinishCbSharedPtr>& getUnfinishedRequestsForTest();
+
 private:
   ProduceFinishCbSharedPtr getMatching(const RdKafka::Message& message);
 

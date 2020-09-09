@@ -140,7 +140,6 @@ void RichKafkaProducer::processDelivery(const DeliveryMemento& memento) {
                 reinterpret_cast<long>(memento.data_));
       unfinished_produce_requests_.erase(it);
       break; // This is important - a single request can be mapped into multiple callbacks here.
-             // (awkward)
     } else {
       ++it;
     }
@@ -148,6 +147,10 @@ void RichKafkaProducer::processDelivery(const DeliveryMemento& memento) {
 }
 
 void RichKafkaProducer::markFinished() { poller_thread_active_ = false; }
+
+std::list<ProduceFinishCbSharedPtr>& RichKafkaProducer::getUnfinishedRequestsForTest() {
+  return unfinished_produce_requests_;
+}
 
 } // namespace Mesh
 } // namespace Kafka
