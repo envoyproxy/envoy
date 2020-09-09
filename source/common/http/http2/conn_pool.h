@@ -42,7 +42,7 @@ protected:
     ConnPoolImpl& parent() { return static_cast<ConnPoolImpl&>(parent_); }
 
     // ConnPoolImpl::ActiveClient
-    bool closingWithIncompleteRequest() const override;
+    bool closingWithIncompleteStream() const override;
     RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
 
     // CodecClientCallbacks
@@ -59,7 +59,7 @@ protected:
     bool closed_with_active_rq_{};
   };
 
-  uint64_t maxRequestsPerConnection();
+  uint64_t maxStreamsPerConnection();
   void movePrimaryClientToDraining();
   void onGoAway(ActiveClient& client, Http::GoAwayErrorCode error_code);
   void onStreamDestroy(ActiveClient& client);

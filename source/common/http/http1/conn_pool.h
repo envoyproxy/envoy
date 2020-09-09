@@ -71,7 +71,7 @@ protected:
     ConnPoolImpl& parent() { return static_cast<ConnPoolImpl&>(parent_); }
 
     // ConnPoolImplBase::ActiveClient
-    bool closingWithIncompleteRequest() const override;
+    bool closingWithIncompleteStream() const override;
     RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
 
     StreamWrapperPtr stream_wrapper_;

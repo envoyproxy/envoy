@@ -39,7 +39,7 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
   }
 }
 
-bool HttpConnPool::cancelAnyPendingRequest() {
+bool HttpConnPool::cancelAnyPendingStream() {
   if (conn_pool_stream_handle_) {
     conn_pool_stream_handle_->cancel(ConnectionPool::CancelPolicy::Default);
     conn_pool_stream_handle_ = nullptr;

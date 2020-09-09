@@ -21,14 +21,14 @@ struct HttpAttachContext : public Envoy::ConnectionPool::AttachContext {
   Http::ConnectionPool::Callbacks* callbacks_;
 };
 
-// An implementation of Envoy::ConnectionPool::PendingRequest for HTTP/1.1 and HTTP/2
-class HttpPendingRequest : public Envoy::ConnectionPool::PendingRequest {
+// An implementation of Envoy::ConnectionPool::PendingStream for HTTP/1.1 and HTTP/2
+class HttpPendingStream : public Envoy::ConnectionPool::PendingStream {
 public:
   // OnPoolSuccess for HTTP requires both the decoder and callbacks. OnPoolFailure
   // requires only the callbacks, but passes both for consistency.
-  HttpPendingRequest(Envoy::ConnectionPool::ConnPoolImplBase& parent,
-                     Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-      : Envoy::ConnectionPool::PendingRequest(parent), context_(&decoder, &callbacks) {}
+  HttpPendingStream(Envoy::ConnectionPool::ConnPoolImplBase& parent, Http::ResponseDecoder& decoder,
+                    Http::ConnectionPool::Callbacks& callbacks)
+      : Envoy::ConnectionPool::PendingStream(parent), context_(&decoder, &callbacks) {}
 
   Envoy::ConnectionPool::AttachContext& context() override { return context_; }
   HttpAttachContext context_;
@@ -53,9 +53,9 @@ public:
                                          Http::ConnectionPool::Callbacks& callbacks) override;
   bool hasActiveConnections() const override;
 
-  // Creates a new PendingRequest and enqueues it into the request queue.
+  // Creates a new PendingStream and enqueues it into the queue.
   ConnectionPool::Cancellable*
-  newPendingRequest(Envoy::ConnectionPool::AttachContext& context) override;
+  newPendingStream(Envoy::ConnectionPool::AttachContext& context) override;
   void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
                      absl::string_view failure_reason, ConnectionPool::PoolFailureReason reason,
                      Envoy::ConnectionPool::AttachContext& context) override {
@@ -71,10 +71,10 @@ public:
 // An implementation of Envoy::ConnectionPool::ActiveClient for HTTP/1.1 and HTTP/2
 class ActiveClient : public Envoy::ConnectionPool::ActiveClient {
 public:
-  ActiveClient(HttpConnPoolImplBase& parent, uint64_t lifetime_request_limit,
-               uint64_t concurrent_request_limit)
-      : Envoy::ConnectionPool::ActiveClient(parent, lifetime_request_limit,
-                                            concurrent_request_limit) {
+  ActiveClient(HttpConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
+               uint64_t concurrent_stream_limit)
+      : Envoy::ConnectionPool::ActiveClient(parent, lifetime_stream_limit,
+                                            concurrent_stream_limit) {
     Upstream::Host::CreateConnectionData data = parent_.host()->createConnection(
         parent_.dispatcher(), parent_.socketOptions(), parent_.transportSocketOptions());
     real_host_description_ = data.host_description_;
@@ -92,7 +92,7 @@ public:
   void onEvent(Network::ConnectionEvent event) override {
     parent_.onConnectionEvent(*this, codec_client_->connectionFailureReason(), event);
   }
-  size_t numActiveRequests() const override { return codec_client_->numActiveRequests(); }
+  size_t numActiveStreams() const override { return codec_client_->numActiveRequests(); }
   uint64_t id() const override { return codec_client_->id(); }
 
   Http::CodecClientPtr codec_client_;

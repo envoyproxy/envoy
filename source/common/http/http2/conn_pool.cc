@@ -37,7 +37,7 @@ void ConnPoolImpl::onGoAway(ActiveClient& client, Http::GoAwayErrorCode) {
 }
 
 void ConnPoolImpl::onStreamDestroy(ActiveClient& client) {
-  onRequestClosed(client, false);
+  onStreamClosed(client, false);
 
   // If we are destroying this stream because of a disconnect, do not check for drain here. We will
   // wait until the connection has been fully drained of streams and then check in the connection
@@ -59,14 +59,14 @@ void ConnPoolImpl::onStreamReset(ActiveClient& client, Http::StreamResetReason r
   }
 }
 
-uint64_t ConnPoolImpl::maxRequestsPerConnection() {
+uint64_t ConnPoolImpl::maxStreamsPerConnection() {
   uint64_t max_streams_config = host_->cluster().maxRequestsPerConnection();
   return (max_streams_config != 0) ? max_streams_config : DEFAULT_MAX_STREAMS;
 }
 
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
     : Envoy::Http::ActiveClient(
-          parent, parent.maxRequestsPerConnection(),
+          parent, parent.maxStreamsPerConnection(),
           parent.host_->cluster().http2Options().max_concurrent_streams().value()) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
@@ -74,7 +74,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent.host_->cluster().stats().upstream_cx_http2_total_.inc();
 }
 
-bool ConnPoolImpl::ActiveClient::closingWithIncompleteRequest() const {
+bool ConnPoolImpl::ActiveClient::closingWithIncompleteStream() const {
   return closed_with_active_rq_;
 }
 

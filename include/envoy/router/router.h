@@ -1154,7 +1154,7 @@ public:
    * when a stream is available or GenericConnectionPoolCallbacks::onPoolFailure
    * if stream creation fails.
    *
-   * The caller is responsible for calling cancelAnyPendingRequest() if stream
+   * The caller is responsible for calling cancelAnyPendingStream() if stream
    * creation is no longer desired. newStream may only be called once per
    * GenericConnPool.
    *
@@ -1164,7 +1164,7 @@ public:
   /**
    * Called to cancel any pending newStream request,
    */
-  virtual bool cancelAnyPendingRequest() PURE;
+  virtual bool cancelAnyPendingStream() PURE;
   /**
    * @return optionally returns the protocol for the connection pool.
    */
