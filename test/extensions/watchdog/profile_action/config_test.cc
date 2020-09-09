@@ -34,7 +34,7 @@ TEST(ProfileActionFactoryTest, CanCreateAction) {
 	      "value": {
 		"profile_duration": "2s",
 		"profile_path": "/tmp/envoy/",
-		"max_profiles_per_thread": "20"
+		"max_profiles": "20"
 	      }
             }
           },

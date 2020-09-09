@@ -26,17 +26,12 @@ public:
            MonotonicTime now) override;
 
 private:
-  // Helper to determine if we should run the profiler.
-  absl::optional<Thread::ThreadId> getTidTriggeringProfile(
-      const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs);
-
   const std::string path_;
   const std::chrono::milliseconds duration_;
-  const uint64_t max_profiles_per_tid_;
+  const uint64_t max_profiles_;
   bool running_profile_;
   std::string profile_filename_;
   uint64_t profiles_started_;
-  absl::flat_hash_map<Thread::ThreadId, uint64_t> tid_to_profile_count_;
   Server::Configuration::GuardDogActionFactoryContext& context_;
   Event::TimerPtr timer_cb_;
 };
