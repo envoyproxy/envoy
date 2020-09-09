@@ -26,8 +26,10 @@ public:
             config.format_case() ==
                     envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat
                 ? Http::Headers::get().ContentTypeValues.Json
-                : config.format_case() == envoy::config::core::v3::SubstitutionFormatString::FormatCase::kHtmlFormat ?
-                Http::Headers::get().ContentTypeValues.Html : Http::Headers::get().ContentTypeValues.Text) {}
+                : config.format_case() == 
+                    envoy::config::core::v3::SubstitutionFormatString::FormatCase::kHtmlFormat
+                ? Http::Headers::get().ContentTypeValues.Html
+                : Http::Headers::get().ContentTypeValues.Text) {}
 
   void format(const Http::RequestHeaderMap& request_headers,
               const Http::ResponseHeaderMap& response_headers,

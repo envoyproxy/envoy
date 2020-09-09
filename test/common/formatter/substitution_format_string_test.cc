@@ -101,10 +101,9 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigHtml) {
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_);
-  const auto out = formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
-                              body_);
-  EXPECT_EQ("<h1>Sample html</h1>",out);
-  
+  const auto out = formatter->format(request_headers_, response_headers_, response_trailers_,
+                                     stream_info_, body_);
+  EXPECT_EQ("<h1>Sample html</h1>", out);
 }
 
 } // namespace Formatter
