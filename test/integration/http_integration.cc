@@ -286,14 +286,16 @@ ConfigHelper::ConfigModifierFunction HttpIntegrationTest::setEnableUpstreamTrail
 IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
     const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,
     const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_size,
-    int upstream_index, std::chrono::milliseconds time) {
-  ASSERT(codec_client_ != nullptr);
+    int upstream_index, int downstream_index, std::chrono::milliseconds time) {
+  auto& codec_client =
+      downstream_index == 0 ? codec_client_ : extra_codec_clients_[downstream_index - 1];
+  ASSERT(codec_client != nullptr);
   // Send the request to Envoy.
   IntegrationStreamDecoderPtr response;
   if (request_body_size) {
-    response = codec_client_->makeRequestWithBody(request_headers, request_body_size);
+    response = codec_client->makeRequestWithBody(request_headers, request_body_size);
   } else {
-    response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    response = codec_client->makeHeaderOnlyRequest(request_headers);
   }
   waitForNextUpstreamRequest(upstream_index, time);
   // Send response headers, and end_stream if there is no response body.
@@ -305,6 +307,18 @@ IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
   // Wait for the response to be read by the codec client.
   response->waitForEndStream();
   return response;
+}
+
+void HttpIntegrationTest::cleanupDownstream() {
+  if (codec_client_) {
+    codec_client_->close();
+  }
+  for (auto& codec_client : extra_codec_clients_) {
+    if (codec_client) {
+      codec_client->close();
+    }
+  }
+  extra_codec_clients_.clear();
 }
 
 void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
@@ -319,9 +333,7 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
     RELEASE_ASSERT(result, result.message());
     fake_upstream_connection_.reset();
   }
-  if (codec_client_) {
-    codec_client_->close();
-  }
+  cleanupDownstream();
 }
 
 void HttpIntegrationTest::sendRequestAndVerifyResponse(
@@ -1137,7 +1149,7 @@ void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time)
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response =
-      sendRequestAndWaitForResponse(*big_headers, 0, default_response_headers_, 0, 0, time);
+      sendRequestAndWaitForResponse(*big_headers, 0, default_response_headers_, 0, 0, 0, time);
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());

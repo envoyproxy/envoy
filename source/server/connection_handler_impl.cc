@@ -480,7 +480,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   }
 
   if (filter_chain->isPlaceholder()) {
-    ENVOY_LOG(debug, "found a filter chain placeholder, start rebuilding request");
+    ENVOY_LOG(debug, "found a filter chain placeholder");
     const auto& worker_name = parent_.dispatcher_.name();
     const auto& listener_name = config_->name();
     ENVOY_LOG(debug, "info: worker_name: {}, listener_name: {}", worker_name, listener_name);
@@ -494,7 +494,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     pending_sockets_[filter_chain_message].emplace_back(std::move(socket), std::move(stream_info));
     // Post rebuilding request to the master thread only when there exists no unfinished rebuilding.
     if (should_send_request) {
-      ENVOY_LOG(debug, "listener:{} post rebuilding request for filter chain on the first time",
+      ENVOY_LOG(debug, "listener: {} post rebuilding request for filter chain on the first time",
                 listener_name);
       auto& server_dispatcher = config_->dispatcher();
       auto& worker_dispatcher = parent_.dispatcher_;

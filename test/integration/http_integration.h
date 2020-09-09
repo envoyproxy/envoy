@@ -131,7 +131,8 @@ protected:
   IntegrationStreamDecoderPtr sendRequestAndWaitForResponse(
       const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,
       const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_body_size,
-      int upstream_index = 0, std::chrono::milliseconds time = TestUtility::DefaultTimeout);
+      int upstream_index = 0, int downstream_index = 0,
+      std::chrono::milliseconds time = TestUtility::DefaultTimeout);
 
   // Wait for the end of stream on the next upstream stream on any of the provided fake upstreams.
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
@@ -144,7 +145,9 @@ protected:
       uint64_t upstream_index = 0,
       std::chrono::milliseconds connection_wait_timeout = TestUtility::DefaultTimeout);
 
-  // Close |codec_client_| and |fake_upstream_connection_| cleanly.
+  // Close |codec_client_| and |extra_codec_clients_| cleanly.
+  void cleanupDownstream();
+  // Close downstreams and |fake_upstream_connection_| cleanly.
   void cleanupUpstreamAndDownstream();
 
   // Verifies the response_headers contains the expected_headers, and response body matches given
@@ -235,7 +238,7 @@ protected:
   // The client making requests to Envoy.
   IntegrationCodecClientPtr codec_client_;
   // Multiple clients making same requests to Envoy. Used for gauge test.
-  std::vector<IntegrationCodecClientPtr> gauge_code_clients_;
+  std::vector<IntegrationCodecClientPtr> extra_codec_clients_;
   // A placeholder for the first upstream connection.
   FakeHttpConnectionPtr fake_upstream_connection_;
   // A placeholder for the first request received at upstream.
