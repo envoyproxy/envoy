@@ -47,7 +47,12 @@ public:
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
-                           OpaqueResourceDecoder& resource_decoder) override;
+                           OpaqueResourceDecoder& resource_decoder,
+                           const bool use_namespace_matching = false) override;
+
+  void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
   void handleDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message);
@@ -159,8 +164,12 @@ public:
   }
 
   GrpcMuxWatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
-                           OpaqueResourceDecoder&) override {
+                           OpaqueResourceDecoder&, const bool) override {
     ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
+  }
+
+  void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   void onWriteable() override {}

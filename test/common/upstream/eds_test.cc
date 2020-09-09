@@ -104,7 +104,7 @@ protected:
   }
 
   void initialize() {
-    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
+    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_, _));
     cluster_->initialize([this] { initialized_ = true; });
   }
 
