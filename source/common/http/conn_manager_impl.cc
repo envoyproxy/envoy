@@ -480,11 +480,59 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
   }
 }
 
+// TODO(chaoqin-li1123): Make on demand vhds and on demand srds works at the same time.
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
-    const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
+    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+  absl::optional<Router::ConfigConstSharedPtr> route_config = parent_.routeConfig();
+  Event::Dispatcher& thread_local_dispatcher =
+      parent_.connection_manager_.read_callbacks_->connection().dispatcher();
+  if (route_config.has_value() && route_config.value()->usesVhds()) {
+    ASSERT(!parent_.request_headers_->Host()->value().empty());
+    const auto& host_header = absl::AsciiStrToLower(parent_.request_headers_->getHostValue());
+    requestVhdsUpdate(host_header, thread_local_dispatcher, std::move(route_config_updated_cb));
+    return;
+  } else if (parent_.snapped_scoped_routes_config_ != nullptr) {
+    Router::ScopeKeyPtr scope_key =
+        parent_.snapped_scoped_routes_config_->computeScopeKey(*parent_.request_headers_);
+    // If scope_key is not null, the scope exists but RouteConfiguration is not initialized.
+    if (scope_key != nullptr) {
+      requestSrdsUpdate(std::move(scope_key), thread_local_dispatcher,
+                        std::move(route_config_updated_cb));
+      return;
+    }
+  }
+  // Continue the filter chain if no on demand update is requested.
+  (*route_config_updated_cb)(false);
+}
+
+void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestVhdsUpdate(
+    const std::string& host_header, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   route_config_provider_->requestVirtualHostsUpdate(host_header, thread_local_dispatcher,
                                                     std::move(route_config_updated_cb));
+}
+
+void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
+    Router::ScopeKeyPtr scope_key, Event::Dispatcher& thread_local_dispatcher,
+    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+  // Since inline scope_route_config_provider is not fully implemented and never used,
+  // dynamic cast in constructor always succeed and the pointer should not be null here.
+  ASSERT(scoped_route_config_provider_ != nullptr);
+  Http::RouteConfigUpdatedCallback scoped_route_config_updated_cb =
+      Http::RouteConfigUpdatedCallback(
+          [this, weak_route_config_updated_cb = std::weak_ptr<Http::RouteConfigUpdatedCallback>(
+                     route_config_updated_cb)](bool scope_exist) {
+            // If the callback can be locked, this ActiveStream is still alive.
+            if (auto cb = weak_route_config_updated_cb.lock()) {
+              // Refresh the route before continue the filter chain.
+              if (scope_exist) {
+                parent_.refreshCachedRoute();
+              }
+              (*cb)(scope_exist && parent_.hasCachedRoute());
+            }
+          });
+  scoped_route_config_provider_->onDemandRdsUpdate(std::move(scope_key), thread_local_dispatcher,
+                                                   std::move(scoped_route_config_updated_cb));
 }
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager,
@@ -520,11 +568,12 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       connection_manager.config_.routeConfigProvider() != nullptr) {
     route_config_update_requester_ =
         std::make_unique<ConnectionManagerImpl::RdsRouteConfigUpdateRequester>(
-            connection_manager.config_.routeConfigProvider());
+            connection_manager.config_.routeConfigProvider(), *this);
   } else if (connection_manager_.config_.isRoutable() &&
              connection_manager.config_.scopedRouteConfigProvider() != nullptr) {
     route_config_update_requester_ =
-        std::make_unique<ConnectionManagerImpl::NullRouteConfigUpdateRequester>();
+        std::make_unique<ConnectionManagerImpl::RdsRouteConfigUpdateRequester>(
+            connection_manager.config_.scopedRouteConfigProvider(), *this);
   }
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
@@ -1138,21 +1187,18 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
   }
 }
 
+// TODO(chaoqin-li1123): Make on demand vhds and on demand srds works at the same time.
 void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
-    Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  ASSERT(!request_headers_->Host()->value().empty());
-  const auto& host_header = absl::AsciiStrToLower(request_headers_->getHostValue());
-  route_config_update_requester_->requestRouteConfigUpdate(host_header, thread_local_dispatcher,
-                                                           std::move(route_config_updated_cb));
+  route_config_update_requester_->requestRouteConfigUpdate(route_config_updated_cb);
 }
 
 absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
-  if (connection_manager_.config_.routeConfigProvider() == nullptr) {
-    return {};
+  if (connection_manager_.config_.routeConfigProvider() != nullptr) {
+    return absl::optional<Router::ConfigConstSharedPtr>(
+        connection_manager_.config_.routeConfigProvider()->config());
   }
-  return absl::optional<Router::ConfigConstSharedPtr>(
-      connection_manager_.config_.routeConfigProvider()->config());
+  return {};
 }
 
 void ConnectionManagerImpl::ActiveStream::onLocalReply(Code code) {
@@ -1196,7 +1242,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     connection_manager_.config_.dateProvider().setDateHeader(headers);
   }
 
-  // Following setReference() is safe because serverName() is constant for the life of the listener.
+  // Following setReference() is safe because serverName() is constant for the life of the
+  // listener.
   const auto transformation = connection_manager_.config_.serverHeaderTransformation();
   if (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE ||
       (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::APPEND_IF_ABSENT &&
