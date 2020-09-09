@@ -1081,12 +1081,6 @@ Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
     sendProtocolErrorOld(details);
     return okStatus();
   }
-
-  // Cannot send a message using the HCM if the stream was reset.
-  if (resetStreamCalled()) {
-    return codecClientError("sendProtocolError on a reset stream should not be called");
-  }
-
   // We do this here because we may get a protocol error before we have a logical stream.
   if (!active_request_.has_value()) {
     RETURN_IF_ERROR(onMessageBeginBase());
