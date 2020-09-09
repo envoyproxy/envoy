@@ -89,7 +89,8 @@ TEST_P(SocketInterfaceIntegrationTest, AddressWithSocketInterface) {
   client_->close(Network::ConnectionCloseType::FlushWrite);
 }
 
-// Test that connecting to internal address should always followed by disconnection with no crash.
+// Test that connecting to internal address will crash.
+// TODO(lambdai): Add internal connection implementation to enable the connection creation.
 TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   BaseIntegrationTest::initialize();
 
@@ -100,20 +101,14 @@ TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
 
-  client_ = dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                                Network::Test::createRawBufferSocket(), nullptr);
-
-  client_->addConnectionCallbacks(connect_callbacks_);
-  client_->connect();
-
-  while (!connect_callbacks_.closed()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-
-  client_->close(Network::ConnectionCloseType::FlushWrite);
+  ASSERT_DEATH(client_ = dispatcher_->createClientConnection(
+                   address, Network::Address::InstanceConstSharedPtr(),
+                   Network::Test::createRawBufferSocket(), nullptr),
+               "panic: not implemented");
 }
 
-// Test that recv from internal address should return io error.
+// Test that recv from internal address will crash.
+// TODO(lambdai): Add internal socket implementation to enable the io path.
 TEST_P(SocketInterfaceIntegrationTest, UdpRecvFromInternalAddressWithSocketInterface) {
   BaseIntegrationTest::initialize();
 
@@ -122,23 +117,10 @@ TEST_P(SocketInterfaceIntegrationTest, UdpRecvFromInternalAddressWithSocketInter
   Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
 
-  auto socket = std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, address);
-
-  Network::IoHandle::RecvMsgOutput output{1, nullptr};
-  Buffer::OwnedImpl buffer;
-
-  Buffer::RawSlice iovec;
-  buffer.reserve(100, &iovec, 1);
-
-  Api::IoCallUint64Result result = socket->ioHandle().recvmsg(&iovec, 1, 12345, output);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(Api::IoError::IoErrorCode::NoSupport, result.err_->getErrorCode());
-  EXPECT_TRUE(socket->isOpen());
-  socket->close();
-  EXPECT_FALSE(socket->isOpen());
+  ASSERT_DEATH(std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, address), "");
 }
 
-// Test that send to internal address should return io error.
+// Test that send to internal address will return io error.
 TEST_P(SocketInterfaceIntegrationTest, UdpSendToInternalAddressWithSocketInterface) {
   BaseIntegrationTest::initialize();
 
