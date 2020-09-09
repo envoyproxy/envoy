@@ -8,7 +8,7 @@ namespace NetworkFilters {
 namespace PostgresProxy {
 
 /*
- * Postgres messages are described in official postgres documentation:
+ * Postgres messages are described in official Postgres documentation:
  * https://www.postgresql.org/docs/12/protocol-message-formats.html
  *
  * Most of messages start with 1-byte message identifier followed by 4-bytes length field. Few
@@ -20,13 +20,13 @@ namespace PostgresProxy {
  * Structures defined below have the same naming as types used in official Postgres documentation.
  *
  * Each structure has the following methods:
- * read - to read number bytes from received buffer. The number of bytes depends on structure type.
- * toString - method returns displayable representation of the structure value.
+ * read - to read number of bytes from received buffer. The number of bytes depends on structure
+ * type. toString - method returns displayable representation of the structure value.
  *
  */
 
 // Template for integer types.
-// Size of integer types if fixed and known and depends on the type of integer.
+// Size of integer types is fixed and depends on the type of integer.
 template <typename T> class Int {
   T value_;
 
@@ -74,10 +74,10 @@ public:
       return false;
     }
 
-    // reserve that much in the string
+    // Reserve that many bytes in the string.
     auto size = index - pos;
     value_.resize(size);
-    // Now copy from buffer to string
+    // Now copy from buffer to string.
     data.copyOut(pos, index - pos, value_.data());
     pos += (size + 1);
     left -= (size + 1);
@@ -89,13 +89,13 @@ public:
 };
 
 // ByteN type is used as the last type in the Postgres message and contains
-// sequence of bytes. The length must be deduced from buffer length.
+// sequence of bytes. The length must be deduced from message length.
 class ByteN {
   std::vector<uint8_t> value_;
 
 public:
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
-    if (left > data.length()) {
+    if (left > (data.length() - pos)) {
       return false;
     }
     value_.resize(left);
@@ -148,7 +148,7 @@ public:
     pos += sizeof(int32_t);
     left -= sizeof(int32_t);
     if (len_ < 1) {
-      // nothing follows
+      // Nothing follows.
       value_.clear();
       return true;
     }
@@ -233,7 +233,7 @@ public:
   // read method should read only as many bytes from data
   // buffer as it is indicated in message's length field.
   // "length" parameter indicates how many bytes were indicated in Postgres message's
-  // length field. "data" parameter may contain more bytes than "length".
+  // length field. "data" buffer may contain more bytes than "length".
   virtual bool read(const Buffer::Instance& data, const uint64_t length) = 0;
 
   // toString method provides displayable representation of

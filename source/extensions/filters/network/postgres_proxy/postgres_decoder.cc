@@ -12,7 +12,7 @@ namespace PostgresProxy {
 
 void DecoderImpl::initialize() {
   // Special handler for first message of the transaction.
-  first_ = MsgProcessor{"Startup", nullptr, {}};
+  first_ = MsgProcessor{"Startup", BODY_FORMAT(Int32, String), {}};
 
   // Frontend messages.
   FE_messages_.direction_ = "Frontend";
@@ -209,19 +209,11 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
     }
   }
 
-  //  setMessageLength(length);
-
   data.drain(startup_ ? 4 : 5); // Length plus optional 1st byte.
 
   auto bytesToRead = message_len_ - 4;
   message.assign(std::string(static_cast<char*>(data.linearize(bytesToRead)), bytesToRead));
-  // data.drain(bytesToRead);
   setMessage(message);
-
-  //  char* p = message.data();
-  //  for (size_t i = 0; i < message.length(); i++) {
-  //	printf("[%d]", p[i]);
-  //  }
 
   ENVOY_LOG(trace, "postgres_proxy: msg parsed");
   return true;

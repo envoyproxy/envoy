@@ -11,7 +11,8 @@ namespace NetworkFilters {
 namespace PostgresProxy {
 
 // Tests for individual types used in Postgres messages.
-// Integer types
+//
+// Integer types.
 
 // Fixture class for testing Integer types.
 template <typename T> class IntTest : public testing::Test {
@@ -34,7 +35,7 @@ TYPED_TEST(IntTest, BasicRead) {
 
   sprintf(this->buf_, this->field_.getFormat(), 12);
   ASSERT_THAT(out, this->buf_);
-  // pos should be moved forward by the number of bytes read
+  // pos should be moved forward by the number of bytes read.
   ASSERT_THAT(pos, sizeof(TypeParam));
 
   // Make sure that all bytes have been read from the buffer.
@@ -43,7 +44,7 @@ TYPED_TEST(IntTest, BasicRead) {
 
 TYPED_TEST(IntTest, ReadWithLeftovers) {
   this->data_.template writeBEInt<decltype(std::declval<TypeParam>().get())>(12);
-  // write 1 byte more
+  // Write 1 byte more.
   this->data_.template writeBEInt<uint8_t>(11);
   uint64_t pos = 0;
   uint64_t left = this->data_.length();
@@ -52,7 +53,7 @@ TYPED_TEST(IntTest, ReadWithLeftovers) {
   auto out = this->field_.toString();
   sprintf(this->buf_, this->field_.getFormat(), 12);
   ASSERT_THAT(out, this->buf_);
-  // pos should be moved forward by the number of bytes read
+  // pos should be moved forward by the number of bytes read.
   ASSERT_THAT(pos, sizeof(TypeParam));
 
   // Make sure that all bytes have been read from the buffer.
@@ -60,7 +61,7 @@ TYPED_TEST(IntTest, ReadWithLeftovers) {
 }
 
 TYPED_TEST(IntTest, ReadAtOffset) {
-  // write 1 byte before the actual value
+  // write 1 byte before the actual value.
   this->data_.template writeBEInt<uint8_t>(11);
   this->data_.template writeBEInt<decltype(std::declval<TypeParam>().get())>(12);
   uint64_t pos = 1;
@@ -70,9 +71,9 @@ TYPED_TEST(IntTest, ReadAtOffset) {
   auto out = this->field_.toString();
   sprintf(this->buf_, this->field_.getFormat(), 12);
   ASSERT_THAT(out, this->buf_);
-  // pos should be moved forward by the number of bytes read
+  // pos should be moved forward by the number of bytes read.
   ASSERT_THAT(pos, 1 + sizeof(TypeParam));
-  // Nothing should be left to read
+  // Nothing should be left to read.
   ASSERT_THAT(left, 0);
 }
 
@@ -160,7 +161,7 @@ TEST(ByteN, BasicTest) {
   Buffer::OwnedImpl data;
   // Write 11 bytes. We will read only 10 to make sure
   // that len is used, not buffer's length.
-  for (auto i = 0; i < 10; i++) {
+  for (auto i = 0; i < 11; i++) {
     data.writeBEInt<uint8_t>(i);
   }
   uint64_t pos = 0;
@@ -168,6 +169,7 @@ TEST(ByteN, BasicTest) {
   auto result = field.read(data, pos, len);
   ASSERT_TRUE(result);
   ASSERT_THAT(pos, 10);
+  // One byte should be left in the buffer.
   ASSERT_THAT(len, 0);
 
   auto out = field.toString();
@@ -400,7 +402,7 @@ TEST(Sequence, BasicMultipleValues) {
 }
 
 // Test versifies that read fails when reading of one element
-// fails.
+// in Sequence fails.
 TEST(Sequence, NotEnoughData) {
   Sequence<Int32, String> field;
 
