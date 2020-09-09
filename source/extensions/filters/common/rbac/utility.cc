@@ -11,6 +11,10 @@ RoleBasedAccessControlFilterStats generateStats(const std::string& prefix, Stats
   return {ALL_RBAC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
+std::string responseDetail(const std::string& policy_id) {
+  return fmt::format("rbac_access_denied_matched_policy_{}", policy_id);
+}
+
 } // namespace RBAC
 } // namespace Common
 } // namespace Filters

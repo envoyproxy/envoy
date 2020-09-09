@@ -131,7 +131,8 @@ typed_config:
   EXPECT_EQ(1U, test_server_->counter("tcp.rbac.shadow_allowed")->value());
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.shadow_denied")->value());
   // the detail is "none" because none of the policies is matched.
-  EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::HasSubstr("RBAC none"));
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
+              testing::HasSubstr("RBAC rbac_access_denied_matched_policy_none"));
 }
 
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DeniedWithDenyAction) {
@@ -156,7 +157,8 @@ typed_config:
 
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());
   EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
-  EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::HasSubstr("RBAC deny_all"));
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
+              testing::HasSubstr("RBAC rbac_access_denied_matched_policy_deny_all"));
 }
 
 } // namespace RBAC

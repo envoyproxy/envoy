@@ -142,8 +142,8 @@ TEST_P(RBACIntegrationTest, Denied) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
-  // the detail is "none" because none of the policies is matched.
-  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("RBAC none"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::HasSubstr("RBAC rbac_access_denied_matched_policy_none"));
 }
 
 TEST_P(RBACIntegrationTest, DeniedWithDenyAction) {
@@ -165,7 +165,8 @@ TEST_P(RBACIntegrationTest, DeniedWithDenyAction) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("RBAC deny-policy"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::HasSubstr("RBAC rbac_access_denied_matched_policy_deny-policy"));
 }
 
 TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
