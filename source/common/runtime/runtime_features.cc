@@ -82,6 +82,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.stop_faking_paths",
     "envoy.reloadable_features.strict_1xx_and_204_response_headers",
     "envoy.reloadable_features.tls_use_io_handle_bio",
+    "envoy.reloadable_features.unify_grpc_handling",
 };
 
 // This is a section for officially sanctioned runtime features which are too
