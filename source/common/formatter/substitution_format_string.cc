@@ -17,7 +17,7 @@ FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormat:
     return std::make_unique<FormatterImpl>(config.text_format(), config.omit_empty_values());
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kHtmlFormat:
-    return std::make_unique<FormatterImpl>(config.html_format());    
+    return std::make_unique<FormatterImpl>(config.html_format());
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat: {
     return createJsonFormatter(config.json_format(), true, config.omit_empty_values());
   }
