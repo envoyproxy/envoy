@@ -421,6 +421,52 @@ TEST(GetAllMatchingHeaderNames, MultipleMatches) {
   EXPECT_TRUE(result.contains("accept-language"));
 }
 
+TEST(ParseCommaDelimitedList, Null) {
+  Http::TestResponseHeaderMapImpl headers;
+  std::vector<std::string> result =
+      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::Headers::get().Vary));
+
+  EXPECT_EQ(result.size(), 0);
+}
+
+TEST(ParseCommaDelimitedList, Empty) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", ""}};
+  std::vector<std::string> result =
+      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::Headers::get().Vary));
+
+  EXPECT_EQ(result.size(), 1);
+  EXPECT_EQ(result[0], "");
+}
+
+TEST(ParseCommaDelimitedList, SingleValue) {
+  Http::TestResponseHeaderMapImpl headers{{"vary", "accept"}};
+  std::vector<std::string> result =
+      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::Headers::get().Vary));
+
+  EXPECT_EQ(result.size(), 1);
+  EXPECT_EQ(result[0], "accept");
+}
+
+class ParseCommaDelimitedListMultipleTest : public testing::Test,
+                                            public testing::WithParamInterface<std::string> {
+protected:
+  Http::TestResponseHeaderMapImpl headers{{"vary", GetParam()}};
+};
+
+INSTANTIATE_TEST_SUITE_P(MultipleValuesMixedSpaces, ParseCommaDelimitedListMultipleTest,
+                         testing::Values("accept,accept-language", " accept,accept-language",
+                                         "accept ,accept-language", "accept, accept-language",
+                                         "accept,accept-language ", " accept, accept-language ",
+                                         "  accept  ,  accept-language  "));
+
+TEST_P(ParseCommaDelimitedListMultipleTest, MultipleValuesMixedSpaces) {
+  std::vector<std::string> result =
+      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::Headers::get().Vary));
+  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result[0], "accept");
+  EXPECT_EQ(result[1], "accept-language");
+}
+
 TEST(HasVary, Null) {
   Http::TestResponseHeaderMapImpl headers;
   ASSERT_FALSE(VaryHeader::hasVary(headers));
@@ -434,52 +480,6 @@ TEST(HasVary, Empty) {
 TEST(HasVary, NotEmpty) {
   Http::TestResponseHeaderMapImpl headers{{"vary", "accept"}};
   ASSERT_TRUE(VaryHeader::hasVary(headers));
-}
-
-TEST(ParseHeaderValue, Null) {
-  Http::TestResponseHeaderMapImpl headers;
-  std::vector<std::string> result =
-      VaryHeader::parseHeaderValue(headers.get(Http::Headers::get().Vary));
-
-  EXPECT_EQ(result.size(), 0);
-}
-
-TEST(ParseHeaderValue, Empty) {
-  Http::TestResponseHeaderMapImpl headers{{"vary", ""}};
-  std::vector<std::string> result =
-      VaryHeader::parseHeaderValue(headers.get(Http::Headers::get().Vary));
-
-  EXPECT_EQ(result.size(), 1);
-  EXPECT_EQ(result[0], "");
-}
-
-TEST(ParseHeaderValue, SingleValue) {
-  Http::TestResponseHeaderMapImpl headers{{"vary", "accept"}};
-  std::vector<std::string> result =
-      VaryHeader::parseHeaderValue(headers.get(Http::Headers::get().Vary));
-
-  EXPECT_EQ(result.size(), 1);
-  EXPECT_EQ(result[0], "accept");
-}
-
-class ParseHeaderValueMultipleTest : public testing::Test,
-                                     public testing::WithParamInterface<std::string> {
-protected:
-  Http::TestResponseHeaderMapImpl headers{{"vary", GetParam()}};
-};
-
-INSTANTIATE_TEST_SUITE_P(MultipleValuesMixedSpaces, ParseHeaderValueMultipleTest,
-                         testing::Values("accept,accept-language", " accept,accept-language",
-                                         "accept ,accept-language", "accept, accept-language",
-                                         "accept,accept-language ", " accept, accept-language ",
-                                         "  accept  ,  accept-language  "));
-
-TEST_P(ParseHeaderValueMultipleTest, MultipleValuesMixedSpaces) {
-  std::vector<std::string> result =
-      VaryHeader::parseHeaderValue(headers.get(Http::Headers::get().Vary));
-  EXPECT_EQ(result.size(), 2);
-  EXPECT_EQ(result[0], "accept");
-  EXPECT_EQ(result[1], "accept-language");
 }
 
 TEST(CreateVaryKey, EmptyVaryEntry) {
@@ -578,54 +578,6 @@ TEST(CreateVaryKey, MultiValueSameHeader) {
       "bar\n");
 }
 
-TEST(VaryParseAllowlist, Empty) {
-  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
-  std::vector<Matchers::StringMatcherPtr> allowlist =
-      VaryHeader::parseAllowlist(config.allowed_vary_headers());
-  ASSERT_TRUE(allowlist.empty());
-}
-
-TEST(VaryParseAllowlist, SingleRule) {
-  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
-  const auto& add_new_rule = config.mutable_allowed_vary_headers()->Add();
-  add_new_rule->set_exact("accept");
-
-  std::vector<Matchers::StringMatcherPtr> allowlist =
-      VaryHeader::parseAllowlist(config.allowed_vary_headers());
-  ASSERT_EQ(allowlist.size(), 1);
-  EXPECT_TRUE(allowlist[0]->match("accept"));
-  EXPECT_FALSE(allowlist[0]->match("accept-language"));
-}
-
-TEST(VaryParseAllowlist, MultipleRules) {
-  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
-
-  // Matches only "accept".
-  const auto& add_new_rule1 = config.mutable_allowed_vary_headers()->Add();
-  add_new_rule1->set_exact("accept");
-
-  // Matches only "accept-language".
-  const auto& add_new_rule2 = config.mutable_allowed_vary_headers()->Add();
-  add_new_rule2->set_exact("accept-language");
-
-  // Matches any string starting with "accept".
-  const auto& add_new_rule3 = config.mutable_allowed_vary_headers()->Add();
-  add_new_rule3->set_prefix("accept");
-
-  std::vector<Matchers::StringMatcherPtr> allowlist =
-      VaryHeader::parseAllowlist(config.allowed_vary_headers());
-  ASSERT_EQ(allowlist.size(), 3);
-
-  EXPECT_TRUE(allowlist[0]->match("accept"));
-  EXPECT_FALSE(allowlist[0]->match("accept-language"));
-
-  EXPECT_FALSE(allowlist[1]->match("accept"));
-  EXPECT_TRUE(allowlist[1]->match("accept-language"));
-
-  EXPECT_TRUE(allowlist[2]->match("accept"));
-  EXPECT_TRUE(allowlist[2]->match("accept-language"));
-}
-
 envoy::extensions::filters::http::cache::v3alpha::CacheConfig getConfig() {
   // Allows {accept, accept-language, width} to be varied in the tests.
   envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
@@ -644,48 +596,50 @@ envoy::extensions::filters::http::cache::v3alpha::CacheConfig getConfig() {
 
 class VaryHeaderTest : public testing::Test {
 protected:
-  VaryHeaderTest() : vary_allowlist_(getConfig().allowed_vary_headers()) {}
+  VaryHeaderTest() : vary_allow_list_(getConfig().allowed_vary_headers()) {}
 
-  VaryHeader vary_allowlist_;
+  VaryHeader vary_allow_list_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
 };
 
-TEST_F(VaryHeaderTest, IsAllowedNull) { ASSERT_TRUE(vary_allowlist_.isAllowed(response_headers_)); }
+TEST_F(VaryHeaderTest, IsAllowedNull) {
+  ASSERT_TRUE(vary_allow_list_.isAllowed(response_headers_));
+}
 
 TEST_F(VaryHeaderTest, IsAllowedEmpty) {
   response_headers_.addCopy("vary", "");
-  ASSERT_TRUE(vary_allowlist_.isAllowed(response_headers_));
+  ASSERT_TRUE(vary_allow_list_.isAllowed(response_headers_));
 }
 
 TEST_F(VaryHeaderTest, IsAllowedSingle) {
   response_headers_.addCopy("vary", "accept");
-  ASSERT_TRUE(vary_allowlist_.isAllowed(response_headers_));
+  ASSERT_TRUE(vary_allow_list_.isAllowed(response_headers_));
 }
 
 TEST_F(VaryHeaderTest, IsAllowedMultiple) {
   response_headers_.addCopy("vary", "accept");
-  ASSERT_TRUE(vary_allowlist_.isAllowed(response_headers_));
+  ASSERT_TRUE(vary_allow_list_.isAllowed(response_headers_));
 }
 
 TEST_F(VaryHeaderTest, NotIsAllowedStar) {
-  // Should never be allowed, regardless of the allowlist.
+  // Should never be allowed, regardless of the allow_list.
   response_headers_.addCopy("vary", "*");
-  ASSERT_FALSE(vary_allowlist_.isAllowed(response_headers_));
+  ASSERT_FALSE(vary_allow_list_.isAllowed(response_headers_));
 }
 
 TEST_F(VaryHeaderTest, NotIsAllowedSingle) {
   response_headers_.addCopy("vary", "wrong-header");
-  ASSERT_FALSE(vary_allowlist_.isAllowed(response_headers_));
+  ASSERT_FALSE(vary_allow_list_.isAllowed(response_headers_));
 }
 
 TEST_F(VaryHeaderTest, NotIsAllowedMixed) {
   response_headers_.addCopy("vary", "accept, wrong-header");
-  ASSERT_FALSE(vary_allowlist_.isAllowed(response_headers_));
+  ASSERT_FALSE(vary_allow_list_.isAllowed(response_headers_));
 }
 
 TEST_F(VaryHeaderTest, PossibleVariedHeadersEmpty) {
-  Http::HeaderMapPtr result = vary_allowlist_.possibleVariedHeaders(request_headers_);
+  Http::HeaderMapPtr result = vary_allow_list_.possibleVariedHeaders(request_headers_);
 
   EXPECT_FALSE(result->get(Http::LowerCaseString("accept")));
   EXPECT_FALSE(result->get(Http::LowerCaseString("accept-language")));
@@ -694,7 +648,7 @@ TEST_F(VaryHeaderTest, PossibleVariedHeadersEmpty) {
 
 TEST_F(VaryHeaderTest, PossibleVariedHeadersNoOverlap) {
   request_headers_.addCopy("abc", "123");
-  Http::HeaderMapPtr result = vary_allowlist_.possibleVariedHeaders(request_headers_);
+  Http::HeaderMapPtr result = vary_allow_list_.possibleVariedHeaders(request_headers_);
 
   EXPECT_FALSE(result->get(Http::LowerCaseString("accept")));
   EXPECT_FALSE(result->get(Http::LowerCaseString("accept-language")));
@@ -704,7 +658,7 @@ TEST_F(VaryHeaderTest, PossibleVariedHeadersNoOverlap) {
 TEST_F(VaryHeaderTest, PossibleVariedHeadersOverlap) {
   request_headers_.addCopy("abc", "123");
   request_headers_.addCopy("accept", "image/*");
-  Http::HeaderMapPtr result = vary_allowlist_.possibleVariedHeaders(request_headers_);
+  Http::HeaderMapPtr result = vary_allow_list_.possibleVariedHeaders(request_headers_);
 
   std::vector<absl::string_view> values;
   Http::HeaderUtility::getAllOfHeader(*result, "accept", values);
@@ -718,7 +672,7 @@ TEST_F(VaryHeaderTest, PossibleVariedHeadersOverlap) {
 TEST_F(VaryHeaderTest, PossibleVariedHeadersMultiValues) {
   request_headers_.addCopy("accept", "image/*");
   request_headers_.addCopy("accept", "text/html");
-  Http::HeaderMapPtr result = vary_allowlist_.possibleVariedHeaders(request_headers_);
+  Http::HeaderMapPtr result = vary_allow_list_.possibleVariedHeaders(request_headers_);
 
   std::vector<absl::string_view> values;
   Http::HeaderUtility::getAllOfHeader(*result, "accept", values);
@@ -733,7 +687,7 @@ TEST_F(VaryHeaderTest, PossibleVariedHeadersMultiValues) {
 TEST_F(VaryHeaderTest, PossibleVariedHeadersMultiHeaders) {
   request_headers_.addCopy("accept", "image/*");
   request_headers_.addCopy("accept-language", "en-US");
-  Http::HeaderMapPtr result = vary_allowlist_.possibleVariedHeaders(request_headers_);
+  Http::HeaderMapPtr result = vary_allow_list_.possibleVariedHeaders(request_headers_);
 
   std::vector<absl::string_view> values;
   Http::HeaderUtility::getAllOfHeader(*result, "accept", values);

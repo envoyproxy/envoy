@@ -23,7 +23,7 @@ public:
   // Therefore, isCacheableRequest, isCacheableResponse and CacheFilter::request_allows_inserts_
   // together should cover https://httpwg.org/specs/rfc7234.html#response.cacheability.
   static bool isCacheableResponse(const Http::ResponseHeaderMap& headers,
-                                  const VaryHeader& vary_allowlist);
+                                  const VaryHeader& vary_allow_list);
 };
 } // namespace Cache
 } // namespace HttpFilters

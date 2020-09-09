@@ -110,6 +110,10 @@ public:
   static void getAllMatchingHeaderNames(const Http::HeaderMap& headers,
                                         const std::vector<Matchers::StringMatcherPtr>& ruleset,
                                         absl::flat_hash_set<absl::string_view>& out);
+
+  // Parses the values of a comma-delimited list as defined per
+  // https://tools.ietf.org/html/rfc7230#section-7.
+  static std::vector<std::string> parseCommaDelimitedList(const Http::HeaderEntry* entry);
 };
 
 class VaryHeader {
@@ -121,11 +125,8 @@ public:
   static std::string createVaryKey(const Http::HeaderEntry* vary_header,
                                    const Http::RequestHeaderMap& entry_headers);
 
-  // Parses the header names that are in the Vary header value.
-  static std::vector<std::string> parseHeaderValue(const Http::HeaderEntry* vary_header);
-
-  // Parses the allowlist from the Cache Config into the object's private allowlist_.
-  VaryHeader(const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allowlist);
+  // Parses the allow list from the Cache Config into the object's private allow_list_.
+  VaryHeader(const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allow_list);
 
   // Checks if the headers contain an allowed value in the Vary header.
   bool isAllowed(const Http::ResponseHeaderMap& headers) const;
@@ -134,14 +135,10 @@ public:
   // request.
   Http::RequestHeaderMapPtr
   possibleVariedHeaders(const Http::RequestHeaderMap& request_headers) const;
-  // Parses the allowlist of matching rules that define header names that can be used to create
-  // varied responses.
-  static std::vector<Matchers::StringMatcherPtr> parseAllowlist(
-      const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allowlist);
 
 private:
   // Stores the matching rules that define whether a header is allowed to be varied.
-  std::vector<Matchers::StringMatcherPtr> allowlist_;
+  std::vector<Matchers::StringMatcherPtr> allow_list_;
 };
 
 } // namespace Cache

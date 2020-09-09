@@ -30,7 +30,7 @@ envoy::extensions::filters::http::cache::v3alpha::CacheConfig getConfig() {
 
 class SimpleHttpCacheTest : public testing::Test {
 protected:
-  SimpleHttpCacheTest() : vary_allowlist_(getConfig().allowed_vary_headers()) {
+  SimpleHttpCacheTest() : vary_allow_list_(getConfig().allowed_vary_headers()) {
     request_headers_.setMethod("GET");
     request_headers_.setHost("example.com");
     request_headers_.setForwardedProto("https");
@@ -73,7 +73,7 @@ protected:
 
   LookupRequest makeLookupRequest(absl::string_view request_path) {
     request_headers_.setPath(request_path);
-    return LookupRequest(request_headers_, current_time_, vary_allowlist_);
+    return LookupRequest(request_headers_, current_time_, vary_allow_list_);
   }
 
   AssertionResult expectLookupSuccessWithBody(LookupContext* lookup_context,
@@ -102,7 +102,7 @@ protected:
   Event::SimulatedTimeSystem time_source_;
   SystemTime current_time_ = time_source_.systemTime();
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
-  VaryHeader vary_allowlist_;
+  VaryHeader vary_allow_list_;
 };
 
 // Simple flow of putting in an item, getting it, deleting it.
