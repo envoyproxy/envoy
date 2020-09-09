@@ -19,7 +19,7 @@ namespace Network {
 void InternalListenerImpl::setupInternalListener(Event::DispatcherImpl& dispatcher,
                                                  const std::string& listener_id) {
   dispatcher.registerInternalListener(
-      absl::StrCat("envoy://", pipe_listener_id),
+      listener_id,
       [this](const Address::InstanceConstSharedPtr& address, Network::ConnectionPtr server_conn) {
         Network::ConnectionSocketPtr socket = std::make_unique<Network::ConnectionSocketImpl>(
             nullptr,
@@ -33,13 +33,13 @@ void InternalListenerImpl::setupInternalListener(Event::DispatcherImpl& dispatch
 
 InternalListenerImpl::InternalListenerImpl(Event::DispatcherImpl& dispatcher,
                                            const std::string& listener_id,
-                                           InternalListenerCallbacks& cb);
-    : BaseListenerImpl(dispatcher, nullptr), cb_(cb) {
-}
+                                           InternalListenerCallbacks& cb)
+    : BaseListenerImpl(dispatcher, nullptr), internal_listener_id_(listener_id),
+      dispatcher_(dispatcher), cb_(cb) {}
 
-    void InternalListenerImpl::enable() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+void InternalListenerImpl::enable() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-    void InternalListenerImpl::disable() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+void InternalListenerImpl::disable() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-    } // namespace Network
-    } // namespace Envoy
+} // namespace Network
+} // namespace Envoy

@@ -41,7 +41,9 @@ void ConnectionHandlerImpl::decNumConnections() {
 void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
                                         Network::ListenerConfig& config) {
   ActiveListenerDetails details;
-  if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {
+  if (config.isInternalListener()) {
+
+  } else if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {
     if (overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
         if (listener.second.listener_->listenerTag() == overridden_listener) {
@@ -646,6 +648,12 @@ ConnectionHandlerImpl::ActiveInternalListener::~ActiveInternalListener() {
   ASSERT(num_listener_connections_ == 0);
 }
 
+void ConnectionHandlerImpl::ActiveInternalListener::shutdownListener() {
+  internal_listener_->dispatcher_.registerInternalListener(
+          internal_listener_->internal_listener_id_,
+    /* connection_callback= */nullptr
+  );
+}
 // Copied from newConnection(). Invoked by SetupPipeListener.
 void ConnectionHandlerImpl::ActiveInternalListener::setupNewConnection(
     Network::ConnectionPtr server_conn, Network::ConnectionSocketPtr socket) {

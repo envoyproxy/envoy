@@ -141,6 +141,10 @@ public:
    */
   virtual UdpPacketWriterFactoryOptRef udpPacketWriterFactory() PURE;
 
+  virtual bool isInternalListener() {
+    return false;
+  }
+
   /**
    * @return traffic direction of the listener.
    */

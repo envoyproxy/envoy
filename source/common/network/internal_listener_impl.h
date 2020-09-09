@@ -20,10 +20,13 @@ public:
 
 protected:
   void setupInternalListener(Event::DispatcherImpl& dispatcher,
-                             const std::string& pipe_listener_id);
+                             const std::string& internal_listener_id);
 
-private:
-  InteranalListenerCallbacks& cb_;
+// TODO(lambdai): make it private
+public:
+  std::string internal_listener_id_;
+  Event::DispatcherImpl& dispatcher_;
+  InternalListenerCallbacks& cb_;
 };
 
 } // namespace Network

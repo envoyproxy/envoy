@@ -12,6 +12,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
+
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
@@ -20,6 +21,7 @@
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"
 #include "common/stream_info/stream_info_impl.h"
+#include "common/network/internal_listener_impl.h"
 
 #include "spdlog/spdlog.h"
 
@@ -210,10 +212,10 @@ private:
                             Network::ConnectionSocketPtr socket) override;
 
     // ActiveListenerImplBase
-    Network::Listener* listener() override { return listener_.get(); }
-    void pauseListening() override { listener_->disable(); }
-    void resumeListening() override { listener_->enable(); }
-    void shutdownListener() override { listener_.reset(); }
+    Network::Listener* listener() override { return internal_listener_.get(); }
+    void pauseListening() override { internal_listener_->disable(); }
+    void resumeListening() override { internal_listener_->enable(); }
+    void shutdownListener() override;
 
     /**
      * Remove and destroy an active connection.
@@ -246,7 +248,8 @@ private:
     void updateListenerConfig(Network::ListenerConfig& config);
 
     ConnectionHandlerImpl& parent_;
-    Network::ListenerPtr listener_;
+    std::unique_ptr<Network::InternalListenerImpl> internal_listener_;
+
     std::list<ActiveTcpSocketPtr> sockets_;
     absl::node_hash_map<const Network::FilterChain*, ActiveConnectionsPtr> connections_by_context_;
 

@@ -144,8 +144,13 @@ DispatcherImpl::createInternalConnection(Network::Address::InstanceConstSharedPt
 void DispatcherImpl::registerInternalListener(
     const std::string& internal_listener_id,
     DispatcherImpl::InternalConnectionCallback internal_conn_callback) {
-  ENVOY_LOG_MISC(debug, "lambdai: register pipe factory on address {}", internal_listener_id);
-  internal_listeners_[internal_listener_id] = internal_conn_callback;
+  if (internal_conn_callback == nullptr) {
+    ENVOY_LOG_MISC(debug, "lambdai: unregister pipe factory on address {}", internal_listener_id);
+    internal_listeners_.erase(internal_listener_id);
+  } else {
+    ENVOY_LOG_MISC(debug, "lambdai: register pipe factory on address {}", internal_listener_id);
+    internal_listeners_[internal_listener_id] = internal_conn_callback;
+  }
 }
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
