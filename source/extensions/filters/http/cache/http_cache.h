@@ -172,6 +172,8 @@ size_t stableHashKey(const Key& key);
 
 // The metadata associated with a cached response.
 // TODO(yosrym93): This could be changed to a proto if a need arises.
+// If a cache was created with the current interface, then it was changed to a proto, all the cache
+// entries will need to be invalidated.
 struct ResponseMetadata {
   // The time at which a response was was most recently inserted, updated, or validated in this
   // cache. This represents "response_time" in the age header calculations at:
