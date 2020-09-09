@@ -33,6 +33,8 @@ The following procedure will be used when proposing new extensions for inclusion
   4. Any extension added via this process becomes a full part of the repository. This means that any
   API breaking changes in the core code will be automatically fixed as part of the normal PR process
   by other contributors.
+  5. Any new dependencies added for this extension must comply with
+  [DEPENDENCY_POLICY.md](DEPENDENCY_POLICY.md), please follow the steps detailed there.
 
 ## Removing existing extensions
 
@@ -56,3 +58,54 @@ may be a single individual, but it is always preferred to have multiple reviewer
 In the event that the Extension PR author is a sponsoring maintainer and no other sponsoring maintainer
 is available, another maintainer may be enlisted to perform a minimal review for style and common C++
 anti-patterns. The Extension PR must still be approved by a non-maintainer reviewer.
+
+## Extension stability and security posture
+
+Every extension is expected to be tagged with a `status` and `security_posture` in its
+`envoy_cc_extension` rule.
+
+The `status` is one of:
+* `stable`: The extension is stable and is expected to be production usable. This is the default if
+  no `status` is specified.
+* `alpha`: The extension is functional but has not had substantial production burn time, use only
+  with this caveat.
+* `wip`: The extension is work-in-progress. Functionality is incomplete and it is not intended for
+  production use.
+
+The extension status may be adjusted by the extension [CODEOWNERS](./CODEOWNERS) and/or Envoy
+maintainers based on an assessment of the above criteria. Note that the status of the extension
+reflects the implementation status. It is orthogonal to the API stability, for example, an extension
+with configuration `envoy.foo.v3alpha.Bar` might have a `stable` implementation and
+`envoy.foo.v3.Baz` can have a `wip` implementation.
+
+The `security_posture` is one of:
+* `robust_to_untrusted_downstream`: The extension is hardened against untrusted downstream traffic. It
+   assumes that the upstream is trusted.
+* `robust_to_untrusted_downstream_and_upstream`: The extension is hardened against both untrusted
+   downstream and upstream traffic.
+* `requires_trusted_downstream_and_upstream`: The extension is not hardened and should only be used in deployments
+   where both the downstream and upstream are trusted.
+* `unknown`: This is functionally equivalent to `requires_trusted_downstream_and_upstream`, but acts
+  as a placeholder to allow us to identify extensions that need classifying.
+* `data_plane_agnostic`: Not relevant to data plane threats, e.g. stats sinks.
+ 
+An assessment of a robust security posture for an extension is subject to the following guidelines:
+
+* Does the extension have fuzz coverage? If it's only receiving fuzzing
+  courtesy of the generic listener/network/HTTP filter fuzzers, does it have a
+  dedicated fuzzer for any parts of the code that would benefit?
+* Does the extension have unbounded internal buffering? Does it participate in
+  flow control via watermarking as needed?
+* Does the extension have at least one deployment with live untrusted traffic
+  for a period of time, N months?
+* Does the extension rely on dependencies that meet our [extension maturity
+  model](https://github.com/envoyproxy/envoy/issues/10471)?
+* Is the extension reasonable to audit by Envoy security team?
+* Is the extension free of obvious scary things, e.g. `memcpy`, does it have gnarly parsing code, etc?
+* Does the extension have active [CODEOWNERS](CODEOWNERS) who are willing to
+  vouch for the robustness of the extension?
+* Is the extension absent a [low coverage
+  exception](https://github.com/envoyproxy/envoy/blob/master/test/per_file_coverage.sh#L5)?
+
+The current stability and security posture of all extensions can be seen
+[here](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions).
