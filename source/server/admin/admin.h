@@ -7,12 +7,6 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/admin/v3/init_dump.pb.h"
-#include "envoy/admin/v3/server_info.pb.h"
-#include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/route/v3/route.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/network/filter.h"
@@ -43,7 +37,9 @@
 
 #include "server/admin/admin_filter.h"
 #include "server/admin/clusters_handler.h"
+#include "server/admin/config_dump_handler.h"
 #include "server/admin/config_tracker_impl.h"
+#include "server/admin/init_dump_handler.h"
 #include "server/admin/listeners_handler.h"
 #include "server/admin/logs_handler.h"
 #include "server/admin/profiling_handler.h"
@@ -283,40 +279,8 @@ private:
     ThreadLocal::SlotPtr tls_;
   };
 
-  /**
-   * Helper methods for the /config_dump url handler.
-   */
-  void addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
-                          const absl::optional<std::string>& mask, bool include_eds) const;
-  /**
-   * Add the config matching the passed resource to the passed config dump.
-   * @return absl::nullopt on success, else the Http::Code and an error message that should be added
-   * to the admin response.
-   */
-  absl::optional<std::pair<Http::Code, std::string>>
-  addResourceToDump(envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
-                    const std::string& resource, bool include_eds) const;
-
   std::vector<const UrlHandler*> sortedHandlers() const;
   envoy::admin::v3::ServerInfo::State serverState();
-
-  /**
-   * Helper methods for the /config_dump url handler to add endpoints config
-   */
-  void addLbEndpoint(const Upstream::HostSharedPtr& host,
-                     envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint) const;
-  ProtobufTypes::MessagePtr dumpEndpointConfigs() const;
-
-  /**
-   * Helper methods for the /init_dump url handler to add unready targets information.
-   */
-  std::unique_ptr<envoy::admin::v3::UnreadyTargetsDumps>
-  dumpUnreadyTargets(const absl::optional<std::string>& mask) const;
-
-  /**
-   * Helper methods for the /init_dump url handler to add unready targets config of listeners.
-   */
-  void dumpListenerUnreadyTargets(envoy::admin::v3::UnreadyTargetsDumps& config_dump_list) const;
 
   /**
    * URL handlers.
@@ -324,11 +288,7 @@ private:
   Http::Code handlerAdminHome(absl::string_view path_and_query,
                               Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                               AdminStream&);
-  Http::Code handlerConfigDump(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers,
-                               Buffer::Instance& response, AdminStream&) const;
-  Http::Code handlerInitDump(absl::string_view url, Http::ResponseHeaderMap& response_headers,
-                             Buffer::Instance& response, AdminStream&) const;
+
   Http::Code handlerHelp(absl::string_view path_and_query,
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream&);
@@ -442,6 +402,8 @@ private:
   NullRouteConfigProvider route_config_provider_;
   NullScopedRouteConfigProvider scoped_route_config_provider_;
   Server::ClustersHandler clusters_handler_;
+  Server::ConfigDumpHandler config_dump_handler_;
+  Server::InitDumpHandler init_dump_handler_;
   Server::StatsHandler stats_handler_;
   Server::LogsHandler logs_handler_;
   Server::ProfilingHandler profiling_handler_;
