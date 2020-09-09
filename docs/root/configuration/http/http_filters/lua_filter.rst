@@ -226,7 +226,7 @@ more details on the supported API.
 .. code-block:: lua
 
   function envoy_on_request(request_handle)
-    -- Log information about the request.
+    -- Log information about the request
     request_handle:logInfo("Authority: "..request_handle:headers():get(":authority"))
     request_handle:logInfo("Method: "..request_handle:headers():get(":method"))
     request_handle:logInfo("Path: "..request_handle:headers():get(":path"))
