@@ -81,7 +81,8 @@ protected:
   // degraded_per_priority_load_, only degraded hosts should be selected from that host set.
   //
   // @return host set to use and which availability to target.
-  std::pair<HostSet&, HostAvailability> chooseHostSet(LoadBalancerContext* context) const;
+  std::pair<HostSet&, HostAvailability> chooseHostSet(LoadBalancerContext* context,
+                                                      uint64_t hash) const;
 
   uint32_t percentageLoad(uint32_t priority) const {
     return per_priority_load_.healthy_priority_load_.get()[priority];
@@ -90,9 +91,24 @@ protected:
     return per_priority_load_.degraded_priority_load_.get()[priority];
   }
   bool isInPanic(uint32_t priority) const { return per_priority_panic_[priority]; }
+  uint64_t random(bool peeking) {
+    if (peeking) {
+      stashed_random_.push_back(random_.random());
+      return stashed_random_.back();
+    } else {
+      if (!stashed_random_.empty()) {
+        auto random = stashed_random_.front();
+        stashed_random_.pop_front();
+        return random;
+      } else {
+        return random_.random();
+      }
+    }
+  }
 
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
+  std::list<uint64_t> stashed_random_;
   Random::RandomGenerator& random_;
   const uint32_t default_healthy_panic_percent_;
   // The priority-ordered set of hosts to use for load balancing.
@@ -240,7 +256,7 @@ protected:
    * Pick the host source to use, doing zone aware routing when the hosts are sufficiently healthy.
    * If no host is chosen (due to fail_traffic_on_panic being set), return absl::nullopt.
    */
-  absl::optional<HostsSource> hostSourceToUse(LoadBalancerContext* context) const;
+  absl::optional<HostsSource> hostSourceToUse(LoadBalancerContext* context, uint64_t hash) const;
 
   /**
    * Index into priority_set via hosts source descriptor.
@@ -414,6 +430,9 @@ private:
     // already exists. Note that host sources will never be removed, but given how uncommon this
     // is it probably doesn't matter.
     rr_indexes_.insert({source, seed_});
+    // If the list of hosts changes, the order of picks change. Discard the
+    // index.
+    peekahead_index_ = 0;
   }
   double hostWeight(const Host& host) override { return host.weight(); }
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
@@ -556,9 +575,6 @@ public:
   // Upstream::LoadBalancerBase
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
-
-protected:
-  std::list<uint64_t> stashed_random_;
 };
 
 /**

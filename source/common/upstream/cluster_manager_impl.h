@@ -336,10 +336,10 @@ private:
 
       Http::ConnectionPool::Instance* connPool(ResourcePriority priority,
                                                absl::optional<Http::Protocol> downstream_protocol,
-                                               LoadBalancerContext* context);
+                                               LoadBalancerContext* context, bool peek);
 
       Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
-                                                 LoadBalancerContext* context);
+                                                 LoadBalancerContext* context, bool peek);
 
       // Upstream::ThreadLocalCluster
       const PrioritySet& prioritySet() override { return priority_set_; }
@@ -484,7 +484,7 @@ private:
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();
   void maybePrefetch(ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry,
-                     LoadBalancerContext* context, ConnectionPool::Instance* conn_pool);
+                     std::function<ConnectionPool::Instance*()> prefetch_pool);
 
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;

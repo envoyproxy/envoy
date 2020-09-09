@@ -123,6 +123,7 @@ LoadBalancerBase::LoadBalancerBase(
       [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
         UNREFERENCED_PARAMETER(priority);
         recalculatePerPriorityPanic();
+        stashed_random_.clear();
       });
 }
 
@@ -321,20 +322,18 @@ void LoadBalancerBase::recalculateLoadInTotalPanic() {
 }
 
 std::pair<HostSet&, LoadBalancerBase::HostAvailability>
-LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) const {
+LoadBalancerBase::chooseHostSet(LoadBalancerContext* context, uint64_t hash) const {
   if (context) {
     const auto priority_loads = context->determinePriorityLoad(
         priority_set_, per_priority_load_, Upstream::RetryPriority::defaultPriorityMapping);
-    const auto priority_and_source =
-        choosePriority(random_.random(), priority_loads.healthy_priority_load_,
-                       priority_loads.degraded_priority_load_);
+    const auto priority_and_source = choosePriority(hash, priority_loads.healthy_priority_load_,
+                                                    priority_loads.degraded_priority_load_);
     return {*priority_set_.hostSetsPerPriority()[priority_and_source.first],
             priority_and_source.second};
   }
 
-  const auto priority_and_source =
-      choosePriority(random_.random(), per_priority_load_.healthy_priority_load_,
-                     per_priority_load_.degraded_priority_load_);
+  const auto priority_and_source = choosePriority(hash, per_priority_load_.healthy_priority_load_,
+                                                  per_priority_load_.degraded_priority_load_);
   return {*priority_set_.hostSetsPerPriority()[priority_and_source.first],
           priority_and_source.second};
 }
@@ -607,8 +606,8 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
 }
 
 absl::optional<ZoneAwareLoadBalancerBase::HostsSource>
-ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) const {
-  auto host_set_and_source = chooseHostSet(context);
+ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_t hash) const {
+  auto host_set_and_source = chooseHostSet(context, hash);
 
   // The second argument tells us which availability we should target from the selected host set.
   const auto host_availability = host_set_and_source.second;
@@ -775,7 +774,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
 }
 
 HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* context) {
-  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context);
+  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random(true));
   if (!hosts_source) {
     return nullptr;
   }
@@ -801,7 +800,7 @@ HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* con
 }
 
 HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* context) {
-  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context);
+  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random(false));
   if (!hosts_source) {
     return nullptr;
   }
@@ -859,7 +858,7 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
 }
 
 HostConstSharedPtr RandomLoadBalancer::peekAnotherHost(LoadBalancerContext* context) {
-  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context);
+  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random(true));
   if (!hosts_source) {
     return nullptr;
   }
@@ -869,12 +868,11 @@ HostConstSharedPtr RandomLoadBalancer::peekAnotherHost(LoadBalancerContext* cont
     return nullptr;
   }
 
-  stashed_random_.push_back(random_.random());
-  return hosts_to_use[stashed_random_.back() % hosts_to_use.size()];
+  return hosts_to_use[random(true) % hosts_to_use.size()];
 }
 
 HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* context) {
-  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context);
+  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random(false));
   if (!hosts_source) {
     return nullptr;
   }
@@ -884,15 +882,7 @@ HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* conte
     return nullptr;
   }
 
-  uint64_t random;
-  if (!stashed_random_.empty()) {
-    random = stashed_random_.front();
-    stashed_random_.pop_front();
-  } else {
-    random = random_.random();
-  }
-
-  return hosts_to_use[random % hosts_to_use.size()];
+  return hosts_to_use[random(false) % hosts_to_use.size()];
 }
 
 SubsetSelectorImpl::SubsetSelectorImpl(
