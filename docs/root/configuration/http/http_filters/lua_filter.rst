@@ -153,7 +153,7 @@ Lua script as follows:
       source_code:
         inline_string: |
           function envoy_on_response(response_handle)
-            response_handle:logInfo("Go Go C Plus Plus.")
+            response_handle:logInfo("Goodbye.")
           end
 
 
