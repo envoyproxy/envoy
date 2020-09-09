@@ -313,6 +313,8 @@ void HdsDelegate::onReceiveMessage(
   // Process the HealthCheckSpecifier message.
   processMessage(std::move(message));
 
+  stats_.updates_.inc();
+
   // Update the stored hash.
   specifier_hash_ = hash;
 

@@ -124,7 +124,8 @@ using HdsClusterPtr = std::shared_ptr<HdsCluster>;
 #define ALL_HDS_STATS(COUNTER)                                                                     \
   COUNTER(requests)                                                                                \
   COUNTER(responses)                                                                               \
-  COUNTER(errors)
+  COUNTER(errors)                                                                                  \
+  COUNTER(updates)
 
 /**
  * Struct definition for all hds stats. @see stats_macros.h

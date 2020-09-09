@@ -60,6 +60,15 @@ protected:
     node_.set_id("hds-node");
   }
 
+  // Checks if the cluster counters are correct
+  void checkHdsCounters(int requests, int responses, int errors, int updates) {
+    auto stats = hds_delegate_friend_.getStats(*hds_delegate_);
+    EXPECT_EQ(requests, stats.requests_.value());
+    EXPECT_LE(responses, stats.responses_.value());
+    EXPECT_EQ(errors, stats.errors_.value());
+    EXPECT_EQ(updates, stats.updates_.value());
+  }
+
   // Creates an HdsDelegate
   void createHdsDelegate() {
     InSequence s;
@@ -586,6 +595,34 @@ TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
                 .socket_address()
                 .port_value(),
             1234);
+}
+
+TEST_F(HdsTest, TestSameSpecifier) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message.reset(createSimpleMessage());
+
+  Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection_));
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  EXPECT_CALL(*connection_, setBufferLimits(_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  hds_delegate_->sendResponse();
+
+  // Try to change the specifier, but it is the same.
+  message.reset(createSimpleMessage());
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Check to see that HDS got two requests, but only used the specifier one time.
+  checkHdsCounters(2, 0, 0, 1);
 }
 
 } // namespace Upstream
