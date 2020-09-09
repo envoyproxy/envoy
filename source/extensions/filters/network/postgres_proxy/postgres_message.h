@@ -28,8 +28,6 @@ namespace PostgresProxy {
 // Template for integer types.
 // Size of integer types is fixed and depends on the type of integer.
 template <typename T> class Int {
-  T value_{};
-
 public:
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
     if ((data.length() - pos) < sizeof(T)) {
@@ -49,6 +47,9 @@ public:
 
   constexpr const char* getFormat() const { return "[%02d]"; }
   T get() const { return value_; }
+
+private:
+  T value_{};
 };
 
 using Int32 = Int<uint32_t>;
@@ -63,8 +64,6 @@ template <> constexpr const char* Int<char>::getFormat() const { return "[%c]"; 
 
 // String type requires byte with zero value to indicate end of string.
 class String {
-  std::string value_;
-
 public:
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
     // First find the terminating zero.
@@ -86,13 +85,14 @@ public:
   }
 
   std::string toString() const { return absl::StrCat("[", value_, "]"); }
+
+private:
+  std::string value_;
 };
 
 // ByteN type is used as the last type in the Postgres message and contains
 // sequence of bytes. The length must be deduced from message length.
 class ByteN {
-  std::vector<uint8_t> value_;
-
 public:
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
     if (left > (data.length() - pos)) {
@@ -122,6 +122,9 @@ public:
     absl::StrAppend(&out, "]");
     return out;
   }
+
+private:
+  std::vector<uint8_t> value_;
 };
 
 // Class represents the structure consisting of 4 bytes of length
@@ -136,9 +139,6 @@ public:
 // The value of the function result, in the format indicated by the associated format code. n is the
 // above length.
 class VarByteN {
-  int32_t len_;
-  std::vector<char> value_;
-
 public:
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
     if ((left < sizeof(int32_t)) || ((data.length() - pos) < sizeof(int32_t))) {
@@ -182,12 +182,14 @@ public:
     absl::StrAppend(&out, "]");
     return out;
   }
+
+private:
+  int32_t len_;
+  std::vector<char> value_;
 };
 
 // Array contains one or more values of the same type.
 template <typename T> class Array {
-  std::vector<std::unique_ptr<T>> value_;
-
 public:
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
     // First read the 16 bits value which indicates how many
@@ -223,6 +225,9 @@ public:
 
     return out;
   }
+
+private:
+  std::vector<std::unique_ptr<T>> value_;
 };
 
 // Interface to Postgres message class.
