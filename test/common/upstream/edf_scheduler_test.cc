@@ -76,6 +76,22 @@ TEST(EdfSchedulerTest, Expired) {
   EXPECT_EQ(*second_entry, *p);
 }
 
+// Validate that expired entries are not peeked.
+TEST(EdfSchedulerTest, ExpiredPeek) {
+  EdfScheduler<uint32_t> sched;
+
+  {
+    auto second_entry = std::make_shared<uint32_t>(42);
+    auto first_entry = std::make_shared<uint32_t>(37);
+    sched.add(2, first_entry);
+    sched.add(1, second_entry);
+  }
+  auto third_entry = std::make_shared<uint32_t>(37);
+  sched.add(3, third_entry);
+
+  EXPECT_EQ(37, *sched.peekAgain([](const double&) { return 1; }));
+}
+
 // Validate that expired entries are ignored.
 TEST(EdfSchedulerTest, ExpiredPeekedIsNotPicked) {
   EdfScheduler<uint32_t> sched;

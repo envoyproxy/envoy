@@ -33,16 +33,12 @@ public:
   // return the second item which will be picked. As picks occur, that window
   // will shrink.
   std::shared_ptr<C> peekAgain(std::function<double(const C&)> calculate_weight) {
-    while (!queue_.empty()) {
-      if (queue_.top().entry_.expired()) {
-        queue_.pop();
-      } else if (hasEntry()) {
-        prepick_list_.push_back(std::move(queue_.top().entry_));
-        std::shared_ptr<C> ret{prepick_list_.back()};
-        add(calculate_weight(*ret), ret);
-        queue_.pop();
-        return ret;
-      }
+    if (hasEntry()) {
+      prepick_list_.push_back(std::move(queue_.top().entry_));
+      std::shared_ptr<C> ret{prepick_list_.back()};
+      add(calculate_weight(*ret), ret);
+      queue_.pop();
+      return ret;
     }
     return nullptr;
   }
@@ -96,12 +92,12 @@ private:
   /**
    * Clears expired entries, and returns true if there's still entries in the queue.
    */
-  std::shared_ptr<C> hasEntry() {
+  bool hasEntry() {
     EDF_TRACE("Queue pick: queue_.size()={}, current_time_={}.", queue_.size(), current_time_);
     while (true) {
       if (queue_.empty()) {
         EDF_TRACE("Queue is empty.");
-        return nullptr;
+        return false;
       }
       const EdfEntry& edf_entry = queue_.top();
       // Entry has been removed, let's see if there's another one.
@@ -114,7 +110,7 @@ private:
       ASSERT(edf_entry.deadline_ >= current_time_);
       current_time_ = edf_entry.deadline_;
       EDF_TRACE("Picked {}, current_time_={}.", static_cast<const void*>(ret.get()), current_time_);
-      return ret;
+      return true;
     }
   }
 
