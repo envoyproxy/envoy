@@ -203,7 +203,7 @@ ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& re
         auto* fields = output.mutable_fields();
         JsonFormatMapVisitor visitor{json_format_map_callback, providers_callback};
         for (const auto& pair : *format.value_) {
-          ProtobufWkt::Value value = std::visit(visitor, pair.second);
+          ProtobufWkt::Value value = absl::visit(visitor, pair.second);
           if (omit_empty_values_ && value.kind_case() == ProtobufWkt::Value::kNullValue) {
             continue;
           }
