@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.service.health.v3;
 
+import "envoy/config/cluster/v3/cluster.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/health_check.proto";
 import "envoy/config/endpoint/v3/endpoint_components.proto";
@@ -168,6 +169,11 @@ message ClusterHealthCheck {
   repeated config.core.v3.HealthCheck health_checks = 2;
 
   repeated LocalityEndpoints locality_endpoints = 3;
+
+  // Optional map that gets filtered by :ref:`health_checks.transport_socket_match_criteria <envoy_api_field_config.core.v3.HealthCheck.transport_socket_match_criteria>`
+  // on connection when health checking. For more details, see
+  // :ref:`config.cluster.v3.Cluster.transport_socket_matches <envoy_api_field_config.cluster.v3.Cluster.transport_socket_matches>`.
+  repeated config.cluster.v3.Cluster.TransportSocketMatch transport_socket_matches = 4;
 }
 
 message HealthCheckSpecifier {

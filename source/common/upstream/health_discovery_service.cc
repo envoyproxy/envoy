@@ -203,6 +203,10 @@ void HdsDelegate::processMessage(
       cluster_config.add_health_checks()->MergeFrom(health_check);
     }
 
+    // Add transport_socket_match to cluster for use in host connections.
+    cluster_config.mutable_transport_socket_matches()->MergeFrom(
+        cluster_health_check.transport_socket_matches());
+
     ENVOY_LOG(debug, "New HdsCluster config {} ", cluster_config.DebugString());
 
     // Create HdsCluster
