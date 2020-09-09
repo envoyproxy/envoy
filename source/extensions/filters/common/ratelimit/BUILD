@@ -1,12 +1,12 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "ratelimit_lib",
@@ -39,6 +39,7 @@ envoy_cc_library(
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//source/common/stats:symbol_table_lib",
+        "@envoy_api//envoy/service/ratelimit/v3:pkg_cc_proto",
     ],
 )
 

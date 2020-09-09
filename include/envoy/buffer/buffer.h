@@ -12,10 +12,12 @@
 #include "envoy/network/io_handle.h"
 
 #include "common/common/byte_order.h"
+#include "common/common/utility.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -54,6 +56,21 @@ public:
    */
   virtual void done() PURE;
 };
+
+/**
+ * A class to facilitate extracting buffer slices from a buffer instance.
+ */
+class SliceData {
+public:
+  virtual ~SliceData() = default;
+
+  /**
+   * @return a mutable view of the slice data.
+   */
+  virtual absl::Span<uint8_t> getMutableData() PURE;
+};
+
+using SliceDataPtr = std::unique_ptr<SliceData>;
 
 /**
  * A basic buffer abstraction.
@@ -143,6 +160,15 @@ public:
    */
   virtual RawSliceVector
   getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const PURE;
+
+  /**
+   * Transfer ownership of the front slice to the caller. Must only be called if the
+   * buffer is not empty otherwise the implementation will have undefined behavior.
+   * If the underlying slice is immutable then the implementation must create and return
+   * a mutable slice that has a copy of the immutable data.
+   * @return pointer to SliceData object that wraps the front slice
+   */
+  virtual SliceDataPtr extractMutableFrontSlice() PURE;
 
   /**
    * @return uint64_t the total length of the buffer (not necessarily contiguous in memory).
@@ -261,7 +287,7 @@ public:
     static_assert(Size <= sizeof(T), "requested size is bigger than integer being read");
 
     if (length() < start + Size) {
-      throw EnvoyException("buffer underflow");
+      ExceptionUtil::throwEnvoyException("buffer underflow");
     }
 
     constexpr const auto displacement = Endianness == ByteOrder::BigEndian ? sizeof(T) - Size : 0;

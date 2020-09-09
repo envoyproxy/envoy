@@ -4,11 +4,11 @@
 
 #include <chrono>
 #include <cstdint>
-#include <unordered_map>
 
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
 
 // Performance Annotation system, enabled with
@@ -139,7 +139,7 @@ private:
     }
   };
 
-  using DurationStatsMap = std::unordered_map<CategoryDescription, DurationStats, Hash>;
+  using DurationStatsMap = absl::node_hash_map<CategoryDescription, DurationStats, Hash>;
 
   // Maps {category, description} to DurationStats.
 #if PERF_THREAD_SAFE

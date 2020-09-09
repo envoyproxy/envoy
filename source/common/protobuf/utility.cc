@@ -36,12 +36,12 @@ void blockFormat(YAML::Node node) {
   node.SetStyle(YAML::EmitterStyle::Block);
 
   if (node.Type() == YAML::NodeType::Sequence) {
-    for (auto it : node) {
+    for (const auto& it : node) {
       blockFormat(it);
     }
   }
   if (node.Type() == YAML::NodeType::Map) {
-    for (auto it : node) {
+    for (const auto& it : node) {
       blockFormat(it.second);
     }
   }
@@ -249,6 +249,16 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
     : EnvoyException(fmt::format("Proto constraint validation failed ({}): {}", validation_error,
                                  message.DebugString())) {
   ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
+}
+
+void ProtoExceptionUtil::throwMissingFieldException(const std::string& field_name,
+                                                    const Protobuf::Message& message) {
+  throw MissingFieldException(field_name, message);
+}
+
+void ProtoExceptionUtil::throwProtoValidationException(const std::string& validation_error,
+                                                       const Protobuf::Message& message) {
+  throw ProtoValidationException(validation_error, message);
 }
 
 size_t MessageUtil::hash(const Protobuf::Message& message) {
@@ -870,6 +880,13 @@ ProtobufWkt::Value ValueUtil::stringValue(const std::string& str) {
   ProtobufWkt::Value val;
   val.set_string_value(str);
   return val;
+}
+
+ProtobufWkt::Value ValueUtil::optionalStringValue(const absl::optional<std::string>& str) {
+  if (str.has_value()) {
+    return ValueUtil::stringValue(str.value());
+  }
+  return ValueUtil::nullValue();
 }
 
 ProtobufWkt::Value ValueUtil::boolValue(bool b) {

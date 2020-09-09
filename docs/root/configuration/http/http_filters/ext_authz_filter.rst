@@ -10,7 +10,7 @@ The external authorization filter calls an external gRPC or HTTP service to chec
 HTTP request is authorized or not.
 If the request is deemed unauthorized, then the request will be denied normally with 403 (Forbidden) response.
 Note that sending additional custom metadata from the authorization service to the upstream, to the downstream or to the authorization service is
-also possible. This is explained in more details at :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`.
+also possible. This is explained in more details at :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`.
 
 The content of the requests that are passed to an authorization service is specified by
 :ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>`.
@@ -19,7 +19,7 @@ The content of the requests that are passed to an authorization service is speci
 
 The HTTP filter, using a gRPC/HTTP service, can be configured as follows. You can see all the
 configuration options at
-:ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`.
+:ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`.
 
 Configuration Examples
 -----------------------------
@@ -148,10 +148,9 @@ Dynamic Metadata
   gRPC service as the authorization server.
 
 The External Authorization filter emits dynamic metadata as an opaque ``google.protobuf.Struct``
-*only* when the gRPC authorization server returns an :ref:`OK
-<envoy_v3_api_msg_service.auth.v3.OkHttpResponse>` :ref:`CheckResponse
+*only* when the gRPC authorization server returns a :ref:`CheckResponse
 <envoy_v3_api_msg_service.auth.v3.CheckResponse>` with a filled :ref:`dynamic_metadata
-<envoy_v3_api_field_service.auth.v3.OkHttpResponse.dynamic_metadata>` field.
+<envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` field.
 
 Runtime
 -------

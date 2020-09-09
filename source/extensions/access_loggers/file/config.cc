@@ -1,7 +1,6 @@
 #include "extensions/access_loggers/file/config.h"
 
 #include <memory>
-#include <unordered_map>
 
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.validate.h"
@@ -42,7 +41,7 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kJsonFormat:
     formatter = Formatter::SubstitutionFormatStringUtils::createJsonFormatter(
-        fal_config.json_format(), false);
+        fal_config.json_format(), false, false);
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
       kTypedJsonFormat: {

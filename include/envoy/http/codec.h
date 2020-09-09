@@ -142,6 +142,12 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(const ResponseTrailerMap& trailers) PURE;
+
+  /**
+   * Indicates whether invalid HTTP messaging should be handled with a stream error or a connection
+   * error.
+   */
+  virtual bool streamErrorOnInvalidHttpMessage() const PURE;
 };
 
 /**
@@ -193,13 +199,11 @@ public:
    * @param code supplies the HTTP error code to send.
    * @param body supplies an optional body to send with the local reply.
    * @param modify_headers supplies a way to edit headers before they are sent downstream.
-   * @param is_head_request indicates if the request is a HEAD request
    * @param grpc_status an optional gRPC status for gRPC requests
    * @param details details about the source of the error, for debug purposes
    */
   virtual void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                              bool is_head_request,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
 };
@@ -376,6 +380,10 @@ struct Http1Settings {
   //  - Is neither a HEAD only request nor a HTTP Upgrade
   //  - Not a HEAD request
   bool enable_trailers_{false};
+  // Allows Envoy to process requests/responses with both `Content-Length` and `Transfer-Encoding`
+  // headers set. By default such messages are rejected, but if option is enabled - Envoy will
+  // remove Content-Length header and process message.
+  bool allow_chunked_length_{false};
 
   enum class HeaderKeyFormat {
     // By default no formatting is performed, presenting all headers in lowercase (as Envoy
@@ -388,6 +396,11 @@ struct Http1Settings {
 
   // How header keys should be formatted when serializing HTTP/1.1 headers.
   HeaderKeyFormat header_key_format_{HeaderKeyFormat::Default};
+
+  // Behaviour on invalid HTTP messaging:
+  // - if true, the HTTP/1.1 connection is left open (where possible)
+  // - if false, the HTTP/1.1 connection is terminated
+  bool stream_error_on_invalid_http_message_{false};
 };
 
 /**

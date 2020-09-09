@@ -2,7 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -11,7 +11,7 @@ licenses(["notice"])  # Apache 2
 # clusters.
 # Public docs: docs/root/configuration/network_filters/redis_proxy_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "command_splitter_interface",
@@ -120,6 +120,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    # TODO(#9953) clean up.
+    extra_visibility = [
+        "//test/integration:__subpackages__",
+    ],
     security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         "//include/envoy/upstream:upstream_interface",

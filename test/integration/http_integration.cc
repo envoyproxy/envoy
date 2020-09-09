@@ -25,11 +25,15 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/context_impl.h"
+#include "extensions/transport_sockets/tls/ssl_socket.h"
+
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/test_host_predicate_config.h"
 #include "test/integration/utility.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
@@ -226,6 +230,28 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
                                                   downstream_protocol_);
 }
 
+Network::TransportSocketFactoryPtr HttpIntegrationTest::createUpstreamTlsContext() {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string yaml = absl::StrFormat(
+      R"EOF(
+common_tls_context:
+  tls_certificates:
+  - certificate_chain: { filename: "%s" }
+    private_key: { filename: "%s" }
+  validation_context:
+    trusted_ca: { filename: "%s" }
+require_client_certificate: true
+)EOF",
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"),
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"),
+      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+  TestUtility::loadFromYaml(yaml, tls_context);
+  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+      tls_context, factory_context_);
+  static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
+  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+      std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+}
 IntegrationCodecClientPtr
 HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
   auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
@@ -364,8 +390,7 @@ HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& ups
   if (!fake_upstream_connection_) {
     AssertionResult result = AssertionFailure();
     int upstream_index = 0;
-    Event::TestTimeSystem& time_system = timeSystem();
-    auto end_time = time_system.monotonicTime() + connection_wait_timeout;
+    Event::TestTimeSystem::RealTimeBound bound(connection_wait_timeout);
     // Loop over the upstreams until the call times out or an upstream request is received.
     while (!result) {
       upstream_index = upstream_index % upstream_indices.size();
@@ -375,7 +400,7 @@ HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& ups
       if (result) {
         upstream_with_request = upstream_index;
         break;
-      } else if (time_system.monotonicTime() >= end_time) {
+      } else if (!bound.withinBound()) {
         result = (AssertionFailure() << "Timed out waiting for new connection.");
         break;
       }
@@ -842,9 +867,9 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  ASSERT(response->continue_headers() != nullptr);
-  EXPECT_EQ("100", response->continue_headers()->getStatusValue());
-  EXPECT_EQ(nullptr, response->continue_headers()->Via());
+  ASSERT(response->continueHeaders() != nullptr);
+  EXPECT_EQ("100", response->continueHeaders()->getStatusValue());
+  EXPECT_EQ(nullptr, response->continueHeaders()->Via());
   EXPECT_EQ("200", response->headers().getStatusValue());
   if (via.empty()) {
     EXPECT_EQ(nullptr, response->headers().Via());
@@ -926,8 +951,8 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  ASSERT(response->continue_headers() != nullptr);
-  EXPECT_EQ("100", response->continue_headers()->getStatusValue());
+  ASSERT(response->continueHeaders() != nullptr);
+  EXPECT_EQ("100", response->continueHeaders()->getStatusValue());
 
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
@@ -1083,7 +1108,6 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
@@ -1240,7 +1264,6 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecClient::Type admin_request_t
                                                  {":authority", "host"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest(0);
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
@@ -1282,7 +1305,6 @@ void HttpIntegrationTest::testMaxStreamDuration() {
   });
 
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
@@ -1315,7 +1337,6 @@ void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstr
       {":method", "POST"},    {":path", "/test/long/url"},     {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"x-envoy-retry-on", "5xx"}};
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto encoder_decoder = codec_client_->startRequest(retriable_header);

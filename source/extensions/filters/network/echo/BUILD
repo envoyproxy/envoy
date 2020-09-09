@@ -2,7 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 # Echo L4 network filter. This is primarily a simplistic example.
 # Public docs: docs/root/configuration/network_filters/echo_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "echo",
@@ -28,6 +28,10 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
+    # TODO(#9953) move echo integration test to extensions.
+    extra_visibility = [
+        "//test/integration:__subpackages__",
+    ],
     security_posture = "unknown",
     deps = [
         ":echo",

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
-#include "envoy/network/socket.h"
+#include "envoy/network/socket_interface.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
 

@@ -43,7 +43,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 50]
+// [#next-free-field: 53]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -246,6 +246,20 @@ message Cluster {
       // List of keys to match with the weighted cluster metadata.
       repeated string keys = 1;
 
+      // Selects a mode of operation in which each subset has only one host. This mode uses the same rules for
+      // choosing a host, but updating hosts is faster, especially for large numbers of hosts.
+      //
+      // If a match is found to a host, that host will be used regardless of priority levels, unless the host is unhealthy.
+      //
+      // Currently, this mode is only supported if `subset_selectors` has only one entry, and `keys` contains
+      // only one entry.
+      //
+      // When this mode is enabled, configurations that contain more than one host with the same metadata value for the single key in `keys`
+      // will use only one of the hosts with the given key; no requests will be routed to the others. The cluster gauge
+      // :ref:`lb_subsets_single_host_per_subset_duplicate<config_cluster_manager_cluster_stats_subset_lb>` indicates how many duplicates are
+      // present in the current configuration.
+      bool single_host_per_subset = 4;
+
       // The behavior used when no endpoint subset matches the selected route's
       // metadata.
       LbSubsetSelectorFallbackPolicy fallback_policy = 2
@@ -396,6 +410,16 @@ message Cluster {
     google.protobuf.UInt64Value maximum_ring_size = 4 [(validate.rules).uint64 = {lte: 8388608}];
   }
 
+  // Specific configuration for the :ref:`Maglev<arch_overview_load_balancing_types_maglev>`
+  // load balancing policy.
+  message MaglevLbConfig {
+    // The table size for Maglev hashing. The Maglev aims for ‘minimal disruption’ rather than an absolute guarantee.
+    // Minimal disruption means that when the set of upstreams changes, a connection will likely be sent to the same
+    // upstream as it was before. Increasing the table size reduces the amount of disruption.
+    // The table size must be prime number. If it is not specified, the default is 65537.
+    google.protobuf.UInt64Value table_size = 1;
+  }
+
   // Specific configuration for the
   // :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
   // load balancing policy.
@@ -462,6 +486,26 @@ message Cluster {
       // If set to `true`, the cluster will use hostname instead of the resolved
       // address as the key to consistently hash to an upstream host. Only valid for StrictDNS clusters with hostnames which resolve to a single IP address.
       bool use_hostname_for_hashing = 1;
+
+      // Configures percentage of average cluster load to bound per upstream host. For example, with a value of 150
+      // no upstream host will get a load more than 1.5 times the average load of all the hosts in the cluster.
+      // If not specified, the load is not bounded for any upstream host. Typical value for this parameter is between 120 and 200.
+      // Minimum is 100.
+      //
+      // Applies to both Ring Hash and Maglev load balancers.
+      //
+      // This is implemented based on the method described in the paper https://arxiv.org/abs/1608.01350. For the specified
+      // `hash_balance_factor`, requests to any upstream host are capped at `hash_balance_factor/100` times the average number of requests
+      // across the cluster. When a request arrives for an upstream host that is currently serving at its max capacity, linear probing
+      // is used to identify an eligible host. Further, the linear probe is implemented using a random jump in hosts ring/table to identify
+      // the eligible host (this technique is as described in the paper https://arxiv.org/abs/1908.08762 - the random jump avoids the
+      // cascading overflow effect when choosing the next host in the ring/table).
+      //
+      // If weights are specified on the hosts, they are respected.
+      //
+      // This is an O(N) algorithm, unlike other load balancers. Using a lower `hash_balance_factor` results in more hosts
+      // being probed, so use a higher value if you require better performance.
+      google.protobuf.UInt32Value hash_balance_factor = 2 [(validate.rules).uint32 = {gte: 100}];
     }
 
     // Configures the :ref:`healthy panic threshold <arch_overview_load_balancing_panic_threshold>`.
@@ -519,7 +563,7 @@ message Cluster {
     // connections to upstream hosts whenever hosts are added or removed from the cluster.
     bool close_connections_on_host_set_change = 6;
 
-    //Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
+    // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
     ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
   }
 
@@ -539,6 +583,36 @@ message Cluster {
     // :ref:`base_interval <envoy_api_field_config.cluster.v3.Cluster.RefreshRate.base_interval>`  if set. The default
     // is 10 times the :ref:`base_interval <envoy_api_field_config.cluster.v3.Cluster.RefreshRate.base_interval>`.
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
+  }
+
+  // [#not-implemented-hide:]
+  message PrefetchPolicy {
+    // Indicates how many streams (rounded up) can be anticipated per-upstream for each
+    // incoming stream. This is useful for high-QPS or latency-sensitive services. Prefetching
+    // will only be done if the upstream is healthy.
+    //
+    // For example if this is 2, for an incoming HTTP/1.1 stream, 2 connections will be
+    // established, one for the new incoming stream, and one for a presumed follow-up stream. For
+    // HTTP/2, only one connection would be established by default as one connection can
+    // serve both the original and presumed follow-up stream.
+    //
+    // In steady state for non-multiplexed connections a value of 1.5 would mean if there were 100
+    // active streams, there would be 100 connections in use, and 50 connections prefetched.
+    // This might be a useful value for something like short lived single-use connections,
+    // for example proxying HTTP/1.1 if keep-alive were false and each stream resulted in connection
+    // termination. It would likely be overkill for long lived connections, such as TCP proxying SMTP
+    // or regular HTTP/1.1 with keep-alive. For long lived traffic, a value of 1.05 would be more
+    // reasonable, where for every 100 connections, 5 prefetched connections would be in the queue
+    // in case of unexpected disconnects where the connection could not be reused.
+    //
+    // If this value is not set, or set explicitly to one, Envoy will fetch as many connections
+    // as needed to serve streams in flight. This means in steady state if a connection is torn down,
+    // a subsequent streams will pay an upstream-rtt latency penalty waiting for streams to be
+    // prefetched.
+    //
+    // This is limited somewhat arbitrarily to 3 because prefetching connections too aggressively can
+    // harm latency more than the prefetching helps.
+    google.protobuf.DoubleValue prefetch_ratio = 1 [(validate.rules).double = {lte: 3.0 gte: 1.0}];
   }
 
   reserved 12, 15, 7, 11, 35;
@@ -766,14 +840,18 @@ message Cluster {
 
   // Optional configuration for the load balancing algorithm selected by
   // LbPolicy. Currently only
-  // :ref:`RING_HASH<envoy_api_enum_value_config.cluster.v3.Cluster.LbPolicy.RING_HASH>` and
+  // :ref:`RING_HASH<envoy_api_enum_value_config.cluster.v3.Cluster.LbPolicy.RING_HASH>`,
+  // :ref:`MAGLEV<envoy_api_enum_value_config.cluster.v3.Cluster.LbPolicy.MAGLEV>` and
   // :ref:`LEAST_REQUEST<envoy_api_enum_value_config.cluster.v3.Cluster.LbPolicy.LEAST_REQUEST>`
   // has additional configuration options.
-  // Specifying ring_hash_lb_config or least_request_lb_config without setting the corresponding
+  // Specifying ring_hash_lb_config or maglev_lb_config or least_request_lb_config without setting the corresponding
   // LbPolicy will generate an error at runtime.
   oneof lb_config {
     // Optional configuration for the Ring Hash load balancing policy.
     RingHashLbConfig ring_hash_lb_config = 23;
+
+    // Optional configuration for the Maglev load balancing policy.
+    MaglevLbConfig maglev_lb_config = 52;
 
     // Optional configuration for the Original Destination load balancing policy.
     OriginalDstLbConfig original_dst_lb_config = 34;
@@ -884,6 +962,14 @@ message Cluster {
 
   // Configuration to track optional cluster stats.
   TrackClusterStats track_cluster_stats = 49;
+
+  // [#not-implemented-hide:]
+  // Prefetch configuration for this cluster.
+  PrefetchPolicy prefetch_policy = 50;
+
+  // If `connection_pool_per_downstream_connection` is true, the cluster will use a separate
+  // connection pool for every downstream connection
+  bool connection_pool_per_downstream_connection = 51;
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.

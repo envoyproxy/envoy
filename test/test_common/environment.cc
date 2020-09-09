@@ -5,7 +5,6 @@
 #include <regex>
 #include <sstream>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/common/platform.h"
@@ -16,6 +15,8 @@
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/filesystem/directory.h"
+
+#include "absl/container/node_hash_map.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "common/signal/signal_action.h"
@@ -155,6 +156,7 @@ void TestEnvironment::renameFile(const std::string& old_name, const std::string&
 #ifdef WIN32
   // use MoveFileEx, since ::rename will not overwrite an existing file. See
   // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/rename-wrename?view=vs-2017
+  // Note MoveFileEx cannot overwrite a directory as documented, nor a symlink, apparently.
   const BOOL rc = ::MoveFileEx(old_name.c_str(), new_name.c_str(), MOVEFILE_REPLACE_EXISTING);
   ASSERT_NE(0, rc);
 #else
@@ -265,14 +267,6 @@ const std::string& TestEnvironment::temporaryDirectory() {
   CONSTRUCT_ON_FIRST_USE(std::string, getTemporaryDirectory());
 }
 
-const std::string& TestEnvironment::nullDevicePath() {
-#ifdef WIN32
-  CONSTRUCT_ON_FIRST_USE(std::string, "NUL");
-#else
-  CONSTRUCT_ON_FIRST_USE(std::string, "/dev/null");
-#endif
-}
-
 std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
   return runfiles_->Rlocation(workspace);
@@ -289,7 +283,7 @@ const std::string TestEnvironment::unixDomainSocketDirectory() {
 
 std::string TestEnvironment::substitute(const std::string& str,
                                         Network::Address::IpVersion version) {
-  const std::unordered_map<std::string, std::string> path_map = {
+  const absl::node_hash_map<std::string, std::string> path_map = {
       {"test_tmpdir", TestEnvironment::temporaryDirectory()},
       {"test_udsdir", TestEnvironment::unixDomainSocketDirectory()},
       {"test_rundir", runfiles_ != nullptr ? TestEnvironment::runfilesDirectory() : "invalid"},
@@ -303,7 +297,8 @@ std::string TestEnvironment::substitute(const std::string& str,
 
   // Substitute platform specific null device.
   const std::regex null_device_regex(R"(\{\{ null_device_path \}\})");
-  out_json_string = std::regex_replace(out_json_string, null_device_regex, nullDevicePath());
+  out_json_string = std::regex_replace(out_json_string, null_device_regex,
+                                       std::string(Platform::null_device_path).c_str());
 
   // Substitute IP loopback addresses.
   const std::regex loopback_address_regex(R"(\{\{ ip_loopback_address \}\})");
@@ -393,7 +388,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   const std::string out_json_path =
       TestEnvironment::temporaryPath(name) + ".with.ports" + extension;
   {
-    std::ofstream out_json_file(out_json_path);
+    std::ofstream out_json_file(out_json_path, std::ios::binary);
     out_json_file << out_json_string;
   }
   return out_json_path;

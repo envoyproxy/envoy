@@ -8,6 +8,8 @@
 
 namespace Envoy {
 
+using testing::HasSubstr;
+
 namespace {
 constexpr char HandleThreeHopLocationFormat[] =
     "http://handle.internal.redirect.max.three.hop/path{}";
@@ -46,8 +48,8 @@ protected:
     FakeStreamPtr new_stream = nullptr;
     auto wait_new_stream_fn = [this,
                                &new_stream](FakeHttpConnectionPtr& connection) -> AssertionResult {
-      AssertionResult result = connection->waitForNewStream(*dispatcher_, new_stream, false,
-                                                            std::chrono::milliseconds(50));
+      AssertionResult result =
+          connection->waitForNewStream(*dispatcher_, new_stream, std::chrono::milliseconds(50));
       if (result) {
         ASSERT(new_stream);
       }
@@ -110,12 +112,12 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPassedThrough) {
 }
 
 TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   // Validate that header sanitization is only called once.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.set_via("via_value"); });
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -141,6 +143,7 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
                    ->value());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("internal_redirect"));
 }
 
 TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
@@ -149,7 +152,6 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.set_via("via_value"); });
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -195,7 +197,6 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithBody) {
     "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -245,7 +246,6 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByPreviousRoutesPredica
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.set_via("via_value"); });
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -303,7 +303,6 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByAllowListedRoutesPred
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.set_via("via_value"); });
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -363,7 +362,6 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedBySafeCrossSchemePredic
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.set_via("via_value"); });
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 

@@ -151,7 +151,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonDeathTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
-#if defined(__has_feature) && (__has_feature(thread_sanitizer) || __has_feature(address_sanitizer))
+#if defined(__clang_analyzer__) || (defined(__has_feature) && (__has_feature(thread_sanitizer) ||  \
+                                                               __has_feature(address_sanitizer) || \
+                                                               __has_feature(memory_sanitizer)))
   ENVOY_LOG_MISC(critical,
                  "MainCommonTest::OutOfMemoryHandler not supported by this compiler configuration");
 #else
@@ -161,7 +163,7 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
   // so disable handling that signal.
   signal(SIGABRT, SIG_DFL);
 #endif
-  EXPECT_DEATH_LOG_TO_STDERR(
+  EXPECT_DEATH(
       []() {
         // Allocating a fixed-size large array that results in OOM on gcc
         // results in a compile-time error on clang of "array size too big",

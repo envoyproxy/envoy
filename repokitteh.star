@@ -4,6 +4,7 @@ use("github.com/repokitteh/modules/assign.star")
 use("github.com/repokitteh/modules/review.star")
 use("github.com/repokitteh/modules/wait.star")
 use("github.com/repokitteh/modules/circleci.star", secret_token=get_secret('circle_token'))
+use("github.com/envoyproxy/envoy/ci/repokitteh/modules/azure_pipelines.star", secret_token=get_secret('azp_token'))
 use(
   "github.com/envoyproxy/envoy/ci/repokitteh/modules/ownerscheck.star",
   paths=[
@@ -25,10 +26,16 @@ use(
       "owner": "envoyproxy/api-watchers",
       "path": "api/envoy/",
     },
+    {
+      "owner": "envoyproxy/dependency-watchers",
+      "path":
+      "(bazel/repository_locations\.bzl)|(api/bazel/repository_locations\.bzl)|(.*/requirements\.txt)",
+    },
   ],
 )
 
-alias('retest', 'retry-circle')
+alias('retest-circle', 'retry-circle')
+alias('retest', 'retry-azp')
 
 def _backport():
   github.issue_label('backport/review')

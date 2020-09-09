@@ -87,6 +87,10 @@ STD_REGEX_ALLOWLIST = (
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")
 
+# These files should not throw exceptions. Add HTTP/1 when exceptions removed.
+EXCEPTION_DENYLIST = ("./source/common/http/http2/codec_impl.h",
+                      "./source/common/http/http2/codec_impl.cc")
+
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-10")
 BUILDIFIER_PATH = paths.getBuildifier()
 BUILDOZER_PATH = paths.getBuildozer()
@@ -103,6 +107,8 @@ MANGLED_PROTOBUF_NAME_REGEX = re.compile(r"envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*
 HISTOGRAM_SI_SUFFIX_REGEX = re.compile(r"(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)")
 TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s\{")
 EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
+COMMENT_REGEX = re.compile(r"//|\*")
+DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -328,7 +334,7 @@ def allowlistedForRegisterFactory(file_path):
 
 
 def allowlistedForSerializeAsString(file_path):
-  return file_path in SERIALIZE_AS_STRING_ALLOWLIST
+  return file_path in SERIALIZE_AS_STRING_ALLOWLIST or file_path.endswith(DOCS_SUFFIX)
 
 
 def allowlistedForJsonStringToMessage(file_path):
@@ -352,6 +358,16 @@ def allowlistedForUnpackTo(file_path):
   return file_path.startswith("./test") or file_path in [
       "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
   ]
+
+
+def denylistedForExceptions(file_path):
+  # Returns true when it is a non test header file or the file_path is in DENYLIST or
+  # it is under toos/testdata subdirectory.
+  if file_path.endswith(DOCS_SUFFIX):
+    return False
+
+  return (file_path.endswith('.h') and not file_path.startswith("./test/")) or file_path in EXCEPTION_DENYLIST \
+      or isInSubdir(file_path, 'tools/testdata')
 
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
@@ -385,7 +401,7 @@ def isExternalBuildFile(file_path):
                                      file_path.startswith("./tools/clang_tools"))
 
 
-def isSkylarkFile(file_path):
+def isStarlarkFile(file_path):
   return file_path.endswith(".bzl")
 
 
@@ -567,7 +583,11 @@ def tokenInLine(token, line):
   index = 0
   while True:
     index = line.find(token, index)
-    if index < 1:
+    # the following check has been changed from index < 1 to index < 0 because
+    # this function incorrectly returns false when the token in question is the
+    # first one in a line. The following line returns false when the token is present:
+    # (no leading whitespace) violating_symbol foo;
+    if index < 0:
       break
     if index == 0 or not (line[index - 1].isalnum() or line[index - 1] == '_'):
       if index + len(token) >= len(line) or not (line[index + len(token)].isalnum() or
@@ -620,6 +640,12 @@ def checkSourceLine(line, file_path, reportError):
        "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
        "std::this_thread::sleep_for" in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
+  duration_arg = DURATION_VALUE_REGEX.search(line)
+  if duration_arg and duration_arg.group(1) != "0" and duration_arg.group(1) != "0.0":
+    # Matching duration(int-const or float-const) other than zero
+    reportError(
+        "Don't use ambiguous duration(value), use an explicit duration type, e.g. Event::TimeSystem::Milliseconds(value)"
+    )
   if not allowlistedForRegisterFactory(file_path):
     if "Registry::RegisterFactory<" in line or "REGISTER_FACTORY" in line:
       reportError("Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, "
@@ -647,10 +673,28 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use strptime; use absl::FormatTime instead")
   if tokenInLine("strerror", line):
     reportError("Don't use strerror; use Envoy::errorDetails instead")
+  # Prefer using abseil hash maps/sets over std::unordered_map/set for performance optimizations and
+  # non-deterministic iteration order that exposes faulty assertions.
+  # See: https://abseil.io/docs/cpp/guides/container#hash-tables
+  if "std::unordered_map" in line:
+    reportError("Don't use std::unordered_map; use absl::flat_hash_map instead or "
+                "absl::node_hash_map if pointer stability of keys/values is required")
+  if "std::unordered_set" in line:
+    reportError("Don't use std::unordered_set; use absl::flat_hash_set instead or "
+                "absl::node_hash_set if pointer stability of keys/values is required")
   if "std::atomic_" in line:
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.
     reportError("Don't use free std::atomic_* functions, use std::atomic<T> members instead.")
+  # Blocking the use of std::any, std::optional, std::variant for now as iOS 11/macOS 10.13
+  # does not support these functions at runtime.
+  # See: https://github.com/envoyproxy/envoy/issues/12341
+  if tokenInLine("std::any", line):
+    reportError("Don't use std::any; use absl::any instead")
+  if tokenInLine("std::optional", line):
+    reportError("Don't use std::optional; use absl::optional instead")
+  if tokenInLine("std::variant", line):
+    reportError("Don't use std::variant; use absl::variant instead")
   if "__attribute__((packed))" in line and file_path != "./include/envoy/common/platform.h":
     # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
     # can be used instead
@@ -715,22 +759,35 @@ def checkSourceLine(line, file_path, reportError):
         reportError("Don't call grpc_init() or grpc_shutdown() directly, instantiate " +
                     "Grpc::GoogleGrpcContext. See #8282")
 
+  if denylistedForExceptions(file_path):
+    # Skpping cases where 'throw' is a substring of a symbol like in "foothrowBar".
+    if "throw" in line.split():
+      comment_match = COMMENT_REGEX.search(line)
+      if comment_match is None or comment_match.start(0) > line.find("throw"):
+        reportError("Don't introduce throws into exception-free files, use error " +
+                    "statuses instead.")
+
+  if "lua_pushlightuserdata" in line:
+    reportError("Don't use lua_pushlightuserdata, since it can cause unprotected error in call to" +
+                "Lua API (bad light userdata pointer) on ARM64 architecture. See " +
+                "https://github.com/LuaJIT/LuaJIT/issues/450#issuecomment-433659873 for details.")
+
 
 def checkBuildLine(line, file_path, reportError):
-  if "@bazel_tools" in line and not (isSkylarkFile(file_path) or file_path.startswith("./bazel/") or
-                                     "python/runfiles" in line):
+  if "@bazel_tools" in line and not (isStarlarkFile(file_path) or
+                                     file_path.startswith("./bazel/") or "python/runfiles" in line):
     reportError("unexpected @bazel_tools reference, please indirect via a definition in //bazel")
   if not allowlistedForProtobufDeps(file_path) and '"protobuf"' in line:
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
-  if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
-      not isExternalBuildFile(file_path) and "@envoy//" in line):
+  if (envoy_build_rule_check and not isStarlarkFile(file_path) and
+      not isWorkspaceFile(file_path) and not isExternalBuildFile(file_path) and "@envoy//" in line):
     reportError("Superfluous '@envoy//' prefix")
 
 
 def fixBuildLine(file_path, line, line_number):
-  if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
-      not isExternalBuildFile(file_path)):
+  if (envoy_build_rule_check and not isStarlarkFile(file_path) and
+      not isWorkspaceFile(file_path) and not isExternalBuildFile(file_path)):
     line = line.replace("@envoy//", "//")
   return line
 
@@ -741,7 +798,7 @@ def fixBuildPath(file_path):
   error_messages = []
 
   # TODO(htuch): Add API specific BUILD fixer script.
-  if not isBuildFixerExcludedFile(file_path) and not isApiFile(file_path) and not isSkylarkFile(
+  if not isBuildFixerExcludedFile(file_path) and not isApiFile(file_path) and not isStarlarkFile(
       file_path) and not isWorkspaceFile(file_path):
     if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
@@ -754,7 +811,7 @@ def fixBuildPath(file_path):
 def checkBuildPath(file_path):
   error_messages = []
 
-  if not isBuildFixerExcludedFile(file_path) and not isApiFile(file_path) and not isSkylarkFile(
+  if not isBuildFixerExcludedFile(file_path) and not isApiFile(file_path) and not isStarlarkFile(
       file_path) and not isWorkspaceFile(file_path):
     command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
     error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
@@ -860,7 +917,7 @@ def checkFormat(file_path):
   # Apply fixes first, if asked, and then run checks. If we wind up attempting to fix
   # an issue, but there's still an error, that's a problem.
   try_to_fix = operation_type == "fix"
-  if isBuildFile(file_path) or isSkylarkFile(file_path) or isWorkspaceFile(file_path):
+  if isBuildFile(file_path) or isStarlarkFile(file_path) or isWorkspaceFile(file_path):
     if try_to_fix:
       error_messages += fixBuildPath(file_path)
     error_messages += checkBuildPath(file_path)
@@ -942,7 +999,7 @@ def checkFormatVisitor(arg, dir_name, names):
     checkOwners(dir_name[len(source_prefix):], owned_directories, error_messages)
 
   for file_name in names:
-    if dir_name.startswith("./api") and isSkylarkFile(file_name):
+    if dir_name.startswith("./api") and isStarlarkFile(file_name):
       result = pool.apply_async(checkApiShadowStarlarkFiles,
                                 args=(api_shadow_root, dir_name + "/" + file_name, error_messages))
       result_list.append(result)

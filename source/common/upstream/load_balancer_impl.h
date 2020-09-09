@@ -228,7 +228,7 @@ protected:
 
   struct HostsSourceHash {
     size_t operator()(const HostsSource& hs) const {
-      // This is only used for std::unordered_map keys, so we don't need a deterministic hash.
+      // This is only used for absl::node_hash_map keys, so we don't need a deterministic hash.
       size_t hash = std::hash<uint32_t>()(hs.priority_);
       hash = 37 * hash + std::hash<size_t>()(static_cast<std::size_t>(hs.source_type_));
       hash = 37 * hash + std::hash<uint32_t>()(hs.locality_index_);
@@ -387,7 +387,7 @@ private:
                                                 const HostsSource& source) PURE;
 
   // Scheduler for each valid HostsSource.
-  std::unordered_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
+  absl::node_hash_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
 };
 
 /**
@@ -422,7 +422,7 @@ private:
     return hosts_to_use[rr_indexes_[source]++ % hosts_to_use.size()];
   }
 
-  std::unordered_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
+  absl::node_hash_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
 };
 
 /**
@@ -546,7 +546,8 @@ public:
   SubsetSelectorImpl(const Protobuf::RepeatedPtrField<std::string>& selector_keys,
                      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
                          LbSubsetSelectorFallbackPolicy fallback_policy,
-                     const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset);
+                     const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset,
+                     bool single_host_per_subset);
 
   // SubsetSelector
   const std::set<std::string>& selectorKeys() const override { return selector_keys_; }
@@ -556,12 +557,14 @@ public:
     return fallback_policy_;
   }
   const std::set<std::string>& fallbackKeysSubset() const override { return fallback_keys_subset_; }
+  bool singleHostPerSubset() const override { return single_host_per_subset_; }
 
 private:
   const std::set<std::string> selector_keys_;
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
       LbSubsetSelectorFallbackPolicy fallback_policy_;
   const std::set<std::string> fallback_keys_subset_;
+  const bool single_host_per_subset_;
 };
 
 /**
@@ -580,7 +583,8 @@ public:
     for (const auto& subset : subset_config.subset_selectors()) {
       if (!subset.keys().empty()) {
         subset_selectors_.emplace_back(std::make_shared<SubsetSelectorImpl>(
-            subset.keys(), subset.fallback_policy(), subset.fallback_keys_subset()));
+            subset.keys(), subset.fallback_policy(), subset.fallback_keys_subset(),
+            subset.single_host_per_subset()));
       }
     }
   }

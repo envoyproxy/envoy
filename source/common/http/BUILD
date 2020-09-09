@@ -158,6 +158,25 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "filter_manager_lib",
+    srcs = [
+        "filter_manager.cc",
+    ],
+    hdrs = [
+        "filter_manager.h",
+    ],
+    deps = [
+        ":headers_lib",
+        "//include/envoy/http:filter_interface",
+        "//source/common/buffer:watermark_buffer_lib",
+        "//source/common/common:linked_object",
+        "//source/common/common:scope_tracker",
+        "//source/common/grpc:common_lib",
+        "//source/common/local_reply:local_reply_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_manager_lib",
     srcs = [
         "conn_manager_impl.cc",
@@ -171,6 +190,7 @@ envoy_cc_library(
         ":codes_lib",
         ":conn_manager_config_interface",
         ":exception_lib",
+        ":filter_manager_lib",
         ":header_map_lib",
         ":header_utility_lib",
         ":headers_lib",
@@ -247,7 +267,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "exception_lib",
     hdrs = ["exception.h"],
-    deps = ["//include/envoy/http:header_map_interface"],
+    deps = [
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/http:header_map_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -344,6 +367,7 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     external_deps = [
+        "abseil_node_hash_set",
         "abseil_optional",
         "nghttp2",
     ],
@@ -419,6 +443,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/server:request_id_extension_config_interface",
+        "//source/common/common:random_generator_lib",
         "//source/common/config:utility_lib",
         "//source/common/runtime:runtime_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",

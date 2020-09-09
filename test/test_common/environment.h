@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/network/address.h"
@@ -10,6 +9,7 @@
 
 #include "common/json/json_loader.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -18,9 +18,9 @@
 namespace Envoy {
 class TestEnvironment {
 public:
-  using PortMap = std::unordered_map<std::string, uint32_t>;
+  using PortMap = absl::node_hash_map<std::string, uint32_t>;
 
-  using ParamMap = std::unordered_map<std::string, std::string>;
+  using ParamMap = absl::node_hash_map<std::string, std::string>;
 
   /**
    * Perform common initialization steps needed to run a test binary. This
@@ -88,10 +88,15 @@ public:
   }
 
   /**
-   * Obtain platform specific null device path
-   * @return const std::string& null device path
+   * Obtain platform specific new line character(s)
+   * @return absl::string_view platform specific new line character(s)
    */
-  static const std::string& nullDevicePath();
+  static constexpr absl::string_view newLine
+#ifdef WIN32
+      {"\r\n"};
+#else
+      {"\n"};
+#endif
 
   /**
    * Obtain read-only test input data directory.

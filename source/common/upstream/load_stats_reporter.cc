@@ -152,7 +152,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
   // problems due to referencing of temporaries in the below loop with Google's
   // internal string type. Consider this optimization when the string types
   // converge.
-  std::unordered_map<std::string, std::chrono::steady_clock::duration> existing_clusters;
+  absl::node_hash_map<std::string, std::chrono::steady_clock::duration> existing_clusters;
   if (message_->send_all_clusters()) {
     for (const auto& p : cm_.clusters()) {
       const std::string& cluster_name = p.first;

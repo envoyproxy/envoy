@@ -6,6 +6,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 
+#include "extensions/common/sqlutils/sqlutils.h"
 #include "extensions/filters/network/postgres_proxy/postgres_message.h"
 #include "extensions/filters/network/postgres_proxy/postgres_session.h"
 
@@ -40,6 +41,8 @@ public:
 
   enum class ErrorType { Error, Fatal, Panic, Unknown };
   virtual void incErrors(ErrorType) PURE;
+
+  virtual void processQuery(const std::string&) PURE;
 };
 
 // Postgres message decoder.
@@ -49,6 +52,15 @@ public:
 
   virtual bool onData(Buffer::Instance& data, bool frontend) PURE;
   virtual PostgresSession& getSession() PURE;
+
+  const Extensions::Common::SQLUtils::SQLUtils::DecoderAttributes& getAttributes() const {
+    return attributes_;
+  }
+
+protected:
+  // Decoder attributes extracted from Startup message.
+  // It can be username, database name, client app type, etc.
+  Extensions::Common::SQLUtils::SQLUtils::DecoderAttributes attributes_;
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;
@@ -112,6 +124,9 @@ protected:
   void decodeBackendNoticeResponse();
   void decodeFrontendTerminate();
   void decodeErrorNotice(MsgParserDict& types);
+  void onQuery();
+  void onParse();
+  void onStartup();
 
   void incMessagesUnknown() { callbacks_->incMessagesUnknown(); }
   void incSessionsEncrypted() { callbacks_->incSessionsEncrypted(); }

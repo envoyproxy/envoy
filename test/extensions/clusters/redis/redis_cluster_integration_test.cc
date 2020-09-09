@@ -18,9 +18,9 @@ namespace {
 // in the cluster. The load balancing policy must be set
 // to random for proper test operation.
 const std::string& listenerConfig() {
-  CONSTRUCT_ON_FIRST_USE(std::string, R"EOF(
+  CONSTRUCT_ON_FIRST_USE(std::string, fmt::format(R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
@@ -44,7 +44,8 @@ static_resources:
           settings:
             op_timeout: 5s
             enable_redirection: true
-)EOF");
+)EOF",
+                                                  Platform::null_device_path));
 }
 
 const std::string& clusterConfig() {
@@ -260,8 +261,6 @@ protected:
                              const std::string& auth_username = "",
                              const std::string& auth_password = "") {
     std::string cluster_slot_request = makeBulkStringArray({"CLUSTER", "SLOTS"});
-
-    fake_upstreams_[stream_index]->set_allow_unexpected_disconnects(true);
 
     std::string proxied_cluster_slot_request;
 

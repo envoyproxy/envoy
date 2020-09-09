@@ -416,8 +416,6 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
   // the initial LDS file has loaded.
   EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
 
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-
   // HTTP 1.0 is disabled by default.
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, true);
@@ -452,8 +450,7 @@ TEST_P(LdsIntegrationTest, FailConfigLoad) {
     filter_chain->mutable_filters(0)->clear_typed_config();
     filter_chain->mutable_filters(0)->set_name("grewgragra");
   });
-  EXPECT_DEATH_LOG_TO_STDERR(initialize(),
-                             "Didn't find a registered implementation for name: 'grewgragra'");
+  EXPECT_DEATH(initialize(), "Didn't find a registered implementation for name: 'grewgragra'");
 }
 } // namespace
 } // namespace Envoy

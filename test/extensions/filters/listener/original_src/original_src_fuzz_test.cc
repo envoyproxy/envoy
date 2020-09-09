@@ -10,8 +10,7 @@ namespace ListenerFilters {
 namespace OriginalSrc {
 
 DEFINE_PROTO_FUZZER(
-    const envoy::extensions::filters::listener::original_src::OriginalSrcTestCase& input) {
-
+    const test::extensions::filters::listener::original_src::OriginalSrcTestCase& input) {
   try {
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {
@@ -21,14 +20,8 @@ DEFINE_PROTO_FUZZER(
 
   Config config(input.config());
   auto filter = std::make_unique<OriginalSrcFilter>(config);
-
-  try {
-    ListenerFilterFuzzer fuzzer;
-    fuzzer.fuzz(*filter, input.data());
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-    return;
-  }
+  ListenerFilterFuzzer fuzzer;
+  fuzzer.fuzz(*filter, input.fuzzed());
 }
 
 } // namespace OriginalSrc

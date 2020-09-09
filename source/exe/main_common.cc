@@ -68,7 +68,8 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                                         log_lock, options_.logFormatEscaped());
+                                                         log_lock, options_.logFormatEscaped(),
+                                                         options_.enableFineGrainLogging());
 
     configureComponentLogLevels();
 

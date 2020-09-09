@@ -2,7 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
     "envoy_proto_library",
 )
 
@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 
 # Trace driver for AWS X-Ray.
 
-envoy_package()
+envoy_extension_package()
 
 envoy_proto_library(
     name = "daemon",
@@ -44,6 +44,7 @@ envoy_cc_library(
         "//include/envoy/tracing:http_tracer_interface",
         "//source/common/common:hex_lib",
         "//source/common/common:macros",
+        "//source/common/common:random_generator_lib",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",

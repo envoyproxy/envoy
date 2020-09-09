@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 
 #include "envoy/config/core/v3/substitution_format_string.pb.h"
 #include "envoy/formatter/substitution_formatter.h"
@@ -26,7 +25,7 @@ public:
    * Generate a Json formatter object from proto::Struct config
    */
   static FormatterPtr createJsonFormatter(const ProtobufWkt::Struct& struct_format,
-                                          bool preserve_types);
+                                          bool preserve_types, bool omit_empty_values);
 };
 
 } // namespace Formatter

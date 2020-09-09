@@ -12,6 +12,7 @@
 #include "common/common/fmt.h"
 #include "common/filesystem/filesystem_impl.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 
@@ -95,6 +96,11 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
   // 0x1a will be treated as EOF
   std::ifstream file(path, std::ios_base::binary);
   if (file.fail()) {
+    auto last_error = ::GetLastError();
+    if (last_error == ERROR_FILE_NOT_FOUND) {
+      throw EnvoyException(absl::StrCat("Invalid path: ", path));
+    }
+
     throw EnvoyException(absl::StrCat("unable to read file: ", path));
   }
 
@@ -156,7 +162,7 @@ static const char filename_char_table[] = {
 // The "COM#" and "LPT#" names below have boolean flag requiring a [1-9] suffix.
 // This list can be avoided by observing dwFileAttributes & FILE_ATTRIBUTE_DEVICE
 // within WIN32_FILE_ATTRIBUTE_DATA or WIN32_FIND_DATA results.
-std::unordered_map<std::string, bool> pathelt_table = {
+absl::node_hash_map<std::string, bool> pathelt_table = {
     {"CON", false}, {"NUL", false}, {"AUX", false}, {"PRN", false}, {"COM", true}, {"LPT", true}
 };
 

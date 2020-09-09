@@ -207,7 +207,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       http2_options_(Http2::Utility::initializeAndValidateOptions(
           config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
-      http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
+      http1_settings_(Http::Utility::parseHttp1Settings(
+          config.http_protocol_options(), config.stream_error_on_invalid_http_message())),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
       max_request_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -551,7 +552,7 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
         config_discovery.default_config(), context_.messageValidationVisitor(), *default_factory);
     Http::FilterFactoryCb default_config =
         default_factory->createFilterFactoryFromProto(*message, stats_prefix_, context_);
-    filter_config_provider->onConfigUpdate(default_config, "");
+    filter_config_provider->onConfigUpdate(default_config, "", nullptr);
   }
   filter_factories.push_back(std::move(filter_config_provider));
 }

@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <memory>
 #include <queue>
-#include <unordered_map>
 
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/random_generator.h"
@@ -17,9 +16,12 @@
 
 #include "common/common/cleanup.h"
 #include "common/common/logger.h"
+#include "common/common/utility.h"
 #include "common/config/api_version.h"
 #include "common/config/grpc_stream.h"
 #include "common/config/utility.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Config {
@@ -131,7 +133,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
   bool first_stream_request_;
-  std::unordered_map<std::string, ApiState> api_state_;
+  absl::node_hash_map<std::string, ApiState> api_state_;
   // Envoy's dependency ordering.
   std::list<std::string> subscriptions_;
 
@@ -158,7 +160,7 @@ public:
 
   GrpcMuxWatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
                            OpaqueResourceDecoder&) override {
-    throw EnvoyException("ADS must be configured to support an ADS config source");
+    ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
   }
 
   void onWriteable() override {}

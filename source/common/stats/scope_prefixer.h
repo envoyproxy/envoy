@@ -49,8 +49,8 @@ public:
   HistogramOptConstRef findHistogram(StatName name) const override;
   TextReadoutOptConstRef findTextReadout(StatName name) const override;
 
-  const SymbolTable& constSymbolTable() const override { return scope_.constSymbolTable(); }
-  SymbolTable& symbolTable() override { return scope_.symbolTable(); }
+  const SymbolTable& constSymbolTable() const final { return scope_.constSymbolTable(); }
+  SymbolTable& symbolTable() final { return scope_.symbolTable(); }
 
   NullGaugeImpl& nullGauge(const std::string& str) override { return scope_.nullGauge(str); }
 

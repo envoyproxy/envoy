@@ -6,10 +6,11 @@ MySQL Filter
 In this example, we show how the :ref:`MySQL filter <config_network_filters_mysql_proxy>` can be used with the Envoy proxy. The Envoy proxy configuration includes a MySQL filter that parses queries and collects MySQL-specific
 metrics.
 
+
 Running the Sandboxes
 ~~~~~~~~~~~~~~~~~~~~~
 
-The following documentation runs through the setup of both services.
+The following documentation runs through the setup of the services.
 
 **Step 1: Install Docker**
 
@@ -17,11 +18,17 @@ Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
 
 A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
 
-**Step 2: Clone the Envoy repo and start all of our containers**
+**Step 2: Clone the Envoy repo**
 
-If you have not cloned the Envoy repo, clone it with ``git clone git@github.com:envoyproxy/envoy``
-or ``git clone https://github.com/envoyproxy/envoy.git``
+If you have not cloned the Envoy repo, clone it with:
 
+``git clone git@github.com:envoyproxy/envoy``
+
+or
+
+``git clone https://github.com/envoyproxy/envoy.git``
+
+**Step 3: Build the sandbox**
 
 Terminal 1
 
@@ -39,7 +46,7 @@ Terminal 1
   mysql_proxy_1   /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:1999->1999/tcp, 0.0.0.0:8001->8001/tcp
 
 
-**Step 3: Issue commands using mysql**
+**Step 4: Issue commands using mysql**
 
 Use ``mysql`` to issue some commands and verify they are routed via Envoy. Note
 that the current implementation of the protocol filter was tested with MySQL
@@ -83,7 +90,7 @@ Terminal 1
   mysql> exit
   Bye
 
-**Step 4: Check egress stats**
+**Step 5: Check egress stats**
 
 Check egress stats were updated.
 
@@ -102,7 +109,7 @@ Terminal 1
   mysql.egress_mysql.sessions: 1
   mysql.egress_mysql.upgraded_to_ssl: 0
 
-**Step 5: Check TCP stats**
+**Step 6: Check TCP stats**
 
 Check TCP stats were updated.
 

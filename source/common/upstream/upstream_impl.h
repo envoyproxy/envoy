@@ -54,6 +54,7 @@
 
 #include "server/transport_socket_config_impl.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
@@ -195,7 +196,7 @@ public:
   }
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
-  void healthFlagSet(HealthFlag flag) override { health_flags_ |= enumToInt(flag); }
+  void healthFlagSet(HealthFlag flag) final { health_flags_ |= enumToInt(flag); }
 
   ActiveHealthFailureType getActiveHealthFailureType() const override {
     return active_health_failure_type_;
@@ -498,12 +499,12 @@ private:
                      const HostVector& hosts_removed,
                      absl::optional<uint32_t> overprovisioning_factor) override;
 
-    std::unordered_set<HostSharedPtr> all_hosts_added_;
-    std::unordered_set<HostSharedPtr> all_hosts_removed_;
+    absl::node_hash_set<HostSharedPtr> all_hosts_added_;
+    absl::node_hash_set<HostSharedPtr> all_hosts_removed_;
 
   private:
     PrioritySetImpl& parent_;
-    std::unordered_set<uint32_t> priorities_;
+    absl::node_hash_set<uint32_t> priorities_;
   };
 };
 
@@ -515,8 +516,7 @@ public:
   ClusterInfoImpl(const envoy::config::cluster::v3::Cluster& config,
                   const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
                   TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope,
-                  bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor,
-                  Server::Configuration::TransportSocketFactoryContext&);
+                  bool added_via_api, Server::Configuration::TransportSocketFactoryContext&);
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
@@ -535,6 +535,7 @@ public:
   const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
     return idle_timeout_;
   }
+  float prefetchRatio() const override { return prefetch_ratio_; }
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
   }
@@ -561,6 +562,10 @@ public:
   const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
   lbRingHashConfig() const override {
     return lb_ring_hash_config_;
+  }
+  const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>&
+  lbMaglevConfig() const override {
+    return lb_maglev_config_;
   }
   const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&
   lbOriginalDstConfig() const override {
@@ -611,6 +616,9 @@ public:
   };
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
+  bool connectionPoolPerDownstreamConnection() const override {
+    return connection_pool_per_downstream_connection_;
+  }
   bool warmHosts() const override { return warm_hosts_; }
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
   upstreamHttpProtocolOptions() const override {
@@ -654,6 +662,7 @@ private:
   const uint32_t max_response_headers_count_;
   const std::chrono::milliseconds connect_timeout_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
+  const float prefetch_ratio_;
   const uint32_t per_connection_buffer_limit_bytes_;
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopePtr stats_scope_;
@@ -673,6 +682,7 @@ private:
   absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
       lb_least_request_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
   absl::optional<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   const bool added_via_api_;
@@ -682,6 +692,7 @@ private:
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
+  const bool connection_pool_per_downstream_connection_;
   const bool warm_hosts_;
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;

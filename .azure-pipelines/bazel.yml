@@ -16,7 +16,7 @@ parameters:
     default: true
   - name: bazelBuildExtraOptions
     type: string
-    default: ""
+    default: "--flaky_test_attempts=2"
 
 steps:
   - task: Cache@2
@@ -48,16 +48,17 @@ steps:
     workingDirectory: $(Build.SourcesDirectory)
     env:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+      SLACK_TOKEN: $(SLACK_TOKEN)
+      REPO_URI: $(Build.Repository.Uri)
+      BUILD_URI: $(Build.BuildUri)
       ${{ if parameters.rbe }}:
         ENVOY_RBE: "1"
-        # Use https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_repository_cache_hardlinks
-        # to save disk space.
-        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs) --curses=no --experimental_repository_cache_hardlinks ${{ parameters.bazelBuildExtraOptions }}"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs) ${{ parameters.bazelBuildExtraOptions }}"
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       ${{ if eq(parameters.rbe, false) }}:
-        BAZEL_BUILD_EXTRA_OPTIONS: "--curses=no --experimental_repository_cache_hardlinks ${{ parameters.bazelBuildExtraOptions }}"
+        BAZEL_BUILD_EXTRA_OPTIONS: "${{ parameters.bazelBuildExtraOptions }}"
         BAZEL_REMOTE_CACHE: $(LocalBuildCache)
 
     displayName: "Run CI script"

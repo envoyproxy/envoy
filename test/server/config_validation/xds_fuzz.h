@@ -11,6 +11,7 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
+#include "test/fuzz/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/server/config_validation/xds_fuzz.pb.h"
 #include "test/server/config_validation/xds_verifier.h"
@@ -55,6 +56,8 @@ private:
   void removeListener(const std::string& listener_name);
   void addRoute(const std::string& route_name);
 
+  void logState();
+
   void verifyState();
   void verifyListeners();
   void verifyRoutes();
@@ -63,7 +66,7 @@ private:
   std::vector<envoy::api::v2::RouteConfiguration> getRoutesConfigDump();
 
   bool eraseListener(const std::string& listener_name);
-  bool hasRoute(const std::string& route_num);
+  bool hasRoute(const std::string& route_name);
   AssertionResult waitForAck(const std::string& expected_type_url,
                              const std::string& expected_version);
 
@@ -77,6 +80,9 @@ private:
   envoy::config::core::v3::ApiVersion api_version_;
 
   Network::Address::IpVersion ip_version_;
+
+  std::chrono::seconds timeout_{5};
+  uint64_t lds_update_success_{0};
 };
 
 } // namespace Envoy

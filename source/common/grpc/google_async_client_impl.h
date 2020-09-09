@@ -21,6 +21,7 @@
 #include "common/grpc/typed_async_client.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "absl/container/node_hash_set.h"
 #include "grpcpp/generic/generic_stub.h"
 #include "grpcpp/grpcpp.h"
 #include "grpcpp/support/proto_buffer_writer.h"
@@ -109,7 +110,7 @@ private:
   Thread::ThreadPtr completion_thread_;
   // Track all streams that are currently using this CQ, so we can notify them
   // on shutdown.
-  std::unordered_set<GoogleAsyncStreamImpl*> streams_;
+  absl::node_hash_set<GoogleAsyncStreamImpl*> streams_;
 };
 
 using GoogleAsyncClientThreadLocalPtr = std::unique_ptr<GoogleAsyncClientThreadLocal>;
@@ -209,7 +210,7 @@ private:
 class GoogleAsyncStreamImpl : public RawAsyncStream,
                               public Event::DeferredDeletable,
                               Logger::Loggable<Logger::Id::grpc>,
-                              LinkedObject<GoogleAsyncStreamImpl> {
+                              public LinkedObject<GoogleAsyncStreamImpl> {
 public:
   GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
                         absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,

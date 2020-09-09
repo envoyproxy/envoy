@@ -58,23 +58,24 @@ public:
     for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
       Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
       makeBulkStringArray(*request, {command, "hello"});
-      splitter_.makeRequest(std::move(request), callbacks_);
+      splitter_.makeRequest(std::move(request), callbacks_, dispatcher_);
     }
 
     for (const std::string& command : Common::Redis::SupportedCommands::evalCommands()) {
       Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
       makeBulkStringArray(*request, {command, "hello"});
-      splitter_.makeRequest(std::move(request), callbacks_);
+      splitter_.makeRequest(std::move(request), callbacks_, dispatcher_);
     }
   }
 
-  RouterPtr router_{std::make_unique<NullRouterImpl>()};
+  Router* router_{new NullRouterImpl()};
   Stats::IsolatedStoreImpl store_;
   Event::SimulatedTimeSystem time_system_;
   NiceMock<MockFaultManager> fault_manager_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  CommandSplitter::InstanceImpl splitter_{*router_, store_,         "redis.foo.", time_system_,
-                                          false,    fault_manager_, dispatcher_};
+  CommandSplitter::InstanceImpl splitter_{
+      RouterPtr{router_}, store_, "redis.foo.",
+      time_system_,       false,  std::make_unique<NiceMock<MockFaultManager>>(fault_manager_)};
   NoOpSplitCallbacks callbacks_;
   CommandSplitter::SplitRequestPtr handle_;
 };

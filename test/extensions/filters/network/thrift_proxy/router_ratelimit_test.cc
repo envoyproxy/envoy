@@ -6,6 +6,7 @@
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 #include "envoy/ratelimit/ratelimit.h"
 
+#include "common/network/address_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/network/thrift_proxy/config.h"
@@ -31,9 +32,9 @@ namespace {
 
 class ThriftRateLimitConfigurationTest : public testing::Test {
 public:
-  void initialize(const std::string& yaml) {
+  void initialize(const std::string& yaml, bool avoid_boosting = true) {
     envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config;
-    TestUtility::loadFromYaml(yaml, config);
+    TestUtility::loadFromYaml(yaml, config, false, avoid_boosting);
     initialize(config);
   }
 

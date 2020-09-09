@@ -60,7 +60,7 @@ public:
     data_[key] = std::move(value);
   }
 
-  std::unordered_map<std::string, std::unique_ptr<const TypedMetadata::Object>>& data() {
+  absl::node_hash_map<std::string, std::unique_ptr<const TypedMetadata::Object>>& data() {
     return data_;
   }
 };
@@ -89,6 +89,7 @@ public:
   MOCK_METHOD(bool, addedViaApi, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, connectTimeout, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
+  MOCK_METHOD(float, prefetchRatio, (), (const));
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
   MOCK_METHOD(uint64_t, features, (), (const));
   MOCK_METHOD(const Http::Http1Settings&, http1Settings, (), (const));
@@ -104,6 +105,8 @@ public:
               clusterType, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&,
               lbRingHashConfig, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>&,
+              lbMaglevConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&,
               lbLeastRequestConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&,
@@ -128,6 +131,7 @@ public:
   MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, clusterSocketOptions, (),
               (const));
   MOCK_METHOD(bool, drainConnectionsOnHostRemoval, (), (const));
+  MOCK_METHOD(bool, connectionPoolPerDownstreamConnection, (), (const));
   MOCK_METHOD(bool, warmHosts, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&,
               upstreamHttpProtocolOptions, (), (const));
@@ -167,6 +171,7 @@ public:
   absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
   absl::optional<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;

@@ -188,7 +188,7 @@ maintainer's discretion. Generally all runtime guarded features will be set true
 release is cut. Old code paths for refactors can be cleaned up after a release and there has been
 some production run time. Old code for behavioral changes will be deprecated after six months.
 Runtime features are set true by default by inclusion in
-[source/common/runtime/runtime_features.h](https://github.com/envoyproxy/envoy/blob/master/source/common/runtime/runtime_features.h)
+[source/common/runtime/runtime_features.cc](https://github.com/envoyproxy/envoy/blob/master/source/common/runtime/runtime_features.cc)
 
 There are four suggested options for testing new runtime features:
 
@@ -344,7 +344,15 @@ should only be done to correct a DCO mistake.
 
 ## Triggering CI re-run without making changes
 
-To rerun failed tasks in CI, add a comment with the the line
+To rerun failed tasks in Circle-CI, add a comment with the line
+
+```
+/retest-circle
+```
+
+in it. This should rebuild only the failed tasks.
+
+To rerun failed tasks in Azure pipelines, add a comment with the line
 
 ```
 /retest

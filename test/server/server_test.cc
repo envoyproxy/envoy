@@ -194,7 +194,7 @@ protected:
         std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
         std::move(process_context_));
-    EXPECT_TRUE(server_->api().fileSystem().fileExists(TestEnvironment::nullDevicePath()));
+    EXPECT_TRUE(server_->api().fileSystem().fileExists(std::string(Platform::null_device_path)));
   }
 
   void initializeWithHealthCheckParams(const std::string& bootstrap_path, const double timeout,
@@ -213,7 +213,7 @@ protected:
         std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
 
-    EXPECT_TRUE(server_->api().fileSystem().fileExists(TestEnvironment::nullDevicePath()));
+    EXPECT_TRUE(server_->api().fileSystem().fileExists(std::string(Platform::null_device_path)));
   }
 
   Thread::ThreadPtr startTestServer(const std::string& bootstrap_path,
@@ -294,8 +294,9 @@ private:
 class CustomStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
 public:
   // StatsSinkFactory
-  Stats::SinkPtr createStatsSink(const Protobuf::Message&, Server::Instance& server) override {
-    return std::make_unique<CustomStatsSink>(server.stats());
+  Stats::SinkPtr createStatsSink(const Protobuf::Message&,
+                                 Server::Configuration::ServerFactoryContext& server) override {
+    return std::make_unique<CustomStatsSink>(server.scope());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -891,10 +892,9 @@ namespace {
 void bindAndListenTcpSocket(const Network::Address::InstanceConstSharedPtr& address,
                             const Network::Socket::OptionsSharedPtr& options) {
   auto socket = std::make_unique<Network::TcpListenSocket>(address, options, true);
-  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
   // Some kernels erroneously allow `bind` without SO_REUSEPORT for addresses
   // with some other socket already listening on it, see #7636.
-  if (SOCKET_FAILURE(os_sys_calls.listen(socket->ioHandle().fd(), 1).rc_)) {
+  if (SOCKET_FAILURE(socket->ioHandle().listen(1).rc_)) {
     // Mimic bind exception for the test simplicity.
     throw Network::SocketBindException(fmt::format("cannot listen: {}", errorDetails(errno)),
                                        errno);
@@ -1184,7 +1184,7 @@ TEST_P(StaticValidationTest, ClusterUnknownField) {
 // Custom StatsSink that registers both a Cluster update callback and Server lifecycle callback.
 class CallbacksStatsSink : public Stats::Sink, public Upstream::ClusterUpdateCallbacks {
 public:
-  CallbacksStatsSink(Server::Instance& server)
+  CallbacksStatsSink(Server::Configuration::ServerFactoryContext& server)
       : cluster_removal_cb_handle_(
             server.clusterManager().addThreadLocalClusterUpdateCallbacks(*this)),
         lifecycle_cb_handle_(server.lifecycleNotifier().registerCallback(
@@ -1207,7 +1207,8 @@ private:
 class CallbacksStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
 public:
   // StatsSinkFactory
-  Stats::SinkPtr createStatsSink(const Protobuf::Message&, Server::Instance& server) override {
+  Stats::SinkPtr createStatsSink(const Protobuf::Message&,
+                                 Server::Configuration::ServerFactoryContext& server) override {
     return std::make_unique<CallbacksStatsSink>(server);
   }
 

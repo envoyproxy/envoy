@@ -3,13 +3,8 @@ services:
 
   front-envoy:
     build:
-      context: ../
-      dockerfile: front-proxy/Dockerfile-frontenvoy
-    volumes:
-      - ./front-envoy-jaeger.yaml:/etc/front-envoy.yaml
-      - ./install-jaeger-plugin.sh:/install-jaeger-plugin.sh
-      - ./start-front.sh:/start-front.sh
-    entrypoint: /start-front.sh
+      context: .
+      dockerfile: Dockerfile-frontenvoy
     networks:
       - envoymesh
     expose:
@@ -25,12 +20,9 @@ services:
   service1:
     build:
       context: ../front-proxy
-      dockerfile: Dockerfile-service
+      dockerfile: Dockerfile-jaeger-service
     volumes:
       - ./service1-envoy-jaeger.yaml:/etc/service-envoy.yaml
-      - ./install-jaeger-plugin.sh:/install-jaeger-plugin.sh
-      - ./start-service.sh:/start-service.sh
-    entrypoint: /start-service.sh
     networks:
       envoymesh:
         aliases:
@@ -46,12 +38,9 @@ services:
   service2:
     build:
       context: ../front-proxy
-      dockerfile: Dockerfile-service
+      dockerfile: Dockerfile-jaeger-service
     volumes:
       - ./service2-envoy-jaeger.yaml:/etc/service-envoy.yaml
-      - ./install-jaeger-plugin.sh:/install-jaeger-plugin.sh
-      - ./start-service.sh:/start-service.sh
-    entrypoint: /start-service.sh
     networks:
       envoymesh:
         aliases:

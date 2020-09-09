@@ -1,22 +1,16 @@
 #include "common/network/socket_impl.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/network/socket_interface.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/io_socket_handle_impl.h"
-#include "common/network/socket_interface_impl.h"
 
 namespace Envoy {
 namespace Network {
 
-SocketImpl::SocketImpl(Socket::Type type, Address::Type addr_type, Address::IpVersion version)
-    : io_handle_(SocketInterfaceSingleton::get().socket(type, addr_type, version)),
-      sock_type_(type), addr_type_(addr_type) {}
-
 SocketImpl::SocketImpl(Socket::Type sock_type, const Address::InstanceConstSharedPtr addr)
-    : io_handle_(SocketInterfaceSingleton::get().socket(sock_type, addr)), sock_type_(sock_type),
+    : io_handle_(ioHandleForAddr(sock_type, addr)), sock_type_(sock_type),
       addr_type_(addr->type()) {}
 
 SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
@@ -29,7 +23,7 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
   }
 
   // Should not happen but some tests inject -1 fds
-  if (SOCKET_INVALID(io_handle_->fd())) {
+  if (!io_handle_->isOpen()) {
     return;
   }
 

@@ -20,7 +20,6 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -33,6 +32,7 @@ using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::ReturnRef;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Router {
@@ -267,6 +267,65 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
       "Unexpected RDS configuration (expecting foo_route_config): INVALID_NAME_FOR_route_config");
 }
 
+// rds and vhds configurations change together
+TEST_F(RdsImplTest, VHDSandRDSupdateTogether) {
+  setup();
+
+  const std::string response1_json = R"EOF(
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "foo_route_config",
+      "virtual_hosts": [
+        {
+          "name": "foo",
+          "domains": [
+            "foo"
+          ],
+          "routes": [
+            {
+              "match": {
+                "prefix": "/foo"
+              },
+              "route": {
+                "cluster": "foo"
+              }
+            }
+          ]
+        }
+      ],
+      "vhds": {
+        "config_source": {
+          "api_config_source": {
+            "api_type": "DELTA_GRPC",
+            "grpc_services": {
+              "envoy_grpc": {
+                "cluster_name": "xds_cluster"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
+)EOF";
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_json);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
+
+  EXPECT_CALL(init_watcher_, ready());
+  rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
+  EXPECT_TRUE(rds_->config()->usesVhds());
+
+  EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
+                       ->routeEntry()
+                       ->clusterName());
+}
+
 // Validate behavior when the config fails delivery at the subscription level.
 TEST_F(RdsImplTest, FailureSubscription) {
   InSequence s;
@@ -276,6 +335,42 @@ TEST_F(RdsImplTest, FailureSubscription) {
   EXPECT_CALL(init_watcher_, ready());
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
   rds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, {});
+}
+
+// Verifies that a queued up request for a virtual host update doesn't crash if
+// RdsRouteConfigProvider is deallocated
+TEST_F(RdsImplTest, VirtualHostUpdateWhenProviderHasBeenDeallocated) {
+  const std::string rds_config = R"EOF(
+rds:
+  route_config_name: my_route
+  config_source:
+    api_config_source:
+      api_type: GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+)EOF";
+
+  Event::PostCb post_cb;
+  testing::NiceMock<Event::MockDispatcher> local_thread_dispatcher;
+  testing::MockFunction<void(bool)> mock_callback;
+  {
+    auto rds = RouteConfigProviderUtil::create(
+        parseHttpConnectionManagerFromYaml(rds_config), server_factory_context_,
+        validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
+
+    EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+    rds->requestVirtualHostsUpdate(
+        "testing", local_thread_dispatcher,
+        std::make_shared<Http::RouteConfigUpdatedCallback>(
+            Http::RouteConfigUpdatedCallback(mock_callback.AsStdFunction())));
+  }
+
+  // Invoke the callback that was scheduled on the main thread
+  // RdsRouteConfigProvider in rds is out of scope and callback's captured parameters are no longer
+  // valid
+  EXPECT_CALL(mock_callback, Call(_)).Times(0);
+  EXPECT_NO_THROW(post_cb());
 }
 
 class RdsRouteConfigSubscriptionTest : public RdsTestBase {
@@ -664,7 +759,7 @@ resources:
 
   EXPECT_THROW_WITH_MESSAGE(
       rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
-      EnvoyException, "Only a single wildcard domain is permitted");
+      EnvoyException, "Only a single wildcard domain is permitted in route foo_route_config");
 
   message_ptr =
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();

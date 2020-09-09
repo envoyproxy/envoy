@@ -99,15 +99,16 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     return sysCallResultToIoCallResult(result);
   } else {
     const size_t space_v6 = CMSG_SPACE(sizeof(in6_pktinfo));
-    // FreeBSD only needs in_addr size, but allocates more to unify code in two platforms.
     const size_t space_v4 = CMSG_SPACE(sizeof(in_pktinfo));
-    const size_t cmsg_space = (space_v4 < space_v6) ? space_v6 : space_v4;
+
+    // FreeBSD only needs in_addr size, but allocates more to unify code in two platforms.
+    const size_t cmsg_space = (self_ip->version() == Address::IpVersion::v4) ? space_v4 : space_v6;
     // kSpaceForIp should be big enough to hold both IPv4 and IPv6 packet info.
     absl::FixedArray<char> cbuf(cmsg_space);
     memset(cbuf.begin(), 0, cmsg_space);
 
     message.msg_control = cbuf.begin();
-    message.msg_controllen = cmsg_space * sizeof(char);
+    message.msg_controllen = cmsg_space;
     cmsghdr* const cmsg = CMSG_FIRSTHDR(&message);
     RELEASE_ASSERT(cmsg != nullptr, fmt::format("cbuf with size {} is not enough, cmsghdr size {}",
                                                 sizeof(cbuf), sizeof(cmsghdr)));
@@ -371,6 +372,12 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
   return sysCallResultToIoCallResult(result);
 }
 
+Api::IoCallUint64Result IoSocketHandleImpl::recv(void* buffer, size_t length, int flags) {
+  const Api::SysCallSizeResult result =
+      Api::OsSysCallsSingleton::get().recv(fd_, buffer, length, flags);
+  return sysCallResultToIoCallResult(result);
+}
+
 bool IoSocketHandleImpl::supportsMmsg() const {
   return Api::OsSysCallsSingleton::get().supportsMmsg();
 }
@@ -385,6 +392,15 @@ Api::SysCallIntResult IoSocketHandleImpl::bind(Address::InstanceConstSharedPtr a
 
 Api::SysCallIntResult IoSocketHandleImpl::listen(int backlog) {
   return Api::OsSysCallsSingleton::get().listen(fd_, backlog);
+}
+
+IoHandlePtr IoSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen) {
+  auto result = Api::OsSysCallsSingleton::get().accept(fd_, addr, addrlen);
+  if (SOCKET_INVALID(result.rc_)) {
+    return nullptr;
+  }
+
+  return std::make_unique<IoSocketHandleImpl>(result.rc_, socket_v6only_);
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
@@ -430,24 +446,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
     throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
                                      errorDetails(result.errno_)));
   }
-  int socket_v6only = 0;
-  if (ss.ss_family == AF_INET6) {
-    socklen_t size_int = sizeof(socket_v6only);
-    result = os_sys_calls.getsockopt(fd_, IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int);
-#ifdef WIN32
-    // On Windows, it is possible for this getsockopt() call to fail.
-    // This can happen if the address we are trying to connect to has nothing
-    // listening. So we can't use RELEASE_ASSERT and instead must throw an
-    // exception
-    if (SOCKET_FAILURE(result.rc_)) {
-      throw EnvoyException(fmt::format("getsockopt failed for '{}': ({}) {}", fd_, result.errno_,
-                                       errorDetails(result.errno_)));
-    }
-#else
-    RELEASE_ASSERT(result.rc_ == 0, "");
-#endif
-  }
-  return Address::addressFromSockAddr(ss, ss_len, socket_v6only);
+  return Address::addressFromSockAddr(ss, ss_len, socket_v6only_);
 }
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
@@ -477,6 +476,17 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
     }
   }
   return Address::addressFromSockAddr(ss, ss_len);
+}
+
+Event::FileEventPtr IoSocketHandleImpl::createFileEvent(Event::Dispatcher& dispatcher,
+                                                        Event::FileReadyCb cb,
+                                                        Event::FileTriggerType trigger,
+                                                        uint32_t events) {
+  return dispatcher.createFileEvent(fd_, cb, trigger, events);
+}
+
+Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {
+  return Api::OsSysCallsSingleton::get().shutdown(fd_, how);
 }
 
 } // namespace Network

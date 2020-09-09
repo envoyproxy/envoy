@@ -2,6 +2,8 @@
 
 #include <vector>
 
+#include "absl/strings/str_split.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -12,7 +14,7 @@ namespace PostgresProxy {
 
 void DecoderImpl::initialize() {
   // Special handler for first message of the transaction.
-  first_ = MsgProcessor{"Startup", BODY_FORMAT(Int32, String), {}};
+  first_ = MsgProcessor{"Startup", BODY_FORMAT(Int32, String), {&DecoderImpl::onStartup}};
 
   // Frontend messages.
   FE_messages_.direction_ = "Frontend";
@@ -20,7 +22,7 @@ void DecoderImpl::initialize() {
   // Setup handlers for known messages.
   absl::flat_hash_map<char, MsgProcessor>& FE_known_msgs = FE_messages_.messages_;
 
-  // Handler for know messages.
+  // Handler for known Frontend messages.
   FE_known_msgs['B'] = MsgProcessor{
       "Bind", BODY_FORMAT(String, String, Array<Int16>, Array<VarByteN>, Array<Int16>), {}};
   FE_known_msgs['C'] = MsgProcessor{"Close", BODY_FORMAT(Byte1, String), {}};
@@ -35,12 +37,13 @@ void DecoderImpl::initialize() {
   FE_known_msgs['p'] = MsgProcessor{"PasswordMessage/GSSResponse/SASLInitialResponse/SASLResponse",
                                     BODY_FORMAT(Int32, ByteN),
                                     {}};
-  FE_known_msgs['P'] = MsgProcessor{"Parse", BODY_FORMAT(String, String, Array<Int32>), {}};
-  FE_known_msgs['Q'] = MsgProcessor{"Query", BODY_FORMAT(String), {}};
+  FE_known_msgs['P'] =
+      MsgProcessor{"Parse", BODY_FORMAT(String, String, Array<Int32>), {&DecoderImpl::onParse}};
+  FE_known_msgs['Q'] = MsgProcessor{"Query", BODY_FORMAT(String), {&DecoderImpl::onQuery}};
   FE_known_msgs['S'] = MsgProcessor{"Sync", NO_BODY, {}};
   FE_known_msgs['X'] = MsgProcessor{"Terminate", NO_BODY, {&DecoderImpl::decodeFrontendTerminate}};
 
-  // Handler for unknown messages.
+  // Handler for unknown Frontend messages.
   FE_messages_.unknown_ =
       MsgProcessor{"Other", BODY_FORMAT(ByteN), {&DecoderImpl::incMessagesUnknown}};
 
@@ -50,7 +53,7 @@ void DecoderImpl::initialize() {
   // Setup handlers for known messages.
   absl::flat_hash_map<char, MsgProcessor>& BE_known_msgs = BE_messages_.messages_;
 
-  // Handler for know messages.
+  // Handler for known Backend messages.
   BE_known_msgs['R'] =
       MsgProcessor{"Authentication", BODY_FORMAT(ByteN), {&DecoderImpl::decodeAuthentication}};
   BE_known_msgs['K'] = MsgProcessor{"BackendKeyData", BODY_FORMAT(Int32, Int32), {}};
@@ -83,7 +86,7 @@ void DecoderImpl::initialize() {
                    BODY_FORMAT(Array<Sequence<String, Int32, Int16, Int32, Int16, Int32, Int16>>),
                    {}};
 
-  // Handler for unknown messages.
+  // Handler for unknown Backend messages.
   BE_messages_.unknown_ =
       MsgProcessor{"Other", BODY_FORMAT(ByteN), {&DecoderImpl::incMessagesUnknown}};
 
@@ -206,6 +209,7 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
       return false;
     } else {
       ENVOY_LOG(debug, "Detected version {}.{} of Postgres", code >> 16, code & 0x0000FFFF);
+      // 4 bytes of length and 4 bytes of version code.
     }
   }
 
@@ -346,6 +350,44 @@ void DecoderImpl::decodeBackendErrorResponse() { decodeErrorNotice(BE_errors_); 
 // Method parses N (Notice) message and looks for string
 // indicating its meaning. It can be warning, notice, info, debug or log.
 void DecoderImpl::decodeBackendNoticeResponse() { decodeErrorNotice(BE_notices_); }
+
+// Method parses Parse message of the following format:
+// String: The name of the destination prepared statement (an empty string selects the unnamed
+// prepared statement).
+//
+// String: The query string to be parsed.
+//
+// Int16: The number of parameter data
+// types specified (can be zero). Note that this is not an indication of the number of parameters
+// that might appear in the query string, only the number that the frontend wants to pre-specify
+// types for. Then, for each parameter, there is the following:
+//
+// Int32: Specifies the object ID of
+// the parameter data type. Placing a zero here is equivalent to leaving the type unspecified.
+void DecoderImpl::onParse() {
+  // The first two strings are separated by \0.
+  // The first string is optional. If no \0 is found it means
+  // that the message contains query string only.
+  std::vector<std::string> query_parts = absl::StrSplit(message_, absl::ByChar('\0'));
+  callbacks_->processQuery(query_parts[1]);
+}
+
+void DecoderImpl::onQuery() { callbacks_->processQuery(message_); }
+
+// Method is invoked on clear-text Startup message.
+// The message format is continuous string of the following format:
+// user<username>database<database-name>application_name<application>encoding<encoding-type>
+void DecoderImpl::onStartup() {
+  // First 4 bytes of startup message contains version code.
+  // It is skipped. After that message contains attributes.
+  attributes_ = absl::StrSplit(message_.substr(4), absl::ByChar('\0'), absl::SkipEmpty());
+
+  // If "database" attribute is not found, default it to "user" attribute.
+  if ((attributes_.find("database") == attributes_.end()) &&
+      (attributes_.find("user") != attributes_.end())) {
+    attributes_["database"] = attributes_["user"];
+  }
+}
 
 } // namespace PostgresProxy
 } // namespace NetworkFilters

@@ -11,6 +11,7 @@
 #include "common/filter/http/filter_config_discovery_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/request_id_extension_uuid_impl.h"
+#include "common/network/address_impl.h"
 
 #include "extensions/filters/network/http_connection_manager/config.h"
 
@@ -94,6 +95,18 @@ http_filters:
 
   EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
                             "Didn't find a registered implementation for name: 'foo'");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, InvalidServerName) {
+  const std::string yaml_string = R"EOF(
+server_name: >
+  foo
+route_config:
+  name: local_route
+stat_prefix: router
+  )EOF";
+
+  EXPECT_THROW(createHttpConnectionManagerConfig(yaml_string), ProtoValidationException);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, RouterInverted) {
@@ -625,8 +638,8 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
   Network::Address::PipeInstance unixAddress{"/foo"};
-  Network::Address::Ipv4Instance internalIpAddress{"127.0.0.1", 0};
-  Network::Address::Ipv4Instance externalIpAddress{"12.0.0.1", 0};
+  Network::Address::Ipv4Instance internalIpAddress{"127.0.0.1", 0, nullptr};
+  Network::Address::Ipv4Instance externalIpAddress{"12.0.0.1", 0, nullptr};
   EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(unixAddress));
   EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(internalIpAddress));
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));

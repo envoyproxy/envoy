@@ -33,7 +33,10 @@
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/health_checker.h"
+#include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -814,7 +817,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
   // Remove the duplicated hosts from both resolve targets and ensure that we don't see the same
   // host multiple times.
-  std::unordered_set<HostSharedPtr> removed_hosts;
+  absl::node_hash_set<HostSharedPtr> removed_hosts;
   cluster.prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
         for (const auto& host : hosts_removed) {
@@ -2712,7 +2715,7 @@ public:
   }
   Upstream::ProtocolOptionsConfigConstSharedPtr
   createProtocolOptionsConfig(const Protobuf::Message& msg,
-                              ProtobufMessage::ValidationVisitor&) override {
+                              Server::Configuration::ProtocolOptionsFactoryContext&) override {
     return parent_.createProtocolOptionsConfig(msg);
   }
   std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
@@ -2747,7 +2750,7 @@ public:
   }
   Upstream::ProtocolOptionsConfigConstSharedPtr
   createProtocolOptionsConfig(const Protobuf::Message& msg,
-                              ProtobufMessage::ValidationVisitor&) override {
+                              Server::Configuration::ProtocolOptionsFactoryContext&) override {
     return parent_.createProtocolOptionsConfig(msg);
   }
   std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }

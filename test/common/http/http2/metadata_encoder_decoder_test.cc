@@ -1,3 +1,5 @@
+#include "envoy/http/metadata_interface.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 #include "common/common/random_generator.h"
@@ -8,6 +10,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "http2_frame.h"
 #include "nghttp2/nghttp2.h"
 
 // A global variable in nghttp2 to disable preface and initial settings for tests.
@@ -329,11 +332,27 @@ TEST_F(MetadataEncoderDecoderTest, EncodeFuzzedMetadata) {
   cleanUp();
 }
 
+TEST_F(MetadataEncoderDecoderTest, EncodeDecodeFrameTest) {
+  MetadataMap metadataMap = {
+      {"Connections", "15"},
+      {"Timeout Seconds", "10"},
+  };
+  MetadataMapPtr metadataMapPtr = std::make_unique<MetadataMap>(metadataMap);
+  MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadataMapPtr));
+  Http2Frame http2FrameFromUltility = Http2Frame::makeMetadataFrameFromMetadataMap(
+      1, metadataMap, Http2Frame::MetadataFlags::EndMetadata);
+  MetadataDecoder decoder([this, &metadata_map_vector](MetadataMapPtr&& metadata_map_ptr) -> void {
+    this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
+  });
+  decoder.receiveMetadata(http2FrameFromUltility.data() + 9, http2FrameFromUltility.size() - 9);
+  decoder.onMetadataFrameComplete(true);
+}
+
 using MetadataEncoderDecoderDeathTest = MetadataEncoderDecoderTest;
 
 // Crash if a caller tries to pack more frames than the encoder has data for.
 TEST_F(MetadataEncoderDecoderDeathTest, PackTooManyFrames) {
-  Logger::StderrSinkDelegate stderr_sink(Logger::Registry::getSink()); // For coverage build.
   MetadataMap metadata_map = {
       {"header_key1", std::string(5, 'a')},
       {"header_key2", std::string(5, 'b')},

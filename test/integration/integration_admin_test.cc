@@ -227,8 +227,8 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_THAT(response->body(),
               HasSubstr("envoy_cluster_upstream_cx_active{envoy_cluster_name=\"cluster_0\"} 0\n"));
 
-  // Test that a specific bucket config is applied. Buckets 0-3 (inclusive) are set in initialize().
-  for (int i = 0; i <= 3; i++) {
+  // Test that a specific bucket config is applied. Buckets 1-4 (inclusive) are set in initialize().
+  for (int i = 1; i <= 4; i++) {
     EXPECT_THAT(
         response->body(),
         HasSubstr(fmt::format("envoy_cluster_upstream_cx_connect_ms_bucket{{envoy_cluster_name="

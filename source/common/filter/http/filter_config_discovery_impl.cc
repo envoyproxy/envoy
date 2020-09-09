@@ -52,13 +52,23 @@ void DynamicFilterConfigProviderImpl::validateConfig(
 }
 
 void DynamicFilterConfigProviderImpl::onConfigUpdate(Envoy::Http::FilterFactoryCb config,
-                                                     const std::string&) {
-  tls_->runOnAllThreads([config](ThreadLocal::ThreadLocalObjectSharedPtr previous)
-                            -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    auto prev_config = std::dynamic_pointer_cast<ThreadLocalConfig>(previous);
-    prev_config->config_ = config;
-    return previous;
-  });
+                                                     const std::string&,
+                                                     Config::ConfigAppliedCb cb) {
+  tls_->runOnAllThreads(
+      [config, cb](ThreadLocal::ThreadLocalObjectSharedPtr previous)
+          -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        auto prev_config = std::dynamic_pointer_cast<ThreadLocalConfig>(previous);
+        prev_config->config_ = config;
+        if (cb) {
+          cb();
+        }
+        return previous;
+      },
+      [this, config]() {
+        // This happens after all workers have discarded the previous config so it can be safely
+        // deleted on the main thread by an update with the new config.
+        this->current_config_ = config;
+      });
 }
 
 FilterConfigSubscription::FilterConfigSubscription(
@@ -126,10 +136,15 @@ void FilterConfigSubscription::onConfigUpdate(
   Envoy::Http::FilterFactoryCb factory_callback =
       factory.createFilterFactoryFromProto(*message, stat_prefix_, factory_context_);
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
+  const auto pending_update = std::make_shared<std::atomic<uint64_t>>(
+      (factory_context_.admin().concurrency() + 1) * filter_config_providers_.size());
   for (auto* provider : filter_config_providers_) {
-    provider->onConfigUpdate(factory_callback, version_info);
+    provider->onConfigUpdate(factory_callback, version_info, [this, pending_update]() {
+      if (--(*pending_update) == 0) {
+        stats_.config_reload_.inc();
+      }
+    });
   }
-  stats_.config_reload_.inc();
   last_config_hash_ = new_hash;
 }
 

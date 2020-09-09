@@ -20,3 +20,5 @@ Extensions
   internal_redirect/internal_redirect
   endpoint/endpoint
   upstream/upstream
+  wasm/wasm
+  watchdog/watchdog

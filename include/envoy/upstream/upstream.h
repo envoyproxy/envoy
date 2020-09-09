@@ -211,7 +211,7 @@ using HostVector = std::vector<HostSharedPtr>;
 using HealthyHostVector = Phantom<HostVector, Healthy>;
 using DegradedHostVector = Phantom<HostVector, Degraded>;
 using ExcludedHostVector = Phantom<HostVector, Excluded>;
-using HostMap = std::unordered_map<std::string, Upstream::HostSharedPtr>;
+using HostMap = absl::node_hash_map<std::string, Upstream::HostSharedPtr>;
 using HostVectorSharedPtr = std::shared_ptr<HostVector>;
 using HostVectorConstSharedPtr = std::shared_ptr<const HostVector>;
 
@@ -221,7 +221,7 @@ using ExcludedHostVectorConstSharedPtr = std::shared_ptr<const ExcludedHostVecto
 
 using HostListPtr = std::unique_ptr<HostVector>;
 using LocalityWeightsMap =
-    std::unordered_map<envoy::config::core::v3::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
+    absl::node_hash_map<envoy::config::core::v3::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
 using PriorityState = std::vector<std::pair<HostListPtr, LocalityWeightsMap>>;
 
 /**
@@ -577,6 +577,8 @@ public:
   COUNTER(upstream_rq_pending_total)                                                               \
   COUNTER(upstream_rq_per_try_timeout)                                                             \
   COUNTER(upstream_rq_retry)                                                                       \
+  COUNTER(upstream_rq_retry_backoff_exponential)                                                   \
+  COUNTER(upstream_rq_retry_backoff_ratelimited)                                                   \
   COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
   COUNTER(upstream_rq_retry_overflow)                                                              \
   COUNTER(upstream_rq_retry_success)                                                               \
@@ -731,6 +733,11 @@ public:
   virtual const absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
+   * @return how many streams should be anticipated per each current stream.
+   */
+  virtual float prefetchRatio() const PURE;
+
+  /**
    * @return soft limit on size of the cluster's connections read and write buffers.
    */
   virtual uint32_t perConnectionBufferLimitBytes() const PURE;
@@ -772,8 +779,8 @@ public:
   }
 
   /**
-   * @return const envoy::api::v2::Cluster::CommonLbConfig& the common configuration for all
-   *         load balancers for this cluster.
+   * @return const envoy::config::cluster::v3::Cluster::CommonLbConfig& the common configuration for
+   * all load balancers for this cluster.
    */
   virtual const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const PURE;
 
@@ -806,8 +813,14 @@ public:
   lbRingHashConfig() const PURE;
 
   /**
-   * @return const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>& the configuration
-   *         for the Original Destination load balancing policy, only used if type is set to
+   * @return configuration for maglev load balancing, only used if type is set to maglev_lb.
+   */
+  virtual const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>&
+  lbMaglevConfig() const PURE;
+
+  /**
+   * @return const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>& the
+   * configuration for the Original Destination load balancing policy, only used if type is set to
    *         ORIGINAL_DST_LB.
    */
   virtual const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&
@@ -899,7 +912,7 @@ public:
   virtual const LoadBalancerSubsetInfo& lbSubsetInfo() const PURE;
 
   /**
-   * @return const envoy::api::v2::core::Metadata& the configuration metadata for this cluster.
+   * @return const envoy::config::core::v3::Metadata& the configuration metadata for this cluster.
    */
   virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
 
@@ -920,6 +933,12 @@ public:
    *         after a host is removed from service discovery.
    */
   virtual bool drainConnectionsOnHostRemoval() const PURE;
+
+  /**
+   *  @return whether to create a new connection pool for each downstream connection routed to
+   *          the cluster
+   */
+  virtual bool connectionPoolPerDownstreamConnection() const PURE;
 
   /**
    * @return true if this cluster is configured to ignore hosts for the purpose of load balancing

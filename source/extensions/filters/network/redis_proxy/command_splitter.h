@@ -73,34 +73,15 @@ public:
    * Make a split redis request capable of being retried/redirected.
    * @param request supplies the split request to make (ownership transferred to call).
    * @param callbacks supplies the split request completion callbacks.
+   * @param dispatcher supplies dispatcher used for delay fault timer.
    * @return SplitRequestPtr a handle to the active request or nullptr if the request has already
    *         been satisfied (via onResponse() being called). The splitter ALWAYS calls
    *         onResponse() for a given request.
    */
   virtual SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
-                                      SplitCallbacks& callbacks) PURE;
+                                      SplitCallbacks& callbacks,
+                                      Event::Dispatcher& dispatcher) PURE;
 };
-
-using CommandSplitterPtr = std::unique_ptr<Instance>;
-
-/**
- * A command splitter factory that allows creation of the command splitter when
- * we have access to the dispatcher parameter. This supports fault injection,
- * specifically delay faults, which rely on the dispatcher for creating delay timers.
- */
-class CommandSplitterFactory {
-public:
-  virtual ~CommandSplitterFactory() = default;
-
-  /**
-   * Create a command splitter.
-   * @param dispatcher supplies the dispatcher .
-   * @return CommandSplitterPtr a handle to a newly created command splitter.
-   */
-  virtual CommandSplitterPtr create(Event::Dispatcher& dispatcher) PURE;
-};
-
-using CommandSplitterFactorySharedPtr = std::shared_ptr<CommandSplitterFactory>;
 
 } // namespace CommandSplitter
 } // namespace RedisProxy

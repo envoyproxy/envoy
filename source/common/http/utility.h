@@ -265,11 +265,16 @@ bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
 
 /**
  * @return Http1Settings An Http1Settings populated from the
- * envoy::api::v2::core::Http1ProtocolOptions config.
+ * envoy::config::core::v3::Http1ProtocolOptions config.
  */
 Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config);
 
+Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
+                                 const Protobuf::BoolValue& hcm_stream_error);
+
 struct EncodeFunctions {
+  // Function to modify locally generated response headers.
+  std::function<void(ResponseHeaderMap& headers)> modify_headers_;
   // Function to rewrite locally generated response.
   std::function<void(ResponseHeaderMap& response_headers, Code& code, std::string& body,
                      absl::string_view& content_type)>

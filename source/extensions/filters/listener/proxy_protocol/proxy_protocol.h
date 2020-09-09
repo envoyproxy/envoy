@@ -8,8 +8,13 @@
 
 #include "common/common/logger.h"
 
+#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "proxy_protocol_header.h"
+
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_ADDR_LEN_UNIX;
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_HEADER_LEN;
 
 namespace Envoy {
 namespace Extensions {
@@ -95,14 +100,15 @@ private:
    * throws EnvoyException on any socket errors.
    * @return bool true valid header, false if more data is needed.
    */
-  bool readProxyHeader(os_fd_t fd);
+  bool readProxyHeader(Network::IoHandle& io_handle);
 
   /**
    * Parse (and discard unknown) header extensions (until hdr.extensions_length == 0)
    */
-  bool parseExtensions(os_fd_t fd, uint8_t* buf, size_t buf_size, size_t* buf_off = nullptr);
+  bool parseExtensions(Network::IoHandle& io_handle, uint8_t* buf, size_t buf_size,
+                       size_t* buf_off = nullptr);
   void parseTlvs(const std::vector<uint8_t>& tlvs);
-  bool readExtensions(os_fd_t fd);
+  bool readExtensions(Network::IoHandle& io_handle);
 
   /**
    * Given a char * & len, parse the header as per spec
