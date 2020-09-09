@@ -94,5 +94,18 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {
   }
 }
 
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigHtml) {
+  const std::string yaml = R"EOF(
+  html_format: "<h1>Sample html</h1>"
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_);
+  const auto out = formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
+                              body_);
+  EXPECT_EQ("<h1>Sample html</h1>",out);
+  
+}
+
 } // namespace Formatter
 } // namespace Envoy

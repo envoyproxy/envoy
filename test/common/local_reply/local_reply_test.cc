@@ -149,6 +149,24 @@ TEST_F(LocalReplyTest, TestDefaultJsonFormatter) {
   EXPECT_TRUE(TestUtility::jsonStringEqual(body_, expected));
 }
 
+TEST_F(LocalReplyTest, TestDefaultHtmlFormatter) {
+  // Default html formatter without any mappers
+  const std::string yaml = R"(
+  body_format:
+     html_format: "<h1>Sample Html Body</h1>"
+)";
+  TestUtility::loadFromYaml(yaml, config_);
+  auto local = Factory::create(config_, context_);
+
+  local->rewrite(nullptr, response_headers_, stream_info_, code_, body_, content_type_);
+  EXPECT_EQ(code_, TestInitCode);
+  EXPECT_EQ(stream_info_.response_code_, static_cast<uint32_t>(TestInitCode));
+  EXPECT_EQ(response_headers_.Status()->value().getStringView(),
+            std::to_string(enumToInt(TestInitCode)));
+  EXPECT_EQ(body_, "<h1>Sample Html Body</h1>");
+  EXPECT_EQ(content_type_, "text/html; charset=UTF-8");
+}
+
 TEST_F(LocalReplyTest, TestMapperRewrite) {
   // Match with response_code, and rewrite the code and body.
   const std::string yaml = R"(
@@ -334,6 +352,61 @@ TEST_F(LocalReplyTest, TestHeaderAddition) {
   ASSERT_EQ(out.size(), 2);
   ASSERT_EQ(out[0], "bar3");
   ASSERT_EQ(out[1], "append-bar3");
+}
+
+TEST_F(LocalReplyTest, TestMapperWithHtmlFormat) {
+  // Match with response_code, and rewrite the code and body.
+  const std::string yaml = R"(
+    mappers:
+    - filter:
+        status_code_filter:
+          comparison:
+            op: EQ
+            value:
+              default_value: 400
+              runtime_key: key_b
+      status_code: 401
+      body:
+        inline_string: "401 body text"
+      body_format_override:
+        html_format: "<h1>%LOCAL_REPLY_BODY%</h1>"
+    - filter:
+        status_code_filter:
+          comparison:
+            op: EQ
+            value:
+              default_value: 410
+              runtime_key: key_b
+      status_code: 411
+      body:
+        inline_string: "411 body text"
+    body_format:
+      html_format: "<h1>%LOCAL_REPLY_BODY%</h1> %RESPONSE_CODE% default formatter"
+)";
+  TestUtility::loadFromYaml(yaml, config_);
+  auto local = Factory::create(config_, context_);
+
+  // code=400 matches the first filter; rewrite code and body
+  // has its own formatter
+  resetData(400);
+  local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  EXPECT_EQ(code_, static_cast<Http::Code>(401));
+  EXPECT_EQ(stream_info_.response_code_, 401U);
+  EXPECT_EQ(response_headers_.Status()->value().getStringView(), "401");
+  EXPECT_EQ(content_type_, "text/html; charset=UTF-8");
+
+  const std::string expected = R"(<h1>401 body text</h1>)";
+  EXPECT_EQ(body_, expected);
+
+  // code=410 matches the second filter; rewrite code and body
+  // but using default formatter
+  resetData(410);
+  local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  EXPECT_EQ(code_, static_cast<Http::Code>(411));
+  EXPECT_EQ(stream_info_.response_code_, 411U);
+  EXPECT_EQ(response_headers_.Status()->value().getStringView(), "411");
+  EXPECT_EQ(body_, "<h1>411 body text</h1> 411 default formatter");
+  EXPECT_EQ(content_type_, "text/html; charset=UTF-8");
 }
 
 } // namespace LocalReply
