@@ -323,7 +323,6 @@ TEST_P(ListenerIntegrationTest, BasicSuccessWithOnDemandFilterChain) {
   // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   // Workers not started, the LDS added listener 0 is in active_listeners_ list.
-  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 2);
   registerTestServerPorts({listener_name_, listener_name_2_});
 
   const std::string route_config_tmpl = R"EOF(
@@ -368,7 +367,7 @@ TEST_P(ListenerIntegrationTest, BasicSuccessWithOnDemandFilterChain) {
   sendLdsResponseV3({MessageUtil::getYamlStringFromMessage(listener_config_),
                      MessageUtil::getYamlStringFromMessage(listener_config_2_)},
                     "2");
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 2);
   // close current connection, make a new connection, will not request rebuilding again.
   codec_client_->close();
@@ -603,7 +602,7 @@ TEST_P(ListenerIntegrationTest, BasicSuccessOnDemandFilterChainWithMultipleClien
   sendLdsResponseV3({MessageUtil::getYamlStringFromMessage(listener_config_),
                      MessageUtil::getYamlStringFromMessage(listener_config_2_)},
                     "2");
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 2);
   // close current connection, make a new connection, will not request rebuilding again.
   cleanupDownstream();
