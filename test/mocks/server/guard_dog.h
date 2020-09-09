@@ -14,7 +14,8 @@ public:
 
   // Server::GuardDog
   MOCK_METHOD(WatchDogSharedPtr, createWatchDog,
-              (Thread::ThreadId thread_id, const std::string& thread_name));
+              (Thread::ThreadId thread_id, const std::string& thread_name,
+               Event::Dispatcher& dispatcher));
   MOCK_METHOD(void, stopWatching, (WatchDogSharedPtr wd));
 
   std::shared_ptr<MockWatchDog> watch_dog_;

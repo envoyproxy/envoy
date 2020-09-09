@@ -53,6 +53,11 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactory
 
 DispatcherImpl::~DispatcherImpl() { FatalErrorHandler::removeFatalErrorHandler(*this); }
 
+void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
+                                      std::chrono::milliseconds min_touch_interval) {
+  watchdog_registrations_.emplace_back(watchdog, *scheduler_, min_touch_interval, *this);
+}
+
 void DispatcherImpl::initializeStats(Stats::Scope& scope,
                                      const absl::optional<std::string>& prefix) {
   const std::string effective_prefix = prefix.has_value() ? *prefix : absl::StrCat(name_, ".");
@@ -128,7 +133,13 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                              uint32_t events) {
   ASSERT(isThreadSafe());
-  return FileEventPtr{new FileEventImpl(*this, fd, cb, trigger, events)};
+  return FileEventPtr{new FileEventImpl(
+      *this, fd,
+      [this, cb](uint32_t events) {
+        cb(events);
+        touchWatchdogs();
+      },
+      trigger, events)};
 }
 
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
@@ -157,11 +168,19 @@ TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
 
 Event::SchedulableCallbackPtr DispatcherImpl::createSchedulableCallback(std::function<void()> cb) {
   ASSERT(isThreadSafe());
-  return base_scheduler_.createSchedulableCallback(cb);
+  return base_scheduler_.createSchedulableCallback([this, cb]() {
+    cb();
+    touchWatchdogs();
+  });
 }
 
 TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
-  return scheduler_->createTimer(cb, *this);
+  return scheduler_->createTimer(
+      [this, cb]() {
+        cb();
+        touchWatchdogs();
+      },
+      *this);
 }
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
@@ -232,6 +251,12 @@ void DispatcherImpl::runPostCallbacks() {
       post_callbacks_.pop_front();
     }
     callback();
+  }
+}
+
+void DispatcherImpl::touchWatchdogs() {
+  for (auto& registration : watchdog_registrations_) {
+    registration.touchWatchdog();
   }
 }
 

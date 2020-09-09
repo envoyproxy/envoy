@@ -126,9 +126,8 @@ void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
   // The watch dog must be created after the dispatcher starts running and has post events flushed,
   // as this is when TLS stat scopes start working.
   dispatcher_->post([this, &guard_dog]() {
-    watch_dog_ =
-        guard_dog.createWatchDog(api_.threadFactory().currentThreadId(), dispatcher_->name());
-    watch_dog_->startWatchdog(*dispatcher_);
+    watch_dog_ = guard_dog.createWatchDog(api_.threadFactory().currentThreadId(),
+                                          dispatcher_->name(), *dispatcher_);
   });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(debug, "worker exited dispatch loop");

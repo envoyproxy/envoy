@@ -42,6 +42,8 @@ public:
 
   // Event::Dispatcher
   const std::string& name() override { return name_; }
+  void registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
+                        std::chrono::milliseconds min_touch_interval) override;
   TimeSource& timeSource() override { return api_.timeSource(); }
   void initializeStats(Stats::Scope& scope, const absl::optional<std::string>& prefix) override;
   void clearDeferredDeleteList() override;
@@ -92,9 +94,33 @@ public:
   }
 
 private:
+  class WatchdogRegistration {
+  public:
+    WatchdogRegistration(const Server::WatchDogSharedPtr& watchdog, Scheduler& scheduler,
+                         std::chrono::milliseconds timer_interval, Dispatcher& dispatcher)
+        : watchdog_(watchdog), timer_interval_(timer_interval) {
+      touch_timer_ = scheduler.createTimer(
+          [this]() -> void {
+            watchdog_->touch();
+            touch_timer_->enableTimer(timer_interval_);
+          },
+          dispatcher);
+      touch_timer_->enableTimer(timer_interval_);
+    }
+
+    void touchWatchdog() { watchdog_->touch(); }
+
+  private:
+    Server::WatchDogSharedPtr watchdog_;
+    const std::chrono::milliseconds timer_interval_;
+    TimerPtr touch_timer_;
+  };
+
   TimerPtr createTimerInternal(TimerCb cb);
   void updateApproximateMonotonicTimeInternal();
   void runPostCallbacks();
+  // Helper used to touch all watchdog after most schedulable, fd, and timer callbacks.
+  void touchWatchdogs();
 
   // Validate that an operation is thread safe, i.e. it's invoked on the same thread that the
   // dispatcher run loop is executing on. We allow run_tid_ to be empty for tests where we don't
@@ -121,6 +147,7 @@ private:
   const ScopeTrackedObject* current_object_{};
   bool deferred_deleting_{};
   MonotonicTime approximate_monotonic_time_;
+  std::list<WatchdogRegistration> watchdog_registrations_;
 };
 
 } // namespace Event

@@ -90,8 +90,8 @@ public:
   }
 
   // Server::GuardDog
-  WatchDogSharedPtr createWatchDog(Thread::ThreadId thread_id,
-                                   const std::string& thread_name) override;
+  WatchDogSharedPtr createWatchDog(Thread::ThreadId thread_id, const std::string& thread_name,
+                                   Event::Dispatcher& dispatcher) override;
   void stopWatching(WatchDogSharedPtr wd) override;
 
 private:
