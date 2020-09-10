@@ -103,7 +103,7 @@ StatusOr<ParseContext> parseQuotedString(const ParseContext& input) {
 
   if (context.atEnd()) {
     return absl::InvalidArgumentError(absl::StrFormat(
-        "expected opening '\"' at position %d; found end-of-context", context.next()));
+        "expected opening '\"' at position %d; found end-of-input", context.next()));
   }
 
   if (context.peek() != '"') {
