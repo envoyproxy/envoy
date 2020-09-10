@@ -24,10 +24,9 @@ run_shellcheck_on () {
 }
 
 run_shellchecks () {
-    local all_shellfiles=() failed failure \
+    local all_shellfiles=() failed=() failure \
 	  filtered_shellfiles=() found_shellfiles \
-	  skipped_count success_count
-    failed=()
+	  line skipped_count success_count
 
     found_shellfiles=$(find_shell_files)
     while read -r line; do all_shellfiles+=("$line"); done \
