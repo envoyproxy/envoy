@@ -194,7 +194,7 @@ public:
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
     // First read the 16 bits value which indicates how many
     // elements there are in the array.
-    if ((data.length() < sizeof(uint16_t)) || (left < sizeof(uint16_t))) {
+    if (((data.length() - pos) < sizeof(uint16_t)) || (left < sizeof(uint16_t))) {
       return false;
     }
     uint16_t num = data.peekBEInt<uint16_t>(pos);
@@ -223,6 +223,39 @@ public:
     }
     absl::StrAppend(&out, "}]");
 
+    return out;
+  }
+
+private:
+  std::vector<std::unique_ptr<T>> value_;
+};
+
+// Repeated is a composite type used at the end of the message.
+// It indicates to read the value of the same type until the end
+// of the Postgres message.
+template <typename T> class Repeated {
+public:
+  bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
+    if ((data.length() - pos) < left) {
+      return false;
+    }
+    // Read until nothing is left.
+    while (left != 0) {
+      auto item = std::make_unique<T>();
+      if (!item->read(data, pos, left)) {
+        return false;
+      }
+      value_.push_back(std::move(item));
+    }
+    return true;
+  }
+
+  std::string toString() const {
+    std::string out;
+
+    for (const auto& i : value_) {
+      absl::StrAppend(&out, i->toString());
+    }
     return out;
   }
 

@@ -29,8 +29,7 @@ TYPED_TEST(IntTest, BasicRead) {
   this->data_.template writeBEInt<decltype(std::declval<TypeParam>().get())>(12);
   uint64_t pos = 0;
   uint64_t left = this->data_.length();
-  auto result = this->field_.read(this->data_, pos, left);
-  ASSERT_TRUE(result);
+  ASSERT_TRUE(this->field_.read(this->data_, pos, left));
   auto out = this->field_.toString();
 
   sprintf(this->buf_, this->field_.getFormat(), 12);
@@ -48,8 +47,7 @@ TYPED_TEST(IntTest, ReadWithLeftovers) {
   this->data_.template writeBEInt<uint8_t>(11);
   uint64_t pos = 0;
   uint64_t left = this->data_.length();
-  auto result = this->field_.read(this->data_, pos, left);
-  ASSERT_TRUE(result);
+  ASSERT_TRUE(this->field_.read(this->data_, pos, left));
   auto out = this->field_.toString();
   sprintf(this->buf_, this->field_.getFormat(), 12);
   ASSERT_THAT(out, this->buf_);
@@ -66,8 +64,7 @@ TYPED_TEST(IntTest, ReadAtOffset) {
   this->data_.template writeBEInt<decltype(std::declval<TypeParam>().get())>(12);
   uint64_t pos = 1;
   uint64_t left = this->data_.length() - 1;
-  auto result = this->field_.read(this->data_, pos, left);
-  ASSERT_TRUE(result);
+  ASSERT_TRUE(this->field_.read(this->data_, pos, left));
   auto out = this->field_.toString();
   sprintf(this->buf_, this->field_.getFormat(), 12);
   ASSERT_THAT(out, this->buf_);
@@ -94,8 +91,7 @@ TEST(StringType, SingleString) {
   data.writeBEInt<uint8_t>(0);
   uint64_t pos = 0;
   uint64_t left = 5;
-  auto result = field.read(data, pos, left);
-  ASSERT_TRUE(result);
+  ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 5);
   ASSERT_THAT(left, 0);
 
@@ -118,24 +114,21 @@ TEST(StringType, MultipleStrings) {
   uint64_t left = 3 * 6;
 
   // Read the first string.
-  auto result = field.read(data, pos, left);
-  ASSERT_TRUE(result);
+  ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 1 * 6);
   ASSERT_THAT(left, 2 * 6);
   auto out = field.toString();
   ASSERT_THAT(out, "[test1]");
 
   // Read the second string.
-  result = field.read(data, pos, left);
-  ASSERT_TRUE(result);
+  ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 2 * 6);
   ASSERT_THAT(left, 1 * 6);
   out = field.toString();
   ASSERT_THAT(out, "[test2]");
 
   // Read the third string.
-  result = field.read(data, pos, left);
-  ASSERT_TRUE(result);
+  ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 3 * 6);
   ASSERT_THAT(left, 0);
   out = field.toString();
@@ -165,12 +158,11 @@ TEST(ByteN, BasicTest) {
     data.writeBEInt<uint8_t>(i);
   }
   uint64_t pos = 0;
-  uint64_t len = 10;
-  auto result = field.read(data, pos, len);
-  ASSERT_TRUE(result);
+  uint64_t left = 10;
+  ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 10);
   // One byte should be left in the buffer.
-  ASSERT_THAT(len, 0);
+  ASSERT_THAT(left, 0);
 
   auto out = field.toString();
   ASSERT_THAT(out, "[00 01 02 03 04 05 06 07 08 09]");
@@ -182,8 +174,8 @@ TEST(ByteN, Empty) {
   Buffer::OwnedImpl data;
   // Write nothing to data buffer.
   uint64_t pos = 0;
-  uint64_t len = 0;
-  ASSERT_TRUE(field.read(data, pos, len));
+  uint64_t left = 0;
+  ASSERT_TRUE(field.read(data, pos, left));
 
   auto out = field.toString();
   ASSERT_THAT(out, "[]");
@@ -207,34 +199,31 @@ TEST(VarByteN, BasicTest) {
   data.writeBEInt<int32_t>(-1);
 
   uint64_t pos = 0;
-  uint64_t len = 4 + 4 + 5 + 4;
-  uint64_t expected_len = len;
+  uint64_t left = 4 + 4 + 5 + 4;
+  uint64_t expected_left = left;
 
   // Read the first value.
-  auto result = field.read(data, pos, len);
-  ASSERT_TRUE(result);
+  ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 4);
-  expected_len -= 4;
-  ASSERT_THAT(len, expected_len);
+  expected_left -= 4;
+  ASSERT_THAT(left, expected_left);
   auto out = field.toString();
   ASSERT_TRUE(out.find("0 bytes") != std::string::npos);
 
   // Read the second value.
-  result = field.read(data, pos, len);
-  ASSERT_TRUE(result);
+  ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 4 + 4 + 5);
-  expected_len -= (4 + 5);
-  ASSERT_THAT(len, expected_len);
+  expected_left -= (4 + 5);
+  ASSERT_THAT(left, expected_left);
   out = field.toString();
   ASSERT_TRUE(out.find("5 bytes") != std::string::npos);
   ASSERT_TRUE(out.find("10 11 12 13 14") != std::string::npos);
 
   // Read the third value.
-  result = field.read(data, pos, len);
-  ASSERT_TRUE(result);
+  ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 4 + 4 + 5 + 4);
-  expected_len -= 4;
-  ASSERT_THAT(len, expected_len);
+  expected_left -= 4;
+  ASSERT_THAT(left, expected_left);
   out = field.toString();
   ASSERT_TRUE(out.find("-1 bytes") != std::string::npos);
 }
@@ -249,8 +238,8 @@ TEST(VarByteN, NotEnoughLengthData) {
   data.writeBEInt<uint8_t>(2);
 
   uint64_t pos = 0;
-  uint64_t len = 3;
-  ASSERT_FALSE(field.read(data, pos, len));
+  uint64_t left = 3;
+  ASSERT_FALSE(field.read(data, pos, left));
 }
 
 TEST(VarByteN, NotEnoughValueData) {
@@ -265,8 +254,8 @@ TEST(VarByteN, NotEnoughValueData) {
   data.writeBEInt<uint8_t>(3);
 
   uint64_t pos = 0;
-  uint64_t len = 5 + 4;
-  ASSERT_FALSE(field.read(data, pos, len));
+  uint64_t left = 5 + 4;
+  ASSERT_FALSE(field.read(data, pos, left));
 }
 
 // Array composite type tests.
@@ -279,11 +268,10 @@ TEST(Array, SingleInt) {
   data.writeBEInt<uint32_t>(123);
 
   uint64_t pos = 0;
-  uint64_t len = 2 + 4;
-  auto result = field.read(data, pos, len);
-  ASSERT_TRUE(result);
+  uint64_t left = 2 + 4;
+  ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 6);
-  ASSERT_THAT(len, 0);
+  ASSERT_THAT(left, 0);
 
   auto out = field.toString();
   ASSERT_TRUE(out.find("Array of 1") != std::string::npos);
@@ -301,11 +289,10 @@ TEST(Array, MultipleInts) {
   data.writeBEInt<uint8_t>(213);
 
   uint64_t pos = 0;
-  uint64_t len = 2 + 3 * 1;
-  auto result = field.read(data, pos, len);
-  ASSERT_TRUE(result);
+  uint64_t left = 2 + 3 * 1;
+  ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 5);
-  ASSERT_THAT(len, 0);
+  ASSERT_THAT(left, 0);
 
   auto out = field.toString();
   ASSERT_TRUE(out.find("Array of 3") != std::string::npos);
@@ -322,11 +309,10 @@ TEST(Array, Empty) {
   data.writeBEInt<uint16_t>(0);
 
   uint64_t pos = 0;
-  uint64_t len = 2;
-  auto result = field.read(data, pos, len);
-  ASSERT_TRUE(result);
+  uint64_t left = 2;
+  ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 2);
-  ASSERT_THAT(len, 0);
+  ASSERT_THAT(left, 0);
 
   auto out = field.toString();
   ASSERT_TRUE(out.find("Array of 0") != std::string::npos);
@@ -341,8 +327,8 @@ TEST(Array, NotEnoughDataForLength) {
   data.writeBEInt<uint8_t>(1);
 
   uint64_t pos = 0;
-  uint64_t len = 1;
-  ASSERT_FALSE(field.read(data, pos, len));
+  uint64_t left = 1;
+  ASSERT_FALSE(field.read(data, pos, left));
 }
 
 // Test situation when there is not enough data in the buffer to read one of the elements
@@ -359,8 +345,57 @@ TEST(Array, NotEnoughDataForValues) {
   data.writeBEInt<uint16_t>(102);
 
   uint64_t pos = 0;
-  uint64_t len = 2 + 4 + 2;
-  ASSERT_FALSE(field.read(data, pos, len));
+  uint64_t left = 2 + 4 + 2;
+  ASSERT_FALSE(field.read(data, pos, left));
+}
+
+// Repeated composite type tests.
+TEST(Repeated, BasicTestWithStrings) {
+  Repeated<String> field;
+
+  Buffer::OwnedImpl data;
+  // Write some data to simulate message header.
+  // It will be ignored.
+  data.writeBEInt<uint32_t>(101);
+  data.writeBEInt<uint8_t>(102);
+  // Now write 3 strings. Each terminated by zero byte.
+  data.add("test1");
+  data.writeBEInt<uint8_t>(0);
+  data.add("test2");
+  data.writeBEInt<uint8_t>(0);
+  data.add("test3");
+  data.writeBEInt<uint8_t>(0);
+  uint64_t pos = 5;
+  uint64_t left = 3 * 6;
+  ASSERT_TRUE(field.read(data, pos, left));
+  ASSERT_THAT(pos, 5 + 3 * 6);
+  ASSERT_THAT(left, 0);
+
+  auto out = field.toString();
+  ASSERT_TRUE(out.find("test1") != std::string::npos);
+  ASSERT_TRUE(out.find("test2") != std::string::npos);
+  ASSERT_TRUE(out.find("test3") != std::string::npos);
+}
+
+// Test verifies that entire read fails when one of
+// subordinate reads fails.
+TEST(Repeated, NotEnoughData) {
+  Repeated<String> field;
+
+  Buffer::OwnedImpl data;
+  // Write some data to simulate message header.
+  // It will be ignored.
+  data.writeBEInt<uint32_t>(101);
+  data.writeBEInt<uint8_t>(102);
+  // Now write 3 strings. Each terminated by zero byte.
+  data.add("test1");
+  data.writeBEInt<uint8_t>(0);
+  data.add("test2");
+  // Do not write terminating zero.
+  // Read should fail here.
+  uint64_t pos = 5;
+  uint64_t left = 6 + 5;
+  ASSERT_FALSE(field.read(data, pos, left));
 }
 
 // Sequence composite type tests.
@@ -371,11 +406,10 @@ TEST(Sequence, BasicSingleValue) {
   data.writeBEInt<uint32_t>(101);
 
   uint64_t pos = 0;
-  uint64_t len = 4;
-  auto result = field.read(data, pos, len);
-  ASSERT_TRUE(result);
+  uint64_t left = 4;
+  ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 4);
-  ASSERT_THAT(len, 0);
+  ASSERT_THAT(left, 0);
 
   auto out = field.toString();
   ASSERT_TRUE(out.find("101") != std::string::npos);
@@ -390,11 +424,10 @@ TEST(Sequence, BasicMultipleValues) {
   data.writeBEInt<uint8_t>(0);
 
   uint64_t pos = 0;
-  uint64_t len = 4 + 5;
-  auto result = field.read(data, pos, len);
-  ASSERT_TRUE(result);
+  uint64_t left = 4 + 5;
+  ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 4 + 5);
-  ASSERT_THAT(len, 0);
+  ASSERT_THAT(left, 0);
 
   auto out = field.toString();
   ASSERT_TRUE(out.find("101") != std::string::npos);
@@ -412,8 +445,8 @@ TEST(Sequence, NotEnoughData) {
   data.add("test");
 
   uint64_t pos = 0;
-  uint64_t len = 4 + 4;
-  ASSERT_FALSE(field.read(data, pos, len));
+  uint64_t left = 4 + 4;
+  ASSERT_FALSE(field.read(data, pos, left));
 }
 
 // Tests for MessageI interface and helper function createMsg.
@@ -422,8 +455,7 @@ TEST(PostgresMessage, SingleField) {
 
   Buffer::OwnedImpl data;
   data.writeBEInt<uint32_t>(12);
-  auto result = msg->read(data, 4);
-  ASSERT_TRUE(result);
+  ASSERT_TRUE(msg->read(data, 4));
   auto out = msg->toString();
   ASSERT_THAT(out, "[12]");
 }
@@ -437,8 +469,7 @@ TEST(PostgresMessage, SingleByteN) {
   data.writeBEInt<uint8_t>(2);
   data.writeBEInt<uint8_t>(3);
   data.writeBEInt<uint8_t>(4);
-  auto result = msg->read(data, 5 * 1);
-  ASSERT_TRUE(result);
+  ASSERT_TRUE(msg->read(data, 5 * 1));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("00") != std::string::npos);
   ASSERT_TRUE(out.find("01") != std::string::npos);

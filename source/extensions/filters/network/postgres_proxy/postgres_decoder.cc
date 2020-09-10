@@ -14,7 +14,7 @@ namespace PostgresProxy {
 
 void DecoderImpl::initialize() {
   // Special handler for first message of the transaction.
-  first_ = MsgProcessor{"Startup", BODY_FORMAT(Int32, String), {&DecoderImpl::onStartup}};
+  first_ = MsgProcessor{"Startup", BODY_FORMAT(Int32, Repeated<String>), {&DecoderImpl::onStartup}};
 
   // Frontend messages.
   FE_messages_.direction_ = "Frontend";
