@@ -13,14 +13,18 @@ TOOLS="$(dirname "$(dirname "$(realpath "$0")")")"
 export PYTHONPATH="$TOOLS"
 
 # protoxform fix test cases
-read -ra PROTO_TARGETS < <(bazel query "labels(srcs, labels(deps, //tools/testdata/protoxform:fix_protos))")
+PROTO_TARGETS=()
+while read -r line; do PROTO_TARGETS+=("$line"); done \
+    < <(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//versioning:fix_protos))")
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
   //tools/testdata/protoxform:fix_protos --aspects //tools/protoxform:protoxform.bzl%protoxform_aspect --output_groups=proto
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:protoprint
 ./tools/protoxform/protoxform_test_helper.py fix "${PROTO_TARGETS[@]}"
 
 # protoxform freeze test cases
-read -ra PROTO_TARGETS < <(bazel query "labels(srcs, labels(deps, //tools/testdata/protoxform:freeze_protos))")
+PROTO_TARGETS=()
+while read -r line; do PROTO_TARGETS+=("$line"); done \
+    < <(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//versioning:freeze_protos))")
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:freeze_protos \
   --//tools/api_proto_plugin:extra_args=freeze \
   //tools/testdata/protoxform:freeze_protos --aspects //tools/protoxform:protoxform.bzl%protoxform_aspect --output_groups=proto
