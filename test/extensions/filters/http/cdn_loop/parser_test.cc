@@ -59,7 +59,7 @@ TEST(ParseQuotedPairTest, Simple) {
 }
 
 TEST(ParseQuotedPairTest, EndOfInput) {
-  const std::string value = R"(a)";
+  const std::string value = "";
   ParseContext input(value);
   EXPECT_THAT(parseQuotedPair(input), StatusIs(absl::StatusCode::kInvalidArgument));
 }
