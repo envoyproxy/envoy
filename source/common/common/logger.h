@@ -1,5 +1,7 @@
 #pragma once
 
+#include <bitset>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -397,6 +399,60 @@ protected:
       FANCY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
     } else {                                                                                       \
       ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__);                                   \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_LOG_FIRST_N(LEVEL, N, ...)                                                           \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)) {                                             \
+      static auto* countdown = new std::atomic<uint64_t>();                                        \
+      if (countdown->fetch_add(1) < N) {                                                           \
+        ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                           \
+      }                                                                                            \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_LOG_ONCE(LEVEL, ...)                                                                 \
+  do {                                                                                             \
+    ENVOY_LOG_FIRST_N(LEVEL, 1, ##__VA_ARGS__);                                                    \
+  } while (0)
+
+#define ENVOY_LOG_EVERY_NTH(LEVEL, N, ...)                                                         \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)) {                                             \
+      static auto* count = new std::atomic<uint64_t>();                                            \
+      if ((count->fetch_add(1) % N) == 0) {                                                        \
+        ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                           \
+      }                                                                                            \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_LOG_EVERY_POW_2(LEVEL, ...)                                                          \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)) {                                             \
+      static auto* count = new std::atomic<uint64_t>();                                            \
+      if (std::bitset<64>(1 /* for the first hit*/ + count->fetch_add(1)).count() == 1) {          \
+        ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                           \
+      }                                                                                            \
+    }                                                                                              \
+  } while (0)
+
+// This is to get us to pass the format check. We reference a real-world time source here.
+// We'd have to introduce a singleton for a time source here, and consensus was that avoiding
+// that is preferable.
+using t_logclock = std::chrono::steady_clock; // NOLINT
+
+#define ENVOY_LOG_PERIODIC(LEVEL, CHRONO_DURATION, ...)                                            \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)) {                                             \
+      static auto* last_hit = new std::atomic<int64_t>();                                          \
+      auto last = last_hit->load();                                                                \
+      const auto now = t_logclock::now().time_since_epoch().count();                               \
+      if ((now - last) >                                                                           \
+              std::chrono::duration_cast<std::chrono::nanoseconds>(CHRONO_DURATION).count() &&     \
+          last_hit->compare_exchange_strong(last, now)) {                                          \
+        ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                           \
+      }                                                                                            \
     }                                                                                              \
   } while (0)
 

@@ -34,7 +34,7 @@ ActiveTcpClient::~ActiveTcpClient() {
   if (tcp_connection_data_) {
     ASSERT(state_ == ActiveClient::State::CLOSED);
     tcp_connection_data_->release();
-    parent_.onRequestClosed(*this, true);
+    parent_.onStreamClosed(*this, true);
     parent_.checkForDrained();
   }
   parent_.onConnDestroyed();
@@ -47,7 +47,7 @@ void ActiveTcpClient::clearCallbacks() {
   }
   callbacks_ = nullptr;
   tcp_connection_data_ = nullptr;
-  parent_.onRequestClosed(*this, true);
+  parent_.onStreamClosed(*this, true);
   parent_.checkForDrained();
 }
 
