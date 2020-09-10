@@ -13,11 +13,8 @@ namespace AbortAction {
 
 /**
  * A GuardDogAction that will terminate the process by sending SIGABRT to the
- * stuck thread. This would allow easier access to the call stack of the stuck
- * thread since we would run signal handlers on that thread.
- *
- * This is currently only implemented for systems that support kill to send
- * signals.
+ * stuck thread. This is currently only implemented for systems that
+ * support kill to send signals.
  */
 class AbortAction : public Server::Configuration::GuardDogAction {
 public:
@@ -25,7 +22,7 @@ public:
               Server::Configuration::GuardDogActionFactoryContext& context);
 
   void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
-           const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs,
+           const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_last_checkin_pairs,
            MonotonicTime now) override;
 
 private:

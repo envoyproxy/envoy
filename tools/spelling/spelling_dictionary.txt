@@ -468,6 +468,7 @@ canonicalizing
 cardinality
 casted
 charset
+checkin
 checksum
 chrono
 chroot

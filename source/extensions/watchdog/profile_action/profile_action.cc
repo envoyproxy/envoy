@@ -51,14 +51,14 @@ ProfileAction::ProfileAction(
 
 void ProfileAction::run(
     envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent /*event*/,
-    const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs,
+    const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_last_checkin_pairs,
     MonotonicTime /*now*/) {
   if (running_profile_) {
     return;
   }
 
   // Check if there's a tid that justifies profiling
-  auto trigger_tid = getTidTriggeringProfile(thread_ltt_pairs);
+  auto trigger_tid = getTidTriggeringProfile(thread_last_checkin_pairs);
   if (!trigger_tid.has_value()) {
     ENVOY_LOG_MISC(warn, "Profile Action: None of the provided tids justify profiling");
     return;
@@ -92,10 +92,10 @@ void ProfileAction::run(
 
 // Helper to determine if we have a valid tid to start profiling.
 absl::optional<Thread::ThreadId> ProfileAction::getTidTriggeringProfile(
-    const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs) {
+    const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_last_checkin_pairs) {
 
   // Find a TID not over the max_profiles threshold
-  for (const auto& [tid, ltt] : thread_ltt_pairs) {
+  for (const auto& [tid, last_checkin] : thread_last_checkin_pairs) {
     if (tid_to_profile_count_[tid] < max_profiles_per_tid_) {
       return tid;
     }

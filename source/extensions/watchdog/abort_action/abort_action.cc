@@ -31,15 +31,15 @@ AbortAction::AbortAction(
 
 void AbortAction::run(
     envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent /*event*/,
-    const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs,
+    const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_last_checkin_pairs,
     MonotonicTime /*now*/) {
 
-  if (thread_ltt_pairs.empty()) {
+  if (thread_last_checkin_pairs.empty()) {
     ENVOY_LOG_MISC(warn, "Watchdog AbortAction called without any thread.");
     return;
   }
 
-  int64_t raw_tid = thread_ltt_pairs[0].first.getId();
+  int64_t raw_tid = thread_last_checkin_pairs[0].first.getId();
 
 #ifdef WIN32
   // TODO(kbaichoo): add support for this with windows.
