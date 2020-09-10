@@ -692,8 +692,6 @@ def checkSourceLine(line, file_path, reportError):
   # See: https://github.com/envoyproxy/envoy/issues/12341
   if tokenInLine("std::any", line):
     reportError("Don't use std::any; use absl::any instead")
-  if tokenInLine("std::get", line):
-    reportError("Don't use std::get; use absl::get instead")
   if tokenInLine("std::get_if", line):
     reportError("Don't use std::get_if; use absl::get_if instead")
   if tokenInLine("std::holds_alternative", line):

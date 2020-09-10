@@ -243,7 +243,6 @@ def runChecks():
       "std_unordered_set.cc", "Don't use std::unordered_set; use absl::flat_hash_set instead " +
       "or absl::node_hash_set if pointer stability of keys/values is required")
   errors += checkUnfixableError("std_any.cc", "Don't use std::any; use absl::any instead")
-  errors += checkUnfixableError("std_get.cc", "Don't use std::get; use absl::get instead")
   errors += checkUnfixableError("std_get_if.cc", "Don't use std::get_if; use absl::get_if instead")
   errors += checkUnfixableError("std_holds_alternative.cc",
                                 "Don't use std::holds_alternative; use absl::holds_alternative instead")
