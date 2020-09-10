@@ -78,7 +78,7 @@ StatusOr<ParseContext> parseQuotedPair(const ParseContext& input) {
 
   if (context.peek() != '\\') {
     return absl::InvalidArgumentError(absl::StrFormat(
-        "expected backslash at position %d; found '%c'.", input.next(), context.peek()));
+        "expected backslash at position %d; found '%c'", input.next(), context.peek()));
   }
   context.increment();
 
@@ -90,7 +90,7 @@ StatusOr<ParseContext> parseQuotedPair(const ParseContext& input) {
   const char c = context.peek();
   if (!(c == '\t' || c == ' ' || isVChar(c) || isObsText(c))) {
     return absl::InvalidArgumentError(
-        absl::StrFormat("expected escapable character at position %d; found '\\x%x'.", input.next(),
+        absl::StrFormat("expected escapable character at position %d; found '\\x%x'", input.next(),
                         context.peek()));
   }
   context.increment();
@@ -108,7 +108,7 @@ StatusOr<ParseContext> parseQuotedString(const ParseContext& input) {
 
   if (context.peek() != '"') {
     return absl::InvalidArgumentError(absl::StrFormat(
-        "expected opening quote at position %d; found '%c'.", context.next(), context.peek()));
+        "expected opening quote at position %d; found '%c'", context.next(), context.peek()));
   }
   context.increment();
 
@@ -136,7 +136,7 @@ StatusOr<ParseContext> parseQuotedString(const ParseContext& input) {
 
   if (context.peek() != '"') {
     return absl::InvalidArgumentError(absl::StrFormat(
-        "expected closing quote at position %d; found '%c'.", input.next(), context.peek()));
+        "expected closing quote at position %d; found '%c'", input.next(), context.peek()));
   }
   context.increment();
 
@@ -163,7 +163,7 @@ StatusOr<ParseContext> parseToken(const ParseContext& input) {
           "expected token starting at position %d; found end of input", input.next()));
     } else {
       return absl::InvalidArgumentError(absl::StrFormat(
-          "expected token starting at position %d; found %c", input.next(), context.peek()));
+          "expected token starting at position %d; found '%c'", input.next(), context.peek()));
     }
   }
 
@@ -179,7 +179,7 @@ StatusOr<ParseContext> parsePlausibleIpV6(const ParseContext& input) {
 
   if (context.peek() != '[') {
     return absl::InvalidArgumentError(absl::StrFormat("expected opening '[' of IPv6 literal at "
-                                                      "position %d; found %c",
+                                                      "position %d; found '%c'",
                                                       context.next(), context.peek()));
   }
   context.increment();
@@ -203,7 +203,7 @@ StatusOr<ParseContext> parsePlausibleIpV6(const ParseContext& input) {
   }
   if (context.peek() != ']') {
     return absl::InvalidArgumentError(absl::StrFormat("expected closing ']' of IPv6 literal at "
-                                                      "position %d; found %c",
+                                                      "position %d; found '%c'",
                                                       context.next(), context.peek()));
   }
   context.increment();
@@ -272,8 +272,8 @@ StatusOr<ParseContext> parseParameter(const ParseContext& input) {
   }
 
   if (context.peek() != '=') {
-    return absl::InvalidArgumentError(absl::StrFormat("expected '=' at position %d; found '%c'.",
-                                                      context.next(), context.peek()));
+    return absl::InvalidArgumentError(
+        absl::StrFormat("expected '=' at position %d; found '%c'", context.next(), context.peek()));
   }
   context.increment();
 
@@ -362,8 +362,8 @@ StatusOr<ParsedCdnInfoList> parseCdnInfoList(const ParseContext& input) {
     }
 
     if (context.peek() != ',') {
-      return absl::InvalidArgumentError(
-          absl::StrFormat("expected ',' at position %d", context.next()));
+      return absl::InvalidArgumentError(absl::StrFormat("expected ',' at position %d; found '%c'",
+                                                        context.next(), context.peek()));
     } else {
       context.increment();
     }
