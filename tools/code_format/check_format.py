@@ -698,6 +698,8 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use std::optional; use absl::optional instead")
   if tokenInLine("std::variant", line):
     reportError("Don't use std::variant; use absl::variant instead")
+  if tokenInLine("std::visit", line):
+    reportError("Don't use std::visit; use absl::visit instead")
   if "__attribute__((packed))" in line and file_path != "./include/envoy/common/platform.h":
     # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
     # can be used instead
