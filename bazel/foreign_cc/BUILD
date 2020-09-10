@@ -115,8 +115,9 @@ envoy_cmake_external(
         "CMAKE_USE_GSSAPI": "off",
         "HTTP_ONLY": "on",
         "CMAKE_INSTALL_LIBDIR": "lib",
-        # Explicitly enable Unix sockets and disable crypto for Windows
-        "USE_UNIX_SOCKETS": "on",
+        # Explicitly enable Unix sockets, once afunix.h is correctly detected
+        # "USE_UNIX_SOCKETS": "on",
+        # Explicitly disable "Windows" crypto for Windows
         "CURL_DISABLE_CRYPTO_AUTH": "on",
         # C-Ares.
         "ENABLE_ARES": "on",
