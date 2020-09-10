@@ -30,7 +30,8 @@ constexpr bool isDigit(char c) { return '\x30' <= c && c <= '\x39'; }
 //
 // HEXDIG         =  DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
 //
-// This rule allows lower case letters too in violation of the RFC.
+// This rule allows lower case letters too in violation of the RFC since IPv6
+// addresses commonly contain lower-case hex digits.
 constexpr bool isHexDigitCaseInsensitive(char c) {
   return isDigit(c) || ('A' <= c && c <= 'F') || ('a' <= c && c <= 'f');
 }
