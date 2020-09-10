@@ -1,7 +1,6 @@
 #include "test/server/admin/admin_instance.h"
 
 using testing::Return;
-using testing::ReturnPointee;
 using testing::ReturnRef;
 
 namespace Envoy {
