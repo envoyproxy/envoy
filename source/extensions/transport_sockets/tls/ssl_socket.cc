@@ -513,15 +513,6 @@ const std::string& SslHandshakerImpl::tlsVersion() const {
   return cached_tls_version_;
 }
 
-absl::optional<std::string>
-SslHandshakerImpl::x509Extension(absl::string_view extension_name) const {
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
-  if (!cert) {
-    return absl::nullopt;
-  }
-  return Utility::getX509ExtensionValue(*cert, extension_name);
-}
-
 Network::PostIoAction SslHandshakerImpl::doHandshake() {
   ASSERT(state_ != Ssl::SocketState::HandshakeComplete && state_ != Ssl::SocketState::ShutdownSent);
   int rc = SSL_do_handshake(ssl());
