@@ -32,9 +32,8 @@ run_shellchecks () {
     found_shellfiles=$(find_shell_files)
     while read -r line; do all_shellfiles+=("$line"); done \
 	<<< "$found_shellfiles"
-    found_shellfiles=$(find_shell_files | grep -vE "${EXCLUDED_SHELLFILES}")
     while read -r line; do filtered_shellfiles+=("$line"); done \
-	<<< "$found_shellfiles"
+	<<< "$(echo -e "$found_shellfiles" | grep -vE "${EXCLUDED_SHELLFILES}")"
 
     for file in "${filtered_shellfiles[@]}"; do
 	run_shellcheck_on "$file" || {
