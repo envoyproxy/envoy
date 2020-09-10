@@ -687,6 +687,7 @@ TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
             1234);
 }
 
+// Check to see if two of the same specifier does not get parsed twice in a row.
 TEST_F(HdsTest, TestSameSpecifier) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
@@ -713,6 +714,82 @@ TEST_F(HdsTest, TestSameSpecifier) {
 
   // Check to see that HDS got two requests, but only used the specifier one time.
   checkHdsCounters(2, 0, 0, 1);
+}
+
+// Test to see that if a cluster is added or removed, the ones that did not change are reused.
+TEST_F(HdsTest, TestClusterChange) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message = createComplexSpecifier(2, 1, 1);
+
+  // Create a new active connection on request, setting its status to connected
+  // to mock a found endpoint.
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+      .WillRepeatedly(Invoke(
+          [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
+             Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
+            Network::MockClientConnection* connection =
+                new NiceMock<Network::MockClientConnection>();
+
+            // pretend our endpoint was connected to.
+            connection->raiseEvent(Network::ConnectionEvent::Connected);
+
+            // return this new, connected endpoint.
+            return connection;
+          }));
+
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  auto response1 = hds_delegate_->sendResponse();
+
+  // Get cluster raw pointers to make sure they are the same addresses, that we reused them.
+  auto original_clusters = hds_delegate_->hdsClusters();
+  ASSERT_EQ(original_clusters.size(), 2);
+
+  // Add a third cluster to the specifier. The first two should reuse pointers.
+  message = createComplexSpecifier(3, 1, 1);
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+
+  // Get the new clusters list from HDS.
+  auto new_clusters = hds_delegate_->hdsClusters();
+  ASSERT_EQ(new_clusters.size(), 3);
+
+  // Make sure our first two clusters are at the same address in memory as before.
+  for (int i = 0; i < 2; i++) {
+    EXPECT_EQ(new_clusters[i], original_clusters[i]);
+  }
+
+  message = createComplexSpecifier(3, 1, 1);
+
+  // Remove the first element, change the order of the last two elements.
+  message->mutable_cluster_health_checks()->SwapElements(0, 2);
+  message->mutable_cluster_health_checks()->RemoveLast();
+  // Sanity check.
+  ASSERT_EQ(message->cluster_health_checks_size(), 2);
+
+  // Send this new specifier.
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Check to see that even if we changed the order, we get the expected pointers.
+  auto final_clusters = hds_delegate_->hdsClusters();
+  ASSERT_EQ(final_clusters.size(), 2);
+
+  // Compare first cluster in the new list is the same as the last in the previous list,
+  // and that the second cluster in the new list is the same as the second in the previous.
+  for (int i = 0; i < 2; i++) {
+    EXPECT_EQ(final_clusters[i], new_clusters[2-i]);
+  }
+
+  // Check to see that HDS got three requests, and updated three times with it.
+  checkHdsCounters(3, 0, 0, 3);
 }
 
 } // namespace Upstream
