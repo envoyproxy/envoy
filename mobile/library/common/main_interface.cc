@@ -58,10 +58,6 @@ envoy_status_t reset_stream(envoy_stream_t stream) {
 envoy_engine_t init_engine() {
   // TODO(goaway): return new handle once multiple engine support is in place.
   // https://github.com/lyft/envoy-mobile/issues/332
-
-  // Register stub implementation of a platform filter (hardcoded in configuration).
-  register_platform_api("PlatformStub", safe_calloc(1, sizeof(envoy_http_filter)));
-
   return 1;
 }
 
