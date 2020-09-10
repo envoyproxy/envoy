@@ -428,6 +428,12 @@ TEST(ParseCdnInfoListTest, InvalidParseNoComma) {
   EXPECT_THAT(parseCdnInfoList(input), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
+TEST(ParseCdnInfoListTest, InvalidCdnId) {
+  const std::string value = "[bad";
+  ParseContext input(value);
+  EXPECT_THAT(parseCdnInfoList(input), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
 TEST(ParseCdnInfoListTest, Rfc7230Section7Tests) {
   // These are the examples from https://tools.ietf.org/html/rfc7230#section-7
   {
