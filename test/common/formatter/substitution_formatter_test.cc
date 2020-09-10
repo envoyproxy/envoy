@@ -2157,7 +2157,8 @@ TEST(SubstitutionFormatterTest, ParserFailures) {
       "%FILTER_STATE()%",
       "%START_TIME(%85n)%",
       "%START_TIME(%#__88n)%",
-      "%START_TIME(%En%)%"};
+      "%START_TIME(%En%)%",
+      "%START_TIME(%E4n%)%"};
 
   for (const std::string& test_case : test_cases) {
     EXPECT_THROW(parser.parse(test_case), EnvoyException) << test_case;
