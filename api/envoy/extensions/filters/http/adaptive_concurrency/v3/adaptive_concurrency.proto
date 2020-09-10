@@ -54,7 +54,7 @@ message GradientControllerConfig {
     // The time interval between recalculating the minimum request round-trip time.
     google.protobuf.Duration interval = 1 [(validate.rules).duration = {
       required: true
-      gt {}
+      gte {nanos: 500000}
     }];
 
     // The number of requests to aggregate/sample during the minRTT recalculation window before
