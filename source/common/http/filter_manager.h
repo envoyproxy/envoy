@@ -204,7 +204,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   void requestRouteConfigUpdate(
       Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
-  absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
+  absl::optional<Router::ConfigConstSharedPtr> routeConfig();
 
   StreamDecoderFilterSharedPtr handle_;
   bool is_grpc_request_{};
@@ -429,8 +429,7 @@ public:
    * Update the current route configuration.
    */
   virtual void
-  requestRouteConfigUpdate(Event::Dispatcher& thread_local_dispatcher,
-                           Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+  requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
 
   /**
    * Returns the current active span.
