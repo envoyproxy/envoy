@@ -565,6 +565,7 @@ dgst
 dir
 dirname
 djb
+dont
 downcasted
 downstreams
 drainable

@@ -22,21 +22,29 @@ namespace Cache {
  * A filter that caches responses and attempts to satisfy requests from cache.
  */
 class CacheFilter : public Http::PassThroughFilter,
+                    public Http::DownstreamWatermarkCallbacks,
                     public Logger::Loggable<Logger::Id::cache_filter>,
                     public std::enable_shared_from_this<CacheFilter> {
 public:
   CacheFilter(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config,
               const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source,
               HttpCache& http_cache);
+
   // Http::StreamFilterBase
   void onDestroy() override;
+
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
+
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
+
+  // Http::DownstreamWatermarkCallbacks
+  void onAboveWriteBufferHighWatermark() override;
+  void onBelowWriteBufferLowWatermark() override;
 
 private:
   // Utility functions; make any necessary checks and call the corresponding lookup_ functions
@@ -100,6 +108,10 @@ private:
   // True if a request allows cache inserts according to:
   // https://httpwg.org/specs/rfc7234.html#response.cacheability
   bool request_allows_inserts_ = false;
+
+  // True if the encoding buffer is above its high watermark. Fetching body chunks from cache should
+  // be pause while this is true.
+  bool encode_buffer_high_watermark_ = false;
 
   enum class FilterState {
     Initial,

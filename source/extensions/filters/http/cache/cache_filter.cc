@@ -120,6 +120,17 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
   return Http::FilterDataStatus::Continue;
 }
 
+void CacheFilter::onAboveWriteBufferHighWatermark() { encode_buffer_high_watermark_ = true; }
+
+void CacheFilter::onBelowWriteBufferLowWatermark() {
+  ASSERT(encode_buffer_high_watermark_);
+  encode_buffer_high_watermark_ = false;
+  if (!remaining_ranges_.empty()) {
+    // Cached body fetch was stopped, resume fetching.
+    getBody();
+  }
+}
+
 void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
   ASSERT(lookup_, "CacheFilter is trying to call getHeaders with no LookupContext");
 
@@ -314,7 +325,7 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
       ? decoder_callbacks_->encodeData(*body, end_stream)
       : encoder_callbacks_->injectEncodedDataToFilterChain(*body, end_stream);
 
-  if (!remaining_ranges_.empty()) {
+  if (!remaining_ranges_.empty() && !encode_buffer_high_watermark_) {
     getBody();
   } else if (response_has_trailers_) {
     getTrailers();
@@ -331,10 +342,11 @@ void CacheFilter::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   if (filter_state_ == FilterState::DecodeServingFromCache) {
     decoder_callbacks_->encodeTrailers(std::move(trailers));
   } else {
-    Http::ResponseTrailerMap& response_trailers = encoder_callbacks_->addEncodedTrailers();
-    response_trailers = std::move(*trailers);
-    // Continue encoding iteration to process the added trailers and end encoding.
-    encoder_callbacks_->continueEncoding();
+    // The current API does not support this.
+    // TODO(yosrym93): When trailers support is implemented, a function in
+    // StreamEncoderFilterCallbacks will need to be implemented to inject trailers. See
+    // FilterHeadersStatus::ContinueAndDontEndStream docs in filter.h for more details.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -449,6 +461,9 @@ void CacheFilter::encodeCachedResponse() {
   if (filter_state_ == FilterState::DecodeServingFromCache) {
     decoder_callbacks_->encodeHeaders(std::move(lookup_result_->headers_), end_stream);
   }
+
+  // TODO(yosrym93): Make sure this is the right place to add the callbacks.
+  decoder_callbacks_->addDownstreamWatermarkCallbacks(*this);
 
   if (lookup_result_->content_length_ > 0) {
     if (remaining_ranges_.empty()) {
