@@ -98,9 +98,9 @@ message Bootstrap {
     core.v4alpha.ApiConfigSource ads_config = 3;
   }
 
-  reserved 10, 11, 9;
+  reserved 10, 11, 8, 9;
 
-  reserved "runtime", "tracing";
+  reserved "runtime", "watchdog", "tracing";
 
   // Node identity to present to the management server and for instance
   // identification purposes (e.g. in generated headers).
@@ -140,15 +140,9 @@ message Bootstrap {
   }];
 
   // Optional watchdog configuration.
-  // This is for a single watchdog configuration for the entire system.
-  // For finer granularity watchdogs use *multi_watchdog*.
-  Watchdog watchdog = 8;
-
-  // Optional watchdog configuration.
   // This is used for specifying different watchdogs for the different subsystems.
-  // If both *multi_watchdog* and *watchdog* are specified, we'll use
-  // *multi_watchdog*.
-  MultiWatchdog multi_watchdog = 26;
+  // Only one of *watchdog* or *watchdogs* should be specified.
+  Watchdogs watchdogs = 26;
 
   // Configuration for the runtime configuration provider. If not
   // specified, a “null” provider will be used which will result in all defaults
@@ -304,12 +298,12 @@ message ClusterManager {
 // Allows you to specify different watchdog configs for different subsystems.
 // This allows finer tuned policies for the watchdog. If a subsystem is omitted
 // we'll use default values for that system.
-message MultiWatchdog {
+message Watchdogs {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.bootstrap.v3.MultiWatchdog";
+      "envoy.config.bootstrap.v3.Watchdogs";
 
   // Watchdog for the main thread.
-  Watchdog aux_watchdog = 1;
+  Watchdog main_thread_watchdog = 1;
 
   // Watchdog for the worker threads.
   Watchdog worker_watchdog = 2;

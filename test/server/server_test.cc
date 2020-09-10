@@ -1252,14 +1252,20 @@ TEST_P(ServerInstanceImplTest, DisabledExtension) {
   ASSERT_TRUE(disabled_filter_found);
 }
 
-TEST_P(ServerInstanceImplTest, MultiWatchdogTest) {
-  EXPECT_NO_THROW(initialize("test/server/test_data/server/multiwatchdog_bootstrap.yaml"));
+TEST_P(ServerInstanceImplTest, WatchdogsTest) {
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/watchdogs_bootstrap.yaml"));
 
-  // Should have separate aux and workers counters
-  EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "aux.watchdog_miss"));
+  // Should have separate main thread and workers counters
+  EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "main_thread.watchdog_miss"));
   EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "workers.watchdog_miss"));
 
   server_->shutdown();
+}
+
+TEST_P(ServerInstanceImplTest, WatchdogsTestWithDeprecatedField) {
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/watchdogs_bootstrap_with_deprecated_field.yaml"),
+      EnvoyException, "Only one of watchdog or watchdogs should be set!");
 }
 
 } // namespace

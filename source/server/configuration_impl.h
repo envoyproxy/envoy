@@ -110,7 +110,7 @@ public:
 
   WatchdogOptConstRef auxWatchdogConfig() const override {
     if (multi_watchdog_) {
-      return std::cref(*aux_watchdog_);
+      return std::cref(*main_thread_watchdog_);
     }
     return absl::nullopt;
   }
@@ -141,7 +141,7 @@ private:
   std::list<Stats::SinkPtr> stats_sinks_;
   std::chrono::milliseconds stats_flush_interval_;
   std::unique_ptr<Watchdog> watchdog_;
-  std::unique_ptr<Watchdog> aux_watchdog_;
+  std::unique_ptr<Watchdog> main_thread_watchdog_;
   std::unique_ptr<Watchdog> worker_watchdog_;
   bool multi_watchdog_;
 };

@@ -30,7 +30,7 @@ namespace Envoy {
 namespace Server {
 
 GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config,
-                           Api::Api& api, const std::string& name,
+                           Api::Api& api, absl::string_view name,
                            std::unique_ptr<TestInterlockHook>&& test_interlock)
     : test_interlock_hook_(std::move(test_interlock)), stats_scope_(stats_scope),
       time_source_(api.timeSource()), miss_timeout_(config.missTimeout()),
@@ -78,7 +78,7 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
 }
 
 GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config,
-                           Api::Api& api, const std::string& name)
+                           Api::Api& api, absl::string_view name)
     : GuardDogImpl(stats_scope, config, api, name, std::make_unique<TestInterlockHook>()) {}
 
 GuardDogImpl::~GuardDogImpl() { stop(); }

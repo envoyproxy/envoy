@@ -515,7 +515,7 @@ void InstanceImpl::initialize(const Options& options,
   // started and before our own run() loop runs.
   if (config_.multiWatchdog()) {
     aux_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
-        stats_store_, config_.auxWatchdogConfig()->get(), *api_, "aux");
+        stats_store_, config_.auxWatchdogConfig()->get(), *api_, "main_thread");
     worker_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
         stats_store_, config_.workerWatchdogConfig()->get(), *api_, "workers");
   } else {

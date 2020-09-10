@@ -797,7 +797,7 @@ TEST_F(ConfigurationImplTest, DoesNotSkewIfKillTimeoutDisabled) {
 }
 
 TEST_F(ConfigurationImplTest, ShouldDefaultUnsetMultiWatchdogs) {
-  const std::string json = R"EOF( { "multi_watchdog": {} })EOF";
+  const std::string json = R"EOF( { "watchdogs": {} })EOF";
 
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromJson(json, bootstrap);
@@ -811,23 +811,20 @@ TEST_F(ConfigurationImplTest, ShouldDefaultUnsetMultiWatchdogs) {
 }
 
 TEST_F(ConfigurationImplTest, ShouldPreferMultiWatchdog) {
-  const std::string json = R"EOF( { "multi_watchdog": {}, "watchdog": {}})EOF";
+  const std::string json = R"EOF( { "watchdogs": {}, "watchdog": {}})EOF";
 
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromJson(json, bootstrap);
 
   MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_TRUE(config.multiWatchdog());
-  EXPECT_TRUE(config.auxWatchdogConfig().has_value());
-  EXPECT_TRUE(config.workerWatchdogConfig().has_value());
-  EXPECT_FALSE(config.watchdogConfig().has_value());
+  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
+                            EnvoyException, "Only one of watchdog or watchdogs should be set!");
 }
 
 TEST_F(ConfigurationImplTest, CanSetMultiWatchdogConfigs) {
-  const std::string json = R"EOF( { "multi_watchdog": {
-    "aux_watchdog" : {
+  const std::string json = R"EOF( { "watchdogs": {
+    "main_thread_watchdog" : {
       miss_timeout : "2s"
     },
     "worker_watchdog" : {

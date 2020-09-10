@@ -141,14 +141,13 @@ message Bootstrap {
 
   // Optional watchdog configuration.
   // This is for a single watchdog configuration for the entire system.
-  // For finer granularity watchdogs use *multi_watchdog*.
-  Watchdog watchdog = 8;
+  // Prefer to use *watchdogs* which has finer granularity.
+  Watchdog watchdog = 8 [deprecated = true];
 
   // Optional watchdog configuration.
   // This is used for specifying different watchdogs for the different subsystems.
-  // If both *multi_watchdog* and *watchdog* are specified, we'll use
-  // *multi_watchdog*.
-  MultiWatchdog multi_watchdog = 26;
+  // Only one of *watchdog* or *watchdogs* should be specified.
+  Watchdogs watchdogs = 26;
 
   // Configuration for an external tracing provider.
   //
@@ -314,9 +313,9 @@ message ClusterManager {
 // Allows you to specify different watchdog configs for different subsystems.
 // This allows finer tuned policies for the watchdog. If a subsystem is omitted
 // we'll use default values for that system.
-message MultiWatchdog {
+message Watchdogs {
   // Watchdog for the main thread.
-  Watchdog aux_watchdog = 1;
+  Watchdog main_thread_watchdog = 1;
 
   // Watchdog for the worker threads.
   Watchdog worker_watchdog = 2;

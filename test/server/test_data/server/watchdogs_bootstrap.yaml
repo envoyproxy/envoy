@@ -1,5 +1,5 @@
-multi_watchdog:
-  aux_watchdog:
+watchdogs:
+  main_thread_watchdog:
     miss_timeout: 1s
   worker_watchdog:
     miss_timeout: 0.5s
