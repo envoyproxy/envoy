@@ -757,7 +757,6 @@ TEST_F(HdsTest, TestClusterChange) {
   message = createComplexSpecifier(3, 1, 1);
   hds_delegate_->onReceiveMessage(std::move(message));
 
-
   // Get the new clusters list from HDS.
   auto new_clusters = hds_delegate_->hdsClusters();
   ASSERT_EQ(new_clusters.size(), 3);
@@ -785,7 +784,7 @@ TEST_F(HdsTest, TestClusterChange) {
   // Compare first cluster in the new list is the same as the last in the previous list,
   // and that the second cluster in the new list is the same as the second in the previous.
   for (int i = 0; i < 2; i++) {
-    EXPECT_EQ(final_clusters[i], new_clusters[2-i]);
+    EXPECT_EQ(final_clusters[i], new_clusters[2 - i]);
   }
 
   // Check to see that HDS got three requests, and updated three times with it.
