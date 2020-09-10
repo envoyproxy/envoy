@@ -17,6 +17,7 @@ envoy_cc_library(
         ":clusters_handler_lib",
         ":config_dump_handler_lib",
         ":config_tracker_lib",
+        ":init_dump_handler_lib",
         ":listeners_handler_lib",
         ":logs_handler_lib",
         ":profiling_handler_lib",
@@ -63,6 +64,7 @@ envoy_cc_library(
         "//source/common/router:scoped_config_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/access_loggers/file:file_access_log_lib",
+        "//source/server:listener_manager_lib",
     ],
 )
 
@@ -256,6 +258,21 @@ envoy_cc_library(
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "init_dump_handler_lib",
+    srcs = ["init_dump_handler.cc"],
+    hdrs = ["init_dump_handler.h"],
+    deps = [
+        ":handler_ctx_lib",
+        ":utils_lib",
+        "//include/envoy/server:admin_interface",
+        "//include/envoy/server:instance_interface",
+        "//source/common/http:codes_lib",
+        "//source/common/http:header_map_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )
 
