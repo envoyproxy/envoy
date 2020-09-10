@@ -435,9 +435,11 @@ Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions&
 
 void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
                              const LocalReplyData& local_reply_data) {
-  absl::string_view details = (callbacks.streamInfo().responseCodeDetails().has_value()
-                                   ? callbacks.streamInfo().responseCodeDetails().value()
-                                   : "");
+  absl::string_view details = "";
+  if (callbacks.streamInfo().responseCodeDetails().has_value()) {
+    details = callbacks.streamInfo().responseCodeDetails().value();
+  };
+
   sendLocalReply(
       is_reset,
       Utility::EncodeFunctions{nullptr, nullptr,
