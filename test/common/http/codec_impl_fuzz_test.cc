@@ -385,7 +385,7 @@ public:
 // the buffer via swap() or modified with mutate().
 class ReorderBuffer {
 public:
-  ReorderBuffer(Connection& connection) : connection_(connection), can_dispatch_(true) {}
+  ReorderBuffer(Connection& connection, const bool& disable_dispatch) : connection_(connection), disable_dispatch_(disable_dispatch) {}
 
   void add(Buffer::Instance& data) {
     bufs_.emplace_back();
@@ -397,7 +397,7 @@ public:
     while (!bufs_.empty()) {
       Buffer::OwnedImpl& buf = bufs_.front();
       while (buf.length() > 0) {
-        if (!can_dispatch_) {
+        if (disable_dispatch_) {
           ENVOY_LOG_MISC(trace, "Buffer dispatch disabled, stopping drain");
           return codecClientError("preventing buffer drain due to connection reset");
         }
@@ -441,12 +441,11 @@ public:
 
   bool empty() const { return bufs_.empty(); }
 
-  void disableDispatch() { can_dispatch_ = false; }
-
   Connection& connection_;
   std::deque<Buffer::OwnedImpl> bufs_;
-  // Indicating whether the reorder buffer is allowed to dispatch data over the connection.
-  bool can_dispatch_;
+  // A reference to a flag indicating whether the reorder buffer is allowed to dispatch data to
+  // the connection.
+  const bool& disable_dispatch_;
 };
 
 using HttpStreamPtr = std::unique_ptr<HttpStream>;
@@ -502,8 +501,14 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         headers_with_underscores_action);
   }
 
-  ReorderBuffer client_write_buf{*server};
-  ReorderBuffer server_write_buf{*client};
+  // We track whether the connection should be closed for HTTP/1, since stream resets imply
+  // connection closes.
+  bool should_close_connection = false;
+
+  // The buffers will be blocked from dispatching data if should_close_connection is set to true.
+  // This prevents sending data if a stream reset occurs during the test cleanup when using HTTP/1.
+  ReorderBuffer client_write_buf{*server, should_close_connection};
+  ReorderBuffer server_write_buf{*client, should_close_connection};
 
   ON_CALL(client_connection, write(_, _))
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
@@ -553,10 +558,6 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     return status;
   };
 
-  // We track whether the connection should be closed for HTTP/1, since stream resets imply
-  // connection closes.
-  bool should_close_connection = false;
-
   constexpr auto max_actions = 1024;
   bool codec_error = false;
   for (int i = 0; i < std::min(max_actions, input.actions().size()) && !should_close_connection &&
@@ -582,11 +583,10 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
       HttpStreamPtr stream = std::make_unique<HttpStream>(
           *client,
           fromSanitizedHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers()),
-          action.new_stream().end_stream(), [&should_close_connection, http2, &client_write_buf]() {
+          action.new_stream().end_stream(), [&should_close_connection, http2]() {
             // HTTP/1 codec has stream reset implying connection close.
             if (!http2) {
               should_close_connection = true;
-              client_write_buf.disableDispatch();
             }
           });
       LinkedList::moveIntoListBack(std::move(stream), pending_streams);
