@@ -330,8 +330,14 @@ TEST(ParseParameterTest, SimpleQuotedValue) {
   EXPECT_THAT(parseParameter(input), IsOkAndHolds(ParseContext(value, 5)));
 }
 
-TEST(ParseParameterTest, TruncatedBeforeEquals) {
+TEST(ParseParameterTest, EndOfInputBeforeEquals) {
   const std::string value = "a";
+  ParseContext input(value);
+  EXPECT_THAT(parseParameter(input), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(ParseParameterTest, EndOfInputAfterEquals) {
+  const std::string value = "a=";
   ParseContext input(value);
   EXPECT_THAT(parseParameter(input), StatusIs(absl::StatusCode::kInvalidArgument));
 }
