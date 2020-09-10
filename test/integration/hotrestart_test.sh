@@ -284,15 +284,12 @@ do
 done
 
 # Hotrestart in specified UDS
-for HOT_RESTART_JSON in "${JSON_TEST_ARRAY[@]}"
-do
-  # Run one of the tests with real symbol tables. No need to do all of them.
-  if [ "$TEST_INDEX" = "0" ]; then
-    run_testsuite "$HOT_RESTART_JSON" "0" "/tmp/envoy_domain_socket" "600" || exit 1
-  fi
+# Run one of the tests with real symbol tables. No need to do all of them.
+if [ "$TEST_INDEX" = "0" ]; then
+  run_testsuite "${HOT_RESTART_JSON_V4}" "0" "/tmp/envoy_domain_socket" "600" || exit 1
+fi
 
-  run_testsuite "$HOT_RESTART_JSON" "1" "/tmp/envoy_domain_socket" "600" || exit 1
-done
+run_testsuite "${HOT_RESTART_JSON_V4}" "1" "/tmp/envoy_domain_socket" "600" || exit 1
 
 start_test disabling hot_restart by command line.
 CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --disable-hot-restart 2>&1)
