@@ -122,7 +122,7 @@ private:
     void closeStream();
     void onComplete();
     void onCancel();
-    void onReset();
+    void onError();
     void mapLocalResponseToError(const ResponseHeaderMap& headers);
 
     // ResponseEncoder

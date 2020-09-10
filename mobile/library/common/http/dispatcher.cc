@@ -55,7 +55,7 @@ void Dispatcher::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& h
     ENVOY_LOG(debug, "[S{}] intercepted local response", direct_stream_.stream_handle_);
     mapLocalResponseToError(headers);
     if (end_stream) {
-      onReset();
+      onError();
     }
     return;
   }
@@ -109,7 +109,7 @@ void Dispatcher::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool 
            "local response has to end the stream with a single data frame. If Envoy changes "
            "this expectation, this code needs to be updated.");
     error_message_ = Buffer::Utility::toBridgeData(data);
-    onReset();
+    onError();
     return;
   }
 
@@ -159,10 +159,10 @@ void Dispatcher::DirectStreamCallbacks::onComplete() {
   bridge_callbacks_.on_complete(bridge_callbacks_.context);
 }
 
-void Dispatcher::DirectStreamCallbacks::onReset() {
+void Dispatcher::DirectStreamCallbacks::onError() {
   ENVOY_LOG(debug, "[S{}] remote reset stream", direct_stream_.stream_handle_);
 
-  // The stream should no longer be preset in the map, because onReset() was either called from a
+  // The stream should no longer be preset in the map, because onError() was either called from a
   // terminal callback that mapped to an error or it was called in response to a resetStream().
   ASSERT(!http_dispatcher_.getStream(direct_stream_.stream_handle_));
   envoy_error_code_t code = error_code_.value_or(ENVOY_STREAM_RESET);
@@ -203,7 +203,7 @@ void Dispatcher::DirectStream::resetStream(StreamResetReason reason) {
     return;
   }
   parent_.removeStream(stream_handle_);
-  callbacks_->onReset();
+  callbacks_->onError();
 }
 
 Dispatcher::Dispatcher(std::atomic<envoy_network_t>& preferred_network)
