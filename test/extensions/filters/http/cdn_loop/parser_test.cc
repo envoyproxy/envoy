@@ -106,8 +106,14 @@ TEST(ParseQuotedStringTest, NoStartQuote) {
   EXPECT_THAT(parseQuotedString(input), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
-TEST(ParseQuotedStringTest, EndOfInput) {
+TEST(ParseQuotedStringTest, NoEndQuote) {
   const std::string value = "\"missing-final-dquote";
+  ParseContext input(value);
+  EXPECT_THAT(parseQuotedString(input), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(ParseQuotedStringTest, EmptyInput) {
+  const std::string value = "";
   ParseContext input(value);
   EXPECT_THAT(parseQuotedString(input), StatusIs(absl::StatusCode::kInvalidArgument));
 }

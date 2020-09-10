@@ -116,14 +116,16 @@ StatusOr<ParseContext> parseQuotedString(const ParseContext& input) {
     if (isQdText(context.peek())) {
       context.increment();
       continue;
-    }
-
-    if (StatusOr<ParseContext> quoted_pair_context = parseQuotedPair(context);
-        !quoted_pair_context) {
-      return quoted_pair_context.status();
+    } else if (context.peek() == '\\') {
+      if (StatusOr<ParseContext> quoted_pair_context = parseQuotedPair(context);
+          !quoted_pair_context) {
+        return quoted_pair_context.status();
+      } else {
+        context.setNext(*quoted_pair_context);
+        continue;
+      }
     } else {
-      context.setNext(*quoted_pair_context);
-      continue;
+      break;
     }
   }
 
