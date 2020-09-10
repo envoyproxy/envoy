@@ -5,7 +5,7 @@ namespace Envoy {
   };
 
   void foo() {
-    absl::variant<int, std::string> foo = std::string("foo");
+    absl::variant<int, float> foo(1.23);
     SomeVisitorFunctor visitor;
     std::visit(visitor, foo);
   }
