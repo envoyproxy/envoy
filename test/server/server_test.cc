@@ -475,7 +475,8 @@ TEST_P(ServerInstanceImplTest, Stats) {
   options_.concurrency_ = 2;
   options_.hot_restart_epoch_ = 3;
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "server.watchdog_miss"));
+  EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "main_thread.watchdog_miss"));
+  EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "workers.watchdog_miss"));
   EXPECT_EQ(2L, TestUtility::findGauge(stats_store_, "server.concurrency")->value());
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch")->value());
 
@@ -1252,17 +1253,7 @@ TEST_P(ServerInstanceImplTest, DisabledExtension) {
   ASSERT_TRUE(disabled_filter_found);
 }
 
-TEST_P(ServerInstanceImplTest, WatchdogsTest) {
-  EXPECT_NO_THROW(initialize("test/server/test_data/server/watchdogs_bootstrap.yaml"));
-
-  // Should have separate main thread and workers counters
-  EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "main_thread.watchdog_miss"));
-  EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "workers.watchdog_miss"));
-
-  server_->shutdown();
-}
-
-TEST_P(ServerInstanceImplTest, WatchdogsTestWithDeprecatedField) {
+TEST_P(ServerInstanceImplTest, ShouldErrorIfBothWatchdogsAndWatchdogSet) {
   EXPECT_THROW_WITH_MESSAGE(
       initialize("test/server/test_data/server/watchdogs_bootstrap_with_deprecated_field.yaml"),
       EnvoyException, "Only one of watchdog or watchdogs should be set!");

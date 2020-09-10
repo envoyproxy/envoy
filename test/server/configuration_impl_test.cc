@@ -754,8 +754,8 @@ TEST_F(ConfigurationImplTest, KillTimeoutWithoutSkew) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  ASSERT_FALSE(config.multiWatchdog());
-  EXPECT_EQ(std::chrono::milliseconds(1000), config.watchdogConfig()->get().killTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(1000), config.workerWatchdogConfig().killTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(1000), config.mainThreadWatchdogConfig().killTimeout());
 }
 
 TEST_F(ConfigurationImplTest, CanSkewsKillTimeout) {
@@ -773,9 +773,10 @@ TEST_F(ConfigurationImplTest, CanSkewsKillTimeout) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  ASSERT_FALSE(config.multiWatchdog());
-  EXPECT_LT(std::chrono::milliseconds(1000), config.watchdogConfig()->get().killTimeout());
-  EXPECT_GE(std::chrono::milliseconds(1500), config.watchdogConfig()->get().killTimeout());
+  EXPECT_LT(std::chrono::milliseconds(1000), config.mainThreadWatchdogConfig().killTimeout());
+  EXPECT_LT(std::chrono::milliseconds(1000), config.workerWatchdogConfig().killTimeout());
+  EXPECT_GE(std::chrono::milliseconds(1500), config.mainThreadWatchdogConfig().killTimeout());
+  EXPECT_GE(std::chrono::milliseconds(1500), config.workerWatchdogConfig().killTimeout());
 }
 
 TEST_F(ConfigurationImplTest, DoesNotSkewIfKillTimeoutDisabled) {
@@ -792,25 +793,11 @@ TEST_F(ConfigurationImplTest, DoesNotSkewIfKillTimeoutDisabled) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  ASSERT_FALSE(config.multiWatchdog());
-  EXPECT_EQ(std::chrono::milliseconds(0), config.watchdogConfig()->get().killTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(0), config.mainThreadWatchdogConfig().killTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(0), config.workerWatchdogConfig().killTimeout());
 }
 
-TEST_F(ConfigurationImplTest, ShouldDefaultUnsetMultiWatchdogs) {
-  const std::string json = R"EOF( { "watchdogs": {} })EOF";
-
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromJson(json, bootstrap);
-
-  MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
-
-  EXPECT_TRUE(config.multiWatchdog());
-  EXPECT_TRUE(config.auxWatchdogConfig().has_value());
-  EXPECT_TRUE(config.workerWatchdogConfig().has_value());
-}
-
-TEST_F(ConfigurationImplTest, ShouldPreferMultiWatchdog) {
+TEST_F(ConfigurationImplTest, ShouldErrorIfBothWatchdogsAndWatchdogSet) {
   const std::string json = R"EOF( { "watchdogs": {}, "watchdog": {}})EOF";
 
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
@@ -838,12 +825,8 @@ TEST_F(ConfigurationImplTest, CanSetMultiWatchdogConfigs) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  ASSERT_TRUE(config.multiWatchdog());
-  ASSERT_TRUE(config.auxWatchdogConfig().has_value());
-  ASSERT_TRUE(config.workerWatchdogConfig().has_value());
-
-  EXPECT_EQ(config.auxWatchdogConfig()->get().missTimeout(), std::chrono::milliseconds(2000));
-  EXPECT_EQ(config.workerWatchdogConfig()->get().missTimeout(), std::chrono::milliseconds(500));
+  EXPECT_EQ(config.mainThreadWatchdogConfig().missTimeout(), std::chrono::milliseconds(2000));
+  EXPECT_EQ(config.workerWatchdogConfig().missTimeout(), std::chrono::milliseconds(500));
 }
 } // namespace
 } // namespace Configuration

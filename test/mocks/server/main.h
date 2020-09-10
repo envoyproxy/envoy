@@ -21,10 +21,8 @@ public:
   MOCK_METHOD(Upstream::ClusterManager*, clusterManager, ());
   MOCK_METHOD(std::list<Stats::SinkPtr>&, statsSinks, ());
   MOCK_METHOD(std::chrono::milliseconds, statsFlushInterval, (), (const));
-  MOCK_METHOD(WatchdogOptConstRef, watchdogConfig, (), (const));
-  MOCK_METHOD(WatchdogOptConstRef, auxWatchdogConfig, (), (const));
-  MOCK_METHOD(WatchdogOptConstRef, workerWatchdogConfig, (), (const));
-  MOCK_METHOD(bool, multiWatchdog, (), (const));
+  MOCK_METHOD(const Watchdog&, mainThreadWatchdogConfig, (), (const));
+  MOCK_METHOD(const Watchdog&, workerWatchdogConfig, (), (const));
 };
 } // namespace Configuration
 } // namespace Server

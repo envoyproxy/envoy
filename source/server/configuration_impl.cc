@@ -137,10 +137,9 @@ void MainImpl::initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap
   }
 
   if (bootstrap.has_watchdog()) {
-    multi_watchdog_ = false;
-    watchdog_ = std::make_unique<WatchdogImpl>(bootstrap.watchdog(), server);
+    main_thread_watchdog_ = std::make_unique<WatchdogImpl>(bootstrap.watchdog(), server);
+    worker_watchdog_ = std::make_unique<WatchdogImpl>(bootstrap.watchdog(), server);
   } else {
-    multi_watchdog_ = true;
     main_thread_watchdog_ =
         std::make_unique<WatchdogImpl>(bootstrap.watchdogs().main_thread_watchdog(), server);
     worker_watchdog_ =

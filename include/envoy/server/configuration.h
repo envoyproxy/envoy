@@ -17,9 +17,6 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-class Watchdog;
-using WatchdogOptConstRef = absl::optional<std::reference_wrapper<const Watchdog>>;
-
 /*
  * Watchdog configuration.
  */
@@ -93,27 +90,14 @@ public:
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
 
   /**
-   * @return WatchdogOptConstRef the configuration of the watchdog.
-   *         If multiWatchdog() returns true this will be empty.
+   * @return const Watchdog& the configuration of the main thread  watchdog.
    */
-  virtual WatchdogOptConstRef watchdogConfig() const PURE;
+  virtual const Watchdog& mainThreadWatchdogConfig() const PURE;
 
   /**
-   * @return WatchdogOptConstRef the configuration of the auxiliary watchdog.
-   *         This will be empty unless we're multiWatchdog() returns true.
+   * @return const Watchdog& the configuration of the worker watchdog.
    */
-  virtual WatchdogOptConstRef auxWatchdogConfig() const PURE;
-
-  /**
-   * @return WatchdogOptConstRef the configuration of the worker watchdog.
-   *         This will be empty unless we're multiWatchdog() returns true.
-   */
-  virtual WatchdogOptConstRef workerWatchdogConfig() const PURE;
-
-  /**
-   * @return Whether we're using multiWatchdog.
-   */
-  virtual bool multiWatchdog() const PURE;
+  virtual const Watchdog& workerWatchdogConfig() const PURE;
 };
 
 /**

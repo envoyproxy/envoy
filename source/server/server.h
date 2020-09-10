@@ -343,10 +343,7 @@ private:
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
-  // Either guard_dog_ or (aux_guard_dog_ and worker_guard_dog_) are set
-  // depending on if we're using multiWatchdog specified by config_.
-  std::unique_ptr<Server::GuardDog> guard_dog_;
-  std::unique_ptr<Server::GuardDog> aux_guard_dog_;
+  std::unique_ptr<Server::GuardDog> main_thread_guard_dog_;
   std::unique_ptr<Server::GuardDog> worker_guard_dog_;
   bool terminated_;
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
