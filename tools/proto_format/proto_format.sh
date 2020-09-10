@@ -5,7 +5,8 @@
 set -e
 set -x
 
-IFS=' ' read -ra BAZEL_BUILD_OPTIONS < <(echo "${BAZEL_BUILD_OPTIONS:-}")
+read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
+
 
 [[ "$1" == "check" || "$1" == "fix" || "$1" == "freeze" ]] || \
   (echo "Usage: $0 <check|fix|freeze>"; exit 1)

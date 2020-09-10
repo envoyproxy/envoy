@@ -4,13 +4,12 @@ set -e
 
 rm -rf bazel-bin/tools
 
-read -ra BAZEL_BUILD_OPTIONS < <(echo "${BAZEL_BUILD_OPTIONS:-}")
-
+read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 BAZEL_BUILD_OPTIONS+=("--remote_download_outputs=all")
-
 TOOLS="$(dirname "$(dirname "$(realpath "$0")")")"
 # to satisfy dependency on run_command
 export PYTHONPATH="$TOOLS"
+
 
 # protoxform fix test cases
 PROTO_TARGETS=()
