@@ -25,7 +25,7 @@ table.docutils div.line-block {
   color: #6332a7;
 }
 
-/* Set the color of highlighted keyword to "pink" #ffc6ff */
+/* Set the background color of highlighted keyword to "pink" #ffc6ff */
 .rst-content .highlighted {
   background: #ffc6ff;
   box-shadow: 0 0 0 2px #ffc6ff;
