@@ -135,7 +135,7 @@ TEST_F(BrotliDecompressorImplTest, WrongInput) {
   Stats::IsolatedStoreImpl stats_store{};
   BrotliDecompressorImpl decompressor{stats_store, "test.", 16, false};
   decompressor.decompress(buffer, output_buffer);
-  EXPECT_EQ(2, stats_store.counterFromString("test.brotli_error").value());
+  EXPECT_EQ(1, stats_store.counterFromString("test.brotli_error").value());
 }
 
 TEST_F(BrotliDecompressorImplTest, CompressDecompressOfMultipleSlices) {

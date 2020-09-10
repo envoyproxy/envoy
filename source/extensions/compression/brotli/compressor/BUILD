@@ -17,6 +17,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/compression/compressor:compressor_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/extensions/compression/brotli/common:brotli_base_lib",
     ],
 )
 

@@ -1,5 +1,7 @@
 #include "extensions/compression/brotli/compressor/brotli_compressor_impl.h"
 
+#include "common/buffer/buffer_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Compression {
@@ -37,18 +39,20 @@ BrotliCompressorImpl::BrotliCompressorImpl(const uint32_t quality, const uint32_
 
 void BrotliCompressorImpl::compress(Buffer::Instance& buffer,
                                     Envoy::Compression::Compressor::State state) {
-  BrotliContext ctx(chunk_size_);
+  Common::BrotliContext ctx(chunk_size_);
 
+  Buffer::OwnedImpl accumulation_buffer;
   for (const Buffer::RawSlice& input_slice : buffer.getRawSlices()) {
-    ctx.avail_in = input_slice.len_;
-    ctx.next_in = static_cast<uint8_t*>(input_slice.mem_);
+    ctx.avail_in_ = input_slice.len_;
+    ctx.next_in_ = static_cast<uint8_t*>(input_slice.mem_);
 
-    while (ctx.avail_in > 0) {
-      process(ctx, buffer, BROTLI_OPERATION_PROCESS);
+    while (ctx.avail_in_ > 0) {
+      process(ctx, accumulation_buffer, BROTLI_OPERATION_PROCESS);
     }
-
-    buffer.drain(input_slice.len_);
   }
+
+  buffer.drain(buffer.length());
+  buffer.add(accumulation_buffer);
 
   do {
     process(ctx, buffer,
@@ -56,24 +60,15 @@ void BrotliCompressorImpl::compress(Buffer::Instance& buffer,
                                                                    : BROTLI_OPERATION_FLUSH);
   } while (BrotliEncoderHasMoreOutput(state_.get()) && !BrotliEncoderIsFinished(state_.get()));
 
-  const size_t n_output = chunk_size_ - ctx.avail_out;
-  if (n_output > 0) {
-    buffer.add(static_cast<void*>(ctx.chunk_ptr.get()), n_output);
-  }
+  ctx.finalizeOutput(buffer);
 }
 
-void BrotliCompressorImpl::process(BrotliContext& ctx, Buffer::Instance& output_buffer,
+void BrotliCompressorImpl::process(Common::BrotliContext& ctx, Buffer::Instance& output_buffer,
                                    const BrotliEncoderOperation op) {
-  BROTLI_BOOL result = BrotliEncoderCompressStream(state_.get(), op, &ctx.avail_in, &ctx.next_in,
-                                                   &ctx.avail_out, &ctx.next_out, nullptr);
-  RELEASE_ASSERT(result == BROTLI_TRUE, "");
-  if (ctx.avail_out == 0) {
-    // update output and reset context
-    output_buffer.add(static_cast<void*>(ctx.chunk_ptr.get()), chunk_size_);
-    ctx.chunk_ptr = std::make_unique<uint8_t[]>(chunk_size_);
-    ctx.avail_out = chunk_size_;
-    ctx.next_out = ctx.chunk_ptr.get();
-  }
+  BROTLI_BOOL result = BrotliEncoderCompressStream(state_.get(), op, &ctx.avail_in_, &ctx.next_in_,
+                                                   &ctx.avail_out_, &ctx.next_out_, nullptr);
+  RELEASE_ASSERT(result == BROTLI_TRUE, "unable to compress");
+  ctx.updateOutput(output_buffer);
 }
 } // namespace Compressor
 } // namespace Brotli

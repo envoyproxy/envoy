@@ -2,6 +2,8 @@
 
 #include "envoy/compression/compressor/compressor.h"
 
+#include "extensions/compression/brotli/common/base.h"
+
 #include "brotli/encode.h"
 
 namespace Envoy {
@@ -53,24 +55,10 @@ public:
   void compress(Buffer::Instance& buffer, Envoy::Compression::Compressor::State state) override;
 
 private:
-  struct BrotliContext {
-    BrotliContext(uint32_t chunk_size)
-        : chunk_ptr(new uint8_t[chunk_size]), next_in(nullptr), next_out(nullptr), avail_in(0),
-          avail_out(chunk_size) {
-      next_out = chunk_ptr.get();
-    }
-
-    std::unique_ptr<uint8_t[]> chunk_ptr;
-    const uint8_t* next_in;
-    uint8_t* next_out;
-    size_t avail_in;
-    size_t avail_out;
-  };
-
-  void process(BrotliContext& ctx, Buffer::Instance& output_buffer,
+  void process(Common::BrotliContext& ctx, Buffer::Instance& output_buffer,
                const BrotliEncoderOperation op);
 
-  const size_t chunk_size_;
+  const uint32_t chunk_size_;
   std::unique_ptr<BrotliEncoderState, decltype(&BrotliEncoderDestroyInstance)> state_;
 };
 

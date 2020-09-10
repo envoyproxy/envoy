@@ -9,8 +9,8 @@ namespace Brotli {
 namespace Decompressor {
 
 BrotliDecompressorImpl::BrotliDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,
-                                               uint64_t chunk_size,
-                                               bool disable_ring_buffer_reallocation)
+                                               const uint32_t chunk_size,
+                                               const bool disable_ring_buffer_reallocation)
     : chunk_size_{chunk_size},
       state_(BrotliDecoderCreateInstance(nullptr, nullptr, nullptr), &BrotliDecoderDestroyInstance),
       stats_(generateStats(stats_prefix, scope)) {
@@ -22,33 +22,33 @@ BrotliDecompressorImpl::BrotliDecompressorImpl(Stats::Scope& scope, const std::s
 
 void BrotliDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
                                         Buffer::Instance& output_buffer) {
-  BrotliContext ctx(chunk_size_);
-  bool success{true};
+  Common::BrotliContext ctx(chunk_size_);
 
   for (const Buffer::RawSlice& input_slice : input_buffer.getRawSlices()) {
-    ctx.avail_in = input_slice.len_;
-    ctx.next_in = static_cast<uint8_t*>(input_slice.mem_);
+    ctx.avail_in_ = input_slice.len_;
+    ctx.next_in_ = static_cast<uint8_t*>(input_slice.mem_);
 
-    while (ctx.avail_in > 0 && success) {
-      success = process(ctx, output_buffer);
+    while (ctx.avail_in_ > 0) {
+      if (!process(ctx, output_buffer)) {
+        ctx.finalizeOutput(output_buffer);
+        return;
+      }
     }
   }
 
+  bool success;
   do {
     success = process(ctx, output_buffer);
-  } while (BrotliDecoderHasMoreOutput(state_.get()) && !BrotliDecoderIsFinished(state_.get()) &&
-           success);
+  } while (success && BrotliDecoderHasMoreOutput(state_.get()) &&
+           !BrotliDecoderIsFinished(state_.get()));
 
-  const size_t n_output = chunk_size_ - ctx.avail_out;
-  if (n_output > 0) {
-    output_buffer.add(static_cast<void*>(ctx.chunk_ptr.get()), n_output);
-  }
+  ctx.finalizeOutput(output_buffer);
 }
 
-bool BrotliDecompressorImpl::process(BrotliContext& ctx, Buffer::Instance& output_buffer) {
+bool BrotliDecompressorImpl::process(Common::BrotliContext& ctx, Buffer::Instance& output_buffer) {
   BrotliDecoderResult result;
-  result = BrotliDecoderDecompressStream(state_.get(), &ctx.avail_in, &ctx.next_in, &ctx.avail_out,
-                                         &ctx.next_out, nullptr);
+  result = BrotliDecoderDecompressStream(state_.get(), &ctx.avail_in_, &ctx.next_in_,
+                                         &ctx.avail_out_, &ctx.next_out_, nullptr);
   if (result == BROTLI_DECODER_RESULT_ERROR) {
     // TODO(rojkov): currently the Brotli library doesn't specify possible errors in its API. Add
     // more detailed stats when they are documented.
@@ -56,13 +56,7 @@ bool BrotliDecompressorImpl::process(BrotliContext& ctx, Buffer::Instance& outpu
     return false;
   }
 
-  if (ctx.avail_out == 0) {
-    // update output and reset context
-    output_buffer.add(static_cast<void*>(ctx.chunk_ptr.get()), chunk_size_);
-    ctx.chunk_ptr = std::make_unique<uint8_t[]>(chunk_size_);
-    ctx.avail_out = chunk_size_;
-    ctx.next_out = ctx.chunk_ptr.get();
-  }
+  ctx.updateOutput(output_buffer);
 
   return true;
 }

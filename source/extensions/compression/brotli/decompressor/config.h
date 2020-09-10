@@ -44,7 +44,7 @@ private:
 };
 
 class BrotliDecompressorLibraryFactory
-    : public Common::Decompressor::DecompressorLibraryFactoryBase<
+    : public Compression::Common::Decompressor::DecompressorLibraryFactoryBase<
           envoy::extensions::compression::brotli::decompressor::v3::Brotli> {
 public:
   BrotliDecompressorLibraryFactory() : DecompressorLibraryFactoryBase(brotliExtensionName()) {}

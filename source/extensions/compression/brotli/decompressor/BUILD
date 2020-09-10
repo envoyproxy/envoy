@@ -19,6 +19,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
+        "//source/extensions/compression/brotli/common:brotli_base_lib",
     ],
 )
 
