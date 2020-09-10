@@ -4,7 +4,7 @@ set -e
 
 rm -rf bazel-bin/tools
 
-IFS=' ' read -ra BAZEL_BUILD_OPTIONS < <(echo "${BAZEL_BUILD_OPTIONS:-}")
+read -ra BAZEL_BUILD_OPTIONS < <(echo "${BAZEL_BUILD_OPTIONS:-}")
 
 BAZEL_BUILD_OPTIONS+=("--remote_download_outputs=all")
 
