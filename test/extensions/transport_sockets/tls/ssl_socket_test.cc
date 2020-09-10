@@ -255,18 +255,6 @@ public:
 
   bool ocspStaplingEnabled() const { return ocsp_stapling_enabled_; }
 
-  TestUtilOptions& addExpected509Extension(absl::string_view name,
-                                           absl::optional<std::string> value) {
-    expected_x509_extensions_[name] = std::move(value);
-
-    return *this;
-  }
-
-  const absl::flat_hash_map<std::string, absl::optional<std::string>>&
-  expectedX509Extensions() const {
-    return expected_x509_extensions_;
-  }
-
 private:
   const std::string client_ctx_yaml_;
   const std::string server_ctx_yaml_;
@@ -288,7 +276,6 @@ private:
   std::string expected_expiration_peer_cert_;
   std::string expected_ocsp_response_;
   bool ocsp_stapling_enabled_{false};
-  absl::flat_hash_map<std::string, absl::optional<std::string>> expected_x509_extensions_;
 };
 
 void testUtil(const TestUtilOptions& options) {
@@ -459,10 +446,6 @@ void testUtil(const TestUtilOptions& options) {
       std::string ocsp_response{reinterpret_cast<const char*>(response_head), response_len};
       EXPECT_EQ(options.expectedOcspResponse(), ocsp_response);
 
-      for (const auto& expected_extension : options.expectedX509Extensions()) {
-        const auto& result = server_connection->ssl()->x509Extension(expected_extension.first);
-        EXPECT_EQ(expected_extension.second, result);
-      }
       // By default, the session is not created with session resumption. The
       // client should see a session ID but the server should not.
       EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
@@ -1499,7 +1482,7 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerification) {
   testUtil(test_options.setExpectedServerStats("ssl.fail_verify_san"));
 }
 
-TEST_P(SslSocketTest, X509Extensions) {
+TEST_P(SslSocketTest, X509ExtensionsCertificateSerialNumber) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -1523,10 +1506,7 @@ TEST_P(SslSocketTest, X509Extensions) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
-  testUtil(test_options.addExpected509Extension("1.2.3.4.5.6.7.8", absl::make_optional("Something"))
-               .addExpected509Extension("1.2.3.4.5.6.7.9", "\x1\x1\xFF")
-               .addExpected509Extension("1.2.3.4", absl::nullopt)
-               .setExpectedSerialNumber(TEST_EXTENSIONS_CERT_SERIAL));
+  testUtil(test_options.setExpectedSerialNumber(TEST_EXTENSIONS_CERT_SERIAL));
 }
 
 // By default, expired certificates are not permitted.
