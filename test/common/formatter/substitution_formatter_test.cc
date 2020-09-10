@@ -5,6 +5,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/formatter/substitution_formatter.h"
 #include "common/http/header_map_impl.h"
@@ -2121,6 +2122,15 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     EXPECT_EQ(
         "%%|%%123456000|1522796769%%123|1%%1522796769",
         formatter.format(request_header, response_header, response_trailer, stream_info, body));
+  }
+
+  {
+    const std::string format = "%START_TIME(%E4n)%";
+    const SystemTime start_time(std::chrono::microseconds(1522796769123456));
+    EXPECT_CALL(stream_info, startTime()).WillOnce(Return(start_time));
+    FormatterImpl formatter(format);
+    EXPECT_EQ("%E4n", formatter.format(request_header, response_header, response_trailer,
+                                       stream_info, body));
   }
 }
 
