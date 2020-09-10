@@ -20,17 +20,12 @@ table.docutils div.line-block {
 }
 
 .wy-side-nav-search > div.version {
-  margin-top: -.4045em;
-  margin-bottom: .809em;
-  font-weight: 400;
   color: #6332a7;
 }
 
 .rst-content .highlighted {
   background: #ffc6ff;
   box-shadow: 0 0 0 2px #ffc6ff;
-  display: inline;
-  font-weight: 700;
 }
 
 .api-version-label {
