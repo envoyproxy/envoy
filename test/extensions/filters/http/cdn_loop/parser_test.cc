@@ -244,6 +244,12 @@ TEST(ParseCdnIdTest, InvalidIpV6) {
   EXPECT_THAT(parseCdnId(input), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
+TEST(ParseCdnIdTest, InvalidPortNumberStopsParse) {
+  const std::string value = "host:13z";
+  ParseContext input(value);
+  EXPECT_THAT(parseCdnId(input), IsOkAndHolds(ParsedCdnId(ParseContext(value, 7), "host:13")));
+}
+
 TEST(ParseCdnIdTest, UriHostName) {
   const std::string value = "www.example.com";
   ParseContext input(value);
