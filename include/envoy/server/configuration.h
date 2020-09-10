@@ -90,7 +90,7 @@ public:
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
 
   /**
-   * @return const Watchdog& the configuration of the main thread  watchdog.
+   * @return const Watchdog& the configuration of the main thread watchdog.
    */
   virtual const Watchdog& mainThreadWatchdogConfig() const PURE;
 
