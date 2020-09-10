@@ -165,12 +165,12 @@ private:
   std::vector<absl::string_view> cdn_ids_;
 };
 
-// Parses optional whitespace according to RFC 7230 Section 3.2.3.
+// Skips optional whitespace according to RFC 7230 Section 3.2.3.
 //
 // OWS  = *( SP / HTAB )
 //
 // Since this is completely optional, there's no way this call can fail.
-ParseContext parseOptionalWhitespace(const ParseContext& input);
+ParseContext skipOptionalWhitespace(const ParseContext& input);
 
 // Parses a quoted-pair according to RFC 7230 Section 3.2.6.
 //

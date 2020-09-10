@@ -16,40 +16,40 @@ namespace {
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::Envoy::StatusHelpers::StatusIs;
 
-TEST(ParseOptionalWhitespaceTest, TestEmpty) {
+TEST(SkipOptionalWhitespaceTest, TestEmpty) {
   const std::string value = "";
   ParseContext input(value);
-  EXPECT_EQ(parseOptionalWhitespace(input), (ParseContext(value, 0)));
+  EXPECT_EQ(skipOptionalWhitespace(input), (ParseContext(value, 0)));
 }
 
-TEST(ParseOptionalWhitespaceTest, TestSpace) {
+TEST(SkipOptionalWhitespaceTest, TestSpace) {
   const std::string value = " ";
   ParseContext input(value);
-  EXPECT_EQ(parseOptionalWhitespace(input), (ParseContext(value, 1)));
+  EXPECT_EQ(skipOptionalWhitespace(input), (ParseContext(value, 1)));
 }
 
-TEST(ParseOptionalWhitespaceTest, TestTab) {
+TEST(SkipOptionalWhitespaceTest, TestTab) {
   const std::string value = "\t";
   ParseContext input(value);
-  EXPECT_EQ(parseOptionalWhitespace(input), (ParseContext(value, 1)));
+  EXPECT_EQ(skipOptionalWhitespace(input), (ParseContext(value, 1)));
 }
 
-TEST(ParseOptionalWhitespaceTest, TestLots) {
+TEST(SkipOptionalWhitespaceTest, TestLots) {
   const std::string value = "   \t \t ";
   ParseContext input(value);
-  EXPECT_EQ(parseOptionalWhitespace(input), (ParseContext(value, 7)));
+  EXPECT_EQ(skipOptionalWhitespace(input), (ParseContext(value, 7)));
 }
 
-TEST(ParseOptionalWhitespaceTest, NoWhitespace) {
+TEST(SkipOptionalWhitespaceTest, NoWhitespace) {
   const std::string value = "c";
   ParseContext input(value);
-  EXPECT_EQ(parseOptionalWhitespace(input), (ParseContext(value, 0)));
+  EXPECT_EQ(skipOptionalWhitespace(input), (ParseContext(value, 0)));
 }
 
-TEST(ParseOptionalWhitespaceTest, StopsAtNonWhitespace) {
+TEST(SkipOptionalWhitespaceTest, StopsAtNonWhitespace) {
   const std::string value = "  c";
   ParseContext input(value);
-  EXPECT_EQ(parseOptionalWhitespace(input), (ParseContext(value, 2)));
+  EXPECT_EQ(skipOptionalWhitespace(input), (ParseContext(value, 2)));
 }
 
 TEST(ParseQuotedPairTest, Simple) {
@@ -213,8 +213,8 @@ TEST(ParseCdnIdTest, Simple) {
 }
 
 TEST(ParseCdnIdTest, SecondInSeries) {
-  // This showcases a bug where I thought absl::string_view::substr took (start,
-  // end) arguments, not (start, len).
+  // Make sure that absl::string_view::substr is called with (start, end) not
+  // (start, len)
   const std::string value = "cdn1, cdn2, cdn3";
   ParseContext input(value, 6);
   EXPECT_THAT(parseCdnId(input), IsOkAndHolds(ParsedCdnId(ParseContext(value, 10), "cdn2")));

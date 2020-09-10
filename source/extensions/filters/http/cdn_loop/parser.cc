@@ -57,7 +57,7 @@ constexpr bool isVChar(char c) { return '\x21' <= c && c <= '\x7e'; }
 
 } // namespace
 
-ParseContext parseOptionalWhitespace(const ParseContext& input) {
+ParseContext skipOptionalWhitespace(const ParseContext& input) {
   ParseContext context = input;
   while (!context.atEnd()) {
     const char c = context.peek();
@@ -289,7 +289,7 @@ StatusOr<ParsedCdnInfo> parseCdnInfo(const ParseContext& input) {
     cdn_id = parsed_id->cdnId();
   }
 
-  context.setNext(parseOptionalWhitespace(context));
+  context.setNext(skipOptionalWhitespace(context));
 
   while (!context.atEnd()) {
     if (context.peek() != ';') {
@@ -297,7 +297,7 @@ StatusOr<ParsedCdnInfo> parseCdnInfo(const ParseContext& input) {
     }
     context.increment();
 
-    context.setNext(parseOptionalWhitespace(context));
+    context.setNext(skipOptionalWhitespace(context));
 
     if (StatusOr<ParseContext> parameter = parseParameter(context); !parameter) {
       return parameter.status();
@@ -305,7 +305,7 @@ StatusOr<ParsedCdnInfo> parseCdnInfo(const ParseContext& input) {
       context.setNext(*parameter);
     }
 
-    context.setNext(parseOptionalWhitespace(context));
+    context.setNext(skipOptionalWhitespace(context));
   }
 
   return ParsedCdnInfo(context, cdn_id);
@@ -315,7 +315,7 @@ StatusOr<ParsedCdnInfoList> parseCdnInfoList(const ParseContext& input) {
   std::vector<std::string_view> cdn_infos;
   ParseContext context = input;
 
-  context.setNext(parseOptionalWhitespace(context));
+  context.setNext(skipOptionalWhitespace(context));
 
   while (!context.atEnd()) {
     // Loop invariant: we're always at the beginning of a new element.
@@ -323,7 +323,7 @@ StatusOr<ParsedCdnInfoList> parseCdnInfoList(const ParseContext& input) {
     if (context.peek() == ',') {
       // Empty element case
       context.increment();
-      context.setNext(parseOptionalWhitespace(context));
+      context.setNext(skipOptionalWhitespace(context));
       continue;
     }
 
@@ -334,7 +334,7 @@ StatusOr<ParsedCdnInfoList> parseCdnInfoList(const ParseContext& input) {
       context.setNext(parsed_cdn_info->context());
     }
 
-    context.setNext(parseOptionalWhitespace(context));
+    context.setNext(skipOptionalWhitespace(context));
 
     if (context.atEnd()) {
       break;
@@ -347,7 +347,7 @@ StatusOr<ParsedCdnInfoList> parseCdnInfoList(const ParseContext& input) {
       context.increment();
     }
 
-    context.setNext(parseOptionalWhitespace(context));
+    context.setNext(skipOptionalWhitespace(context));
   }
 
   return ParsedCdnInfoList(context, std::move(cdn_infos));
