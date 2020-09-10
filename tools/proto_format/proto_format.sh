@@ -43,10 +43,10 @@ bazel build "${BAZEL_BUILD_OPTIONS[@]}" --//tools/api_proto_plugin:default_type_
   @envoy_api_canonical//versioning:active_protos --aspects //tools/protoxform:protoxform.bzl%protoxform_aspect --output_groups=proto
 
 # Find all source protos.
-readarray -t PROTO_TARGETS \
-	  < <(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//versioning:active_protos))")
-readarray -t -O "${#PROTO_TARGETS[@]}" PROTO_TARGETS \
-	  < <(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//versioning:frozen_protos))")
+while read line; do PROTO_TARGETS+=("$line"); done \
+    < <(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//versioning:active_protos))")
+while read line; do PROTO_TARGETS+=("$line"); done \
+    < <(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//versioning:frozen_protos))")
 
 # Setup for proto_sync.py.
 TOOLS="$(dirname "$(dirname "$(realpath "$0")")")"
