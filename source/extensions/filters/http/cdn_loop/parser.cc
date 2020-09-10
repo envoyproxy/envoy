@@ -48,7 +48,7 @@ constexpr bool isQdText(char c) {
          ('\x5D' <= c && c <= '\x7E') || isObsText(c);
 }
 
-// RFC 5324 Appendix B.1 says:
+// RFC 5234 Appendix B.1 says:
 //
 // VCHAR          =  %x21-7E
 //                        ; visible (printing) characters
