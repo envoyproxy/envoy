@@ -170,6 +170,7 @@ envoy_cc_library(
         ":udp_packet_writer_handler_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/common:resource_interface",
+        "//include/envoy/init:manager_interface",
         "//include/envoy/stats:stats_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

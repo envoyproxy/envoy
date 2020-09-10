@@ -656,7 +656,8 @@ private:
     FakeListener(FakeUpstream& parent)
         : parent_(parent), name_("fake_upstream"),
           udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>()),
-          udp_writer_factory_(std::make_unique<Network::UdpDefaultWriterFactory>()) {}
+          udp_writer_factory_(std::make_unique<Network::UdpDefaultWriterFactory>()),
+          init_manager_(nullptr) {}
 
   private:
     // Network::ListenerConfig
@@ -688,6 +689,7 @@ private:
     }
     ResourceLimit& openConnections() override { return connection_resource_; }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+    Init::Manager& initManager() override { return *init_manager_; }
 
     void setMaxConnections(const uint32_t num_connections) {
       connection_resource_.setMax(num_connections);
@@ -701,6 +703,7 @@ private:
     const Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
     BasicResourceLimitImpl connection_resource_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+    std::unique_ptr<Init::Manager> init_manager_;
   };
 
   void threadRoutine();

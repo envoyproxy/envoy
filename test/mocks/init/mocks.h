@@ -5,6 +5,7 @@
 #include "common/init/target_impl.h"
 #include "common/init/watcher_impl.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -72,6 +73,8 @@ struct MockManager : Manager {
   MOCK_METHOD(Manager::State, state, (), (const));
   MOCK_METHOD(void, add, (const Target&));
   MOCK_METHOD(void, initialize, (const Watcher&));
+  MOCK_METHOD((const absl::flat_hash_map<std::string, uint32_t>&), unreadyTargets, (), (const));
+  MOCK_METHOD(void, dumpUnreadyTargets, (envoy::admin::v3::UnreadyTargetsDumps&));
 };
 
 } // namespace Init

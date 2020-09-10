@@ -39,6 +39,7 @@
 #include "server/admin/clusters_handler.h"
 #include "server/admin/config_dump_handler.h"
 #include "server/admin/config_tracker_impl.h"
+#include "server/admin/init_dump_handler.h"
 #include "server/admin/listeners_handler.h"
 #include "server/admin/logs_handler.h"
 #include "server/admin/profiling_handler.h"
@@ -287,6 +288,7 @@ private:
   Http::Code handlerAdminHome(absl::string_view path_and_query,
                               Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                               AdminStream&);
+
   Http::Code handlerHelp(absl::string_view path_and_query,
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream&);
@@ -320,7 +322,8 @@ private:
   public:
     AdminListener(AdminImpl& parent, Stats::ScopePtr&& listener_scope)
         : parent_(parent), name_("admin"), scope_(std::move(listener_scope)),
-          stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)) {}
+          stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)),
+          init_manager_(nullptr) {}
 
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
@@ -351,6 +354,7 @@ private:
       return empty_access_logs_;
     }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+    Init::Manager& initManager() override { return *init_manager_; }
 
     AdminImpl& parent_;
     const std::string name_;
@@ -361,6 +365,7 @@ private:
 
   private:
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+    std::unique_ptr<Init::Manager> init_manager_;
   };
   using AdminListenerPtr = std::unique_ptr<AdminListener>;
 
@@ -398,6 +403,7 @@ private:
   NullScopedRouteConfigProvider scoped_route_config_provider_;
   Server::ClustersHandler clusters_handler_;
   Server::ConfigDumpHandler config_dump_handler_;
+  Server::InitDumpHandler init_dump_handler_;
   Server::StatsHandler stats_handler_;
   Server::LogsHandler logs_handler_;
   Server::ProfilingHandler profiling_handler_;

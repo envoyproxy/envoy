@@ -25,6 +25,7 @@ public:
   MOCK_METHOD(void, beginListenerUpdate, ());
   MOCK_METHOD(void, endListenerUpdate, (ListenerManager::FailureStates &&));
   MOCK_METHOD(ApiListenerOptRef, apiListener, ());
+  MOCK_METHOD(bool, isWorkerStarted, ());
 };
 } // namespace Server
 } // namespace Envoy

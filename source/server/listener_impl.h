@@ -312,7 +312,7 @@ public:
     return access_logs_;
   }
   uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
-  Init::Manager& initManager();
+  Init::Manager& initManager() override;
   envoy::config::core::v3::TrafficDirection direction() const override {
     return config().traffic_direction();
   }
