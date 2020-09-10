@@ -58,24 +58,24 @@ public:
   ParseContext(absl::string_view value, absl::string_view::size_type next)
       : value_(value), next_(next) {}
 
-  // Return true if we have reached the end of value.
+  // Returns true if we have reached the end of value.
   constexpr bool atEnd() const { return value_.length() <= next_; }
 
-  // Return the value we're parsing
+  // Returns the value we're parsing
   constexpr absl::string_view value() const { return value_; }
 
-  // Return the position of the next character to process.
+  // Returns the position of the next character to process.
   constexpr absl::string_view::size_type next() const { return next_; }
 
-  // Return the character at next.
+  // Returns the character at next.
   //
   // REQUIRES: !at_end()
   constexpr char peek() const { return value_[next_]; }
 
-  // Move to the next character.
+  // Moves to the next character.
   constexpr void increment() { ++next_; }
 
-  // Set next from another context.
+  // Sets next from another context.
   constexpr void setNext(const ParseContext& other) { next_ = other.next_; }
 
   constexpr bool operator==(const ParseContext& other) const {
@@ -165,20 +165,19 @@ private:
   std::vector<absl::string_view> cdn_ids_;
 };
 
-// Parse optional whitespace according to RFC 7230 Section 3.2.3.
+// Parses optional whitespace according to RFC 7230 Section 3.2.3.
 //
 // OWS  = *( SP / HTAB )
 //
 // Since this is completely optional, there's no way this call can fail.
 ParseContext parseOptionalWhitespace(const ParseContext& input);
 
-// Parse a quoted-pair according to RFC 7230 Section 3.2.6.
+// Parses a quoted-pair according to RFC 7230 Section 3.2.6.
 //
 // quoted-pair    = "\" ( HTAB / SP / VCHAR / obs-text )
 StatusOr<ParseContext> parseQuotedPair(const ParseContext& input);
 
-// Parse a quoted-string according to RFC 7230 Section 3.2.6.
-//
+// Parses a quoted-string according to RFC 7230 Section 3.2.6.
 //
 // quoted-string  = DQUOTE *( qdtext / quoted-pair ) DQUOTE
 // qdtext         = HTAB / SP / %x21 / %x23-5B / %x5D-7E / obs-text
@@ -187,7 +186,7 @@ StatusOr<ParseContext> parseQuotedPair(const ParseContext& input);
 // quoted-pair    = "\" ( HTAB / SP / VCHAR / obs-text )
 StatusOr<ParseContext> parseQuotedString(const ParseContext& input);
 
-// Parse a token according to RFC 7320 Section 3.2.6.
+// Parses a token according to RFC 7320 Section 3.2.6.
 //
 // token          = 1*tchar
 //
@@ -203,7 +202,7 @@ StatusOr<ParseContext> parseQuotedString(const ParseContext& input);
 // DIGIT          =  %x30-39
 StatusOr<ParseContext> parseToken(const ParseContext& input);
 
-// Parse something that looks like an IPv6 address literal.
+// Parses something that looks like an IPv6 address literal.
 //
 // A proper IPv6 address literal is defined in RFC 3986, Section 3.2.2 as part
 // of the host rule. We're going to allow something simpler:
@@ -218,7 +217,7 @@ StatusOr<ParseContext> parseToken(const ParseContext& input);
 // - allows embedded IPv4 addresses multiple times rather than just at the end.
 StatusOr<ParseContext> parsePlausibleIpV6(const ParseContext& input);
 
-// Parse a cdn-id in a lax way.
+// Parses a cdn-id in a lax way.
 //
 // According to to RFC 8586 Section 2, the cdn-id is:
 //
@@ -230,7 +229,7 @@ StatusOr<ParseContext> parsePlausibleIpV6(const ParseContext& input);
 // tries to parse exactly valid IP addresses (e.g., disallowing values greater
 // than 255 in an IPv4 address or only allowing one instance of "::" in IPv6
 // addresses) and needs to deal with % escaping in names.
-
+//
 // Worse, the uri-host reg-name rule admits ',' and ';' as members of sub-delim
 // rule, making parsing ambiguous in some cases! RFC 3986 does this in order to
 // be "future-proof" for naming schemes we haven't dreamed up yet. RFC 8586
@@ -255,17 +254,17 @@ StatusOr<ParseContext> parsePlausibleIpV6(const ParseContext& input);
 // cdn-id = ( plausible-ipv6-address / token ) [ ":" *DIGIT ]
 StatusOr<ParsedCdnId> parseCdnId(const ParseContext& input);
 
-// Parse a parameter according RFC 7231 Appendix D.
+// Parses a parameter according RFC 7231 Appendix D.
 //
 // parameter = token "=" ( token / quoted-string )
 StatusOr<ParseContext> parseParameter(const ParseContext& input);
 
-// Parse a cdn-info according to RFC 8586 Section 2.
+// Parses a cdn-info according to RFC 8586 Section 2.
 //
 // cdn-info  = cdn-id *( OWS ";" OWS parameter )
 StatusOr<ParsedCdnInfo> parseCdnInfo(const ParseContext& input);
 
-// Parse the top-level cdn-info according to RFC 8586 Section 2.
+// Parses the top-level cdn-info according to RFC 8586 Section 2.
 //
 // CDN-Loop  = #cdn-info
 //
