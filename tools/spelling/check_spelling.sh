@@ -71,11 +71,10 @@ chmod +x "${TMP_DIR}/misspell"
 # Spell checking
 # All the skipping files are defined in tools/spelling/spelling_skip_files.txt
 read -ra SKIP_FILES < "${ROOTDIR}/tools/spelling/spelling_skip_files.txt"
-SKIP_FILES="${SKIP_FILES[@]/#/-e }"
 
 # All the ignore words are defined in tools/spelling/spelling_allowlist_words.txt
 SPELLING_ALLOWLIST_WORDS_FILE="${ROOTDIR}/tools/spelling/spelling_allowlist_words.txt"
 ALLOWLIST_WORDS=$(grep -vE '^#|^$' "${SPELLING_ALLOWLIST_WORDS_FILE}" | xargs | tr ' ' ',')
 
-git ls-files | grep -v "${SKIP_FILES[@]}" | xargs "${TMP_DIR}/misspell" -i \
+git ls-files | grep -v "${SKIP_FILES[*]/#/-e }" | xargs "${TMP_DIR}/misspell" -i \
   "${ALLOWLIST_WORDS}" ${MISSPELL_ARGS}
