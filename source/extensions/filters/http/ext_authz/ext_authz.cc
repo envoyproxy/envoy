@@ -105,7 +105,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::Continue;
   }
 
-  bool might_match_later;
+  bool might_match_later = false;
   if (config_->hasMatcher()) {
     const auto& matcher = config_->rootMatcher();
     matcher.onNewStream(statuses_);
