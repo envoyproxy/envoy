@@ -217,12 +217,20 @@ StatusOr<ParsedCdnId> parseCdnId(const ParseContext& input) {
         absl::StrFormat("expected cdn-id at position %d; found end-of-input", context.next()));
   }
 
-  if (StatusOr<ParseContext> ipv6 = parsePlausibleIpV6(context); ipv6) {
-    context.setNext(*ipv6);
-  } else if (StatusOr<ParseContext> token = parseToken(context); token) {
-    context.setNext(*token);
+  // Optimization: dispatch on the next character to avoid the StrFormat in the
+  // error path of an IPv6 parser when the value has a token (and vice versa).
+  if (context.peek() == '[') {
+    if (StatusOr<ParseContext> ipv6 = parsePlausibleIpV6(context); !ipv6) {
+      return ipv6.status();
+    } else {
+      context.setNext(*ipv6);
+    }
   } else {
-    return token.status();
+    if (StatusOr<ParseContext> token = parseToken(context); !token) {
+      return token.status();
+    } else {
+      context.setNext(*token);
+    }
   }
 
   if (context.atEnd()) {
@@ -267,16 +275,27 @@ StatusOr<ParseContext> parseParameter(const ParseContext& input) {
   }
   context.increment();
 
-  if (StatusOr<ParseContext> value_token = parseToken(context); value_token) {
-    return *value_token;
+  if (context.atEnd()) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "expected token or quoted-string at position %d; found end-of-input", context.next()));
   }
 
-  if (StatusOr<ParseContext> value_quote = parseQuotedString(context); value_quote) {
-    return *value_quote;
+  // Optimization: dispatch on the next character to avoid the StrFormat in the
+  // error path of an quoted string parser when the next item is a token (and
+  // vice versa).
+  if (context.peek() == '"') {
+    if (StatusOr<ParseContext> value_quote = parseQuotedString(context); !value_quote) {
+      return value_quote.status();
+    } else {
+      return *value_quote;
+    }
+  } else {
+    if (StatusOr<ParseContext> value_token = parseToken(context); !value_token) {
+      return value_token.status();
+    } else {
+      return *value_token;
+    }
   }
-
-  return absl::InvalidArgumentError(
-      absl::StrCat("expected token or quoted-string at position %d.", context.next()));
 }
 
 StatusOr<ParsedCdnInfo> parseCdnInfo(const ParseContext& input) {

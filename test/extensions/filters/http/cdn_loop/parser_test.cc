@@ -232,6 +232,12 @@ TEST(ParseCdnIdTest, NotValidTokenOrUri) {
   EXPECT_THAT(parseCdnId(input), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
+TEST(ParseCdnIdTest, InvalidIpV6) {
+  const std::string value = "[2001::";
+  ParseContext input(value);
+  EXPECT_THAT(parseCdnId(input), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
 TEST(ParseCdnIdTest, UriHostName) {
   const std::string value = "www.example.com";
   ParseContext input(value);
