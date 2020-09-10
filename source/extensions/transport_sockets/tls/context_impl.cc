@@ -148,7 +148,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 #endif
 
   if (config.certificateValidationContext() != nullptr &&
-      !config.certificateValidationContext()->caCert().empty()) {
+      !config.certificateValidationContext()->caCert().empty() &&
+      !config.capabilities().provides_certificates) {
     ca_file_path_ = config.certificateValidationContext()->caCertPath();
     bssl::UniquePtr<BIO> bio(
         BIO_new_mem_buf(const_cast<char*>(config.certificateValidationContext()->caCert().data()),
@@ -271,162 +272,168 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     }
   }
 
-  for (auto& ctx : tls_contexts_) {
-    if (verify_mode != SSL_VERIFY_NONE && !capabilities_.verifies_peer_certificates) {
-      SSL_CTX_set_verify(ctx.ssl_ctx_.get(), verify_mode, nullptr);
-      SSL_CTX_set_cert_verify_callback(ctx.ssl_ctx_.get(), ContextImpl::verifyCallback, this);
+  if (!capabilities_.verifies_peer_certificates) {
+    for (auto& ctx : tls_contexts_) {
+      if (verify_mode != SSL_VERIFY_NONE) {
+        SSL_CTX_set_verify(ctx.ssl_ctx_.get(), verify_mode, nullptr);
+        SSL_CTX_set_cert_verify_callback(ctx.ssl_ctx_.get(), ContextImpl::verifyCallback, this);
+      }
     }
   }
 
   absl::node_hash_set<int> cert_pkey_ids;
-  for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
-    auto& ctx = tls_contexts_[i];
-    // Load certificate chain.
-    const auto& tls_certificate = tls_certificates[i].get();
-    ctx.cert_chain_file_path_ = tls_certificate.certificateChainPath();
-    bssl::UniquePtr<BIO> bio(
-        BIO_new_mem_buf(const_cast<char*>(tls_certificate.certificateChain().data()),
-                        tls_certificate.certificateChain().size()));
-    RELEASE_ASSERT(bio != nullptr, "");
-    ctx.cert_chain_.reset(PEM_read_bio_X509_AUX(bio.get(), nullptr, nullptr, nullptr));
-    if (ctx.cert_chain_ == nullptr ||
-        !SSL_CTX_use_certificate(ctx.ssl_ctx_.get(), ctx.cert_chain_.get())) {
-      while (uint64_t err = ERR_get_error()) {
-        ENVOY_LOG_MISC(debug, "SSL error: {}:{}:{}:{}", err, ERR_lib_error_string(err),
-                       ERR_func_error_string(err), ERR_GET_REASON(err),
-                       ERR_reason_error_string(err));
-      }
-      throw EnvoyException(
-          absl::StrCat("Failed to load certificate chain from ", ctx.cert_chain_file_path_));
-    }
-    // Read rest of the certificate chain.
-    while (true) {
-      bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
-      if (cert == nullptr) {
-        break;
-      }
-      if (!SSL_CTX_add_extra_chain_cert(ctx.ssl_ctx_.get(), cert.get())) {
+  if (!capabilities_.provides_certificates) {
+    for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
+      auto& ctx = tls_contexts_[i];
+      // Load certificate chain.
+      const auto& tls_certificate = tls_certificates[i].get();
+      ctx.cert_chain_file_path_ = tls_certificate.certificateChainPath();
+      bssl::UniquePtr<BIO> bio(
+          BIO_new_mem_buf(const_cast<char*>(tls_certificate.certificateChain().data()),
+                          tls_certificate.certificateChain().size()));
+      RELEASE_ASSERT(bio != nullptr, "");
+      ctx.cert_chain_.reset(PEM_read_bio_X509_AUX(bio.get(), nullptr, nullptr, nullptr));
+      if (ctx.cert_chain_ == nullptr ||
+          !SSL_CTX_use_certificate(ctx.ssl_ctx_.get(), ctx.cert_chain_.get())) {
+        while (uint64_t err = ERR_get_error()) {
+          ENVOY_LOG_MISC(debug, "SSL error: {}:{}:{}:{}", err, ERR_lib_error_string(err),
+                         ERR_func_error_string(err), ERR_GET_REASON(err),
+                         ERR_reason_error_string(err));
+        }
         throw EnvoyException(
             absl::StrCat("Failed to load certificate chain from ", ctx.cert_chain_file_path_));
       }
-      // SSL_CTX_add_extra_chain_cert() takes ownership.
-      cert.release();
-    }
-    // Check for EOF.
-    const uint32_t err = ERR_peek_last_error();
-    if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
-      ERR_clear_error();
-    } else {
-      throw EnvoyException(
-          absl::StrCat("Failed to load certificate chain from ", ctx.cert_chain_file_path_));
-    }
+      // Read rest of the certificate chain.
+      while (true) {
+        bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+        if (cert == nullptr) {
+          break;
+        }
+        if (!SSL_CTX_add_extra_chain_cert(ctx.ssl_ctx_.get(), cert.get())) {
+          throw EnvoyException(
+              absl::StrCat("Failed to load certificate chain from ", ctx.cert_chain_file_path_));
+        }
+        // SSL_CTX_add_extra_chain_cert() takes ownership.
+        cert.release();
+      }
+      // Check for EOF.
+      const uint32_t err = ERR_peek_last_error();
+      if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
+        ERR_clear_error();
+      } else {
+        throw EnvoyException(
+            absl::StrCat("Failed to load certificate chain from ", ctx.cert_chain_file_path_));
+      }
 
-    bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
-    const int pkey_id = EVP_PKEY_id(public_key.get());
-    if (!cert_pkey_ids.insert(pkey_id).second) {
-      throw EnvoyException(fmt::format("Failed to load certificate chain from {}, at most one "
-                                       "certificate of a given type may be specified",
-                                       ctx.cert_chain_file_path_));
-    }
-    ctx.is_ecdsa_ = pkey_id == EVP_PKEY_EC;
-    switch (pkey_id) {
-    case EVP_PKEY_EC: {
-      // We only support P-256 ECDSA today.
-      const EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
-      // Since we checked the key type above, this should be valid.
-      ASSERT(ecdsa_public_key != nullptr);
-      const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
-      if (ecdsa_group == nullptr || EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
-        throw EnvoyException(fmt::format("Failed to load certificate chain from {}, only P-256 "
-                                         "ECDSA certificates are supported",
+      bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
+      const int pkey_id = EVP_PKEY_id(public_key.get());
+      if (!cert_pkey_ids.insert(pkey_id).second) {
+        throw EnvoyException(fmt::format("Failed to load certificate chain from {}, at most one "
+                                         "certificate of a given type may be specified",
                                          ctx.cert_chain_file_path_));
       }
-      ctx.is_ecdsa_ = true;
-    } break;
-    case EVP_PKEY_RSA: {
-      // We require RSA certificates with 2048-bit or larger keys.
-      const RSA* rsa_public_key = EVP_PKEY_get0_RSA(public_key.get());
-      // Since we checked the key type above, this should be valid.
-      ASSERT(rsa_public_key != nullptr);
-      const unsigned rsa_key_length = RSA_size(rsa_public_key);
-#ifdef BORINGSSL_FIPS
-      if (rsa_key_length != 2048 / 8 && rsa_key_length != 3072 / 8) {
-        throw EnvoyException(
-            fmt::format("Failed to load certificate chain from {}, only RSA certificates with "
-                        "2048-bit or 3072-bit keys are supported in FIPS mode",
-                        ctx.cert_chain_file_path_));
-      }
-#else
-      if (rsa_key_length < 2048 / 8) {
-        throw EnvoyException(fmt::format("Failed to load certificate chain from {}, only RSA "
-                                         "certificates with 2048-bit or larger keys are supported",
-                                         ctx.cert_chain_file_path_));
-      }
-#endif
-    } break;
-#ifdef BORINGSSL_FIPS
-    default:
-      throw EnvoyException(fmt::format("Failed to load certificate chain from {}, only RSA and "
-                                       "ECDSA certificates are supported in FIPS mode",
-                                       ctx.cert_chain_file_path_));
-#endif
-    }
-
-    Envoy::Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider =
-        tls_certificate.privateKeyMethod();
-    // We either have a private key or a BoringSSL private key method provider.
-    if (private_key_method_provider) {
-      ctx.private_key_method_provider_ = private_key_method_provider;
-      // The provider has a reference to the private key method for the context lifetime.
-      Ssl::BoringSslPrivateKeyMethodSharedPtr private_key_method =
-          private_key_method_provider->getBoringSslPrivateKeyMethod();
-      if (private_key_method == nullptr) {
-        throw EnvoyException(
-            fmt::format("Failed to get BoringSSL private key method from provider"));
-      }
-#ifdef BORINGSSL_FIPS
-      if (!ctx.private_key_method_provider_->checkFips()) {
-        throw EnvoyException(
-            fmt::format("Private key method doesn't support FIPS mode with current parameters"));
-      }
-#endif
-      SSL_CTX_set_private_key_method(ctx.ssl_ctx_.get(), private_key_method.get());
-    } else {
-      // Load private key.
-      bio.reset(BIO_new_mem_buf(const_cast<char*>(tls_certificate.privateKey().data()),
-                                tls_certificate.privateKey().size()));
-      RELEASE_ASSERT(bio != nullptr, "");
-      bssl::UniquePtr<EVP_PKEY> pkey(
-          PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr,
-                                  !tls_certificate.password().empty()
-                                      ? const_cast<char*>(tls_certificate.password().c_str())
-                                      : nullptr));
-      if (pkey == nullptr || !SSL_CTX_use_PrivateKey(ctx.ssl_ctx_.get(), pkey.get())) {
-        throw EnvoyException(
-            absl::StrCat("Failed to load private key from ", tls_certificate.privateKeyPath()));
-      }
-
-#ifdef BORINGSSL_FIPS
-      // Verify that private keys are passing FIPS pairwise consistency tests.
+      ctx.is_ecdsa_ = pkey_id == EVP_PKEY_EC;
       switch (pkey_id) {
       case EVP_PKEY_EC: {
-        const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey.get());
-        if (!EC_KEY_check_fips(ecdsa_private_key)) {
-          throw EnvoyException(fmt::format("Failed to load private key from {}, ECDSA key failed "
-                                           "pairwise consistency test required in FIPS mode",
-                                           tls_certificate.privateKeyPath()));
+        // We only support P-256 ECDSA today.
+        const EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
+        // Since we checked the key type above, this should be valid.
+        ASSERT(ecdsa_public_key != nullptr);
+        const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
+        if (ecdsa_group == nullptr ||
+            EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
+          throw EnvoyException(fmt::format("Failed to load certificate chain from {}, only P-256 "
+                                           "ECDSA certificates are supported",
+                                           ctx.cert_chain_file_path_));
         }
+        ctx.is_ecdsa_ = true;
       } break;
       case EVP_PKEY_RSA: {
-        RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey.get());
-        if (!RSA_check_fips(rsa_private_key)) {
-          throw EnvoyException(fmt::format("Failed to load private key from {}, RSA key failed "
-                                           "pairwise consistency test required in FIPS mode",
-                                           tls_certificate.privateKeyPath()));
+        // We require RSA certificates with 2048-bit or larger keys.
+        const RSA* rsa_public_key = EVP_PKEY_get0_RSA(public_key.get());
+        // Since we checked the key type above, this should be valid.
+        ASSERT(rsa_public_key != nullptr);
+        const unsigned rsa_key_length = RSA_size(rsa_public_key);
+#ifdef BORINGSSL_FIPS
+        if (rsa_key_length != 2048 / 8 && rsa_key_length != 3072 / 8) {
+          throw EnvoyException(
+              fmt::format("Failed to load certificate chain from {}, only RSA certificates with "
+                          "2048-bit or 3072-bit keys are supported in FIPS mode",
+                          ctx.cert_chain_file_path_));
         }
-      } break;
-      }
+#else
+        if (rsa_key_length < 2048 / 8) {
+          throw EnvoyException(
+              fmt::format("Failed to load certificate chain from {}, only RSA "
+                          "certificates with 2048-bit or larger keys are supported",
+                          ctx.cert_chain_file_path_));
+        }
 #endif
+      } break;
+#ifdef BORINGSSL_FIPS
+      default:
+        throw EnvoyException(fmt::format("Failed to load certificate chain from {}, only RSA and "
+                                         "ECDSA certificates are supported in FIPS mode",
+                                         ctx.cert_chain_file_path_));
+#endif
+      }
+
+      Envoy::Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider =
+          tls_certificate.privateKeyMethod();
+      // We either have a private key or a BoringSSL private key method provider.
+      if (private_key_method_provider) {
+        ctx.private_key_method_provider_ = private_key_method_provider;
+        // The provider has a reference to the private key method for the context lifetime.
+        Ssl::BoringSslPrivateKeyMethodSharedPtr private_key_method =
+            private_key_method_provider->getBoringSslPrivateKeyMethod();
+        if (private_key_method == nullptr) {
+          throw EnvoyException(
+              fmt::format("Failed to get BoringSSL private key method from provider"));
+        }
+#ifdef BORINGSSL_FIPS
+        if (!ctx.private_key_method_provider_->checkFips()) {
+          throw EnvoyException(
+              fmt::format("Private key method doesn't support FIPS mode with current parameters"));
+        }
+#endif
+        SSL_CTX_set_private_key_method(ctx.ssl_ctx_.get(), private_key_method.get());
+      } else {
+        // Load private key.
+        bio.reset(BIO_new_mem_buf(const_cast<char*>(tls_certificate.privateKey().data()),
+                                  tls_certificate.privateKey().size()));
+        RELEASE_ASSERT(bio != nullptr, "");
+        bssl::UniquePtr<EVP_PKEY> pkey(
+            PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr,
+                                    !tls_certificate.password().empty()
+                                        ? const_cast<char*>(tls_certificate.password().c_str())
+                                        : nullptr));
+        if (pkey == nullptr || !SSL_CTX_use_PrivateKey(ctx.ssl_ctx_.get(), pkey.get())) {
+          throw EnvoyException(
+              absl::StrCat("Failed to load private key from ", tls_certificate.privateKeyPath()));
+        }
+
+#ifdef BORINGSSL_FIPS
+        // Verify that private keys are passing FIPS pairwise consistency tests.
+        switch (pkey_id) {
+        case EVP_PKEY_EC: {
+          const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey.get());
+          if (!EC_KEY_check_fips(ecdsa_private_key)) {
+            throw EnvoyException(fmt::format("Failed to load private key from {}, ECDSA key failed "
+                                             "pairwise consistency test required in FIPS mode",
+                                             tls_certificate.privateKeyPath()));
+          }
+        } break;
+        case EVP_PKEY_RSA: {
+          RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey.get());
+          if (!RSA_check_fips(rsa_private_key)) {
+            throw EnvoyException(fmt::format("Failed to load private key from {}, RSA key failed "
+                                             "pairwise consistency test required in FIPS mode",
+                                             tls_certificate.privateKeyPath()));
+          }
+        } break;
+        }
+#endif
+      }
     }
   }
 
@@ -1007,7 +1014,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   // First, configure the base context for ClientHello interception.
   // TODO(htuch): replace with SSL_IDENTITY when we have this as a means to do multi-cert in
   // BoringSSL.
-  if (!config.capabilities().handles_session_resumption) {
+  if (!config.capabilities().provides_certificates) {
     SSL_CTX_set_select_certificate_cb(
         tls_contexts_[0].ssl_ctx_.get(),
         [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
@@ -1037,10 +1044,9 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
 
     // If the handshaker handles session tickets natively, don't call
     // `SSL_CTX_set_tlsext_ticket_key_cb`.
-    if (config.disableStatelessSessionResumption() ||
-        config.capabilities().handles_session_resumption) {
+    if (config.disableStatelessSessionResumption()) {
       SSL_CTX_set_options(ctx.ssl_ctx_.get(), SSL_OP_NO_TICKET);
-    } else if (!session_ticket_keys_.empty()) {
+    } else if (!session_ticket_keys_.empty() && !config.capabilities().handles_session_resumption) {
       SSL_CTX_set_tlsext_ticket_key_cb(
           ctx.ssl_ctx_.get(),
           [](SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx,
