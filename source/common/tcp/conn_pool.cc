@@ -53,10 +53,9 @@ void ActiveTcpClient::clearCallbacks() {
 
 void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
   Envoy::ConnectionPool::ActiveClient::onEvent(event);
-  // Do not pass the Connected event to TCP proxy sessions.
-  // The tcp proxy filter synthesizes its own Connected event in onPoolReadyBase
-  // and receiving it twice causes problems.
-  // TODO(alyssawilk) clean this up in a follow-up. It's confusing.
+  // Do not pass the Connected event to any session which registered during onEvent above.
+  // Consumers of connection pool connections assume they are receiving already connected
+  // connections.
   if (callbacks_ && event != Network::ConnectionEvent::Connected) {
     callbacks_->onEvent(event);
     // After receiving a disconnect event, the owner of callbacks_ will likely self-destruct.

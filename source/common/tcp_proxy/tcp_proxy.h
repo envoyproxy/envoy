@@ -353,6 +353,7 @@ protected:
   void onDownstreamEvent(Network::ConnectionEvent event);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
   void onUpstreamEvent(Network::ConnectionEvent event);
+  void onUpstreamConnection();
   void onIdleTimeout();
   void resetIdleTimer();
   void disableIdleTimer();
