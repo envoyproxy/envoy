@@ -66,9 +66,10 @@ public:
    *
    * See the configuration documentation for details on the timeout settings.
    */
-  GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config, Api::Api& api,
-               std::unique_ptr<TestInterlockHook>&& test_interlock);
-  GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config, Api::Api& api);
+  GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config,
+               Api::Api& api, std::unique_ptr<TestInterlockHook>&& test_interlock);
+  GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config,
+               Api::Api& api);
   ~GuardDogImpl() override;
 
   /**

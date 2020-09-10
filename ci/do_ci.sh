@@ -12,8 +12,11 @@ if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositor
 fi
 
 SRCDIR="${PWD}"
-. "$(dirname "$0")"/setup_cache.sh
-. "$(dirname "$0")"/build_setup.sh $build_setup_args
+NO_BUILD_SETUP="${NO_BUILD_SETUP:-}"
+if [[ -z "$NO_BUILD_SETUP" ]]; then
+    . "$(dirname "$0")"/setup_cache.sh
+    . "$(dirname "$0")"/build_setup.sh $build_setup_args
+fi
 cd "${SRCDIR}"
 
 if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
@@ -216,13 +219,16 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
     bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${ENVOY_FILTER_EXAMPLE_TESTS}
     popd
   fi
-  # Also validate that integration test traffic tapping (useful when debugging etc.)
-  # works. This requires that we set TAP_PATH. We do this under bazel.asan to
-  # ensure a debug build in CI.
-  echo "Validating integration test traffic tapping..."
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} \
-    --run_under=@envoy//bazel/test:verify_tap_test.sh \
-    //test/extensions/transport_sockets/tls/integration:ssl_integration_test
+
+  if [ "${CI_SKIP_INTEGRATION_TEST_TRAFFIC_TAPPING}" != "1" ] ; then
+    # Also validate that integration test traffic tapping (useful when debugging etc.)
+    # works. This requires that we set TAP_PATH. We do this under bazel.asan to
+    # ensure a debug build in CI.
+    echo "Validating integration test traffic tapping..."
+    bazel_with_collection test ${BAZEL_BUILD_OPTIONS} \
+      --run_under=@envoy//bazel/test:verify_tap_test.sh \
+      //test/extensions/transport_sockets/tls/integration:ssl_integration_test
+  fi
   exit 0
 elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
   setup_clang_toolchain
@@ -367,6 +373,7 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   echo "check_format_test..."
   ./tools/code_format/check_format_test_helper.sh --log=WARN
   echo "check_format..."
+  ./tools/code_format/check_shellcheck_format.sh
   ./tools/code_format/check_format.py check
   ./tools/code_format/format_python_tools.sh check
   ./tools/proto_format/proto_format.sh check --test
@@ -394,6 +401,23 @@ elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."
   docs/build.sh
+  exit 0
+elif [[ "$CI_TARGET" == "verify_examples" ]]; then
+  echo "verify examples..."
+  docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
+  images=($(docker image list --format "{{.Repository}}"))
+  tags=($(docker image list --format "{{.Tag}}"))
+  for i in "${!images[@]}"; do
+      if [[ "${images[i]}" =~ "envoy" ]]; then
+          docker tag "${images[$i]}:${tags[$i]}" "${images[$i]}:latest"
+      fi
+  done
+  docker images
+  sudo apt-get update -y
+  sudo apt-get install -y -qq --no-install-recommends redis-tools
+  export DOCKER_NO_PULL=1
+  umask 027
+  ci/verify_examples.sh
   exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."
