@@ -338,7 +338,9 @@ message WeightedCluster {
 
     // Specifies a list of HTTP headers that should be removed from each request when
     // this cluster is selected through the enclosing :ref:`envoy_api_msg_config.route.v4alpha.RouteAction`.
-    repeated string request_headers_to_remove = 9;
+    repeated string request_headers_to_remove = 9 [(validate.rules).repeated = {
+      items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
+    }];
 
     // Specifies a list of headers to be added to responses when this cluster is selected
     // through the enclosing :ref:`envoy_api_msg_config.route.v4alpha.RouteAction`.
@@ -352,7 +354,9 @@ message WeightedCluster {
 
     // Specifies a list of headers to be removed from responses when this cluster is selected
     // through the enclosing :ref:`envoy_api_msg_config.route.v4alpha.RouteAction`.
-    repeated string response_headers_to_remove = 6;
+    repeated string response_headers_to_remove = 6 [(validate.rules).repeated = {
+      items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
+    }];
 
     // The per_filter_config field can be used to provide weighted cluster-specific
     // configurations for filters. The key should match the filter name, such as
