@@ -385,7 +385,8 @@ public:
 // the buffer via swap() or modified with mutate().
 class ReorderBuffer {
 public:
-  ReorderBuffer(Connection& connection, const bool& disable_dispatch) : connection_(connection), disable_dispatch_(disable_dispatch) {}
+  ReorderBuffer(Connection& connection, const bool& disable_dispatch)
+      : connection_(connection), disable_dispatch_(disable_dispatch) {}
 
   void add(Buffer::Instance& data) {
     bufs_.emplace_back();
