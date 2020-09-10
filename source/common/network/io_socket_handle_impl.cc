@@ -74,7 +74,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
   sockaddr* sock_addr = const_cast<sockaddr*>(address_base->sockAddr());
   if (sock_addr == nullptr) {
     // Unlikely to happen unless the wrong peer address is passed.
-    return sysCallResultToIoCallResult(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_NOT_SUP});
+    return IoSocketError::ioResultSocketInvalidAddress();
   }
   absl::FixedArray<iovec> iov(num_slice);
   uint64_t num_slices_to_write = 0;

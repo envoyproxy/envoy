@@ -263,6 +263,7 @@ public:
   const Ip* ip() const override { return nullptr; }
   const Pipe* pipe() const override { return nullptr; }
   const EnvoyInternalAddress* envoyInternalAddress() const override { return &internal_address_; }
+  // TODO(lambdai): Verify all callers accepts nullptr.
   const sockaddr* sockAddr() const override { return nullptr; }
   socklen_t sockAddrLen() const override { return 0; }
 

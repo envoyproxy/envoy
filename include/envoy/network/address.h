@@ -118,6 +118,9 @@ public:
   virtual mode_t mode() const PURE;
 };
 
+/**
+ * Interface for a generic internal address.
+ */
 class EnvoyInternalAddress {
 public:
   virtual ~EnvoyInternalAddress() = default;

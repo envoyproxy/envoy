@@ -141,6 +141,7 @@ message Address {
 
     Pipe pipe = 2;
 
+    // [#not-implemented-hide:]
     EnvoyInternalAddress envoy_internal_address = 3;
   }
 }
