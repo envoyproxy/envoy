@@ -273,7 +273,7 @@ void HdsDelegate::processMessage(
     // future.
     if (!cluster_health_check.cluster_name().empty()) {
       // Since this cluster has a name, add it to our by-name map.
-      hds_clusters_name_map_.insert({cluster_health_check.cluster_name(), cluster_ptr});
+      new_hds_clusters_name_map.insert({cluster_health_check.cluster_name(), cluster_ptr});
     }
 
     // Add to our remaining data structures.
@@ -354,7 +354,6 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
       hosts_(new HostVector()), validation_visitor_(validation_visitor) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
-  config_hash_ = MessageUtil::hash(cluster_);
   endpoints_hash_ = RepeatedPtrUtil::hash(cluster_.load_assignment().endpoints());
   health_checkers_hash_ = RepeatedPtrUtil::hash(cluster_.health_checks());
 
@@ -403,30 +402,27 @@ void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluste
                         ThreadLocal::SlotAllocator& tls,
                         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
                         AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime) {
-  const uint64_t config_hash = MessageUtil::hash(cluster);
-  // if this is a different config then what we already have, update the cluster.
-  if (config_hash_ != config_hash) {
-    config_hash_ = config_hash;
-    cluster_ = std::move(cluster);
+  cluster_ = std::move(cluster);
 
-    // always update our info_
-    info_ = info_factory.createClusterInfo(
-        {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
-         local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
+  // always update our info_
+  info_ = info_factory.createClusterInfo(
+      {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
+       local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
 
-    const auto& endpoints = cluster.load_assignment().endpoints();
-    const uint64_t endpoints_hash = RepeatedPtrUtil::hash(endpoints);
-    if (endpoints_hash_ != endpoints_hash) {
-      endpoints_hash_ = endpoints_hash;
-      updateHosts(endpoints);
-    }
+  const auto& endpoints = cluster_.load_assignment().endpoints();
+  const uint64_t endpoints_hash = RepeatedPtrUtil::hash(endpoints);
+  if (endpoints_hash_ != endpoints_hash) {
+    ENVOY_LOG(debug, "endpoints have changed, updating");
+    endpoints_hash_ = endpoints_hash;
+    updateHosts(endpoints);
+  }
 
-    const uint64_t health_checkers_hash = RepeatedPtrUtil::hash(cluster.health_checks());
-    if (health_checkers_hash_ != health_checkers_hash) {
-      health_checkers_hash_ = health_checkers_hash;
-      updateHealthchecks(cluster_.health_checks(), access_log_manager, runtime, random, dispatcher,
-                         api);
-    }
+  const uint64_t health_checkers_hash = RepeatedPtrUtil::hash(cluster.health_checks());
+  if (health_checkers_hash_ != health_checkers_hash) {
+    ENVOY_LOG(debug, "health checkers have changed, updating");
+    health_checkers_hash_ = health_checkers_hash;
+    updateHealthchecks(cluster_.health_checks(), access_log_manager, runtime, random, dispatcher,
+                       api);
   }
 }
 
@@ -463,7 +459,6 @@ void HdsCluster::updateHealthchecks(
 void HdsCluster::updateHosts(
     const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
         locality_endpoints) {
-  // TODO(drewsortega)
   HostVectorSharedPtr hosts;
   std::vector<HostSharedPtr> hosts_added;
   std::vector<HostSharedPtr> hosts_removed;
@@ -503,6 +498,9 @@ void HdsCluster::updateHosts(
 
   hosts_ = std::move(hosts);
   hosts_map_ = std::move(hosts_map);
+
+  ENVOY_LOG(debug, "HOSTS ADDED: {}, REMOVED: {}, REUSED: {}", hosts_added.size(),
+            hosts_removed.size(), hosts_->size() - hosts_added.size());
 
   hosts_per_locality_ =
       std::make_shared<Envoy::Upstream::HostsPerLocalityImpl>(std::move(hosts_by_locality), false);

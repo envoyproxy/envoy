@@ -79,6 +79,7 @@ public:
                         Api::Api& api);
 
   std::vector<Upstream::HealthCheckerSharedPtr> healthCheckers() { return health_checkers_; };
+  std::vector<HostSharedPtr> hosts() { return *hosts_; };
 
 protected:
   PrioritySetImpl priority_set_;
@@ -95,7 +96,6 @@ private:
   Ssl::ContextManager& ssl_context_manager_;
   bool added_via_api_;
   bool initialized_ = false;
-  uint64_t config_hash_;
   uint64_t endpoints_hash_;
   uint64_t health_checkers_hash_;
 
