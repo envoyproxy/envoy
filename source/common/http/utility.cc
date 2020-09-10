@@ -435,11 +435,14 @@ Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions&
 
 void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
                              const LocalReplyData& local_reply_data) {
+  absl::string_view details = (callbacks.streamInfo().responseCodeDetails().has_value()
+                                   ? callbacks.streamInfo().responseCodeDetails().value()
+                                   : "");
   sendLocalReply(
       is_reset,
       Utility::EncodeFunctions{nullptr, nullptr,
                                [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-                                 callbacks.encodeHeaders(std::move(headers), end_stream);
+                                 callbacks.encodeHeaders(std::move(headers), end_stream, details);
                                },
                                [&](Buffer::Instance& data, bool end_stream) -> void {
                                  callbacks.encodeData(data, end_stream);
