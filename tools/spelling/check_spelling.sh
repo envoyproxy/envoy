@@ -70,8 +70,7 @@ chmod +x "${TMP_DIR}/misspell"
 
 # Spell checking
 # All the skipping files are defined in tools/spelling/spelling_skip_files.txt
-SPELLING_SKIP_FILES="${ROOTDIR}/tools/spelling/spelling_skip_files.txt"
-read -ra SKIP_FILES < "$SPELLING_SKIP_FILES"
+read -ra SKIP_FILES < "${ROOTDIR}/tools/spelling/spelling_skip_files.txt"
 
 # All the ignore words are defined in tools/spelling/spelling_allowlist_words.txt
 SPELLING_ALLOWLIST_WORDS_FILE="${ROOTDIR}/tools/spelling/spelling_allowlist_words.txt"
