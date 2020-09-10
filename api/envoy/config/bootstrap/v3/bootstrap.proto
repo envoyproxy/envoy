@@ -40,7 +40,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 26]
+// [#next-free-field: 27]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -107,6 +107,40 @@ message Bootstrap {
   // Node identity to present to the management server and for instance
   // identification purposes (e.g. in generated headers).
   core.v3.Node node = 1;
+
+  // A list of :ref:`Node <envoy_v3_api_msg_config.core.v3.Node>` field names
+  // that will be included in the context parameters of the effective
+  // *UdpaResourceLocator* that is sent in a discovery request when resource
+  // locators are used for LDS/CDS. Any non-string field will have its JSON
+  // encoding set as the context parameter value, with the exception of
+  // metadata, which will be flattened (see example below). The supported field
+  // names are:
+  // - "cluster"
+  // - "id"
+  // - "locality.region"
+  // - "locality.sub_zone"
+  // - "locality.zone"
+  // - "metadata"
+  // - "user_agent_build_version.metadata"
+  // - "user_agent_build_version.version"
+  // - "user_agent_name"
+  // - "user_agent_version"
+  //
+  // The node context parameters act as a base layer dictionary for the context
+  // parameters (i.e. more specific resource specific context parameters will
+  // override). Field names will be prefixed with “udpa.node.” when included in
+  // context parameters.
+  //
+  // For example, if node_context_params is ``["user_agent_name", "metadata"]``,
+  // the implied context parameters might be::
+  //
+  //   node.user_agent_name: "envoy"
+  //   node.metadata.foo: "{\"bar\": \"baz\"}"
+  //   node.metadata.some: "42"
+  //   node.metadata.thing: "\"thing\""
+  //
+  // [#not-implemented-hide:]
+  repeated string node_context_params = 26;
 
   // Statically specified resources.
   StaticResources static_resources = 2;

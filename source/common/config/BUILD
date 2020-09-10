@@ -326,6 +326,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "udpa_context_params_lib",
+    srcs = ["udpa_context_params.cc"],
+    hdrs = ["udpa_context_params.h"],
+    deps = [
+        "//source/common/common:macros",
+        "//source/common/protobuf:utility_lib",
+        "@com_github_cncf_udpa//udpa/core/v1:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "udpa_resource_lib",
     srcs = ["udpa_resource.cc"],
     hdrs = ["udpa_resource.h"],

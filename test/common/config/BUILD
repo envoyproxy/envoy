@@ -441,12 +441,29 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "udpa_context_params_test",
+    srcs = ["udpa_context_params_test.cc"],
+    deps = [
+        ":udpa_test_utility_lib",
+        "//source/common/config:udpa_context_params_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "udpa_resource_test",
     srcs = ["udpa_resource_test.cc"],
     deps = [
+        ":udpa_test_utility_lib",
         "//source/common/config:udpa_resource_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "udpa_test_utility_lib",
+    hdrs = ["udpa_test_utility.h"],
 )
 
 envoy_proto_library(
