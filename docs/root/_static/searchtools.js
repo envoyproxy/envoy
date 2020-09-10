@@ -506,8 +506,7 @@ var Search = {
       var valid = true;
 
       // check if all requirements are matched
-      var filteredTermCount = searchterms.filter(function (term) {
-        // as search terms with length < 3 are discarded: ignore
+      var filteredTermCount = searchterms.filter(function (term) { // as search terms with length < 3 are discarded: ignore
         return term.length > 2;
       }).length;
       if (

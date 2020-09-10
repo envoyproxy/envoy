@@ -212,6 +212,24 @@ modify different aspects of the server:
 
   See :option:`--hot-restart-version`.
 
+.. _operations_admin_interface_init_dump:
+
+.. http:get:: /init_dump
+
+  Dump currently information of unready targets of various Envoy components as JSON-serialized proto
+  messages. See the :ref:`response definition <envoy_v3_api_msg_admin.v3.UnreadyTargetsDumps>` for more
+  information.
+
+.. _operations_admin_interface_init_dump_by_mask:
+
+.. http:get:: /init_dump?mask={}
+
+  When mask query parameters is specified, the mask value is the desired component to dump unready targets.
+  The mask is parsed as a ``ProtobufWkt::FieldMask``.
+
+  For example, get the unready targets of all listeners with
+  ``/init_dump?mask=listener``
+
 .. _operations_admin_interface_listeners:
 
 .. http:get:: /listeners
