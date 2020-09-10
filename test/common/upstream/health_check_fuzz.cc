@@ -18,7 +18,12 @@ void HealthCheckFuzz::allocHealthCheckerFromProto(
 
 void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTestCase input) {
   second_host_ = false;
-  allocHealthCheckerFromProto(input.health_check_config());
+  try {
+    allocHealthCheckerFromProto(input.health_check_config());
+  } catch (EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
+    return;
+  }
   ON_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillByDefault(testing::Return(input.http_verify_cluster()));
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -96,7 +101,8 @@ void HealthCheckFuzz::raiseEvent(test::common::upstream::RaiseEvent event, bool 
     eventType = Network::ConnectionEvent::LocalClose;
     break;
   }
-  default:
+  default: // shouldn't hit
+    eventType = Network::ConnectionEvent::Connected;
     break;
   }
 
@@ -105,7 +111,7 @@ void HealthCheckFuzz::raiseEvent(test::common::upstream::RaiseEvent event, bool 
   case HealthCheckFuzz::Type::HTTP: {
     test_sessions_[index]->client_connection_->raiseEvent(eventType);
     if (!last_action && eventType != Network::ConnectionEvent::Connected) {
-      ENVOY_LOG_MISC(trace, "Creating client and stream from close event.");
+      ENVOY_LOG_MISC(trace, "Creating client and stream from close event on host {}", index);
       expectClientCreate(index);
       expectStreamCreate(index);
       test_sessions_[index]->interval_timer_->invokeCallback();
