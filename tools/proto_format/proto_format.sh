@@ -46,8 +46,9 @@ bazel build "${BAZEL_BUILD_OPTIONS[@]}" --//tools/api_proto_plugin:default_type_
 # Find all source protos.
 PROTO_TARGETS=()
 for proto_type in active frozen; do
+    protos=$(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//versioning:${proto_type}_protos))")
     while read -r line; do PROTO_TARGETS+=("$line"); done \
-	< <(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//versioning:${proto_type}_protos))")
+	<<< "$protos"
 done
 
 # Setup for proto_sync.py.
