@@ -1,3 +1,5 @@
+#include <sstream>
+
 #include "extensions/filters/http/cdn_loop/parser.h"
 
 #include "test/test_common/status_utility.h"
@@ -15,6 +17,34 @@ namespace {
 
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::Envoy::StatusHelpers::StatusIs;
+
+TEST(ParseContextOstreamTest, Works) {
+  std::ostringstream out;
+  ParseContext context("foo", 3);
+  out << context;
+  EXPECT_EQ(out.str(), "ParseContext{next=3}");
+}
+
+TEST(ParsedCdnIdOstreamTest, Works) {
+  std::ostringstream out;
+  ParsedCdnId cdnId(ParseContext("foo", 3), "foo");
+  out << cdnId;
+  EXPECT_EQ(out.str(), "ParsedCdnId{context=ParseContext{next=3}, cdn_id=foo}");
+}
+
+TEST(ParsedCdnInfoOstreamTest, Works) {
+  std::ostringstream out;
+  ParsedCdnInfo cdnId(ParseContext("foo", 3), "foo");
+  out << cdnId;
+  EXPECT_EQ(out.str(), "ParsedCdnInfo{context=ParseContext{next=3}, cdn_id=foo}");
+}
+
+TEST(ParsedCdnInfoListOstreamTest, Works) {
+  std::ostringstream out;
+  ParsedCdnInfoList cdnId(ParseContext("foo", 3), {"foo"});
+  out << cdnId;
+  EXPECT_EQ(out.str(), "ParsedCdnInfoList{context=ParseContext{next=3}, cdn_ids=[foo]}");
+}
 
 TEST(SkipOptionalWhitespaceTest, TestEmpty) {
   const std::string value = "";
