@@ -17,7 +17,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/filesystem/posix:93.7"
 "source/common/thread_local:95.7"
 "source/common/crypto:0.0"
-"source/common/common:96.2"
+"source/common/common:96.1"
 "source/common/common/posix:94.1"
 "source/common/signal:85.1"
 "source/exe:93.7"
