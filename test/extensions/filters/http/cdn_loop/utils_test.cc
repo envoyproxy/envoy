@@ -130,7 +130,8 @@ TEST(CountCdnLoopOccurrencesTest, BadCdnId) {
 }
 
 TEST(CountCdnLoopOccurrencesTest, BadHeader) {
-  EXPECT_THAT(countCdnLoopOccurrences("cdn", ""), StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(countCdnLoopOccurrences("[bad-id", "cdn"),
+              StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 } // namespace
