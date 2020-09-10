@@ -24,10 +24,17 @@ run_shellcheck_on () {
 }
 
 run_shellchecks () {
-    local all_shellfiles failed failure filtered_shellfiles skipped_count success_count
+    local all_shellfiles=() failed failure \
+	  filtered_shellfiles=() found_shellfiles \
+	  skipped_count success_count
     failed=()
-    readarray -t all_shellfiles <<< "$(find_shell_files)"
-    readarray -t filtered_shellfiles <<< "$(find_shell_files | grep -vE "${EXCLUDED_SHELLFILES}")"
+
+    found_shellfiles=$(find_shell_files)
+    while read -r line; do all_shellfiles+=("$line"); done \
+	<<< "$found_shellfiles"
+    found_shellfiles=$(find_shell_files | grep -vE "${EXCLUDED_SHELLFILES}")
+    while read -r line; do filtered_shellfiles+=("$line"); done \
+	<<< "$found_shellfiles"
 
     for file in "${filtered_shellfiles[@]}"; do
 	run_shellcheck_on "$file" || {
