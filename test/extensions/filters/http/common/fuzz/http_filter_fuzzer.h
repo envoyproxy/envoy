@@ -30,7 +30,7 @@ namespace HttpFilters {
 class HttpFilterFuzzer {
 public:
   // Instantiate HttpFilterFuzzer
-  HttpFilterFuzzer(){};
+  HttpFilterFuzzer() = default;
 
   // This executes the filter decode or encode methods with the fuzzed data.
   template <class FilterType> void runData(FilterType* filter, const test::fuzz::HttpData& data);
