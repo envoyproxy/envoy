@@ -97,6 +97,8 @@ public:
   // Used to test if trailers are decoded/encoded
   void expectTrailersTest(bool enable_trailers);
 
+  void testServerAllowChunkedContentLength(uint32_t content_length, bool allow_chunked_length);
+
   // Send the request, and validate the received request headers.
   // Then send a response just to clean up.
   void
@@ -326,6 +328,65 @@ void Http1ServerConnectionImplTest::testRequestHeadersAccepted(std::string heade
   buffer = Buffer::OwnedImpl(header_string + "\r\n");
   status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
+}
+
+void Http1ServerConnectionImplTest::testServerAllowChunkedContentLength(uint32_t content_length,
+                                                                        bool allow_chunked_length) {
+  codec_settings_.allow_chunked_length_ = allow_chunked_length;
+  if (testingNewCodec()) {
+    codec_ = std::make_unique<Http1::ServerConnectionImpl>(
+        connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+  } else {
+    codec_ = std::make_unique<Legacy::Http1::ServerConnectionImpl>(
+        connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+  }
+
+  MockRequestDecoder decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/"},
+      {":method", "POST"},
+      {"transfer-encoding", "chunked"},
+  };
+  Buffer::OwnedImpl expected_data("Hello World");
+
+  if (allow_chunked_length) {
+    EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+    EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
+    EXPECT_CALL(decoder, decodeData(_, true));
+  } else {
+    EXPECT_CALL(decoder, decodeHeaders_(_, _)).Times(0);
+    EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
+    EXPECT_CALL(decoder, sendLocalReply(false, Http::Code::BadRequest, "Bad Request", _, _, _));
+  }
+
+  Buffer::OwnedImpl buffer(
+      fmt::format("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\ncontent-length: {}\r\n\r\n"
+                  "6\r\nHello \r\n"
+                  "5\r\nWorld\r\n"
+                  "0\r\n\r\n",
+                  content_length));
+
+  auto status = codec_->dispatch(buffer);
+
+  if (allow_chunked_length) {
+    EXPECT_TRUE(status.ok());
+  } else {
+    EXPECT_TRUE(isCodecProtocolError(status));
+    EXPECT_EQ(status.message(),
+              "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
+    EXPECT_EQ("http1.content_length_and_chunked_not_allowed",
+              response_encoder->getStream().responseDetails());
+  }
 }
 
 INSTANTIATE_TEST_SUITE_P(Codecs, Http1ServerConnectionImplTest, testing::Bool(),
@@ -608,6 +669,72 @@ TEST_P(Http1ServerConnectionImplTest, InnerLWSIsPreserved) {
     EXPECT_EQ(3, header_buffer.getRawSlices().size());
     sendAndValidateRequestAndSendResponse(header_buffer, expected_headers);
   }
+}
+
+TEST_P(Http1ServerConnectionImplTest, CodecHasCorrectStreamErrorIfTrue) {
+  codec_settings_.stream_error_on_invalid_http_message_ = true;
+  if (GetParam()) {
+    codec_ = std::make_unique<Http1::ServerConnectionImpl>(
+        connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+  } else {
+    codec_ = std::make_unique<Legacy::Http1::ServerConnectionImpl>(
+        connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+  }
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
+  NiceMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(response_encoder->streamErrorOnInvalidHttpMessage());
+}
+
+TEST_P(Http1ServerConnectionImplTest, CodecHasCorrectStreamErrorIfFalse) {
+  codec_settings_.stream_error_on_invalid_http_message_ = false;
+  if (GetParam()) {
+    codec_ = std::make_unique<Http1::ServerConnectionImpl>(
+        connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+  } else {
+    codec_ = std::make_unique<Legacy::Http1::ServerConnectionImpl>(
+        connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
+        max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+  }
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
+  NiceMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  auto status = codec_->dispatch(buffer);
+  EXPECT_FALSE(response_encoder->streamErrorOnInvalidHttpMessage());
+}
+
+TEST_P(Http1ServerConnectionImplTest, CodecHasDefaultStreamErrorIfNotSet) {
+  initialize();
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
+  NiceMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  auto status = codec_->dispatch(buffer);
+  EXPECT_FALSE(response_encoder->streamErrorOnInvalidHttpMessage());
 }
 
 TEST_P(Http1ServerConnectionImplTest, Http10) {
@@ -1840,6 +1967,30 @@ TEST_P(Http1ServerConnectionImplTest, WatermarkTest) {
       ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
 }
 
+TEST_P(Http1ServerConnectionImplTest, TestSmugglingDisallowChunkedContentLength0) {
+  testServerAllowChunkedContentLength(0, false);
+}
+TEST_P(Http1ServerConnectionImplTest, TestSmugglingDisallowChunkedContentLength1) {
+  // content-length less than POST body size
+  testServerAllowChunkedContentLength(1, false);
+}
+TEST_P(Http1ServerConnectionImplTest, TestSmugglingDisallowChunkedContentLength100) {
+  // content-length greater than POST body size
+  testServerAllowChunkedContentLength(100, false);
+}
+
+TEST_P(Http1ServerConnectionImplTest, TestSmugglingAllowChunkedContentLength0) {
+  testServerAllowChunkedContentLength(0, true);
+}
+TEST_P(Http1ServerConnectionImplTest, TestSmugglingAllowChunkedContentLength1) {
+  // content-length less than POST body size
+  testServerAllowChunkedContentLength(1, true);
+}
+TEST_P(Http1ServerConnectionImplTest, TestSmugglingAllowChunkedContentLength100) {
+  // content-length greater than POST body size
+  testServerAllowChunkedContentLength(100, true);
+}
+
 class Http1ClientConnectionImplTest : public Http1CodecTestBase,
                                       public testing::TestWithParam<bool> {
 public:
@@ -1868,6 +2019,8 @@ public:
   NiceMock<Http1Settings> codec_settings_;
   Http::ClientConnectionPtr codec_;
 
+  void testClientAllowChunkedContentLength(uint32_t content_length, bool allow_chunked_length);
+
 protected:
   Stats::TestUtil::TestStore store_;
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
@@ -1877,6 +2030,52 @@ INSTANTIATE_TEST_SUITE_P(Codecs, Http1ClientConnectionImplTest, testing::Bool(),
                          [](const testing::TestParamInfo<bool>& param) {
                            return param.param ? "New" : "Legacy";
                          });
+
+void Http1ClientConnectionImplTest::testClientAllowChunkedContentLength(uint32_t content_length,
+                                                                        bool allow_chunked_length) {
+  codec_settings_.allow_chunked_length_ = allow_chunked_length;
+  if (testingNewCodec()) {
+    codec_ = std::make_unique<Http1::ClientConnectionImpl>(
+        connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_);
+  } else {
+    codec_ = std::make_unique<Legacy::Http1::ClientConnectionImpl>(
+        connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_);
+  }
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  TestResponseHeaderMapImpl expected_headers{{":status", "200"}, {"transfer-encoding", "chunked"}};
+  Buffer::OwnedImpl expected_data("Hello World");
+
+  if (allow_chunked_length) {
+    EXPECT_CALL(response_decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+    EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false));
+    EXPECT_CALL(response_decoder, decodeData(_, true));
+  } else {
+    EXPECT_CALL(response_decoder, decodeHeaders_(_, _)).Times(0);
+    EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
+  }
+
+  Buffer::OwnedImpl buffer(
+      fmt::format("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\ncontent-length: {}\r\n\r\n"
+                  "6\r\nHello \r\n"
+                  "5\r\nWorld\r\n"
+                  "0\r\n\r\n",
+                  content_length));
+  auto status = codec_->dispatch(buffer);
+
+  if (allow_chunked_length) {
+    EXPECT_TRUE(status.ok());
+  } else {
+    EXPECT_TRUE(isCodecProtocolError(status));
+    EXPECT_EQ(status.message(),
+              "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
+  };
+}
 
 TEST_P(Http1ClientConnectionImplTest, SimpleGet) {
   initialize();
@@ -2839,6 +3038,30 @@ TEST_P(Http1ClientConnectionImplTest, ManyResponseHeadersAccepted) {
   // Response already contains one header.
   buffer = Buffer::OwnedImpl(createHeaderFragment(150) + "\r\n");
   status = codec_->dispatch(buffer);
+}
+
+TEST_P(Http1ClientConnectionImplTest, TestResponseSplit0) {
+  testClientAllowChunkedContentLength(0, false);
+}
+
+TEST_P(Http1ClientConnectionImplTest, TestResponseSplit1) {
+  testClientAllowChunkedContentLength(1, false);
+}
+
+TEST_P(Http1ClientConnectionImplTest, TestResponseSplit100) {
+  testClientAllowChunkedContentLength(100, false);
+}
+
+TEST_P(Http1ClientConnectionImplTest, TestResponseSplitAllowChunkedLength0) {
+  testClientAllowChunkedContentLength(0, true);
+}
+
+TEST_P(Http1ClientConnectionImplTest, TestResponseSplitAllowChunkedLength1) {
+  testClientAllowChunkedContentLength(1, true);
+}
+
+TEST_P(Http1ClientConnectionImplTest, TestResponseSplitAllowChunkedLength100) {
+  testClientAllowChunkedContentLength(100, true);
 }
 
 } // namespace Http

@@ -1,4 +1,4 @@
-#include "common/network/listener_impl.h"
+#include "common/network/tcp_listener_impl.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
@@ -17,10 +17,10 @@
 namespace Envoy {
 namespace Network {
 
-const absl::string_view ListenerImpl::GlobalMaxCxRuntimeKey =
+const absl::string_view TcpListenerImpl::GlobalMaxCxRuntimeKey =
     "overload.global_downstream_max_connections";
 
-bool ListenerImpl::rejectCxOverGlobalLimit() {
+bool TcpListenerImpl::rejectCxOverGlobalLimit() {
   // Enforce the global connection limit if necessary, immediately closing the accepted connection.
   Runtime::Loader* runtime = Runtime::LoaderSingleton::getExisting();
 
@@ -41,7 +41,7 @@ bool ListenerImpl::rejectCxOverGlobalLimit() {
   return AcceptedSocketImpl::acceptedSocketCount() >= global_cx_limit;
 }
 
-void ListenerImpl::onSocketEvent(short flags) {
+void TcpListenerImpl::onSocketEvent(short flags) {
   ASSERT(flags & (Event::FileReadyType::Read));
 
   // TODO(fcoras): Add limit on number of accepted calls per wakeup
@@ -90,7 +90,7 @@ void ListenerImpl::onSocketEvent(short flags) {
   }
 }
 
-void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket) {
+void TcpListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket) {
   socket.ioHandle().listen(backlog_size_);
 
   // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
@@ -106,17 +106,17 @@ void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& 
   }
 }
 
-ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
-                           ListenerCallbacks& cb, bool bind_to_port, uint32_t backlog_size)
+TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
+                                 TcpListenerCallbacks& cb, bool bind_to_port, uint32_t backlog_size)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), backlog_size_(backlog_size) {
   if (bind_to_port) {
     setupServerSocket(dispatcher, *socket_);
   }
 }
 
-void ListenerImpl::enable() { file_event_->setEnabled(Event::FileReadyType::Read); }
+void TcpListenerImpl::enable() { file_event_->setEnabled(Event::FileReadyType::Read); }
 
-void ListenerImpl::disable() { file_event_->setEnabled(0); }
+void TcpListenerImpl::disable() { file_event_->setEnabled(0); }
 
 } // namespace Network
 } // namespace Envoy
