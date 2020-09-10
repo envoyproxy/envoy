@@ -65,6 +65,7 @@ const std::string errorDetails(int error_code) {
 }
 
 std::string DateFormatter::fromTime(const SystemTime& time) const {
+  //ENVOY_LOG_MISC(info, "Original time: {}", time);
   struct CachedTime {
     // The string length of a number of seconds since the Epoch. E.g. for "1528270093", the length
     // is 10.
@@ -89,6 +90,7 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
     absl::node_hash_map<std::string, const Formatted> formatted;
   };
   static thread_local CachedTime cached_time;
+  //ENVOY_LOG_MISC(info, "Original cached time: {}", cached_time);
 
   const std::chrono::nanoseconds epoch_time_ns =
       std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch());
@@ -122,6 +124,7 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
     // Stamp the formatted string using the current epoch time in seconds, and then cache it in.
     formatted.epoch_time_seconds = epoch_time_seconds;
     cached_time.formatted.emplace(std::make_pair(raw_format_string_, formatted));
+    //ENVOY_LOG_MISC(info, "Cached Time line 127: {}", cached_time);
   }
 
   const auto& formatted = cached_time.formatted.at(raw_format_string_);
@@ -130,12 +133,15 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
   // Copy the current cached formatted format string, then replace its subseconds part (when it has
   // non-zero width) by correcting its position using prepared subseconds offsets.
   std::string formatted_str = formatted.str;
+  ENVOY_LOG_MISC(info, "Original Formatted String: {}", formatted_str);
   std::string nanoseconds = fmt::format_int(epoch_time_ns.count()).str();
   // Special case handling for beginning of time, we should never need to do this outside of
   // tests or a time machine.
   if (nanoseconds.size() < 10) {
     nanoseconds = std::string(10 - nanoseconds.size(), '0') + nanoseconds;
   }
+
+  ENVOY_LOG_MISC(info, "Nanoseconds: {}", nanoseconds);
 
   for (size_t i = 0; i < specifiers_.size(); ++i) {
     const auto& specifier = specifiers_.at(i);
@@ -147,10 +153,12 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
       formatted_str.replace(specifier.position_ + formatted.specifier_offsets.at(i),
                             specifier.width_,
                             nanoseconds.substr(cached_time.seconds_length, specifier.width_));
+      ENVOY_LOG_MISC(info, "Nanoseconds substr: {}", nanoseconds.substr(cached_time.seconds_length, specifier.width_));
     }
   }
 
   ASSERT(formatted_str.size() == formatted.str.size());
+  ENVOY_LOG_MISC(info, "Formatted String: {}", formatted_str);
   return formatted_str;
 }
 
@@ -200,6 +208,9 @@ DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets&
   for (const auto& specifier : specifiers_) {
     std::string current_format =
         absl::FormatTime(specifier.segment_, absl::FromTimeT(time), absl::UTCTimeZone());
+    ENVOY_LOG_MISC(info, "Absl from time: {}", absl::FromTimeT(time));
+    ENVOY_LOG_MISC(info, "Specifier Segment line 211: {}", specifier.segment_);
+    ENVOY_LOG_MISC(info, "Formatted String line 212: {}", current_format);
     absl::StrAppend(&formatted_time, current_format,
                     specifier.second_ ? seconds_str : std::string(specifier.width_, '?'));
 

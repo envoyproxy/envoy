@@ -328,6 +328,7 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     };
   } else if (absl::StartsWith(field_name, "START_TIME")) {
     const std::string pattern = fmt::format("%{}%", field_name);
+    ENVOY_LOG_MISC(info, "Pattern: {}", pattern);
     if (start_time_formatters_.find(pattern) == start_time_formatters_.end()) {
       start_time_formatters_.emplace(
           std::make_pair(pattern, Formatter::SubstitutionFormatParser::parse(pattern)));
