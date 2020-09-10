@@ -385,8 +385,8 @@ public:
 // the buffer via swap() or modified with mutate().
 class ReorderBuffer {
 public:
-  ReorderBuffer(Connection& connection, const bool& disable_dispatch)
-      : connection_(connection), disable_dispatch_(disable_dispatch) {}
+  ReorderBuffer(Connection& connection, const bool& should_close_connection)
+      : connection_(connection), should_close_connection_(should_close_connection) {}
 
   void add(Buffer::Instance& data) {
     bufs_.emplace_back();
@@ -398,9 +398,9 @@ public:
     while (!bufs_.empty()) {
       Buffer::OwnedImpl& buf = bufs_.front();
       while (buf.length() > 0) {
-        if (disable_dispatch_) {
+        if (should_close_connection_) {
           ENVOY_LOG_MISC(trace, "Buffer dispatch disabled, stopping drain");
-          return codecClientError("preventing buffer drain due to connection reset");
+          return codecClientError("preventing buffer drain due to connection closure");
         }
         status = connection_.dispatch(buf);
         if (!status.ok()) {
@@ -445,8 +445,8 @@ public:
   Connection& connection_;
   std::deque<Buffer::OwnedImpl> bufs_;
   // A reference to a flag indicating whether the reorder buffer is allowed to dispatch data to
-  // the connection.
-  const bool& disable_dispatch_;
+  // the connection (reference to should_close_connection).
+  const bool& should_close_connection_;
 };
 
 using HttpStreamPtr = std::unique_ptr<HttpStream>;
