@@ -91,7 +91,8 @@ FilesystemCollectionSubscriptionImpl::FilesystemCollectionSubscriptionImpl(
     : FilesystemSubscriptionImpl(dispatcher, path, callbacks, resource_decoder, stats,
                                  validation_visitor, api) {}
 
-std::string FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr* config_update) {
+std::string
+FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr* config_update) {
   auto owned_resource_message = std::make_unique<envoy::service::discovery::v3::Resource>();
   auto& resource_message = *owned_resource_message;
   MessageUtil::loadFromFile(path_, resource_message, validation_visitor_, api_);

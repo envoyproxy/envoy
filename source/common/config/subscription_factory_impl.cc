@@ -117,7 +117,8 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
 
   switch (collection_locator.scheme()) {
   case udpa::core::v1::ResourceLocator::FILE: {
-    const std::string path = Http::Utility::localPathFromFilePath(absl::StrJoin(collection_locator.id(), "/"));
+    const std::string path =
+        Http::Utility::localPathFromFilePath(absl::StrJoin(collection_locator.id(), "/"));
     Utility::checkFilesystemSubscriptionBackingPath(path, api_);
     return std::make_unique<Config::FilesystemCollectionSubscriptionImpl>(
         dispatcher_, path, callbacks, resource_decoder, stats, validation_visitor_, api_);
