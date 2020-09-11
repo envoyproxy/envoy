@@ -90,7 +90,7 @@ EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
 
 bool EnvoyQuicClientSession::hasDataToWrite() { return HasDataToWrite(); }
 
-void EnvoyQuicClientSession::OnOneRttKeysAvailable() {
+void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 

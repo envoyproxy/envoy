@@ -3534,6 +3534,23 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_library(
+    name = "quic_test_tools_flow_controller_peer_lib",
+    srcs = [
+        "quiche/quic/test_tools/quic_flow_controller_peer.cc",
+    ],
+    hdrs = [
+        "quiche/quic/test_tools/quic_flow_controller_peer.h",
+    ],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_core_packets_lib",
+        ":quic_core_session_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "quic_test_tools_framer_peer_lib",
     srcs = ["quiche/quic/test_tools/quic_framer_peer.cc"],
@@ -3667,6 +3684,7 @@ envoy_cc_test_library(
         ":quic_core_session_lib",
         ":quic_core_stream_send_buffer_lib",
         ":quic_platform_base",
+        ":quic_test_tools_flow_controller_peer_lib",
         ":quic_test_tools_stream_send_buffer_peer_lib",
     ],
 )
