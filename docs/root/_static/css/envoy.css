@@ -15,27 +15,10 @@ table.docutils div.line-block {
   max-width: 1000px;
 }
 
-/* Change the top side-navigation with lighter background color */
-.wy-side-nav-search {
-  background: #edf0f2;
-}
-
-/* Since the top side-navigation color is lighter, this is needed to let the current version label standout */
-.wy-side-nav-search > div.version {
-  /* This "purple" color is from Envoy's website */
-  color: #6332a7;
-}
-
-/* Set the background color of highlighted keyword to "pink" #ffc6ff */
-.rst-content .highlighted {
-  background: #ffc6ff;
-  box-shadow: 0 0 0 2px #ffc6ff;
-}
-
 /* To style the API version label of a search result item */
 .api-version-label {
   border-radius: 20%;
-  background-color: #bdb2ff;
+  background-color: #c0c0c0;
   color: #ffffff;
   margin-left: 4px;
   padding: 4px;
