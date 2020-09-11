@@ -45,15 +45,16 @@ ScopedResume NewGrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
 }
 
 void NewGrpcMuxImpl::registerVersionedTypeUrl(const std::string& type_url) {
-  if (type_url_mapping_.find(type_url) != type_url_mapping_.end()) {
+  TypeUrlMap& type_url_map = typeUrlMap();
+  if (type_url_map.find(type_url) != type_url_map.end()) {
     return;
   }
   // If type_url is v3, earlier_type_url will contain v2 type url.
   absl::optional<std::string> earlier_type_url = ApiTypeOracle::getEarlierTypeUrl(type_url);
   // Register v2 to v3 and v3 to v2 type_url mapping in the hash map.
   if (earlier_type_url.has_value()) {
-    type_url_mapping_[earlier_type_url.value()] = type_url;
-    type_url_mapping_[type_url] = earlier_type_url.value();
+    type_url_map[earlier_type_url.value()] = type_url;
+    type_url_map[type_url] = earlier_type_url.value();
   }
 }
 
@@ -67,8 +68,9 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   if (sub == subscriptions_.end()) {
     const std::string& type_url = message->type_url();
     registerVersionedTypeUrl(type_url);
-    if (type_url_mapping_.find(type_url) != type_url_mapping_.end()) {
-      sub = subscriptions_.find(type_url_mapping_[type_url]);
+    TypeUrlMap& type_url_map = typeUrlMap();
+    if (type_url_map.find(type_url) != type_url_map.end()) {
+      sub = subscriptions_.find(type_url_map[type_url]);
     }
   }
   if (sub == subscriptions_.end()) {

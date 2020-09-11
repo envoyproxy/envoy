@@ -101,8 +101,8 @@ public:
                                    SubscriptionCallbacks& callbacks,
                                    OpaqueResourceDecoder& resource_decoder) PURE;
 
-protected:
-  absl::flat_hash_map<std::string, std::string> type_url_mapping_;
+  using TypeUrlMap = absl::flat_hash_map<std::string, std::string>;
+  static TypeUrlMap& typeUrlMap() { MUTABLE_CONSTRUCT_ON_FIRST_USE(TypeUrlMap, {}); }
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;
