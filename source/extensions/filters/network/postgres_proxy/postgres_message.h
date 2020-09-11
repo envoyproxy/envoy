@@ -1,13 +1,14 @@
 #include "common/buffer/buffer_impl.h"
 
 #include "absl/strings/str_cat.h"
+#include "fmt/printf.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace PostgresProxy {
 
-/*
+/**
  * Postgres messages are described in official Postgres documentation:
  * https://www.postgresql.org/docs/12/protocol-message-formats.html
  *
@@ -39,13 +40,9 @@ public:
     return true;
   }
 
-  std::string toString() const {
-    char buf[32];
-    sprintf(buf, getFormat(), value_);
-    return std::string(buf);
-  }
+  std::string toString() const { return fmt::format(getFormat(), value_); }
 
-  constexpr const char* getFormat() const { return "[%02d]"; }
+  constexpr const char* getFormat() const { return "[{}]"; }
   T get() const { return value_; }
 
 private:
@@ -56,11 +53,8 @@ using Int32 = Int<uint32_t>;
 using Int16 = Int<uint16_t>;
 using Int8 = Int<uint8_t>;
 
-// 8-bits character value
+// 8-bits character value.
 using Byte1 = Int<char>;
-
-// getFormat method specialization for Byte1.
-template <> constexpr const char* Int<char>::getFormat() const { return "[%c]"; }
 
 // String type requires byte with zero value to indicate end of string.
 class String {
@@ -107,15 +101,14 @@ public:
 
   std::string toString() const {
     std::string out = "[";
-    out.reserve(value_.size() * 3);
     bool first = true;
     for (const auto& i : value_) {
-      char buf[16];
+      std::string buf;
       if (first) {
-        sprintf(buf, "%02d", i);
+        buf = fmt::format("{}", i);
         first = false;
       } else {
-        sprintf(buf, " %02d", i);
+        buf = fmt::format(" {}", i);
       }
       absl::StrAppend(&out, buf);
     }
@@ -127,17 +120,17 @@ private:
   std::vector<uint8_t> value_;
 };
 
-// Class represents the structure consisting of 4 bytes of length
+// VarByteN represents the structure consisting of 4 bytes of length
 // indicating how many bytes follow.
 // In Postgres documentation it is described as:
-// Int32
-// The length of the function result value, in bytes (this count does not include itself). Can be
-// zero. As a special case, -1 indicates a NULL function result. No value bytes follow in the NULL
+// - Int32
+//   The number of bytes in the structure (this count does not include itself). Can be
+//   zero. As a special case, -1 indicates a NULL (no result). No value bytes follow in the NULL
 // case.
 //
-// ByteN
-// The value of the function result, in the format indicated by the associated format code. n is the
-// above length.
+// - ByteN
+// The sequence of bytes representing the value. Bytes are present only when length has a positive
+// value.
 class VarByteN {
 public:
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
@@ -148,7 +141,7 @@ public:
     pos += sizeof(int32_t);
     left -= sizeof(int32_t);
     if (len_ < 1) {
-      // Nothing follows.
+      // There is no payload if length is not positive.
       value_.clear();
       return true;
     }
@@ -164,18 +157,17 @@ public:
   }
 
   std::string toString() const {
-    char buf[16];
-    sprintf(buf, "[(%d bytes):", len_);
+    std::string out;
+    out = fmt::format("[({} bytes):", len_);
 
-    std::string out = buf;
-    out.reserve(value_.size() * 3 + 16);
     bool first = true;
     for (const auto& i : value_) {
+      std::string buf;
       if (first) {
-        sprintf(buf, "%02d", i);
+        buf = fmt::format("{}", i);
         first = false;
       } else {
-        sprintf(buf, " %02d", i);
+        buf = fmt::format(" {}", i);
       }
       absl::StrAppend(&out, buf);
     }
@@ -185,7 +177,7 @@ public:
 
 private:
   int32_t len_;
-  std::vector<char> value_;
+  std::vector<uint8_t> value_;
 };
 
 // Array contains one or more values of the same type.
@@ -213,10 +205,7 @@ public:
   }
 
   std::string toString() const {
-    std::string out;
-    char buf[128];
-    sprintf(buf, "[Array of %zu:{", value_.size());
-    out = buf;
+    std::string out = fmt::format("[Array of {}:{{", value_.size());
 
     for (const auto& i : value_) {
       absl::StrAppend(&out, i->toString());
@@ -264,19 +253,19 @@ private:
 };
 
 // Interface to Postgres message class.
-class MessageI {
+class Message {
 public:
-  virtual ~MessageI() = default;
+  virtual ~Message() = default;
 
   // read method should read only as many bytes from data
   // buffer as it is indicated in message's length field.
   // "length" parameter indicates how many bytes were indicated in Postgres message's
   // length field. "data" buffer may contain more bytes than "length".
-  virtual bool read(const Buffer::Instance& data, const uint64_t length) = 0;
+  virtual bool read(const Buffer::Instance& data, const uint64_t length) PURE;
 
   // toString method provides displayable representation of
   // the Postgres message.
-  virtual std::string toString() const = 0;
+  virtual std::string toString() const PURE;
 };
 
 // Sequence is tuple like structure, which binds together
@@ -284,7 +273,7 @@ public:
 template <typename... Types> class Sequence;
 
 template <typename FirstField, typename... Remaining>
-class Sequence<FirstField, Remaining...> : public MessageI {
+class Sequence<FirstField, Remaining...> : public Message {
   FirstField first_;
   Sequence<Remaining...> remaining_;
 
@@ -310,7 +299,7 @@ public:
 };
 
 // Terminal template definition for variadic Sequence template.
-template <> class Sequence<> : public MessageI {
+template <> class Sequence<> : public Message {
 public:
   Sequence<>() = default;
   std::string toString() const override { return ""; }
@@ -320,7 +309,7 @@ public:
 
 // Helper function to create pointer to a Sequence structure and is used by Postgres
 // decoder after learning the type of Postgres message.
-template <typename... Types> std::unique_ptr<MessageI> createMsg() {
+template <typename... Types> std::unique_ptr<Message> createMsg() {
   return std::make_unique<Sequence<Types...>>();
 }
 

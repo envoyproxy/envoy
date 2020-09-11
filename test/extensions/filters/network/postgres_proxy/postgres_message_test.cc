@@ -5,6 +5,8 @@
 
 #include "extensions/filters/network/postgres_proxy/postgres_message.h"
 
+#include "fmt/printf.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -22,7 +24,7 @@ public:
   char buf_[32];
 };
 
-using IntTypes = ::testing::Types<Int32, Int16, Int8, Byte1>;
+using IntTypes = ::testing::Types<Int32, Int16, Int8>;
 TYPED_TEST_SUITE(IntTest, IntTypes);
 
 TYPED_TEST(IntTest, BasicRead) {
@@ -32,8 +34,8 @@ TYPED_TEST(IntTest, BasicRead) {
   ASSERT_TRUE(this->field_.read(this->data_, pos, left));
   auto out = this->field_.toString();
 
-  sprintf(this->buf_, this->field_.getFormat(), 12);
-  ASSERT_THAT(out, this->buf_);
+  auto out1 = fmt::format(this->field_.getFormat(), 12);
+  ASSERT_THAT(out, out1);
   // pos should be moved forward by the number of bytes read.
   ASSERT_THAT(pos, sizeof(TypeParam));
 
@@ -49,8 +51,8 @@ TYPED_TEST(IntTest, ReadWithLeftovers) {
   uint64_t left = this->data_.length();
   ASSERT_TRUE(this->field_.read(this->data_, pos, left));
   auto out = this->field_.toString();
-  sprintf(this->buf_, this->field_.getFormat(), 12);
-  ASSERT_THAT(out, this->buf_);
+  auto out1 = fmt::format(this->field_.getFormat(), 12);
+  ASSERT_THAT(out, out1);
   // pos should be moved forward by the number of bytes read.
   ASSERT_THAT(pos, sizeof(TypeParam));
 
@@ -66,8 +68,8 @@ TYPED_TEST(IntTest, ReadAtOffset) {
   uint64_t left = this->data_.length() - 1;
   ASSERT_TRUE(this->field_.read(this->data_, pos, left));
   auto out = this->field_.toString();
-  sprintf(this->buf_, this->field_.getFormat(), 12);
-  ASSERT_THAT(out, this->buf_);
+  auto out1 = fmt::format(this->field_.getFormat(), 12);
+  ASSERT_THAT(out, out1);
   // pos should be moved forward by the number of bytes read.
   ASSERT_THAT(pos, 1 + sizeof(TypeParam));
   // Nothing should be left to read.
@@ -80,6 +82,23 @@ TYPED_TEST(IntTest, NotEnoughData) {
   uint64_t pos = 1;
   uint64_t left = this->data_.length() - pos;
   ASSERT_FALSE(this->field_.read(this->data_, pos, left));
+}
+
+// Byte1 should format content as char.
+TEST(Byte1, Formatting) {
+  Byte1 field;
+
+  Buffer::OwnedImpl data;
+  data.add("I");
+
+  uint64_t pos = 0;
+  uint64_t left = 1;
+  ASSERT_TRUE(field.read(data, pos, left));
+  ASSERT_THAT(pos, 1);
+  ASSERT_THAT(left, 0);
+
+  auto out = field.toString();
+  ASSERT_THAT(out, "[I]");
 }
 
 // Tests for String type.
@@ -165,7 +184,7 @@ TEST(ByteN, BasicTest) {
   ASSERT_THAT(left, 0);
 
   auto out = field.toString();
-  ASSERT_THAT(out, "[00 01 02 03 04 05 06 07 08 09]");
+  ASSERT_THAT(out, "[0 1 2 3 4 5 6 7 8 9]");
 }
 
 TEST(ByteN, Empty) {
@@ -449,9 +468,9 @@ TEST(Sequence, NotEnoughData) {
   ASSERT_FALSE(field.read(data, pos, left));
 }
 
-// Tests for MessageI interface and helper function createMsg.
+// Tests for Message interface and helper function createMsg.
 TEST(PostgresMessage, SingleField) {
-  std::unique_ptr<MessageI> msg = createMsg<Int32>();
+  std::unique_ptr<Message> msg = createMsg<Int32>();
 
   Buffer::OwnedImpl data;
   data.writeBEInt<uint32_t>(12);
@@ -461,7 +480,7 @@ TEST(PostgresMessage, SingleField) {
 }
 
 TEST(PostgresMessage, SingleByteN) {
-  std::unique_ptr<MessageI> msg = createMsg<ByteN>();
+  std::unique_ptr<Message> msg = createMsg<ByteN>();
 
   Buffer::OwnedImpl data;
   data.writeBEInt<uint8_t>(0);
@@ -471,15 +490,15 @@ TEST(PostgresMessage, SingleByteN) {
   data.writeBEInt<uint8_t>(4);
   ASSERT_TRUE(msg->read(data, 5 * 1));
   auto out = msg->toString();
-  ASSERT_TRUE(out.find("00") != std::string::npos);
-  ASSERT_TRUE(out.find("01") != std::string::npos);
-  ASSERT_TRUE(out.find("02") != std::string::npos);
-  ASSERT_TRUE(out.find("03") != std::string::npos);
-  ASSERT_TRUE(out.find("04") != std::string::npos);
+  ASSERT_TRUE(out.find("0") != std::string::npos);
+  ASSERT_TRUE(out.find("1") != std::string::npos);
+  ASSERT_TRUE(out.find("2") != std::string::npos);
+  ASSERT_TRUE(out.find("3") != std::string::npos);
+  ASSERT_TRUE(out.find("4") != std::string::npos);
 }
 
 TEST(PostgresMessage, NotEnoughData) {
-  std::unique_ptr<MessageI> msg = createMsg<Int32, String>();
+  std::unique_ptr<Message> msg = createMsg<Int32, String>();
   Buffer::OwnedImpl data;
   // Write only 3 bytes into the buffer.
   data.writeBEInt<uint8_t>(0);

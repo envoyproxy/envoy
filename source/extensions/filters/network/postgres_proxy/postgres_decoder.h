@@ -90,7 +90,7 @@ protected:
   // second - vector of Decoder's methods which are invoked when the message
   // is processed.
   using MsgProcessor =
-      std::tuple<std::string, std::function<std::unique_ptr<MessageI>()>, std::vector<MsgAction>>;
+      std::tuple<std::string, std::function<std::unique_ptr<Message>()>, std::vector<MsgAction>>;
 
   // Frontend and Backend messages.
   using MsgGroup = struct {
