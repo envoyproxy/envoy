@@ -5,7 +5,8 @@ Local Stats
 
 The `local-stats` `branch <https://github.com/lyft/envoy-mobile/tree/local-stats>`_ allows a
 developer to run a local statsd server, and see stats emissions from a client running in the
-simulator/emulator.
+simulator/emulator. Unless network tunneling is set up this is not going to work in a physical
+device, as the statsd server is running on the computer's local network.
 
 ------
 Config
