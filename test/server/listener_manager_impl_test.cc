@@ -545,8 +545,7 @@ filter_chains:
 - filters: []
   )EOF";
 
-  EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true));
-  EXPECT_EQ(0U, manager_->listeners().size());
+  ASSERT_DEATH(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), "");
 }
 
 TEST_F(ListenerManagerImplTest, NotDefaultListenerFiltersTimeout) {
