@@ -18,6 +18,7 @@ envoy_cc_library(
         ":pkg_cc_proto",
         "@envoy//include/envoy/http:codes_interface",
         "@envoy//include/envoy/http:filter_interface",
+        "@envoy//source/common/http:header_map_lib",
         "@envoy//source/extensions/common/matcher:matcher_lib",
         "@envoy//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
