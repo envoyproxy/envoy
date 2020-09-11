@@ -257,10 +257,10 @@ public:
       processed++;
 
       // Put the 7 bits where they should have been.
-      // Impl note: the cast is done to avoid undefined behaviour when offset_ >= 28 and some bits
-      // at positions 5-7 are set (we would have left shift of signed value that does not fit in
+      // Impl note: the cast is done to avoid undefined behaviour when offset_ >= 63 and some bits
+      // at positions 2-7 are set (we would have left shift of signed value that does not fit in
       // data type).
-      result_ |= ((static_cast<uint32_t>(el) & 0x7f) << offset_);
+      bytes_ |= ((static_cast<uint64_t>(el) & 0x7f) << offset_);
       if ((el & 0x80) == 0) {
         // If this was the last byte to process (what is marked by unset highest bit), we are done.
         ready_ = true;
@@ -269,8 +269,9 @@ public:
         // Otherwise, we need to read next byte.
         offset_ += 7;
         // Valid input can have at most 5 bytes.
-        if (offset_ >= 9 * 7) {
-          ExceptionUtil::throwEnvoyException("VarInt64 is too long (9th byte has highest bit set)");
+        if (offset_ >= 10 * 7) {
+          ExceptionUtil::throwEnvoyException(
+              "VarInt64 is too long (10th byte has highest bit set)");
         }
       }
     }
@@ -279,10 +280,13 @@ public:
 
   bool ready() const override { return ready_; }
 
-  int64_t get() const override { return result_; }
+  int64_t get() const override {
+    // Do the final conversion, this is a zig-zag encoded signed value.
+    return (bytes_ >> 1) ^ -(bytes_ & 1);
+  }
 
 private:
-  int64_t result_ = 0;
+  uint64_t bytes_ = 0;
   uint32_t offset_ = 0;
   bool ready_ = false;
 };

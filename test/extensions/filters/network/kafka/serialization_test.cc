@@ -27,6 +27,8 @@ TEST_EmptyDeserializerShouldNotBeReady(UInt32Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(Int64Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(BooleanDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(VarUInt32Deserializer);
+TEST_EmptyDeserializerShouldNotBeReady(VarInt32Deserializer);
+TEST_EmptyDeserializerShouldNotBeReady(VarInt64Deserializer);
 
 TEST_EmptyDeserializerShouldNotBeReady(StringDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(CompactStringDeserializer);
@@ -150,6 +152,54 @@ TEST(VarUInt32Deserializer, ShouldThrowIfNoEndWith5Bytes) {
   // when
   // then
   EXPECT_THROW(testee.feed(data), EnvoyException);
+}
+
+TEST(VarInt32Deserializer, ShouldDeserialize) {
+  Buffer::OwnedImpl buffer;
+  const char input[1] = {0};
+  buffer.add(absl::string_view(input, sizeof(input)));
+  const int32_t expected_value = 0;
+  deserializeCompactAndCheckEqualityInOneGo<VarInt32Deserializer>(buffer, expected_value);
+}
+
+TEST(VarInt32Deserializer, ShouldDeserializeMinInt32) {
+  Buffer::OwnedImpl buffer;
+  const uint8_t input[5] = {0xFF, 0xFF, 0xFF, 0xFF, 0x0F};
+  buffer.add(absl::string_view(reinterpret_cast<const char*>(input), sizeof(input)));
+  const int32_t expected_value = std::numeric_limits<int32_t>::min();
+  deserializeCompactAndCheckEqualityInOneGo<VarInt32Deserializer>(buffer, expected_value);
+}
+
+TEST(VarInt32Deserializer, ShouldDeserializeMaxInt32) {
+  Buffer::OwnedImpl buffer;
+  const uint8_t input[5] = {0xFE, 0xFF, 0xFF, 0xFF, 0x0F};
+  buffer.add(absl::string_view(reinterpret_cast<const char*>(input), sizeof(input)));
+  const int32_t expected_value = std::numeric_limits<int32_t>::max();
+  deserializeCompactAndCheckEqualityInOneGo<VarInt32Deserializer>(buffer, expected_value);
+}
+
+TEST(VarInt64Deserializer, ShouldDeserialize) {
+  Buffer::OwnedImpl buffer;
+  const char input[1] = {0};
+  buffer.add(absl::string_view(input, sizeof(input)));
+  const int64_t expected_value = 0;
+  deserializeCompactAndCheckEqualityInOneGo<VarInt64Deserializer>(buffer, expected_value);
+}
+
+TEST(VarInt64Deserializer, ShouldDeserializeMinInt64) {
+  Buffer::OwnedImpl buffer;
+  const uint8_t input[10] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F};
+  buffer.add(absl::string_view(reinterpret_cast<const char*>(input), sizeof(input)));
+  const int64_t expected_value = std::numeric_limits<int64_t>::min();
+  deserializeCompactAndCheckEqualityInOneGo<VarInt64Deserializer>(buffer, expected_value);
+}
+
+TEST(VarInt64Deserializer, ShouldDeserializeMaxInt64) {
+  Buffer::OwnedImpl buffer;
+  const uint8_t input[10] = {0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F};
+  buffer.add(absl::string_view(reinterpret_cast<const char*>(input), sizeof(input)));
+  const int64_t expected_value = std::numeric_limits<int64_t>::max();
+  deserializeCompactAndCheckEqualityInOneGo<VarInt64Deserializer>(buffer, expected_value);
 }
 
 // String tests.
