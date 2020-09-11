@@ -440,7 +440,7 @@ message RouteMatch {
     // (WebSocket and the like) as they are normalized in Envoy as HTTP/1.1 style
     // upgrades.
     // This is the only way to match CONNECT requests for HTTP/1.1. For HTTP/2,
-    // where CONNECT requests may have a path, the path matchers will work if
+    // where Extended CONNECT requests may have a path, the path matchers will work if
     // there is a path present.
     // Note that CONNECT support is currently considered alpha in Envoy.
     // [#comment:TODO(htuch): Replace the above comment with an alpha tag.
