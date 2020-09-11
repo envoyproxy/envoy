@@ -92,6 +92,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "apple_dns_lib",
+    srcs = ["apple_dns_impl.cc"],
+    hdrs = ["apple_dns_impl.h"],
+    deps = [
+        ":address_lib",
+        ":utility_lib",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:file_event_interface",
+        "//include/envoy/network:dns_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:linked_object",
+    ],
+)
+
+envoy_cc_library(
     name = "dns_lib",
     srcs = ["dns_impl.cc"],
     hdrs = ["dns_impl.h"],
