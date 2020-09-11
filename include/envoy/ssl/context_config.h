@@ -8,6 +8,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
+#include "envoy/ssl/handshaker.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
 #include "absl/types/optional.h"
@@ -73,6 +74,16 @@ public:
    * @param callback callback that is executed by context config.
    */
   virtual void setSecretUpdateCallback(std::function<void()> callback) PURE;
+
+  /**
+   * @return a callback which can be used to create Handshaker instances.
+   */
+  virtual HandshakerFactoryCb createHandshaker() const PURE;
+
+  /**
+   * @return the set of capabilities for handshaker instances created by this context.
+   */
+  virtual HandshakerCapabilities capabilities() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {
