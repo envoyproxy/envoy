@@ -2202,6 +2202,9 @@ TEST_F(LuaHttpFilterTest, LuaFilterBase64Escape) {
     end
 
     function envoy_on_response(response_handle)
+      local base64Encoded = response_handle:base64Escape("barfoo")
+      response_handle:logTrace(base64Encoded)
+
       local resp_body_buf = response_handle:body()
       local resp_body = resp_body_buf:getBytes(0, resp_body_buf:length())
       local b64_resp_body = response_handle:base64Escape(resp_body)
@@ -2218,10 +2221,11 @@ TEST_F(LuaHttpFilterTest, LuaFilterBase64Escape) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("YmFyZm9v")));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->encodeHeaders(response_headers, false));
 
-  // base64 encoding should also work for binary data
+  // Base64 encoding should also work for binary data.
   uint8_t buffer[34] = {31, 139, 8,  0, 0, 0, 0, 0,   0,   255, 202, 72,  205, 201, 201, 47, 207,
                         47, 202, 73, 1, 4, 0, 0, 255, 255, 173, 32,  235, 249, 10,  0,   0,  0};
   Buffer::OwnedImpl response_body(buffer, 34);
