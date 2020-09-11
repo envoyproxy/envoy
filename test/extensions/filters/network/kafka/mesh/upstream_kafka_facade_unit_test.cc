@@ -86,8 +86,22 @@ TEST(UpstreamKafkaFacadeTest, shouldCreateDifferentProducersForDifferentClusters
   EXPECT_EQ(testee.getProducerCountForTest(), 2);
 }
 
-TEST(UpstreamKafkaFacadeTest, shouldRethrowCreationException) {
-  // TODO
+TEST(UpstreamKafkaFacadeTest, shouldThrowIfThereIsNoConfigurationForGivenTopic) {
+  // given
+  const std::string topic = "topic1";
+
+  MockClusteringConfiguration clustering_configuration;
+  const ClusterConfig cluster_config = {"cluster", 1, {{"bootstrap.servers", "localhost:9092"}}};
+  EXPECT_CALL(clustering_configuration, computeClusterConfigForTopic(topic))
+      .WillOnce(Return(absl::nullopt));
+  ThreadLocal::MockInstance slot_allocator;
+  EXPECT_CALL(slot_allocator, allocateSlot())
+      .WillOnce(Invoke(&slot_allocator, &ThreadLocal::MockInstance::allocateSlot_));
+  Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
+  UpstreamKafkaFacadeImpl testee = {clustering_configuration, slot_allocator, thread_factory};
+
+  // when, then - exception gets thrown.
+  EXPECT_THROW(testee.getProducerForTopic(topic), EnvoyException);
 }
 
 } // namespace

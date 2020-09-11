@@ -1,5 +1,7 @@
 #include "extensions/filters/network/kafka/mesh/splitter.h"
 
+#include "envoy/common/exception.h"
+
 #include "extensions/filters/network/kafka/mesh/command_handlers/api_versions.h"
 #include "extensions/filters/network/kafka/mesh/command_handlers/metadata.h"
 #include "extensions/filters/network/kafka/mesh/command_handlers/produce.h"
@@ -13,6 +15,12 @@ namespace Mesh {
 RequestProcessor::RequestProcessor(AbstractRequestListener& origin,
                                    const ClusteringConfiguration& clustering_configuration)
     : origin_{origin}, clustering_configuration_{clustering_configuration} {}
+
+// Helper function. Throws a nice message. Filter will react by closing the connection.
+static void throwOnUnsupportedRequest(const std::string& reason, const RequestHeader& header) {
+  throw EnvoyException(absl::StrCat(reason, " Kafka request (key=", header.api_key_, ", version=",
+                                    header.api_version_, ", cid=", header.correlation_id_));
+}
 
 void RequestProcessor::onMessage(AbstractRequestSharedPtr arg) {
   switch (arg->request_header_.api_key_) {
@@ -35,16 +43,16 @@ void RequestProcessor::onMessage(AbstractRequestSharedPtr arg) {
     break;
   }
   default: {
-    ENVOY_LOG(warn, "unknown request: {}/{}", arg->request_header_.api_key_,
-              arg->request_header_.api_version_);
+    // We got something else than typical Produce request.
+    throwOnUnsupportedRequest("unsupported (bad client API invoked?)", arg->request_header_);
     break;
   }
   } // switch
 }
 
-void RequestProcessor::onFailedParse(RequestParseFailureSharedPtr) {
-  ENVOY_LOG(warn, "got parse failure");
-  // kill connection.
+// We got something that the parser could not handle.
+void RequestProcessor::onFailedParse(RequestParseFailureSharedPtr arg) {
+  throwOnUnsupportedRequest("unknown", arg->request_header_);
 }
 
 void RequestProcessor::process(const std::shared_ptr<Request<ProduceRequest>> request) const {
