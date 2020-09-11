@@ -281,9 +281,9 @@ namespace {
 // https://tools.ietf.org/html/rfc2616#section-4.2.
 
 // Used to separate the values of different headers.
-constexpr std::string_view header_separator = "\n";
+constexpr absl::string_view header_separator = "\n";
 // Used to separate multiple values of a same header.
-constexpr std::string_view in_value_separator = "\r";
+constexpr absl::string_view in_value_separator = "\r";
 }; // namespace
 
 std::string VaryHeader::createVaryKey(const Http::HeaderEntry* vary_header,
