@@ -40,7 +40,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 27]
+// [#next-free-field: 28]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -183,7 +183,7 @@ message Bootstrap {
   // Optional watchdog configuration.
   // This is used for specifying different watchdogs for the different subsystems.
   // Only one of *watchdog* or *watchdogs* should be specified.
-  Watchdogs watchdogs = 26;
+  Watchdogs watchdogs = 27;
 
   // Configuration for an external tracing provider.
   //
