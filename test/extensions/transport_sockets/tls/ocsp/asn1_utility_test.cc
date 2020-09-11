@@ -307,13 +307,13 @@ void cbbAddAsn1Int64(CBB* cbb, int64_t value) {
 
   // Skip past bytes that are purely sign extension.
   int start;
-  for (start = 0; start < 7; start++) {
+  for (start = 7; start > 0; start--) {
     uint8_t byte = (value >> start * 8) & 0xFF;
     if (byte != 0xFF) {
       break;
     }
 
-    uint8_t next_byte = (value >> (start + 1) * 8) & 0xFF;
+    uint8_t next_byte = (value >> (start - 1) * 8) & 0xFF;
     if ((next_byte & 0x80) == 0) {
       break;
     }
@@ -321,7 +321,7 @@ void cbbAddAsn1Int64(CBB* cbb, int64_t value) {
 
   CBB child;
   ASSERT_TRUE(CBB_add_asn1(cbb, &child, CBS_ASN1_INTEGER));
-  for (int i = start; i < 8; i++) {
+  for (int i = start; i >= 0; i--) {
     uint8_t byte = (value >> i * 8) & 0xFF;
     ASSERT_TRUE(CBB_add_u8(&child, byte));
   }
@@ -330,10 +330,7 @@ void cbbAddAsn1Int64(CBB* cbb, int64_t value) {
 
 TEST_F(Asn1UtilityTest, ParseIntegerTest) {
   std::vector<std::pair<int64_t, std::string>> integers = {
-      {1, "01"},
-      {10, "0a"},
-      {1000000, "0f4240"},
-      {-1, "-01"},
+      {1, "01"}, {10, "0a"}, {1000000, "0f4240"}, {-1, "-01"}, {-128, "-80"},
   };
   bssl::ScopedCBB cbb;
   CBS cbs;
