@@ -120,13 +120,11 @@ TEST_F(IsCacheableResponseTest, ValidationData) {
   // Max-age data available
   response_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "s-maxage=1000");
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, allowed_vary_headers_));
-  // Max-age data available with no date
-  response_headers_.removeDate();
-  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers_, allowed_vary_headers_));
-  // No date, but the response requires revalidation anyway
+  // No max-age data, but the response requires revalidation anyway
   response_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, allowed_vary_headers_));
-  // No cache control headers or date, but there is an expires header
+  // No cache control headers, but there is an expires header
+  response_headers_.remove(Http::CustomHeaders::get().CacheControl);
   response_headers_.setReferenceKey(Http::Headers::get().Expires, "Sun, 06 Nov 1994 09:49:37 GMT");
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, allowed_vary_headers_));
 }
