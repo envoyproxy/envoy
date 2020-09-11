@@ -9,8 +9,8 @@
 #include "envoy/service/health/v3/hds.pb.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
-#include "envoy/upstream/upstream.h"
 #include "envoy/upstream/locality_endpoint.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/backoff_strategy.h"
 #include "common/common/logger.h"
