@@ -19,14 +19,14 @@ public:
   using ActiveClient::ActiveClient;
   void close() override { onEvent(Network::ConnectionEvent::LocalClose); }
   uint64_t id() const override { return 1; }
-  bool closingWithIncompleteRequest() const override { return false; }
-  size_t numActiveRequests() const override { return 1; }
+  bool closingWithIncompleteStream() const override { return false; }
+  size_t numActiveStreams() const override { return 1; }
 };
 
-class TestPendingRequest : public PendingRequest {
+class TestPendingStream : public PendingStream {
 public:
-  TestPendingRequest(ConnPoolImplBase& parent, AttachContext& context)
-      : PendingRequest(parent), context_(context) {}
+  TestPendingStream(ConnPoolImplBase& parent, AttachContext& context)
+      : PendingStream(parent), context_(context) {}
   AttachContext& context() override { return context_; }
   AttachContext& context_;
 };
@@ -34,8 +34,8 @@ public:
 class TestConnPoolImplBase : public ConnPoolImplBase {
 public:
   using ConnPoolImplBase::ConnPoolImplBase;
-  ConnectionPool::Cancellable* newPendingRequest(AttachContext& context) override {
-    auto entry = std::make_unique<TestPendingRequest>(*this, context);
+  ConnectionPool::Cancellable* newPendingStream(AttachContext& context) override {
+    auto entry = std::make_unique<TestPendingStream>(*this, context);
     LinkedList::moveIntoList(std::move(entry), pending_streams_);
     return pending_streams_.front().get();
   }

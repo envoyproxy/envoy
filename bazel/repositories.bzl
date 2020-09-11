@@ -96,10 +96,6 @@ _default_envoy_build_config = repository_rule(
 def _python_deps():
     # TODO(htuch): convert these to pip3_import.
     _repository_impl(
-        name = "com_github_apache_thrift",
-        build_file = "@envoy//bazel/external:apache_thrift.BUILD",
-    )
-    _repository_impl(
         name = "com_github_twitter_common_lang",
         build_file = "@envoy//bazel/external:twitter_common_lang.BUILD",
     )
