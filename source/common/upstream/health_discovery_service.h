@@ -10,6 +10,7 @@
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/upstream.h"
+#include "envoy/upstream/locality_endpoint.h"
 
 #include "common/common/backoff_strategy.h"
 #include "common/common/logger.h"
@@ -29,7 +30,8 @@
 namespace Envoy {
 namespace Upstream {
 
-using HostsMapKey = std::pair<uint64_t, uint64_t>;
+using HostsMap = absl::flat_hash_map<LocalityEndpointTuple, HostSharedPtr, LocalityEndpointHash,
+                                     LocalityEndpointEqualTo>;
 
 class ProdClusterInfoFactory : public ClusterInfoFactory, Logger::Loggable<Logger::Id::upstream> {
 public:
@@ -101,7 +103,7 @@ private:
 
   HostVectorSharedPtr hosts_;
   HostsPerLocalitySharedPtr hosts_per_locality_;
-  absl::flat_hash_map<HostsMapKey, HostSharedPtr> hosts_map_;
+  HostsMap hosts_map_;
   ClusterInfoConstSharedPtr info_;
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers_;
   absl::flat_hash_map<uint64_t, Upstream::HealthCheckerSharedPtr> health_checkers_map_;

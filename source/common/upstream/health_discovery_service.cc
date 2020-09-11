@@ -368,13 +368,12 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
 
   // Iterate over every endpoint in every cluster.
   for (const auto& locality_endpoints : cluster_.load_assignment().endpoints()) {
-    const auto locality_hash = MessageUtil::hash(locality_endpoints.locality());
     // Add a locality grouping to the hosts sorted by locality.
     hosts_by_locality.emplace_back();
     hosts_by_locality.back().reserve(locality_endpoints.lb_endpoints_size());
 
     for (const auto& host : locality_endpoints.lb_endpoints()) {
-      const HostsMapKey endpoint_key = {locality_hash, MessageUtil::hash(host)};
+      const LocalityEndpointTuple endpoint_key = {locality_endpoints.locality(), host};
       // Initialize an endpoint host object.
       HostSharedPtr endpoint = std::make_shared<HostImpl>(
           info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()), nullptr, 1,
@@ -463,13 +462,12 @@ void HdsCluster::updateHosts(
   std::vector<HostSharedPtr> hosts_added;
   std::vector<HostSharedPtr> hosts_removed;
   std::vector<HostVector> hosts_by_locality;
-  absl::flat_hash_map<HostsMapKey, HostSharedPtr> hosts_map;
+  HostsMap hosts_map;
 
   for (auto& endpoints : locality_endpoints) {
-    uint64_t locality_hash = MessageUtil::hash(endpoints.locality());
     hosts_by_locality.emplace_back();
     for (auto& endpoint : endpoints.lb_endpoints()) {
-      HostsMapKey endpoint_key = {locality_hash, MessageUtil::hash(endpoint)};
+      LocalityEndpointTuple endpoint_key = {endpoints.locality(), endpoint};
 
       auto host_pair = hosts_map_.find(endpoint_key);
       HostSharedPtr host;

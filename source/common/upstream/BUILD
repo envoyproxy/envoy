@@ -216,6 +216,7 @@ envoy_cc_library(
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//include/envoy/upstream:locality_endpoint_lib",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:backoff_lib",
         "//source/common/common:minimal_logger_lib",

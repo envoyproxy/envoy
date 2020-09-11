@@ -96,6 +96,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "locality_endpoint_lib",
+    hdrs = ["locality_endpoint.h"],
+    deps = [
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "outlier_detection_interface",
     hdrs = ["outlier_detection.h"],
     external_deps = ["abseil_optional"],
