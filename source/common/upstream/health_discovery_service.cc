@@ -417,7 +417,7 @@ void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluste
     updateHosts(endpoints);
   }
 
-  const uint64_t health_checkers_hash = RepeatedPtrUtil::hash(cluster.health_checks());
+  const uint64_t health_checkers_hash = RepeatedPtrUtil::hash(cluster_.health_checks());
   if (health_checkers_hash_ != health_checkers_hash) {
     ENVOY_LOG(debug, "health checkers have changed, updating");
     health_checkers_hash_ = health_checkers_hash;

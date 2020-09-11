@@ -826,7 +826,7 @@ TEST_F(HdsTest, TestUpdateEndpoints) {
   hds_delegate_->onReceiveMessage(std::move(message));
   hds_delegate_->sendResponse();
 
-  //
+  // Save list of hosts/endpoints for comparison later.
   auto original_hosts = hds_delegate_->hdsClusters()[1]->hosts();
   ASSERT_EQ(original_hosts.size(), 2);
 
@@ -873,14 +873,16 @@ TEST_F(HdsTest, TestUpdateEndpoints) {
 }
 
 // Test adding, reusing, and removing health checks.
-TEST_F(HdsTest, TestUpdateEndpoints) {
+TEST_F(HdsTest, TestUpdateHealthCheckers) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
-  // Create Message, and later add/remove endpoints from the second cluster.
+  // Create Message with two different health checkers.
   message.reset(createSimpleMessage());
-  message->MergeFrom(*createComplexSpecifier(1, 1, 2));
+  auto new_hc = message->mutable_cluster_health_checks(0)->add_health_checks();
+  new_hc->MergeFrom(message->mutable_cluster_health_checks(0)->health_checks(0));
+  new_hc->mutable_http_health_check()->set_path("/different_path");
 
   // Create a new active connection on request, setting its status to connected
   // to mock a found endpoint.
@@ -906,50 +908,32 @@ TEST_F(HdsTest, TestUpdateEndpoints) {
   hds_delegate_->onReceiveMessage(std::move(message));
   hds_delegate_->sendResponse();
 
-  //
-  auto original_hosts = hds_delegate_->hdsClusters()[1]->hosts();
-  ASSERT_EQ(original_hosts.size(), 2);
+  // Save list of health checkers for use later.
+  auto original_hcs = hds_delegate_->hdsClusters()[0]->healthCheckers();
+  ASSERT_EQ(original_hcs.size(), 2);
 
-  // Add 3 endpoints to the specifier's second cluster. The first in the list should reuse pointers.
+  // Create a new specifier, but make the second health checker different and add a third.
+  // Then reverse the order so the first one is at the end, testing the hashing works as expected.
   message.reset(createSimpleMessage());
-  message->MergeFrom(*createComplexSpecifier(1, 1, 5));
+  auto new_hc0 = message->mutable_cluster_health_checks(0)->add_health_checks();
+  new_hc0->MergeFrom(message->mutable_cluster_health_checks(0)->health_checks(0));
+  new_hc0->mutable_http_health_check()->set_path("/path0");
+  auto new_hc1 = message->mutable_cluster_health_checks(0)->add_health_checks();
+  new_hc1->MergeFrom(message->mutable_cluster_health_checks(0)->health_checks(0));
+  new_hc1->mutable_http_health_check()->set_path("/path1");
+  message->mutable_cluster_health_checks(0)->mutable_health_checks()->SwapElements(0, 2);
   hds_delegate_->onReceiveMessage(std::move(message));
 
-  // Get the new clusters list from HDS.
-  auto new_hosts = hds_delegate_->hdsClusters()[1]->hosts();
-  ASSERT_EQ(new_hosts.size(), 5);
+  // Get the new health check list from HDS.
+  auto new_hcs = hds_delegate_->hdsClusters()[0]->healthCheckers();
+  ASSERT_EQ(new_hcs.size(), 3);
 
-  // Make sure our first two endpoints are at the same address in memory as before.
-  for (int i = 0; i < 2; i++) {
-    EXPECT_EQ(original_hosts[i], new_hosts[i]);
-  }
-  EXPECT_TRUE(original_hosts[0] != new_hosts[2]);
+  // Make sure our first hc from the original list is the same as the third in the new list.
+  EXPECT_EQ(original_hcs[0], new_hcs[2]);
+  EXPECT_TRUE(original_hcs[1] != new_hcs[1]);
 
-  // This time, have 4 endpoints, 2 each under 2 localities.
-  // The first locality will be reused, so its 2 endpoints will be as well.
-  // The second locality is new so we should be getting 2 new endpoints.
-  // Since the first locality had 5 but now has 2, we are removing 3.
-  // 2 ADDED, 3 REMOVED, 2 REUSED.
-  message.reset(createSimpleMessage());
-  message->MergeFrom(*createComplexSpecifier(1, 2, 2));
-  hds_delegate_->onReceiveMessage(std::move(message));
-
-  // Get this new list of hosts.
-  auto final_hosts = hds_delegate_->hdsClusters()[1]->hosts();
-  ASSERT_EQ(final_hosts.size(), 4);
-
-  // Ensure the first two elements in the new list are reused.
-  for (int i = 0; i < 2; i++) {
-    EXPECT_EQ(new_hosts[i], final_hosts[i]);
-  }
-
-  // Ensure the first last two elements in the new list are different then the previous list.
-  for (int i = 2; i < 4; i++) {
-    EXPECT_TRUE(new_hosts[i] != final_hosts[i]);
-  }
-
-  // Check to see that HDS got three requests, and updated three times with it.
-  checkHdsCounters(3, 0, 0, 3);
+  // Check to see that HDS got two requests, and updated two times with it.
+  checkHdsCounters(2, 0, 0, 2);
 }
 
 } // namespace Upstream
