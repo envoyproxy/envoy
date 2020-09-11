@@ -128,9 +128,7 @@ for how to update or override dependencies.
     ```
 
     See [Using Bazel on Windows](https://docs.bazel.build/versions/master/windows.html) page for 
-    other common issues, such as 
-    [symlink support](https://docs.bazel.build/versions/master/windows.html#enable-symlink-support)
-    and further [long path issues](https://docs.bazel.build/versions/master/windows.html#avoid-long-path-issues).
+    other common issues.
 
     [python3](https://www.python.org/downloads/): Specifically, the Windows-native flavor distributed
     by python.org. The POSIX flavor available via MSYS2, the Windows Store flavor and other distributions
@@ -193,11 +191,6 @@ for how to update or override dependencies.
     In the MSYS2 shell, install additional packages via pacman:
     ```
     pacman -S diffutils patch unzip zip
-    ```
-
-    Check that the PATH variable in the MSYS2 shell is not truncated because of spaces:
-    ```
-    $PATH
     ```
 
     [Git](https://git-scm.com/downloads): This version from the Git project, or the version
