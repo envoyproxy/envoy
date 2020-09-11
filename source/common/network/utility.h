@@ -282,7 +282,7 @@ public:
 
   /**
    * Returns socket type corresponding to SocketAddress.protocol value of the
-   * given address, or SocketType::Stream if the address is a pipe address.
+   * given address, or SocketType::Stream if the address is a pipe address or internal address.
    * @param proto_address the address protobuf
    * @return socket type
    */

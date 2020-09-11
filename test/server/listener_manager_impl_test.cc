@@ -4824,6 +4824,72 @@ TEST_F(ListenerManagerImplTest, TcpBacklogCustomConfig) {
   EXPECT_EQ(100U, manager_->listeners().back().get().tcpBacklogSize());
 }
 
+// Test that internal listener config can be added.
+TEST_F(ListenerManagerImplTest, InternalListenerBasic) {
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+internal_listener: {}
+reuse_port: false
+address:
+  envoy_internal_address:
+    server_listener_name: listener_foo
+filter_chains:
+  filters: []
+    )EOF");
+
+  manager_->addOrUpdateListener(listener, "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+// Test internal listener can be updated and drained.
+TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, InternalListenerUpdate) {
+  const envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(R"EOF(
+name: listener_name_foo
+internal_listener: {}
+reuse_port: false
+address:
+  envoy_internal_address:
+    server_listener_name: listener_foo
+filter_chains:
+  filters: []
+    )EOF");
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+
+  // expectAddListener(listener_proto, listener_foo) except no listen socket
+  {
+    // EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+    EXPECT_CALL(*worker_, addListener(_, _, _));
+    manager_->addOrUpdateListener(listener_proto, "", true);
+    worker_->callAddCompletion(true);
+    EXPECT_EQ(1UL, manager_->listeners().size());
+    checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+  }
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(false, true);
+
+  auto new_listener_proto = listener_proto;
+  new_listener_proto.set_traffic_direction(::envoy::config::core::v3::TrafficDirection::INBOUND);
+  expectUpdateToThenDrain(new_listener_proto, listener_foo);
+
+  //   expectRemove(new_listener_proto, listener_foo_update1) except no socket close_
+  {
+    EXPECT_CALL(*worker_, stopListener(_, _));
+    // EXPECT_CALL(*listener_factory_.socket_, close());
+    EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
+    EXPECT_TRUE(manager_->removeListener(new_listener_proto.name()));
+
+    EXPECT_CALL(*worker_, removeListener(_, _));
+    listener_foo_update1->drain_manager_->drain_sequence_completion_();
+
+    EXPECT_CALL(*listener_foo_update1, onDestroy());
+    worker_->callRemovalCompletion();
+  }
+  EXPECT_EQ(0UL, manager_->listeners().size());
+  EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

@@ -54,7 +54,8 @@ public:
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
-  // Register the internal listener to setup the internal connection. Pass nullptr callback to unregister.
+  // Register the internal listener to setup the internal connection. Pass nullptr callback to
+  // unregister.
   void registerInternalListener(const std::string& internal_listener_id,
                                 InternalConnectionCallback internal_conn_callback);
 

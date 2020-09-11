@@ -22,7 +22,7 @@ protected:
   void setupInternalListener(Event::DispatcherImpl& dispatcher,
                              const std::string& internal_listener_id);
 
-// TODO(lambdai): make it private
+  // TODO(lambdai): make it private
 public:
   std::string internal_listener_id_;
   Event::DispatcherImpl& dispatcher_;

@@ -12,7 +12,6 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
-
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
@@ -20,8 +19,8 @@
 
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"
-#include "common/stream_info/stream_info_impl.h"
 #include "common/network/internal_listener_impl.h"
+#include "common/stream_info/stream_info_impl.h"
 
 #include "spdlog/spdlog.h"
 

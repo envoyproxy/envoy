@@ -3,8 +3,10 @@
 #include <memory>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/network/address.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/drain_manager.h"
@@ -57,7 +59,9 @@ public:
    * @return the socket shared by worker threads; otherwise return null.
    */
   Network::SocketOptRef sharedSocket() const override {
-    if (!reuse_port_) {
+    if (!reuse_port_ &&
+        // EnvoyInternalAddress is always handled by worker.
+        local_address_->type() != Network::Address::Type::EnvoyInternal) {
       ASSERT(socket_ != nullptr);
       return *socket_;
     }

@@ -512,10 +512,13 @@ Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto
     }
   }
   case envoy::config::core::v3::Address::AddressCase::kPipe:
-    return Socket::Type::Stream;
-  default:
+    FALLTHRU;
+  case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
+    break;
+  case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  return Socket::Type::Stream;
 }
 
 Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, const Buffer::Instance& buffer,

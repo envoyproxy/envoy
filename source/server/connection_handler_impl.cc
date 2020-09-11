@@ -650,9 +650,8 @@ ConnectionHandlerImpl::ActiveInternalListener::~ActiveInternalListener() {
 
 void ConnectionHandlerImpl::ActiveInternalListener::shutdownListener() {
   internal_listener_->dispatcher_.registerInternalListener(
-          internal_listener_->internal_listener_id_,
-    /* connection_callback= */nullptr
-  );
+      internal_listener_->internal_listener_id_,
+      /* connection_callback= */ nullptr);
 }
 // Copied from newConnection(). Invoked by SetupPipeListener.
 void ConnectionHandlerImpl::ActiveInternalListener::setupNewConnection(

@@ -56,8 +56,8 @@ public:
   }
 
   Network::ClientConnectionPtr
-  createInternalConnection(Network::Address::InstanceConstSharedPtr internal_address,
-                           Network::Address::InstanceConstSharedPtr local_address) override {
+  createInternalConnection(Network::Address::InstanceConstSharedPtr,
+                           Network::Address::InstanceConstSharedPtr) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 

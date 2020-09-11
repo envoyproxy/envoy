@@ -1132,21 +1132,13 @@ TEST_F(ConnectionHandlerTest, TcpBacklogCustom) {
   handler_->addListener(absl::nullopt, *test_listener);
 }
 
+TEST_F(ConnectionHandlerTest, AddInternalListener) {}
 
-TEST_F(ConnectionHandlerTest, AddInternalListener) {
-}
+TEST_F(ConnectionHandlerTest, StopInternalListener) {}
 
-TEST_F(ConnectionHandlerTest, StopInternalListener) {
-}
+TEST_F(ConnectionHandlerTest, InternalListenerAddConnection) {}
 
-TEST_F(ConnectionHandlerTest, InternalListenerAddConnection) {
-}
-
-TEST_F(ConnectionHandlerTest, RemoveInternalListener) {
-}
-
-
-
+TEST_F(ConnectionHandlerTest, RemoveInternalListener) {}
 
 } // namespace
 } // namespace Server

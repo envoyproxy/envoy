@@ -64,7 +64,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& facto
                                                  const std::string& listener_name, bool reuse_port)
     : factory_(factory), local_address_(address), socket_type_(socket_type), options_(options),
       bind_to_port_(bind_to_port), listener_name_(listener_name), reuse_port_(reuse_port) {
-  // TODO(lambdai): Dispatch by address type.      
+  // TODO(lambdai): Dispatch by address type.
   bool create_socket = false;
   if (local_address_->type() == Network::Address::Type::Ip) {
     if (socket_type_ == Network::Socket::Type::Datagram) {
