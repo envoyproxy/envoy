@@ -53,9 +53,9 @@ public:
   Address::Type addressType() const override { return addr_type_; }
   absl::optional<Address::IpVersion> ipVersion() const override;
 
-protected:
   SocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address);
 
+protected:
   const IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   OptionsSharedPtr options_;
