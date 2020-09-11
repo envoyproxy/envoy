@@ -494,7 +494,9 @@ void InstanceImpl::initialize(const Options& options,
   if (bootstrap_.dynamic_resources().has_lds_config() ||
       bootstrap_.dynamic_resources().has_lds_resources_locator()) {
     listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config(),
-                                    bootstrap_.dynamic_resources().lds_resources_locator());
+                                    bootstrap_.dynamic_resources().has_lds_resources_locator()
+                                        ? &bootstrap_.dynamic_resources().lds_resources_locator()
+                                        : nullptr);
   }
 
   // We have to defer RTDS initialization until after the cluster manager is

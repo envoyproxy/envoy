@@ -20,7 +20,7 @@ namespace Envoy {
 namespace Server {
 
 LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
-                       const udpa::core::v1::ResourceLocator& lds_resources_locator,
+                       const udpa::core::v1::ResourceLocator* lds_resources_locator,
                        Upstream::ClusterManager& cm, Init::Manager& init_manager,
                        Stats::Scope& scope, ListenerManager& lm,
                        ProtobufMessage::ValidationVisitor& validation_visitor)
@@ -29,12 +29,12 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
       listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
       init_target_("LDS", [this]() { subscription_->start({}); }) {
   const auto resource_name = getResourceName();
-  if (lds_resources_locator.ByteSize() == 0) {
+  if (lds_resources_locator == nullptr) {
     subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
         lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
   } else {
     subscription_ = cm.subscriptionFactory().collectionSubscriptionFromUrl(
-        lds_resources_locator, lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this,
+        *lds_resources_locator, lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this,
         resource_decoder_);
   }
   init_manager.add(init_target_);

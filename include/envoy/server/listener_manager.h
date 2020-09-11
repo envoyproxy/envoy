@@ -61,7 +61,7 @@ public:
    * @param lds_resources_locator udpa::core::v1::ResourceLocator for listener collection.
    */
   virtual LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
-                                 const udpa::core::v1::ResourceLocator& lds_resources_locator) PURE;
+                                 const udpa::core::v1::ResourceLocator* lds_resources_locator) PURE;
 
   /**
    * Creates a socket.
@@ -172,7 +172,7 @@ public:
    * @param lds_resources_locator udpa::core::v1::ResourceLocator for listener collection.
    */
   virtual void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
-                            const udpa::core::v1::ResourceLocator& lds_resources_locator) PURE;
+                            const udpa::core::v1::ResourceLocator* lds_resources_locator) PURE;
 
   /**
    * @param state the type of listener to be returned (defaults to ACTIVE), states can be OR'd
