@@ -10,21 +10,22 @@ check_validated() {
     dates=($(grep -oP '\d\d:\d\d:\d\d' <<< "$1"))
     # Make sure they are different
     if [[ ${dates[0]} == ${dates[1]} ]]; then
-       echo "ERROR: validated responses should have a date AFTER the generation timestamp"
+       echo "ERROR: validated responses should have a date AFTER the generation timestamp" >&2
        return 1
     fi
     # Make sure there is no age header
-    grep -q "age:" <<< "$1" && {
-        echo "ERROR: validated responses should not have an age header"
+    if grep -q "age:" <<< "$1"; then
+        echo "ERROR: validated responses should not have an age header" >&2
         return 1
-    }
+    fi
 }
 
 check_cached() {
     # Make sure there is an age header
-    grep -q "age:" <<< "$1" || {
-        echo "ERROR: cached responses should have an age header"
-    }
+    if ! grep -q "age:" <<< "$1"; then
+        echo "ERROR: cached responses should have an age header" >&2
+        return 1
+    fi
 }
 
 check_from_origin() {
@@ -32,20 +33,20 @@ check_from_origin() {
     dates=($(grep -oP '\d\d:\d\d:\d\d' <<< "$1"))
     # Make sure they are equal
     if [[ ${dates[0]} != ${dates[1]} ]]; then
-       echo "ERROR: responses from origin should have a date equal to the generation timestamp" 
+       echo "ERROR: responses from origin should have a date equal to the generation timestamp" >&2
        return 1
     fi
     # Make sure there is no age header
-    grep -q "age:" <<< "$1" && {
-        echo "ERROR: responses from origin should not have an age header"
+    if grep -q "age:" <<< "$1" ; then
+        echo "ERROR: responses from origin should not have an age header" >&2
         return 1
-    }
+    fi
 }
 
 
 run_log "Valid-for-minute: First request should be served by the origin"
 response=$(curl -si localhost:8000/service/1/valid-for-minute)
-#check_from_origin "$response"
+check_from_origin "$response"
 
 run_log "Snooze for 30 seconds"
 sleep 30
@@ -57,7 +58,7 @@ check_cached "$response"
 run_log "Snooze for 31 more seconds"
 sleep 31
 
-run_log "Valid-for-minute: Third request should be validated as the response max-age is a minute"
+run_log "Valid-for-minute: More than a minute has passed, this request should get a validated response"
 response=$(curl -si localhost:8000/service/1/valid-for-minute)
 check_validated "$response"
 
