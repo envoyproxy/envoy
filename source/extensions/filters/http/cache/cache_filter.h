@@ -49,7 +49,7 @@ public:
 private:
   // Utility functions; make any necessary checks and call the corresponding lookup_ functions
   void getHeaders(Http::RequestHeaderMap& request_headers);
-  void getBody();
+  void maybeGetBody();
   void getTrailers();
 
   // Callbacks for HttpCache to call when headers/body/trailers are ready.
@@ -79,12 +79,10 @@ private:
   // or during encoding if a cache entry was validated successfully.
   void encodeCachedResponse();
 
-  // Initializes remaining_ranges_. It divides the given range into several ranges, if necessary, so
-  // that each range does not exceed the encoding buffer limit. Currently, this takes in a single
-  // AdjustedByteRange, which can be either a single-part range or the entire body.
-  // TODO(yosrym93): When multi-part ranges are supported, this will need to take in multiple
-  // ranges.
-  void initRanges(AdjustedByteRange&& range);
+  bool shouldFetchMoreData() {
+    // No outstanding high watermark callbacks and we are not already fetching any data.
+    return high_watermark_calls_ == 0 && !ongoing_fetch_;
+  }
 
   TimeSource& time_source_;
   HttpCache& cache_;
@@ -93,7 +91,6 @@ private:
   LookupResultPtr lookup_result_;
 
   // Tracks what body bytes still need to be read from the cache.
-  // Must be initialized with initRanges.
   std::vector<AdjustedByteRange> remaining_ranges_;
 
   // TODO(#12901): The allowlist could be constructed only once directly from the config, instead of
@@ -109,9 +106,9 @@ private:
   // https://httpwg.org/specs/rfc7234.html#response.cacheability
   bool request_allows_inserts_ = false;
 
-  // True if the encoding buffer is above its high watermark. Fetching body chunks from cache should
-  // be pause while this is true.
-  bool encode_buffer_high_watermark_ = false;
+  // These are used to keep track of whether we should fetch more data from the cache.
+  int high_watermark_calls_ = 0;
+  bool ongoing_fetch_ = false;
 
   enum class FilterState {
     Initial,

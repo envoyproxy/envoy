@@ -123,14 +123,14 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
   return Http::FilterDataStatus::Continue;
 }
 
-void CacheFilter::onAboveWriteBufferHighWatermark() { encode_buffer_high_watermark_ = true; }
+void CacheFilter::onAboveWriteBufferHighWatermark() { high_watermark_calls_++; }
 
 void CacheFilter::onBelowWriteBufferLowWatermark() {
-  ASSERT(encode_buffer_high_watermark_);
-  encode_buffer_high_watermark_ = false;
+  ASSERT(high_watermark_calls_ > 0);
+  high_watermark_calls_--;
   if (!remaining_ranges_.empty()) {
-    // Cached body fetch was stopped, resume fetching.
-    getBody();
+    // Fetching the cached response body was stopped, continue if possible.
+    maybeGetBody();
   }
 }
 
@@ -173,9 +173,20 @@ void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
   });
 }
 
-void CacheFilter::getBody() {
+void CacheFilter::maybeGetBody() {
   ASSERT(lookup_, "CacheFilter is trying to call getBody with no LookupContext");
   ASSERT(!remaining_ranges_.empty(), "No reason to call getBody when there's no body to get.");
+
+  if (!shouldFetchMoreData()) {
+    return;
+  }
+
+  // Make sure we are not fetching a chunk of data larger than the encoding buffer limit.
+  uint64_t begin = remaining_ranges_[0].begin();
+  uint64_t end = std::min(remaining_ranges_[0].end(),
+                          remaining_ranges_[0].begin() + encoder_callbacks_->encoderBufferLimit());
+  AdjustedByteRange range_to_fetch = {begin, end};
+
   // If the cache posts a callback to the dispatcher then the CacheFilter is destroyed for any
   // reason (e.g client disconnected and HTTP stream terminated), then there is no guarantee that
   // the posted callback will run before the filter is deleted. Hence, a weak_ptr to the CacheFilter
@@ -185,8 +196,8 @@ void CacheFilter::getBody() {
 
   // The dispatcher needs to be captured because there's no guarantee that
   // decoder_callbacks_->dispatcher() is thread-safe.
-  lookup_->getBody(remaining_ranges_[0], [self, &dispatcher = decoder_callbacks_->dispatcher()](
-                                             Buffer::InstancePtr&& body) {
+  lookup_->getBody(range_to_fetch, [self, &dispatcher = decoder_callbacks_->dispatcher()](
+                                       Buffer::InstancePtr&& body) {
     // The callback is posted to the dispatcher to make sure it is called on the worker thread.
     // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
     // initialize a std::function. Therefore, it cannot capture anything non-copyable.
@@ -200,6 +211,7 @@ void CacheFilter::getBody() {
       }
     });
   });
+  ongoing_fetch_ = true;
 }
 
 void CacheFilter::getTrailers() {
@@ -274,7 +286,7 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
                        lookup_result_->content_length_));
       // We serve only the desired range, so adjust the length accordingly.
       lookup_result_->setContentLength(lookup_result_->response_ranges_[0].length());
-      initRanges(std::move(lookup_result_->response_ranges_[0]));
+      remaining_ranges_ = std::move(lookup_result_->response_ranges_);
       encodeCachedResponse();
       break;
     }
@@ -310,6 +322,8 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
          "bogus callback.");
   ASSERT(body, "Cache said it had a body, but isn't giving it to us.");
 
+  ongoing_fetch_ = false;
+
   const uint64_t bytes_from_cache = body->length();
   if (bytes_from_cache < remaining_ranges_[0].length()) {
     remaining_ranges_[0].trimFront(bytes_from_cache);
@@ -328,8 +342,8 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
       ? decoder_callbacks_->encodeData(*body, end_stream)
       : encoder_callbacks_->injectEncodedDataToFilterChain(*body, end_stream);
 
-  if (!remaining_ranges_.empty() && !encode_buffer_high_watermark_) {
-    getBody();
+  if (!remaining_ranges_.empty()) {
+    maybeGetBody();
   } else if (response_has_trailers_) {
     getTrailers();
   }
@@ -475,23 +489,11 @@ void CacheFilter::encodeCachedResponse() {
   if (lookup_result_->content_length_ > 0) {
     if (remaining_ranges_.empty()) {
       // This is not a range request, encode the entire body.
-      initRanges({0, lookup_result_->content_length_});
+      remaining_ranges_.emplace_back(0, lookup_result_->content_length_);
     }
-    getBody();
+    maybeGetBody();
   } else if (response_has_trailers_) {
     getTrailers();
-  }
-}
-
-void CacheFilter::initRanges(AdjustedByteRange&& range) {
-  // The body should be fetched in sequential chunks, where each chunk's size does not exceed
-  // the buffer limit.
-  uint64_t offset = range.begin();
-  uint64_t max_chunk_size = encoder_callbacks_->encoderBufferLimit();
-  while (offset < range.end()) {
-    uint64_t chunk_size = std::min(max_chunk_size, range.end() - offset);
-    remaining_ranges_.emplace_back(offset, offset + chunk_size);
-    offset += chunk_size;
   }
 }
 
