@@ -576,10 +576,6 @@ void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_
   static_cast<HostSetImpl*>(host_sets_[priority].get())
       ->updateHosts(std::move(update_hosts_params), std::move(locality_weights), hosts_added,
                     hosts_removed, overprovisioning_factor);
-
-  if (!batch_update_) {
-    runUpdateCallbacks(hosts_added, hosts_removed);
-  }
 }
 
 void PrioritySetImpl::batchHostUpdate(BatchUpdateCb& callback) {

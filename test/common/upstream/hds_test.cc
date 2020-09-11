@@ -747,9 +747,10 @@ TEST_F(HdsTest, TestClusterChange) {
   EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
-  auto response1 = hds_delegate_->sendResponse();
+  hds_delegate_->sendResponse();
 
-  // Get cluster raw pointers to make sure they are the same addresses, that we reused them.
+  // Get cluster shared pointers to make sure they are the same memory addresses, that we reused
+  // them.
   auto original_clusters = hds_delegate_->hdsClusters();
   ASSERT_EQ(original_clusters.size(), 2);
 
@@ -785,6 +786,166 @@ TEST_F(HdsTest, TestClusterChange) {
   // and that the second cluster in the new list is the same as the second in the previous.
   for (int i = 0; i < 2; i++) {
     EXPECT_EQ(final_clusters[i], new_clusters[2 - i]);
+  }
+
+  // Check to see that HDS got three requests, and updated three times with it.
+  checkHdsCounters(3, 0, 0, 3);
+}
+
+// Edit one of two cluster's endpoints by adding and removing.
+TEST_F(HdsTest, TestUpdateEndpoints) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message, and later add/remove endpoints from the second cluster.
+  message.reset(createSimpleMessage());
+  message->MergeFrom(*createComplexSpecifier(1, 1, 2));
+
+  // Create a new active connection on request, setting its status to connected
+  // to mock a found endpoint.
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+      .WillRepeatedly(Invoke(
+          [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
+             Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
+            Network::MockClientConnection* connection =
+                new NiceMock<Network::MockClientConnection>();
+
+            // pretend our endpoint was connected to.
+            connection->raiseEvent(Network::ConnectionEvent::Connected);
+
+            // return this new, connected endpoint.
+            return connection;
+          }));
+
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  hds_delegate_->sendResponse();
+
+  //
+  auto original_hosts = hds_delegate_->hdsClusters()[1]->hosts();
+  ASSERT_EQ(original_hosts.size(), 2);
+
+  // Add 3 endpoints to the specifier's second cluster. The first in the list should reuse pointers.
+  message.reset(createSimpleMessage());
+  message->MergeFrom(*createComplexSpecifier(1, 1, 5));
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Get the new clusters list from HDS.
+  auto new_hosts = hds_delegate_->hdsClusters()[1]->hosts();
+  ASSERT_EQ(new_hosts.size(), 5);
+
+  // Make sure our first two endpoints are at the same address in memory as before.
+  for (int i = 0; i < 2; i++) {
+    EXPECT_EQ(original_hosts[i], new_hosts[i]);
+  }
+  EXPECT_TRUE(original_hosts[0] != new_hosts[2]);
+
+  // This time, have 4 endpoints, 2 each under 2 localities.
+  // The first locality will be reused, so its 2 endpoints will be as well.
+  // The second locality is new so we should be getting 2 new endpoints.
+  // Since the first locality had 5 but now has 2, we are removing 3.
+  // 2 ADDED, 3 REMOVED, 2 REUSED.
+  message.reset(createSimpleMessage());
+  message->MergeFrom(*createComplexSpecifier(1, 2, 2));
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Get this new list of hosts.
+  auto final_hosts = hds_delegate_->hdsClusters()[1]->hosts();
+  ASSERT_EQ(final_hosts.size(), 4);
+
+  // Ensure the first two elements in the new list are reused.
+  for (int i = 0; i < 2; i++) {
+    EXPECT_EQ(new_hosts[i], final_hosts[i]);
+  }
+
+  // Ensure the first last two elements in the new list are different then the previous list.
+  for (int i = 2; i < 4; i++) {
+    EXPECT_TRUE(new_hosts[i] != final_hosts[i]);
+  }
+
+  // Check to see that HDS got three requests, and updated three times with it.
+  checkHdsCounters(3, 0, 0, 3);
+}
+
+// Test adding, reusing, and removing health checks.
+TEST_F(HdsTest, TestUpdateEndpoints) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message, and later add/remove endpoints from the second cluster.
+  message.reset(createSimpleMessage());
+  message->MergeFrom(*createComplexSpecifier(1, 1, 2));
+
+  // Create a new active connection on request, setting its status to connected
+  // to mock a found endpoint.
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+      .WillRepeatedly(Invoke(
+          [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
+             Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
+            Network::MockClientConnection* connection =
+                new NiceMock<Network::MockClientConnection>();
+
+            // pretend our endpoint was connected to.
+            connection->raiseEvent(Network::ConnectionEvent::Connected);
+
+            // return this new, connected endpoint.
+            return connection;
+          }));
+
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  hds_delegate_->sendResponse();
+
+  //
+  auto original_hosts = hds_delegate_->hdsClusters()[1]->hosts();
+  ASSERT_EQ(original_hosts.size(), 2);
+
+  // Add 3 endpoints to the specifier's second cluster. The first in the list should reuse pointers.
+  message.reset(createSimpleMessage());
+  message->MergeFrom(*createComplexSpecifier(1, 1, 5));
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Get the new clusters list from HDS.
+  auto new_hosts = hds_delegate_->hdsClusters()[1]->hosts();
+  ASSERT_EQ(new_hosts.size(), 5);
+
+  // Make sure our first two endpoints are at the same address in memory as before.
+  for (int i = 0; i < 2; i++) {
+    EXPECT_EQ(original_hosts[i], new_hosts[i]);
+  }
+  EXPECT_TRUE(original_hosts[0] != new_hosts[2]);
+
+  // This time, have 4 endpoints, 2 each under 2 localities.
+  // The first locality will be reused, so its 2 endpoints will be as well.
+  // The second locality is new so we should be getting 2 new endpoints.
+  // Since the first locality had 5 but now has 2, we are removing 3.
+  // 2 ADDED, 3 REMOVED, 2 REUSED.
+  message.reset(createSimpleMessage());
+  message->MergeFrom(*createComplexSpecifier(1, 2, 2));
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Get this new list of hosts.
+  auto final_hosts = hds_delegate_->hdsClusters()[1]->hosts();
+  ASSERT_EQ(final_hosts.size(), 4);
+
+  // Ensure the first two elements in the new list are reused.
+  for (int i = 0; i < 2; i++) {
+    EXPECT_EQ(new_hosts[i], final_hosts[i]);
+  }
+
+  // Ensure the first last two elements in the new list are different then the previous list.
+  for (int i = 2; i < 4; i++) {
+    EXPECT_TRUE(new_hosts[i] != final_hosts[i]);
   }
 
   // Check to see that HDS got three requests, and updated three times with it.

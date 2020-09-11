@@ -459,7 +459,7 @@ void HdsCluster::updateHealthchecks(
 void HdsCluster::updateHosts(
     const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
         locality_endpoints) {
-  HostVectorSharedPtr hosts;
+  HostVectorSharedPtr hosts = std::make_shared<std::vector<HostSharedPtr>>();
   std::vector<HostSharedPtr> hosts_added;
   std::vector<HostSharedPtr> hosts_removed;
   std::vector<HostVector> hosts_by_locality;
@@ -499,7 +499,7 @@ void HdsCluster::updateHosts(
   hosts_ = std::move(hosts);
   hosts_map_ = std::move(hosts_map);
 
-  ENVOY_LOG(debug, "HOSTS ADDED: {}, REMOVED: {}, REUSED: {}", hosts_added.size(),
+  ENVOY_LOG(debug, "Hosts Added: {}, Removed: {}, Reused: {}", hosts_added.size(),
             hosts_removed.size(), hosts_->size() - hosts_added.size());
 
   hosts_per_locality_ =
