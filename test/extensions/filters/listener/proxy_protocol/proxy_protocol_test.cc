@@ -346,10 +346,11 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
     return os_sys_calls_actual_.close(fd);
   }));
 #ifdef WIN32
-  EXPECT_CALL(os_sys_calls, setsocketblocking(_, _)).Times(AnyNumber())
+  EXPECT_CALL(os_sys_calls, setsocketblocking(_, _))
+      .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, bool block) -> Api::SysCallIntResult {
-          return os_sys_calls_actual_.setsocketblocking(sockfd, block);
-  }));
+        return os_sys_calls_actual_.setsocketblocking(sockfd, block);
+      }));
 #endif
   connect(false);
   write(buffer, sizeof(buffer));
@@ -404,10 +405,11 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
     return os_sys_calls_actual_.close(fd);
   }));
 #ifdef WIN32
-  EXPECT_CALL(os_sys_calls, setsocketblocking(_, _)).Times(AnyNumber())
+  EXPECT_CALL(os_sys_calls, setsocketblocking(_, _))
+      .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, bool block) -> Api::SysCallIntResult {
-          return os_sys_calls_actual_.setsocketblocking(sockfd, block);
-  }));
+        return os_sys_calls_actual_.setsocketblocking(sockfd, block);
+      }));
 #endif
   connect(false);
   write(buffer, sizeof(buffer));
@@ -634,10 +636,11 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
     return os_sys_calls_actual_.close(fd);
   }));
 #ifdef WIN32
-  EXPECT_CALL(os_sys_calls, setsocketblocking(_, _)).Times(AnyNumber())
+  EXPECT_CALL(os_sys_calls, setsocketblocking(_, _))
+      .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, bool block) -> Api::SysCallIntResult {
-          return os_sys_calls_actual_.setsocketblocking(sockfd, block);
-  }));
+        return os_sys_calls_actual_.setsocketblocking(sockfd, block);
+      }));
 #endif
   connect(false);
   write(buffer, sizeof(buffer));
@@ -787,10 +790,11 @@ TEST_P(ProxyProtocolTest, V2Fragmented3Error) {
     return os_sys_calls_actual_.close(fd);
   }));
 #ifdef WIN32
-  EXPECT_CALL(os_sys_calls, setsocketblocking(_, _)).Times(AnyNumber())
+  EXPECT_CALL(os_sys_calls, setsocketblocking(_, _))
+      .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, bool block) -> Api::SysCallIntResult {
-          return os_sys_calls_actual_.setsocketblocking(sockfd, block);
-  }));
+        return os_sys_calls_actual_.setsocketblocking(sockfd, block);
+      }));
 #endif
   connect(false);
   write(buffer, 17);
@@ -857,10 +861,11 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
     return os_sys_calls_actual_.close(fd);
   }));
 #ifdef WIN32
-  EXPECT_CALL(os_sys_calls, setsocketblocking(_, _)).Times(AnyNumber())
+  EXPECT_CALL(os_sys_calls, setsocketblocking(_, _))
+      .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, bool block) -> Api::SysCallIntResult {
-          return os_sys_calls_actual_.setsocketblocking(sockfd, block);
-  }));
+        return os_sys_calls_actual_.setsocketblocking(sockfd, block);
+      }));
 #endif
   connect(false);
   write(buffer, 10);

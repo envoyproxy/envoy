@@ -341,7 +341,8 @@ typed_config:
     typed_config:
       "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
       path: {}
-  )EOF", Platform::null_device_path);
+  )EOF",
+                                                    Platform::null_device_path);
         TestUtility::loadFromYaml(yaml_string, *hcm.mutable_http_filters(1));
       });
 
