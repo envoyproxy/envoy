@@ -20,9 +20,17 @@ namespace {
 
 const std::string EpochDate = "Thu, 01 Jan 1970 00:00:00 GMT";
 
+envoy::extensions::filters::http::cache::v3alpha::CacheConfig getConfig() {
+  // Allows 'accept' to be varied in the tests.
+  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
+  const auto& add_accept = config.mutable_allowed_vary_headers()->Add();
+  add_accept->set_exact("accept");
+  return config;
+}
+
 class SimpleHttpCacheTest : public testing::Test {
 protected:
-  SimpleHttpCacheTest() {
+  SimpleHttpCacheTest() : vary_allow_list_(getConfig().allowed_vary_headers()) {
     request_headers_.setMethod("GET");
     request_headers_.setHost("example.com");
     request_headers_.setForwardedProto("https");
@@ -66,9 +74,7 @@ protected:
 
   LookupRequest makeLookupRequest(absl::string_view request_path) {
     request_headers_.setPath(request_path);
-    // Using 'accept' as an allowed header to be varied for testing-purpose.
-    absl::flat_hash_set<std::string> allowed_vary_headers{"accept"};
-    return LookupRequest(request_headers_, current_time_, allowed_vary_headers);
+    return LookupRequest(request_headers_, current_time_, vary_allow_list_);
   }
 
   AssertionResult expectLookupSuccessWithBody(LookupContext* lookup_context,
@@ -97,6 +103,7 @@ protected:
   Event::SimulatedTimeSystem time_source_;
   SystemTime current_time_ = time_source_.systemTime();
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
+  VaryHeader vary_allow_list_;
 };
 
 // Simple flow of putting in an item, getting it, deleting it.
