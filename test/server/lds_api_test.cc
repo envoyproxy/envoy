@@ -40,7 +40,7 @@ public:
   void setup() {
     envoy::config::core::v3::ConfigSource lds_config;
     EXPECT_CALL(init_manager_, add(_));
-    lds_ = std::make_unique<LdsApiImpl>(lds_config, udpa::core::v1::ResourceLocator(),
+    lds_ = std::make_unique<LdsApiImpl>(lds_config, nullptr,
                                         cluster_manager_, init_manager_, store_, listener_manager_,
                                         validation_visitor_);
     EXPECT_CALL(*cluster_manager_.subscription_factory_.subscription_, start(_, _));

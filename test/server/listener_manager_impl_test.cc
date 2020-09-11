@@ -753,7 +753,7 @@ TEST_F(ListenerManagerImplTest, ListenerTeardownNotifiesServerInitManager) {
   auto* lds_api = new MockLdsApi();
   EXPECT_CALL(listener_factory_, createLdsApi_(_, _)).WillOnce(Return(lds_api));
   envoy::config::core::v3::ConfigSource lds_config;
-  manager_->createLdsApi(lds_config, {});
+  manager_->createLdsApi(lds_config, nullptr);
 
   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return(""));
   checkConfigDump(R"EOF(
@@ -885,7 +885,7 @@ TEST_F(ListenerManagerImplTest, OverrideListener) {
   auto* lds_api = new MockLdsApi();
   EXPECT_CALL(listener_factory_, createLdsApi_(_, _)).WillOnce(Return(lds_api));
   envoy::config::core::v3::ConfigSource lds_config;
-  manager_->createLdsApi(lds_config, {});
+  manager_->createLdsApi(lds_config, nullptr);
 
   // Add foo listener.
   const std::string listener_foo_yaml = R"EOF(
@@ -959,7 +959,7 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   auto* lds_api = new MockLdsApi();
   EXPECT_CALL(listener_factory_, createLdsApi_(_, _)).WillOnce(Return(lds_api));
   envoy::config::core::v3::ConfigSource lds_config;
-  manager_->createLdsApi(lds_config, {});
+  manager_->createLdsApi(lds_config, nullptr);
 
   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return(""));
   checkConfigDump(R"EOF(
