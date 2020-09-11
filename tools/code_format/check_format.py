@@ -37,6 +37,7 @@ REAL_TIME_ALLOWLIST = ("./source/common/common/utility.h",
                        "./source/common/event/real_time_system.h", "./source/exe/main_common.cc",
                        "./source/exe/main_common.h", "./source/server/config_validation/server.cc",
                        "./source/common/common/perf_annotation.h",
+                       "./test/common/common/log_macros_test.cc",
                        "./test/test_common/simulated_time_system.cc",
                        "./test/test_common/simulated_time_system.h",
                        "./test/test_common/test_time.cc", "./test/test_common/test_time.h",
@@ -691,6 +692,8 @@ def checkSourceLine(line, file_path, reportError):
   # See: https://github.com/envoyproxy/envoy/issues/12341
   if tokenInLine("std::any", line):
     reportError("Don't use std::any; use absl::any instead")
+  if tokenInLine("std::make_optional", line):
+    reportError("Don't use std::make_optional; use absl::make_optional instead")
   if tokenInLine("std::optional", line):
     reportError("Don't use std::optional; use absl::optional instead")
   if tokenInLine("std::variant", line):
