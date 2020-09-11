@@ -252,8 +252,7 @@ var Search = {
     //Search.lastresults = results.slice();  // a copy
     //console.info('search results:', Search.lastresults);
 
-    // renderApiVersionLabel renders API version for each search result item as shown in:
-    // https://user-images.githubusercontent.com/73152/92459079-6ceae580-f1f0-11ea-8d53-3073bd508532.png.
+    // renderApiVersionLabel renders API version for each search result item.
     function renderApiVersionLabel(linkUrl) {
       const filtered = linkUrl
         .split("/")
