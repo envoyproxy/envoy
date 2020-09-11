@@ -354,6 +354,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
       hosts_(new HostVector()), validation_visitor_(validation_visitor) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
+  // Set initial hashes for possible delta updates.
   endpoints_hash_ = RepeatedPtrUtil::hash(cluster_.load_assignment().endpoints());
   health_checkers_hash_ = RepeatedPtrUtil::hash(cluster_.health_checks());
 
@@ -403,22 +404,28 @@ void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluste
                         AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime) {
   cluster_ = std::move(cluster);
 
-  // always update our info_
+  // Always update our info_.
   info_ = info_factory.createClusterInfo(
       {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
        local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
 
+  // Check to see if anything in the endpoints list has changed.
   const auto& endpoints = cluster_.load_assignment().endpoints();
   const uint64_t endpoints_hash = RepeatedPtrUtil::hash(endpoints);
   if (endpoints_hash_ != endpoints_hash) {
     ENVOY_LOG(debug, "endpoints have changed, updating");
+
+    // Endpoints have changed, update the data structures.
     endpoints_hash_ = endpoints_hash;
     updateHosts(endpoints);
   }
 
+  // Check to see if any of the health checkers have changed.
   const uint64_t health_checkers_hash = RepeatedPtrUtil::hash(cluster_.health_checks());
   if (health_checkers_hash_ != health_checkers_hash) {
     ENVOY_LOG(debug, "health checkers have changed, updating");
+
+    // Health checkers have changed, so update the data structures.
     health_checkers_hash_ = health_checkers_hash;
     updateHealthchecks(cluster_.health_checks(), access_log_manager, runtime, random, dispatcher,
                        api);
@@ -434,6 +441,7 @@ void HdsCluster::updateHealthchecks(
 
   for (auto& health_check : health_checks) {
     uint64_t health_check_hash = MessageUtil::hash(health_check);
+
     // Check to see if this exact same health_check config already has a health checker.
     auto health_checker = health_checkers_map_.find(health_check_hash);
     if (health_checker != health_checkers_map_.end()) {
@@ -447,6 +455,8 @@ void HdsCluster::updateHealthchecks(
                                                  access_log_manager, validation_visitor_, api);
       health_checkers_map.insert({health_check_hash, new_health_checker});
       health_checkers.push_back(new_health_checker);
+
+      // Start these health checks now because upstream assumes they already have been started.
       new_health_checker->start();
     }
   }
@@ -458,10 +468,13 @@ void HdsCluster::updateHealthchecks(
 void HdsCluster::updateHosts(
     const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
         locality_endpoints) {
+  // Create the data structures needed for PrioritySet::update.
   HostVectorSharedPtr hosts = std::make_shared<std::vector<HostSharedPtr>>();
   std::vector<HostSharedPtr> hosts_added;
   std::vector<HostSharedPtr> hosts_removed;
   std::vector<HostVector> hosts_by_locality;
+
+  // Use for delta update comparison.
   HostsMap hosts_map;
 
   for (auto& endpoints : locality_endpoints) {
@@ -469,37 +482,50 @@ void HdsCluster::updateHosts(
     for (auto& endpoint : endpoints.lb_endpoints()) {
       LocalityEndpointTuple endpoint_key = {endpoints.locality(), endpoint};
 
+      // Check to see if this exact Locality+Endpoint has been seen before.
       auto host_pair = hosts_map_.find(endpoint_key);
       HostSharedPtr host;
       if (host_pair != hosts_map_.end()) {
+        // If we have this exact pair, save the shared pointer.
         host = host_pair->second;
       } else {
+        // We do not have this endpoint saved, so create a new one.
         auto new_host = std::make_shared<HostImpl>(
             info_, "", Network::Address::resolveProtoAddress(endpoint.endpoint().address()),
             nullptr, 1, endpoints.locality(),
             envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
             envoy::config::core::v3::UNKNOWN);
+
+        // Set the initial health status as in HdsCluster::initialize.
+        new_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+
+        // Add to our hosts added list and save the shared pointer.
         hosts_added.push_back(host);
         host = new_host;
       }
+
+      // No matter if it is reused or new, always add to these data structures.
       hosts_by_locality.back().push_back(host);
       hosts->push_back(host);
       hosts_map.insert({endpoint_key, host});
     }
   }
 
+  // Compare the old map to the new to find out which endpoints are going to be removed.
   for (auto& host_pair : hosts_map_) {
     if (!hosts_map.contains(host_pair.first)) {
       hosts_removed.push_back(host_pair.second);
     }
   }
 
+  // Update the member data structures.
   hosts_ = std::move(hosts);
   hosts_map_ = std::move(hosts_map);
 
   ENVOY_LOG(debug, "Hosts Added: {}, Removed: {}, Reused: {}", hosts_added.size(),
             hosts_removed.size(), hosts_->size() - hosts_added.size());
 
+  // Update the priority set.
   hosts_per_locality_ =
       std::make_shared<Envoy::Upstream::HostsPerLocalityImpl>(std::move(hosts_by_locality), false);
   priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},

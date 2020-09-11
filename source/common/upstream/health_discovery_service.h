@@ -67,7 +67,7 @@ public:
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
-
+  // Compare changes in the cluster proto, and update parts of the cluster as needed.
   void update(Server::Admin& admin, envoy::config::cluster::v3::Cluster cluster,
               ClusterInfoFactory& info_factory, ClusterManager& cm,
               const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
