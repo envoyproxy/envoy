@@ -99,6 +99,10 @@ public:
   // header_entry is null or malformed.
   static SystemTime httpTime(const Http::HeaderEntry* header_entry);
 
+  // Calculates the age of a cached response
+  static Seconds calculateAge(const Http::ResponseHeaderMap& response_headers,
+                              SystemTime response_time, SystemTime now);
+
   /**
    * Read a leading positive decimal integer value and advance "*str" past the
    * digits read. If overflow occurs, or no digits exist, return
