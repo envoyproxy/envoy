@@ -74,19 +74,33 @@ template <class T> T* InjectableSingleton<T>::loader_ = nullptr;
 
 template <class T> class ScopedInjectableLoader {
 public:
-  enum class PreviousSingletonBehavior { ExpectEmpty, OverrideAndRestore };
+  enum class PreviousSingletonBehavior {
+    // The ScopedInjectableLoader expects that the singleton has not been previously set,
+    // or was cleared prior to loading new one. If there is existing singleton
+    // the loader will RELEASE_ASSERT.
+    ExpectUnset,
+
+    // The ScopedInjectableLoader will automatically clear existing singleton (if present)
+    // and replace it with the new one. When an instance of ScopedInjectableLoader is destroyed
+    // the previously set singleton is restored.
+    // This option is intended to be used in unit tests to replace a singleton for the duration of
+    // the test and then restore the default singleton. A ScopedInjectableLoader with this option
+    // MUST be instantiated before the singleton is expected to be used. It is undefined behavior
+    // to replace the singleton object while it is being concurrently accessed.
+    ReplaceAndRestore
+  };
 
   explicit ScopedInjectableLoader(std::unique_ptr<T>&& instance)
-      : ScopedInjectableLoader(PreviousSingletonBehavior::ExpectEmpty, std::move(instance)) {}
+      : ScopedInjectableLoader(PreviousSingletonBehavior::ExpectUnset, std::move(instance)) {}
 
   ScopedInjectableLoader(PreviousSingletonBehavior previous_singleton_behavior,
                          std::unique_ptr<T>&& instance)
       : previous_instance_(previous_singleton_behavior ==
-                                   PreviousSingletonBehavior::OverrideAndRestore
+                                   PreviousSingletonBehavior::ReplaceAndRestore
                                ? InjectableSingleton<T>::getExisting()
                                : nullptr),
         instance_(std::move(instance)) {
-    if (previous_singleton_behavior == PreviousSingletonBehavior::OverrideAndRestore) {
+    if (previous_singleton_behavior == PreviousSingletonBehavior::ReplaceAndRestore) {
       InjectableSingleton<T>::clear();
     }
     InjectableSingleton<T>::initialize(instance_.get());

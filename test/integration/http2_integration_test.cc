@@ -1579,7 +1579,7 @@ const uint32_t AllFrameFloodLimit = 1000;
 
 Http2FloodMitigationTest::Http2FloodMitigationTest()
     : test_socket_interface_loader_(
-          Envoy::Network::SocketInterfaceLoader::PreviousSingletonBehavior::OverrideAndRestore,
+          Envoy::Network::SocketInterfaceLoader::PreviousSingletonBehavior::ReplaceAndRestore,
           std::make_unique<Envoy::Network::TestSocketInterface>(
               [writev_matcher = writev_matcher_](
                   Envoy::Network::TestIoSocketHandle* io_handle, const Buffer::RawSlice*,
