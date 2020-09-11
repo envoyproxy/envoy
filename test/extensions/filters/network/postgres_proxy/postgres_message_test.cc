@@ -490,11 +490,11 @@ TEST(PostgresMessage, SingleByteN) {
   data.writeBEInt<uint8_t>(4);
   ASSERT_TRUE(msg->read(data, 5 * 1));
   auto out = msg->toString();
-  ASSERT_TRUE(out.find("0") != std::string::npos);
-  ASSERT_TRUE(out.find("1") != std::string::npos);
-  ASSERT_TRUE(out.find("2") != std::string::npos);
-  ASSERT_TRUE(out.find("3") != std::string::npos);
-  ASSERT_TRUE(out.find("4") != std::string::npos);
+  ASSERT_TRUE(out.find("0") != std::string::npos); // NOLINT
+  ASSERT_TRUE(out.find("1") != std::string::npos); // NOLINT
+  ASSERT_TRUE(out.find("2") != std::string::npos); // NOLINT
+  ASSERT_TRUE(out.find("3") != std::string::npos); // NOLINT
+  ASSERT_TRUE(out.find("4") != std::string::npos); // NOLINT
 }
 
 TEST(PostgresMessage, NotEnoughData) {
