@@ -1,9 +1,15 @@
 #include "extensions/filters/http/cache/cache_headers_utils.h"
 
 #include <array>
+#include <chrono>
 #include <string>
 
-#include "envoy/common/time.h"
+#include "envoy/http/header_map.h"
+
+#include "common/http/header_map_impl.h"
+#include "common/http/header_utility.h"
+
+#include "extensions/filters/http/cache/inline_headers_handles.h"
 
 #include "absl/algorithm/container.h"
 #include "absl/strings/ascii.h"
@@ -28,7 +34,7 @@ OptionalDuration parseDuration(absl::string_view s) {
   long num;
   if (absl::SimpleAtoi(s, &num) && num >= 0) {
     // s is a valid string of digits representing a positive number.
-    duration = std::chrono::seconds(num);
+    duration = Seconds(num);
   }
   return duration;
 }
@@ -141,6 +147,31 @@ SystemTime CacheHeadersUtils::httpTime(const Http::HeaderEntry* header_entry) {
     }
   }
   return {};
+}
+
+Seconds CacheHeadersUtils::calculateAge(const Http::ResponseHeaderMap& response_headers,
+                                        const SystemTime response_time, const SystemTime now) {
+  // Age headers calculations follow: https://httpwg.org/specs/rfc7234.html#age.calculations
+  const SystemTime date_value = CacheHeadersUtils::httpTime(response_headers.Date());
+
+  long age_value;
+  const absl::string_view age_header = response_headers.getInlineValue(age_handle.handle());
+  if (!absl::SimpleAtoi(age_header, &age_value)) {
+    age_value = 0;
+  }
+
+  const SystemTime::duration apparent_age =
+      std::max(SystemTime::duration(0), response_time - date_value);
+
+  // Assumption: response_delay is negligible -> corrected_age_value = age_value.
+  const SystemTime::duration corrected_age_value = Seconds(age_value);
+  const SystemTime::duration corrected_initial_age = std::max(apparent_age, corrected_age_value);
+
+  // Calculate current_age:
+  const SystemTime::duration resident_time = now - response_time;
+  const SystemTime::duration current_age = corrected_initial_age + resident_time;
+
+  return std::chrono::duration_cast<Seconds>(current_age);
 }
 
 absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::string_view& str) {

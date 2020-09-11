@@ -62,14 +62,15 @@ bool CacheabilityUtils::isCacheableResponse(
   absl::string_view cache_control = headers.getInlineValue(response_cache_control_handle.handle());
   ResponseCacheControl response_cache_control(cache_control);
 
-  // Only cache responses with explicit validation data, either:
-  //    "no-cache" cache-control directive
-  //    "max-age" or "s-maxage" cache-control directives with date header
-  //    expires header
-  const bool has_validation_data =
-      response_cache_control.must_validate_ ||
-      (headers.Date() && response_cache_control.max_age_.has_value()) ||
-      headers.get(Http::Headers::get().Expires);
+  // Only cache responses with enough data to calculate freshness lifetime as per:
+  // https://httpwg.org/specs/rfc7234.html#calculating.freshness.lifetime.
+  // Either:
+  //    "no-cache" cache-control directive (requires revalidation anyway).
+  //    "max-age" or "s-maxage" cache-control directives.
+  //    Both "Expires" and "Date" headers.
+  const bool has_validation_data = response_cache_control.must_validate_ ||
+                                   response_cache_control.max_age_.has_value() ||
+                                   (headers.Date() && headers.getInline(expires_handle.handle()));
 
   return !response_cache_control.no_store_ &&
          cacheableStatusCodes().contains((headers.getStatusValue())) && has_validation_data &&

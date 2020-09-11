@@ -5,11 +5,14 @@
 #include "envoy/common/time.h"
 
 #include "common/common/macros.h"
+#include "common/common/utility.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/header_utility.h"
 
 #include "extensions/filters/http/cache/cache_headers_utils.h"
 
 #include "test/extensions/filters/http/cache/common.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -34,26 +37,9 @@ struct TestRequestCacheControl : public RequestCacheControl {
   }
 };
 
-struct TestResponseCacheControl : public ResponseCacheControl {
-  TestResponseCacheControl(bool must_validate, bool no_store, bool no_transform, bool no_stale,
-                           bool is_public, OptionalDuration max_age) {
-    must_validate_ = must_validate;
-    no_store_ = no_store;
-    no_transform_ = no_transform;
-    no_stale_ = no_stale;
-    is_public_ = is_public;
-    max_age_ = max_age;
-  }
-};
-
 struct RequestCacheControlTestCase {
   absl::string_view cache_control_header;
   TestRequestCacheControl request_cache_control;
-};
-
-struct ResponseCacheControlTestCase {
-  absl::string_view cache_control_header;
-  TestResponseCacheControl response_cache_control;
 };
 
 class RequestCacheControlTest : public testing::TestWithParam<RequestCacheControlTestCase> {
@@ -71,55 +57,55 @@ public:
         {
           "max-age=3600, min-fresh=10, no-transform, only-if-cached, no-store",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, true, true, true, std::chrono::seconds(3600), std::chrono::seconds(10), absl::nullopt}
+          {false, true, true, true, Seconds(3600), Seconds(10), absl::nullopt}
         },
         {
           "min-fresh=100, max-stale, no-cache",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {true, false, false, false, absl::nullopt, std::chrono::seconds(100), SystemTime::duration::max()}
+          {true, false, false, false, absl::nullopt, Seconds(100), SystemTime::duration::max()}
         },
         {
           "max-age=10, max-stale=50",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, std::chrono::seconds(10), absl::nullopt, std::chrono::seconds(50)}
+          {false, false, false, false, Seconds(10), absl::nullopt, Seconds(50)}
         },
         // Quoted arguments are interpreted correctly
         {
           "max-age=\"3600\", min-fresh=\"10\", no-transform, only-if-cached, no-store",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, true, true, true, std::chrono::seconds(3600), std::chrono::seconds(10), absl::nullopt}
+          {false, true, true, true, Seconds(3600), Seconds(10), absl::nullopt}
         },
         {
           "max-age=\"10\", max-stale=\"50\", only-if-cached",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, true, std::chrono::seconds(10), absl::nullopt, std::chrono::seconds(50)}
+          {false, false, false, true, Seconds(10), absl::nullopt, Seconds(50)}
         },
         // Unknown directives are ignored
         {
           "max-age=10, max-stale=50, unknown-directive",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, std::chrono::seconds(10), absl::nullopt, std::chrono::seconds(50)}
+          {false, false, false, false, Seconds(10), absl::nullopt, Seconds(50)}
         },
         {
           "max-age=10, max-stale=50, unknown-directive-with-arg=arg1",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, std::chrono::seconds(10), absl::nullopt, std::chrono::seconds(50)}
+          {false, false, false, false, Seconds(10), absl::nullopt, Seconds(50)}
         },
         {
           "max-age=10, max-stale=50, unknown-directive-with-quoted-arg=\"arg1\"",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, std::chrono::seconds(10), absl::nullopt, std::chrono::seconds(50)}
+          {false, false, false, false, Seconds(10), absl::nullopt, Seconds(50)}
         },
         {
           "max-age=10, max-stale=50, unknown-directive, unknown-directive-with-quoted-arg=\"arg1\"",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, std::chrono::seconds(10), absl::nullopt, std::chrono::seconds(50)}
+          {false, false, false, false, Seconds(10), absl::nullopt, Seconds(50)}
         },
         // Invalid durations are ignored
         {
           "max-age=five, min-fresh=30, no-store",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, true, false, false, absl::nullopt, std::chrono::seconds(30), absl::nullopt}
+          {false, true, false, false, absl::nullopt, Seconds(30), absl::nullopt}
         },
         {
           "max-age=five, min-fresh=30s, max-stale=-2",
@@ -135,7 +121,7 @@ public:
         {
           "no-cache, ,,,fjfwioen3298, max-age=20, min-fresh=30=40",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {true, false, false, false, std::chrono::seconds(20), absl::nullopt, absl::nullopt}
+          {true, false, false, false, Seconds(20), absl::nullopt, absl::nullopt}
         },
         // If a directive argument contains a comma by mistake
         // the part before the comma will be interpreted as the argument
@@ -143,11 +129,37 @@ public:
         {
           "no-cache, max-age=10,0, no-store",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {true, true, false, false, std::chrono::seconds(10), absl::nullopt, absl::nullopt}
+          {true, true, false, false, Seconds(10), absl::nullopt, absl::nullopt}
         },
     );
     // clang-format on
   }
+};
+
+INSTANTIATE_TEST_SUITE_P(RequestCacheControlTest, RequestCacheControlTest,
+                         testing::ValuesIn(RequestCacheControlTest::getTestCases()));
+
+TEST_P(RequestCacheControlTest, RequestCacheControlTest) {
+  const absl::string_view cache_control_header = GetParam().cache_control_header;
+  const RequestCacheControl expected_request_cache_control = GetParam().request_cache_control;
+  EXPECT_EQ(expected_request_cache_control, RequestCacheControl(cache_control_header));
+}
+
+struct TestResponseCacheControl : public ResponseCacheControl {
+  TestResponseCacheControl(bool must_validate, bool no_store, bool no_transform, bool no_stale,
+                           bool is_public, OptionalDuration max_age) {
+    must_validate_ = must_validate;
+    no_store_ = no_store;
+    no_transform_ = no_transform;
+    no_stale_ = no_stale;
+    is_public_ = is_public;
+    max_age_ = max_age;
+  }
+};
+
+struct ResponseCacheControlTestCase {
+  absl::string_view cache_control_header;
+  TestResponseCacheControl response_cache_control;
 };
 
 class ResponseCacheControlTest : public testing::TestWithParam<ResponseCacheControlTestCase> {
@@ -165,17 +177,17 @@ public:
         {
           "s-maxage=1000, max-age=2000, proxy-revalidate, no-store",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, true, false, true, false, std::chrono::seconds(1000)}
+          {false, true, false, true, false, Seconds(1000)}
         },
         {
           "max-age=500, must-revalidate, no-cache, no-transform",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {true, false, true, true, false, std::chrono::seconds(500)}
+          {true, false, true, true, false, Seconds(500)}
         },
         {
           "s-maxage=10, private=content-length, no-cache=content-encoding",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {true, true, false, false, false, std::chrono::seconds(10)}
+          {true, true, false, false, false, Seconds(10)}
         },
         {
           "private",
@@ -185,44 +197,44 @@ public:
         {
           "public, max-age=0",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, false, false, false, true, std::chrono::seconds(0)}
+          {false, false, false, false, true, Seconds(0)}
         },
         // Quoted arguments are interpreted correctly
         {
           "s-maxage=\"20\", max-age=\"10\", public",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, false, false, false, true, std::chrono::seconds(20)}
+          {false, false, false, false, true, Seconds(20)}
         },
         {
           "max-age=\"50\", private",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, true, false, false, false, std::chrono::seconds(50)}
+          {false, true, false, false, false, Seconds(50)}
         },
         {
           "s-maxage=\"0\"", 
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, false, false, false, false, std::chrono::seconds(0)}
+          {false, false, false, false, false, Seconds(0)}
         },
         // Unknown directives are ignored
         {
           "private, no-cache, max-age=30, unknown-directive",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {true, true, false, false, false, std::chrono::seconds(30)}
+          {true, true, false, false, false, Seconds(30)}
         },
         {
           "private, no-cache, max-age=30, unknown-directive-with-arg=arg",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {true, true, false, false, false, std::chrono::seconds(30)}
+          {true, true, false, false, false, Seconds(30)}
         },
         {
           "private, no-cache, max-age=30, unknown-directive-with-quoted-arg=\"arg\"",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {true, true, false, false, false, std::chrono::seconds(30)}
+          {true, true, false, false, false, Seconds(30)}
         },
         {
           "private, no-cache, max-age=30, unknown-directive, unknown-directive-with-quoted-arg=\"arg\"",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {true, true, false, false, false, std::chrono::seconds(30)}
+          {true, true, false, false, false, Seconds(30)}
         },
         // Invalid durations are ignored
         {
@@ -243,7 +255,7 @@ public:
         {
           "s-maxage=five, max-age=10, no-transform", 
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, false, true, false, false, std::chrono::seconds(10)}
+          {false, false, true, false, false, Seconds(10)}
         },
         {
           "max-age=\"", 
@@ -254,7 +266,7 @@ public:
         {
           "no-cache, ,,,fjfwioen3298, max-age=20", 
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {true, false, false, false, false, std::chrono::seconds(20)}
+          {true, false, false, false, false, Seconds(20)}
         },
         // If a directive argument contains a comma by mistake
         // the part before the comma will be interpreted as the argument
@@ -262,14 +274,22 @@ public:
         {
           "no-cache, max-age=10,0, no-store", 
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {true, true, false, false, false, std::chrono::seconds(10)}
+          {true, true, false, false, false, Seconds(10)}
         },
     );
     // clang-format on
   }
 };
 
-// TODO(#9872): More tests for httpTime.
+INSTANTIATE_TEST_SUITE_P(ResponseCacheControlTest, ResponseCacheControlTest,
+                         testing::ValuesIn(ResponseCacheControlTest::getTestCases()));
+
+TEST_P(ResponseCacheControlTest, ResponseCacheControlTest) {
+  const absl::string_view cache_control_header = GetParam().cache_control_header;
+  const ResponseCacheControl expected_response_cache_control = GetParam().response_cache_control;
+  EXPECT_EQ(expected_response_cache_control, ResponseCacheControl(cache_control_header));
+}
+
 class HttpTimeTest : public testing::TestWithParam<std::string> {
 public:
   static const std::vector<std::string>& getOkTestCases() {
@@ -282,24 +302,6 @@ public:
     // clang-format on
   }
 };
-
-INSTANTIATE_TEST_SUITE_P(RequestCacheControlTest, RequestCacheControlTest,
-                         testing::ValuesIn(RequestCacheControlTest::getTestCases()));
-
-TEST_P(RequestCacheControlTest, RequestCacheControlTest) {
-  const absl::string_view cache_control_header = GetParam().cache_control_header;
-  const RequestCacheControl expected_request_cache_control = GetParam().request_cache_control;
-  EXPECT_EQ(expected_request_cache_control, RequestCacheControl(cache_control_header));
-}
-
-INSTANTIATE_TEST_SUITE_P(ResponseCacheControlTest, ResponseCacheControlTest,
-                         testing::ValuesIn(ResponseCacheControlTest::getTestCases()));
-
-TEST_P(ResponseCacheControlTest, ResponseCacheControlTest) {
-  const absl::string_view cache_control_header = GetParam().cache_control_header;
-  const ResponseCacheControl expected_response_cache_control = GetParam().response_cache_control;
-  EXPECT_EQ(expected_response_cache_control, ResponseCacheControl(cache_control_header));
-}
 
 INSTANTIATE_TEST_SUITE_P(Ok, HttpTimeTest, testing::ValuesIn(HttpTimeTest::getOkTestCases()));
 
@@ -317,6 +319,102 @@ TEST(HttpTime, InvalidFormat) {
 }
 
 TEST(HttpTime, Null) { EXPECT_EQ(CacheHeadersUtils::httpTime(nullptr), SystemTime()); }
+
+struct CalculateAgeTestCase {
+  std::string test_name;
+  Http::TestResponseHeaderMapImpl response_headers;
+  SystemTime response_time, now;
+  Seconds expected_age;
+};
+
+class CalculateAgeTest : public testing::TestWithParam<CalculateAgeTestCase> {
+public:
+  static std::string durationToString(const SystemTime::duration& duration) {
+    return std::to_string(duration.count());
+  }
+  static std::string formatTime(const SystemTime& time) { return formatter().fromTime(time); }
+  static const DateFormatter& formatter() {
+    CONSTRUCT_ON_FIRST_USE(DateFormatter, {"%a, %d %b %Y %H:%M:%S GMT"});
+  }
+  static const SystemTime& currentTime() {
+    CONSTRUCT_ON_FIRST_USE(SystemTime, Event::SimulatedTimeSystem().systemTime());
+  }
+  static const std::vector<CalculateAgeTestCase>& getTestCases() {
+    // clang-format off
+    CONSTRUCT_ON_FIRST_USE(std::vector<CalculateAgeTestCase>,
+        {
+          "no_initial_age_all_times_equal",
+          /*response_headers=*/{{"date", formatTime(currentTime())}},
+          /*response_time=*/currentTime(),
+          /*now=*/currentTime(),
+          /*expected_age=*/Seconds(0)
+        },
+        {
+          "initial_age_zero_all_times_equal",
+          /*response_headers=*/{{"date", formatTime(currentTime())}, {"age", "0"}},
+          /*response_time=*/currentTime(),
+          /*now=*/currentTime(),
+          /*expected_age=*/Seconds(0)
+        },
+        {
+          "initial_age_non_zero_all_times_equal",
+          /*response_headers=*/{{"date", formatTime(currentTime())}, {"age", "50"}},
+          /*response_time=*/currentTime(),
+          /*now=*/currentTime(),
+          /*expected_age=*/Seconds(50)
+        },
+        {
+          "date_after_response_time_no_initial_age",
+          /*response_headers=*/{{"date", formatTime(currentTime() + Seconds(5))}},
+          /*response_time=*/currentTime(),
+          /*now=*/currentTime() + Seconds(10),
+          /*expected_age=*/Seconds(10)
+        },
+        {
+          "date_after_response_time_with_initial_age",
+          /*response_headers=*/{{"date", formatTime(currentTime() + Seconds(10))}, {"age", "5"}},
+          /*response_time=*/currentTime(),
+          /*now=*/currentTime() + Seconds(10),
+          /*expected_age=*/Seconds(15)
+        },
+        {
+          "apparent_age_equals_initial_age",
+          /*response_headers=*/{{"date", formatTime(currentTime())}, {"age", "1"}},
+          /*response_time=*/currentTime() + Seconds(1),
+          /*now=*/currentTime() + Seconds(5),
+          /*expected_age=*/Seconds(5)
+        },
+        {
+          "apparent_age_lower_than_initial_age",
+          /*response_headers=*/{{"date", formatTime(currentTime())}, {"age", "3"}},
+          /*response_time=*/currentTime() + Seconds(1),
+          /*now=*/currentTime() + Seconds(5),
+          /*expected_age=*/Seconds(7)
+        },
+        {
+          "apparent_age_higher_than_initial_age",
+          /*response_headers=*/{{"date", formatTime(currentTime())}, {"age", "1"}},
+          /*response_time=*/currentTime() + Seconds(3),
+          /*now=*/currentTime() + Seconds(5),
+          /*expected_age=*/Seconds(5)
+        },
+    );
+    // clang-format on
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(CalculateAgeTest, CalculateAgeTest,
+                         testing::ValuesIn(CalculateAgeTest::getTestCases()),
+                         [](const auto& info) { return info.param.test_name; });
+
+TEST_P(CalculateAgeTest, CalculateAgeTest) {
+  const Seconds calculated_age = CacheHeadersUtils::calculateAge(
+      GetParam().response_headers, GetParam().response_time, GetParam().now);
+  const Seconds expected_age = GetParam().expected_age;
+  EXPECT_EQ(calculated_age, expected_age)
+      << "Expected age: " << durationToString(expected_age)
+      << ", Calculated age: " << durationToString(calculated_age);
+}
 
 void testReadAndRemoveLeadingDigits(absl::string_view input, int64_t expected,
                                     absl::string_view remaining) {

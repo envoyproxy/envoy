@@ -21,9 +21,9 @@ public:
   void getHeaders(LookupHeadersCallback&& cb) override {
     auto entry = cache_.lookup(request_);
     body_ = std::move(entry.body_);
-    cb(entry.response_headers_
-           ? request_.makeLookupResult(std::move(entry.response_headers_), body_.size())
-           : LookupResult{});
+    cb(entry.response_headers_ ? request_.makeLookupResult(std::move(entry.response_headers_),
+                                                           std::move(entry.metadata_), body_.size())
+                               : LookupResult{});
   }
 
   void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override {
@@ -53,9 +53,11 @@ public:
             dynamic_cast<SimpleLookupContext&>(lookup_context).request().getVaryHeaders()),
         cache_(cache) {}
 
-  void insertHeaders(const Http::ResponseHeaderMap& response_headers, bool end_stream) override {
+  void insertHeaders(const Http::ResponseHeaderMap& response_headers,
+                     const ResponseMetadata& metadata, bool end_stream) override {
     ASSERT(!committed_);
     response_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers);
+    metadata_ = metadata;
     if (end_stream) {
       commit();
     }
@@ -84,14 +86,16 @@ private:
   void commit() {
     committed_ = true;
     if (VaryHeader::hasVary(*response_headers_)) {
-      cache_.varyInsert(key_, std::move(response_headers_), body_.toString(), entry_vary_headers_);
+      cache_.varyInsert(key_, std::move(response_headers_), std::move(metadata_), body_.toString(),
+                        entry_vary_headers_);
     } else {
-      cache_.insert(key_, std::move(response_headers_), body_.toString());
+      cache_.insert(key_, std::move(response_headers_), std::move(metadata_), body_.toString());
     }
   }
 
   Key key_;
   Http::ResponseHeaderMapPtr response_headers_;
+  ResponseMetadata metadata_;
   const Http::RequestHeaderMap& entry_vary_headers_;
   SimpleHttpCache& cache_;
   Buffer::OwnedImpl body_;
@@ -103,7 +107,8 @@ LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request) {
   return std::make_unique<SimpleLookupContext>(*this, std::move(request));
 }
 
-void SimpleHttpCache::updateHeaders(const LookupContext&, const Http::ResponseHeaderMap&) {
+void SimpleHttpCache::updateHeaders(const LookupContext&, const Http::ResponseHeaderMap&,
+                                    const ResponseMetadata&) {
   // TODO(toddmgreer): Support updating headers.
   // Not implemented yet, however this is called during tests
   // NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -122,14 +127,15 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
   } else {
     return SimpleHttpCache::Entry{
         Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*iter->second.response_headers_),
-        iter->second.body_};
+        iter->second.metadata_, iter->second.body_};
   }
 }
 
 void SimpleHttpCache::insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers,
-                             std::string&& body) {
+                             ResponseMetadata&& metadata, std::string&& body) {
   absl::WriterMutexLock lock(&mutex_);
-  map_[key] = SimpleHttpCache::Entry{std::move(response_headers), std::move(body)};
+  map_[key] =
+      SimpleHttpCache::Entry{std::move(response_headers), std::move(metadata), std::move(body)};
 }
 
 SimpleHttpCache::Entry
@@ -153,11 +159,12 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
 
   return SimpleHttpCache::Entry{
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*iter->second.response_headers_),
-      iter->second.body_};
+      iter->second.metadata_, iter->second.body_};
 }
 
 void SimpleHttpCache::varyInsert(const Key& request_key,
-                                 Http::ResponseHeaderMapPtr&& response_headers, std::string&& body,
+                                 Http::ResponseHeaderMapPtr&& response_headers,
+                                 ResponseMetadata&& metadata, std::string&& body,
                                  const Http::RequestHeaderMap& request_vary_headers) {
   absl::WriterMutexLock lock(&mutex_);
 
@@ -168,7 +175,8 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
   Key varied_request_key = request_key;
   const std::string vary_key = VaryHeader::createVaryKey(vary_header, request_vary_headers);
   varied_request_key.add_custom_fields(vary_key);
-  map_[varied_request_key] = SimpleHttpCache::Entry{std::move(response_headers), std::move(body)};
+  map_[varied_request_key] =
+      SimpleHttpCache::Entry{std::move(response_headers), std::move(metadata), std::move(body)};
 
   // Add a special entry to flag that this request generates varied responses.
   auto iter = map_.find(request_key);
@@ -181,7 +189,7 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
     // have inserted for that resource. For the first entry simply use vary_key as the entry_list,
     // for future entries append vary_key to existing list.
     std::string entry_list;
-    map_[request_key] = SimpleHttpCache::Entry{std::move(vary_only_map), std::move(entry_list)};
+    map_[request_key] = SimpleHttpCache::Entry{std::move(vary_only_map), {}, std::move(entry_list)};
   }
 }
 
