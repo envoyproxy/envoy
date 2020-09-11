@@ -86,10 +86,11 @@ private:
   // onHeaders for Range Responses, otherwise initialized by encodeCachedResponse.
   std::vector<AdjustedByteRange> remaining_ranges_;
 
-  // TODO(#12901): The allowlist could be constructed only once directly from the config, instead of
-  // doing it per-request.
-  // Stores the headers that can be used to vary responses.
-  absl::flat_hash_set<std::string> allowed_vary_headers_;
+  // TODO(#12901): The allow list could be constructed only once directly from the config, instead
+  // of doing it per-request. A good example of such config is found in the gzip filter:
+  // source/extensions/filters/http/gzip/gzip_filter.h.
+  // Stores the allow list rules that decide if a header can be varied upon.
+  VaryHeader vary_allow_list_;
 
   // True if the response has trailers.
   // TODO(toddmgreer): cache trailers.
