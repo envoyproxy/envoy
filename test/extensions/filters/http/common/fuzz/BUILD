@@ -24,6 +24,18 @@ envoy_proto_library(
 )
 
 envoy_cc_test_library(
+    name = "http_filter_fuzzer_lib",
+    hdrs = ["http_filter_fuzzer.h"],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//source/common/http:utility_lib",
+        "//test/fuzz:common_proto_cc_proto",
+        "//test/fuzz:utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "uber_filter_lib",
     srcs = [
         "uber_filter.cc",
@@ -32,13 +44,13 @@ envoy_cc_test_library(
     hdrs = ["uber_filter.h"],
     deps = [
         ":filter_fuzz_proto_cc_proto",
+        ":http_filter_fuzzer_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:utility_lib",
-        "//test/fuzz:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
