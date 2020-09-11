@@ -102,23 +102,37 @@ public:
 };
 
 /**
- * Interface for a generic Pipe address
+ * Interface for a generic Pipe address.
  */
 class Pipe {
 public:
   virtual ~Pipe() = default;
   /**
-   * @return abstract namespace flag
+   * @return abstract namespace flag.
    */
   virtual bool abstractNamespace() const PURE;
 
   /**
-   * @return pipe mode
+   * @return pipe mode.
    */
   virtual mode_t mode() const PURE;
 };
 
-enum class Type { Ip, Pipe };
+/**
+ * Interface for a generic internal address.
+ */
+class EnvoyInternalAddress {
+public:
+  virtual ~EnvoyInternalAddress() = default;
+
+  /**
+   * @return The unique id of the internal address. If the address represents the destination
+   * internal listener, the address id is that listener name.
+   */
+  virtual const std::string& addressId() const PURE;
+};
+
+enum class Type { Ip, Pipe, EnvoyInternal };
 
 /**
  * Interface for all network addresses.
@@ -167,12 +181,19 @@ public:
   virtual const Pipe* pipe() const PURE;
 
   /**
-   * @return the underlying structure wherein the address is stored
+   * @return the envoy internal address information IFF type() ==
+   * Type::EnvoyInternal, otherwise nullptr.
+   */
+  virtual const EnvoyInternalAddress* envoyInternalAddress() const PURE;
+
+  /**
+   * @return the underlying structure wherein the address is stored. Return nullptr if the address
+   * type is internal address.
    */
   virtual const sockaddr* sockAddr() const PURE;
 
   /**
-   * @return length of the address container
+   * @return length of the address container.
    */
   virtual socklen_t sockAddrLen() const PURE;
 
@@ -182,7 +203,7 @@ public:
   virtual Type type() const PURE;
 
   /**
-   * @return SocketInterface to be used with the address
+   * @return SocketInterface to be used with the address.
    */
   virtual const Network::SocketInterface& socketInterface() const PURE;
 };
