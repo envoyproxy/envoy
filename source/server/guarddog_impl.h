@@ -17,6 +17,7 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
+#include "server/watchdog_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -110,11 +111,14 @@ private:
                         std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs,
                         MonotonicTime now);
 
+  using WatchDogImplSharedPtr = std::shared_ptr<WatchDogImpl>;
   struct WatchedDog {
     WatchedDog(Stats::Scope& stats_scope, const std::string& thread_name,
-               const WatchDogSharedPtr& watch_dog);
+               const WatchDogImplSharedPtr& watch_dog);
 
-    const WatchDogSharedPtr dog_;
+    const WatchDogImplSharedPtr dog_;
+    uint64_t last_touch_count_;
+    MonotonicTime last_touch_time_;
     absl::optional<MonotonicTime> last_alert_time_;
     bool miss_alerted_{};
     bool megamiss_alerted_{};

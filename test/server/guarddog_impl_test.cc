@@ -309,6 +309,7 @@ TEST_P(GuardDogMissTest, MissTest) {
   initGuardDog(stats_store_, config_miss_);
   auto unpet_dog =
       guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+  guard_dog_->forceCheckForTest();
   // We'd better start at 0:
   checkMiss(0, "MissTest check 1");
   // At 300ms we shouldn't have hit the timeout yet:
@@ -334,6 +335,7 @@ TEST_P(GuardDogMissTest, MegaMissTest) {
   initGuardDog(stats_store_, config_mega_);
   auto unpet_dog =
       guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+  guard_dog_->forceCheckForTest();
   // We'd better start at 0:
   checkMegaMiss(0, "MegaMissTest check 1");
   // This shouldn't be enough to increment the stat:
@@ -360,6 +362,7 @@ TEST_P(GuardDogMissTest, MissCountTest) {
   initGuardDog(stats_store_, config_miss_);
   auto sometimes_pet_dog =
       guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+  guard_dog_->forceCheckForTest();
   // These steps are executed once without ever touching the watchdog.
   // Then the last step is to touch the watchdog and repeat the steps.
   // This verifies that the behavior is reset back to baseline after a touch.
@@ -382,9 +385,11 @@ TEST_P(GuardDogMissTest, MissCountTest) {
     // When we finally touch the dog we should get one more increment once the
     // timeout value expires:
     sometimes_pet_dog->touch();
+    guard_dog_->forceCheckForTest();
   }
   time_system_->advanceTimeWait(std::chrono::milliseconds(1000));
   sometimes_pet_dog->touch();
+  guard_dog_->forceCheckForTest();
   // Make sure megamiss still works:
   checkMegaMiss(0UL, "MissCountTest check 5");
   time_system_->advanceTimeWait(std::chrono::milliseconds(1500));
@@ -657,6 +662,7 @@ TEST_P(GuardDogActionsTest, MissShouldSaturateOnMissEvent) {
 
   // Touch the watchdog, which should allow the event to trigger again.
   first_dog_->touch();
+  guard_dog_->forceCheckForTest();
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
@@ -719,6 +725,7 @@ TEST_P(GuardDogActionsTest, MegaMissShouldSaturateOnMegaMissEvent) {
 
   // Touch the watchdog, which should allow the event to trigger again.
   first_dog_->touch();
+  guard_dog_->forceCheckForTest();
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
@@ -734,6 +741,7 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
     initGuardDog(fake_stats_, config);
     auto first_dog = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread");
     auto second_dog = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
+    guard_dog_->forceCheckForTest();
     time_system_->advanceTimeWait(std::chrono::milliseconds(101));
     guard_dog_->forceCheckForTest();
   };
@@ -748,6 +756,7 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
     initGuardDog(fake_stats_, config);
     auto first_dog = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread");
     auto second_dog = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
+    guard_dog_->forceCheckForTest();
     time_system_->advanceTimeWait(std::chrono::milliseconds(101));
     guard_dog_->forceCheckForTest();
   };

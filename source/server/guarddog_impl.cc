@@ -100,7 +100,15 @@ void GuardDogImpl::step() {
                  static_cast<size_t>(ceil(multi_kill_fraction_ * watched_dogs_.size())));
 
     for (auto& watched_dog : watched_dogs_) {
-      const auto ltt = watched_dog->dog_->lastTouchTime();
+      uint64_t touch_count = watched_dog->dog_->touchCount();
+      if (watched_dog->last_touch_count_ != touch_count) {
+        // Watchdog was touched since guarddog last checked; update time and continue.
+        watched_dog->last_touch_count_ = touch_count;
+        watched_dog->last_touch_time_ = now;
+        continue;
+      }
+
+      const auto ltt = watched_dog->last_touch_time_;
       const auto tid = watched_dog->dog_->threadId();
       const auto delta = now - ltt;
       if (watched_dog->last_alert_time_ && watched_dog->last_alert_time_.value() < ltt) {
@@ -167,14 +175,13 @@ WatchDogSharedPtr GuardDogImpl::createWatchDog(Thread::ThreadId thread_id,
   // accessed out of the locked section below is const (time_source_ has no
   // state).
   const auto wd_interval = loop_interval_ / 2;
-  WatchDogSharedPtr new_watchdog =
-      std::make_shared<WatchDogImpl>(std::move(thread_id), time_source_, wd_interval);
+  auto new_watchdog = std::make_shared<WatchDogImpl>(std::move(thread_id), wd_interval);
   WatchedDogPtr watched_dog = std::make_unique<WatchedDog>(stats_scope_, thread_name, new_watchdog);
+  new_watchdog->touch();
   {
     Thread::LockGuard guard(wd_lock_);
     watched_dogs_.push_back(std::move(watched_dog));
   }
-  new_watchdog->touch();
   return new_watchdog;
 }
 
@@ -222,8 +229,9 @@ void GuardDogImpl::invokeGuardDogActions(
 }
 
 GuardDogImpl::WatchedDog::WatchedDog(Stats::Scope& stats_scope, const std::string& thread_name,
-                                     const WatchDogSharedPtr& watch_dog)
+                                     const WatchDogImplSharedPtr& watch_dog)
     : dog_(watch_dog),
+      last_touch_count_(dog_->touchCount()),
       miss_counter_(stats_scope.counterFromStatName(
           Stats::StatNameManagedStorage(fmt::format("server.{}.watchdog_miss", thread_name),
                                         stats_scope.symbolTable())
