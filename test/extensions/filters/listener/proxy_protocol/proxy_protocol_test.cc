@@ -303,6 +303,8 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  // TODO(davinci26): Mocking should not be used to provide real system calls.
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -366,6 +368,8 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  // TODO(davinci26): Mocking should not be used to provide real system calls.
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Return(Api::SysCallSizeResult{-1, 0}));
@@ -589,6 +593,7 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
+  // TODO(davinci26): Mocking should not be used to provide real system calls.
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t n, int flags) {
@@ -739,6 +744,7 @@ TEST_P(ProxyProtocolTest, V2Fragmented3Error) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
+  // TODO(davinci26): Mocking should not be used to provide real system calls.
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
@@ -809,6 +815,7 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
+  // TODO(davinci26): Mocking should not be used to provide real system calls.
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
