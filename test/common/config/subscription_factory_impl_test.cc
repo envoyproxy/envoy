@@ -211,7 +211,9 @@ TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscription) {
   EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch(test_path, _, _));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
-  collectionSubscriptionFromUrl(fmt::format("file://{}", test_path))->start({});
+  // Unix paths start with /, Windows with c:/.
+  const std::string file_path = test_path[0] == '/' ? test_path.substr(1) : test_path;
+  collectionSubscriptionFromUrl(fmt::format("file:///{}", file_path))->start({});
 }
 
 TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscriptionNonExistentFile){

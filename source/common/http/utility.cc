@@ -725,6 +725,14 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
   }
 }
 
+std::string Utility::localPathFromFilePath(const absl::string_view& file_path) {
+  if (file_path.size() >= 3 && file_path[1] == ':' & file_path[2] == '/' &&
+      std::isalpha(file_path[0])) {
+    return std::string(file_path);
+  }
+  return absl::StrCat("/", file_path);
+}
+
 RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri) {
   absl::string_view host, path;
   extractHostPathFromUri(http_uri.uri(), host, path);

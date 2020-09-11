@@ -310,6 +310,7 @@ envoy_cc_library(
         "//include/envoy/config:subscription_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/http:utility_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

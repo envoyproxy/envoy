@@ -10,6 +10,7 @@
 #include "common/config/type_to_endpoint.h"
 #include "common/config/udpa_resource.h"
 #include "common/config/utility.h"
+#include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -116,7 +117,7 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
 
   switch (collection_locator.scheme()) {
   case udpa::core::v1::ResourceLocator::FILE: {
-    const std::string path = "/" + absl::StrJoin(collection_locator.id(), "/");
+    const std::string path = Http::Utility::localPathFromFilePath(absl::StrJoin(collection_locator.id(), "/"));
     Utility::checkFilesystemSubscriptionBackingPath(path, api_);
     return std::make_unique<Config::FilesystemCollectionSubscriptionImpl>(
         dispatcher_, path, callbacks, resource_decoder, stats, validation_visitor_, api_);
