@@ -178,10 +178,10 @@ TEST_F(ConnPoolImplBaseTest, TimeoutTest) {
   EXPECT_CALL(*pool_, onPoolReady);
   clients_.back()->onEvent(Network::ConnectionEvent::Connected);
 
-  // Close the newly-created request and expect the timer to be set
+  // Close the newly-created stream and expect the timer to be set
   EXPECT_CALL(*timer_ptr, enableTimer(IDLE_TIMEOUT, _));
-  EXPECT_CALL(*clients_.back(), numActiveRequests).WillRepeatedly(Return(0));
-  pool_->onRequestClosed(*clients_.back(), false);
+  EXPECT_CALL(*clients_.back(), numActiveStreams).WillRepeatedly(Return(0));
+  pool_->onStreamClosed(*clients_.back(), false);
   clients_.back()->close();
 
   // Emulate the idle timeout firing and expect our callback to be triggered
