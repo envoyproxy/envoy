@@ -24,6 +24,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:logger_lib",
         "//source/common/common:macros",
+        "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
@@ -75,11 +76,11 @@ envoy_cc_library(
     hdrs = ["cache_headers_utils.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        ":inline_headers_handles",
         "//include/envoy/common:time_interface",
         "//include/envoy/http:header_map_interface",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
-        "//source/common/http:headers_lib",
     ],
 )
 
