@@ -31,7 +31,6 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/host.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -1145,6 +1144,15 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsLimit)) {
 
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UF,URX");
+}
+
+TEST_F(TcpProxyTest, ConnectedNoOp) {
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::Connected);
+
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 // Test that the tcp proxy sends the correct notifications to the outlier detector

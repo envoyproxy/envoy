@@ -32,12 +32,17 @@ public:
   virtual ~IoHandle() = default;
 
   /**
-   * Return data associated with IoHandle.
+   * NOTE: Must NOT be used for new use cases!
    *
-   * TODO(danzh) move it to IoSocketHandle after replacing the calls to it with
-   * calls to IoHandle API's everywhere.
+   * This is most probably not the function you are looking for. IoHandle has wrappers for most of
+   * the POSIX socket api functions so there should be no need to interact with the internal fd by
+   * means of syscalls. Moreover, depending on the IoHandle implementation, the fd might not be an
+   * underlying OS file descriptor. If any api function is missing, a wrapper for it should be added
+   * to the IoHandle interface.
+   *
+   * Return data associated with IoHandle. It is not necessarily a file descriptor.
    */
-  virtual os_fd_t fd() const PURE;
+  virtual os_fd_t fdDoNotUse() const PURE;
 
   /**
    * Clean up IoHandle resources
@@ -86,7 +91,7 @@ public:
   struct RecvMsgPerPacketInfo {
     // The destination address from transport header.
     Address::InstanceConstSharedPtr local_address_;
-    // The the source address from transport header.
+    // The source address from transport header.
     Address::InstanceConstSharedPtr peer_address_;
     // The payload length of this packet.
     unsigned int msg_len_{0};
@@ -248,6 +253,11 @@ public:
    */
   virtual Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                                               Event::FileTriggerType trigger, uint32_t events) PURE;
+
+  /**
+   * Shut down part of a full-duplex connection (see man 2 shutdown)
+   */
+  virtual Api::SysCallIntResult shutdown(int how) PURE;
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;

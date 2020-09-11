@@ -24,6 +24,9 @@
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/upstream/retry_priority.h"
+#include "test/mocks/upstream/retry_priority_factory.h"
+#include "test/mocks/upstream/test_retry_host_predicate_factory.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
@@ -488,8 +491,8 @@ virtual_hosts:
     route:
       cluster: connect_break
   - match:
-        connect_matcher:
-          {}
+      connect_matcher:
+        {}
     route:
       cluster: connect_match
       prefix_rewrite: "/rewrote"
@@ -504,9 +507,21 @@ virtual_hosts:
   - bat4.com
   routes:
   - match:
-        connect_matcher:
-          {}
+      connect_matcher:
+        {}
     redirect: { path_redirect: /new_path }
+- name: connect3
+  domains:
+  - bat5.com
+  routes:
+  - match:
+      connect_matcher:
+        {}
+      headers:
+      - name: x-safe
+        exact_match: "safe"
+    route:
+      cluster: connect_header_match
 - name: default
   domains:
   - "*"
@@ -554,6 +569,15 @@ virtual_hosts:
     redirect->rewritePathHeader(headers, true);
     EXPECT_EQ("http://bat4.com/new_path", redirect->newPath(headers));
   }
+
+  // Header matching (for HTTP/1.1)
+  EXPECT_EQ(
+      "connect_header_match",
+      config.route(genPathlessHeaders("bat5.com", "CONNECT"), 0)->routeEntry()->clusterName());
+
+  // Header matching (for HTTP/2)
+  EXPECT_EQ("connect_header_match",
+            config.route(genHeaders("bat5.com", " ", "CONNECT"), 0)->routeEntry()->clusterName());
 }
 
 TEST_F(RouteMatcherTest, TestRoutes) {

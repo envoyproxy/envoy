@@ -127,6 +127,17 @@ TEST(UtilityTest, GetLastCryptoError) {
   EXPECT_FALSE(Utility::getLastCryptoError().has_value());
 }
 
+TEST(UtilityTest, TestGetCertificationExtensionValue) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/extensions_cert.pem"));
+  EXPECT_EQ("\xc\x9Something", Utility::getCertificateExtensionValue(*cert, "1.2.3.4.5.6.7.8"));
+  EXPECT_EQ("\x30\x3\x1\x1\xFF", Utility::getCertificateExtensionValue(*cert, "1.2.3.4.5.6.7.9"));
+  EXPECT_EQ("", Utility::getCertificateExtensionValue(*cert, "1.2.3.4.5.6.7.10"));
+  EXPECT_EQ("", Utility::getCertificateExtensionValue(*cert, "1.2.3.4"));
+  EXPECT_EQ("", Utility::getCertificateExtensionValue(*cert, ""));
+  EXPECT_EQ("", Utility::getCertificateExtensionValue(*cert, "foo"));
+}
+
 } // namespace
 } // namespace Tls
 } // namespace TransportSockets

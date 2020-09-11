@@ -11,6 +11,7 @@
 #include "common/filter/http/filter_config_discovery_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/request_id_extension_uuid_impl.h"
+#include "common/network/address_impl.h"
 
 #include "extensions/filters/network/http_connection_manager/config.h"
 
@@ -94,6 +95,18 @@ http_filters:
 
   EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
                             "Didn't find a registered implementation for name: 'foo'");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, InvalidServerName) {
+  const std::string yaml_string = R"EOF(
+server_name: >
+  foo
+route_config:
+  name: local_route
+stat_prefix: router
+  )EOF";
+
+  EXPECT_THROW(createHttpConnectionManagerConfig(yaml_string), ProtoValidationException);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, RouterInverted) {

@@ -33,7 +33,10 @@
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/health_checker.h"
+#include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 

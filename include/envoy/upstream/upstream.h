@@ -813,6 +813,12 @@ public:
   lbRingHashConfig() const PURE;
 
   /**
+   * @return configuration for maglev load balancing, only used if type is set to maglev_lb.
+   */
+  virtual const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>&
+  lbMaglevConfig() const PURE;
+
+  /**
    * @return const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>& the
    * configuration for the Original Destination load balancing policy, only used if type is set to
    *         ORIGINAL_DST_LB.
@@ -927,6 +933,12 @@ public:
    *         after a host is removed from service discovery.
    */
   virtual bool drainConnectionsOnHostRemoval() const PURE;
+
+  /**
+   *  @return whether to create a new connection pool for each downstream connection routed to
+   *          the cluster
+   */
+  virtual bool connectionPoolPerDownstreamConnection() const PURE;
 
   /**
    * @return true if this cluster is configured to ignore hosts for the purpose of load balancing

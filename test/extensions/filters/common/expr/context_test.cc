@@ -4,7 +4,7 @@
 
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/host.h"
 
 #include "absl/time/time.h"
 #include "gmock/gmock.h"
@@ -28,6 +28,13 @@ TEST(Context, EmptyHeadersAttributes) {
   EXPECT_FALSE(header.has_value());
   EXPECT_EQ(0, headers.size());
   EXPECT_TRUE(headers.empty());
+}
+
+TEST(Context, InvalidRequest) {
+  Http::TestRequestHeaderMapImpl header_map{{"referer", "dogs.com"}};
+  HeadersWrapper<Http::RequestHeaderMap> headers(&header_map);
+  auto header = headers[CelValue::CreateStringView("dogs.com\n")];
+  EXPECT_FALSE(header.has_value());
 }
 
 TEST(Context, RequestAttributes) {

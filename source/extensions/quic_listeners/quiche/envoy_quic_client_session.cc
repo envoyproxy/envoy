@@ -64,6 +64,15 @@ void EnvoyQuicClientSession::OnGoAway(const quic::QuicGoAwayFrame& frame) {
   }
 }
 
+void EnvoyQuicClientSession::OnHttp3GoAway(uint64_t stream_id) {
+  ENVOY_CONN_LOG(debug, "HTTP/3 GOAWAY received", *this);
+  quic::QuicSpdyClientSession::OnHttp3GoAway(stream_id);
+  if (http_connection_callbacks_ != nullptr) {
+    // HTTP/3 GOAWAY doesn't have an error code field.
+    http_connection_callbacks_->onGoAway(Http::GoAwayErrorCode::NoError);
+  }
+}
+
 void EnvoyQuicClientSession::SetDefaultEncryptionLevel(quic::EncryptionLevel level) {
   quic::QuicSpdyClientSession::SetDefaultEncryptionLevel(level);
   if (level == quic::ENCRYPTION_FORWARD_SECURE) {
