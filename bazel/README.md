@@ -127,7 +127,7 @@ for how to update or override dependencies.
     startup --output_base=C:/_eb
     ```
 
-    Bazel also creates file symlinks when building Envoy.  It's recommended to enable file symlink support 
+    Bazel also creates file symlinks when building Envoy. It's strongly recommended to enable file symlink support 
     using [Bazel's instructions](https://docs.bazel.build/versions/master/windows.html#enable-symlink-support).
     For other common issues, see the 
     [Using Bazel on Windows](https://docs.bazel.build/versions/master/windows.html) page.
