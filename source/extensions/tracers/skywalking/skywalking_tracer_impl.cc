@@ -4,6 +4,7 @@
 
 #include "common/common/macros.h"
 #include "common/common/utility.h"
+#include "common/http/path_utility.h"
 
 #include "extensions/tracers/skywalking/skywalking_types.h"
 
@@ -14,39 +15,55 @@ namespace SkyWalking {
 
 Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
                Server::Configuration::TracerFactoryContext& context)
-    : tls_slot_ptr_(context.serverFactoryContext().threadLocal().allocateSlot()) {
-  tls_slot_ptr_->set([this, proto_config, &context](
+    : client_config_(proto_config.client_config()),
+      random_generator_(context.serverFactoryContext().random()),
+      tls_slot_ptr_(context.serverFactoryContext().threadLocal().allocateSlot()) {
+
+  if (client_config_.service_name().empty()) {
+    client_config_.set_service_name(context.serverFactoryContext().localInfo().clusterName());
+  }
+  if (client_config_.instance_name().empty()) {
+    client_config_.set_instance_name(context.serverFactoryContext().localInfo().nodeName());
+  }
+
+  tls_slot_ptr_->set([proto_config, &context, this](
                          Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     auto& factory_context = context.serverFactoryContext();
-    TracerPtr tracer =
-        std::make_unique<Tracer>(factory_context.clusterManager(), factory_context.scope(),
-                                 factory_context.localInfo(), factory_context.timeSource(),
-                                 factory_context.random(), dispatcher, proto_config.grpc_service());
-    return std::make_shared<TlsTracer>(std::move(tracer), *this);
+    TracerPtr tracer = std::make_unique<Tracer>(
+        factory_context.clusterManager(), factory_context.scope(), factory_context.timeSource(),
+        dispatcher, proto_config.grpc_service(), client_config_);
+    return std::make_shared<TlsTracer>(std::move(tracer));
   });
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
-                                   Http::RequestHeaderMap& request_headers, const std::string&,
-                                   Envoy::SystemTime start_time, const Tracing::Decision) {
+                                   Http::RequestHeaderMap& request_headers,
+                                   const std::string& operation_name, Envoy::SystemTime start_time,
+                                   const Tracing::Decision decision) {
   auto& tracer = *tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_;
 
-  SpanContext previous_span_context;
-  const bool valid_context = previous_span_context.extract(request_headers);
-  if (!valid_context) {
+  try {
+    SpanContextPtr previous_span_context = SpanContext::spanContextFromRequest(request_headers);
+    auto segment_context = std::make_shared<SegmentContext>(std::move(previous_span_context),
+                                                            decision, random_generator_);
+
+    // Initialize fields of current span context.
+    segment_context->setService(client_config_.service_name());
+    segment_context->setServiceInstance(client_config_.instance_name());
+
+    if (!client_config_.pass_endpoint() || !segment_context->previousSpanContext()) {
+      segment_context->setEndpoint(
+          absl::StrCat("/", request_headers.getMethodValue(),
+                       Http::PathUtil::removeQueryAndFragment(request_headers.getPathValue())));
+    } else {
+      segment_context->setEndpoint(segment_context->previousSpanContext()->endpoint_);
+    }
+
+    return tracer.startSpan(config, start_time, operation_name, std::move(segment_context),
+                            nullptr);
+  } catch (const EnvoyException&) {
     return std::make_unique<Tracing::NullSpan>();
   }
-
-  SpanContext span_context;
-  span_context.setParentEndpointAndNetworkAddressUsedAtPeer(Endpoint{request_headers});
-  span_context.setService(tracer.service());
-  span_context.setServiceInstance(tracer.node());
-
-  if (previous_span_context.isNew()) {
-    return tracer.startSpan(config, start_time, span_context, SpanContext{});
-  }
-
-  return tracer.startSpan(config, start_time, span_context, previous_span_context);
 }
 
 } // namespace SkyWalking

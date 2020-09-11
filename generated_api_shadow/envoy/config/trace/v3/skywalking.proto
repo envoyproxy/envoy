@@ -23,4 +23,33 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message SkyWalkingConfig {
   // SkyWalking collector service.
   core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
+
+  ClientConfig client_config = 2;
+}
+
+// Client config for SkyWalking tracer.
+// [#next-free-field: 6]
+message ClientConfig {
+  // Service name for SkyWalking tracer. If service_name is empty, then cluster
+  // name of Envoy will be used as service name.
+  string service_name = 1;
+
+  // Service instance name for SkyWalking tracer. If instance_name is empty, the
+  // node name of Envoy will be used as service instance name.
+  string instance_name = 2;
+
+  // Authentication token. Set client token if backend open token
+  // authentication.
+  string authentication = 3;
+
+  // When this field is set to true and Envoy is not the first tracing node, it
+  // directly uses the downstream endpoint as its own endpoint. This is helpful
+  // when the user wants to use the endpoint to aggregate all span data on the
+  // tracing link.
+  bool pass_endpoint = 4;
+
+  // Envoy caches the segment in memory when the backend service is temporarily
+  // unavailable. This field specifies the maximum number of segments that can
+  // be cached.
+  uint32 max_cache_size = 5;
 }

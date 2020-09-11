@@ -11,7 +11,7 @@ namespace Tracers {
 namespace SkyWalking {
 
 /**
- * Config registration for the skywalking tracer. @see TracerFactory.
+ * Config registration for the SkyWalking tracer. @see TracerFactory.
  */
 class SkyWalkingTracerFactory
     : public Common::FactoryBase<envoy::config::trace::v3::SkyWalkingConfig> {

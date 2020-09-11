@@ -23,3 +23,73 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "skywalking_types_test",
+    srcs = ["skywalking_types_test.cc"],
+    extension_name = "envoy.tracers.skywalking",
+    deps = [
+        ":skywalking_test_helper",
+        "//source/extensions/tracers/skywalking:skywalking_types_lib",
+        "//test/mocks:common_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "trace_segment_reporter_test",
+    srcs = ["trace_segment_reporter_test.cc"],
+    extension_name = "envoy.tracers.skywalking",
+    deps = [
+        ":skywalking_test_helper",
+        "//source/extensions/tracers/skywalking:trace_segment_reporter_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "skywalking_test_helper",
+    srcs = ["skywalking_test_helper.h"],
+    extension_name = "envoy.tracers.skywalking",
+    deps = [
+        "//source/common/common:base64_lib",
+        "//source/common/common:hex_lib",
+        "//source/extensions/tracers/skywalking:skywalking_types_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "tracer_test",
+    srcs = ["tracer_test.cc"],
+    extension_name = "envoy.tracers.skywalking",
+    deps = [
+        ":skywalking_test_helper",
+        "//source/extensions/tracers/skywalking:skywalking_tracer_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "skywalking_tracer_impl_test",
+    srcs = ["skywalking_tracer_impl_test.cc"],
+    extension_name = "envoy.tracers.skywalking",
+    deps = [
+        ":skywalking_test_helper",
+        "//source/extensions/tracers/skywalking:skywalking_tracer_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/server:tracer_factory_context_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)

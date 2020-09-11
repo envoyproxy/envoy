@@ -1,5 +1,8 @@
 #pragma once
 
+#include <queue>
+
+#include "envoy/config/trace/v3/skywalking.pb.h"
 #include "envoy/grpc/async_client_manager.h"
 
 #include "common/Common.pb.h"
@@ -14,30 +17,51 @@ namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
 
+using TraceSegmentPtr = std::unique_ptr<SegmentObject>;
+
 class TraceSegmentReporter : Grpc::AsyncStreamCallbacks<Commands> {
 public:
   explicit TraceSegmentReporter(Grpc::AsyncClientFactoryPtr&& factory,
-                                Event::Dispatcher& dispatcher);
+                                Event::Dispatcher& dispatcher,
+                                const envoy::config::trace::v3::ClientConfig& client_config);
 
   // Grpc::AsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+  void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
   void onReceiveMessage(std::unique_ptr<Commands>&&) override {}
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override;
 
+  /*
+   * Flush all cached segment objects to the back-end tracing service and close the GRPC stream.
+   */
   void closeStream();
-  void report(const SpanObject& span_object);
+
+  /*
+   * Convert the current span context into a segment object and report it to the back-end tracing
+   * service through the GRPC stream.
+   *
+   * @param span_context The span context.
+   */
+  void report(const SegmentContext& span_context);
 
 private:
-  void sendTraceSegment(const SegmentObject& request);
+  void flushTraceSegments();
+
+  void sendTraceSegment(TraceSegmentPtr&& request);
   void establishNewStream();
   void handleFailure();
   void setRetryTimer();
 
+  const envoy::config::trace::v3::ClientConfig& config_;
+  uint32_t max_delayed_segments_cache_size_{0};
   Grpc::AsyncClient<SegmentObject, Commands> client_;
   Grpc::AsyncStream<SegmentObject> stream_{};
   const Protobuf::MethodDescriptor& service_method_;
+
+  // If the connection is unavailable when reporting data, the created SegmentObject will be cached
+  // in the queue, and when a new connection is established, the cached data will be reported.
+  std::queue<TraceSegmentPtr> delayed_segments_cache_;
 
   Event::TimerPtr retry_timer_;
 };

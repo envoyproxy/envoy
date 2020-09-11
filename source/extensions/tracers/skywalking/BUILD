@@ -20,6 +20,7 @@ envoy_cc_library(
         "//include/envoy/grpc:async_client_manager_interface",
         "//source/common/grpc:async_client_lib",
         "@com_github_apache_skywalking_data_collect_protocol//:protocol_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
 
@@ -31,9 +32,11 @@ envoy_cc_library(
         "//include/envoy/common:random_generator_interface",
         "//include/envoy/common:time_interface",
         "//include/envoy/http:header_map_interface",
+        "//include/envoy/tracing:http_tracer_interface",
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
+        "@com_github_apache_skywalking_data_collect_protocol//:protocol_cc_proto",
     ],
 )
 

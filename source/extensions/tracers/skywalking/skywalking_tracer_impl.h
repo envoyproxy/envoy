@@ -25,14 +25,18 @@ public:
 
 private:
   struct TlsTracer : ThreadLocal::ThreadLocalObject {
-    TlsTracer(TracerPtr tracer, Driver& driver) : tracer_(std::move(tracer)), driver_(driver) {}
+    TlsTracer(TracerPtr tracer) : tracer_(std::move(tracer)) {}
 
     TracerPtr tracer_;
-    Driver& driver_;
   };
 
+  envoy::config::trace::v3::ClientConfig client_config_;
+
+  Random::RandomGenerator& random_generator_;
   ThreadLocal::SlotPtr tls_slot_ptr_;
 };
+
+using DriverPtr = std::unique_ptr<Driver>;
 
 } // namespace SkyWalking
 } // namespace Tracers

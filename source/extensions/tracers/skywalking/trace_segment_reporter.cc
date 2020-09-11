@@ -6,77 +6,114 @@ namespace Tracers {
 namespace SkyWalking {
 
 namespace {
+static constexpr uint32_t DEFAULT_DELAYED_SEGMENTS_CACHE_SIZE = 1024;
 
-SegmentObject toSegmentObject(const SpanObject& span_object) {
-  SegmentObject segment_object;
-  segment_object.set_traceid(span_object.context().traceId());
-  segment_object.set_tracesegmentid(span_object.context().traceSegmentId());
-  segment_object.set_service(span_object.context().service());
-  segment_object.set_serviceinstance(span_object.context().serviceInstance());
+// Convert SegmentContext to SegmentObject.
+TraceSegmentPtr toSegmentObject(const SegmentContext& segment_context) {
+  auto new_segment = std::make_unique<SegmentObject>();
+  SegmentObject& segment_object = *new_segment;
 
-  auto* span = segment_object.mutable_spans()->Add();
-  // The SpanLayer is always Http.
-  span->set_spanlayer(SpanLayer::Http);
-  span->set_spantype(span_object.isEntrySpan() ? SpanType::Entry : SpanType::Exit);
+  segment_object.set_traceid(segment_context.traceId());
+  segment_object.set_tracesegmentid(segment_context.traceSegmentId());
+  segment_object.set_service(segment_context.service());
+  segment_object.set_serviceinstance(segment_context.serviceInstance());
 
-  if (!span_object.peer().empty()) {
-    span->set_peer(span_object.peer());
-  }
+  for (const auto& span_store : segment_context.spanList()) {
+    if (!span_store->sampled()) {
+      continue;
+    }
+    auto* span = segment_object.mutable_spans()->Add();
 
-  span->set_componentid(6000);
-  span->set_starttime(span_object.startTime());
-  span->set_endtime(span_object.endTime());
-  span->set_iserror(span_object.isError());
-  span->set_operationname(span_object.operationName().empty()
-                              ? span_object.context().parentEndpoint()
-                              : span_object.operationName());
-  span->set_spanid(span_object.spanId());
-  span->set_parentspanid(span_object.parentSpanId());
+    span->set_spanlayer(SpanLayer::Http);
+    span->set_spantype(span_store->isEntrySpan() ? SpanType::Entry : SpanType::Exit);
+    span->set_componentid(6000);
 
-  const auto& previous_context = span_object.previousContext();
-  if (!previous_context.isNew()) {
+    if (!span_store->peer().empty()) {
+      span->set_peer(span_store->peer());
+    }
+
+    span->set_spanid(span_store->spanId());
+    span->set_parentspanid(span_store->parentSpanId());
+
+    span->set_starttime(span_store->startTime());
+    span->set_endtime(span_store->endTime());
+
+    span->set_iserror(span_store->isError());
+
+    span->set_operationname(span_store->operation());
+
+    auto& tags = *span->mutable_tags();
+    tags.Reserve(span_store->tags().size());
+
+    for (auto& span_tag : span_store->tags()) {
+      tags.Add(std::move(const_cast<Tag&>(span_tag)));
+    }
+
+    SpanContext* previous_span_context = segment_context.previousSpanContext();
+    if (!previous_span_context) {
+      continue;
+    }
+
     auto* ref = span->mutable_refs()->Add();
-    ref->set_traceid(previous_context.traceId());
-    ref->set_parenttracesegmentid(previous_context.traceSegmentId());
-    ref->set_parentspanid(previous_context.parentSpanId());
-    ref->set_parentservice(previous_context.service());
-    ref->set_parentserviceinstance(previous_context.serviceInstance());
-    ref->set_parentendpoint(previous_context.parentEndpoint());
-    ref->set_networkaddressusedatpeer(previous_context.networkAddressUsedAtPeer());
+    ref->set_traceid(previous_span_context->trace_id_);
+    ref->set_parenttracesegmentid(previous_span_context->trace_segment_id_);
+    ref->set_parentspanid(previous_span_context->span_id_);
+    ref->set_parentservice(previous_span_context->service_);
+    ref->set_parentserviceinstance(previous_span_context->service_instance_);
+    ref->set_parentendpoint(previous_span_context->endpoint_);
+    ref->set_networkaddressusedatpeer(previous_span_context->target_address_);
   }
-
-  for (const auto& span_tag : span_object.tags()) {
-    auto* tag = span->mutable_tags()->Add();
-    tag->set_key(span_tag.first);
-    tag->set_value(span_tag.second);
-  }
-  return segment_object;
+  return new_segment;
 }
 
 } // namespace
 
-TraceSegmentReporter::TraceSegmentReporter(Grpc::AsyncClientFactoryPtr&& factory,
-                                           Event::Dispatcher& dispatcher)
-    : client_(factory->create()),
+TraceSegmentReporter::TraceSegmentReporter(
+    Grpc::AsyncClientFactoryPtr&& factory, Event::Dispatcher& dispatcher,
+    const envoy::config::trace::v3::ClientConfig& client_config)
+    : config_(client_config), client_(factory->create()),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "TraceSegmentReportService.collect")) {
+  max_delayed_segments_cache_size_ = config_.max_cache_size() == 0
+                                         ? DEFAULT_DELAYED_SEGMENTS_CACHE_SIZE
+                                         : config_.max_cache_size();
+
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   establishNewStream();
 }
 
-void TraceSegmentReporter::report(const SpanObject& span_object) {
-  sendTraceSegment(toSegmentObject(span_object));
+void TraceSegmentReporter::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
+  if (!config_.authentication().empty()) {
+    metadata.setReferenceKey(Http::CustomHeaders::get().Authorization, config_.authentication());
+  }
 }
 
-void TraceSegmentReporter::sendTraceSegment(const SegmentObject& request) {
-  // TODO(dio): Buffer when stream is not yet established
+void TraceSegmentReporter::report(const SegmentContext& segment_context) {
+  sendTraceSegment(toSegmentObject(segment_context));
+}
+
+void TraceSegmentReporter::sendTraceSegment(TraceSegmentPtr&& request) {
   if (stream_ != nullptr) {
-    stream_->sendMessage(request, false);
+    stream_->sendMessage(*request, false);
+    return;
+  }
+  // Null stream_ and cache segment data temporarily.
+  delayed_segments_cache_.emplace(std::move(request));
+  if (delayed_segments_cache_.size() > max_delayed_segments_cache_size_) {
+    delayed_segments_cache_.pop();
+  }
+}
+
+void TraceSegmentReporter::flushTraceSegments() {
+  while (!delayed_segments_cache_.empty() && stream_ != nullptr) {
+    stream_->sendMessage(*delayed_segments_cache_.front(), false);
+    delayed_segments_cache_.pop();
   }
 }
 
 void TraceSegmentReporter::closeStream() {
   if (stream_ != nullptr) {
+    flushTraceSegments();
     stream_->closeStream();
   }
 }
@@ -92,6 +129,7 @@ void TraceSegmentReporter::establishNewStream() {
     handleFailure();
     return;
   }
+  flushTraceSegments();
 }
 
 void TraceSegmentReporter::handleFailure() { setRetryTimer(); }
