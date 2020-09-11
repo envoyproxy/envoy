@@ -14,7 +14,9 @@ public:
   MOCK_METHOD(bool, addOrUpdateListener,
               (const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                bool modifiable));
-  MOCK_METHOD(void, createLdsApi, (const envoy::config::core::v3::ConfigSource& lds_config));
+  MOCK_METHOD(void, createLdsApi,
+              (const envoy::config::core::v3::ConfigSource& lds_config,
+               const udpa::core::v1::ResourceLocator*));
   MOCK_METHOD(std::vector<std::reference_wrapper<Network::ListenerConfig>>, listeners,
               (ListenerState state));
   MOCK_METHOD(uint64_t, numConnections, (), (const));

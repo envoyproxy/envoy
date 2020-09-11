@@ -1,0 +1,13 @@
+dynamic_resources:
+  lds_resources_locator:
+    scheme: FILE
+    id: {{ lds_json_path }}
+    resource_type: envoy.config.listener.v3.ListenerCollection
+  cds_config:
+    path: {{ cds_json_path }}
+admin:
+  access_log_path: {{ null_device_path }}
+  address:
+    socket_address:
+      address: {{ ntop_ip_loopback_address }}
+      port_value: 0

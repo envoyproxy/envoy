@@ -4,6 +4,8 @@
 
 #include "common/protobuf/utility.h"
 
+#include "udpa/core/v1/collection_entry.pb.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -28,6 +30,11 @@ public:
                       const envoy::service::discovery::v3::Resource& resource)
       : DecodedResourceImpl(resource_decoder, resource.name(), resource.aliases(),
                             resource.resource(), resource.has_resource(), resource.version()) {}
+  DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder,
+                      const udpa::core::v1::CollectionEntry::InlineEntry& inline_entry)
+      : DecodedResourceImpl(resource_decoder, inline_entry.name(),
+                            Protobuf::RepeatedPtrField<std::string>(), inline_entry.resource(),
+                            true, inline_entry.version()) {}
   DecodedResourceImpl(ProtobufTypes::MessagePtr resource, const std::string& name,
                       const std::vector<std::string>& aliases, const std::string& version)
       : resource_(std::move(resource)), has_resource_(true), name_(name), aliases_(aliases),
@@ -64,9 +71,13 @@ struct DecodedResourcesWrapper {
                           const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                           const std::string& version) {
     for (const auto& resource : resources) {
-      owned_resources_.emplace_back(new DecodedResourceImpl(resource_decoder, resource, version));
-      refvec_.emplace_back(*owned_resources_.back());
+      pushBack(std::make_unique<DecodedResourceImpl>(resource_decoder, resource, version));
     }
+  }
+
+  void pushBack(Config::DecodedResourcePtr&& resource) {
+    owned_resources_.push_back(std::move(resource));
+    refvec_.emplace_back(*owned_resources_.back());
   }
 
   std::vector<Config::DecodedResourcePtr> owned_resources_;

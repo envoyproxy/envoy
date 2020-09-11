@@ -749,6 +749,13 @@ TEST(HttpUtility, TestExtractHostPathFromUri) {
   EXPECT_EQ(path, "/:/adsf");
 }
 
+TEST(HttpUtility, LocalPathFromFilePath) {
+  EXPECT_EQ("/", Utility::localPathFromFilePath(""));
+  EXPECT_EQ("c:/", Utility::localPathFromFilePath("c:/"));
+  EXPECT_EQ("Z:/foo/bar", Utility::localPathFromFilePath("Z:/foo/bar"));
+  EXPECT_EQ("/foo/bar", Utility::localPathFromFilePath("foo/bar"));
+}
+
 TEST(HttpUtility, TestPrepareHeaders) {
   envoy::config::core::v3::HttpUri http_uri;
   http_uri.set_uri("scheme://dns.name/x/y/z");

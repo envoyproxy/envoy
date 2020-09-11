@@ -77,6 +77,11 @@ public:
               (const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
                Stats::Scope& scope, SubscriptionCallbacks& callbacks,
                OpaqueResourceDecoder& resource_decoder));
+  MOCK_METHOD(SubscriptionPtr, collectionSubscriptionFromUrl,
+              (const udpa::core::v1::ResourceLocator& collection_locator,
+               const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
+               Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+               OpaqueResourceDecoder& resource_decoder));
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
 
   MockSubscription* subscription_{};
