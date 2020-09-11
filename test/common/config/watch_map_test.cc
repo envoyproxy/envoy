@@ -129,6 +129,12 @@ TEST(WatchMapTest, Basic) {
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
 
   {
+    // nothing is interested, so become wildcard watch
+    // should callback with empty resource
+    expectDeltaAndSotwUpdate(callbacks, {}, {}, "version1");
+    doDeltaAndSotwUpdate(watch_map, {}, {}, "version1");
+  }
+  {
     // The watch is interested in Alice and Bob...
     std::set<std::string> update_to({"alice", "bob"});
     AddedRemoved added_removed = watch_map.updateWatchInterest(watch, update_to);
