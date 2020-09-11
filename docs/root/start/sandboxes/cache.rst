@@ -66,7 +66,7 @@ response produced by service 1).
 
 To send a request: 
 
-``curl -v localhost:8000/service/<service_no>/<response>``
+``curl -i localhost:8000/service/<service_no>/<response>``
 
 ``service_no``: The service to send the request to, 1 or 2.
 
@@ -93,29 +93,19 @@ Example responses
 
 .. code-block:: console
 
-    $ curl -v localhost:8000/service/1/valid-for-minute
-    *   Trying ::1:8000...
-    * TCP_NODELAY set
-    * Connected to localhost (::1) port 8000 (#0)
-    > GET /service/2/valid-for-minute HTTP/1.1
-    > Host: localhost:8000
-    > User-Agent: curl/7.68.0
-    > Accept: */*
-    > 
-    * Mark bundle as not supporting multiuse
-    < HTTP/1.1 200 OK
-    < content-type: text/html; charset=utf-8
-    < content-length: 103
-    < cache-control: max-age=60
-    < custom-header: any value
-    < etag: "172ae25df822c3299cf2248694b4ce23"
-    < date: Mon, 31 Aug 2020 18:57:40 GMT
-    < server: envoy
-    < x-envoy-upstream-service-time: 12
-    < 
+    $ curl -i localhost:8000/service/1/valid-for-minute
+    HTTP/1.1 200 OK
+    content-type: text/html; charset=utf-8
+    content-length: 103
+    cache-control: max-age=60
+    custom-header: any value
+    etag: "172ae25df822c3299cf2248694b4ce23"
+    date: Fri, 11 Sep 2020 03:20:40 GMT
+    server: envoy
+    x-envoy-upstream-service-time: 11
+
     This response will stay fresh for one minute
-    Response body generated at: Mon, 31 Aug 2020 18:57:40 GMT
-    * Connection #0 to host localhost left intact
+    Response body generated at: Fri, 11 Sep 2020 03:20:40 GMT
 
 Naturally, response ``date`` header is the same time as the generated time.
 Sending the same request after 30 seconds gives the same exact response with the same generation date, 
@@ -123,58 +113,38 @@ but with an ``age`` header as it was served from cache:
 
 .. code-block:: console
 
-    $ curl -v localhost:8000/service/1/valid-for-minute
-    *   Trying ::1:8000...
-    * TCP_NODELAY set
-    * Connected to localhost (::1) port 8000 (#0)
-    > GET /service/2/valid-for-minute HTTP/1.1
-    > Host: localhost:8000
-    > User-Agent: curl/7.68.0
-    > Accept: */*
-    > 
-    * Mark bundle as not supporting multiuse
-    < HTTP/1.1 200 OK
-    < content-type: text/html; charset=utf-8
-    < content-length: 103
-    < cache-control: max-age=60
-    < custom-header: any value
-    < etag: "172ae25df822c3299cf2248694b4ce23"
-    < date: Mon, 31 Aug 2020 18:57:40 GMT
-    < server: envoy
-    < x-envoy-upstream-service-time: 12
-    < age: 30
-    < 
+    $ curl -i localhost:8000/service/1/valid-for-minute
+    HTTP/1.1 200 OK
+    content-type: text/html; charset=utf-8
+    content-length: 103
+    cache-control: max-age=60
+    custom-header: any value
+    etag: "172ae25df822c3299cf2248694b4ce23"
+    date: Fri, 11 Sep 2020 03:20:40 GMT
+    server: envoy
+    x-envoy-upstream-service-time: 11
+    age: 30
+
     This response will stay fresh for one minute
-    Response body generated at: Mon, 31 Aug 2020 18:57:40 GMT
-    * Connection #0 to host localhost left intact
+    Response body generated at: Fri, 11 Sep 2020 03:20:40 GMT
 
 After 1 minute and 1 second:
 
 .. code-block:: console
 
-    $ curl -v localhost:8000/service/1/valid-for-minute
-    *   Trying ::1:8000...
-    * TCP_NODELAY set
-    * Connected to localhost (::1) port 8000 (#0)
-    > GET /service/2/valid-for-minute HTTP/1.1
-    > Host: localhost:8000
-    > User-Agent: curl/7.68.0
-    > Accept: */*
-    > 
-    * Mark bundle as not supporting multiuse
-    < HTTP/1.1 200 OK
-    < cache-control: max-age=60
-    < custom-header: any value
-    < etag: "172ae25df822c3299cf2248694b4ce23"
-    < date: Mon, 31 Aug 2020 18:58:41 GMT
-    < server: envoy
-    < x-envoy-upstream-service-time: 8
-    < content-length: 103
-    < content-type: text/html; charset=utf-8
-    < 
+    $ curl -i localhost:8000/service/1/valid-for-minute
+    HTTP/1.1 200 OK
+    cache-control: max-age=60
+    custom-header: any value
+    etag: "172ae25df822c3299cf2248694b4ce23"
+    date: Fri, 11 Sep 2020 03:21:41 GMT
+    server: envoy
+    x-envoy-upstream-service-time: 8
+    content-length: 103
+    content-type: text/html; charset=utf-8
+
     This response will stay fresh for one minute
-    Response body generated at: Mon, 31 Aug 2020 18:57:40 GMT
-    * Connection #0 to host localhost left intact
+    Response body generated at: Fri, 11 Sep 2020 03:20:40 GMT
 
 The same response was served after being validated with the backend service. 
 You can see this as the response generation time is the same, 
@@ -189,28 +159,18 @@ the cached response will still be served. The cached response will only be updat
 
 .. code-block:: console
 
-    curl -v localhost:8000/service/1/private
-    *   Trying ::1:8000...
-    * TCP_NODELAY set
-    * Connected to localhost (::1) port 8000 (#0)
-    > GET /service/1/private HTTP/1.1
-    > Host: localhost:8000
-    > User-Agent: curl/7.68.0
-    > Accept: */*
-    > 
-    * Mark bundle as not supporting multiuse
-    < HTTP/1.1 200 OK
-    < content-type: text/html; charset=utf-8
-    < content-length: 117
-    < cache-control: private
-    < etag: "6bd80b59b2722606abf2b8d83ed2126d"
-    < date: Mon, 31 Aug 2020 19:05:59 GMT
-    < server: envoy
-    < x-envoy-upstream-service-time: 7
-    < 
+    $ curl -i localhost:8000/service/1/private
+    HTTP/1.1 200 OK
+    content-type: text/html; charset=utf-8
+    content-length: 117
+    cache-control: private
+    etag: "6bd80b59b2722606abf2b8d83ed2126d"
+    date: Fri, 11 Sep 2020 03:22:28 GMT
+    server: envoy
+    x-envoy-upstream-service-time: 7
+
     This is a private response, it will not be cached by Envoy
-    Response body generated at: Mon, 31 Aug 2020 19:05:59 GMT
-    * Connection #0 to host localhost left intact
+    Response body generated at: Fri, 11 Sep 2020 03:22:28 GMT
 
 No matter how many times you make this request, you will always receive a new response; 
 new date of generation, new ``date`` header, and no ``age`` header. 
@@ -219,86 +179,59 @@ new date of generation, new ``date`` header, and no ``age`` header.
 
 .. code-block:: console
 
-    curl -v localhost:8000/service/1/no-cache
-    *   Trying ::1:8000...
-    * TCP_NODELAY set
-    * Connected to localhost (::1) port 8000 (#0)
-    > GET /service/1/no-cache HTTP/1.1
-    > Host: localhost:8000
-    > User-Agent: curl/7.68.0
-    > Accept: */*
-    > 
-    * Mark bundle as not supporting multiuse
-    < HTTP/1.1 200 OK
-    < cache-control: max-age=0, no-cache
-    < etag: "ce39a53bd6bb8abdb2488a5a375397e4"
-    < date: Mon, 31 Aug 2020 19:07:16 GMT
-    < server: envoy
-    < x-envoy-upstream-service-time: 8
-    < content-length: 130
-    < content-type: text/html; charset=utf-8
-    < 
+    $ curl -i localhost:8000/service/1/no-cache
+    HTTP/1.1 200 OK
+    content-type: text/html; charset=utf-8
+    content-length: 130
+    cache-control: max-age=0, no-cache
+    etag: "ce39a53bd6bb8abdb2488a5a375397e4"
+    date: Fri, 11 Sep 2020 03:23:07 GMT
+    server: envoy
+    x-envoy-upstream-service-time: 7
+
     This response can be cached, but it has to be validated on each request
-    Response body generated at: Mon, 31 Aug 2020 18:48:42 GMT
-    * Connection #0 to host localhost left intact
+    Response body generated at: Fri, 11 Sep 2020 03:23:07 GMT
 
 After a few seconds:
 
 .. code-block:: console
 
-    curl -v localhost:8000/service/1/no-cache
-    *   Trying ::1:8000...
-    * TCP_NODELAY set
-    * Connected to localhost (::1) port 8000 (#0)
-    > GET /service/1/no-cache HTTP/1.1
-    > Host: localhost:8000
-    > User-Agent: curl/7.68.0
-    > Accept: */*
-    > 
-    * Mark bundle as not supporting multiuse
-    < HTTP/1.1 200 OK
-    < cache-control: max-age=0, no-cache
-    < etag: "ce39a53bd6bb8abdb2488a5a375397e4"
-    < date: Mon, 31 Aug 2020 19:07:22 GMT
-    < server: envoy
-    < x-envoy-upstream-service-time: 7
-    < content-length: 130
-    < content-type: text/html; charset=utf-8
-    < 
+    $ curl -i localhost:8000/service/1/no-cache
+    HTTP/1.1 200 OK
+    cache-control: max-age=0, no-cache
+    etag: "ce39a53bd6bb8abdb2488a5a375397e4"
+    date: Fri, 11 Sep 2020 03:23:12 GMT
+    server: envoy
+    x-envoy-upstream-service-time: 7
+    content-length: 130
+    content-type: text/html; charset=utf-8
+
     This response can be cached, but it has to be validated on each request
-    Response body generated at: Mon, 31 Aug 2020 18:48:42 GMT
-    * Connection #0 to host localhost left intact
+    Response body generated at: Fri, 11 Sep 2020 03:23:07 GMT
 
 You will receive a cached response that has the same generation time. 
 However, the ``date`` header will always be updated as this response will always be validated first.
+Also, no ``age`` header.
 
 If you change the response body in the yaml file:
 
 .. code-block:: console
 
-    curl -v localhost:8000/service/1/no-cache
-    *   Trying ::1:8000...
-    * TCP_NODELAY set
-    * Connected to localhost (::1) port 8000 (#0)
-    > GET /service/1/no-cache HTTP/1.1
-    > Host: localhost:8000
-    > User-Agent: curl/7.68.0
-    > Accept: */*
-    > 
-    * Mark bundle as not supporting multiuse
-    < HTTP/1.1 200 OK
-    < content-type: text/html; charset=utf-8
-    < content-length: 133
-    < cache-control: max-age=0, no-cache
-    < etag: "f4768af0ac9f6f54f88169a1f3ecc9f3"
-    < date: Mon, 31 Aug 2020 19:10:25 GMT
-    < server: envoy
-    < x-envoy-upstream-service-time: 8
-    < 
-    This response can be cached, but it has to be validated on each request!!!
-    Response body generated at: Mon, 31 Aug 2020 19:10:2
+    $ curl -i localhost:8000/service/1/no-cache
+    HTTP/1.1 200 OK
+    content-type: text/html; charset=utf-8
+    content-length: 133
+    cache-control: max-age=0, no-cache
+    etag: "f4768af0ac9f6f54f88169a1f3ecc9f3"
+    date: Fri, 11 Sep 2020 03:24:10 GMT
+    server: envoy
+    x-envoy-upstream-service-time: 7
 
-You will receive a new response that's served from the backend. The new response will be cached.
+    This response can be cached, but it has to be validated on each request!!!
+    Response body generated at: Fri, 11 Sep 2020 03:24:10 GMT
+
+You will receive a new response that's served from the backend service.
+The new response will be cached for subsequent requests.
 
 You can also add new responses to the yaml file with different ``cache-control`` headers and start experimenting!
 To learn more about caching and ``cache-control`` headers visit 
