@@ -31,7 +31,7 @@ public:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
-TEST_F(AssertionFilterTest, HeadersMatchWithEndStream) {
+TEST_F(AssertionFilterTest, RequestHeadersMatchWithEndStream) {
   setUpFilter(R"EOF(
 match_config:
   http_request_headers_match:
@@ -42,14 +42,10 @@ match_config:
 
   Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
 
-  EXPECT_CALL(
-      decoder_callbacks_,
-      sendLocalReply(Http::Code::OK, "Request Headers match configured expectations", _, _, ""));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
-TEST_F(AssertionFilterTest, HeadersMatch) {
+TEST_F(AssertionFilterTest, RequestHeadersMatch) {
   setUpFilter(R"EOF(
 match_config:
   http_request_headers_match:
@@ -63,7 +59,7 @@ match_config:
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 }
 
-TEST_F(AssertionFilterTest, HeadersNoMatch) {
+TEST_F(AssertionFilterTest, RequestHeadersNoMatchWithEndStream) {
   setUpFilter(R"EOF(
 match_config:
   http_request_headers_match:
@@ -81,7 +77,72 @@ match_config:
             filter_->decodeHeaders(request_headers, true));
 }
 
-TEST_F(AssertionFilterTest, DataMatchWithEndStream) {
+TEST_F(AssertionFilterTest, RequestHeadersNoMatch) {
+  setUpFilter(R"EOF(
+match_config:
+  http_request_headers_match:
+    headers:
+      - name: ":authority"
+        exact_match: test.code
+)EOF");
+
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", "no.match"}};
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "Request Headers do not match configured expectations", _, _, ""));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+TEST_F(AssertionFilterTest, RequestHeadersMatchWithEndstreamAndDataMissing) {
+  setUpFilter(R"EOF(
+match_config:
+  and_match:
+    rules:
+    - http_request_headers_match:
+        headers:
+          - name: ":authority"
+            exact_match: test.code
+    - http_request_generic_body_match:
+        patterns:
+        - string_match: match_me
+)EOF");
+
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "Request Body does not match configured expectations", _, _, ""));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(AssertionFilterTest, RequestHeadersMatchWithEndstreamAndTrailersMissing) {
+  setUpFilter(R"EOF(
+match_config:
+  and_match:
+    rules:
+    - http_request_headers_match:
+        headers:
+          - name: ":authority"
+            exact_match: test.code
+    - http_request_trailers_match:
+        headers:
+          - name: "test-trailer"
+            exact_match: test.code
+)EOF");
+
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "Request Trailers do not match configured expectations", _, _, ""));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(AssertionFilterTest, RequestDataMatchWithEndStream) {
   setUpFilter(R"EOF(
 match_config:
   http_request_generic_body_match:
@@ -91,13 +152,10 @@ match_config:
 
   Buffer::InstancePtr body{new Buffer::OwnedImpl("match_me")};
 
-  EXPECT_CALL(
-      decoder_callbacks_,
-      sendLocalReply(Http::Code::OK, "Request Body match configured expectations", _, _, ""));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(*body, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(*body, true));
 }
 
-TEST_F(AssertionFilterTest, DataMatch) {
+TEST_F(AssertionFilterTest, RequestDataMatch) {
   setUpFilter(R"EOF(
 match_config:
   http_request_generic_body_match:
@@ -110,7 +168,7 @@ match_config:
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(*body, false));
 }
 
-TEST_F(AssertionFilterTest, DataNoMatch) {
+TEST_F(AssertionFilterTest, RequestDataNoMatchWithEndStream) {
   setUpFilter(R"EOF(
 match_config:
   http_request_generic_body_match:
@@ -126,7 +184,55 @@ match_config:
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(*body, true));
 }
 
-TEST_F(AssertionFilterTest, TrailersMatch) {
+TEST_F(AssertionFilterTest, RequestDataMatchWithEndStreamAndTrailersMissing) {
+  setUpFilter(R"EOF(
+match_config:
+  and_match:
+    rules:
+    - http_request_generic_body_match:
+        patterns:
+          - string_match: match_me
+    - http_request_trailers_match:
+        headers:
+          - name: "test-trailer"
+            exact_match: test.code
+)EOF");
+
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("match_me")};
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "Request Trailers do not match configured expectations", _, _, ""));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(*body, true));
+}
+
+TEST_F(AssertionFilterTest, RequestDataNoMatchAfterTrailers) {
+  setUpFilter(R"EOF(
+match_config:
+  and_match:
+    rules:
+    - http_request_headers_match:
+        headers:
+          - name: ":authority"
+            exact_match: test.code
+    - http_request_generic_body_match:
+        patterns:
+        - string_match: match_me
+)EOF");
+
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("garbage")};
+  Http::TestRequestTrailerMapImpl request_trailers{{"test-trailer", "test.code"}};
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "Request Body does not match configured expectations", _, _, ""));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(*body, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
+}
+
+TEST_F(AssertionFilterTest, RequestTrailersMatch) {
   setUpFilter(R"EOF(
 match_config:
   http_request_trailers_match:
@@ -137,13 +243,10 @@ match_config:
 
   Http::TestRequestTrailerMapImpl request_trailers{{"test-trailer", "test.code"}};
 
-  EXPECT_CALL(
-      decoder_callbacks_,
-      sendLocalReply(Http::Code::OK, "Request Trailers match configured expectations", _, _, ""));
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
-TEST_F(AssertionFilterTest, TrailersNoMatch) {
+TEST_F(AssertionFilterTest, RequestTrailersNoMatch) {
   setUpFilter(R"EOF(
 match_config:
   http_request_trailers_match:
