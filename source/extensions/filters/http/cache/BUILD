@@ -79,8 +79,12 @@ envoy_cc_library(
         ":inline_headers_handles",
         "//include/envoy/common:time_interface",
         "//include/envoy/http:header_map_interface",
+        "//source/common/common:matchers_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/extensions/filters/http/cache/v3alpha:pkg_cc_proto",
     ],
 )
 
