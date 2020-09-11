@@ -123,11 +123,11 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
   return Http::FilterDataStatus::Continue;
 }
 
-void CacheFilter::onAboveWriteBufferHighWatermark() { high_watermark_calls_++; }
+void CacheFilter::onAboveWriteBufferHighWatermark() { ++high_watermark_calls_; }
 
 void CacheFilter::onBelowWriteBufferLowWatermark() {
   ASSERT(high_watermark_calls_ > 0);
-  high_watermark_calls_--;
+  --high_watermark_calls_;
   if (!remaining_ranges_.empty()) {
     // Fetching the cached response body was stopped, continue if possible.
     maybeGetBody();
@@ -177,9 +177,10 @@ void CacheFilter::maybeGetBody() {
   ASSERT(lookup_, "CacheFilter is trying to call getBody with no LookupContext");
   ASSERT(!remaining_ranges_.empty(), "No reason to call getBody when there's no body to get.");
 
-  if (!shouldFetchMoreData()) {
+  if (high_watermark_calls_ > 0 || ongoing_fetch_) {
     return;
   }
+  ongoing_fetch_ = true;
 
   // Make sure we are not fetching a chunk of data larger than the encoding buffer limit.
   uint64_t begin = remaining_ranges_[0].begin();
@@ -211,7 +212,6 @@ void CacheFilter::maybeGetBody() {
       }
     });
   });
-  ongoing_fetch_ = true;
 }
 
 void CacheFilter::getTrailers() {

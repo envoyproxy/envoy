@@ -79,11 +79,6 @@ private:
   // or during encoding if a cache entry was validated successfully.
   void encodeCachedResponse();
 
-  bool shouldFetchMoreData() {
-    // No outstanding high watermark callbacks and we are not already fetching any data.
-    return high_watermark_calls_ == 0 && !ongoing_fetch_;
-  }
-
   TimeSource& time_source_;
   HttpCache& cache_;
   LookupContextPtr lookup_;
