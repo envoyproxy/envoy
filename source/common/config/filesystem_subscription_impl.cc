@@ -123,7 +123,7 @@ void FilesystemCollectionSubscriptionImpl::refresh() {
           *collection_message, collection_entries_field_descriptor, i));
       // TODO(htuch): implement indirect collection entries.
       if (collection_entry.has_inline_entry()) {
-        decoded_resources.push_back(std::make_unique<DecodedResourceImpl>(
+        decoded_resources.pushBack(std::make_unique<DecodedResourceImpl>(
             resource_decoder_, collection_entry.inline_entry()));
       }
     }

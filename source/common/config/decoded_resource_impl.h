@@ -71,11 +71,11 @@ struct DecodedResourcesWrapper {
                           const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                           const std::string& version) {
     for (const auto& resource : resources) {
-      push_back(std::make_unique<DecodedResourceImpl>(resource_decoder, resource, version));
+      pushBack(std::make_unique<DecodedResourceImpl>(resource_decoder, resource, version));
     }
   }
 
-  void push_back(Config::DecodedResourcePtr&& resource) {
+  void pushBack(Config::DecodedResourcePtr&& resource) {
     owned_resources_.push_back(std::move(resource));
     refvec_.emplace_back(*owned_resources_.back());
   }

@@ -185,7 +185,7 @@ resource:
   )EOF",
                                            MessageUtil::getJsonStringFromMessage(inline_entry));
   DecodedResourcesWrapper decoded_resources;
-  decoded_resources.push_back(
+  decoded_resources.pushBack(
       std::make_unique<DecodedResourceImpl>(resource_decoder, inline_entry));
   EXPECT_CALL(callbacks_,
               onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), "system.1"));
@@ -215,7 +215,7 @@ resource:
                                              MessageUtil::getJsonStringFromMessage(inline_entry_2));
   {
     DecodedResourcesWrapper decoded_resources_2;
-    decoded_resources_2.push_back(
+    decoded_resources_2.pushBack(
         std::make_unique<DecodedResourceImpl>(resource_decoder, inline_entry_2));
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(DecodedResourcesEq(decoded_resources_2.refvec_), "system.2"));
