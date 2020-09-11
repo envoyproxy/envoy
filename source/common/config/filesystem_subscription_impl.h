@@ -34,7 +34,8 @@ public:
   }
 
 protected:
-  virtual void refresh();
+  virtual std::string refreshInternal(ProtobufTypes::MessagePtr* config_update);
+  void refresh();
   void configRejected(const EnvoyException& e, const std::string& message);
 
   bool started_{};
@@ -58,7 +59,7 @@ public:
                                        ProtobufMessage::ValidationVisitor& validation_visitor,
                                        Api::Api& api);
 
-  void refresh() override;
+  std::string refreshInternal(ProtobufTypes::MessagePtr* config_update) override;
 };
 
 } // namespace Config
