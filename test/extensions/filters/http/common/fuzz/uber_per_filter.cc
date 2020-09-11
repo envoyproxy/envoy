@@ -76,16 +76,6 @@ void UberFilterFuzzer::guideAnyProtoType(test::fuzz::HttpData* mutable_data, uin
   mutable_any->set_type_url(type_url);
 }
 
-void removeConnectMatcher(Protobuf::Message* message) {
-  envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config =
-      dynamic_cast<envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication&>(*message);
-  for (auto& rules : *config.mutable_rules()) {
-    if (rules.match().has_connect_matcher()) {
-      rules.mutable_match()->set_path("/");
-    }
-  }
-}
-
 void cleanAttachmentTemplate(Protobuf::Message* message) {
   envoy::extensions::filters::http::squash::v3::Squash& config =
       dynamic_cast<envoy::extensions::filters::http::squash::v3::Squash&>(*message);
@@ -137,10 +127,6 @@ void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
   } else if (name == HttpFilterNames::get().Tap) {
     // TapDS oneof field and OutputSinkType StreamingGrpc not implemented
     cleanTapConfig(message);
-  }
-  if (filter_name == HttpFilterNames::get().JwtAuthn) {
-    // Remove when connect matcher is implemented for Jwt Authentication filter.
-    removeConnectMatcher(message);
   }
 }
 
