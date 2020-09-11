@@ -31,11 +31,6 @@ namespace HttpFilters {
 namespace ExtAuthz {
 
 /**
- * Type of requests the filter should apply to.
- */
-enum class FilterRequestType { Internal, External, Both };
-
-/**
  * All stats for the Ext Authz filter. @see stats_macros.h
  */
 

@@ -311,7 +311,6 @@ TEST_P(IntegrationTest, ResponseFramedByConnectionCloseWithReadLimits) {
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
@@ -370,7 +369,6 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
     circuit_breakers->add_thresholds()->mutable_max_connections()->set_value(1);
   });
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -437,7 +435,6 @@ TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
   // Send the overly large response. Because the grpc_http1_bridge filter buffers and buffer
   // limits are exceeded, this will be translated into an unknown gRPC error.
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   upstream_request_->encodeData(1024 * 65, false);
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
@@ -591,7 +588,6 @@ TEST_P(IntegrationTest, InvalidVersion) {
 // Expect that malformed trailers to break the connection
 TEST_P(IntegrationTest, BadTrailer) {
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "POST / HTTP/1.1\r\n"
@@ -608,7 +604,6 @@ TEST_P(IntegrationTest, BadTrailer) {
 // Expect malformed headers to break the connection
 TEST_P(IntegrationTest, BadHeader) {
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "POST / HTTP/1.1\r\n"
@@ -1079,9 +1074,6 @@ TEST_P(IntegrationTest, TestFailedBind) {
   config_helper_.setSourceAddress("8.8.8.8");
 
   initialize();
-  // Envoy will create and close some number of connections when trying to bind.
-  // Make sure they don't cause assertion failures when we ignore them.
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   // With no ability to successfully bind on an upstream connection Envoy should
   // send a 500.
@@ -1147,8 +1139,6 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto encoder_decoder =
@@ -1184,8 +1174,6 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(0); });
   initialize();
-
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -1224,8 +1212,6 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
       });
 
   initialize();
-
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 

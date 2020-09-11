@@ -530,7 +530,7 @@ public:
 
 class MockGenericConnPool : public GenericConnPool {
   MOCK_METHOD(void, newStream, (GenericConnectionPoolCallbacks * request));
-  MOCK_METHOD(bool, cancelAnyPendingRequest, ());
+  MOCK_METHOD(bool, cancelAnyPendingStream, ());
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
   MOCK_METHOD(bool, initialize,
               (Upstream::ClusterManager&, const RouteEntry&, Http::Protocol,
