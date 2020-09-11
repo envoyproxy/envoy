@@ -7,6 +7,7 @@ export NAME=cache
 
 check_validated() {
     # Get the date header and the response generation timestamp
+    local dates
     dates=($(grep -oP '\d\d:\d\d:\d\d' <<< "$1"))
     # Make sure they are different
     if [[ ${dates[0]} == ${dates[1]} ]]; then
@@ -30,6 +31,7 @@ check_cached() {
 
 check_from_origin() {
     # Get the date header and the response generation timestamp
+    local dates
     dates=($(grep -oP '\d\d:\d\d:\d\d' <<< "$1"))
     # Make sure they are equal
     if [[ ${dates[0]} != ${dates[1]} ]]; then
