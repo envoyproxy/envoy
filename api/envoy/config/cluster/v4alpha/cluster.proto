@@ -969,7 +969,7 @@ message Cluster {
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
 
-  // If `connection_pool_idle_timeout`is set, the cluster will remove connection pools
+  // If `connection_pool_idle_timeout` is set, the cluster will remove connection pools
   // that have not had active connections for the specified timeout duration.
   google.protobuf.Duration connection_pool_idle_timeout = 53
       [(validate.rules).duration = {gte {nanos: 1000000}}];
