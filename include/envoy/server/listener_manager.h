@@ -235,6 +235,11 @@ public:
    * @return the server's API Listener if it exists, nullopt if it does not.
    */
   virtual ApiListenerOptRef apiListener() PURE;
+
+  /*
+   * @return TRUE if the worker has started or FALSE if not.
+   */
+  virtual bool isWorkerStarted() PURE;
 };
 
 // overload operator| to allow ListenerManager::listeners(ListenerState) to be called using a

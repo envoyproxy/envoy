@@ -78,7 +78,6 @@ public:
   uint16_t ciphersuiteId() const override;
   std::string ciphersuiteString() const override;
   const std::string& tlsVersion() const override;
-  absl::optional<std::string> x509Extension(absl::string_view extension_name) const override;
 
   // Ssl::Handshaker
   Network::PostIoAction doHandshake() override;
