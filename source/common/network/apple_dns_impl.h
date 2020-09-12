@@ -33,7 +33,6 @@ public:
                           ResolveCb callback) override;
 
 private:
-  friend class AppleDnsResolverImplPeer;
   struct PendingResolution : public ActiveDnsQuery {
     PendingResolution(AppleDnsResolverImpl& parent, ResolveCb callback,
                       Event::Dispatcher& dispatcher, DNSServiceRef sd_ref,
@@ -46,12 +45,15 @@ private:
     void cancel() override;
 
     static DnsResponse buildDnsResponse(const struct sockaddr* address, uint32_t ttl);
+    // Wrapper for the API call.
+    DNSServiceErrorType dnsServiceGetAddrInfo(DnsLookupFamily dns_lookup_family);
+    // Wrapper for the API callback.
     void onDNSServiceGetAddrInfoReply(DNSServiceFlags flags, uint32_t interface_index,
                                       DNSServiceErrorType error_code, const char* hostname,
                                       const struct sockaddr* address, uint32_t ttl);
-    // wrapper for the API call
-    DNSServiceErrorType dnsServiceGetAddrInfo(DnsLookupFamily dns_lookup_family);
 
+    // Small wrapping struct to accumulate addresses from firings of the
+    // onDNSServiceGetAddrInfoReply callback.
     struct FinalResponse {
       ResolutionStatus status_;
       std::list<DnsResponse> responses_;
@@ -66,6 +68,9 @@ private:
     const std::string dns_name_;
     bool synchronously_completed_{};
     bool owned_{};
+    // DNSServiceGetAddrInfo fires one callback DNSServiceGetAddrInfoReply callback per IP address,
+    // and informs via flags if more IP addresses are incoming. Therefore, these addresses need to
+    // be accumulated before firing callback_.
     absl::optional<FinalResponse> pending_cb_{};
   };
 
@@ -77,8 +82,12 @@ private:
 
   Event::Dispatcher& dispatcher_;
   DNSServiceRef main_sd_ref_;
-  bool dirty_sd_ref_{};
   Event::FileEventPtr sd_ref_event_;
+  // When using a shared sd ref via DNSServiceCreateConnection, the DNSServiceGetAddrInfoReply
+  // callback with the kDNSServiceFlagsMoreComing flag might refer to addresses for various
+  // PendingResolutions. Therefore, the resolver needs to have a container of queries pending
+  // calling their own callback_s until a DNSServiceGetAddrInfoReply is called with
+  // kDNSServiceFlagsMoreComing not set.
   std::list<PendingResolution*> queries_with_pending_cb_;
 };
 

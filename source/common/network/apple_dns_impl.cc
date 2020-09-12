@@ -28,15 +28,15 @@ AppleDnsResolverImpl::AppleDnsResolverImpl(Event::Dispatcher& dispatcher)
 
 AppleDnsResolverImpl::~AppleDnsResolverImpl() {
   ENVOY_LOG(warn, "Destructing DNS resolver");
-  // dns_sd.h says:
-  //   If the reference's underlying socket is used in a run loop or select() call, it should
-  //   be removed BEFORE DNSServiceRefDeallocate() is called, as this function closes the
-  //   reference's socket.
   deallocateMainSdRef();
 }
 
 void AppleDnsResolverImpl::deallocateMainSdRef() {
   ENVOY_LOG(warn, "DNSServiceRefDeallocate main sd ref");
+  // dns_sd.h says:
+  //   If the reference's underlying socket is used in a run loop or select() call, it should
+  //   be removed BEFORE DNSServiceRefDeallocate() is called, as this function closes the
+  //   reference's socket.
   sd_ref_event_.reset();
   DNSServiceRefDeallocate(main_sd_ref_);
 }
@@ -108,7 +108,6 @@ void AppleDnsResolverImpl::flushPendingQueries() {
       (*it)->dispatcher_.post([] { throw EnvoyException("unknown"); });
     }
 
-    // The query is complete so it can be deleted.
     if ((*it)->owned_) {
       ENVOY_LOG(warn, "Resolution for {} completed (async)", (*it)->dns_name_);
       delete *it;
@@ -164,6 +163,8 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     // deallocates individual refs, so deallocating the main ref aheadd would cause deallocation of
     // invalid individual refs per dns_sd.h
     parent_.deallocateMainSdRef();
+    // POINT FOR DISCUSSION: can this throw here? Or does it need to be posted like the callback in
+    // flushPendingQueries.
     parent_.initializeMainSdRef();
 
     return;
@@ -175,11 +176,6 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
   // stat?
   RELEASE_ASSERT(error_code == kDNSServiceErr_NoError,
                  "An unknown error has been returned by DNSServiceGetAddrInfoReply");
-
-  // POINT FOR DISCUSSION:
-  // answered from cache
-  // expired answer
-  // do we want to enable validation?
 
   // Only add this address to the list if kDNSServiceFlagsAdd is set. Callback targets are purely
   // additive.
@@ -221,7 +217,7 @@ AppleDnsResolverImpl::PendingResolution::dnsServiceGetAddrInfo(DnsLookupFamily d
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
-  // POINT FOR DISCUSSION: Do we want to allow expired answers from the cache?
+  // POINT FOR DISCUSSION: Do we want to allow caching, allow expired answers from the cache?
   // POINT FOR DISCUSSION: Do we want validation DNSSEC?
   return DNSServiceGetAddrInfo(
       &individual_sd_ref_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0, protocol,
