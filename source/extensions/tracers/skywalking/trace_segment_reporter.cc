@@ -70,21 +70,23 @@ TraceSegmentPtr toSegmentObject(const SegmentContext& segment_context) {
 
 TraceSegmentReporter::TraceSegmentReporter(
     Grpc::AsyncClientFactoryPtr&& factory, Event::Dispatcher& dispatcher,
-    const envoy::config::trace::v3::ClientConfig& client_config)
-    : config_(client_config), client_(factory->create()),
+    SkyWalkingTracerStats& stats, const envoy::config::trace::v3::ClientConfig& client_config)
+    : tracing_stats_(stats), simple_authentication_token_(client_config.authentication()),
+      client_(factory->create()),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "TraceSegmentReportService.collect")) {
-  max_delayed_segments_cache_size_ = config_.max_cache_size() == 0
+  max_delayed_segments_cache_size_ = client_config.max_cache_size() == 0
                                          ? DEFAULT_DELAYED_SEGMENTS_CACHE_SIZE
-                                         : config_.max_cache_size();
+                                         : client_config.max_cache_size();
 
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   establishNewStream();
 }
 
 void TraceSegmentReporter::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
-  if (!config_.authentication().empty()) {
-    metadata.setReferenceKey(Http::CustomHeaders::get().Authorization, config_.authentication());
+  if (!simple_authentication_token_.empty()) {
+    metadata.setReferenceKey(Http::CustomHeaders::get().Authorization,
+                             simple_authentication_token_);
   }
 }
 
@@ -94,21 +96,26 @@ void TraceSegmentReporter::report(const SegmentContext& segment_context) {
 
 void TraceSegmentReporter::sendTraceSegment(TraceSegmentPtr&& request) {
   if (stream_ != nullptr) {
+    tracing_stats_.segments_sent_.inc();
     stream_->sendMessage(*request, false);
     return;
   }
   // Null stream_ and cache segment data temporarily.
   delayed_segments_cache_.emplace(std::move(request));
   if (delayed_segments_cache_.size() > max_delayed_segments_cache_size_) {
+    tracing_stats_.segments_dropped_.inc();
     delayed_segments_cache_.pop();
   }
 }
 
 void TraceSegmentReporter::flushTraceSegments() {
   while (!delayed_segments_cache_.empty() && stream_ != nullptr) {
+    tracing_stats_.segments_sent_.inc();
+    tracing_stats_.segments_flushed_.inc();
     stream_->sendMessage(*delayed_segments_cache_.front(), false);
     delayed_segments_cache_.pop();
   }
+  tracing_stats_.cache_flushed_.inc();
 }
 
 void TraceSegmentReporter::closeStream() {

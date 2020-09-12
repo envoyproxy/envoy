@@ -9,6 +9,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using namespace testing;
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -18,12 +20,11 @@ class SkyWalkingDriverTest : public testing::Test {
 public:
   void setupSkyWalkingDriver(const std::string& yaml_string) {
     TestUtility::loadFromYaml(yaml_string, config_);
-
     driver_ = std::make_unique<Driver>(config_, context_);
   }
 
 protected:
-  testing::NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
+  NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
   envoy::config::trace::v3::SkyWalkingConfig config_;
   DriverPtr driver_;
 };

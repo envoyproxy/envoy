@@ -15,23 +15,28 @@ namespace SkyWalking {
 
 Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
                Server::Configuration::TracerFactoryContext& context)
-    : client_config_(proto_config.client_config()),
+    : tracing_stats_{SKYWALKING_TRACER_STATS(
+          POOL_COUNTER_PREFIX(context.serverFactoryContext().scope(), "tracing.skywalking."))},
+      client_config_(proto_config.client_config()),
       random_generator_(context.serverFactoryContext().random()),
       tls_slot_ptr_(context.serverFactoryContext().threadLocal().allocateSlot()) {
 
+  auto& factory_context = context.serverFactoryContext();
+
   if (client_config_.service_name().empty()) {
-    client_config_.set_service_name(context.serverFactoryContext().localInfo().clusterName());
+    client_config_.set_service_name(factory_context.localInfo().clusterName());
   }
   if (client_config_.instance_name().empty()) {
-    client_config_.set_instance_name(context.serverFactoryContext().localInfo().nodeName());
+    client_config_.set_instance_name(factory_context.localInfo().nodeName());
   }
 
-  tls_slot_ptr_->set([proto_config, &context, this](
+  tls_slot_ptr_->set([proto_config, &factory_context, this](
                          Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    auto& factory_context = context.serverFactoryContext();
-    TracerPtr tracer = std::make_unique<Tracer>(
-        factory_context.clusterManager(), factory_context.scope(), factory_context.timeSource(),
-        dispatcher, proto_config.grpc_service(), client_config_);
+    TracerPtr tracer = std::make_unique<Tracer>(factory_context.timeSource());
+    tracer->setReporter(std::make_unique<TraceSegmentReporter>(
+        factory_context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
+            proto_config.grpc_service(), factory_context.scope(), false),
+        dispatcher, tracing_stats_, client_config_));
     return std::make_shared<TlsTracer>(std::move(tracer));
   });
 }

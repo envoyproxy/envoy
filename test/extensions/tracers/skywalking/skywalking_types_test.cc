@@ -5,10 +5,13 @@
 
 #include "test/extensions/tracers/skywalking/skywalking_test_helper.h"
 #include "test/mocks/common.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using namespace testing;
 
 namespace Envoy {
 namespace Extensions {
@@ -24,9 +27,9 @@ constexpr char TEST_ENDPOINT[] = "/POST/path/for/test";
 // Test whether SpanContext can correctly parse data from propagation headers and throw exceptions
 // when errors occur.
 TEST(SpanContextTest, SpanContextCommonTest) {
-  testing::NiceMock<Random::MockRandomGenerator> mock_random_generator;
+  NiceMock<Random::MockRandomGenerator> mock_random_generator;
 
-  ON_CALL(mock_random_generator, random()).WillByDefault(testing::Return(uint64_t(23333)));
+  ON_CALL(mock_random_generator, random()).WillByDefault(Return(uint64_t(23333)));
 
   std::string trace_id = SkyWalkingTestHelper::generateId(mock_random_generator);
   std::string segment_id = SkyWalkingTestHelper::generateId(mock_random_generator);
@@ -128,10 +131,10 @@ TEST(SpanContextTest, SpanContextCommonTest) {
 // Test whether the SegmentContext works normally when Envoy is the root node (Propagation headers
 // does not exist).
 TEST(SegmentContextTest, SegmentContextTestWithEmptyPreviousSpanContext) {
-  testing::NiceMock<Random::MockRandomGenerator> mock_random_generator;
-  testing::NiceMock<Envoy::MockTimeSystem> mock_time_source;
+  NiceMock<Random::MockRandomGenerator> mock_random_generator;
+  NiceMock<Envoy::MockTimeSystem> mock_time_source;
 
-  ON_CALL(mock_random_generator, random()).WillByDefault(testing::Return(233333));
+  ON_CALL(mock_random_generator, random()).WillByDefault(Return(233333));
 
   SegmentContextSharedPtr segment_context =
       SkyWalkingTestHelper::createSegmentContext(true, "NEW", "", mock_random_generator);
@@ -188,9 +191,9 @@ TEST(SegmentContextTest, SegmentContextTestWithEmptyPreviousSpanContext) {
 
 // Test whether the SegmentContext can work normally when a previous span context exists.
 TEST(SegmentContextTest, SegmentContextTestWithPreviousSpanContext) {
-  testing::NiceMock<Random::MockRandomGenerator> mock_random_generator;
+  NiceMock<Random::MockRandomGenerator> mock_random_generator;
 
-  ON_CALL(mock_random_generator, random()).WillByDefault(testing::Return(23333));
+  ON_CALL(mock_random_generator, random()).WillByDefault(Return(23333));
 
   std::string trace_id = SkyWalkingTestHelper::generateId(mock_random_generator);
   std::string segment_id = SkyWalkingTestHelper::generateId(mock_random_generator);
@@ -211,7 +214,7 @@ TEST(SegmentContextTest, SegmentContextTestWithPreviousSpanContext) {
   Tracing::Decision decision;
   decision.traced = true;
 
-  EXPECT_CALL(mock_random_generator, random()).WillRepeatedly(testing::Return(666666));
+  EXPECT_CALL(mock_random_generator, random()).WillRepeatedly(Return(666666));
 
   SegmentContext segment_context(std::move(previous_span_context), decision, mock_random_generator);
 
@@ -230,12 +233,13 @@ TEST(SegmentContextTest, SegmentContextTestWithPreviousSpanContext) {
 
 // Test whether SpanStore can work properly.
 TEST(SpanStoreTest, SpanStoreCommonTest) {
-  testing::NiceMock<Random::MockRandomGenerator> mock_random_generator;
-  testing::NiceMock<Envoy::MockTimeSystem> mock_time_source;
-  auto now = time_system_.systemTime();
+  NiceMock<Random::MockRandomGenerator> mock_random_generator;
+  NiceMock<Envoy::MockTimeSystem> mock_time_source;
+  Event::SimulatedTimeSystem time_system;
+  Envoy::SystemTime now = time_system.systemTime();
 
-  ON_CALL(mock_random_generator, random()).WillByDefault(testing::Return(23333));
-  ON_CALL(mock_time_source, systemTime()).WillByDefault(testing::Return(now));
+  ON_CALL(mock_random_generator, random()).WillByDefault(Return(23333));
+  ON_CALL(mock_time_source, systemTime()).WillByDefault(Return(now));
 
   // Create segment context and first span store.
   SegmentContextSharedPtr segment_context =

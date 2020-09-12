@@ -8,6 +8,7 @@
 #include "common/Common.pb.h"
 #include "common/grpc/async_client_impl.h"
 
+#include "extensions/tracers/skywalking/skywalking_stats.h"
 #include "extensions/tracers/skywalking/skywalking_types.h"
 
 #include "language-agent/Tracing.pb.h"
@@ -22,7 +23,7 @@ using TraceSegmentPtr = std::unique_ptr<SegmentObject>;
 class TraceSegmentReporter : Grpc::AsyncStreamCallbacks<Commands> {
 public:
   explicit TraceSegmentReporter(Grpc::AsyncClientFactoryPtr&& factory,
-                                Event::Dispatcher& dispatcher,
+                                Event::Dispatcher& dispatcher, SkyWalkingTracerStats& stats,
                                 const envoy::config::trace::v3::ClientConfig& client_config);
 
   // Grpc::AsyncStreamCallbacks
@@ -53,7 +54,9 @@ private:
   void handleFailure();
   void setRetryTimer();
 
-  const envoy::config::trace::v3::ClientConfig& config_;
+  SkyWalkingTracerStats& tracing_stats_;
+
+  const std::string simple_authentication_token_;
   uint32_t max_delayed_segments_cache_size_{0};
   Grpc::AsyncClient<SegmentObject, Commands> client_;
   Grpc::AsyncStream<SegmentObject> stream_{};

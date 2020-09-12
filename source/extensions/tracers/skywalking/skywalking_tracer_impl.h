@@ -20,8 +20,8 @@ public:
                   Server::Configuration::TracerFactoryContext& context);
 
   Tracing::SpanPtr startSpan(const Tracing::Config& config, Http::RequestHeaderMap& request_headers,
-                             const std::string& operation_name, Envoy::SystemTime start_time,
-                             const Tracing::Decision tracing_decision) override;
+                             const std::string& operation, Envoy::SystemTime start_time,
+                             const Tracing::Decision decision) override;
 
 private:
   struct TlsTracer : ThreadLocal::ThreadLocalObject {
@@ -29,6 +29,8 @@ private:
 
     TracerPtr tracer_;
   };
+
+  SkyWalkingTracerStats tracing_stats_;
 
   envoy::config::trace::v3::ClientConfig client_config_;
 

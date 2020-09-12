@@ -5,10 +5,13 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using namespace testing;
 
 namespace Envoy {
 namespace Extensions {
@@ -17,54 +20,48 @@ namespace SkyWalking {
 
 class TracerTest : public testing::Test {
 public:
+  TracerTest()
+      : tracing_stats_{
+            SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))} {}
+
   void setupTracer(const std::string& yaml_string) {
     EXPECT_CALL(mock_dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
       return timer_;
     }));
-    timer_ = new testing::NiceMock<Event::MockTimer>();
+    timer_ = new NiceMock<Event::MockTimer>();
 
-    auto client_factory = std::make_unique<testing::NiceMock<Grpc::MockAsyncClientFactory>>();
+    auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
 
-    auto client = std::make_unique<testing::NiceMock<Grpc::MockAsyncClient>>();
-    auto client_ptr = client.get();
+    auto mock_client = std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+    auto mock_client_ptr = mock_client.get();
 
-    mock_stream_ptr_ = std::make_unique<testing::NiceMock<Grpc::MockAsyncStream>>();
+    mock_stream_ptr_ = std::make_unique<NiceMock<Grpc::MockAsyncStream>>();
 
-    EXPECT_CALL(*client_factory, create())
-        .WillOnce(testing::Return(testing::ByMove(std::move(client))));
+    EXPECT_CALL(*mock_client_factory, create()).WillOnce(Return(ByMove(std::move(mock_client))));
 
-    EXPECT_CALL(*client_ptr, startRaw(_, _, _, _))
-        .WillOnce(testing::Return(mock_stream_ptr_.get()));
+    EXPECT_CALL(*mock_client_ptr, startRaw(_, _, _, _)).WillOnce(Return(mock_stream_ptr_.get()));
 
-    EXPECT_CALL(mock_cluster_manager_, grpcAsyncClientManager())
-        .WillOnce(testing::ReturnRef(mock_async_client_manager_));
-
-    EXPECT_CALL(mock_async_client_manager_, factoryForGrpcService(_, _, _))
-        .WillOnce(testing::Return(testing::ByMove(std::move(client_factory))));
-
-    TestUtility::loadFromYaml(yaml_string, config_);
-    tracer_ =
-        std::make_unique<Tracer>(mock_cluster_manager_, stats_, mock_time_source_, mock_dispatcher_,
-                                 config_.grpc_service(), config_.client_config());
+    TestUtility::loadFromYaml(yaml_string, client_config_);
+    tracer_ = std::make_unique<Tracer>(mock_time_source_);
+    tracer_->setReporter(std::make_unique<TraceSegmentReporter>(
+        std::move(mock_client_factory), mock_dispatcher_, tracing_stats_, client_config_));
   }
 
 protected:
-  envoy::config::trace::v3::SkyWalkingConfig config_;
+  NiceMock<Envoy::Tracing::MockConfig> mock_tracing_config_;
+  NiceMock<Event::MockDispatcher> mock_dispatcher_;
+  NiceMock<Random::MockRandomGenerator> mock_random_generator_;
+  NiceMock<Envoy::MockTimeSystem> mock_time_source_;
+  NiceMock<Stats::MockIsolatedStatsStore> mock_scope_;
 
-  testing::NiceMock<Envoy::Tracing::MockConfig> mock_tracing_config_;
-  testing::NiceMock<Event::MockDispatcher> mock_dispatcher_;
-  testing::NiceMock<Random::MockRandomGenerator> mock_random_generator_;
-  testing::NiceMock<Envoy::MockTimeSystem> mock_time_source_;
-  testing::NiceMock<Envoy::Upstream::MockClusterManager> mock_cluster_manager_;
-  testing::NiceMock<Envoy::Grpc::MockAsyncClientManager> mock_async_client_manager_;
-  NiceMock<Stats::MockIsolatedStatsStore> stats_;
+  std::unique_ptr<NiceMock<Grpc::MockAsyncStream>> mock_stream_ptr_{nullptr};
 
-  std::unique_ptr<testing::NiceMock<Grpc::MockAsyncStream>> mock_stream_ptr_{nullptr};
-
-  testing::NiceMock<Event::MockTimer>* timer_;
+  NiceMock<Event::MockTimer>* timer_;
   Event::TimerCb timer_cb_;
 
+  envoy::config::trace::v3::ClientConfig client_config_;
+  SkyWalkingTracerStats tracing_stats_;
   TracerPtr tracer_;
 };
 
@@ -72,16 +69,16 @@ protected:
 // create new child Spans.
 TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   setupTracer("{}");
-  EXPECT_CALL(mock_random_generator_, random()).WillRepeatedly(testing::Return(666666));
-  ON_CALL(mock_time_source_, systemTime())
-      .WillByDefault(testing::Return(time_system_.systemTime());
+  EXPECT_CALL(mock_random_generator_, random()).WillRepeatedly(Return(666666));
+  Event::SimulatedTimeSystem time_system;
+  ON_CALL(mock_time_source_, systemTime()).WillByDefault(Return(time_system.systemTime()));
 
   // Create a new SegmentContext.
   SegmentContextSharedPtr segment_context =
       SkyWalkingTestHelper::createSegmentContext(true, "CURR", "", mock_random_generator_);
 
   EXPECT_CALL(mock_tracing_config_, operationName())
-      .WillOnce(testing::Return(Envoy::Tracing::OperationName::Ingress));
+      .WillOnce(Return(Envoy::Tracing::OperationName::Ingress));
   Envoy::Tracing::SpanPtr org_span = tracer_->startSpan(
       mock_tracing_config_, mock_time_source_.systemTime(), "", segment_context, nullptr);
   Span* span = dynamic_cast<Span*>(org_span.get());
@@ -120,7 +117,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   EXPECT_EQ(expected_header_value, headers.get_("sw8"));
 
   EXPECT_CALL(mock_tracing_config_, operationName())
-      .WillOnce(testing::Return(Envoy::Tracing::OperationName::Egress));
+      .WillOnce(Return(Envoy::Tracing::OperationName::Egress));
   Envoy::Tracing::SpanPtr org_first_child_span =
       span->spawnChild(mock_tracing_config_, "TestChild", mock_time_source_.systemTime());
   Span* first_child_span = dynamic_cast<Span*>(org_first_child_span.get());
@@ -152,7 +149,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   // Reset sampling flag to true.
   span->setSampled(true);
   EXPECT_CALL(mock_tracing_config_, operationName())
-      .WillOnce(testing::Return(Envoy::Tracing::OperationName::Ingress));
+      .WillOnce(Return(Envoy::Tracing::OperationName::Ingress));
   Envoy::Tracing::SpanPtr org_second_child_span =
       span->spawnChild(mock_tracing_config_, "TestChild", mock_time_source_.systemTime());
   Span* second_child_span = dynamic_cast<Span*>(org_second_child_span.get());

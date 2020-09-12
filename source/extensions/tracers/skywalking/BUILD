@@ -16,6 +16,7 @@ envoy_cc_library(
     srcs = ["trace_segment_reporter.cc"],
     hdrs = ["trace_segment_reporter.h"],
     deps = [
+        ":skywalking_stats_lib",
         ":skywalking_types_lib",
         "//include/envoy/grpc:async_client_manager_interface",
         "//source/common/grpc:async_client_lib",
@@ -29,6 +30,7 @@ envoy_cc_library(
     srcs = ["skywalking_types.cc"],
     hdrs = ["skywalking_types.h"],
     deps = [
+        ":skywalking_stats_lib",
         "//include/envoy/common:random_generator_interface",
         "//include/envoy/common:time_interface",
         "//include/envoy/http:header_map_interface",
@@ -61,6 +63,16 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/common/tracing:http_tracer_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "skywalking_stats_lib",
+    hdrs = [
+        "skywalking_stats.h",
+    ],
+    deps = [
+        "//include/envoy/stats:stats_macros",
     ],
 )
 

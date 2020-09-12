@@ -19,20 +19,16 @@ class Span;
 
 class Tracer {
 public:
-  explicit Tracer(Upstream::ClusterManager& cm, Stats::Scope& scope, TimeSource& time_source,
-                  Event::Dispatcher& dispatcher,
-                  const envoy::config::core::v3::GrpcService& grpc_service,
-                  const envoy::config::trace::v3::ClientConfig& client_config)
-      : time_source_(time_source),
-        reporter_(std::make_unique<TraceSegmentReporter>(
-            cm.grpcAsyncClientManager().factoryForGrpcService(grpc_service, scope, false),
-            dispatcher, client_config)) {}
-  void report(const SegmentContext& segment_context) { return reporter_->report(segment_context); }
+  explicit Tracer(TimeSource& time_source) : time_source_(time_source) {}
   ~Tracer() { reporter_->closeStream(); }
 
+  void setReporter(TraceSegmentReporterPtr&& reporter) { reporter_ = std::move(reporter); }
+
+  void report(const SegmentContext& segment_context) { return reporter_->report(segment_context); }
+
   Tracing::SpanPtr startSpan(const Tracing::Config& config, SystemTime start_time,
-                             const std::string& operation_name,
-                             SegmentContextSharedPtr span_context, Span* parent_span);
+                             const std::string& operation, SegmentContextSharedPtr span_context,
+                             Span* parent_span);
 
 private:
   TimeSource& time_source_;
