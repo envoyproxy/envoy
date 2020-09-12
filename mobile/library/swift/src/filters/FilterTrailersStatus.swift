@@ -2,7 +2,7 @@ import Foundation
 
 /// Status returned by filters when transmitting or receiving trailers.
 @frozen
-public enum FilterTrailersStatus<T: Headers, U: Headers>: Equatable {
+public enum FilterTrailersStatus<T: Headers, U: Trailers>: Equatable {
   /// Continue filter chain iteration, passing the provided trailers through.
   ///
   /// - params trailers: The (potentially-modified) trailers to be forwarded along the filter chain.

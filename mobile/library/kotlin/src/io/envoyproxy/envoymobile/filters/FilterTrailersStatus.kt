@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 /*
  * Status to be returned by filters when transmitting or receiving trailers.
  */
-sealed class FilterTrailersStatus<T : Headers, U : Headers>(
+sealed class FilterTrailersStatus<T : Headers, U : Trailers>(
   val status: Int
 ) {
   /**
@@ -13,7 +13,7 @@ sealed class FilterTrailersStatus<T : Headers, U : Headers>(
    *
    * @param trailers: The (potentially-modified) trailers to be forwarded along the filter chain.
    */
-  class Continue<T : Headers, U : Headers>(val trailers: U) : FilterTrailersStatus<T, U>(0)
+  class Continue<T : Headers, U : Trailers>(val trailers: U) : FilterTrailersStatus<T, U>(0)
 
   /**
    * Do not iterate to any of the remaining filters in the chain with trailers.
@@ -23,7 +23,7 @@ sealed class FilterTrailersStatus<T : Headers, U : Headers>(
    * Calling `resumeRequest()`/`resumeResponse()` MUST occur if continued filter iteration
    * is desired.
    */
-  class StopIteration<T : Headers, U : Headers> : FilterTrailersStatus<T, U>(1)
+  class StopIteration<T : Headers, U : Trailers> : FilterTrailersStatus<T, U>(1)
 
   /**
    * Resume previously-stopped iteration, possibly forwarding headers and data if iteration was
@@ -37,7 +37,7 @@ sealed class FilterTrailersStatus<T : Headers, U : Headers>(
    * @param data: Data to be forwarded (if needed).
    * @param trailers: Trailers to be forwarded.
    */
-  class ResumeIteration<T : Headers, U : Headers>(
+  class ResumeIteration<T : Headers, U : Trailers>(
     val headers: T?,
     val data: ByteBuffer?,
     val trailers: U?

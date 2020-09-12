@@ -61,6 +61,7 @@ envoy_mobile_kt_library(
         "StreamClient.kt",
         "StreamClientImpl.kt",
         "StreamPrototype.kt",
+        "Trailers.kt",
         "UpstreamHttpProtocol.kt",
         "filters/*.kt",
         "grpc/*.kt",

@@ -30,6 +30,7 @@ swift_static_framework(
         "StreamClient.swift",
         "StreamClientImpl.swift",
         "StreamPrototype.swift",
+        "Trailers.swift",
         "UpstreamHttpProtocol.swift",
         "filters/*.swift",
         "grpc/*.swift",

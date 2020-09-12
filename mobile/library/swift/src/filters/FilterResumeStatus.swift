@@ -2,7 +2,7 @@ import Foundation
 
 /// Status returned by filters after resuming iteration asynchronously.
 @frozen
-public enum FilterResumeStatus<T: Headers, U: Headers>: Equatable {
+public enum FilterResumeStatus<T: Headers, U: Trailers>: Equatable {
   /// Resume previously-stopped iteration, potentially forwarding headers, data, and/or trailers
   /// that have not yet been passed along the filter chain.
   ///
