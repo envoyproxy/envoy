@@ -45,16 +45,17 @@ public:
     virtual ~TestInterlockHook() = default;
 
     /**
-     * Called from GuardDogImpl to indicate that it has evaluated all watch-dogs
-     * up to a particular point in time.
+     * Called from GuardDogImpl to indicate that it has evaluated all watch-dogs up to a particular
+     * point in time. Called while the Guarddog mutex is held.
      */
-    virtual void signalFromImpl(MonotonicTime) {}
+    virtual void signalFromImpl() {}
 
     /**
-     * Called from GuardDog tests to block until the implementation has reached
-     * the desired point in time.
+     * Called from GuardDog tests to block until the implementation has reached the desired
+     * condition. Called while the Guarddog mutex is held.
+     * @param mutex The Guarddog's mutex for use by Thread::CondVar::wait.
      */
-    virtual void waitFromTest(Thread::MutexBasicLockable&, MonotonicTime) {}
+    virtual void waitFromTest(Thread::MutexBasicLockable& /*mutex*/) {}
   };
 
   /**
@@ -84,9 +85,8 @@ public:
    */
   void forceCheckForTest() {
     Thread::LockGuard guard(mutex_);
-    MonotonicTime now = time_source_.monotonicTime();
     loop_timer_->enableTimer(std::chrono::milliseconds(0));
-    test_interlock_hook_->waitFromTest(mutex_, now);
+    test_interlock_hook_->waitFromTest(mutex_);
   }
 
   // Server::GuardDog

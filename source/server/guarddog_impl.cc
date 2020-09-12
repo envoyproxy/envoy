@@ -81,11 +81,9 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
 GuardDogImpl::~GuardDogImpl() { stop(); }
 
 void GuardDogImpl::step() {
-  {
-    Thread::LockGuard guard(mutex_);
-    if (!run_thread_) {
-      return;
-    }
+  Thread::LockGuard guard(mutex_);
+  if (!run_thread_) {
+    return;
   }
 
   const auto now = time_source_.monotonicTime();
@@ -156,12 +154,9 @@ void GuardDogImpl::step() {
     invokeGuardDogActions(WatchDogAction::MISS, miss_threads, now);
   }
 
-  {
-    Thread::LockGuard guard(mutex_);
-    test_interlock_hook_->signalFromImpl(now);
-    if (run_thread_) {
-      loop_timer_->enableTimer(loop_interval_);
-    }
+  test_interlock_hook_->signalFromImpl();
+  if (run_thread_) {
+    loop_timer_->enableTimer(loop_interval_);
   }
 }
 

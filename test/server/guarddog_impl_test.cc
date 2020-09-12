@@ -48,21 +48,23 @@ const int DISABLE_MEGAMISS = 1000000;
 class DebugTestInterlock : public GuardDogImpl::TestInterlockHook {
 public:
   // GuardDogImpl::TestInterlockHook
-  void signalFromImpl(MonotonicTime time) override {
-    impl_reached_ = time;
+  void signalFromImpl() override {
+    waiting_for_signal_ = false;
     impl_.notifyAll();
   }
 
-  void waitFromTest(Thread::MutexBasicLockable& mutex, MonotonicTime time) override
+  void waitFromTest(Thread::MutexBasicLockable& mutex) override
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
-    while (impl_reached_ < time) {
+    ASSERT(!waiting_for_signal_);
+    waiting_for_signal_ = true;
+    while (waiting_for_signal_) {
       impl_.wait(mutex);
     }
   }
 
 private:
   Thread::CondVar impl_;
-  MonotonicTime impl_reached_;
+  bool waiting_for_signal_ = false;
 };
 
 // We want to make sure guard-dog is tested with both simulated time and real
