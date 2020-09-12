@@ -49,7 +49,7 @@ jobs:
       - name: 'Run swift app'
         run: bazelisk run --config=ios //examples/swift/hello_world:app &> /tmp/envoy.log &
       - name: 'Wait for simulator to start & perform requests'
-        run: sleep 180
+        run: sleep 300
       # Print out the log in case the liveliness check fails.
       # This allows the author to decide if the failure is a flake or a real problem.
       - name: 'Cat log'
