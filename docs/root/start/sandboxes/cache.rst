@@ -7,18 +7,20 @@ Cache Filter
 In this example, we demonstrate how HTTP caching can be utilized in Envoy by using the Cache Filter. 
 The setup of this sandbox is based on the setup of the :ref:`Front Proxy sandbox <install_sandboxes_front_proxy>`.
 
-All incoming requests are routed via the front Envoy, which is acting as a reverse proxy sitting on
+All incoming requests are routed via the front Envoy, which acts as a reverse proxy sitting on
 the edge of the ``envoymesh`` network. Ports ``8000`` and ``8001`` are exposed by docker
 compose (see :repo:`/examples/cache/docker-compose.yaml`) to handle ``HTTP`` calls
 to the services, and requests to ``/admin`` respectively. Two backend services are deployed behind the front Envoy, each with a sidecar Envoy.
 
-The front Envoy is configured to run the Cache Filter, which will store cacheable responses in an in-memory cache, 
-and serve it to subsequent requests. In this demo, the responses that are served by the deployed services are stored in :repo:`/examples/cache/responses.yaml`. 
+The front Envoy is configured to run the Cache Filter, which stores cacheable responses in an in-memory cache,
+and serves it to subsequent requests. In this demo, the responses that are served by the deployed services are stored in :repo:`/examples/cache/responses.yaml`.
 This file is mounted to both services' containers, so any changes made to the stored responses while the services are running should be instantly effective (no need to rebuild or rerun). 
+
 For the purposes of the demo, a response's date of creation is appended to its body before being served. 
 An Etag is computed for every response for validation purposes, which only depends on the response body in the yaml file (i.e. the appended date is not taken into account). 
 Cached responses can be identified by having an ``age`` header. Validated responses can be identified by having a generation date older than the ``date`` header;
 as when a response is validated the ``date`` header is updated, while the body stays the same. Validated responses do not have an ``age`` header.
+Responses served from the backend service have no ``age`` header, and their ``date`` header is the same as their generation date.
 
 Running the Sandbox
 ~~~~~~~~~~~~~~~~~~~
@@ -73,7 +75,7 @@ To send a request:
 ``response``: The response that is being requested. The responses are found in :repo:`/examples/cache/responses.yaml`.
 
 
-The existing example responses are:
+The provided example responses are:
 
 - ``valid-for-minute``
     This response remains fresh in the cache for a minute. After which, the response gets validated by the backend service before being served from the cache.
@@ -85,11 +87,13 @@ The existing example responses are:
 - ``no-cache``
     This response has to be validated every time before being served.
     
-You can change the responses headers and bodies (or add new ones) while the sandbox is running to experiment.
+You can change the responses' headers and bodies (or add new ones) while the sandbox is running to experiment.
 
 Example responses
-^^^^^^^^^^^^^^^^^^^^^
-1. A response that stays fresh for a minute (valid-for-minute):
+-----------------
+
+1. valid-for-minute
+^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: console
 
@@ -147,7 +151,7 @@ After 1 minute and 1 second:
     Response body generated at: Fri, 11 Sep 2020 03:20:40 GMT
 
 The same response was served after being validated with the backend service. 
-You can see this as the response generation time is the same, 
+You can verify this as the response generation time is the same, 
 but the response ``date`` header was updated with the validation response date. 
 Also, no ``age`` header.
 
@@ -155,7 +159,8 @@ Every time the response is validated, it stays fresh for another minute.
 If the response body changes while the cached response is still fresh, 
 the cached response will still be served. The cached response will only be updated when it is no longer fresh.
 
-2. A private response (private):
+2. private
+^^^^^^^^^^
 
 .. code-block:: console
 
@@ -175,7 +180,8 @@ the cached response will still be served. The cached response will only be updat
 No matter how many times you make this request, you will always receive a new response; 
 new date of generation, new ``date`` header, and no ``age`` header. 
 
-3. A response that must always be validated (no-cache):
+3. no-cache
+^^^^^^^^^^^
 
 .. code-block:: console
 
