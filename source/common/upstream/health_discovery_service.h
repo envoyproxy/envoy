@@ -32,6 +32,9 @@ namespace Upstream {
 
 using HostsMap = absl::flat_hash_map<LocalityEndpointTuple, HostSharedPtr, LocalityEndpointHash,
                                      LocalityEndpointEqualTo>;
+using HealthCheckerMap =
+    absl::flat_hash_map<envoy::config::core::v3::HealthCheck, Upstream::HealthCheckerSharedPtr,
+                        HealthCheckerHash, HealthCheckerEqualTo>;
 
 class ProdClusterInfoFactory : public ClusterInfoFactory, Logger::Loggable<Logger::Id::upstream> {
 public:
@@ -106,7 +109,7 @@ private:
   HostsMap hosts_map_;
   ClusterInfoConstSharedPtr info_;
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers_;
-  absl::flat_hash_map<uint64_t, Upstream::HealthCheckerSharedPtr> health_checkers_map_;
+  HealthCheckerMap health_checkers_map_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 
   void updateHealthchecks(

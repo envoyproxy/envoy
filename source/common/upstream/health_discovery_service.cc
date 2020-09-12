@@ -437,23 +437,21 @@ void HdsCluster::updateHealthchecks(
     AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime,
     Random::RandomGenerator& random, Event::Dispatcher& dispatcher, Api::Api& api) {
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers;
-  absl::flat_hash_map<uint64_t, Upstream::HealthCheckerSharedPtr> health_checkers_map;
+  HealthCheckerMap health_checkers_map;
 
   for (auto& health_check : health_checks) {
-    uint64_t health_check_hash = MessageUtil::hash(health_check);
-
     // Check to see if this exact same health_check config already has a health checker.
-    auto health_checker = health_checkers_map_.find(health_check_hash);
+    auto health_checker = health_checkers_map_.find(health_check);
     if (health_checker != health_checkers_map_.end()) {
       // If it does, use it.
-      health_checkers_map.insert({health_check_hash, health_checker->second});
+      health_checkers_map.insert({health_check, health_checker->second});
       health_checkers.push_back(health_checker->second);
     } else {
       // If it does not, create a new one.
       auto new_health_checker =
           Upstream::HealthCheckerFactory::create(health_check, *this, runtime, random, dispatcher,
                                                  access_log_manager, validation_visitor_, api);
-      health_checkers_map.insert({health_check_hash, new_health_checker});
+      health_checkers_map.insert({health_check, new_health_checker});
       health_checkers.push_back(new_health_checker);
 
       // Start these health checks now because upstream assumes they already have been started.
@@ -558,13 +556,12 @@ void HdsCluster::initHealthchecks(AccessLog::AccessLogManager& access_log_manage
                                   Runtime::Loader& runtime, Random::RandomGenerator& random,
                                   Event::Dispatcher& dispatcher, Api::Api& api) {
   for (auto& health_check : cluster_.health_checks()) {
-    const uint64_t health_check_hash = MessageUtil::hash(health_check);
     auto health_checker =
         Upstream::HealthCheckerFactory::create(health_check, *this, runtime, random, dispatcher,
                                                access_log_manager, validation_visitor_, api);
 
     health_checkers_.push_back(health_checker);
-    health_checkers_map_.insert({health_check_hash, health_checker});
+    health_checkers_map_.insert({health_check, health_checker});
     health_checker->start();
   }
 }
