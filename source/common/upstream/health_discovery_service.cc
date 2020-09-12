@@ -490,18 +490,17 @@ void HdsCluster::updateHosts(
         host = host_pair->second;
       } else {
         // We do not have this endpoint saved, so create a new one.
-        auto new_host = std::make_shared<HostImpl>(
+        host = std::make_shared<HostImpl>(
             info_, "", Network::Address::resolveProtoAddress(endpoint.endpoint().address()),
             nullptr, 1, endpoints.locality(),
             envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
             envoy::config::core::v3::UNKNOWN);
 
         // Set the initial health status as in HdsCluster::initialize.
-        new_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+        host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
 
         // Add to our hosts added list and save the shared pointer.
         hosts_added.push_back(host);
-        host = new_host;
       }
 
       // No matter if it is reused or new, always add to these data structures.
@@ -528,8 +527,8 @@ void HdsCluster::updateHosts(
   // Update the priority set.
   hosts_per_locality_ =
       std::make_shared<Envoy::Upstream::HostsPerLocalityImpl>(std::move(hosts_by_locality), false);
-  priority_set_.updateHostsNoCallbacks(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_),
-                                       {}, hosts_added, hosts_removed, absl::nullopt);
+  priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
+                            hosts_added, hosts_removed, absl::nullopt);
 }
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

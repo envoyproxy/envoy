@@ -582,19 +582,6 @@ void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_
   }
 }
 
-void PrioritySetImpl::updateHostsNoCallbacks(uint32_t priority,
-                                             UpdateHostsParams&& update_hosts_params,
-                                             LocalityWeightsConstSharedPtr locality_weights,
-                                             const HostVector& hosts_added,
-                                             const HostVector& hosts_removed,
-                                             absl::optional<uint32_t> overprovisioning_factor) {
-  // Ensure that we have a HostSet for the given priority.
-  getOrCreateHostSet(priority, overprovisioning_factor);
-  static_cast<HostSetImpl*>(host_sets_[priority].get())
-      ->updateHosts(std::move(update_hosts_params), std::move(locality_weights), hosts_added,
-                    hosts_removed, overprovisioning_factor);
-}
-
 void PrioritySetImpl::batchHostUpdate(BatchUpdateCb& callback) {
   BatchUpdateScope scope(*this);
 
