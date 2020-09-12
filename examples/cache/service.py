@@ -26,8 +26,10 @@ def get(service_number, response_id):
   response.add_etag()
 
   # Append the date of response generation
-  body_with_date = response.get_data(as_text=True) + 'Response body generated at: ' \
-      + datetime.datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT") + '\n'
+  body_with_date = "{}\nResponse generated at: {}\n".format(
+      response.get_data(as_text=True),
+      datetime.datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT"))
+
   response.set_data(body_with_date)
 
   # response.make_conditional() will change the response to a 304 response
