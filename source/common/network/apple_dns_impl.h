@@ -35,48 +35,51 @@ public:
 private:
   friend class AppleDnsResolverImplPeer;
   struct PendingResolution : public ActiveDnsQuery {
-    // Network::ActiveDnsQuery
     PendingResolution(AppleDnsResolverImpl& parent, ResolveCb callback,
                       Event::Dispatcher& dispatcher, DNSServiceRef sd_ref,
                       const std::string& dns_name)
         : parent_(parent), callback_(callback), dispatcher_(dispatcher), individual_sd_ref_(sd_ref),
           dns_name_(dns_name) {}
+    ~PendingResolution();
 
-    void cancel() override {
-      // dns_sd.h only supports service-wide cancellation, so we just allow the
-      // network events to continue but don't invoke the callback on completion.
-      cancelled_ = true;
-    }
+    // Network::ActiveDnsQuery
+    void cancel() override;
 
+    static DnsResponse buildDnsResponse(const struct sockaddr* address, uint32_t ttl);
     void onDNSServiceGetAddrInfoReply(DNSServiceFlags flags, uint32_t interface_index,
                                       DNSServiceErrorType error_code, const char* hostname,
                                       const struct sockaddr* address, uint32_t ttl);
     // wrapper for the API call
     DNSServiceErrorType dnsServiceGetAddrInfo(DnsLookupFamily dns_lookup_family);
 
+    struct FinalResponse {
+      ResolutionStatus status_;
+      std::list<DnsResponse> responses_;
+    };
+
     AppleDnsResolverImpl& parent_;
     // Caller supplied callback to invoke on query completion or error.
     const ResolveCb callback_;
     // Dispatcher to post any callback_ exceptions to.
     Event::Dispatcher& dispatcher_;
-    // Has the query completed?
-    bool completed_ = false;
-    // Was the query cancelled via cancel()?
-    bool cancelled_ = false;
-    // If dns_lookup_family is "fallback", fallback to v4 address if v6
-    // resolution failed.
-    bool fallback_if_failed_ = false;
     DNSServiceRef individual_sd_ref_;
     const std::string dns_name_;
+    bool synchronously_completed_{};
+    bool owned_{};
+    absl::optional<FinalResponse> pending_cb_{};
   };
 
   void initializeMainSdRef();
+  void deallocateMainSdRef();
   void onEventCallback(uint32_t events);
+  void addPendingQuery(PendingResolution* query) { queries_with_pending_cb_.push_back(query); }
+  void flushPendingQueries();
 
   Event::Dispatcher& dispatcher_;
   DNSServiceRef main_sd_ref_;
   bool dirty_sd_ref_{};
   Event::FileEventPtr sd_ref_event_;
+  std::list<PendingResolution*> queries_with_pending_cb_;
 };
 
 } // namespace Network
