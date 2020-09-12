@@ -528,8 +528,8 @@ void HdsCluster::updateHosts(
   // Update the priority set.
   hosts_per_locality_ =
       std::make_shared<Envoy::Upstream::HostsPerLocalityImpl>(std::move(hosts_by_locality), false);
-  priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_), {},
-                            hosts_added, hosts_removed, absl::nullopt);
+  priority_set_.updateHostsNoCallbacks(0, HostSetImpl::partitionHosts(hosts_, hosts_per_locality_),
+                                       {}, hosts_added, hosts_removed, absl::nullopt);
 }
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

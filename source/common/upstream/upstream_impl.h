@@ -453,6 +453,10 @@ public:
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                    const HostVector& hosts_removed,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
+  void updateHostsNoCallbacks(uint32_t priority, UpdateHostsParams&& update_hosts_params,
+                              LocalityWeightsConstSharedPtr locality_weights,
+                              const HostVector& hosts_added, const HostVector& hosts_removed,
+                              absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
   void batchHostUpdate(BatchUpdateCb& callback) override;
 
