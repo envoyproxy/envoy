@@ -419,6 +419,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   auto cluster_data = active_clusters_.find(cluster.info()->name());
   if (cluster_data == active_clusters_.end()) {
     clusterWarmingToActive(cluster.info()->name());
+    updateClusterCounts();
   }
   cluster_data = active_clusters_.find(cluster.info()->name());
 
@@ -638,7 +639,6 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
     });
   }
 
-  updateClusterCounts();
   return true;
 }
 
@@ -805,7 +805,9 @@ void ClusterManagerImpl::updateClusterCounts() {
   // Once cluster is warmed up, CDS is resumed, and ACK is sent to ADS, providing a
   // signal to ADS to proceed with RDS updates.
   // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
-  if (ads_mux_) {
+  const bool all_clusters_initialized =
+      init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
+  if (all_clusters_initialized && ads_mux_) {
     const auto type_urls = Config::getAllVersionTypeUrls<envoy::config::cluster::v3::Cluster>();
     const uint64_t previous_warming = cm_stats_.warming_clusters_.value();
     if (previous_warming == 0 && !warming_clusters_.empty()) {
