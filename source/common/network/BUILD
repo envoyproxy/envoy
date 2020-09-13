@@ -191,8 +191,10 @@ envoy_cc_library(
         ":io_socket_error_lib",
         ":socket_interface_lib",
         ":socket_lib",
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:io_handle_interface",
         "//source/common/api:os_sys_calls_lib",
+        "//source/common/event:dispatcher_includes",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ],
 )
@@ -228,12 +230,12 @@ envoy_cc_library(
     name = "listener_lib",
     srcs = [
         "base_listener_impl.cc",
-        "listener_impl.cc",
+        "tcp_listener_impl.cc",
         "udp_listener_impl.cc",
     ],
     hdrs = [
         "base_listener_impl.h",
-        "listener_impl.h",
+        "tcp_listener_impl.h",
         "udp_listener_impl.h",
     ],
     deps = [

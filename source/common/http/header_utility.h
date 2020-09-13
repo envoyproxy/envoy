@@ -19,7 +19,7 @@ namespace Http {
  */
 class HeaderUtility {
 public:
-  enum class HeaderMatchType { Value, Regex, Range, Present, Prefix, Suffix };
+  enum class HeaderMatchType { Value, Regex, Range, Present, Prefix, Suffix, Contains };
 
   /**
    * Get all instances of the header key specified, and return the values in the vector provided.

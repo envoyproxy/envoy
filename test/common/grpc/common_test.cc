@@ -5,7 +5,7 @@
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/global.h"
 #include "test/test_common/utility.h"

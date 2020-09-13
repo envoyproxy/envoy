@@ -77,7 +77,7 @@ ConnPoolImpl::StreamWrapper::~StreamWrapper() {
   // Upstream connection might be closed right after response is complete. Setting delay=true
   // here to attach pending requests in next dispatcher loop to handle that case.
   // https://github.com/envoyproxy/envoy/issues/2715
-  parent_.parent().onRequestClosed(parent_, true);
+  parent_.parent().onStreamClosed(parent_, true);
 }
 
 void ConnPoolImpl::StreamWrapper::onEncodeComplete() { encode_complete_ = true; }
@@ -120,7 +120,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent.host_->cluster().stats().upstream_cx_http1_total_.inc();
 }
 
-bool ConnPoolImpl::ActiveClient::closingWithIncompleteRequest() const {
+bool ConnPoolImpl::ActiveClient::closingWithIncompleteStream() const {
   return (stream_wrapper_ != nullptr) && (!stream_wrapper_->decode_complete_);
 }
 

@@ -8,7 +8,6 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
 WINDOWS_SKIP_TARGETS = [
-    "envoy.filters.http.lua",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.lightstep",
     "envoy.tracers.datadog",
@@ -96,26 +95,6 @@ _default_envoy_build_config = repository_rule(
 # Python dependencies.
 def _python_deps():
     # TODO(htuch): convert these to pip3_import.
-    _repository_impl(
-        name = "com_github_pallets_markupsafe",
-        build_file = "@envoy//bazel/external:markupsafe.BUILD",
-    )
-    native.bind(
-        name = "markupsafe",
-        actual = "@com_github_pallets_markupsafe//:markupsafe",
-    )
-    _repository_impl(
-        name = "com_github_pallets_jinja",
-        build_file = "@envoy//bazel/external:jinja.BUILD",
-    )
-    native.bind(
-        name = "jinja2",
-        actual = "@com_github_pallets_jinja//:jinja2",
-    )
-    _repository_impl(
-        name = "com_github_apache_thrift",
-        build_file = "@envoy//bazel/external:apache_thrift.BUILD",
-    )
     _repository_impl(
         name = "com_github_twitter_common_lang",
         build_file = "@envoy//bazel/external:twitter_common_lang.BUILD",
@@ -214,6 +193,7 @@ def envoy_dependencies(skip_targets = []):
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
+    _com_github_zlib_ng_zlib_ng()
     _upb()
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
@@ -400,6 +380,12 @@ def _net_zlib():
     native.bind(
         name = "madler_zlib",
         actual = "@envoy//bazel/foreign_cc:zlib",
+    )
+
+def _com_github_zlib_ng_zlib_ng():
+    _repository_impl(
+        name = "com_github_zlib_ng_zlib_ng",
+        build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _com_google_cel_cpp():

@@ -4,6 +4,7 @@
 #include "envoy/extensions/network/socket_interface/v3/default_socket_interface.pb.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/network/io_socket_handle_impl.h"
 
@@ -36,9 +37,12 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
       ASSERT(version == Address::IpVersion::v4);
       domain = AF_INET;
     }
-  } else {
-    ASSERT(addr_type == Address::Type::Pipe);
+  } else if (addr_type == Address::Type::Pipe) {
     domain = AF_UNIX;
+  } else {
+    ASSERT(addr_type == Address::Type::EnvoyInternal);
+    // TODO(lambdai): Add InternalIoSocketHandleImpl to support internal address.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   const Api::SysCallSocketResult result = Api::OsSysCallsSingleton::get().socket(domain, flags, 0);
@@ -48,7 +52,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 
 #if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
-  const int rc = Api::OsSysCallsSingleton::get().setsocketblocking(io_handle->fd(), false).rc_;
+  const int rc = io_handle->setBlocking(false).rc_;
   RELEASE_ASSERT(!SOCKET_FAILURE(rc), "");
 #endif
 
@@ -67,9 +71,8 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
       SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version, v6only);
   if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6) {
     // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
-    const Api::SysCallIntResult result = Api::OsSysCallsSingleton::get().setsockopt(
-        io_handle->fd(), IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<const char*>(&v6only),
-        sizeof(v6only));
+    const Api::SysCallIntResult result = io_handle->setOption(
+        IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<const char*>(&v6only), sizeof(v6only));
     RELEASE_ASSERT(!SOCKET_FAILURE(result.rc_), "");
   }
   return io_handle;

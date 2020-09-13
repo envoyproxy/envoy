@@ -25,7 +25,7 @@ Router::RouteSpecificFilterConfigConstSharedPtr
 LuaFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& proto_config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<FilterConfigPerRoute>(proto_config, context.threadLocal(), context.api());
+  return std::make_shared<FilterConfigPerRoute>(proto_config, context);
 }
 
 /**

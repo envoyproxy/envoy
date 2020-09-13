@@ -21,7 +21,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 
@@ -848,7 +848,7 @@ public:
                                            generator_, validation_visitor_, *api_);
     loader_->initialize(cm_);
     for (auto* sub : rtds_subscriptions_) {
-      EXPECT_CALL(*sub, start(_));
+      EXPECT_CALL(*sub, start(_, _));
     }
 
     loader_->startRtdsSubscriptions(rtds_init_callback_.AsStdFunction());

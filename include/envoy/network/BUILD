@@ -100,6 +100,7 @@ envoy_cc_library(
         ":address_interface",
         "//include/envoy/api:io_error_interface",
         "//include/envoy/api:os_sys_calls_interface",
+        "//include/envoy/event:file_event_interface",
         "//source/common/common:assert_lib",
     ],
 )
@@ -169,6 +170,7 @@ envoy_cc_library(
         ":udp_packet_writer_handler_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/common:resource_interface",
+        "//include/envoy/init:manager_interface",
         "//include/envoy/stats:stats_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
