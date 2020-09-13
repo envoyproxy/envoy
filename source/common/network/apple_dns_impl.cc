@@ -145,7 +145,8 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
             flags & kDNSServiceFlagsAdd ? "yes" : "no", interface_index, error_code, hostname);
   ASSERT(interface_index == 0);
 
-  if (error_code == kDNSServiceErr_DefunctConnection || error_code == kDNSServiceErr_Timeout || error_code == kDNSServiceErr_Refused) {
+  if (error_code == kDNSServiceErr_DefunctConnection || error_code == kDNSServiceErr_Timeout ||
+      error_code == kDNSServiceErr_Refused) {
     // Current query gets a failure status
     if (!pending_cb_) {
       ENVOY_LOG(warn, "[Error path] Adding to queries pending callback");
