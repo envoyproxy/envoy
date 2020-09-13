@@ -291,7 +291,7 @@ public:
     config_helper_.addListenerFilter(tls_inspector_config);
     config_helper_.addSslConfig();
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      if (use_default_balancer_) {
+      if (!use_default_balancer_) {
         bootstrap.mutable_static_resources()
             ->mutable_listeners(0)
             ->mutable_connection_balance_config()
