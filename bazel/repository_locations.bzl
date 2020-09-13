@@ -125,23 +125,13 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         use_category = ["dataplane", "controlplane"],
         cpe = "N/A",
     ),
-    com_github_apache_thrift = dict(
-        project_name = "Apache Thrift",
-        project_url = "http://thrift.apache.org/",
-        version = "0.11.0",
-        sha256 = "7d59ac4fdcb2c58037ebd4a9da5f9a49e3e034bf75b3f26d9fe48ba3d8806e6b",
-        strip_prefix = "thrift-{version}",
-        urls = ["https://files.pythonhosted.org/packages/c6/b4/510617906f8e0c5660e7d96fbc5585113f83ad547a3989b80297ac72a74c/thrift-{version}.tar.gz"],
-        use_category = ["dataplane"],
-        cpe = "cpe:2.3:a:apache:thrift:*",
-    ),
     com_github_c_ares_c_ares = dict(
         project_name = "c-ares",
         project_url = "https://c-ares.haxx.se/",
         version = "1.16.1",
         sha256 = "d08312d0ecc3bd48eee0a4cc0d2137c9f194e0a28de2028928c0f6cae85f86ce",
         strip_prefix = "c-ares-{version}",
-        urls = ["https://github.com/c-ares/c-ares/releases/download/cares-1_16_1/c-ares-{version}.tar.gz"],
+        urls = ["https://github.com/c-ares/c-ares/releases/download/cares-{underscore_version}/c-ares-{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:c-ares_project:c-ares:*",
     ),
@@ -389,30 +379,15 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_github_nodejs_http_parser = dict(
         project_name = "HTTP Parser",
         project_url = "https://github.com/nodejs/http-parser",
-        version = "2.9.3",
-        sha256 = "8fa0ab8770fd8425a9b431fdbf91623c4d7a9cdb842b9339289bd2b0b01b0d3d",
+        # 2020-07-10
+        # This SHA includes fix for https://github.com/nodejs/http-parser/issues/517 which allows (opt-in) to serve
+        # requests with both Content-Legth and Transfer-Encoding: chunked headers set.
+        version = "4f15b7d510dc7c6361a26a7c6d2f7c3a17f8d878",
+        sha256 = "6a12896313ce1ca630cf516a0ee43a79b5f13f5a5d8143f56560ac0b21c98fac",
         strip_prefix = "http-parser-{version}",
-        urls = ["https://github.com/nodejs/http-parser/archive/v{version}.tar.gz"],
+        urls = ["https://github.com/nodejs/http-parser/archive/{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:nodejs:node.js:*",
-    ),
-    com_github_pallets_jinja = dict(
-        project_name = "https://palletsprojects.com/p/jinja",
-        project_url = "Jinja",
-        version = "2.10.3",
-        sha256 = "db49236731373e4f3118af880eb91bb0aa6978bc0cf8b35760f6a026f1a9ffc4",
-        strip_prefix = "jinja-{version}",
-        urls = ["https://github.com/pallets/jinja/archive/{version}.tar.gz"],
-        use_category = ["build"],
-    ),
-    com_github_pallets_markupsafe = dict(
-        project_name = "MarkupSafe",
-        project_url = "https://github.com/pallets/markupsafe",
-        version = "2.0.0a1",
-        sha256 = "2b0c5c2a067d9268813d55523bc513a12181cffb23b2f3d5618eb5d93776bad8",
-        strip_prefix = "markupsafe-{version}/src",
-        urls = ["https://github.com/pallets/markupsafe/archive/{version}.tar.gz"],
-        use_category = ["build"],
     ),
     com_github_tencent_rapidjson = dict(
         project_name = "RapidJSON",
@@ -535,7 +510,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     ),
     io_opencensus_cpp = dict(
         project_name = "OpenCensus C++",
-        project_url = "https://pypi.org/project/six/",
+        project_url = "https://github.com/census-instrumentation/opencensus-cpp",
         # 2020-06-01
         version = "7877337633466358ed680f9b26967da5b310d7aa",
         sha256 = "12ff300fa804f97bd07e2ff071d969e09d5f3d7bbffeac438c725fa52a51a212",
@@ -550,18 +525,18 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         version = "7.69.1",
         sha256 = "01ae0c123dee45b01bbaef94c0bc00ed2aec89cb2ee0fd598e0d302a6b5e0a98",
         strip_prefix = "curl-{version}",
-        urls = ["https://github.com/curl/curl/releases/download/curl-7_69_1/curl-{version}.tar.gz"],
+        urls = ["https://github.com/curl/curl/releases/download/curl-{underscore_version}/curl-{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
     com_googlesource_chromium_v8 = dict(
         project_name = "V8",
         project_url = "https://v8.dev",
-        version = "8.3",
+        version = "8.5.210.20",
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
         # and contains complete checkout of V8 with all dependencies necessary to build wee8.
-        sha256 = "cc6f5357cd10922bfcf667bd882624ad313e21b009b919ce00f322f390012476",
-        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.110.9.tar.gz"],
+        sha256 = "ef404643d7da6854b76b9fb9950a79a1acbd037b7a26f02c585ac379b0f7dee1",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
@@ -658,7 +633,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         version = "2.4.1",
         sha256 = "2177cbd14118999e1d76fec628ca78ace7e6f841219dbc6035027c796bbe1a2a",
         strip_prefix = "kafka_2.12-{version}",
-        urls = ["http://us.mirrors.quenda.co/apache/kafka/{version}/kafka_2.12-{version}.tgz"],
+        urls = ["https://mirrors.gigenet.com/apache/kafka/{version}/kafka_2.12-{version}.tgz"],
         use_category = ["test"],
     ),
     kafka_python_client = dict(
@@ -673,10 +648,10 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     org_unicode_icuuc = dict(
         project_name = "International Components for Unicode",
         project_url = "https://github.com/unicode-org/icu",
-        version = "67-1",
+        version = "67.1",
         strip_prefix = "icu",
         sha256 = "94a80cd6f251a53bd2a997f6f1b5ac6653fe791dfab66e1eb0227740fb86d5dc",
-        urls = ["https://github.com/unicode-org/icu/releases/download/release-{version}/icu4c-67_1-src.tgz"],
+        urls = ["https://github.com/unicode-org/icu/releases/download/release-{dash_version}/icu4c-{underscore_version}-src.tgz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:icu-project:international_components_for_unicode",
     ),
@@ -733,6 +708,9 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     ),
 )
 
+def _format_version(s, version):
+    return s.format(version = version, dash_version = version.replace(".", "-"), underscore_version = version.replace(".", "_"))
+
 # Interpolate {version} in the above dependency specs. This code should be capable of running in both Python
 # and Starlark.
 def _dependency_repositories():
@@ -744,8 +722,8 @@ def _dependency_repositories():
         # Fixup with version information.
         if "version" in location:
             if "strip_prefix" in location:
-                mutable_location["strip_prefix"] = location["strip_prefix"].format(version = location["version"])
-            mutable_location["urls"] = [url.format(version = location["version"]) for url in location["urls"]]
+                mutable_location["strip_prefix"] = _format_version(location["strip_prefix"], location["version"])
+            mutable_location["urls"] = [_format_version(url, location["version"]) for url in location["urls"]]
     return locations
 
 DEPENDENCY_REPOSITORIES = _dependency_repositories()

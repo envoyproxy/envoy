@@ -76,6 +76,31 @@ TEST_P(XdsIntegrationTestTypedStruct, RouterRequestAndResponseWithBodyNoBuffer) 
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
+class UdpaXdsIntegrationTestListCollection : public XdsIntegrationTest {
+public:
+  UdpaXdsIntegrationTestListCollection() = default;
+
+  void createEnvoy() override {
+    // TODO(htuch): Convert CDS/EDS/RDS to UDPA list collections when support is implemented in
+    // Envoy.
+    createEnvoyServer({
+        "test/config/integration/server_xds.bootstrap.udpa.yaml",
+        "test/config/integration/server_xds.cds.yaml",
+        "test/config/integration/server_xds.eds.yaml",
+        "test/config/integration/server_xds.lds.udpa.list_collection.yaml",
+        "test/config/integration/server_xds.rds.yaml",
+    });
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, UdpaXdsIntegrationTestListCollection,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(UdpaXdsIntegrationTestListCollection, RouterRequestAndResponseWithBodyNoBuffer) {
+  testRouterRequestAndResponseWithBody(1024, 512, false);
+}
+
 class LdsInplaceUpdateTcpProxyIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public BaseIntegrationTest {
@@ -415,8 +440,6 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
   // Given we're using LDS in this test, initialize() will not complete until
   // the initial LDS file has loaded.
   EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
-
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // HTTP 1.0 is disabled by default.
   std::string response;

@@ -5,9 +5,12 @@
 #include "envoy/service/health/v3/hds.pb.h"
 #include "envoy/type/v3/http.pb.h"
 
+#include "common/protobuf/protobuf.h"
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
+#include "common/upstream/transport_socket_match_impl.h"
 
+#include "extensions/transport_sockets/raw_buffer/config.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
@@ -21,9 +24,12 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_info_factory.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -478,6 +484,90 @@ TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
   // Process message
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   hds_delegate_->onReceiveMessage(std::move(message));
+}
+
+// Test that a transport_socket_matches and transport_socket_match_criteria filter as expected to
+// build the correct TransportSocketFactory based on these fields.
+TEST_F(HdsTest, TestSocketContext) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message.
+  message.reset(createSimpleMessage());
+
+  // Add transport socket matches to message.
+  const std::string match_yaml = absl::StrFormat(
+      R"EOF(
+transport_socket_matches:
+- name: "test_socket"
+  match:
+    test_match: "true"
+  transport_socket:
+    name: "envoy.transport_sockets.raw_buffer"
+)EOF");
+  auto* cluster_health_check = message->mutable_cluster_health_checks(0);
+  cluster_health_check->MergeFrom(
+      TestUtility::parseYaml<envoy::service::health::v3::ClusterHealthCheck>(match_yaml));
+
+  // Add transport socket match criteria to our health check, for filtering matches.
+  const std::string criteria_yaml = absl::StrFormat(
+      R"EOF(
+transport_socket_match_criteria:
+  test_match: "true"
+)EOF");
+  cluster_health_check->mutable_health_checks(0)->MergeFrom(
+      TestUtility::parseYaml<envoy::config::core::v3::HealthCheck>(criteria_yaml));
+
+  Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection));
+
+  // Pull out socket_matcher object normally internal to createClusterInfo, to test that a matcher
+  // would match the expected socket.
+  std::unique_ptr<TransportSocketMatcherImpl> socket_matcher;
+  EXPECT_CALL(test_factory_, createClusterInfo(_))
+      .WillRepeatedly(Invoke([&](const ClusterInfoFactory::CreateClusterInfoParams& params) {
+        // Build scope, factory_context as does ProdClusterInfoFactory.
+        Envoy::Stats::ScopePtr scope =
+            params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
+        Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+            params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
+            params.dispatcher_, params.random_, params.stats_, params.singleton_manager_,
+            params.tls_, params.validation_visitor_, params.api_);
+
+        // Create a mock socket_factory for the scope of this unit test.
+        std::unique_ptr<Envoy::Network::TransportSocketFactory> socket_factory =
+            std::make_unique<Network::MockTransportSocketFactory>();
+
+        // set socket_matcher object in test scope.
+        socket_matcher = std::make_unique<Envoy::Upstream::TransportSocketMatcherImpl>(
+            params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope);
+
+        // But still use the fake cluster_info_.
+        return cluster_info_;
+      }));
+
+  EXPECT_CALL(*connection, setBufferLimits(_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+
+  // Process message.
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // pretend our endpoint was connected to.
+  connection->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Get our health checker to match against.
+  const auto clusters = hds_delegate_->hdsClusters();
+  ASSERT_EQ(clusters.size(), 1);
+  const auto hcs = clusters[0]->healthCheckers();
+  ASSERT_EQ(hcs.size(), 1);
+
+  // Check that our match hits.
+  HealthCheckerImplBase* health_checker_base = dynamic_cast<HealthCheckerImplBase*>(hcs[0].get());
+  const auto match =
+      socket_matcher->resolve(health_checker_base->transportSocketMatchMetadata().get());
+  EXPECT_EQ(match.name_, "test_socket");
 }
 
 // Tests OnReceiveMessage given a HealthCheckSpecifier message without interval field
