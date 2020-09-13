@@ -46,8 +46,25 @@ the downstream remote address for propagation into an
 :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` header. It can also be used in
 conjunction with the
 :ref:`Original Src Listener Filter <arch_overview_ip_transparency_original_src_listener>`. Finally,
-Envoy supports generating this header using the :ref:`Proxy Protocol Transport Socket <extension_envoy.transport_sockets.upstream_proxy_protocol>`
-transport socket.
+Envoy supports generating this header using the :ref:`Proxy Protocol Transport Socket <extension_envoy.transport_sockets.upstream_proxy_protocol>`.
+Here is an example config for setting up the socket:
+
+.. code-block:: yaml
+
+    clusters:
+    - name: service1
+      connect_timeout: 0.25s
+      type: strict_dns
+      lb_policy: round_robin
+      transport_socket:
+        name: envoy.transport_sockets.upstream_proxy_protocol
+        typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.proxy_protocol.v3.ProxyProtocolUpstreamTransport
+        config:
+          version: V1
+        transport_socket:
+          name: envoy.transport_sockets.raw_buffer
+      ...
 
 Some drawbacks to Proxy Protocol:
 
