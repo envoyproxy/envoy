@@ -643,6 +643,8 @@ public:
         filter_manager_callbacks_.requestHeaders()->get().getMethodValue()) {
       state_.is_head_request_ = true;
     }
+    state_.is_grpc_request_ =
+        Grpc::Common::isGrpcRequestHeaders(filter_manager_callbacks_.requestHeaders()->get());
   }
 
   /**
@@ -796,7 +798,7 @@ private:
   struct State {
     State()
         : remote_complete_(false), local_complete_(false), has_continue_headers_(false),
-          created_filter_chain_(false), is_head_request_(false),
+          created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
           non_100_response_headers_encoded_(false) {}
 
     uint32_t filter_call_state_{0};
@@ -809,7 +811,10 @@ private:
     // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
     bool has_continue_headers_ : 1;
     bool created_filter_chain_ : 1;
+    // These two are latched on initial header read, to determine if the original headers
+    // constituted a HEAD or gRPC request, respectively.
     bool is_head_request_ : 1;
+    bool is_grpc_request_ : 1;
     // Tracks if headers other than 100-Continue have been encoded to the codec.
     bool non_100_response_headers_encoded_ : 1;
 

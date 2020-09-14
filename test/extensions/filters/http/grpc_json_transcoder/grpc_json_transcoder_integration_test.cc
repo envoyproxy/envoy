@@ -744,6 +744,14 @@ std::string jsonStrToPbStrucStr(std::string json) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
+  // Lower the timeout for the 408 response.
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        virtual_host->mutable_routes(0)->mutable_route()->mutable_idle_timeout()->set_seconds(5);
+      });
+
   HttpIntegrationTest::initialize();
   // Due to the limit of protobuf util, we can only compare to level 32.
   std::string deepJson = createDeepJson(32, true);
@@ -757,14 +765,13 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
       R"({"content":)" + deepJson + R"(})");
 
   // The valid deep struct is parsed successfully.
-  // Since we didn't set the response, it return 503.
-  // Response body is empty (not a valid JSON), so content type should be application/grpc.
+  // Since we didn't set a response, it will time out.
+  // Response body is empty (not a valid JSON), so the error response is plaintext.
   testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(
       Http::TestRequestHeaderMapImpl{
           {":method", "POST"}, {":path", "/echoStruct"}, {":authority", "host"}},
       createDeepJson(100, true), {}, {}, Status(),
-      Http::TestResponseHeaderMapImpl{{":status", "503"}, {"content-type", "application/grpc"}},
-      "");
+      Http::TestResponseHeaderMapImpl{{":status", "408"}, {"content-type", "text/plain"}}, "");
 
   // The invalid deep struct is detected.
   testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(

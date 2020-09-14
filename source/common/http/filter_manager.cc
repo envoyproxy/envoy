@@ -6,6 +6,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 #include "common/http/utility.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -758,10 +759,15 @@ FilterManager::commonDecodePrefix(ActiveStreamDecoderFilter* filter,
 }
 
 void FilterManager::sendLocalReply(
-    bool is_grpc_request, Code code, absl::string_view body,
+    bool old_was_grpc_request, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   const bool is_head_request = state_.is_head_request_;
+  bool is_grpc_request = old_was_grpc_request;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unify_grpc_handling")) {
+    is_grpc_request = state_.is_grpc_request_;
+  }
+
   stream_info_.setResponseCodeDetails(details);
 
   filter_manager_callbacks_.onLocalReply(code);
