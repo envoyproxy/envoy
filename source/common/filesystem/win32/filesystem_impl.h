@@ -15,15 +15,15 @@ public:
 
 protected:
   struct FlagsAndMode {
-    int flags_ = 0;
-    int pmode_ = 0;
+    DWORD access_ = 0;
+    DWORD creation_ = 0;
   };
 
-  // Filesystem::FileSharedImpl
+  Api::IoCallBoolResult open(FlagSet flag) override;
+  Api::IoCallSizeResult write(absl::string_view buffer) override;
+  Api::IoCallBoolResult close() override;
+
   FlagsAndMode translateFlag(FlagSet in);
-  void openFile(FlagSet in) override;
-  ssize_t writeFile(absl::string_view buffer) override;
-  bool closeFile() override;
 
 private:
   friend class FileSystemImplTest;

@@ -19,7 +19,7 @@ static constexpr FlagSet DefaultFlags{
 
 class FileSystemImplTest : public testing::Test {
 protected:
-  int getFd(File* file) {
+  os_h_t getFd(File* file) {
 #ifdef WIN32
     auto file_impl = dynamic_cast<FileImplWin32*>(file);
 #else
@@ -240,10 +240,10 @@ TEST_F(FileSystemImplTest, OpenTwice) {
   ::unlink(new_file_path.c_str());
 
   FilePtr file = file_system_.createFile(new_file_path);
-  EXPECT_EQ(getFd(file.get()), -1);
+  EXPECT_EQ(getFd(file.get()), INVALID_HANDLE);
 
   const Api::IoCallBoolResult result1 = file->open(DefaultFlags);
-  const int initial_fd = getFd(file.get());
+  const os_h_t initial_fd = getFd(file.get());
   EXPECT_TRUE(result1.rc_);
   EXPECT_TRUE(file->isOpen());
 
@@ -319,8 +319,7 @@ TEST_F(FileSystemImplTest, WriteAfterClose) {
   EXPECT_TRUE(bool_result2.rc_);
   const Api::IoCallSizeResult size_result = file->write(" new data");
   EXPECT_EQ(-1, size_result.rc_);
-  EXPECT_EQ(IoFileError::IoErrorCode::UnknownError, size_result.err_->getErrorCode());
-  EXPECT_EQ("Bad file descriptor", size_result.err_->getErrorDetails());
+  EXPECT_EQ(IoFileError::IoErrorCode::BadFd, size_result.err_->getErrorCode());
 }
 
 TEST_F(FileSystemImplTest, NonExistingFileAndReadOnly) {
@@ -345,7 +344,11 @@ TEST_F(FileSystemImplTest, ExistingReadOnlyFileAndWrite) {
     std::string data(" new data");
     const Api::IoCallSizeResult result = file->write(data);
     EXPECT_TRUE(result.rc_ < 0);
-    EXPECT_EQ(result.err_->getErrorDetails(), "Bad file descriptor");
+#ifdef WIN32
+    EXPECT_EQ(IoFileError::IoErrorCode::Permission, result.err_->getErrorCode());
+#else
+    EXPECT_EQ(IoFileError::IoErrorCode::BadFd, result.err_->getErrorCode());
+#endif
   }
 
   auto contents = TestEnvironment::readFileToStringForTest(file_path);
