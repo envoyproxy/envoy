@@ -14,81 +14,85 @@ namespace PostgresProxy {
 
 void DecoderImpl::initialize() {
   // Special handler for first message of the transaction.
-  first_ = MsgProcessor{"Startup", BODY_FORMAT(Int32, Repeated<String>), {&DecoderImpl::onStartup}};
+  first_ =
+      MessageProcessor{"Startup", BODY_FORMAT(Int32, Repeated<String>), {&DecoderImpl::onStartup}};
 
   // Frontend messages.
   FE_messages_.direction_ = "Frontend";
 
   // Setup handlers for known messages.
-  absl::flat_hash_map<char, MsgProcessor>& FE_known_msgs = FE_messages_.messages_;
+  absl::flat_hash_map<char, MessageProcessor>& FE_known_msgs = FE_messages_.messages_;
 
   // Handler for known Frontend messages.
-  FE_known_msgs['B'] = MsgProcessor{
+  FE_known_msgs['B'] = MessageProcessor{
       "Bind", BODY_FORMAT(String, String, Array<Int16>, Array<VarByteN>, Array<Int16>), {}};
-  FE_known_msgs['C'] = MsgProcessor{"Close", BODY_FORMAT(Byte1, String), {}};
-  FE_known_msgs['d'] = MsgProcessor{"CopyData", BODY_FORMAT(ByteN), {}};
-  FE_known_msgs['c'] = MsgProcessor{"CopyDone", NO_BODY, {}};
-  FE_known_msgs['f'] = MsgProcessor{"CopyFail", BODY_FORMAT(String), {}};
-  FE_known_msgs['D'] = MsgProcessor{"Describe", BODY_FORMAT(Byte1, String), {}};
-  FE_known_msgs['E'] = MsgProcessor{"Execute", BODY_FORMAT(String, Int32), {}};
-  FE_known_msgs['H'] = MsgProcessor{"Flush", NO_BODY, {}};
-  FE_known_msgs['F'] =
-      MsgProcessor{"FunctionCall", BODY_FORMAT(Int32, Array<Int16>, Array<VarByteN>, Int16), {}};
-  FE_known_msgs['p'] = MsgProcessor{"PasswordMessage/GSSResponse/SASLInitialResponse/SASLResponse",
-                                    BODY_FORMAT(Int32, ByteN),
-                                    {}};
+  FE_known_msgs['C'] = MessageProcessor{"Close", BODY_FORMAT(Byte1, String), {}};
+  FE_known_msgs['d'] = MessageProcessor{"CopyData", BODY_FORMAT(ByteN), {}};
+  FE_known_msgs['c'] = MessageProcessor{"CopyDone", NO_BODY, {}};
+  FE_known_msgs['f'] = MessageProcessor{"CopyFail", BODY_FORMAT(String), {}};
+  FE_known_msgs['D'] = MessageProcessor{"Describe", BODY_FORMAT(Byte1, String), {}};
+  FE_known_msgs['E'] = MessageProcessor{"Execute", BODY_FORMAT(String, Int32), {}};
+  FE_known_msgs['H'] = MessageProcessor{"Flush", NO_BODY, {}};
+  FE_known_msgs['F'] = MessageProcessor{
+      "FunctionCall", BODY_FORMAT(Int32, Array<Int16>, Array<VarByteN>, Int16), {}};
+  FE_known_msgs['p'] =
+      MessageProcessor{"PasswordMessage/GSSResponse/SASLInitialResponse/SASLResponse",
+                       BODY_FORMAT(Int32, ByteN),
+                       {}};
   FE_known_msgs['P'] =
-      MsgProcessor{"Parse", BODY_FORMAT(String, String, Array<Int32>), {&DecoderImpl::onParse}};
-  FE_known_msgs['Q'] = MsgProcessor{"Query", BODY_FORMAT(String), {&DecoderImpl::onQuery}};
-  FE_known_msgs['S'] = MsgProcessor{"Sync", NO_BODY, {}};
-  FE_known_msgs['X'] = MsgProcessor{"Terminate", NO_BODY, {&DecoderImpl::decodeFrontendTerminate}};
+      MessageProcessor{"Parse", BODY_FORMAT(String, String, Array<Int32>), {&DecoderImpl::onParse}};
+  FE_known_msgs['Q'] = MessageProcessor{"Query", BODY_FORMAT(String), {&DecoderImpl::onQuery}};
+  FE_known_msgs['S'] = MessageProcessor{"Sync", NO_BODY, {}};
+  FE_known_msgs['X'] =
+      MessageProcessor{"Terminate", NO_BODY, {&DecoderImpl::decodeFrontendTerminate}};
 
   // Handler for unknown Frontend messages.
   FE_messages_.unknown_ =
-      MsgProcessor{"Other", BODY_FORMAT(ByteN), {&DecoderImpl::incMessagesUnknown}};
+      MessageProcessor{"Other", BODY_FORMAT(ByteN), {&DecoderImpl::incMessagesUnknown}};
 
   // Backend messages.
   BE_messages_.direction_ = "Backend";
 
   // Setup handlers for known messages.
-  absl::flat_hash_map<char, MsgProcessor>& BE_known_msgs = BE_messages_.messages_;
+  absl::flat_hash_map<char, MessageProcessor>& BE_known_msgs = BE_messages_.messages_;
 
   // Handler for known Backend messages.
   BE_known_msgs['R'] =
-      MsgProcessor{"Authentication", BODY_FORMAT(ByteN), {&DecoderImpl::decodeAuthentication}};
-  BE_known_msgs['K'] = MsgProcessor{"BackendKeyData", BODY_FORMAT(Int32, Int32), {}};
-  BE_known_msgs['2'] = MsgProcessor{"BindComplete", NO_BODY, {}};
-  BE_known_msgs['3'] = MsgProcessor{"CloseComplete", NO_BODY, {}};
-  BE_known_msgs['C'] =
-      MsgProcessor{"CommandComplete", BODY_FORMAT(String), {&DecoderImpl::decodeBackendStatements}};
-  BE_known_msgs['d'] = MsgProcessor{"CopyData", BODY_FORMAT(ByteN), {}};
-  BE_known_msgs['c'] = MsgProcessor{"CopyDone", NO_BODY, {}};
-  BE_known_msgs['G'] = MsgProcessor{"CopyInResponse", BODY_FORMAT(Int8, Array<Int16>), {}};
-  BE_known_msgs['H'] = MsgProcessor{"CopyOutResponse", BODY_FORMAT(Int8, Array<Int16>), {}};
-  BE_known_msgs['W'] = MsgProcessor{"CopyBothResponse", BODY_FORMAT(Int8, Array<Int16>), {}};
-  BE_known_msgs['D'] = MsgProcessor{"DataRow", BODY_FORMAT(Array<VarByteN>), {}};
-  BE_known_msgs['I'] = MsgProcessor{"EmptyQueryResponse", NO_BODY, {}};
-  BE_known_msgs['E'] = MsgProcessor{
+      MessageProcessor{"Authentication", BODY_FORMAT(ByteN), {&DecoderImpl::decodeAuthentication}};
+  BE_known_msgs['K'] = MessageProcessor{"BackendKeyData", BODY_FORMAT(Int32, Int32), {}};
+  BE_known_msgs['2'] = MessageProcessor{"BindComplete", NO_BODY, {}};
+  BE_known_msgs['3'] = MessageProcessor{"CloseComplete", NO_BODY, {}};
+  BE_known_msgs['C'] = MessageProcessor{
+      "CommandComplete", BODY_FORMAT(String), {&DecoderImpl::decodeBackendStatements}};
+  BE_known_msgs['d'] = MessageProcessor{"CopyData", BODY_FORMAT(ByteN), {}};
+  BE_known_msgs['c'] = MessageProcessor{"CopyDone", NO_BODY, {}};
+  BE_known_msgs['G'] = MessageProcessor{"CopyInResponse", BODY_FORMAT(Int8, Array<Int16>), {}};
+  BE_known_msgs['H'] = MessageProcessor{"CopyOutResponse", BODY_FORMAT(Int8, Array<Int16>), {}};
+  BE_known_msgs['W'] = MessageProcessor{"CopyBothResponse", BODY_FORMAT(Int8, Array<Int16>), {}};
+  BE_known_msgs['D'] = MessageProcessor{"DataRow", BODY_FORMAT(Array<VarByteN>), {}};
+  BE_known_msgs['I'] = MessageProcessor{"EmptyQueryResponse", NO_BODY, {}};
+  BE_known_msgs['E'] = MessageProcessor{
       "ErrorResponse", BODY_FORMAT(Byte1, String), {&DecoderImpl::decodeBackendErrorResponse}};
-  BE_known_msgs['V'] = MsgProcessor{"FunctionCallResponse", BODY_FORMAT(VarByteN), {}};
-  BE_known_msgs['v'] = MsgProcessor{"NegotiateProtocolVersion", BODY_FORMAT(ByteN), {}};
-  BE_known_msgs['n'] = MsgProcessor{"NoData", NO_BODY, {}};
-  BE_known_msgs['N'] = MsgProcessor{
+  BE_known_msgs['V'] = MessageProcessor{"FunctionCallResponse", BODY_FORMAT(VarByteN), {}};
+  BE_known_msgs['v'] = MessageProcessor{"NegotiateProtocolVersion", BODY_FORMAT(ByteN), {}};
+  BE_known_msgs['n'] = MessageProcessor{"NoData", NO_BODY, {}};
+  BE_known_msgs['N'] = MessageProcessor{
       "NoticeResponse", BODY_FORMAT(ByteN), {&DecoderImpl::decodeBackendNoticeResponse}};
-  BE_known_msgs['A'] = MsgProcessor{"NotificationResponse", BODY_FORMAT(Int32, String, String), {}};
-  BE_known_msgs['t'] = MsgProcessor{"ParameterDescription", BODY_FORMAT(Array<Int32>), {}};
-  BE_known_msgs['S'] = MsgProcessor{"ParameterStatus", BODY_FORMAT(String, String), {}};
-  BE_known_msgs['1'] = MsgProcessor{"ParseComplete", NO_BODY, {}};
-  BE_known_msgs['s'] = MsgProcessor{"PortalSuspend", NO_BODY, {}};
-  BE_known_msgs['Z'] = MsgProcessor{"ReadyForQuery", BODY_FORMAT(Byte1), {}};
-  BE_known_msgs['T'] =
-      MsgProcessor{"RowDescription",
-                   BODY_FORMAT(Array<Sequence<String, Int32, Int16, Int32, Int16, Int32, Int16>>),
-                   {}};
+  BE_known_msgs['A'] =
+      MessageProcessor{"NotificationResponse", BODY_FORMAT(Int32, String, String), {}};
+  BE_known_msgs['t'] = MessageProcessor{"ParameterDescription", BODY_FORMAT(Array<Int32>), {}};
+  BE_known_msgs['S'] = MessageProcessor{"ParameterStatus", BODY_FORMAT(String, String), {}};
+  BE_known_msgs['1'] = MessageProcessor{"ParseComplete", NO_BODY, {}};
+  BE_known_msgs['s'] = MessageProcessor{"PortalSuspend", NO_BODY, {}};
+  BE_known_msgs['Z'] = MessageProcessor{"ReadyForQuery", BODY_FORMAT(Byte1), {}};
+  BE_known_msgs['T'] = MessageProcessor{
+      "RowDescription",
+      BODY_FORMAT(Array<Sequence<String, Int32, Int16, Int32, Int16, Int32, Int16>>),
+      {}};
 
   // Handler for unknown Backend messages.
   BE_messages_.unknown_ =
-      MsgProcessor{"Other", BODY_FORMAT(ByteN), {&DecoderImpl::incMessagesUnknown}};
+      MessageProcessor{"Other", BODY_FORMAT(ByteN), {&DecoderImpl::incMessagesUnknown}};
 
   // Setup hash map for handling backend statements.
   BE_statements_["BEGIN"] = [this](DecoderImpl*) -> void {
@@ -242,7 +246,7 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
 
   // Set processing to the handler of unknown messages.
   // If message is found, the processing will be updated.
-  std::reference_wrapper<MsgProcessor> msg = msg_processor.unknown_;
+  std::reference_wrapper<MessageProcessor> msg = msg_processor.unknown_;
 
   if (startup_) {
     msg = std::ref(first_);

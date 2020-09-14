@@ -85,11 +85,13 @@ protected:
   // when a specific message has been decoded.
   using MsgAction = std::function<void(DecoderImpl*)>;
 
-  // MsgProcessor has two fields:
+  // MessageProcessor has the following fields:
   // first - string with message description
-  // second - vector of Decoder's methods which are invoked when the message
+  // second - function which instantiates a Message object of specific type
+  // which is capable of parsing the message's body.
+  // third - vector of Decoder's methods which are invoked when the message
   // is processed.
-  using MsgProcessor =
+  using MessageProcessor =
       std::tuple<std::string, std::function<std::unique_ptr<Message>()>, std::vector<MsgAction>>;
 
   // Frontend and Backend messages.
@@ -97,9 +99,9 @@ protected:
     // String describing direction (Frontend or Backend).
     std::string direction_;
     // Hash map indexed by messages' 1st byte points to handlers used for processing messages.
-    absl::flat_hash_map<char, MsgProcessor> messages_;
+    absl::flat_hash_map<char, MessageProcessor> messages_;
     // Handler used for processing messages not found in hash map.
-    MsgProcessor unknown_;
+    MessageProcessor unknown_;
   };
 
   // Hash map binding keyword found in a message to an
@@ -151,7 +153,7 @@ protected:
   // Startup message message which does not start with 1 byte TYPE.
   // It starts with message length and must be therefore handled
   // differently.
-  MsgProcessor first_;
+  MessageProcessor first_;
 
   // hash map for dispatching backend transaction messages
   KeywordProcessor BE_statements_;
