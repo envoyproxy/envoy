@@ -48,15 +48,8 @@ jobs:
       # Run the app in the background and redirect logs.
       - name: 'Run swift app'
         run: bazelisk run --config=ios //examples/swift/hello_world:app &> /tmp/envoy.log &
-      - name: 'Wait for simulator to start & perform requests'
-        run: sleep 300
-      # Print out the log in case the liveliness check fails.
-      # This allows the author to decide if the failure is a flake or a real problem.
-      - name: 'Cat log'
-        run: 'cat /tmp/envoy.log'
-      # Check for the sentinel value that shows the app is alive and well.
       - name: 'Check liveliness'
-        run: 'cat /tmp/envoy.log | grep "received headers with status 200"'
+        run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
   macobjc:
     name: mac_objc_helloworld
     needs: macdist
@@ -79,15 +72,8 @@ jobs:
       # Run the app in the background and redirect logs.
       - name: 'Run objective-c app'
         run: bazelisk run --config=ios //examples/objective-c/hello_world:app &> /tmp/envoy.log &
-      - name: 'Wait for simulator to start & perform requests'
-        run: sleep 180
-      # Print out the log in case the liveliness check fails.
-      # This allows the author to decide if the failure is a flake or a real problem.
-      - name: 'Cat log'
-        run: 'cat /tmp/envoy.log'
-      # Check for the sentinel value that shows the app is alive and well.
       - name: 'Check liveliness'
-        run: 'cat /tmp/envoy.log | grep "received headers with status 200"'
+        run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
   swifttests:
     name: swift_tests
     runs-on: macOS-latest
