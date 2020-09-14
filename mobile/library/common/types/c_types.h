@@ -166,8 +166,10 @@ typedef struct {
 #ifdef __cplusplus
 extern "C" { // function pointers
 #endif
+
 /**
  * Callback signature for headers on an HTTP stream.
+ *
  * @param headers, the headers received.
  * @param end_stream, whether the response is headers-only.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
@@ -175,9 +177,12 @@ extern "C" { // function pointers
  * @return void*, return context (may be unused).
  */
 typedef void* (*envoy_on_headers_f)(envoy_headers headers, bool end_stream, void* context);
+
 /**
  * Callback signature for data on an HTTP stream.
- * This callback can be invoked multiple times if the data gets streamed.
+ *
+ * This callback can be invoked multiple times when data is streamed.
+ *
  * @param data, the data received.
  * @param end_stream, whether the data is the last data frame.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
@@ -185,26 +190,36 @@ typedef void* (*envoy_on_headers_f)(envoy_headers headers, bool end_stream, void
  * @return void*, return context (may be unused).
  */
 typedef void* (*envoy_on_data_f)(envoy_data data, bool end_stream, void* context);
+
 /**
  * Callback signature for metadata on an HTTP stream.
+ *
  * Note that metadata frames are prohibited from ending a stream.
+ *
  * @param metadata, the metadata received.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  * @return void*, return context (may be unused).
  */
 typedef void* (*envoy_on_metadata_f)(envoy_headers metadata, void* context);
+
 /**
  * Callback signature for trailers on an HTTP stream.
+ *
  * Note that end stream is implied when on_trailers is called.
+ *
  * @param trailers, the trailers received.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  * @return void*, return context (may be unused).
  */
 typedef void* (*envoy_on_trailers_f)(envoy_headers trailers, void* context);
+
 /**
  * Callback signature for errors with an HTTP stream.
+ *
+ * This is a TERMINAL callback. Exactly one terminal callback will be called per stream.
+ *
  * @param envoy_error, the error received/caused by the async HTTP stream.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
@@ -214,6 +229,9 @@ typedef void* (*envoy_on_error_f)(envoy_error error, void* context);
 
 /**
  * Callback signature for when an HTTP stream bi-directionally completes without error.
+ *
+ * This is a TERMINAL callback. Exactly one terminal callback will be called per stream.
+ *
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  * @return void*, return context (may be unused).
@@ -222,6 +240,9 @@ typedef void* (*envoy_on_complete_f)(void* context);
 
 /**
  * Callback signature for when an HTTP stream is cancelled.
+ *
+ * This is a TERMINAL callback. Exactly one terminal callback will be called per stream.
+ *
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  * @return void*, return context (may be unused).
@@ -238,7 +259,7 @@ typedef void (*envoy_on_exit_f)(void* context);
 #endif
 
 /**
- * Interface that can handle HTTP callbacks.
+ * Interface to handle HTTP callbacks.
  */
 typedef struct {
   envoy_on_headers_f on_headers;
@@ -252,11 +273,7 @@ typedef struct {
 } envoy_http_callbacks;
 
 /**
- * Interface that can handle Engine callbacks.
- * Note: currently this set of callbacks doesn't
- * have a context because users of the library do not interact with the
- * callbacks. However, these set of callbacks can be easily extended
- * following the envoy_http_callbacks pattern to do so.
+ * Interface to handle Engine callbacks.
  */
 typedef struct {
   envoy_on_exit_f on_exit;
