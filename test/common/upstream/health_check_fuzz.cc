@@ -139,10 +139,6 @@ void HealthCheckFuzz::raiseEvent(test::common::upstream::RaiseEvent event, bool 
   switch (type_) {
   case HealthCheckFuzz::Type::HTTP: {
     test_sessions_[0]->client_connection_->raiseEvent(eventType);
-    // TODO: Discuss with Asra/Adi, you can either have this hardcoded here or handled in an expect
-    // stream create, but I feel like hardcoding would be better in terms of recreating
-    // client/stream, as otherwise events would have to cycle until invokeIntervalTimer() to do
-    // anything. This discussion maps to all expectClientCreate() calls.
     if (!last_action && eventType != Network::ConnectionEvent::Connected) {
       ENVOY_LOG_MISC(trace, "Creating client and stream from close event");
       expectClientCreate(0);
