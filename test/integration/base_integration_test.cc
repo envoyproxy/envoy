@@ -77,7 +77,7 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
     : BaseIntegrationTest(
           [version](int) {
             return Network::Utility::parseInternetAddress(
-                Network::Test::getAnyAddressString(version), 0);
+                Network::Test::getLoopbackAddressString(version), 0);
           },
           version, config) {}
 

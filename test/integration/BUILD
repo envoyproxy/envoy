@@ -432,7 +432,7 @@ envoy_cc_test(
         "http2_upstream_integration_test.cc",
         "http2_upstream_integration_test.h",
     ],
-    tags = ["fails_on_windows"],
+    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
@@ -453,7 +453,6 @@ envoy_cc_test(
         "integration_admin_test.cc",
         "integration_admin_test.h",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//include/envoy/http:header_map_interface",
@@ -929,7 +928,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "socket_interface_integration_test",
     srcs = ["socket_interface_integration_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/network:socket_interface_lib",
@@ -1033,7 +1031,6 @@ envoy_cc_test(
         "proxy_proto_integration_test.cc",
         "proxy_proto_integration_test.h",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
