@@ -93,7 +93,7 @@ void UdpListenerImpl::processPacket(Address::InstanceConstSharedPtr local_addres
   ASSERT(local_address != nullptr);
   UdpRecvData recvData{
       {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time};
-  cb_.onData(recvData);
+  cb_.onData(std::move(recvData));
 }
 
 void UdpListenerImpl::handleWriteCallback() {
@@ -123,6 +123,48 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
 Api::IoCallUint64Result UdpListenerImpl::flush() {
   ENVOY_UDP_LOG(trace, "flush");
   return cb_.udpPacketWriter().flush();
+}
+
+UdpListenerWorkerRouterImpl::UdpListenerWorkerRouterImpl(uint32_t concurrency)
+    : workers_(concurrency) {}
+
+void UdpListenerWorkerRouterImpl::registerWorker(UdpListenerCallbacks& listener) {
+  absl::WriterMutexLock lock(&mutex_);
+
+  ASSERT(listener.workerId() < workers_.size());
+  workers_.at(listener.workerId()) = &listener;
+}
+
+void UdpListenerWorkerRouterImpl::unregisterWorker(UdpListenerCallbacks& listener) {
+  absl::WriterMutexLock lock(&mutex_);
+
+  ASSERT(workers_.at(listener.workerId()) == &listener);
+  workers_.at(listener.workerId()) = nullptr;
+}
+
+void UdpListenerWorkerRouterImpl::deliver(UdpListenerCallbacks& current, UdpRecvData&& data) {
+  absl::ReaderMutexLock lock(&mutex_);
+
+  absl::optional<uint32_t> dest;
+
+  // For concurrency == 1, the packet will always go to the current worker.
+  if (workers_.size() > 1) {
+    dest = current.destination(data, workers_.size());
+  }
+
+  if (!dest.has_value() || *dest == current.workerId()) {
+    current.onDataWorker(data);
+  } else {
+    RELEASE_ASSERT(*dest < workers_.size(),
+                   "UdpListenerCallbacks::destination returned out-of-range value");
+    auto* worker = workers_[*dest];
+
+    // When a listener is being removed, packets could be processed on some workers after the
+    // listener is removed from other workers, which could result in a nullptr for that worker.
+    if (worker != nullptr) {
+      worker->post(std::move(data));
+    }
+  }
 }
 
 } // namespace Network

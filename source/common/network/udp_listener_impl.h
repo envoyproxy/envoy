@@ -61,5 +61,18 @@ private:
   Event::FileEventPtr file_event_;
 };
 
+class UdpListenerWorkerRouterImpl : public UdpListenerWorkerRouter {
+public:
+  UdpListenerWorkerRouterImpl(uint32_t concurrency);
+
+  void registerWorker(UdpListenerCallbacks& listener) override;
+  void unregisterWorker(UdpListenerCallbacks& listener) override;
+  void deliver(UdpListenerCallbacks& current, UdpRecvData&& data) override;
+
+private:
+  absl::Mutex mutex_;
+  std::vector<UdpListenerCallbacks*> workers_ ABSL_GUARDED_BY(mutex_);
+};
+
 } // namespace Network
 } // namespace Envoy

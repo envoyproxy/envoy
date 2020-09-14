@@ -77,13 +77,13 @@ public:
         per_worker_stats_({ALL_PER_HANDLER_LISTENER_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "worker."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "worker."))}),
-        connection_handler_(*dispatcher_),
+        connection_handler_(*dispatcher_, absl::nullopt),
         envoy_quic_dispatcher_(
             &crypto_config_, quic_config_, &version_manager_,
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),
             std::make_unique<EnvoyQuicAlarmFactory>(*dispatcher_, *connection_helper_.GetClock()),
             quic::kQuicDefaultConnectionIdLength, connection_handler_, listener_config_,
-            listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_),
+            listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_, nullptr),
         connection_id_(quic::test::TestConnectionId(1)) {
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);

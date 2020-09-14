@@ -53,6 +53,13 @@ public:
   virtual void removeListeners(uint64_t listener_tag) PURE;
 
   /**
+   * Get the ``UdpListenerCallbacks`` associated with ``listener_tag``. This will be
+   * nullptr for non-UDP listeners and for ``listener_tag`` values that have already been
+   * removed.
+   */
+  virtual UdpListenerCallbacks* getUdpListenerCallbacks(uint64_t listener_tag) PURE;
+
+  /**
    * Remove the filter chains and the connections in the listener. All connections owned
    * by the filter chains will be closed. Once all the connections are destroyed(connections
    * could be deferred deleted!), invoke the completion.
@@ -147,8 +154,8 @@ public:
    * @return the ActiveUdpListener created.
    */
   virtual ConnectionHandler::ActiveListenerPtr
-  createActiveUdpListener(ConnectionHandler& parent, Event::Dispatcher& disptacher,
-                          Network::ListenerConfig& config) PURE;
+  createActiveUdpListener(uint32_t worker_id, ConnectionHandler& parent,
+                          Event::Dispatcher& dispatcher, Network::ListenerConfig& config) PURE;
 
   /**
    * @return true if the UDP passing through listener doesn't form stateful connections.

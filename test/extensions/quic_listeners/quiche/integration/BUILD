@@ -31,6 +31,7 @@ envoy_cc_test(
         "//test/extensions/quic_listeners/quiche:quic_test_utils_for_envoy_lib",
         "//test/extensions/quic_listeners/quiche:test_utils_lib",
         "//test/integration:http_integration_lib",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",

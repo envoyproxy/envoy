@@ -139,11 +139,16 @@ public:
   MockUdpListenerCallbacks();
   ~MockUdpListenerCallbacks() override;
 
-  MOCK_METHOD(void, onData, (UdpRecvData & data));
+  MOCK_METHOD(void, onData, (UdpRecvData && data));
   MOCK_METHOD(void, onReadReady, ());
   MOCK_METHOD(void, onWriteReady, (const Socket& socket));
   MOCK_METHOD(void, onReceiveError, (Api::IoError::IoErrorCode err));
   MOCK_METHOD(Network::UdpPacketWriter&, udpPacketWriter, ());
+  MOCK_METHOD(uint32_t, workerId, (), (const));
+  MOCK_METHOD(void, onDataWorker, (Network::UdpRecvData & data));
+  MOCK_METHOD(absl::optional<uint32_t>, destination,
+              (const Network::UdpRecvData& data, uint32_t concurrency));
+  MOCK_METHOD(void, post, (Network::UdpRecvData && data));
 };
 
 class MockDrainDecision : public DrainDecision {
@@ -355,6 +360,7 @@ public:
   MOCK_METHOD(uint64_t, listenerTag, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(Network::ActiveUdpListenerFactory*, udpListenerFactory, ());
+  MOCK_METHOD(Network::UdpListenerWorkerRouter*, udpListenerWorkerRouter, ());
   MOCK_METHOD(Network::UdpPacketWriterFactoryOptRef, udpPacketWriterFactory, ());
   MOCK_METHOD(ConnectionBalancer&, connectionBalancer, ());
   MOCK_METHOD(ResourceLimit&, openConnections, ());
@@ -372,6 +378,7 @@ public:
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;
   MockListenSocketFactory socket_factory_;
   SocketSharedPtr socket_;
+  UdpListenerWorkerRouterPtr udp_listener_worker_router_;
   Stats::IsolatedStoreImpl scope_;
   std::string name_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
@@ -398,6 +405,7 @@ public:
   MOCK_METHOD(void, addListener,
               (absl::optional<uint64_t> overridden_listener, ListenerConfig& config));
   MOCK_METHOD(void, removeListeners, (uint64_t listener_tag));
+  MOCK_METHOD(UdpListenerCallbacks*, getUdpListenerCallbacks, (uint64_t listener_tag));
   MOCK_METHOD(void, removeFilterChains,
               (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
                std::function<void()> completion));
@@ -425,8 +433,7 @@ public:
 
 class MockResolvedAddress : public Address::Instance {
 public:
-  MockResolvedAddress(const std::string& logical, const std::string& physical)
-      : logical_(logical), physical_(physical) {}
+  MockResolvedAddress(const std::string& logical, const std::string& physical);
   ~MockResolvedAddress() override;
 
   bool operator==(const Address::Instance& other) const override {
@@ -472,7 +479,8 @@ public:
 
 class MockUdpPacketWriter : public UdpPacketWriter {
 public:
-  MockUdpPacketWriter() = default;
+  MockUdpPacketWriter();
+  ~MockUdpPacketWriter() override;
 
   MOCK_METHOD(Api::IoCallUint64Result, writePacket,
               (const Buffer::Instance& buffer, const Address::Ip* local_ip,
@@ -484,6 +492,16 @@ public:
   MOCK_METHOD(Network::UdpPacketWriterBuffer, getNextWriteLocation,
               (const Address::Ip* local_ip, const Address::Instance& peer_address));
   MOCK_METHOD(Api::IoCallUint64Result, flush, ());
+};
+
+class MockUdpListenerWorkerRouter : public UdpListenerWorkerRouter {
+public:
+  MockUdpListenerWorkerRouter();
+  ~MockUdpListenerWorkerRouter() override;
+
+  MOCK_METHOD(void, registerWorker, (UdpListenerCallbacks & listener));
+  MOCK_METHOD(void, unregisterWorker, (UdpListenerCallbacks & listener));
+  MOCK_METHOD(void, deliver, (UdpListenerCallbacks & current, UdpRecvData&& data));
 };
 
 class MockUdpListener : public UdpListener {

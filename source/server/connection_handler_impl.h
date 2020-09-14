@@ -55,6 +55,8 @@ struct PerHandlerListenerStats {
   ALL_PER_HANDLER_LISTENER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
+class ActiveUdpListenerBase;
+
 /**
  * Server side connection handler. This is used both by workers as well as the
  * main thread for non-threaded listeners.
@@ -63,7 +65,7 @@ class ConnectionHandlerImpl : public Network::ConnectionHandler,
                               NonCopyable,
                               Logger::Loggable<Logger::Id::conn_handler> {
 public:
-  ConnectionHandlerImpl(Event::Dispatcher& dispatcher);
+  ConnectionHandlerImpl(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_id);
 
   // Network::ConnectionHandler
   uint64_t numConnections() const override { return num_handler_connections_; }
@@ -72,6 +74,7 @@ public:
   void addListener(absl::optional<uint64_t> overridden_listener,
                    Network::ListenerConfig& config) override;
   void removeListeners(uint64_t listener_tag) override;
+  Network::UdpListenerCallbacks* getUdpListenerCallbacks(uint64_t listener_tag) override;
   void removeFilterChains(uint64_t listener_tag,
                           const std::list<const Network::FilterChain*>& filter_chains,
                           std::function<void()> completion) override;
@@ -331,16 +334,27 @@ private:
   };
 
   using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
+  using UdpListenerCallbacksOptRef =
+      absl::optional<std::reference_wrapper<Network::UdpListenerCallbacks>>;
 
   struct ActiveListenerDetails {
     // Strong pointer to the listener, whether TCP, UDP, QUIC, etc.
     Network::ConnectionHandler::ActiveListenerPtr listener_;
-    // Reference to the listener IFF this is a TCP listener. Null otherwise.
-    ActiveTcpListenerOptRef tcp_listener_;
+
+    absl::variant<absl::monostate, std::reference_wrapper<ActiveTcpListener>,
+                  std::reference_wrapper<Network::UdpListenerCallbacks>>
+        typed_listener_;
+
+    // Helpers for accessing the data in the variant for cleaner code.
+    ActiveTcpListenerOptRef tcpListener();
+    UdpListenerCallbacksOptRef udpListener();
   };
 
   ActiveTcpListenerOptRef findActiveTcpListenerByAddress(const Network::Address::Instance& address);
+  ActiveListenerDetails* findActiveListenerByTag(uint64_t listener_tag);
 
+  // This has a value on worker threads, and no value on the main thread.
+  const absl::optional<uint32_t> worker_id_;
   Event::Dispatcher& dispatcher_;
   const std::string per_handler_stat_prefix_;
   std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerDetails>> listeners_;
@@ -348,34 +362,60 @@ private:
   bool disable_listeners_;
 };
 
+class ActiveUdpListenerBase : public ConnectionHandlerImpl::ActiveListenerImplBase,
+                              public Network::UdpListenerCallbacks {
+public:
+  ActiveUdpListenerBase(uint32_t worker_id, Network::ConnectionHandler& parent,
+                        Network::UdpListenerPtr&& listener, Network::ListenerConfig* config);
+  ~ActiveUdpListenerBase() override;
+
+  // Network::UdpListenerCallbacks
+  void onData(Network::UdpRecvData&& data) override;
+  uint32_t workerId() const override { return worker_id_; }
+  void post(Network::UdpRecvData&& data) override;
+  absl::optional<uint32_t> destination(const Network::UdpRecvData&, uint32_t) override {
+    // By default, route to the current worker.
+    return absl::nullopt;
+  }
+
+  // ActiveListenerImplBase
+  Network::Listener* listener() override { return udp_listener_.get(); }
+
+protected:
+  const uint32_t worker_id_;
+  Network::ConnectionHandler& parent_;
+  Network::UdpListenerPtr udp_listener_;
+};
+
 /**
  * Wrapper for an active udp listener owned by this handler.
  */
-class ActiveRawUdpListener : public Network::UdpListenerCallbacks,
-                             public ConnectionHandlerImpl::ActiveListenerImplBase,
+class ActiveRawUdpListener : public ActiveUdpListenerBase,
                              public Network::UdpListenerFilterManager,
                              public Network::UdpReadFilterCallbacks {
 public:
-  ActiveRawUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
-                       Network::ListenerConfig& config);
-  ActiveRawUdpListener(Network::ConnectionHandler& parent,
+  ActiveRawUdpListener(uint32_t worker_id, Network::ConnectionHandler& parent,
+                       Event::Dispatcher& dispatcher, Network::ListenerConfig& config);
+  ActiveRawUdpListener(uint32_t worker_id, Network::ConnectionHandler& parent,
                        Network::SocketSharedPtr listen_socket_ptr, Event::Dispatcher& dispatcher,
                        Network::ListenerConfig& config);
-  ActiveRawUdpListener(Network::ConnectionHandler& parent, Network::Socket& listen_socket,
-                       Network::SocketSharedPtr listen_socket_ptr, Event::Dispatcher& dispatcher,
+  ActiveRawUdpListener(uint32_t worker_id, Network::ConnectionHandler& parent,
+                       Network::Socket& listen_socket, Network::SocketSharedPtr listen_socket_ptr,
+                       Event::Dispatcher& dispatcher, Network::ListenerConfig& config);
+  ActiveRawUdpListener(uint32_t worker_id, Network::ConnectionHandler& parent,
+                       Network::Socket& listen_socket, Network::UdpListenerPtr&& listener,
                        Network::ListenerConfig& config);
-  ActiveRawUdpListener(Network::ConnectionHandler& parent, Network::Socket& listen_socket,
-                       Network::UdpListenerPtr&& listener, Network::ListenerConfig& config);
 
   // Network::UdpListenerCallbacks
-  void onData(Network::UdpRecvData& data) override;
   void onReadReady() override;
   void onWriteReady(const Network::Socket& socket) override;
   void onReceiveError(Api::IoError::IoErrorCode error_code) override;
   Network::UdpPacketWriter& udpPacketWriter() override { return *udp_packet_writer_; }
 
+  // Network::UdpWorker
+  void onDataWorker(Network::UdpRecvData& data) override;
+
   // ActiveListenerImplBase
-  Network::Listener* listener() override { return udp_listener_.get(); }
   void pauseListening() override { udp_listener_->disable(); }
   void resumeListening() override { udp_listener_->enable(); }
   void shutdownListener() override {
@@ -394,7 +434,6 @@ public:
   Network::UdpListener& udpListener() override;
 
 private:
-  Network::UdpListenerPtr udp_listener_;
   Network::UdpListenerReadFilterPtr read_filter_;
   Network::UdpPacketWriterPtr udp_packet_writer_;
   Network::Socket& listen_socket_;

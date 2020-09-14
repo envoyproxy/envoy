@@ -305,6 +305,9 @@ public:
   Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
     return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
   }
+  Network::UdpListenerWorkerRouter* udpListenerWorkerRouter() override {
+    return udp_listener_worker_router_.get();
+  }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
 
   ResourceLimit& openConnections() override { return *open_connections_; }
@@ -393,6 +396,7 @@ private:
   const bool continue_on_listener_filters_timeout_;
   Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
   Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
+  Network::UdpListenerWorkerRouterPtr udp_listener_worker_router_;
   Network::ConnectionBalancerPtr connection_balancer_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;

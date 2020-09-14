@@ -11,11 +11,10 @@
 namespace Envoy {
 namespace Server {
 
-Network::ConnectionHandler::ActiveListenerPtr
-ActiveRawUdpListenerFactory::createActiveUdpListener(Network::ConnectionHandler& parent,
-                                                     Event::Dispatcher& dispatcher,
-                                                     Network::ListenerConfig& config) {
-  return std::make_unique<ActiveRawUdpListener>(parent, dispatcher, config);
+Network::ConnectionHandler::ActiveListenerPtr ActiveRawUdpListenerFactory::createActiveUdpListener(
+    uint32_t worker_id, Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
+    Network::ListenerConfig& config) {
+  return std::make_unique<ActiveRawUdpListener>(worker_id, parent, dispatcher, config);
 }
 
 ProtobufTypes::MessagePtr ActiveRawUdpListenerConfigFactory::createEmptyConfigProto() {

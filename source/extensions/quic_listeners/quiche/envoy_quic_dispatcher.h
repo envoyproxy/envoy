@@ -15,6 +15,7 @@
 #include <string>
 
 #include "envoy/network/listener.h"
+#include "common/runtime/runtime_protos.h"
 #include "server/connection_handler_impl.h"
 
 namespace Envoy {
@@ -40,17 +41,15 @@ public:
 
 class EnvoyQuicDispatcher : public quic::QuicDispatcher {
 public:
-  EnvoyQuicDispatcher(const quic::QuicCryptoServerConfig* crypto_config,
-                      const quic::QuicConfig& quic_config,
-                      quic::QuicVersionManager* version_manager,
-                      std::unique_ptr<quic::QuicConnectionHelperInterface> helper,
-                      std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
-                      uint8_t expected_server_connection_id_length,
-                      Network::ConnectionHandler& connection_handler,
-                      Network::ListenerConfig& listener_config,
-                      Server::ListenerStats& listener_stats,
-                      Server::PerHandlerListenerStats& per_worker_stats,
-                      Event::Dispatcher& dispatcher, Network::Socket& listen_socket);
+  EnvoyQuicDispatcher(
+      const quic::QuicCryptoServerConfig* crypto_config, const quic::QuicConfig& quic_config,
+      quic::QuicVersionManager* version_manager,
+      std::unique_ptr<quic::QuicConnectionHelperInterface> helper,
+      std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
+      uint8_t expected_server_connection_id_length, Network::ConnectionHandler& connection_handler,
+      Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats,
+      Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
+      Network::Socket& listen_socket, Runtime::FeatureFlag* enabled);
 
   void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
                           const std::string& error_details,
@@ -62,6 +61,8 @@ protected:
                     const quic::QuicSocketAddress& self_address,
                     const quic::QuicSocketAddress& peer_address, quiche::QuicheStringPiece alpn,
                     const quic::ParsedQuicVersion& version) override;
+  bool
+  ShouldCreateOrBufferPacketForConnection(const quic::ReceivedPacketInfo& packet_info) override;
 
 private:
   Network::ConnectionHandler& connection_handler_;
@@ -70,6 +71,7 @@ private:
   Server::PerHandlerListenerStats& per_worker_stats_;
   Event::Dispatcher& dispatcher_;
   Network::Socket& listen_socket_;
+  Runtime::FeatureFlag* enabled_;
 };
 
 } // namespace Quic

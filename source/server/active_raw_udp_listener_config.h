@@ -10,8 +10,8 @@ namespace Server {
 class ActiveRawUdpListenerFactory : public Network::ActiveUdpListenerFactory {
 public:
   Network::ConnectionHandler::ActiveListenerPtr
-  createActiveUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& disptacher,
-                          Network::ListenerConfig& config) override;
+  createActiveUdpListener(uint32_t worker_id, Network::ConnectionHandler& parent,
+                          Event::Dispatcher& disptacher, Network::ListenerConfig& config) override;
 
   bool isTransportConnectionless() const override { return true; }
 };

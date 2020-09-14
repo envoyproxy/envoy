@@ -982,6 +982,7 @@ resolvers
 responder
 restarter
 resync
+retransmitting
 retriable
 retriggers
 revalidated

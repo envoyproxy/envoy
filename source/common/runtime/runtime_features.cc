@@ -78,6 +78,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.listener_in_place_filterchain_update",
     "envoy.reloadable_features.new_tcp_connection_pool",
     "envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2",
+    "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing",
     "envoy.reloadable_features.preserve_query_string_in_path_redirects",
     "envoy.reloadable_features.preserve_upstream_date",
     "envoy.reloadable_features.stop_faking_paths",
