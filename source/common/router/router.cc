@@ -1042,7 +1042,6 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
 
   const bool dropped = reset_reason == Http::StreamResetReason::Overflow;
   chargeUpstreamAbort(Http::Code::ServiceUnavailable, dropped, upstream_request);
-  // We must defer delete the UstreamReq
   callbacks_->dispatcher().deferredDelete(upstream_request.removeFromList(upstream_requests_));
 
   // If there are other in-flight requests that might see an upstream response,
