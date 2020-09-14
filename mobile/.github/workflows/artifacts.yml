@@ -33,7 +33,7 @@ jobs:
       - uses: actions/upload-artifact@v1
         with:
           name: envoy_android_aar_sources
-          path: dist/envoy_aar_sources.zip
+          path: bazel-bin/envoy_mobile.zip
   main_ios_dist:
     name: main_ios_dist
     runs-on: macOS-latest
