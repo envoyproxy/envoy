@@ -136,7 +136,9 @@ void TraceSegmentReporter::establishNewStream() {
     handleFailure();
     return;
   }
-  flushTraceSegments();
+  if (!delayed_segments_cache_.empty()) {
+    flushTraceSegments();
+  }
 }
 
 void TraceSegmentReporter::handleFailure() { setRetryTimer(); }

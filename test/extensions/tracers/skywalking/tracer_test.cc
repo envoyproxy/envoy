@@ -34,13 +34,11 @@ public:
     auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
 
     auto mock_client = std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
-    auto mock_client_ptr = mock_client.get();
 
     mock_stream_ptr_ = std::make_unique<NiceMock<Grpc::MockAsyncStream>>();
 
+    EXPECT_CALL(*mock_client, startRaw(_, _, _, _)).WillOnce(Return(mock_stream_ptr_.get()));
     EXPECT_CALL(*mock_client_factory, create()).WillOnce(Return(ByMove(std::move(mock_client))));
-
-    EXPECT_CALL(*mock_client_ptr, startRaw(_, _, _, _)).WillOnce(Return(mock_stream_ptr_.get()));
 
     TestUtility::loadFromYaml(yaml_string, client_config_);
     tracer_ = std::make_unique<Tracer>(mock_time_source_);
@@ -165,8 +163,18 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   second_child_span->finishSpan();
   EXPECT_NE(0, first_child_span->spanStore()->endTime());
 
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
+
   // When the first span in the current segment ends, the entire segment is reported.
   span->finishSpan();
+
+  EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
 }
 
 } // namespace SkyWalking

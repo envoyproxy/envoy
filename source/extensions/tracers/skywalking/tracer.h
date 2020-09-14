@@ -56,6 +56,7 @@ public:
   void setBaggage(absl::string_view key, absl::string_view value) override;
 
   SpanStore* spanStore() const { return span_store_; }
+  SegmentContext* segmentContext() const { return segment_context_.get(); }
 
 private:
   SegmentContextSharedPtr segment_context_;

@@ -80,6 +80,62 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportTraceSegment) {
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
 
   reporter_->report(*segment_context);
+
+  EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
+}
+
+TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithCache) {
+  const std::string yaml_string = R"EOF(
+    max_cache_size: 3
+  )EOF";
+
+  setupTraceSegmentReporter(yaml_string);
+  Event::SimulatedTimeSystem time_system;
+  ON_CALL(mock_random_generator_, random()).WillByDefault(Return(23333));
+  ON_CALL(mock_time_source_, systemTime()).WillByDefault(Return(time_system.systemTime()));
+  SegmentContextSharedPtr segment_context =
+      SkyWalkingTestHelper::createSegmentContext(true, "NEW", "PRE", mock_random_generator_);
+  SpanStore* parent_store = SkyWalkingTestHelper::createSpanStore(segment_context.get(), nullptr,
+                                                                  "PARENT", mock_time_source_);
+  SkyWalkingTestHelper::createSpanStore(segment_context.get(), parent_store, "CHILD",
+                                        mock_time_source_);
+
+  EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _)).Times(4);
+
+  reporter_->report(*segment_context);
+
+  EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
+
+  // Simulates a disconnected connection.
+  EXPECT_CALL(*timer_, enableTimer(_, _));
+  reporter_->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Unknown, "");
+
+  // Try to report 10 segments. Due to the disconnection, the cache size is only 3. So 7 of the
+  // segments will be discarded.
+  for (int i = 0; i < 10; i++) {
+    reporter_->report(*segment_context);
+  }
+
+  EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
+  EXPECT_EQ(7U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
+
+  // Simulate the situation where the connection is re-established. The remaining segments in the
+  // cache will be reported.
+  EXPECT_CALL(*mock_client_ptr_, startRaw(_, _, _, _)).WillOnce(Return(mock_stream_ptr_.get()));
+  timer_cb_();
+
+  EXPECT_EQ(4U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
+  EXPECT_EQ(7U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
+  EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
+  EXPECT_EQ(3U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
 }
 
 } // namespace SkyWalking
