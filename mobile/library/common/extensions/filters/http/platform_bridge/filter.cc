@@ -140,15 +140,6 @@ Http::FilterTrailersStatus PlatformBridgeFilter::decodeTrailers(Http::RequestTra
   return onTrailers(trailers, platform_filter_.on_request_trailers);
 }
 
-Http::FilterMetadataStatus PlatformBridgeFilter::decodeMetadata(Http::MetadataMap& /*metadata*/) {
-  return Http::FilterMetadataStatus::Continue;
-}
-
-Http::FilterHeadersStatus
-PlatformBridgeFilter::encode100ContinueHeaders(Http::ResponseHeaderMap& /*headers*/) {
-  return Http::FilterHeadersStatus::Continue;
-}
-
 Http::FilterHeadersStatus PlatformBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                               bool end_stream) {
   // Delegate to shared implementation for request and response path.
@@ -164,10 +155,6 @@ Http::FilterTrailersStatus
 PlatformBridgeFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   // Delegate to shared implementation for request and response path.
   return onTrailers(trailers, platform_filter_.on_response_trailers);
-}
-
-Http::FilterMetadataStatus PlatformBridgeFilter::encodeMetadata(Http::MetadataMap& /*metadata*/) {
-  return Http::FilterMetadataStatus::Continue;
 }
 
 } // namespace PlatformBridge
