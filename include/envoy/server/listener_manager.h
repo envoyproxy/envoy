@@ -58,8 +58,10 @@ public:
   /**
    * @return an LDS API provider.
    * @param lds_config supplies the management server configuration.
+   * @param lds_resources_locator udpa::core::v1::ResourceLocator for listener collection.
    */
-  virtual LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) PURE;
+  virtual LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
+                                 const udpa::core::v1::ResourceLocator* lds_resources_locator) PURE;
 
   /**
    * Creates a socket.
@@ -167,8 +169,10 @@ public:
    * during server initialization because the listener manager is created prior to several core
    * pieces of the server existing.
    * @param lds_config supplies the management server configuration.
+   * @param lds_resources_locator udpa::core::v1::ResourceLocator for listener collection.
    */
-  virtual void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) PURE;
+  virtual void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
+                            const udpa::core::v1::ResourceLocator* lds_resources_locator) PURE;
 
   /**
    * @param state the type of listener to be returned (defaults to ACTIVE), states can be OR'd
