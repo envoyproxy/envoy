@@ -162,6 +162,13 @@ absl::optional<uint32_t> ActiveQuicListener::destination(const Network::UdpRecvD
     return absl::nullopt;
   }
 
+  // This implementation is not as performant as it could be. It will result in most packets being
+  // delivered by the kernel to the wrong worker, and then redirected to the correct worker.
+  //
+  // This could possibly be improved by keeping a global table of connection IDs, so that a new
+  // connection will add its connection ID to the table on the current worker, and so packets should
+  // be delivered to the correct worker by the kernel unless the client changes address.
+
   // This is a re-implementation of the same algorithm written in BPF in
   // ``ActiveQuicListenerFactory::createActiveUdpListener``
   const uint64_t packet_length = data.buffer_->length();
