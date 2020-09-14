@@ -53,16 +53,21 @@ genrule(
 
 # These options are only used to suppress errors in brought-in QUICHE tests.
 # Use #pragma GCC diagnostic ignored in integration code to suppress these errors.
+quiche_common_copts = [
+    "-Wno-unused-parameter",
+    "-Wno-unused-function",
+    # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
+    "-Wno-invalid-offsetof",
+]
+
 quiche_copts = select({
     "@envoy//bazel:windows_x86_64": [],
     # Remove these after upstream fix.
-    "@envoy//bazel:gcc_build": ["-Wno-unused-but-set-variable"],
-    "//conditions:default": [
-        "-Wno-unused-parameter",
-        "-Wno-unused-function",
-        # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
-        "-Wno-invalid-offsetof",
-    ],
+    "@envoy//bazel:gcc_build": [
+        "-Wno-unused-but-set-variable",
+        "-Wno-sign-compare",
+    ] + quiche_common_copts,
+    "//conditions:default": quiche_common_copts,
 })
 
 test_suite(
