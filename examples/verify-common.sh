@@ -2,6 +2,7 @@
 
 DELAY="${DELAY:-0}"
 DOCKER_NO_PULL="${DOCKER_NO_PULL:-}"
+DOCKER_PRUNE="${DOCKER_PRUNE:-}"
 MANUAL="${MANUAL:-}"
 NAME="${NAME:-}"
 PATHS="${PATHS:-.}"
@@ -55,7 +56,9 @@ cleanup_stack () {
     path="$1"
     run_log "Cleanup ($path)"
     docker-compose down
-    docker system prune -f
+    if [[ -n "$DOCKER_PRUNE" ]]; then
+	docker system prune -f
+    fi
 }
 
 cleanup () {
