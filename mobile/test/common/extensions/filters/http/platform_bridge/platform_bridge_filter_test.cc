@@ -15,6 +15,10 @@ namespace HttpFilters {
 namespace PlatformBridge {
 namespace {
 
+std::string to_string(envoy_data data) {
+  return std::string(reinterpret_cast<const char*>(data.bytes), data.length);
+}
+
 class PlatformBridgeFilterTest : public testing::Test {
 public:
   void setUpFilter(std::string&& yaml, envoy_http_filter* platform_filter) {
@@ -58,12 +62,8 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnRequestHeaders) {
                                           const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(std::string(reinterpret_cast<const char*>(c_headers.headers[0].key.bytes),
-                          c_headers.headers[0].key.length),
-              ":authority");
-    EXPECT_EQ(std::string(reinterpret_cast<const char*>(c_headers.headers[0].value.bytes),
-                          c_headers.headers[0].value.length),
-              "test.code");
+    EXPECT_EQ(to_string(c_headers.headers[0].key), ":authority");
+    EXPECT_EQ(to_string(c_headers.headers[0].value), "test.code");
     EXPECT_TRUE(end_stream);
     invocations->on_request_headers_calls++;
     return {kEnvoyFilterHeadersStatusContinue, c_headers};
@@ -93,8 +93,7 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnRequestData) {
   platform_filter.on_request_data = [](envoy_data c_data, bool end_stream,
                                        const void* context) -> envoy_filter_data_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
-    EXPECT_EQ(std::string(reinterpret_cast<const char*>(c_data.bytes), c_data.length),
-              "request body");
+    EXPECT_EQ(to_string(c_data), "request body");
     EXPECT_TRUE(end_stream);
     invocations->on_request_data_calls++;
     return {kEnvoyFilterDataStatusContinue, c_data};
@@ -125,12 +124,8 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnRequestTrailers) {
                                            const void* context) -> envoy_filter_trailers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_trailers.length, 1);
-    EXPECT_EQ(std::string(reinterpret_cast<const char*>(c_trailers.headers[0].key.bytes),
-                          c_trailers.headers[0].key.length),
-              "x-test-trailer");
-    EXPECT_EQ(std::string(reinterpret_cast<const char*>(c_trailers.headers[0].value.bytes),
-                          c_trailers.headers[0].value.length),
-              "test trailer");
+    EXPECT_EQ(to_string(c_trailers.headers[0].key), "x-test-trailer");
+    EXPECT_EQ(to_string(c_trailers.headers[0].value), "test trailer");
     invocations->on_request_trailers_calls++;
     return {kEnvoyFilterTrailersStatusContinue, c_trailers};
   };
@@ -162,12 +157,8 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnResponseHeaders) {
                                            const void* context) -> envoy_filter_headers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_headers.length, 1);
-    EXPECT_EQ(std::string(reinterpret_cast<const char*>(c_headers.headers[0].key.bytes),
-                          c_headers.headers[0].key.length),
-              ":authority");
-    EXPECT_EQ(std::string(reinterpret_cast<const char*>(c_headers.headers[0].value.bytes),
-                          c_headers.headers[0].value.length),
-              "test.code");
+    EXPECT_EQ(to_string(c_headers.headers[0].key), ":status");
+    EXPECT_EQ(to_string(c_headers.headers[0].value), "test.code");
     EXPECT_TRUE(end_stream);
     invocations->on_response_headers_calls++;
     return {kEnvoyFilterHeadersStatusContinue, c_headers};
@@ -179,7 +170,7 @@ platform_filter_name: BasicContinueOnResponseHeaders
               &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
 
-  Http::TestResponseHeaderMapImpl response_headers{{":authority", "test.code"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   EXPECT_EQ(invocations.on_response_headers_calls, 1);
@@ -197,8 +188,7 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnResponseData) {
   platform_filter.on_response_data = [](envoy_data c_data, bool end_stream,
                                         const void* context) -> envoy_filter_data_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
-    EXPECT_EQ(std::string(reinterpret_cast<const char*>(c_data.bytes), c_data.length),
-              "response body");
+    EXPECT_EQ(to_string(c_data), "response body");
     EXPECT_TRUE(end_stream);
     invocations->on_response_data_calls++;
     return {kEnvoyFilterDataStatusContinue, c_data};
@@ -229,12 +219,8 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnResponseTrailers) {
                                             const void* context) -> envoy_filter_trailers_status {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     EXPECT_EQ(c_trailers.length, 1);
-    EXPECT_EQ(std::string(reinterpret_cast<const char*>(c_trailers.headers[0].key.bytes),
-                          c_trailers.headers[0].key.length),
-              "x-test-trailer");
-    EXPECT_EQ(std::string(reinterpret_cast<const char*>(c_trailers.headers[0].value.bytes),
-                          c_trailers.headers[0].value.length),
-              "test trailer");
+    EXPECT_EQ(to_string(c_trailers.headers[0].key), "x-test-trailer");
+    EXPECT_EQ(to_string(c_trailers.headers[0].value), "test trailer");
     invocations->on_response_trailers_calls++;
     return {kEnvoyFilterTrailersStatusContinue, c_trailers};
   };
