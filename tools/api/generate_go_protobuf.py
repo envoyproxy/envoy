@@ -29,7 +29,10 @@ def generateProtobufs(output):
   # Each rule has the form @envoy_api//foo/bar:baz_go_proto.
   # First build all the rules to ensure we have the output files.
   # We preserve source info so comments are retained on generated code.
-  check_call(['bazel', 'build', '-c', 'fastbuild', '--experimental_proto_descriptor_sets_include_source_info'] + go_protos)
+  check_call([
+      'bazel', 'build', '-c', 'fastbuild',
+      '--experimental_proto_descriptor_sets_include_source_info'
+  ] + go_protos)
 
   for rule in go_protos:
     # Example rule:
