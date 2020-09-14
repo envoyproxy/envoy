@@ -59,7 +59,7 @@ void BrotliCompressorImpl::compress(Buffer::Instance& buffer,
     process(ctx, buffer,
             state == Envoy::Compression::Compressor::State::Finish ? BROTLI_OPERATION_FINISH
                                                                    : BROTLI_OPERATION_FLUSH);
-  } while (BrotliEncoderHasMoreOutput(state_.get()) && !BrotliEncoderIsFinished(state_.get()));
+  } while (BrotliEncoderHasMoreOutput(state_.get()));
 
   ctx.finalizeOutput(buffer);
 }

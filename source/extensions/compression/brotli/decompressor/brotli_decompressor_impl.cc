@@ -39,8 +39,7 @@ void BrotliDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
   bool success;
   do {
     success = process(ctx, output_buffer);
-  } while (success && BrotliDecoderHasMoreOutput(state_.get()) &&
-           !BrotliDecoderIsFinished(state_.get()));
+  } while (success && BrotliDecoderHasMoreOutput(state_.get()));
 
   ctx.finalizeOutput(output_buffer);
 }

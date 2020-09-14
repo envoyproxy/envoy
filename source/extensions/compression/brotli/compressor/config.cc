@@ -13,8 +13,12 @@ const uint32_t DefaultInputBlockBits = 24;
 // Default compression window size.
 const uint32_t DefaultWindowBits = 22;
 
-// Default quality. The actual value passed to the compressor is decremented by
-// one.
+// Default quality.
+// Since protobuf numeric objects default to zero values if not present in a
+// message and zero is a legitimate value for quality in the brotli library
+// we cannot have default quality other than zero without additional tweaks.
+// So instead of the 0-11 range we use 1-12 in the config and decrement the actual
+// value passed to the compressor by one.
 const uint32_t DefaultQuality = 12;
 
 // Default zlib chunk size.

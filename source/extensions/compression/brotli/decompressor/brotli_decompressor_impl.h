@@ -32,10 +32,7 @@ struct BrotliDecompressorStats {
 class BrotliDecompressorImpl : public Envoy::Compression::Decompressor::Decompressor, NonCopyable {
 public:
   /**
-   * Constructor that allows setting the size of decompressor's output buffer. It
-   * should be called whenever a buffer size different than the 4096 bytes, normally set by the
-   * default constructor, is desired. If memory is available and it makes sense to output large
-   * chunks of compressed data.
+   * Constructor.
    * @param chunk_size amount of memory reserved for the decompressor output.
    * @param disable_ring_buffer_reallocation if true disables "canny" ring buffer allocation
    * strategy. Ring buffer is allocated according to window size, despite the real size of the

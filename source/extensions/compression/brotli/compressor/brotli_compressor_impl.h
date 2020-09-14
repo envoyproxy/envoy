@@ -19,11 +19,11 @@ class BrotliCompressorImpl : public Envoy::Compression::Compressor::Compressor, 
 public:
   /**
    * Enum values are used for setting the encoder mode.
-   * Generic: in this mode compressor does not know anything in advance about the properties of the
-   * input;
+   * Generic: in this mode the compressor does not know anything in advance about the properties of
+   * the input;
    * Text: compression mode for UTF-8 formatted text input;
    * Font: compression mode used in `WOFF` 2.0;
-   * Default: compression mode used by `Broli` encoder by default.
+   * Default: compression mode used by brotli encoder by default which is Generic currently.
    * @see BROTLI_DEFAULT_MODE in brotli manual.
    */
   enum class EncoderMode : uint32_t {
@@ -34,9 +34,7 @@ public:
   };
 
   /**
-   * Constructor that allows setting the size of compressor's output buffer. It
-   * should be called whenever a buffer size different than the 4096 bytes, normally set by the
-   * default constructor, is desired.
+   * Constructor.
    * @param quality sets compression level. The higher the quality, the slower the
    * compression. @see BROTLI_PARAM_QUALITY (brotli manual).
    * @param window_bits sets recommended sliding `LZ77` window size.
