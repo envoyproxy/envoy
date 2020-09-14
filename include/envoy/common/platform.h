@@ -281,3 +281,16 @@ struct mmsghdr {
 // On non-Linux platforms use 128 which is libevent listener default
 #define ENVOY_TCP_BACKLOG_SIZE 128
 #endif
+
+// Used for retrieving TCP round-trip time.
+#if defined(__linux__)
+// On Linux, default listen backlog size to net.core.somaxconn which is runtime configurable
+#define ENVOY_TCP_INFO TCP_INFO
+#else
+// Define ENVOY_TCP_INFO to an unused value.
+#define ENVOY_TCP_INFO -1
+// Define tcp_info to an empty struct.
+struct tcp_info {
+  uint32_t empty;
+}
+#endif

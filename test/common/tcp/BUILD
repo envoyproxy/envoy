@@ -9,15 +9,6 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "conn_info_test",
-    srcs = ["conn_info_test.cc"],
-    deps = [
-        "//test/mocks/network:network_mocks",
-        "//test/mocks/network:socket_mocks",
-    ],
-)
-
-envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
     deps = [

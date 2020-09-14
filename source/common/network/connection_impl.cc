@@ -18,7 +18,6 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
-#include "common/tcp/conn_info.h"
 
 namespace Envoy {
 namespace Network {
@@ -697,7 +696,7 @@ absl::string_view ConnectionImpl::transportFailureReason() const {
 }
 
 absl::optional<std::chrono::milliseconds> ConnectionImpl::lastRoundTripTime() const {
-  return Envoy::Tcp::ConnectionInfo::lastRoundTripTime(socket_.get());
+  return socket_->lastRoundTripTime();
 };
 
 void ConnectionImpl::flushWriteBuffer() {

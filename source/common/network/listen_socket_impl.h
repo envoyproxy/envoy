@@ -128,6 +128,16 @@ public:
   }
   absl::string_view requestedServerName() const override { return server_name_; }
 
+  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {
+    struct tcp_info ti;
+    socklen_t len = sizeof(ti);
+    if (!SOCKET_FAILURE(ioHandle().getOption(IPPROTO_TCP, ENVOY_TCP_INFO, &ti, &len).rc_)) {
+      return std::chrono::milliseconds(ti.tcpi_rtt);
+    }
+
+    return {};
+  }
+
 protected:
   Address::InstanceConstSharedPtr remote_address_;
   const Address::InstanceConstSharedPtr direct_remote_address_;

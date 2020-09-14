@@ -87,7 +87,6 @@ envoy_cc_library(
         "//source/common/event:libevent_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/stream_info:stream_info_lib",
-        "//source/common/tcp:conn_info_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

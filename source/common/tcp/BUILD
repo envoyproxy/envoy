@@ -9,21 +9,6 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "conn_info_lib",
-    srcs = select({
-        "//bazel:linux": ["conn_info_linux.cc"],
-        "//conditions:default": ["conn_info_default.cc"],
-    }),
-    hdrs = ["conn_info.h"],
-    deps = ["//include/envoy/network:socket_interface"],
-)
-
-envoy_cc_library(
-    name = "conn_info_linux",
-    hdrs = ["conn_info_linux.h"],
-)
-
-envoy_cc_library(
     name = "conn_pool_lib",
     srcs = [
         "conn_pool.cc",
