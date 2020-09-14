@@ -110,7 +110,7 @@ is as follows:
   elimination of the patch.
 
 * Every patch must have comments at its point-of-use in [bazel/repositories.bzl](bazel/repositories.bzl)
-  providing a rationale and detailing to the tracking issue.
+  providing a rationale and detailing the tracking issue.
 
 ## Policy exceptions
 
