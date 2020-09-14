@@ -81,7 +81,7 @@ message OkHttpResponse {
   //
   // When using the HTTP service this must instead be set by the HTTP
   // authorization service as a comma separated list like so:
-  // ``x-envoy-authz-headers-to-remove: one-auth-header, another-auth-header``.
+  // ``x-envoy-auth-headers-to-remove: one-auth-header, another-auth-header``.
   repeated string headers_to_remove = 5;
 
   // This field has been deprecated in favor of :ref:`CheckResponse.dynamic_metadata

@@ -132,9 +132,8 @@ public:
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
   const LowerCaseString EnvoyAttemptCount{absl::StrCat(prefix(), "-attempt-count")};
+  const LowerCaseString EnvoyAuthHeadersToRemove{absl::StrCat(prefix(), "-auth-headers-to-remove")};
   const LowerCaseString EnvoyAuthPartialBody{absl::StrCat(prefix(), "-auth-partial-body")};
-  const LowerCaseString EnvoyAuthzHeadersToRemove{
-      absl::StrCat(prefix(), "-authz-headers-to-remove")};
   const LowerCaseString EnvoyCluster{absl::StrCat(prefix(), "-cluster")};
   const LowerCaseString EnvoyDegraded{absl::StrCat(prefix(), "-degraded")};
   const LowerCaseString EnvoyDownstreamServiceCluster{

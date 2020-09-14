@@ -432,7 +432,7 @@ public:
         {"bat", "bar"},
         {"x-append-bat", "append-foo"},
         {"x-append-bat", "append-bar"},
-        {"x-envoy-authz-headers-to-remove", "remove-me"},
+        {"x-envoy-auth-headers-to-remove", "remove-me"},
     };
     ext_authz_request_->encodeHeaders(response_headers, true);
   }
@@ -500,13 +500,13 @@ public:
 
     // The "remove-me" header that was present in the downstream request has
     // been removed by envoy as a result of being present in
-    // "x-envoy-authz-headers-to-remove".
+    // "x-envoy-auth-headers-to-remove".
     EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString{"remove-me"}), nullptr);
-    // "x-envoy-authz-headers-to-remove" itself has also been removed because
+    // "x-envoy-auth-headers-to-remove" itself has also been removed because
     // it's only used for communication between the authorization server and
     // envoy itself.
     EXPECT_EQ(
-        upstream_request_->headers().get(Http::LowerCaseString{"x-envoy-authz-headers-to-remove"}),
+        upstream_request_->headers().get(Http::LowerCaseString{"x-envoy-auth-headers-to-remove"}),
         nullptr);
 
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);

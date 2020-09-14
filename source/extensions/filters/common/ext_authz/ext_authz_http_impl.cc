@@ -316,7 +316,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
 
   // Extract headers-to-remove from the storage header coming from the
   // authorization server.
-  const auto& storage_header_name = Http::Headers::get().EnvoyAuthzHeadersToRemove;
+  const auto& storage_header_name = Http::Headers::get().EnvoyAuthHeadersToRemove;
   // If we are going to construct an Ok response we need to save the
   // headers_to_remove in a variable first.
   std::vector<Http::LowerCaseString> headers_to_remove{};
