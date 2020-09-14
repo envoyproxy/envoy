@@ -68,7 +68,6 @@ public:
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
           name_(name), listener_filters_timeout_(listener_filters_timeout),
           continue_on_listener_filters_timeout_(continue_on_listener_filters_timeout),
-
           connection_balancer_(connection_balancer == nullptr
                                    ? std::make_shared<Network::NopConnectionBalancerImpl>()
                                    : connection_balancer),

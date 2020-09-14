@@ -373,7 +373,7 @@ public:
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
   Network::Address::InstanceConstSharedPtr address_;
   bool use_default_balancer_{false};
-}; // namespace
+};
 
 // Verify that http response on filter chain 0 has "Connection: close" header when filter chain 0
 // is deleted during the listener update.
