@@ -1,5 +1,6 @@
 #!/bin/bash -E
 
+export DOCKER_PRUNE=1
 TESTFILTER="${1:-*}"
 FAILED=()
 SRCDIR="${SRCDIR:-$(pwd)}"

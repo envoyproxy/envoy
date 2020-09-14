@@ -416,7 +416,6 @@ elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   sudo apt-get update -y
   sudo apt-get install -y -qq --no-install-recommends redis-tools
   export DOCKER_NO_PULL=1
-  export DOCKER_PRUNE=1
   umask 027
   ci/verify_examples.sh
   exit 0
