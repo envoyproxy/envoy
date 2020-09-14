@@ -1253,12 +1253,6 @@ TEST_P(ServerInstanceImplTest, DisabledExtension) {
   ASSERT_TRUE(disabled_filter_found);
 }
 
-TEST_P(ServerInstanceImplTest, ShouldErrorIfBothWatchdogsAndWatchdogSet) {
-  EXPECT_THROW_WITH_MESSAGE(
-      initialize("test/server/test_data/server/watchdogs_bootstrap_with_deprecated_field.yaml"),
-      EnvoyException, "Only one of watchdog or watchdogs should be set!");
-}
-
 } // namespace
 } // namespace Server
 } // namespace Envoy
