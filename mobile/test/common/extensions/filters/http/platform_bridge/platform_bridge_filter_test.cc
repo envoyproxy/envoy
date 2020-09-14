@@ -49,6 +49,66 @@ public:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
+TEST_F(PlatformBridgeFilterTest, NullImplementation) {
+  envoy_http_filter* null_filter =
+      static_cast<envoy_http_filter*>(safe_calloc(1, sizeof(envoy_http_filter)));
+  setUpFilter("platform_filter_name: NullImplementation\n", null_filter);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_data, false));
+
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-test-trailer", "test trailer"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+
+  Buffer::OwnedImpl response_data = Buffer::OwnedImpl("response body");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data, false));
+
+  Http::TestResponseTrailerMapImpl response_trailers{{"x-test-trailer", "test trailer"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
+
+  free(null_filter);
+}
+
+TEST_F(PlatformBridgeFilterTest, PartialNullImplementation) {
+  envoy_http_filter* noop_filter =
+      static_cast<envoy_http_filter*>(safe_calloc(1, sizeof(envoy_http_filter)));
+  filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0};
+  noop_filter->static_context = &invocations;
+  noop_filter->init_filter = [](const void* context) -> const void* {
+    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    invocations->init_filter_calls++;
+    return context;
+  };
+  setUpFilter("platform_filter_name: PartialNullImplementation\n", noop_filter);
+  EXPECT_EQ(invocations.init_filter_calls, 1);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", "test.code"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_data, false));
+
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-test-trailer", "test trailer"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "test.code"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+
+  Buffer::OwnedImpl response_data = Buffer::OwnedImpl("response body");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data, false));
+
+  Http::TestResponseTrailerMapImpl response_trailers{{"x-test-trailer", "test trailer"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
+
+  free(noop_filter);
+}
+
 TEST_F(PlatformBridgeFilterTest, BasicContinueOnRequestHeaders) {
   envoy_http_filter platform_filter;
   filter_invocations invocations = {0, 0, 0, 0, 0, 0, 0, 0};
