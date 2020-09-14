@@ -72,7 +72,7 @@ public:
   SSL* rawSslForTest() const { return rawSsl(); }
 
 protected:
-  SSL* rawSsl() const { return info_->ssl_.get(); }
+  SSL* rawSsl() const { return info_->ssl(); }
 
 private:
   struct ReadResult {
@@ -94,7 +94,7 @@ private:
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
 
-  SslHandshakerImplSharedPtr info_;
+  Ssl::HandshakerAndConnectionInfoSharedPtr info_;
 };
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory,

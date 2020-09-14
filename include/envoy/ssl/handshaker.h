@@ -5,6 +5,8 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/post_io_action.h"
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/ssl/connection.h"
+#include "envoy/ssl/ssl_socket_state.h"
 
 #include "openssl/ssl.h"
 
@@ -46,9 +48,38 @@ public:
   virtual Network::PostIoAction doHandshake() PURE;
 };
 
-using HandshakerSharedPtr = std::shared_ptr<Handshaker>;
-using HandshakerFactoryCb =
-    std::function<HandshakerSharedPtr(bssl::UniquePtr<SSL>, int, HandshakeCallbacks*)>;
+/**
+ * Base interface for a combined handshaker-and-connectioninfo class
+ * which can both perform handshakes and provide connection-specific
+ * information.
+ */
+class HandshakerAndConnectionInfo : public Handshaker, public ConnectionInfo {
+public:
+  /**
+   * Return the current SocketState.
+   */
+  virtual SocketState state() PURE;
+
+  /**
+   * Update the SocketState.
+   */
+  virtual void setState(SocketState state) PURE;
+
+  /**
+   * Returns a pointer to the SSL object.
+   */
+  virtual SSL* ssl() const PURE;
+
+  /**
+   * Returns a pointer to the HandshakeCallbacks object.
+   */
+  virtual HandshakeCallbacks* handshakeCallbacks() PURE;
+};
+
+using HandshakerAndConnectionInfoSharedPtr = std::shared_ptr<HandshakerAndConnectionInfo>;
+
+using HandshakerFactoryCb = std::function<HandshakerAndConnectionInfoSharedPtr(
+    bssl::UniquePtr<SSL>, int, HandshakeCallbacks*)>;
 
 class HandshakerFactoryContext {
 public:

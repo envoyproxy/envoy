@@ -37,7 +37,7 @@ private:
       Envoy::Ssl::ClientValidationStatus::NotValidated};
 };
 
-class SslHandshakerImpl : public Ssl::ConnectionInfo, public Ssl::Handshaker {
+class SslHandshakerImpl : public Ssl::HandshakerAndConnectionInfo {
 public:
   SslHandshakerImpl(bssl::UniquePtr<SSL> ssl, int ssl_extended_socket_info_index,
                     Ssl::HandshakeCallbacks* handshake_callbacks);
@@ -67,10 +67,11 @@ public:
   // Ssl::Handshaker
   Network::PostIoAction doHandshake() override;
 
-  Ssl::SocketState state() { return state_; }
-  void setState(Ssl::SocketState state) { state_ = state; }
-  SSL* ssl() const { return ssl_.get(); }
-  Ssl::HandshakeCallbacks* handshakeCallbacks() { return handshake_callbacks_; }
+  // Ssl::HandshakerAndConnectionInfo
+  Ssl::SocketState state() override { return state_; }
+  void setState(Ssl::SocketState state) override { state_ = state; }
+  SSL* ssl() const override { return ssl_.get(); }
+  Ssl::HandshakeCallbacks* handshakeCallbacks() override { return handshake_callbacks_; }
 
   bssl::UniquePtr<SSL> ssl_;
 
@@ -94,8 +95,6 @@ private:
   mutable std::string cached_tls_version_;
   mutable SslExtendedSocketInfoImpl extended_socket_info_;
 };
-
-using SslHandshakerImplSharedPtr = std::shared_ptr<SslHandshakerImpl>;
 
 class HandshakerFactoryContextImpl : public Ssl::HandshakerFactoryContext {
 public:
