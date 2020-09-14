@@ -136,13 +136,6 @@ void GrpcCollectionSubscriptionImpl::setCollectionlocator(
     const udpa::core::v1::ResourceLocator& collection_locator) {
   watch_ = grpc_mux_->addWatch(type_url_, {UdpaResourceIdentifier::encodeUrl(collection_locator)},
                                *this, resource_decoder_, false);
-  /*
-  ENVOY_LOG(debug, fmt::format("collection resource locator: {}",
-                               UdpaResourceIdentifier::encodeUrl(collection_locator)));
-                               */
-  // The attempt stat here is maintained for the purposes of having consistency between ADS and
-  // gRPC/filesystem/REST Subscriptions. Since ADS is push based and muxed, the notion of an
-  // "attempt" for a given xDS API combined by ADS is not really that meaningful.
   stats_.update_attempt_.inc();
 }
 
