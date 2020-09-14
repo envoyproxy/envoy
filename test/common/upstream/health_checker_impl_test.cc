@@ -2885,7 +2885,7 @@ TEST(TcpHealthCheckMatcher, match) {
   EXPECT_TRUE(TcpHealthCheckMatcher::match(segments, buffer));
 }
 
-class TcpHealthCheckerImplTest : public testing::Test, public HealthCheckerTestBase {
+class TcpHealthCheckerImplTest : public testing::Test, public TcpHealthCheckerImplTestBase {
 public:
   void allocHealthChecker(const std::string& yaml, bool avoid_boosting = true) {
     health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
@@ -2939,23 +2939,6 @@ public:
 
     allocHealthChecker(yaml);
   }
-
-  void expectSessionCreate() {
-    interval_timer_ = new Event::MockTimer(&dispatcher_);
-    timeout_timer_ = new Event::MockTimer(&dispatcher_);
-  }
-
-  void expectClientCreate() {
-    connection_ = new NiceMock<Network::MockClientConnection>();
-    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection_));
-    EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(SaveArg<0>(&read_filter_));
-  }
-
-  std::shared_ptr<TcpHealthCheckerImpl> health_checker_;
-  Network::MockClientConnection* connection_{};
-  Event::MockTimer* timeout_timer_{};
-  Event::MockTimer* interval_timer_{};
-  Network::ReadFilterSharedPtr read_filter_;
 };
 
 TEST_F(TcpHealthCheckerImplTest, Success) {
