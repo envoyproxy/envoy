@@ -609,7 +609,6 @@ void ActiveUdpListenerBase::post(Network::UdpRecvData&& data) {
   // moved, but this is non-trivial and needs investigation.
   auto data_to_post = std::make_shared<Network::UdpRecvData>();
   *data_to_post = std::move(data);
-  ASSERT(data.buffer_ == nullptr);
 
   udp_listener_->dispatcher().post(
       [data_to_post, tag = config_->listenerTag(), &parent = parent_]() {
