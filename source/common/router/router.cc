@@ -1195,15 +1195,15 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& 
   }
 
   if (upstream_request.upstreamHost()) {
-  if (grpc_status.has_value()) {
-    upstream_request.upstreamHost()->outlierDetector().putHttpResponseCode(grpc_to_http_status);
-  } else {
-    upstream_request.upstreamHost()->outlierDetector().putHttpResponseCode(response_code);
-  }
+    if (grpc_status.has_value()) {
+      upstream_request.upstreamHost()->outlierDetector().putHttpResponseCode(grpc_to_http_status);
+    } else {
+      upstream_request.upstreamHost()->outlierDetector().putHttpResponseCode(response_code);
+    }
 
-  if (headers.EnvoyImmediateHealthCheckFail() != nullptr) {
-    upstream_request.upstreamHost()->healthChecker().setUnhealthy();
-  }
+    if (headers.EnvoyImmediateHealthCheckFail() != nullptr) {
+      upstream_request.upstreamHost()->healthChecker().setUnhealthy();
+    }
   }
 
   bool could_not_retry = false;
@@ -1222,7 +1222,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& 
       if (retry_status == RetryStatus::Yes) {
         pending_retries_++;
         if (upstream_request.upstreamHost()) {
-        upstream_request.upstreamHost()->stats().rq_error_.inc();
+          upstream_request.upstreamHost()->stats().rq_error_.inc();
         }
         Http::CodeStats& code_stats = httpContext().codeStats();
         code_stats.chargeBasicResponseStat(cluster_->statsScope(), config_.retry_,
@@ -1231,7 +1231,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& 
         if (!end_stream || !upstream_request.encodeComplete()) {
           upstream_request.resetStream();
         }
-        callbacks_->dispatcher().deferredDelete(upstream_request.removeFromList(upstream_requests_));
+        callbacks_->dispatcher().deferredDelete(
+            upstream_request.removeFromList(upstream_requests_));
 
         return;
       } else if (retry_status == RetryStatus::NoOverflow) {

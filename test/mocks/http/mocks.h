@@ -24,8 +24,8 @@
 #include "test/mocks/http/stream.h"
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/http/stream_encoder.h"
-#include "test/mocks/router/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -163,17 +163,23 @@ public:
                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                        absl::string_view details);
 
-  void setContinueHeaders(ResponseHeaderMapPtr&& headers) override { continue_headers_ = std::move(headers); }
-  void setResponseHeaders(ResponseHeaderMapPtr&& headers) override { response_headers_ = std::move(headers); }
-  void setResponseTrailers(ResponseTrailerMapPtr&& trailers) override { response_trailers_ = std::move(trailers); }
+  void setContinueHeaders(ResponseHeaderMapPtr&& headers) override {
+    continue_headers_ = std::move(headers);
+  }
+  void setResponseHeaders(ResponseHeaderMapPtr&& headers) override {
+    response_headers_ = std::move(headers);
+  }
+  void setResponseTrailers(ResponseTrailerMapPtr&& trailers) override {
+    response_trailers_ = std::move(trailers);
+  }
 
-  ResponseHeaderMapOptRef continueHeaders() override { 
+  ResponseHeaderMapOptRef continueHeaders() override {
     return continue_headers_ ? absl::make_optional(std::ref(*continue_headers_)) : absl::nullopt;
   }
-  ResponseHeaderMapOptRef responseHeaders() override { 
+  ResponseHeaderMapOptRef responseHeaders() override {
     return response_headers_ ? absl::make_optional(std::ref(*response_headers_)) : absl::nullopt;
   }
-  ResponseTrailerMapOptRef responseTrailers() override { 
+  ResponseTrailerMapOptRef responseTrailers() override {
     return response_trailers_ ? absl::make_optional(std::ref(*response_trailers_)) : absl::nullopt;
   }
 

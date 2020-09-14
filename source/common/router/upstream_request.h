@@ -52,7 +52,7 @@ struct UpstreamRequestFilter : public Http::StreamDecoderFilter,
   UpstreamRequestFilter(UpstreamRequest& parent, std::unique_ptr<GenericConnPool>&& conn_pool);
   ~UpstreamRequestFilter();
 
-void resetStream();
+  void resetStream();
   void disableDataFromDownstreamForFlowControl();
   void enableDataFromDownstreamForFlowControl();
 
@@ -168,9 +168,7 @@ public:
   void encodeUpstreamData(Buffer::Instance& data, bool end_stream);
   void encodeUpstreamTrailers(Http::RequestTrailerMap& trailers);
   void encodeUpstreamMetadata(Http::MetadataMapPtr&& metadata_map_ptr);
-  void maybeEndEncode(bool end_stream) { 
-    filter_manager_.maybeEndDecode(end_stream);
-  }
+  void maybeEndEncode(bool end_stream) { filter_manager_.maybeEndDecode(end_stream); }
 
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
 
@@ -180,9 +178,9 @@ public:
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(Http::ResponseTrailerMap& trailers) override;
   void encodeMetadata(Http::MetadataMapVector& metadata) override;
-  void endStream() override { 
+  void endStream() override {
     // TODO(snowp): What happens here?
-   }
+  }
   void setRequestTrailers(Http::RequestTrailerMapPtr&&) override {
     // TODO(snowp): Should an upstream filter be able to inject trailers into the HCM filter chain?
     // Or should these trailers only be injected at the upstream level?
@@ -216,8 +214,7 @@ public:
   absl::optional<Router::ConfigConstSharedPtr> routeConfig() override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  void requestRouteConfigUpdate(
-                                Http::RouteConfigUpdatedCallbackSharedPtr) override {
+  void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   Tracing::Span& activeSpan() override { return *span_; }

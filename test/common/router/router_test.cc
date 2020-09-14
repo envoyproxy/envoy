@@ -275,7 +275,7 @@ public:
         .WillOnce(Invoke([expected_count](Http::ResponseHeaderMap& headers, bool) {
           EXPECT_EQ(expected_count, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
         }));
-  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
+    EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
     response_decoder->decodeHeaders(std::move(response_headers), true);
     EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
     EXPECT_EQ(1U,
