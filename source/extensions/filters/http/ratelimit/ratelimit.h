@@ -109,7 +109,7 @@ public:
   }
 
 private:
-  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
+  const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
       vh_rate_limits_;
 };
 

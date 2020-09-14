@@ -61,11 +61,13 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
                                  route_entry, headers);
     break;
   case VhRateLimitOptions::Override:
-  default:
     if (route_entry->rateLimitPolicy().empty()) {
       populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
                                    route_entry, headers);
     }
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (!descriptors.empty()) {
