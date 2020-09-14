@@ -28,10 +28,10 @@ FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
 
 absl::string_view SubstitutionFormatStringUtils::getContentType(
     const envoy::config::core::v3::SubstitutionFormatString& config) {
-  if (config.content_type() == Http::Headers::get().ContentTypeValues.Html)
+  if (config.content_type() == Http::Headers::get().ContentTypeValues.Html) {
     return Http::Headers::get().ContentTypeValues.Html;
-  else
-    return Http::Headers::get().ContentTypeValues.Text;
+  }
+  return Http::Headers::get().ContentTypeValues.Text;
 }
 
 } // namespace Formatter
