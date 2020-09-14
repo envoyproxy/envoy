@@ -1,16 +1,15 @@
 #include "extensions/watchdog/abort_action/abort_action.h"
 
+#include <sys/types.h>
+
+#include <csignal>
+
+#include "envoy/thread/thread.h"
+
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
-
-#ifndef WIN32
-#include <sys/types.h>
-#include <csignal>
-#endif
-
 #include "common/common/logger.h"
 #include "common/protobuf/utility.h"
-#include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -41,10 +40,6 @@ void AbortAction::run(
 
   int64_t raw_tid = thread_last_checkin_pairs[0].first.getId();
 
-#ifdef WIN32
-  // TODO(kbaichoo): add support for this with windows.
-  ENVOY_LOG_MISC(error, "Watchdog AbortAction is unimplemented for Windows.");
-#else
   // Assume POSIX-compatible system and signal to the thread.
   ENVOY_LOG_MISC(error, "Watchdog AbortAction sending abort signal to thread with tid {}.",
                  raw_tid);
@@ -60,7 +55,6 @@ void AbortAction::run(
   // Abort from the action since the signaled thread hasn't yet crashed the process.
   PANIC(fmt::format("Failed to kill thread with id {}, aborting from Watchdog AbortAction instead.",
                     raw_tid));
-#endif
 }
 
 } // namespace AbortAction

@@ -53,7 +53,6 @@ TEST_F(AbortActionTest, ShouldNotAbortIfNoTids) {
 }
 
 // insufficient signal support on Windows.
-#ifndef WIN32
 TEST_F(AbortActionTest, CanKillThread) {
   AbortActionConfig config;
   config.mutable_wait_duration()->set_seconds(1);
@@ -121,8 +120,6 @@ TEST_F(AbortActionTest, PanicsIfThreadDoesNotDie) {
 
   EXPECT_DEATH(die_function(), "aborting from Watchdog AbortAction instead");
 }
-
-#endif
 
 } // namespace
 } // namespace AbortAction
