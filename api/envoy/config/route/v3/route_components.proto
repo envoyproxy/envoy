@@ -549,7 +549,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 36]
+// [#next-free-field: 37]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -762,6 +762,31 @@ message RouteAction {
     // Note that CONNECT support is currently considered alpha in Envoy.
     // [#comment:TODO(htuch): Replace the above comment with an alpha tag.
     ConnectConfig connect_config = 3;
+  }
+
+  // [#not-implemented-hide:]
+  message MaxStreamDuration {
+    // Specifies the maximum duration allowed for streams on the route. If not specified, the value
+    // from the :ref:`max_stream_duration
+    // <envoy_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>` field in
+    // :ref:`HttpConnectionManager.common_http_protocol_options
+    // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options>`
+    // is used.
+    google.protobuf.Duration max_stream_duration = 1;
+
+    // If present, and the request contains a `grpc-timeout header
+    // <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_, use that value as the
+    // *max_stream_duration*, but limit the applied timeout to the maximum value specified here.
+    // If set to 0, the `grpc-timeout` header is used without modification.
+    google.protobuf.Duration grpc_max_timeout = 2;
+
+    // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by
+    // subtracting the provided duration from the header. This is useful for allowing Envoy to set
+    // its global timeout to be less than that of the deadline imposed by the calling client, which
+    // makes it more likely that Envoy will handle the timeout instead of having the call canceled
+    // by the client. If, after applying the offset, the resulting timeout is zero or negative,
+    // the stream will timeout immediately.
+    google.protobuf.Duration grpc_timeout_offset = 3;
   }
 
   reserved 12, 18, 19, 16, 22, 21, 10;
@@ -1051,6 +1076,10 @@ message RouteAction {
   // it'll take precedence over the virtual host level hedge policy entirely
   // (e.g.: policies are not merged, most internal one becomes the enforced policy).
   HedgePolicy hedge_policy = 27;
+
+  // Specifies the maximum stream duration for this route.
+  // [#not-implemented-hide:]
+  MaxStreamDuration max_stream_duration = 36;
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
