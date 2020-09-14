@@ -59,6 +59,7 @@ quiche_copts = select({
     "@envoy//bazel:gcc_build": ["-Wno-unused-but-set-variable"],
     "//conditions:default": [
         "-Wno-unused-parameter",
+	"-Wno-unused-function",
         # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
         "-Wno-invalid-offsetof",
     ],
