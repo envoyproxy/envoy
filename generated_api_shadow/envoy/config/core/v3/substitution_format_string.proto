@@ -69,6 +69,7 @@ message SubstitutionFormatString {
   // Specify a content_type for text_format. This will be ignored for json_format.
   // Currently supported content-type value includes ``text/html; charset=UTF-8`` and ``text/plain``
   // with default value being ``text/plain``.
+  //
   // .. code-block::
   //
   //   content_type: "text/html; charset=UTF-8"

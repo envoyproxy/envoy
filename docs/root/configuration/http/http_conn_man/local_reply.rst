@@ -65,7 +65,7 @@ Example of a LocalReplyConfig with `body_format` field.
             runtime_key: key_b
     status_code: 401
     body_format_override:
-      text_format: <h1>"%LOCAL_REPLY_BODY% %REQ(:path)%"</h1>
+      text_format: "<h1>%LOCAL_REPLY_BODY% %REQ(:path)%</h1>"
       content_type: "text/html; charset=UTF-8"
   - filter:
       status_code_filter:
