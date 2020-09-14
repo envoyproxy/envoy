@@ -57,13 +57,11 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Addres
           address.envoy_internal_address().server_listener_name());
     case envoy::config::core::v3::EnvoyInternalAddress::AddressNameSpecifierCase::
         ADDRESS_NAME_SPECIFIER_NOT_SET:
-      break;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
-    break;
-  case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
-    break;
+  default:
+    throw EnvoyException("Address must be set: " + address.DebugString());
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 InstanceConstSharedPtr
