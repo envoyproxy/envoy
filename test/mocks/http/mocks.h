@@ -25,6 +25,7 @@
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -162,21 +163,30 @@ public:
                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                        absl::string_view details);
 
-void setContinueHeaders(ResponseHeaderMapPtr&& ) override {}
-void setResponseHeaders(ResponseHeaderMapPtr&& ) override {}
-void setResponseTrailers(ResponseTrailerMapPtr&& ) override {}
+  void setContinueHeaders(ResponseHeaderMapPtr&& headers) override { continue_headers_ = std::move(headers); }
+  void setResponseHeaders(ResponseHeaderMapPtr&& headers) override { response_headers_ = std::move(headers); }
+  void setResponseTrailers(ResponseTrailerMapPtr&& trailers) override { response_trailers_ = std::move(trailers); }
 
-  MOCK_METHOD(ResponseHeaderMapOptRef, continueHeaders, ());
-  MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, ());
-  MOCK_METHOD(ResponseTrailerMapOptRef, responseTrailers, ());
+  ResponseHeaderMapOptRef continueHeaders() override { 
+    return continue_headers_ ? absl::make_optional(std::ref(*continue_headers_)) : absl::nullopt;
+  }
+  ResponseHeaderMapOptRef responseHeaders() override { 
+    return response_headers_ ? absl::make_optional(std::ref(*response_headers_)) : absl::nullopt;
+  }
+  ResponseTrailerMapOptRef responseTrailers() override { 
+    return response_trailers_ ? absl::make_optional(std::ref(*response_trailers_)) : absl::nullopt;
+  }
 
-  MOCK_METHOD(void, encode100ContinueHeaders, (ResponseHeaderMap&));
-  MOCK_METHOD(void, encodeHeaders, (ResponseHeaderMap&, bool));
-  MOCK_METHOD(void, encodeTrailers, (ResponseTrailerMap&));
-
+  void encode100ContinueHeaders(ResponseHeaderMap& headers) override {
+    encode100ContinueHeaders_(headers);
+  }
+  void encodeHeaders(ResponseHeaderMap& headers, bool end_stream) override {
+    encodeHeaders_(headers, end_stream);
+  }
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
     encode100ContinueHeaders_(*headers);
   }
+  void encodeTrailers(ResponseTrailerMap& trailers) override { encodeTrailers_(trailers); }
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override {
     encodeHeaders_(*headers, end_stream);
   }
@@ -212,6 +222,10 @@ void setResponseTrailers(ResponseTrailerMapPtr&& ) override {}
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool stream_destroyed_{};
+  Http::ResponseHeaderMapPtr response_headers_;
+  Http::ResponseHeaderMapPtr continue_headers_;
+  Http::ResponseTrailerMapPtr response_trailers_;
+  testing::NiceMock<Network::MockConnection> connection_;
 };
 
 class MockStreamEncoderFilterCallbacks : public StreamEncoderFilterCallbacks,

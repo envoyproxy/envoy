@@ -1,12 +1,13 @@
 #include "common/http/filter_manager.h"
 
+#include "envoy/http/header_map.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/common/scope_tracker.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 #include "common/http/utility.h"
-#include "envoy/http/header_map.h"
 
 namespace Envoy {
 namespace Http {

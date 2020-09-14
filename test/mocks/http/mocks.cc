@@ -58,6 +58,8 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
         callbacks_.remove(&callbacks);
       }));
 
+  ON_CALL(*this, connection()).WillByDefault(Return(&connection_));
+
   ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(active_span_));
   ON_CALL(*this, tracingConfig()).WillByDefault(ReturnRef(tracing_config_));
   ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));

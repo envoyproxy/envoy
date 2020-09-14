@@ -115,6 +115,10 @@ public:
     // Allow any number of setTrackedObject calls for the dispatcher strict mock.
     EXPECT_CALL(callbacks_.dispatcher_, setTrackedObject(_)).Times(AnyNumber());
   }
+  ~RouterTestBase() {
+    EXPECT_CALL(callbacks_.dispatcher_, clearDeferredDeleteList());
+    callbacks_.dispatcher_.clearDeferredDeleteList();
+  }
 
   void expectResponseTimerCreate() {
     response_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
@@ -271,6 +275,7 @@ public:
         .WillOnce(Invoke([expected_count](Http::ResponseHeaderMap& headers, bool) {
           EXPECT_EQ(expected_count, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
         }));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
     response_decoder->decodeHeaders(std::move(response_headers), true);
     EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
     EXPECT_EQ(1U,
@@ -498,6 +503,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
       .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
         EXPECT_EQ(host_address_, host->address());
       }));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -674,6 +680,8 @@ TEST_F(RouterTest, AddCookie) {
 
   absl::string_view rc_details2 = "via_upstream";
   EXPECT_CALL(callbacks_.stream_info_, setResponseCodeDetails(rc_details2));
+  EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
@@ -726,6 +734,8 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"set-cookie", "foo=baz"}});
+  EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   // When the router filter gets reset we should cancel the pool request.
   router_.onDestroy();
@@ -785,6 +795,8 @@ TEST_F(RouterTest, AddMultipleCookies) {
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   router_.onDestroy();
 }
@@ -945,6 +957,7 @@ TEST_F(RouterTest, ResponseCodeDetailsSetByUpstream) {
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   absl::string_view rc_details = StreamInfo::ResponseCodeDetails::get().ViaUpstream;
   EXPECT_CALL(callbacks_.stream_info_, setResponseCodeDetails(rc_details));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
@@ -975,6 +988,7 @@ TEST_F(RouterTest, EnvoyUpstreamServiceTime) {
       .WillOnce(Invoke([](Http::HeaderMap& headers, bool) {
         EXPECT_NE(nullptr, headers.get(Http::Headers::get().EnvoyUpstreamServiceTime));
       }));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
@@ -1034,6 +1048,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -1061,6 +1076,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
   Http::ResponseHeaderMapPtr response_headers2(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
@@ -1136,6 +1152,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponsePresentWithLocalReply) {
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.decodeHeaders(headers, true);
   // Pool failure, so upstream request was never initiated.
   EXPECT_EQ(0U,
@@ -1163,6 +1180,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseWithRetries) {
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
@@ -1201,6 +1219,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseWithRetries) {
         // Because a retry happened the number of attempts in the response headers should be 2.
         EXPECT_EQ(2, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
       }));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
@@ -1247,6 +1266,7 @@ void RouterTestBase::testAppendCluster(absl::optional<Http::LowerCaseString> clu
         EXPECT_NE(nullptr, cluster_header);
         EXPECT_EQ("fake_cluster", cluster_header->value().getStringView());
       }));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
@@ -1310,6 +1330,7 @@ void RouterTestBase::testAppendUpstreamHost(
         EXPECT_NE(nullptr, host_address_header);
         EXPECT_EQ("10.0.0.5:9211", host_address_header->value().getStringView());
       }));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
@@ -1463,6 +1484,7 @@ TEST_F(RouterTest, NoRetriesOverflow) {
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -1489,6 +1511,7 @@ TEST_F(RouterTest, NoRetriesOverflow) {
   Http::ResponseHeaderMapPtr response_headers2(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
 }
@@ -1520,6 +1543,7 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
                         absl::optional<uint64_t>(absl::nullopt)));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());

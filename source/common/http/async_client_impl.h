@@ -399,10 +399,10 @@ private:
   void encode100ContinueHeaders(ResponseHeaderMapPtr&&) override {}
   void encode100ContinueHeaders(ResponseHeaderMap&) override {}
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
-  void encodeHeaders(ResponseHeaderMap& , bool ) override  {}
+  void encodeHeaders(ResponseHeaderMap&, bool) override {}
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
-  void encodeTrailers(ResponseTrailerMap& ) override {}
+  void encodeTrailers(ResponseTrailerMap&) override {}
   void encodeMetadata(MetadataMapPtr&&) override {}
   void onDecoderFilterAboveWriteBufferHighWatermark() override { ++high_watermark_calls_; }
   void onDecoderFilterBelowWriteBufferLowWatermark() override {

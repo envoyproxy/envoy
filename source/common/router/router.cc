@@ -661,7 +661,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     // since it's all moves from here on.
     if (!upstream_requests_.empty()) {
       Buffer::OwnedImpl copy(data);
-      upstream_requests_.front()->encodeData(copy, end_stream);
+      upstream_requests_.front()->encodeUpstreamData(copy, end_stream);
     }
 
     // If we are potentially going to retry or shadow this request we need to buffer.
@@ -671,7 +671,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     // potentially shadow.
     callbacks_->addDecodedData(data, true);
   } else {
-    upstream_requests_.front()->encodeData(data, end_stream);
+    upstream_requests_.front()->encodeUpstreamData(data, end_stream);
   }
 
   if (end_stream) {
@@ -1042,7 +1042,8 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
 
   const bool dropped = reset_reason == Http::StreamResetReason::Overflow;
   chargeUpstreamAbort(Http::Code::ServiceUnavailable, dropped, upstream_request);
-  upstream_request.removeFromList(upstream_requests_);
+  // We must defer delete the UstreamReq
+  callbacks_->dispatcher().deferredDelete(upstream_request.removeFromList(upstream_requests_));
 
   // If there are other in-flight requests that might see an upstream response,
   // don't return anything downstream.
@@ -1222,7 +1223,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& 
         if (!end_stream || !upstream_request.encodeComplete()) {
           upstream_request.resetStream();
         }
-        upstream_request.removeFromList(upstream_requests_);
+        callbacks_->dispatcher().deferredDelete(upstream_request.removeFromList(upstream_requests_));
 
         return;
       } else if (retry_status == RetryStatus::NoOverflow) {
@@ -1402,7 +1403,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
     }
   }
 
-  upstream_request.removeFromList(upstream_requests_);
+  callbacks_->dispatcher().deferredDelete(upstream_request.removeFromList(upstream_requests_));
   cleanup();
 }
 
@@ -1554,8 +1555,8 @@ void Filter::doRetry() {
 
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
-  upstream_requests_.front()->encodeUpstreamHeaders(!callbacks_->decodingBuffer() &&
-                                            !downstream_trailers_ && downstream_end_stream_);
+  upstream_requests_.front()->encodeUpstreamHeaders(
+      !callbacks_->decodingBuffer() && !downstream_trailers_ && downstream_end_stream_);
   // It's possible we got immediately reset which means the upstream request we just
   // added to the front of the list might have been removed, so we need to check to make
   // sure we don't encodeData on the wrong request.
@@ -1563,7 +1564,8 @@ void Filter::doRetry() {
     if (callbacks_->decodingBuffer()) {
       // If we are doing a retry we need to make a copy.
       Buffer::OwnedImpl copy(*callbacks_->decodingBuffer());
-      upstream_requests_.front()->encodeUpstreamData(copy, !downstream_trailers_ && downstream_end_stream_);
+      upstream_requests_.front()->encodeUpstreamData(copy, !downstream_trailers_ &&
+                                                               downstream_end_stream_);
     }
 
     if (downstream_trailers_) {
