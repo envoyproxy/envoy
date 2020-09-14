@@ -414,10 +414,12 @@ elif [[ "$CI_TARGET" == "docs" ]]; then
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   echo "verify examples..."
   docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
-  readarray -t images \
-	  < <(docker image list --format "{{.Repository}}")
-  readarray -t tags \
-	  < <(docker image list --format "{{.Tag}}")
+  _images=$(docker image list --format "{{.Repository}}")
+  while read -r line; do images+=("$line"); done \
+      <<< "$_images"
+  _tags=$(docker image list --format "{{.Tag}}")
+  while read -r line; do tags+=("$line"); done \
+      <<< "$_tags"
   for i in "${!images[@]}"; do
       if [[ "${images[i]}" =~ "envoy" ]]; then
           docker tag "${images[$i]}:${tags[$i]}" "${images[$i]}:latest"
