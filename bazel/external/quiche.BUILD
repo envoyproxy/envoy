@@ -55,20 +55,12 @@ genrule(
 # Use #pragma GCC diagnostic ignored in integration code to suppress these errors.
 quiche_copts = select({
     "@envoy//bazel:windows_x86_64": [],
+    # Remove these after upstream fix.
+    "@envoy//bazel:gcc_build": ["-Wno-unused-but-set-variable"],
     "//conditions:default": [
-        # Remove these after upstream fix.
         "-Wno-unused-parameter",
-        "-Wno-unused-function",
-        "-Wno-return-type",
-        "-Wno-unknown-warning-option",
-        "-Wno-deprecated-copy",
-        "-Wno-ignored-qualifiers",
-        "-Wno-sign-compare",
-        "-Wno-inconsistent-missing-override",
         # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
         "-Wno-invalid-offsetof",
-        # to suppress errors re: size_t vs. int comparisons
-        "-Wno-sign-compare",
     ],
 })
 
