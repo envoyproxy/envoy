@@ -1105,16 +1105,20 @@ void Filter::handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus
   // the trailers.
   if (grpc_request_) {
     if (end_stream) {
-      if (grpc_status && !Http::CodeUtility::is5xx(grpc_to_http_status)) {
-        upstream_request.upstreamHost()->stats().rq_success_.inc();
-      } else {
-        upstream_request.upstreamHost()->stats().rq_error_.inc();
+      if (upstream_request.upstreamHost()) {
+        if (grpc_status && !Http::CodeUtility::is5xx(grpc_to_http_status)) {
+          upstream_request.upstreamHost()->stats().rq_success_.inc();
+        } else {
+          upstream_request.upstreamHost()->stats().rq_error_.inc();
+        }
       }
     } else {
       upstream_request.grpcRqSuccessDeferred(true);
     }
   } else {
-    upstream_request.upstreamHost()->stats().rq_success_.inc();
+    if (upstream_request.upstreamHost()) {
+      upstream_request.upstreamHost()->stats().rq_success_.inc();
+    }
   }
 }
 
@@ -1190,6 +1194,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& 
     }
   }
 
+  if (upstream_request.upstreamHost()) {
   if (grpc_status.has_value()) {
     upstream_request.upstreamHost()->outlierDetector().putHttpResponseCode(grpc_to_http_status);
   } else {
@@ -1198,6 +1203,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& 
 
   if (headers.EnvoyImmediateHealthCheckFail() != nullptr) {
     upstream_request.upstreamHost()->healthChecker().setUnhealthy();
+  }
   }
 
   bool could_not_retry = false;
@@ -1215,7 +1221,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& 
           retry_state_->shouldRetryHeaders(headers, [this]() -> void { doRetry(); });
       if (retry_status == RetryStatus::Yes) {
         pending_retries_++;
+        if (upstream_request.upstreamHost()) {
         upstream_request.upstreamHost()->stats().rq_error_.inc();
+        }
         Http::CodeStats& code_stats = httpContext().codeStats();
         code_stats.chargeBasicResponseStat(cluster_->statsScope(), config_.retry_,
                                            static_cast<Http::Code>(response_code));
@@ -1278,7 +1286,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& 
 
   upstream_request.upstreamCanary(
       (headers.EnvoyUpstreamCanary() && headers.EnvoyUpstreamCanary()->value() == "true") ||
-      upstream_request.upstreamHost()->canary());
+      (upstream_request.upstreamHost() && upstream_request.upstreamHost()->canary()));
   chargeUpstreamCode(response_code, headers, upstream_request.upstreamHost(), false);
   if (!Http::CodeUtility::is5xx(response_code)) {
     handleNon5xxResponseHeaders(grpc_status, upstream_request, end_stream, grpc_to_http_status);

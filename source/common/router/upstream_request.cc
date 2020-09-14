@@ -53,7 +53,8 @@ UpstreamRequestFilter::UpstreamRequestFilter(UpstreamRequest& parent,
       paused_for_connect_(false), calling_encode_headers_(false), 
       decoding_headers_(false), 
       encoding_headers_only_(false),
-      await_stream_(true) {}
+      await_stream_(true),
+      continue_headers_encoded_(false) {}
 
 UpstreamRequestFilter::~UpstreamRequestFilter() {
     clearRequestEncoder();
@@ -93,8 +94,10 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       encode_complete_(false), decode_complete_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
       filter_manager_(*this, parent_.callbacks()->dispatcher(), *parent_.callbacks()->connection(),
-                      parent_.callbacks()->streamId(), false,
-                      parent_.callbacks()->decoderBufferLimit(), filter_factory_, noopLocalReply(),
+                      parent_.callbacks()->streamId(), true,
+                      std::numeric_limits<uint32_t>::max(), // TODO(snowp): This should probably not be infinite!
+                      // parent_.callbacks()->decoderBufferLimit(), 
+                      filter_factory_, noopLocalReply(),
                       conn_pool->protocol().value(), parent_.callbacks()->dispatcher().timeSource(),
                       nullptr, StreamInfo::FilterState::FilterChain) {
       auto filter = std::make_shared<UpstreamRequestFilter>(*this, std::move(conn_pool));
@@ -180,6 +183,7 @@ Http::ResponseTrailerMapOptRef UpstreamRequest::responseTrailers() {
 }
 
 void UpstreamRequest::encode100ContinueHeaders(Http::ResponseHeaderMap& headers) {
+  ENVOY_LOG_MISC(info, "SEEING 100 CONTINUE");
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
   ASSERT(100 == Http::Utility::getResponseStatus(headers));
@@ -194,22 +198,24 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
 void UpstreamRequest::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
-  // We drop 1xx other than 101 on the floor; 101 upgrade headers need to be passed to the client as
-  // part of the final response. 100-continue headers are handled in onUpstream100ContinueHeaders.
-  //
-  // We could in principle handle other headers here, but this might result in the double invocation
-  // of decodeHeaders() (once for informational, again for non-informational), which is likely an
-  // easy to miss corner case in the filter and HCM contract.
-  //
-  // This filtering is done early in upstream request, unlike 100 coalescing which is performed in
-  // the router filter, since the filtering only depends on the state of a single upstream, and we
-  // don't want to confuse accounting such as onFirstUpstreamRxByteReceived() with informational
-  // headers.
+  // TODO(snowp): Find a good place for this
+  // // We drop 1xx other than 101 on the floor; 101 upgrade headers need to be passed to the client as
+  // // part of the final response. 100-continue headers are handled in onUpstream100ContinueHeaders.
+  // //
+  // // We could in principle handle other headers here, but this might result in the double invocation
+  // // of decodeHeaders() (once for informational, again for non-informational), which is likely an
+  // // easy to miss corner case in the filter and HCM contract.
+  // //
+  // // This filtering is done early in upstream request, unlike 100 coalescing which is performed in
+  // // the router filter, since the filtering only depends on the state of a single upstream, and we
+  // // don't want to confuse accounting such as onFirstUpstreamRxByteReceived() with informational
+  // // headers.
+  // const uint64_t response_code = Http::Utility::getResponseStatus(headers);
+  // if (Http::CodeUtility::is1xx(response_code) &&
+  //     response_code != enumToInt(Http::Code::SwitchingProtocols)) {
+  //   return;
+  // }
   const uint64_t response_code = Http::Utility::getResponseStatus(headers);
-  if (Http::CodeUtility::is1xx(response_code) &&
-      response_code != enumToInt(Http::Code::SwitchingProtocols)) {
-    return;
-  }
 
   // TODO(rodaine): This is actually measuring after the headers are parsed and not the first
   // byte.
@@ -232,8 +238,9 @@ void UpstreamRequest::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_s
   parent_.onUpstreamHeaders(response_code, parent_.callbacks()->responseHeaders()->get(), *this, end_stream);
 }
 
-void UpstreamRequest::encodeTrailers(Http::ResponseTrailerMap& trailers) {
-  parent_.onUpstreamTrailers(trailers, *this);
+void UpstreamRequest::encodeTrailers(Http::ResponseTrailerMap&) {
+  parent_.callbacks()->setResponseTrailers(std::move(trailers_to_encode_));
+  parent_.onUpstreamTrailers(parent_.callbacks()->responseTrailers()->get(), *this);
 }
 void UpstreamRequest::encodeMetadata(Http::MetadataMapVector& metadata) {
   parent_.onUpstreamMetadata(metadata);
@@ -244,7 +251,10 @@ void UpstreamRequestFilter::ActiveUpstreamRequest::decode100ContinueHeaders(
   ScopeTrackerScopeState scope(&parent_.parent_.parent_.callbacks()->scope(),
                                parent_.parent_.parent_.callbacks()->dispatcher());
 
+if (!parent_.continue_headers_encoded_) {
+parent_.continue_headers_encoded_ = true;
   parent_.decoder_callbacks_->encode100ContinueHeaders(std::move(headers));
+}
 }
 
 void UpstreamRequestFilter::disableDataFromDownstreamForFlowControl() {
@@ -291,6 +301,23 @@ void UpstreamRequestFilter::onDestroy() {
 
 void UpstreamRequestFilter::ActiveUpstreamRequest::decodeHeaders(
     Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
+  // We drop 1xx other than 101 on the floor; 101 upgrade headers need to be passed to the client as
+  // part of the final response. 100-continue headers are handled in onUpstream100ContinueHeaders.
+  //
+  // We could in principle handle other headers here, but this might result in the double invocation
+  // of decodeHeaders() (once for informational, again for non-informational), which is likely an
+  // easy to miss corner case in the filter and HCM contract.
+  //
+  // This filtering is done early in upstream request, unlike 100 coalescing which is performed in
+  // the router filter, since the filtering only depends on the state of a single upstream, and we
+  // don't want to confuse accounting such as onFirstUpstreamRxByteReceived() with informational
+  // headers.
+  const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
+  if (Http::CodeUtility::is1xx(response_code) &&
+      response_code != enumToInt(Http::Code::SwitchingProtocols)) {
+    return;
+  }
+
   ScopeTrackerScopeState scope(&parent_.parent_.parent_.callbacks()->scope(),
                                parent_.parent_.parent_.callbacks()->dispatcher());
 

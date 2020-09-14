@@ -175,7 +175,7 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
     // raise further data or trailers.
     ENVOY_STREAM_LOG(debug, "doEndStream() resetting stream", stream);
     // TODO(snowp): This call might not be necessary, try to clean up + remove setter function.
-    stream.filter_manager_.setLocalComplete();
+    // stream.filter_manager_.setLocalComplete();
     stream.state_.codec_saw_local_complete_ = true;
     stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
     reset_stream = true;

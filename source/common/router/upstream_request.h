@@ -147,6 +147,7 @@ private:
   bool decoding_headers_ : 1;
   bool encoding_headers_only_ : 1;
   bool await_stream_ : 1;
+  bool continue_headers_encoded_ : 1;
 
   ActiveUpstreamRequest active_request_{*this};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
