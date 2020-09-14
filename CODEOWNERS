@@ -24,7 +24,7 @@ extensions/filters/common/original_src @snowp @klarose
 # thrift_proxy extension
 /*/extensions/filters/network/thrift_proxy @zuercher @rgs1
 # cdn_loop extension
-/*/extensions/filters/http/cdn @justin-mp @penguingao @alyssawilk
+/*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
 # compressor used by http compression filters
 /*/extensions/filters/http/common/compressor @gsagula @rojkov @dio
 /*/extensions/filters/http/compressor @rojkov @dio
