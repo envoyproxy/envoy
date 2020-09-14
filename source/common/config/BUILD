@@ -157,6 +157,7 @@ envoy_cc_library(
     hdrs = ["grpc_subscription_impl.h"],
     deps = [
         ":grpc_mux_lib",
+        ":udpa_resource_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_interface",

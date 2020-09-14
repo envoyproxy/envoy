@@ -1,4 +1,5 @@
 #include "common/config/grpc_subscription_impl.h"
+#include "common/config/udpa_resource.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
@@ -119,6 +120,30 @@ void GrpcSubscriptionImpl::disableInitFetchTimeoutTimer() {
     init_fetch_timeout_timer_->disableTimer();
     init_fetch_timeout_timer_.reset();
   }
+}
+
+GrpcCollectionSubscriptionImpl::GrpcCollectionSubscriptionImpl(
+    GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
+    OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats, absl::string_view type_url,
+    const udpa::core::v1::ResourceLocator& collection_locator, Event::Dispatcher& dispatcher,
+    std::chrono::milliseconds init_fetch_timeout, bool is_aggregated)
+    : GrpcSubscriptionImpl(grpc_mux, callbacks, resource_decoder, stats, type_url, dispatcher,
+                           init_fetch_timeout, is_aggregated) {
+  setCollectionlocator(collection_locator);
+}
+
+void GrpcCollectionSubscriptionImpl::setCollectionlocator(
+    const udpa::core::v1::ResourceLocator& collection_locator) {
+  watch_ = grpc_mux_->addWatch(type_url_, {UdpaResourceIdentifier::encodeUrl(collection_locator)},
+                               *this, resource_decoder_, false);
+  /*
+  ENVOY_LOG(debug, fmt::format("collection resource locator: {}",
+                               UdpaResourceIdentifier::encodeUrl(collection_locator)));
+                               */
+  // The attempt stat here is maintained for the purposes of having consistency between ADS and
+  // gRPC/filesystem/REST Subscriptions. Since ADS is push based and muxed, the notion of an
+  // "attempt" for a given xDS API combined by ADS is not really that meaningful.
+  stats_.update_attempt_.inc();
 }
 
 } // namespace Config

@@ -15,8 +15,8 @@ namespace Config {
  * Adapter from typed Subscription to untyped GrpcMux. Also handles per-xDS API stats/logging.
  */
 class GrpcSubscriptionImpl : public Subscription,
-                             SubscriptionCallbacks,
-                             Logger::Loggable<Logger::Id::config> {
+                             protected SubscriptionCallbacks,
+                             protected Logger::Loggable<Logger::Id::config> {
 public:
   GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
                        OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
@@ -40,7 +40,7 @@ public:
 
   ScopedResume pause();
 
-private:
+protected:
   void disableInitFetchTimeoutTimer();
 
   GrpcMuxSharedPtr grpc_mux_;
@@ -59,6 +59,18 @@ private:
 
 using GrpcSubscriptionImplPtr = std::unique_ptr<GrpcSubscriptionImpl>;
 using GrpcSubscriptionImplSharedPtr = std::shared_ptr<GrpcSubscriptionImpl>;
+
+class GrpcCollectionSubscriptionImpl : public GrpcSubscriptionImpl {
+public:
+  GrpcCollectionSubscriptionImpl(GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
+                                 OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
+                                 absl::string_view type_url,
+                                 const udpa::core::v1::ResourceLocator& collection_locator,
+                                 Event::Dispatcher& dispatcher,
+                                 std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
+
+  void setCollectionlocator(const udpa::core::v1::ResourceLocator& urls);
+};
 
 } // namespace Config
 } // namespace Envoy

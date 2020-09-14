@@ -41,7 +41,13 @@ public:
                            SubscriptionCallbacks& callbacks,
                            OpaqueResourceDecoder& resource_decoder,
                            const bool use_namespace_matching = false) override;
-
+  /*
+    GrpcMuxWatchPtr addWatch(const std::string& type_url,
+                             const std::set<udpa::core::v1::ResourceLocator>& resources,
+                             SubscriptionCallbacks& callbacks,
+                             OpaqueResourceDecoder& resource_decoder,
+                             const bool use_namespace_matching = false);
+  */
   void requestOnDemandUpdate(const std::string& type_url,
                              const std::set<std::string>& for_update) override;
 

@@ -109,7 +109,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
 
 SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     const udpa::core::v1::ResourceLocator& collection_locator,
-    const envoy::config::core::v3::ConfigSource& /*config*/, absl::string_view /*type_url*/,
+    const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoder& resource_decoder) {
   std::unique_ptr<Subscription> result;
@@ -122,6 +122,23 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     Utility::checkFilesystemSubscriptionBackingPath(path, api_);
     return std::make_unique<Config::FilesystemCollectionSubscriptionImpl>(
         dispatcher_, path, callbacks, resource_decoder, stats, validation_visitor_, api_);
+  }
+  case udpa::core::v1::ResourceLocator::UDPA: {
+    std::unique_ptr<Subscription> result;
+    SubscriptionStats stats = Utility::generateStats(scope);
+    const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
+    Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
+                                                            api_config_source);
+    return std::make_unique<GrpcCollectionSubscriptionImpl>(
+        std::make_shared<Config::NewGrpcMuxImpl>(
+            Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
+                                                           api_config_source, scope, true)
+                ->create(),
+            dispatcher_, deltaGrpcMethod(type_url, api_config_source.transport_api_version()),
+            api_config_source.transport_api_version(), random_, scope,
+            Utility::parseRateLimitSettings(api_config_source), local_info_),
+        callbacks, resource_decoder, stats, type_url, collection_locator, dispatcher_,
+        Utility::configSourceInitialFetchTimeout(config), false);
   }
   default:
     throw EnvoyException(fmt::format("Unsupported collection resource locator: {}",
