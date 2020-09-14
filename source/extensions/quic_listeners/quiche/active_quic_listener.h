@@ -40,7 +40,7 @@ public:
 
   void onListenerShutdown();
   void processBuffered();
-  uint64_t eventLoopChloBuffered() const { return event_loop_chlo_buffered_; }
+  uint64_t eventLoopsWithBufferedChlos() const { return event_loops_with_buffered_chlo_; }
 
   // Network::UdpListenerCallbacks
   void onReadReady() override;
@@ -74,7 +74,7 @@ private:
   bool schedule_process_buffered_enabled_{false};
 
   // The number of runs of the event loop in which at least one CHLO was buffered.
-  uint64_t event_loop_chlo_buffered_{0};
+  uint64_t event_loops_with_buffered_chlo_{0};
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
