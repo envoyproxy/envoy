@@ -410,6 +410,7 @@ public:
         {"x-case-sensitive-header", case_sensitive_header_value_},
         {"baz", "foo"},
         {"bat", "foo"},
+        {"remove-me", "upstream-should-not-see-me"},
     });
   }
 
@@ -424,12 +425,14 @@ public:
 
     // Send back authorization response with "baz" and "bat" headers.
     // Also add multiple values "append-foo" and "append-bar" for key "x-append-bat".
+    // Also tell envoy to remove "remove-me" header before sending to upstream.
     Http::TestResponseHeaderMapImpl response_headers{
         {":status", "200"},
         {"baz", "baz"},
         {"bat", "bar"},
         {"x-append-bat", "append-foo"},
         {"x-append-bat", "append-bar"},
+        {"x-envoy-authz-headers-to-remove", "remove-me"},
     };
     ext_authz_request_->encodeHeaders(response_headers, true);
   }
@@ -494,6 +497,17 @@ public:
     const auto& request_nonexisted_headers = Http::TestRequestHeaderMapImpl{
         {"x-append-bat", "append-foo"}, {"x-append-bat", "append-bar"}};
     EXPECT_THAT(request_nonexisted_headers, Http::IsSubsetOfHeaders(upstream_request_->headers()));
+
+    // The "remove-me" header that was present in the downstream request has
+    // been removed by envoy as a result of being present in
+    // "x-envoy-authz-headers-to-remove".
+    EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString{"remove-me"}), nullptr);
+    // "x-envoy-authz-headers-to-remove" itself has also been removed because
+    // it's only used for communication between the authorization server and
+    // envoy itself.
+    EXPECT_EQ(
+        upstream_request_->headers().get(Http::LowerCaseString{"x-envoy-authz-headers-to-remove"}),
+        nullptr);
 
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
     response_->waitForEndStream();

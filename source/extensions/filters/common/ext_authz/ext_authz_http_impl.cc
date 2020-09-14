@@ -207,10 +207,6 @@ ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatch
       createStringMatchers(list, disable_lowercase_string_matcher));
 }
 
-static const Http::LowerCaseString& getHeaderNameStoringHeadersToRemove() {
-  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "x-envoy-authz-headers-to-remove");
-}
-
 RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config)
     : cm_(cm), config_(config) {}
 
@@ -320,7 +316,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
 
   // Extract headers-to-remove from the storage header coming from the
   // authorization server.
-  const auto& storage_header_name = getHeaderNameStoringHeadersToRemove();
+  const auto& storage_header_name = Http::Headers::get().EnvoyAuthzHeadersToRemove;
   // If we are going to construct an Ok response we need to save the
   // headers_to_remove in a variable first.
   std::vector<Http::LowerCaseString> headers_to_remove{};
@@ -328,9 +324,8 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
     const Http::HeaderEntry* entry = message->headers().get(storage_header_name);
     if (entry != nullptr) {
       absl::string_view storage_header_value = entry->value().getStringView();
-      printf("x-envoy-authz header value: %s\n", storage_header_value.data());
-      for (const auto header_name : StringUtil::splitToken(storage_header_value, ",", false, true)) {
-        printf("x-envoy-authz header item: '%s'\n", std::string(header_name).c_str());
+      for (const auto header_name :
+           StringUtil::splitToken(storage_header_value, ",", false, true)) {
         headers_to_remove.push_back(Http::LowerCaseString(std::string(header_name)));
       }
     }
@@ -343,14 +338,9 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   if (status_code == enumToInt(Http::Code::OK)) {
     SuccessResponse ok{message->headers(), config_->upstreamHeaderMatchers(),
                        config_->upstreamHeaderToAppendMatchers(),
-                       Response{CheckStatus::OK,
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
-                                std::move(headers_to_remove),
-                                EMPTY_STRING,
-                                Http::Code::OK,
-                                ProtobufWkt::Struct{}}};
+                       Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{},
+                                Http::HeaderVector{}, std::move(headers_to_remove), EMPTY_STRING,
+                                Http::Code::OK, ProtobufWkt::Struct{}}};
     return std::move(ok.response_);
   }
 
