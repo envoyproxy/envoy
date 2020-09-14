@@ -25,7 +25,26 @@ health_check_config {
   }
 }
 actions {
+  respond {
+    http_respond {
+      headers {
+        headers {
+          key: ":status"
+          value: "200"
+        }
+      }
+      status: "200"
+    }
+  }
+}
+actions {
+  raise_event {
+    remote_close {
+    }
+  }
+}
+actions {
   trigger_interval_timer {
-
+      
   }
 }

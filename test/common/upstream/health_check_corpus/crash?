@@ -20,6 +20,9 @@ health_check_config {
         }
         path: "/healthcheck"
     }
+    initial_jitter {
+    seconds: 1
+  }
 }
 actions {
     respond {

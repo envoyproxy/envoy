@@ -39,6 +39,6 @@ actions {
 }
 actions {
   trigger_interval_timer {
-    second_host: true
+      
   }
 }

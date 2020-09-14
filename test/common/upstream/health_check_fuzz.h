@@ -19,16 +19,15 @@ public:
   Type type_;
 
 private:
-  void respondHttp(test::fuzz::Headers headers, absl::string_view status,
-                   bool respond_on_second_host);
-  void triggerIntervalTimer(bool create_stream_on_second_host);
-  void triggerTimeoutTimer(bool create_stream_on_second_host, bool last_action);
+  void respondHttp(test::fuzz::Headers headers, absl::string_view status);
+  void triggerIntervalTimer();
+  void triggerTimeoutTimer(bool last_action);
   void allocHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
-  void raiseEvent(test::common::upstream::RaiseEvent event, bool second_host, bool last_action);
+  void raiseEvent(test::common::upstream::RaiseEvent event, bool last_action);
 
   void replay(test::common::upstream::HealthCheckTestCase input);
-  bool second_host_;
-  Event::SimulatedTimeSystem time_system_;
+
+  bool reuse_connection_;
 };
 
 } // namespace Upstream

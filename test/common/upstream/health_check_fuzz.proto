@@ -15,16 +15,12 @@ message HttpRespond { //TODO: Split this across headers, body, and trailers?
 
 message Respond {
   HttpRespond http_respond = 1;
-  //TODO: TCP and gRPC Respond
-  bool second_host = 4;
 }
 
 message TriggerIntervalTimer {
-  bool second_host = 1;
 }
 
 message TriggerTimeoutTimer {
-  bool second_host = 1;
 }
 
 message RaiseEvent {
@@ -34,15 +30,14 @@ message RaiseEvent {
     google.protobuf.Empty remote_close = 2;
     google.protobuf.Empty local_close = 3;
   }
-  bool second_host = 4;
 }
 
 message Action {
   oneof action_selector {
     Respond respond = 1;
-    TriggerIntervalTimer trigger_interval_timer = 2;
+    google.protobuf.Empty trigger_interval_timer = 2;
     //TODO: respondBody, respondTrailers
-    TriggerTimeoutTimer trigger_timeout_timer = 3;
+    google.protobuf.Empty trigger_timeout_timer = 3;
     RaiseEvent raise_event = 4;
   }
 }
@@ -51,7 +46,6 @@ message HealthCheckTestCase {
   envoy.config.core.v3.HealthCheck health_check_config = 1
       [(validate.rules).message.required = true];
   repeated Action actions = 2;
-  bool create_second_host = 3;
-  bool http_verify_cluster = 4; //Determines if verify cluster setting is on
-  bool start_failed = 5;
+  bool http_verify_cluster = 3; //Determines if verify cluster setting is on
+  bool start_failed = 4;
 }

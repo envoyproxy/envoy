@@ -17,7 +17,6 @@ void HealthCheckFuzz::allocHealthCheckerFromProto(
 }
 
 void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTestCase input) {
-  second_host_ = false;
   try {
     allocHealthCheckerFromProto(input.health_check_config());
   } catch (EnvoyException& e) {
@@ -34,59 +33,90 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
     cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
         Host::HealthFlag::FAILED_ACTIVE_HC);
   }
-  if (input.create_second_host()) {
-    cluster_->prioritySet().getMockHostSet(0)->hosts_.push_back(
-        makeTestHost(cluster_->info_, "tcp://127.0.0.1:81"));
-    ENVOY_LOG_MISC(trace, "Created second host.");
-    second_host_ = true;
-    expectSessionCreate();
-    expectStreamCreate(1);
-    if (input.start_failed()) {
-      cluster_->prioritySet().getMockHostSet(0)->hosts_[1]->healthFlagSet(
-          Host::HealthFlag::FAILED_ACTIVE_HC);
-    }
-  }
   health_checker_->start();
   ON_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillByDefault(testing::Return(45000));
+  // If has an initial jitter, this calls onIntervalBase and finishes startup
+  if (input.health_check_config().initial_jitter().seconds() != 0) {
+    test_sessions_[0]->interval_timer_->invokeCallback();
+  }
+  reuse_connection_ = true;
+  if (input.health_check_config().has_reuse_connection()) { // TODO: Does this make sense?
+    reuse_connection_ = input.health_check_config().reuse_connection().value();
+  }
   replay(input);
 }
 
-void HealthCheckFuzz::respondHttp(test::fuzz::Headers headers, absl::string_view status,
-                                  bool second_host) {
+void HealthCheckFuzz::respondHttp(test::fuzz::Headers headers, absl::string_view status) {
+
+  // Timeout timer needs to be explicitly enabled, usually by onIntervalBase() (Callback on interval
+  // timer).
+  if (!test_sessions_[0]->timeout_timer_->enabled_) {
+    ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping response.");
+    return;
+  }
+
   std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers =
       std::make_unique<Http::TestResponseHeaderMapImpl>(
           Fuzz::fromHeaders<Http::TestResponseHeaderMapImpl>(headers, {}, {}));
 
   response_headers->setStatus(status);
 
-  const int index = (second_host_ && second_host) ? 1 : 0;
+  ENVOY_LOG_MISC(trace, "Responded headers");
 
-  test_sessions_[index]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
-                                                                   true);
-}
+  // Responding with http can cause client to close, if so create a new one.
+  bool client_will_close = false;
+  if (response_headers->Connection()) {
+    client_will_close =
+        absl::EqualsIgnoreCase(response_headers->Connection()->value().getStringView(),
+                               Http::Headers::get().ConnectionValues.Close);
+  }
 
-void HealthCheckFuzz::triggerIntervalTimer(bool second_host) {
-  const int index = (second_host_ && second_host) ? 1 : 0;
-  ENVOY_LOG_MISC(trace, "Triggered interval timer on host {}", index);
-  expectStreamCreate(index);
-  test_sessions_[index]->interval_timer_->invokeCallback();
-}
+  if (response_headers->ProxyConnection()) {
+    client_will_close =
+        absl::EqualsIgnoreCase(response_headers->ProxyConnection()->value().getStringView(),
+                               Http::Headers::get().ConnectionValues.Close);
+  }
 
-void HealthCheckFuzz::triggerTimeoutTimer(bool second_host, bool last_action) {
-  const int index = (second_host_ && second_host) ? 1 : 0;
-  ENVOY_LOG_MISC(trace, "Triggered timeout timer on host {}", index);
-  test_sessions_[index]->timeout_timer_->invokeCallback();
-  if (!last_action) {
-    ENVOY_LOG_MISC(trace, "Creating client and stream from network timeout.");
-    expectClientCreate(index);
-    expectStreamCreate(index);
-    test_sessions_[index]->interval_timer_->invokeCallback();
+  test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), true);
+
+  if (!reuse_connection_ || client_will_close) {
+    ENVOY_LOG_MISC(trace, "Creating client and stream because shouldClose() is true");
+    expectClientCreate(0);
+    expectStreamCreate(0);
+    test_sessions_[0]->interval_timer_->invokeCallback();
   }
 }
 
-void HealthCheckFuzz::raiseEvent(test::common::upstream::RaiseEvent event, bool second_host,
-                                 bool last_action) {
+void HealthCheckFuzz::triggerIntervalTimer() {
+  // Interval timer needs to be explicitly enabled, usually by decodeHeaders.
+  if (!test_sessions_[0]->interval_timer_->enabled_) {
+    ENVOY_LOG_MISC(trace, "Interval timer is disabled. Skipping trigger interval timer.");
+    return;
+  }
+  expectStreamCreate(0);
+  ENVOY_LOG_MISC(trace, "Triggered interval timer");
+  test_sessions_[0]->interval_timer_->invokeCallback();
+}
+
+void HealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
+  // Timeout timer needs to be explicitly enabled, usually by a call to onIntervalBase().
+  if (!test_sessions_[0]->timeout_timer_->enabled_) {
+    ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping trigger timeout timer.");
+    return;
+  }
+  ENVOY_LOG_MISC(trace, "Triggered timeout timer");
+  test_sessions_[0]->timeout_timer_->invokeCallback(); // This closes the client, turns off timeout
+                                                       // and enables interval
+  if (!last_action) {
+    ENVOY_LOG_MISC(trace, "Creating client and stream from network timeout");
+    expectClientCreate(0);
+    expectStreamCreate(0);
+    test_sessions_[0]->interval_timer_->invokeCallback();
+  }
+}
+
+void HealthCheckFuzz::raiseEvent(test::common::upstream::RaiseEvent event, bool last_action) {
   Network::ConnectionEvent eventType;
   switch (event.event_selector_case()) {
   case test::common::upstream::RaiseEvent::kConnected: {
@@ -106,15 +136,18 @@ void HealthCheckFuzz::raiseEvent(test::common::upstream::RaiseEvent event, bool 
     break;
   }
 
-  const int index = (second_host_ && second_host) ? 1 : 0;
   switch (type_) {
   case HealthCheckFuzz::Type::HTTP: {
-    test_sessions_[index]->client_connection_->raiseEvent(eventType);
+    test_sessions_[0]->client_connection_->raiseEvent(eventType);
+    // TODO: Discuss with Asra/Adi, you can either have this hardcoded here or handled in an expect
+    // stream create, but I feel like hardcoding would be better in terms of recreating
+    // client/stream, as otherwise events would have to cycle until invokeIntervalTimer() to do
+    // anything. This discussion maps to all expectClientCreate() calls.
     if (!last_action && eventType != Network::ConnectionEvent::Connected) {
-      ENVOY_LOG_MISC(trace, "Creating client and stream from close event on host {}", index);
-      expectClientCreate(index);
-      expectStreamCreate(index);
-      test_sessions_[index]->interval_timer_->invokeCallback();
+      ENVOY_LOG_MISC(trace, "Creating client and stream from close event");
+      expectClientCreate(0);
+      expectStreamCreate(0);
+      test_sessions_[0]->interval_timer_->invokeCallback();
     }
     break;
   }
@@ -133,8 +166,13 @@ void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) 
     case test::common::upstream::Action::kRespond: {
       switch (type_) {
       case HealthCheckFuzz::Type::HTTP: {
+        // TODO: Hardcoded check on status Required because can't find documentation about required
+        // validations for strings in protoc-gen-validate.
+        if (event.respond().http_respond().status().empty()) {
+          return;
+        }
         respondHttp(event.respond().http_respond().headers(),
-                    event.respond().http_respond().status(), event.respond().second_host());
+                    event.respond().http_respond().status());
         break;
       }
       // TODO: TCP and gRPC
@@ -144,21 +182,22 @@ void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) 
       break;
     }
     case test::common::upstream::Action::kTriggerIntervalTimer: {
-      triggerIntervalTimer(event.trigger_interval_timer().second_host());
+      triggerIntervalTimer();
       break;
     }
     case test::common::upstream::Action::kTriggerTimeoutTimer: {
-      triggerTimeoutTimer(event.trigger_timeout_timer().second_host(), last_action);
+      triggerTimeoutTimer(last_action);
       break;
     }
     case test::common::upstream::Action::kRaiseEvent: {
-      raiseEvent(event.raise_event(), event.raise_event().second_host(), last_action);
+      raiseEvent(event.raise_event(), last_action);
       break;
     }
     default:
       break;
     }
   }
+  // TODO: Cleanup?
 }
 
 } // namespace Upstream

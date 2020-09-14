@@ -1,6 +1,7 @@
 health_check_config {
   timeout {
     seconds: 1
+    nanos: 7544832
   }
   interval {
     seconds: 1
@@ -20,12 +21,8 @@ health_check_config {
       prefix: "locations"
     }
   }
-  no_traffic_interval {
-    seconds: 5
-  }
 }
 actions {
-  trigger_interval_timer {
-
+  respond {
   }
 }
