@@ -19,10 +19,10 @@
 
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"
+#include "common/network/generic_listener_filter.h"
 #include "common/network/internal_listener_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/stream_info/stream_info_impl.h"
-#include "common/network/generic_listener_filter.h"
 
 #include "spdlog/spdlog.h"
 
@@ -106,6 +106,8 @@ private:
   using ActiveTcpSocketPtr = std::unique_ptr<ActiveTcpSocket>;
   class ActiveConnections;
   using ActiveConnectionsPtr = std::unique_ptr<ActiveConnections>;
+  struct ActiveInternalSocket;
+  using ActiveInternalSocketPtr = std::unique_ptr<ActiveInternalSocket>;
 
   /**
    * Wrapper for an active tcp listener owned by this handler.
@@ -212,7 +214,7 @@ private:
     void setupNewConnection(Network::ConnectionPtr server_conn,
                             Network::ConnectionSocketPtr socket) override;
     void onNewSocket(Network::ConnectionSocketPtr socket,
-                     Network::ConnectionPtr server_conn) override;
+                     Network::ConnectionSocketPtr server_conn) override;
     // ActiveListenerImplBase
     Network::Listener* listener() override { return internal_listener_.get(); }
     void pauseListening() override { internal_listener_->disable(); }
@@ -251,8 +253,9 @@ private:
 
     ConnectionHandlerImpl& parent_;
     std::unique_ptr<Network::InternalListenerImpl> internal_listener_;
-
-    std::list<ActiveTcpSocketPtr> sockets_;
+    const std::chrono::milliseconds listener_filters_timeout_;
+    const bool continue_on_listener_filters_timeout_;
+    std::list<ActiveInternalSocketPtr> sockets_;
     absl::node_hash_map<const Network::FilterChain*, ActiveConnectionsPtr> connections_by_context_;
 
     // The number of connections currently active on this listener. This is typically used for
@@ -315,9 +318,10 @@ private:
                     bool hand_off_restored_destination_connections)
         : stream_listener_(listener), socket_(std::move(socket)),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
-          iter_(accept_filters_.end()), stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
-                                            stream_listener_.parent_.dispatcher_.timeSource(),
-                                            StreamInfo::FilterState::LifeSpan::Connection)) {
+          stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
+              stream_listener_.parent_.dispatcher_.timeSource(),
+              StreamInfo::FilterState::LifeSpan::Connection)),
+          iter_(accept_filters_.end()) {
       stream_listener_.stats_.downstream_pre_cx_active_.inc();
       stream_info_->setDownstreamLocalAddress(socket_->localAddress());
       stream_info_->setDownstreamRemoteAddress(socket_->remoteAddress());
@@ -343,6 +347,8 @@ private:
     void startTimer();
     void unlink();
     void newConnection();
+    bool isListenerFiltersCompleted() { return iter_ == accept_filters_.end(); }
+    bool isConnected() { return connected_; }
 
     // Network::ListenerFilterManager
     void addAcceptFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
@@ -366,10 +372,83 @@ private:
     ActiveTcpListener& stream_listener_;
     Network::ConnectionSocketPtr socket_;
     const bool hand_off_restored_destination_connections_;
-    std::list<Network::ListenerFilterWrapperPtr> accept_filters_;
-    std::list<Network::ListenerFilterWrapperPtr>::iterator iter_;
     Event::TimerPtr timer_;
     std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
+
+  private:
+    std::list<Network::ListenerFilterWrapperPtr> accept_filters_;
+    std::list<Network::ListenerFilterWrapperPtr>::iterator iter_;
+    bool connected_{false};
+  };
+
+  /**
+   * Wrapper for an active accepted internal socket owned by this handler.
+   */
+  struct ActiveInternalSocket : public Network::ListenerFilterManager,
+                                public Network::ListenerFilterCallbacks,
+                                LinkedObject<ActiveInternalSocket>,
+                                public Event::DeferredDeletable {
+    ActiveInternalSocket(ActiveInternalListener& listener, Network::ConnectionSocketPtr socket)
+        : stream_listener_(listener), socket_(std::move(socket)),
+          stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
+              stream_listener_.parent_.dispatcher_.timeSource(),
+              StreamInfo::FilterState::LifeSpan::Connection)),
+          iter_(accept_filters_.end()) {
+      stream_listener_.stats_.downstream_pre_cx_active_.inc();
+      stream_info_->setDownstreamLocalAddress(socket_->localAddress());
+      stream_info_->setDownstreamRemoteAddress(socket_->remoteAddress());
+      stream_info_->setDownstreamDirectRemoteAddress(socket_->directRemoteAddress());
+    }
+    ~ActiveInternalSocket() override {
+      accept_filters_.clear();
+      stream_listener_.stats_.downstream_pre_cx_active_.dec();
+
+      // If the underlying socket is no longer attached, it means that it has been transferred to
+      // an active connection. In this case, the active connection will decrement the number
+      // of listener connections.
+      // TODO(mattklein123): In general the way we account for the number of listener connections
+      // is incredibly fragile. Revisit this by potentially merging ActiveInternalSocket and
+      // ActiveTcpConnection, having a shared object which does accounting (but would require
+      // another allocation, etc.).
+      if (socket_ != nullptr) {
+        stream_listener_.decNumConnections();
+      }
+    }
+
+    void onTimeout();
+    void startTimer();
+    void unlink();
+    void newConnection();
+    bool isListenerFiltersCompleted() { return iter_ == accept_filters_.end(); }
+    bool isConnected() { return connected_; }
+
+    // Network::ListenerFilterManager
+    void addAcceptFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+                         Network::ListenerFilterPtr&& filter) override {
+      accept_filters_.emplace_back(std::make_unique<Network::GenericListenerFilter>(
+          listener_filter_matcher, std::move(filter)));
+    }
+
+    // Network::ListenerFilterCallbacks
+    Network::ConnectionSocket& socket() override { return *socket_.get(); }
+    Event::Dispatcher& dispatcher() override { return stream_listener_.parent_.dispatcher_; }
+    void continueFilterChain(bool success) override;
+    void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override;
+    envoy::config::core::v3::Metadata& dynamicMetadata() override {
+      return stream_info_->dynamicMetadata();
+    };
+    const envoy::config::core::v3::Metadata& dynamicMetadata() const override {
+      return stream_info_->dynamicMetadata();
+    };
+
+    ActiveInternalListener& stream_listener_;
+    Network::ConnectionSocketPtr socket_;
+    Event::TimerPtr timer_;
+    std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
+
+  private:
+    std::list<Network::ListenerFilterWrapperPtr> accept_filters_;
+    std::list<Network::ListenerFilterWrapperPtr>::iterator iter_;
     bool connected_{false};
   };
 

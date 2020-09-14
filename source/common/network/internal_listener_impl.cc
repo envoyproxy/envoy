@@ -18,7 +18,7 @@
 namespace Envoy {
 namespace Network {
 namespace {
-  uint64_t next_internal_connection_id = 0;
+uint64_t next_internal_connection_id = 0;
 }
 void InternalListenerImpl::setupInternalListener(Event::DispatcherImpl& dispatcher,
                                                  const std::string& listener_id) {

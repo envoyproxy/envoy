@@ -42,7 +42,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
                                         Network::ListenerConfig& config) {
   ActiveListenerDetails details;
   if (config.isInternalListener()) {
-    //TODO(lambdai): register internal listener here.
+    // TODO(lambdai): register internal listener here.
   } else if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {
     if (overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
@@ -316,7 +316,8 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
 
   if (hand_off_restored_destination_connections_ && socket_->localAddressRestored()) {
     // Find a listener associated with the original destination address.
-    new_listener = stream_listener_.parent_.findActiveTcpListenerByAddress(*socket_->localAddress());
+    new_listener =
+        stream_listener_.parent_.findActiveTcpListenerByAddress(*socket_->localAddress());
   }
   if (new_listener.has_value()) {
     // Hands off connections redirected by iptables to the listener associated with the
@@ -378,12 +379,12 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
 
   // Move active_socket to the sockets_ list if filter iteration needs to continue later.
   // Otherwise we let active_socket be destructed when it goes out of scope.
-  if (active_socket->iter_ != active_socket->accept_filters_.end()) {
+  if (!active_socket->isListenerFiltersCompleted()) {
     active_socket->startTimer();
     LinkedList::moveIntoListBack(std::move(active_socket), sockets_);
   } else {
     // If active_socket is about to be destructed, emit logs if a connection is not created.
-    if (!active_socket->connected_) {
+    if (!active_socket->isConnected()) {
       emitLogs(*config_, *active_socket->stream_info_);
     }
   }
@@ -610,9 +611,104 @@ void ActiveRawUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& fil
 
 Network::UdpListener& ActiveRawUdpListener::udpListener() { return *udp_listener_; }
 
+void ConnectionHandlerImpl::ActiveInternalSocket::onTimeout() {
+  stream_listener_.stats_.downstream_pre_cx_timeout_.inc();
+  ASSERT(inserted());
+  ENVOY_LOG(debug, "listener filter times out after {} ms",
+            stream_listener_.listener_filters_timeout_.count());
+
+  if (stream_listener_.continue_on_listener_filters_timeout_) {
+    ENVOY_LOG(debug, "fallback to default listener filter");
+    newConnection();
+  }
+  unlink();
+}
+
+void ConnectionHandlerImpl::ActiveInternalSocket::startTimer() {
+  if (stream_listener_.listener_filters_timeout_.count() > 0) {
+    timer_ = stream_listener_.parent_.dispatcher_.createTimer([this]() -> void { onTimeout(); });
+    timer_->enableTimer(stream_listener_.listener_filters_timeout_);
+  }
+}
+
+void ConnectionHandlerImpl::ActiveInternalSocket::unlink() {
+  auto removed = removeFromList(stream_listener_.sockets_);
+  if (removed->timer_ != nullptr) {
+    removed->timer_->disableTimer();
+  }
+  // Emit logs if a connection is not established.
+  if (!connected_) {
+    emitLogs(*stream_listener_.config_, *stream_info_);
+  }
+  stream_listener_.parent_.dispatcher_.deferredDelete(std::move(removed));
+}
+
+void ConnectionHandlerImpl::ActiveInternalSocket::continueFilterChain(bool success) {
+  if (success) {
+    bool no_error = true;
+    if (iter_ == accept_filters_.end()) {
+      iter_ = accept_filters_.begin();
+    } else {
+      iter_ = std::next(iter_);
+    }
+
+    for (; iter_ != accept_filters_.end(); iter_++) {
+      Network::FilterStatus status = (*iter_)->onAccept(*this);
+      if (status == Network::FilterStatus::StopIteration) {
+        // The filter is responsible for calling us again at a later time to continue the filter
+        // chain from the next filter.
+        if (!socket().ioHandle().isOpen()) {
+          // break the loop but should not create new connection
+          no_error = false;
+          break;
+        } else {
+          // Blocking at the filter but no error
+          return;
+        }
+      }
+    }
+    // Successfully ran all the accept filters.
+    if (no_error) {
+      newConnection();
+    } else {
+      // Signal the caller that no extra filter chain iteration is needed.
+      iter_ = accept_filters_.end();
+    }
+  }
+
+  // Filter execution concluded, unlink and delete this ActiveTcpSocket if it was linked.
+  if (inserted()) {
+    unlink();
+  }
+}
+
+void ConnectionHandlerImpl::ActiveInternalSocket::setDynamicMetadata(
+    const std::string& name, const ProtobufWkt::Struct& value) {
+  stream_info_->setDynamicMetadata(name, value);
+}
+
+void ConnectionHandlerImpl::ActiveInternalSocket::newConnection() {
+  connected_ = true;
+
+  // Set default transport protocol if none of the listener filters did it.
+  if (socket_->detectedTransportProtocol().empty()) {
+    socket_->setDetectedTransportProtocol(
+        Extensions::TransportSockets::TransportProtocolNames::get().RawBuffer);
+  }
+  // TODO(lambdai): add integration test
+  // TODO: Address issues in wider scope. See https://github.com/envoyproxy/envoy/issues/8925
+  // Erase accept filter states because accept filters may not get the opportunity to clean up.
+  // Particularly the assigned events need to reset before assigning new events in the follow up.
+  accept_filters_.clear();
+  // Create a new connection on this listener.
+  stream_listener_.newConnection(std::move(socket_), stream_info_->dynamicMetadata());
+}
+
 ConnectionHandlerImpl::ActiveInternalListener::ActiveInternalListener(
     ConnectionHandlerImpl& parent, Network::ListenerConfig& config)
-    : ConnectionHandlerImpl::ActiveListenerImplBase(parent, &config), parent_(parent) {}
+    : ConnectionHandlerImpl::ActiveListenerImplBase(parent, &config), parent_(parent),
+      listener_filters_timeout_(config.listenerFiltersTimeout()),
+      continue_on_listener_filters_timeout_(config.continueOnListenerFiltersTimeout()) {}
 
 void ConnectionHandlerImpl::ActiveInternalListener::updateListenerConfig(
     Network::ListenerConfig& config) {
@@ -626,7 +722,7 @@ ConnectionHandlerImpl::ActiveInternalListener::~ActiveInternalListener() {
   // Purge sockets that have not progressed to connections. This should only happen when
   // a listener filter stops iteration and never resumes.
   while (!sockets_.empty()) {
-    ActiveTcpSocketPtr removed = sockets_.front()->removeFromList(sockets_);
+    auto removed = sockets_.front()->removeFromList(sockets_);
     parent_.dispatcher_.deferredDelete(std::move(removed));
   }
 
@@ -654,24 +750,22 @@ void ConnectionHandlerImpl::ActiveInternalListener::shutdownListener() {
       /* connection_callback= */ nullptr);
 }
 
-void ConnectionHandlerImpl::ActiveInternalListener::onNewSocket(Network::ConnectionSocketPtr ,
-                                                                Network::ConnectionPtr) {
-  // TODO(lambdai): FIX ME after resolve reference to ActiveInternalListener.                                                                
-  ActiveTcpSocketPtr active_socket = nullptr;
-  // std::make_unique<ActiveTcpSocket>(
-  //     *this, std::move(socket), /* hand_off_restored_destination_connections=*/false);
+void ConnectionHandlerImpl::ActiveInternalListener::onNewSocket(
+    Network::ConnectionSocketPtr, Network::ConnectionSocketPtr socket) {
+  ActiveInternalSocketPtr active_socket =
+      std::make_unique<ActiveInternalSocket>(*this, std::move(socket));
   // Create and run the filters
   config_->filterChainFactory().createListenerFilterChain(*active_socket);
   active_socket->continueFilterChain(true);
 
   // Move active_socket to the sockets_ list if filter iteration needs to continue later.
   // Otherwise we let active_socket be destructed when it goes out of scope.
-  if (active_socket->iter_ != active_socket->accept_filters_.end()) {
+  if (!active_socket->isListenerFiltersCompleted()) {
     active_socket->startTimer();
     LinkedList::moveIntoListBack(std::move(active_socket), sockets_);
   } else {
     // If active_socket is about to be destructed, emit logs if a connection is not created.
-    if (!active_socket->connected_) {
+    if (!active_socket->isListenerFiltersCompleted()) {
       emitLogs(*config_, *active_socket->stream_info_);
     }
   }
@@ -736,7 +830,7 @@ void ConnectionHandlerImpl::ActiveInternalListener::newConnection(
   stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
   stream_info->setDownstreamDirectRemoteAddress(socket->directRemoteAddress());
 
-  // merge from the given dynamic metadata if it's not empty
+  // Merge from the given dynamic metadata if it's not empty.
   if (dynamic_metadata.filter_metadata_size() > 0) {
     stream_info->dynamicMetadata().MergeFrom(dynamic_metadata);
   }
