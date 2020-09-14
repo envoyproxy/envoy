@@ -757,7 +757,7 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
                              "{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp_details.txt"),
                          true),
                      '\n');
-  std::string valid_from, expiration_time;
+  std::string valid_from, expiration;
   for (const auto& detail : ocsp_text_details) {
     std::string::size_type pos = detail.find(this_update);
     if (pos != std::string::npos) {
@@ -767,7 +767,7 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
 
     pos = detail.find(next_update);
     if (pos != std::string::npos) {
-      expiration_time = detail.substr(pos + next_update.size());
+      expiration = detail.substr(pos + next_update.size());
       continue;
     }
   }
@@ -775,8 +775,8 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
   std::string ocsp_json = absl::StrCat(R"EOF({
 "valid_from": ")EOF",
                                        convertTimeCertInfoToCertDetails(valid_from), R"EOF(",
-"expiration_time": ")EOF",
-                                       convertTimeCertInfoToCertDetails(expiration_time), R"EOF("
+"expiration": ")EOF",
+                                       convertTimeCertInfoToCertDetails(expiration), R"EOF("
 }
 )EOF");
 

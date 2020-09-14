@@ -218,7 +218,7 @@ public:
   /**
    * @return The beginning of the validity window for this response.
    */
-  const Envoy::SystemTime getThisUpdate() const;
+  Envoy::SystemTime getThisUpdate() const;
 
   /**
    * The time at which this response is considered to expire. If
@@ -227,7 +227,7 @@ public:
    *
    * @return The end of the validity window for this response.
    */
-  const Envoy::SystemTime getNextUpdate() const;
+  Envoy::SystemTime getNextUpdate() const;
 
 private:
   const std::vector<uint8_t> raw_bytes_;

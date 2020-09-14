@@ -46,7 +46,7 @@ message CertificateDetails {
     google.protobuf.Timestamp valid_from = 1;
 
     // Indicates the time at which the OCSP response expires.
-    google.protobuf.Timestamp expiration_time = 2;
+    google.protobuf.Timestamp expiration = 2;
   }
 
   // Path of the certificate.
