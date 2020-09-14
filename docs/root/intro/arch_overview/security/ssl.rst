@@ -182,6 +182,30 @@ infrastructure.
 Client TLS authentication filter :ref:`configuration reference
 <config_network_filters_client_ssl_auth>`.
 
+.. _arch_overview_ssl_custom_handshaker:
+
+Custom handshaker extension
+---------------------------
+
+The :ref:`CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext>`
+has a ``custom_handshaker`` extension which can be used to override SSL handshake
+behavior entirely. This is useful for implementing any TLS behavior which is
+difficult to express with callbacks. It is not necessary to write a custom
+handshaker to use private key methods, see the
+`private key method interface <https://github.com/google/boringssl/blob/c0b4c72b6d4c6f4828a373ec454bd646390017d4/include/openssl/ssl.h#L1169>`_.
+
+To avoid reimplementing all of the ``Ssl::ConnectionInfo`` interface, a custom
+implementation might choose to extend
+``Envoy::Extensions::TransportSockets::Tls::SslHandshakerImpl``.
+
+Custom handshakers need to explicitly declare via ``HandshakerCapabilities``
+which TLS features they are responsible for. The default Envoy handshaker will
+manage the remainder.
+
+A useful example handshaker, named ``SslHandshakerImplForTest``, lives in
+`this test <https://github.com/envoyproxy/envoy/blob/master/test/extensions/transport_sockets/tls/handshaker_test.cc#L174>`_
+and demonstrates special-case ``SSL_ERROR`` handling and callbacks.
+
 .. _arch_overview_ssl_trouble_shooting:
 
 Trouble shooting
