@@ -14,7 +14,6 @@ df -h
 # shellcheck source=ci/setup_cache.sh
 . "$(dirname "$0")"/setup_cache.sh
 
-read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS:---config=msvc-cl}"
 read -ra BAZEL_EXTRA_TEST_OPTIONS <<< "${BAZEL_EXTRA_TEST_OPTIONS:-}"
 
@@ -32,11 +31,10 @@ fi
 BAZEL_STARTUP_OPTIONS="--output_base=c:/_eb"
 # Default to msvc-cl if not overridden
 BAZEL_BUILD_OPTIONS=(
-    "${BAZEL_BUILD_OPTIONS[@]}"
     -c opt
-    "--show_task_finish"
-    "--verbose_failures"
-    "--test_output=errors"
+    --show_task_finish
+    --verbose_failures
+    --test_output=errors
     "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
     "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 
