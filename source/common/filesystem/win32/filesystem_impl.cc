@@ -59,7 +59,6 @@ Api::IoCallBoolResult FileImplWin32::close() {
   return resultSuccess(true);
 }
 
-
 FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
   DWORD access = 0;
   DWORD creation = OPEN_EXISTING;
@@ -71,7 +70,7 @@ FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
   if (in.test(File::Operation::Write)) {
     access = GENERIC_WRITE;
   }
-  
+
   // Order of tests matter here. There reason for that
   // is that `FILE_APPEND_DATA` should not be used together
   // with `GENERIC_WRITE`. If both of them are used the file
@@ -105,7 +104,8 @@ bool InstanceImplWin32::directoryExists(const std::string& path) {
 }
 
 ssize_t InstanceImplWin32::fileSize(const std::string& path) {
-  auto fd = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL);
+  auto fd =
+      CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL);
   if (fd == INVALID_HANDLE) {
     return -1;
   }
@@ -113,7 +113,7 @@ ssize_t InstanceImplWin32::fileSize(const std::string& path) {
   LARGE_INTEGER lFileSize;
   BOOL bGetSize = GetFileSizeEx(fd, &lFileSize);
   CloseHandle(fd);
-  if(!bGetSize) {
+  if (!bGetSize) {
     return -1;
   }
   result += lFileSize.QuadPart;
