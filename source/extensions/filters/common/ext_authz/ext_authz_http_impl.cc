@@ -207,6 +207,10 @@ ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatch
       createStringMatchers(list, disable_lowercase_string_matcher));
 }
 
+static const Http::LowerCaseString& getHeaderNameStoringHeadersToRemove() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "x-envoy-authz-headers-to-remove");
+}
+
 RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config)
     : cm_(cm), config_(config) {}
 
@@ -314,6 +318,27 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
     return std::make_unique<Response>(errorResponse());
   }
 
+  // Extract headers-to-remove from the storage header coming from the
+  // authorization server.
+  const auto& storage_header_name = getHeaderNameStoringHeadersToRemove();
+  // If we are going to construct an Ok response we need to save the
+  // headers_to_remove in a variable first.
+  std::vector<Http::LowerCaseString> headers_to_remove{};
+  if (status_code == enumToInt(Http::Code::OK)) {
+    const Http::HeaderEntry* entry = message->headers().get(storage_header_name);
+    if (entry != nullptr) {
+      absl::string_view storage_header_value = entry->value().getStringView();
+      printf("x-envoy-authz header value: %s\n", storage_header_value.data());
+      for (const auto header_name : StringUtil::splitToken(storage_header_value, ",", false, true)) {
+        printf("x-envoy-authz header item: '%s'\n", std::string(header_name).c_str());
+        headers_to_remove.push_back(Http::LowerCaseString(std::string(header_name)));
+      }
+    }
+  }
+  // Now remove the storage header from the authz server response headers before
+  // we reuse them to construct an Ok/Denied authorization response below.
+  message->headers().remove(storage_header_name);
+
   // Create an Ok authorization response.
   if (status_code == enumToInt(Http::Code::OK)) {
     SuccessResponse ok{message->headers(), config_->upstreamHeaderMatchers(),
@@ -322,7 +347,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                                 Http::HeaderVector{},
                                 Http::HeaderVector{},
                                 Http::HeaderVector{},
-                                {{}},
+                                std::move(headers_to_remove),
                                 EMPTY_STRING,
                                 Http::Code::OK,
                                 ProtobufWkt::Struct{}}};
