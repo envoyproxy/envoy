@@ -1,6 +1,7 @@
 #include "common/local_reply/local_reply.h"
 
 #include <string>
+#include <typeinfo>
 #include <vector>
 
 #include "common/access_log/access_log_impl.h"
@@ -26,10 +27,7 @@ public:
             config.format_case() ==
                     envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat
                 ? Http::Headers::get().ContentTypeValues.Json
-                : config.format_case() ==
-                          envoy::config::core::v3::SubstitutionFormatString::FormatCase::kHtmlFormat
-                      ? Http::Headers::get().ContentTypeValues.Html
-                      : Http::Headers::get().ContentTypeValues.Text) {}
+                : Formatter::SubstitutionFormatStringUtils::getContentType(config)) {}
 
   void format(const Http::RequestHeaderMap& request_headers,
               const Http::ResponseHeaderMap& response_headers,

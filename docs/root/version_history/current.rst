@@ -64,6 +64,7 @@ New Features
 * access log: added support for :ref:`%DOWNSTREAM_PEER_FINGERPRINT_1% <config_access_log_format_response_flags>` as a response flag.
 * access log: added support for nested objects in :ref:`JSON logging mode <config_access_log_format_dictionaries>`.
 * access log: added :ref:`omit_empty_values<envoy_v3_api_field_config.core.v3.SubstitutionFormatString.omit_empty_values>` option to omit unset value from formatted log.
+* access log: added :ref:`content_type<envoy_v3_api_field_config.core.v3.SubstitutionFormatString.content_type>` option to set content-type for textformat.
 * build: enable building envoy :ref:`arm64 images <arm_binaries>` by buildx tool in x86 CI platform.
 * cluster: added new :ref:`connection_pool_per_downstream_connection <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_per_downstream_connection>` flag, which enable creation of a new connection pool for each downstream connection.
 * decompressor filter: reports compressed and uncompressed bytes in trailers.

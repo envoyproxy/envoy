@@ -57,21 +57,6 @@ message SubstitutionFormatString {
     //  }
     //
     google.protobuf.Struct json_format = 2 [(validate.rules).message = {required: true}];
-
-    // Specify a format with command operators to form a html string.
-    // Its details is described in :ref:`format string<config_access_log_format_strings>`.
-    //
-    // .. code-block::
-    //
-    //   html_format: <p>%LOCAL_REPLY_BODY%:%RESPONSE_CODE%:path=$REQ(:path)%</p>
-    //
-    // The following html text will be created:
-    //
-    // .. code-block::
-    //
-    //   <p>upstream connect error:204:path=/foo</p>
-    //
-    string html_format = 4 [(validate.rules).string = {min_bytes: 1}];
   }
 
   // If set to true, when command operators are evaluated to null,
@@ -80,4 +65,12 @@ message SubstitutionFormatString {
   //   empty string, so that empty values are omitted entirely.
   // * for ``json_format`` the keys with null values are omitted in the output structure.
   bool omit_empty_values = 3;
+
+  // Specify a content_type for text_format. This will be ignored for json_format
+  //
+  // .. code-block::
+  //
+  //   content_type: "text/html; charset=UTF-8"
+  //
+  string content_type = 4 [(validate.rules).string = {min_bytes: 1}];
 }

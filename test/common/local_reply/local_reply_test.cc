@@ -149,24 +149,6 @@ TEST_F(LocalReplyTest, TestDefaultJsonFormatter) {
   EXPECT_TRUE(TestUtility::jsonStringEqual(body_, expected));
 }
 
-TEST_F(LocalReplyTest, TestDefaultHtmlFormatter) {
-  // Default html formatter without any mappers
-  const std::string yaml = R"(
-  body_format:
-     html_format: "<h1>Sample Html Body</h1>"
-)";
-  TestUtility::loadFromYaml(yaml, config_);
-  auto local = Factory::create(config_, context_);
-
-  local->rewrite(nullptr, response_headers_, stream_info_, code_, body_, content_type_);
-  EXPECT_EQ(code_, TestInitCode);
-  EXPECT_EQ(stream_info_.response_code_, static_cast<uint32_t>(TestInitCode));
-  EXPECT_EQ(response_headers_.Status()->value().getStringView(),
-            std::to_string(enumToInt(TestInitCode)));
-  EXPECT_EQ(body_, "<h1>Sample Html Body</h1>");
-  EXPECT_EQ(content_type_, "text/html; charset=UTF-8");
-}
-
 TEST_F(LocalReplyTest, TestMapperRewrite) {
   // Match with response_code, and rewrite the code and body.
   const std::string yaml = R"(
@@ -354,7 +336,7 @@ TEST_F(LocalReplyTest, TestHeaderAddition) {
   ASSERT_EQ(out[1], "append-bar3");
 }
 
-TEST_F(LocalReplyTest, TestMapperWithHtmlFormat) {
+TEST_F(LocalReplyTest, TestMapperWithContentType) {
   // Match with response_code, and rewrite the code and body.
   const std::string yaml = R"(
     mappers:
@@ -369,7 +351,8 @@ TEST_F(LocalReplyTest, TestMapperWithHtmlFormat) {
       body:
         inline_string: "401 body text"
       body_format_override:
-        html_format: "<h1>%LOCAL_REPLY_BODY%</h1>"
+        text_format: "<h1>%LOCAL_REPLY_BODY%</h1>"
+        content_type: "text/html; charset=UTF-8"
     - filter:
         status_code_filter:
           comparison:
@@ -381,7 +364,8 @@ TEST_F(LocalReplyTest, TestMapperWithHtmlFormat) {
       body:
         inline_string: "411 body text"
     body_format:
-      html_format: "<h1>%LOCAL_REPLY_BODY%</h1> %RESPONSE_CODE% default formatter"
+      text_format: "<h1>%LOCAL_REPLY_BODY%</h1> %RESPONSE_CODE% default formatter"
+      content_type: "text/html; charset=UTF-8"
 )";
   TestUtility::loadFromYaml(yaml, config_);
   auto local = Factory::create(config_, context_);

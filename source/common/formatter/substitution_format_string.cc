@@ -1,6 +1,7 @@
 #include "common/formatter/substitution_format_string.h"
 
 #include "common/formatter/substitution_formatter.h"
+#include "common/http/headers.h"
 
 namespace Envoy {
 namespace Formatter {
@@ -16,8 +17,6 @@ FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
   switch (config.format_case()) {
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormat:
     return std::make_unique<FormatterImpl>(config.text_format(), config.omit_empty_values());
-  case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kHtmlFormat:
-    return std::make_unique<FormatterImpl>(config.html_format());
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat: {
     return createJsonFormatter(config.json_format(), true, config.omit_empty_values());
   }
@@ -25,6 +24,19 @@ FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   return nullptr;
+}
+
+absl::string_view SubstitutionFormatStringUtils::getContentType(
+    const envoy::config::core::v3::SubstitutionFormatString& config) {
+  const std::string contentType = config.content_type();
+  if (contentType == Http::Headers::get().ContentTypeValues.TextEventStream)
+    return Http::Headers::get().ContentTypeValues.TextEventStream;
+  else if (contentType == Http::Headers::get().ContentTypeValues.TextUtf8)
+    return Http::Headers::get().ContentTypeValues.TextUtf8;
+  else if (contentType == Http::Headers::get().ContentTypeValues.Html)
+    return Http::Headers::get().ContentTypeValues.Html;
+  else
+    return Http::Headers::get().ContentTypeValues.Text;
 }
 
 } // namespace Formatter

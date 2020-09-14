@@ -94,16 +94,14 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {
   }
 }
 
-TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigHtml) {
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigContentType) {
   const std::string yaml = R"EOF(
-  html_format: "<h1>Sample html</h1>"
+  text_format: "<h1>Sample html</h1>"
+  content_type: "text/html; charset=UTF-8"
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
-
-  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_);
-  const auto out = formatter->format(request_headers_, response_headers_, response_trailers_,
-                                     stream_info_, body_);
-  EXPECT_EQ("<h1>Sample html</h1>", out);
+  const absl::string_view contentType = SubstitutionFormatStringUtils::getContentType(config_);
+  EXPECT_EQ("text/html; charset=UTF-8", contentType);
 }
 
 } // namespace Formatter
