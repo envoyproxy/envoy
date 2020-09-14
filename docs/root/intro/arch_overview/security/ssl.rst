@@ -187,23 +187,23 @@ Client TLS authentication filter :ref:`configuration reference
 Custom handshaker extension
 ---------------------------
 
-The :ref:`CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext>`
+The :ref:`CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_handshaker>`
 has a ``custom_handshaker`` extension which can be used to override SSL handshake
 behavior entirely. This is useful for implementing any TLS behavior which is
 difficult to express with callbacks. It is not necessary to write a custom
 handshaker to use private key methods, see the
 `private key method interface <https://github.com/google/boringssl/blob/c0b4c72b6d4c6f4828a373ec454bd646390017d4/include/openssl/ssl.h#L1169>`_.
 
-To avoid reimplementing all of the ``Ssl::ConnectionInfo`` interface, a custom
+To avoid reimplementing all of the `Ssl::ConnectionInfo <https://github.com/envoyproxy/envoy/blob/64bd6311bcc8f5b18ce44997ae22ff07ecccfe04/include/envoy/ssl/connection.h#L19>`_ interface, a custom
 implementation might choose to extend
-``Envoy::Extensions::TransportSockets::Tls::SslHandshakerImpl``.
+`Envoy::Extensions::TransportSockets::Tls::SslHandshakerImpl <https://github.com/envoyproxy/envoy/blob/64bd6311bcc8f5b18ce44997ae22ff07ecccfe04/source/extensions/transport_sockets/tls/ssl_handshaker.h#L40>`_.
 
-Custom handshakers need to explicitly declare via ``HandshakerCapabilities``
+Custom handshakers need to explicitly declare via `HandshakerCapabilities <https://github.com/envoyproxy/envoy/blob/64bd6311bcc8f5b18ce44997ae22ff07ecccfe04/include/envoy/ssl/handshaker.h#L68-L89>`_
 which TLS features they are responsible for. The default Envoy handshaker will
 manage the remainder.
 
 A useful example handshaker, named ``SslHandshakerImplForTest``, lives in
-`this test <https://github.com/envoyproxy/envoy/blob/master/test/extensions/transport_sockets/tls/handshaker_test.cc#L174>`_
+`this test <https://github.com/envoyproxy/envoy/blob/64bd6311bcc8f5b18ce44997ae22ff07ecccfe04/test/extensions/transport_sockets/tls/handshaker_test.cc#L174-L184>`_
 and demonstrates special-case ``SSL_ERROR`` handling and callbacks.
 
 .. _arch_overview_ssl_trouble_shooting:
