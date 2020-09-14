@@ -49,7 +49,7 @@ public:
 };
 
 /**
- * Base interface for a combined handshaker-and-connectioninfo class
+ * Base interface for a combined `handshaker-and-connectioninfo` class
  * which can both perform handshakes and provide connection-specific
  * information.
  */
