@@ -14,17 +14,15 @@ df -h
 # shellcheck source=ci/setup_cache.sh
 . "$(dirname "$0")"/setup_cache.sh
 
-read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS:-}"
 read -ra BAZEL_EXTRA_TEST_OPTIONS <<< "${BAZEL_EXTRA_TEST_OPTIONS:-}"
 
 # TODO(zuercher): remove --flaky_test_attempts when https://github.com/envoyproxy/envoy/issues/2428
 # is resolved.
 BAZEL_BUILD_OPTIONS=(
-    "${BAZEL_BUILD_OPTIONS[@]}"
     "--curses=no"
-    "--show_task_finish"
-    "--verbose_failures"
+    --show_task_finish
+    --verbose_failures
     "--action_env=PATH=/usr/local/bin:/opt/local/bin:/usr/bin:/bin"
     "--test_output=all"
     "--flaky_test_attempts=integration@2"
