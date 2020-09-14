@@ -371,7 +371,7 @@ TEST_F(LocalReplyTest, TestMapperWithContentType) {
   auto local = Factory::create(config_, context_);
 
   // code=400 matches the first filter; rewrite code and body
-  // has its own formatter
+  // has its own formatter.
   resetData(400);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(401));
@@ -383,7 +383,7 @@ TEST_F(LocalReplyTest, TestMapperWithContentType) {
   EXPECT_EQ(body_, expected);
 
   // code=410 matches the second filter; rewrite code and body
-  // but using default formatter
+  // but using default formatter.
   resetData(410);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(411));

@@ -1,7 +1,6 @@
 #include "common/local_reply/local_reply.h"
 
 #include <string>
-#include <typeinfo>
 #include <vector>
 
 #include "common/access_log/access_log_impl.h"
