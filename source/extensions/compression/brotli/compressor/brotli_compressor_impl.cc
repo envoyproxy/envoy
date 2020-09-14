@@ -49,9 +49,10 @@ void BrotliCompressorImpl::compress(Buffer::Instance& buffer,
     while (ctx.avail_in_ > 0) {
       process(ctx, accumulation_buffer, BROTLI_OPERATION_PROCESS);
     }
+
+    buffer.drain(input_slice.len_);
   }
 
-  buffer.drain(buffer.length());
   buffer.add(accumulation_buffer);
 
   do {
