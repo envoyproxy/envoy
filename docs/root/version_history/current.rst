@@ -66,7 +66,6 @@ New Features
 * access log: added support for :ref:`%DOWNSTREAM_PEER_FINGERPRINT_1% <config_access_log_format_response_flags>` as a response flag.
 * access log: added support for nested objects in :ref:`JSON logging mode <config_access_log_format_dictionaries>`.
 * access log: added :ref:`omit_empty_values<envoy_v3_api_field_config.core.v3.SubstitutionFormatString.omit_empty_values>` option to omit unset value from formatted log.
-* access log: added :ref:`content_type<envoy_v3_api_field_config.core.v3.SubstitutionFormatString.content_type>` option to set content-type for textformat.
 * admin: added the ability to dump init manager unready targets information :ref:`/init_dump <operations_admin_interface_init_dump>` and :ref:`/init_dump?mask={} <operations_admin_interface_init_dump_by_mask>`.
 * build: enable building envoy :ref:`arm64 images <arm_binaries>` by buildx tool in x86 CI platform.
 * cluster: added new :ref:`connection_pool_per_downstream_connection <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_per_downstream_connection>` flag, which enable creation of a new connection pool for each downstream connection.
@@ -85,6 +84,7 @@ New Features
 * load balancer: added a :ref:`configuration<envoy_v3_api_msg_config.cluster.v3.Cluster.LeastRequestLbConfig>` option to specify the active request bias used by the least request load balancer.
 * load balancer: added an :ref:`option <envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.single_host_per_subset>` to optimize subset load balancing when there is only one host per subset.
 * load balancer: added support for bounded load per host for consistent hash load balancers via :ref:`hash_balance_factor <envoy_api_field_Cluster.CommonLbConfig.consistent_hashing_lb_config>`.
+* local_reply config: added :ref:`content_type<envoy_v3_api_field_config.core.v3.SubstitutionFormatString.content_type>` option to set content-type for textformat.
 * lua: added Lua APIs to access :ref:`SSL connection info <config_http_filters_lua_ssl_socket_info>` object.
 * lua: added Lua API for :ref:`base64 escaping a string <config_http_filters_lua_stream_handle_api_base64_escape>`.
 * lua: added new :ref:`source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code>` field to support the dispatching of inline Lua code in per route configuration of Lua filter.

@@ -70,11 +70,12 @@ message SubstitutionFormatString {
   // * for ``json_format`` the keys with null values are omitted in the output structure.
   bool omit_empty_values = 3;
 
-  // Specify a content_type for text_format. This will be ignored for json_format
-  //
+  // Specify a content_type for text_format. This will be ignored for json_format.
+  // Currently supported content-type value includes ``text/html; charset=UTF-8`` and ``text/plain``
+  // with default value being ``text/plain``.
   // .. code-block::
   //
   //   content_type: "text/html; charset=UTF-8"
   //
-  string content_type = 4 [(validate.rules).string = {min_bytes: 1}];
+  string content_type = 4;
 }

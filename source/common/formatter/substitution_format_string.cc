@@ -29,11 +29,7 @@ FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
 absl::string_view SubstitutionFormatStringUtils::getContentType(
     const envoy::config::core::v3::SubstitutionFormatString& config) {
   const std::string contentType = config.content_type();
-  if (contentType == Http::Headers::get().ContentTypeValues.TextEventStream)
-    return Http::Headers::get().ContentTypeValues.TextEventStream;
-  else if (contentType == Http::Headers::get().ContentTypeValues.TextUtf8)
-    return Http::Headers::get().ContentTypeValues.TextUtf8;
-  else if (contentType == Http::Headers::get().ContentTypeValues.Html)
+  if (contentType == Http::Headers::get().ContentTypeValues.Html)
     return Http::Headers::get().ContentTypeValues.Html;
   else
     return Http::Headers::get().ContentTypeValues.Text;
