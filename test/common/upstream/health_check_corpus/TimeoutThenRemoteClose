@@ -30,9 +30,5 @@ actions {
     }
 }
 actions {
-    raise_event {
-        remote_close {
-
-        }
-    }
+    raise_event: REMOTE_CLOSE
 }

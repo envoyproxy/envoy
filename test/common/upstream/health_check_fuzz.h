@@ -6,7 +6,10 @@
 namespace Envoy {
 namespace Upstream {
 
-class HealthCheckFuzz : public HttpHealthCheckerImplTestBase {
+class HealthCheckFuzz
+    : public HttpHealthCheckerImplTestBase { // TODO: once added tcp/grpc, switch this to an
+                                             // abstract health checker test class that can handle
+                                             // one of the three types
 public:
   HealthCheckFuzz() = default;
   void initializeAndReplay(test::common::upstream::HealthCheckTestCase input);
@@ -19,15 +22,16 @@ public:
   Type type_;
 
 private:
-  void respondHttp(test::fuzz::Headers headers, absl::string_view status);
+  void respondHttp(const test::fuzz::Headers& headers, absl::string_view status);
   void triggerIntervalTimer();
   void triggerTimeoutTimer(bool last_action);
   void allocHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
-  void raiseEvent(test::common::upstream::RaiseEvent event, bool last_action);
+  void raiseEvent(const test::common::upstream::RaiseEvent& event, bool last_action);
 
-  void replay(test::common::upstream::HealthCheckTestCase input);
+  void replay(const test::common::upstream::HealthCheckTestCase& input);
 
-  bool reuse_connection_;
+  // Determines whether the client gets reused or not after respondHeaders()
+  bool reuse_connection_ = true;
 };
 
 } // namespace Upstream

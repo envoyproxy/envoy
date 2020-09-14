@@ -25,16 +25,8 @@ health_check_config {
     }
 }
 actions {
-    raise_event {
-        remote_close {
-
-        }
-    }
+    raise_event: REMOTE_CLOSE
 }
 actions {
-    raise_event {
-        remote_close {
-
-        }
-    }
+    raise_event: REMOTE_CLOSE
 }

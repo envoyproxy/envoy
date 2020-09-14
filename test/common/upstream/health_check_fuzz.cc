@@ -29,6 +29,7 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();
   expectStreamCreate(0);
+  // This sets up the possibility of testing hosts that never become healthy
   if (input.start_failed()) {
     cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
         Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -37,17 +38,17 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
   ON_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillByDefault(testing::Return(45000));
   // If has an initial jitter, this calls onIntervalBase and finishes startup
-  if (input.health_check_config().initial_jitter().seconds() != 0) {
+  if (input.health_check_config().initial_jitter().seconds() != 0 ||
+      input.health_check_config().initial_jitter().nanos() >= 500000) {
     test_sessions_[0]->interval_timer_->invokeCallback();
   }
-  reuse_connection_ = true;
-  if (input.health_check_config().has_reuse_connection()) { // TODO: Does this make sense?
+  if (input.health_check_config().has_reuse_connection()) {
     reuse_connection_ = input.health_check_config().reuse_connection().value();
   }
   replay(input);
 }
 
-void HealthCheckFuzz::respondHttp(test::fuzz::Headers headers, absl::string_view status) {
+void HealthCheckFuzz::respondHttp(const test::fuzz::Headers& headers, absl::string_view status) {
 
   // Timeout timer needs to be explicitly enabled, usually by onIntervalBase() (Callback on interval
   // timer).
@@ -62,8 +63,6 @@ void HealthCheckFuzz::respondHttp(test::fuzz::Headers headers, absl::string_view
 
   response_headers->setStatus(status);
 
-  ENVOY_LOG_MISC(trace, "Responded headers");
-
   // Responding with http can cause client to close, if so create a new one.
   bool client_will_close = false;
   if (response_headers->Connection()) {
@@ -72,12 +71,14 @@ void HealthCheckFuzz::respondHttp(test::fuzz::Headers headers, absl::string_view
                                Http::Headers::get().ConnectionValues.Close);
   }
 
-  if (response_headers->ProxyConnection()) {
+  // If client already will close from connection header, no need for this check.
+  if (response_headers->ProxyConnection() && !client_will_close) {
     client_will_close =
         absl::EqualsIgnoreCase(response_headers->ProxyConnection()->value().getStringView(),
                                Http::Headers::get().ConnectionValues.Close);
   }
 
+  ENVOY_LOG_MISC(trace, "Responded headers {}", response_headers);
   test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), true);
 
   if (!reuse_connection_ || client_will_close) {
@@ -116,18 +117,19 @@ void HealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
   }
 }
 
-void HealthCheckFuzz::raiseEvent(test::common::upstream::RaiseEvent event, bool last_action) {
+void HealthCheckFuzz::raiseEvent(const test::common::upstream::RaiseEvent& event,
+                                 bool last_action) {
   Network::ConnectionEvent eventType;
-  switch (event.event_selector_case()) {
-  case test::common::upstream::RaiseEvent::kConnected: {
+  switch (event) {
+  case test::common::upstream::RaiseEvent::CONNECTED: {
     eventType = Network::ConnectionEvent::Connected;
     break;
   }
-  case test::common::upstream::RaiseEvent::kRemoteClose: {
+  case test::common::upstream::RaiseEvent::REMOTE_CLOSE: {
     eventType = Network::ConnectionEvent::RemoteClose;
     break;
   }
-  case test::common::upstream::RaiseEvent::kLocalClose: {
+  case test::common::upstream::RaiseEvent::LOCAL_CLOSE: {
     eventType = Network::ConnectionEvent::LocalClose;
     break;
   }
@@ -152,10 +154,10 @@ void HealthCheckFuzz::raiseEvent(test::common::upstream::RaiseEvent event, bool 
   }
 }
 
-void HealthCheckFuzz::replay(test::common::upstream::HealthCheckTestCase input) {
+void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& input) {
   for (int i = 0; i < input.actions().size(); ++i) {
     const auto& event = input.actions(i);
-    bool last_action = i == input.actions().size() - 1;
+    const bool last_action = i == input.actions().size() - 1;
     ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
     switch (event.action_selector_case()) { // TODO: Once added implementations for tcp and gRPC,
                                             // move this to a separate method, handleHttp

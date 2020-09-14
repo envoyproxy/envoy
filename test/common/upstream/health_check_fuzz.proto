@@ -17,19 +17,10 @@ message Respond {
   HttpRespond http_respond = 1;
 }
 
-message TriggerIntervalTimer {
-}
-
-message TriggerTimeoutTimer {
-}
-
-message RaiseEvent {
-  oneof event_selector {
-    option (validate.required) = true;
-    google.protobuf.Empty connected = 1;
-    google.protobuf.Empty remote_close = 2;
-    google.protobuf.Empty local_close = 3;
-  }
+enum RaiseEvent {
+  CONNECTED = 0;
+  REMOTE_CLOSE = 1;
+  LOCAL_CLOSE = 2;
 }
 
 message Action {
@@ -45,7 +36,8 @@ message Action {
 message HealthCheckTestCase {
   envoy.config.core.v3.HealthCheck health_check_config = 1
       [(validate.rules).message.required = true];
-  repeated Action actions = 2;
+  repeated Action actions =
+      2; //TODO: Timeouts might eventually come up from this becoming too big. If so, can simply add a check in replay loop.
   bool http_verify_cluster = 3; //Determines if verify cluster setting is on
   bool start_failed = 4;
 }
