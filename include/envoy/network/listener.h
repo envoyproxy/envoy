@@ -198,6 +198,8 @@ public:
 
   virtual void setupNewConnection(Network::ConnectionPtr server_conn,
                                   Network::ConnectionSocketPtr socket) PURE;
+  virtual void onNewSocket(Network::ConnectionSocketPtr socket,
+                           Network::ConnectionPtr server_conn) PURE;
 };
 
 /**

@@ -13,20 +13,28 @@
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Network {
-
+namespace {
+  uint64_t next_internal_connection_id = 0;
+}
 void InternalListenerImpl::setupInternalListener(Event::DispatcherImpl& dispatcher,
                                                  const std::string& listener_id) {
   dispatcher.registerInternalListener(
       listener_id,
       [this](const Address::InstanceConstSharedPtr& address, Network::ConnectionPtr server_conn) {
-        Network::ConnectionSocketPtr socket = std::make_unique<Network::ConnectionSocketImpl>(
+        address->asString()
+        auto socket = std::make_unique<Network::InternalConnectionSocketImpl>(
             nullptr,
             // Local
             address,
             // Remote
-            std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
+            std::make_shared<Network::Address::EnvoyInternalAddress>(absl::StrCat(
+              address->asString(),
+              "-",
+              ++next_internal_connection_id));
         cb_.setupNewConnection(std::move(server_conn), std::move(socket));
       });
 }

@@ -198,12 +198,13 @@ private:
   static std::atomic<uint64_t> global_accepted_socket_count_;
 };
 
-// InternalSocketImpl used with internal listener. The owned IoHandle is not referring to any OS fd.
-class InternalSocketImpl : public ConnectionSocketImpl {
-  InternalSocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address,
+// InternalConnectionSocketImpl used with internal listener. The owned IoHandle is not referring to any OS fd.
+class InternalConnectionSocketImpl : public ConnectionSocketImpl {
+public:
+  InternalConnectionSocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address,
                      const Address::InstanceConstSharedPtr& remote_address)
       : ConnectionSocketImpl(std::move(io_handle), local_address, remote_address) {}
-  ~InternalSocketImpl() override = default;
+  ~InternalConnectionSocketImpl() override = default;
 };
 
 // ConnectionSocket used with client connections.

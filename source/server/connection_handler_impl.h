@@ -20,6 +20,7 @@
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"
 #include "common/network/internal_listener_impl.h"
+#include "common/network/listen_socket_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "spdlog/spdlog.h"
@@ -209,7 +210,8 @@ private:
     // Network::InternalListenerCallbacks
     void setupNewConnection(Network::ConnectionPtr server_conn,
                             Network::ConnectionSocketPtr socket) override;
-
+    void onNewSocket(Network::ConnectionSocketPtr socket,
+                     Network::ConnectionPtr server_conn) override;
     // ActiveListenerImplBase
     Network::Listener* listener() override { return internal_listener_.get(); }
     void pauseListening() override { internal_listener_->disable(); }
@@ -310,19 +312,19 @@ private:
                            public Event::DeferredDeletable {
     ActiveTcpSocket(ActiveTcpListener& listener, Network::ConnectionSocketPtr&& socket,
                     bool hand_off_restored_destination_connections)
-        : listener_(listener), socket_(std::move(socket)),
+        : stream_listener_(listener), socket_(std::move(socket)),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
           iter_(accept_filters_.end()), stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
-                                            listener_.parent_.dispatcher_.timeSource(),
+                                            stream_listener_.parent_.dispatcher_.timeSource(),
                                             StreamInfo::FilterState::LifeSpan::Connection)) {
-      listener_.stats_.downstream_pre_cx_active_.inc();
+      stream_listener_.stats_.downstream_pre_cx_active_.inc();
       stream_info_->setDownstreamLocalAddress(socket_->localAddress());
       stream_info_->setDownstreamRemoteAddress(socket_->remoteAddress());
       stream_info_->setDownstreamDirectRemoteAddress(socket_->directRemoteAddress());
     }
     ~ActiveTcpSocket() override {
       accept_filters_.clear();
-      listener_.stats_.downstream_pre_cx_active_.dec();
+      stream_listener_.stats_.downstream_pre_cx_active_.dec();
 
       // If the underlying socket is no longer attached, it means that it has been transferred to
       // an active connection. In this case, the active connection will decrement the number
@@ -332,7 +334,7 @@ private:
       // ActiveTcpConnection, having a shared object which does accounting (but would require
       // another allocation, etc.).
       if (socket_ != nullptr) {
-        listener_.decNumConnections();
+        stream_listener_.decNumConnections();
       }
     }
 
@@ -379,7 +381,7 @@ private:
 
     // Network::ListenerFilterCallbacks
     Network::ConnectionSocket& socket() override { return *socket_.get(); }
-    Event::Dispatcher& dispatcher() override { return listener_.parent_.dispatcher_; }
+    Event::Dispatcher& dispatcher() override { return stream_listener_.parent_.dispatcher_; }
     void continueFilterChain(bool success) override;
     void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override;
     envoy::config::core::v3::Metadata& dynamicMetadata() override {
@@ -389,7 +391,7 @@ private:
       return stream_info_->dynamicMetadata();
     };
 
-    ActiveTcpListener& listener_;
+    ActiveTcpListener& stream_listener_;
     Network::ConnectionSocketPtr socket_;
     const bool hand_off_restored_destination_connections_;
     std::list<ListenerFilterWrapperPtr> accept_filters_;

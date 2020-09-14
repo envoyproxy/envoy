@@ -42,7 +42,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
                                         Network::ListenerConfig& config) {
   ActiveListenerDetails details;
   if (config.isInternalListener()) {
-
+    //TODO(lambdai): register internal listener here.
   } else if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {
     if (overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
@@ -233,12 +233,12 @@ ConnectionHandlerImpl::findActiveTcpListenerByAddress(const Network::Address::In
 }
 
 void ConnectionHandlerImpl::ActiveTcpSocket::onTimeout() {
-  listener_.stats_.downstream_pre_cx_timeout_.inc();
+  stream_listener_.stats_.downstream_pre_cx_timeout_.inc();
   ASSERT(inserted());
   ENVOY_LOG(debug, "listener filter times out after {} ms",
-            listener_.listener_filters_timeout_.count());
+            stream_listener_.listener_filters_timeout_.count());
 
-  if (listener_.continue_on_listener_filters_timeout_) {
+  if (stream_listener_.continue_on_listener_filters_timeout_) {
     ENVOY_LOG(debug, "fallback to default listener filter");
     newConnection();
   }
@@ -246,22 +246,22 @@ void ConnectionHandlerImpl::ActiveTcpSocket::onTimeout() {
 }
 
 void ConnectionHandlerImpl::ActiveTcpSocket::startTimer() {
-  if (listener_.listener_filters_timeout_.count() > 0) {
-    timer_ = listener_.parent_.dispatcher_.createTimer([this]() -> void { onTimeout(); });
-    timer_->enableTimer(listener_.listener_filters_timeout_);
+  if (stream_listener_.listener_filters_timeout_.count() > 0) {
+    timer_ = stream_listener_.parent_.dispatcher_.createTimer([this]() -> void { onTimeout(); });
+    timer_->enableTimer(stream_listener_.listener_filters_timeout_);
   }
 }
 
 void ConnectionHandlerImpl::ActiveTcpSocket::unlink() {
-  ActiveTcpSocketPtr removed = removeFromList(listener_.sockets_);
+  ActiveTcpSocketPtr removed = removeFromList(stream_listener_.sockets_);
   if (removed->timer_ != nullptr) {
     removed->timer_->disableTimer();
   }
   // Emit logs if a connection is not established.
   if (!connected_) {
-    emitLogs(*listener_.config_, *stream_info_);
+    emitLogs(*stream_listener_.config_, *stream_info_);
   }
-  listener_.parent_.dispatcher_.deferredDelete(std::move(removed));
+  stream_listener_.parent_.dispatcher_.deferredDelete(std::move(removed));
 }
 
 void ConnectionHandlerImpl::ActiveTcpSocket::continueFilterChain(bool success) {
@@ -316,7 +316,7 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
 
   if (hand_off_restored_destination_connections_ && socket_->localAddressRestored()) {
     // Find a listener associated with the original destination address.
-    new_listener = listener_.parent_.findActiveTcpListenerByAddress(*socket_->localAddress());
+    new_listener = stream_listener_.parent_.findActiveTcpListenerByAddress(*socket_->localAddress());
   }
   if (new_listener.has_value()) {
     // Hands off connections redirected by iptables to the listener associated with the
@@ -326,7 +326,7 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
     // initially accepted. Note also that we must account for the number of connections properly
     // across both listeners.
     // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting better.
-    listener_.decNumConnections();
+    stream_listener_.decNumConnections();
     new_listener.value().get().incNumConnections();
     new_listener.value().get().onAcceptWorker(std::move(socket_), false, true);
   } else {
@@ -341,7 +341,7 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
     // Particularly the assigned events need to reset before assigning new events in the follow up.
     accept_filters_.clear();
     // Create a new connection on this listener.
-    listener_.newConnection(std::move(socket_), std::move(stream_info_));
+    stream_listener_.newConnection(std::move(socket_), std::move(stream_info_));
   }
 }
 
@@ -653,6 +653,30 @@ void ConnectionHandlerImpl::ActiveInternalListener::shutdownListener() {
       internal_listener_->internal_listener_id_,
       /* connection_callback= */ nullptr);
 }
+
+void ConnectionHandlerImpl::ActiveInternalListener::onNewSocket(Network::ConnectionSocketPtr ,
+                                                                Network::ConnectionPtr) {
+  // TODO(lambdai): FIX ME after resolve reference to ActiveInternalListener.                                                                
+  ActiveTcpSocketPtr active_socket = nullptr;
+  // std::make_unique<ActiveTcpSocket>(
+  //     *this, std::move(socket), /* hand_off_restored_destination_connections=*/false);
+  // Create and run the filters
+  config_->filterChainFactory().createListenerFilterChain(*active_socket);
+  active_socket->continueFilterChain(true);
+
+  // Move active_socket to the sockets_ list if filter iteration needs to continue later.
+  // Otherwise we let active_socket be destructed when it goes out of scope.
+  if (active_socket->iter_ != active_socket->accept_filters_.end()) {
+    active_socket->startTimer();
+    LinkedList::moveIntoListBack(std::move(active_socket), sockets_);
+  } else {
+    // If active_socket is about to be destructed, emit logs if a connection is not created.
+    if (!active_socket->connected_) {
+      emitLogs(*config_, *active_socket->stream_info_);
+    }
+  }
+}
+
 // Copied from newConnection(). Invoked by SetupPipeListener.
 void ConnectionHandlerImpl::ActiveInternalListener::setupNewConnection(
     Network::ConnectionPtr server_conn, Network::ConnectionSocketPtr socket) {
