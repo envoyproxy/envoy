@@ -52,6 +52,7 @@ struct UpstreamRequestFilter : public Http::StreamDecoderFilter,
   UpstreamRequestFilter(UpstreamRequest& parent, std::unique_ptr<GenericConnPool>&& conn_pool);
   ~UpstreamRequestFilter();
 
+void resetStream();
   void disableDataFromDownstreamForFlowControl();
   void enableDataFromDownstreamForFlowControl();
 
@@ -214,7 +215,7 @@ public:
   absl::optional<Router::ConfigConstSharedPtr> routeConfig() override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  void requestRouteConfigUpdate(Event::Dispatcher&,
+  void requestRouteConfigUpdate(
                                 Http::RouteConfigUpdatedCallbackSharedPtr) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
@@ -303,6 +304,7 @@ private:
 
   UpstreamFilterFactory filter_factory_;
   Http::FilterManager filter_manager_;
+  UpstreamRequestFilter* filter_;
 
   friend UpstreamRequestFilter;
 };

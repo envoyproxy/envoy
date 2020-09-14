@@ -56,7 +56,7 @@ UpstreamRequestFilter::UpstreamRequestFilter(UpstreamRequest& parent,
       await_stream_(true) {}
 
 UpstreamRequestFilter::~UpstreamRequestFilter() {
-  clearRequestEncoder();
+    clearRequestEncoder();
 
   // If desired, fire the per-try histogram when the UpstreamRequest
   // completes.
@@ -72,6 +72,20 @@ UpstreamRequestFilter::~UpstreamRequestFilter() {
                                            parent_.parent_.timeout().per_try_timeout_));
   }
 }
+
+void UpstreamRequestFilter::resetStream() {
+  if (conn_pool_->cancelAnyPendingStream()) {
+    ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.parent_.callbacks());
+    ASSERT(!upstream_);
+  }
+
+  if (upstream_) {
+    ENVOY_STREAM_LOG(debug, "resetting pool request", *parent_.parent_.callbacks());
+    upstream_->resetStream();
+    clearRequestEncoder();
+  }
+}
+
 UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  std::unique_ptr<GenericConnPool>&& conn_pool)
     : parent_(parent), outlier_detection_timeout_recorded_(false), retried_(false),
@@ -83,8 +97,9 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                       parent_.callbacks()->decoderBufferLimit(), filter_factory_, noopLocalReply(),
                       conn_pool->protocol().value(), parent_.callbacks()->dispatcher().timeSource(),
                       nullptr, StreamInfo::FilterState::FilterChain) {
-  filter_manager_.addStreamDecoderFilter(
-      std::make_shared<UpstreamRequestFilter>(*this, std::move(conn_pool)));
+      auto filter = std::make_shared<UpstreamRequestFilter>(*this, std::move(conn_pool));
+  filter_manager_.addStreamDecoderFilter(filter);
+  filter_ = filter.get();
   if (parent_.config().start_child_span_) {
     span_ = parent_.callbacks()->activeSpan().spawnChild(
         parent_.callbacks()->tracingConfig(), "router " + parent.cluster()->name() + " egress",
@@ -267,7 +282,7 @@ void UpstreamRequestFilter::enableDataFromDownstreamForFlowControl() {
 }
 void UpstreamRequestFilter::onDestroy() {
   if (!parent_.decode_complete_) {
-    if (conn_pool_->cancelAnyPendingRequest()) {
+    if (conn_pool_->cancelAnyPendingStream()) {
       ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.parent_.callbacks());
       // ASSERT(!upstream_);
     }
@@ -292,7 +307,6 @@ void UpstreamRequestFilter::ActiveUpstreamRequest::decodeData(Buffer::Instance& 
   ScopeTrackerScopeState scope(&parent_.decoder_callbacks_->scope(),
                                parent_.decoder_callbacks_->dispatcher());
 
-  parent_.maybeEndDecode(end_stream);
   parent_.parent_.filter_manager_.streamInfo().addBytesReceived(data.length());
   parent_.decoder_callbacks_->encodeData(data, end_stream);
   // parent_.parent_.filter_manager_.decodeData(data, end_stream);
@@ -373,6 +387,7 @@ void UpstreamRequest::encodeUpstreamHeaders(bool end_stream) {
   ASSERT(!encode_complete_);
   encode_complete_ = end_stream;
 
+  filter_manager_.maybeEndDecode(end_stream);
   filter_manager_.decodeHeaders(*parent_.downstreamHeaders(), end_stream);
 
   // conn_pool_->newStream(this);
@@ -382,10 +397,12 @@ void UpstreamRequest::encodeUpstreamData(Buffer::Instance& data, bool end_stream
   ASSERT(!encode_complete_);
   encode_complete_ = end_stream;
 
+  filter_manager_.maybeEndDecode(end_stream);
   filter_manager_.decodeData(data, end_stream);
 }
 
 void UpstreamRequest::encodeUpstreamTrailers(Http::RequestTrailerMap& trailers) {
+  filter_manager_.maybeEndDecode(true);
   filter_manager_.decodeTrailers(trailers);
 }
 
@@ -410,7 +427,7 @@ void UpstreamRequestFilter::ActiveUpstreamRequest::onResetStream(
                                   Http::Utility::resetReasonToString(reason));
   }
 
-  if (parent_.conn_pool_->cancelAnyPendingRequest()) {
+  if (parent_.conn_pool_->cancelAnyPendingStream()) {
     ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.parent_.parent_.callbacks());
     ASSERT(!parent_.upstream_);
   }
@@ -436,6 +453,7 @@ void UpstreamRequest::resetStream() {
     span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
   }
 
+filter_->resetStream();
   // TODO(snowp): blla
   // if (conn_pool_->cancelAnyPendingStream()) {
   //   ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.callbacks());
