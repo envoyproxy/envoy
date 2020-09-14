@@ -146,7 +146,7 @@ protected:
     // The state of whether client hellos can be buffered or not is different before and after
     // the first packet processed by the listener. This only matters in tests. Force an event
     // to get it into a consistent state.
-    dispatcher_->post([this]() { quic_listener_->processBuffered(); });
+    dispatcher_->post([this]() { quic_listener_->onReadReady(); });
 
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }

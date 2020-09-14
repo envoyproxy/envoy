@@ -39,7 +39,6 @@ public:
   ~ActiveQuicListener() override;
 
   void onListenerShutdown();
-  void processBuffered();
   uint64_t eventLoopsWithBufferedChlos() const { return event_loops_with_buffered_chlo_; }
 
   // Network::UdpListenerCallbacks
@@ -70,8 +69,6 @@ private:
   Network::Socket& listen_socket_;
   Runtime::FeatureFlag enabled_;
   Network::UdpPacketWriter* udp_packet_writer_;
-  Event::SchedulableCallbackPtr schedule_process_buffered_;
-  bool schedule_process_buffered_enabled_{false};
 
   // The number of runs of the event loop in which at least one CHLO was buffered.
   uint64_t event_loops_with_buffered_chlo_{0};

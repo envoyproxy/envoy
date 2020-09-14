@@ -125,6 +125,8 @@ Api::IoCallUint64Result UdpListenerImpl::flush() {
   return cb_.udpPacketWriter().flush();
 }
 
+void UdpListenerImpl::activateRead() { file_event_->activate(Event::FileReadyType::Read); }
+
 UdpListenerWorkerRouterImpl::UdpListenerWorkerRouterImpl(uint32_t concurrency)
     : workers_(concurrency) {}
 

@@ -39,9 +39,7 @@ ActiveQuicListener::ActiveQuicListener(
           worker_id, parent, dispatcher.createUdpListener(listen_socket, *this), &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
       kernel_worker_routing_(kernel_worker_routing), listen_socket_(*listen_socket),
-      enabled_(enabled, Runtime::LoaderSingleton::get()),
-      schedule_process_buffered_(
-          dispatcher.createSchedulableCallback([this]() { processBuffered(); })) {
+      enabled_(enabled, Runtime::LoaderSingleton::get()) {
   if (options != nullptr) {
     const bool ok = Network::Socket::applyOptions(
         options, listen_socket_, envoy::config::core::v3::SocketOption::STATE_BOUND);
@@ -118,19 +116,13 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData& data) {
                                   /*owns_header_buffer*/ false);
   quic_dispatcher_->ProcessPacket(self_address, peer_address, packet);
 
-  if (!schedule_process_buffered_enabled_) {
-    // On event loop runs where this listener reads or has packets posted to it, process buffered
-    // packets on the next loop. This ensures that the limit of processed client hellos per loop is
-    // honored, and that buffered client hellos are processed in a timely fashion.
-    schedule_process_buffered_->scheduleCallbackNextIteration();
-    schedule_process_buffered_enabled_ = true;
-  }
+  // On event loop runs where this listener reads or has packets posted to it, process buffered
+  // packets on the next loop. This ensures that the limit of processed client hellos per loop is
+  // honored, and that buffered client hellos are processed in a timely fashion.
+  udp_listener_->activateRead();
 }
 
-void ActiveQuicListener::onReadReady() {}
-
-void ActiveQuicListener::processBuffered() {
-  schedule_process_buffered_enabled_ = false;
+void ActiveQuicListener::onReadReady() {
 
   if (!enabled_.enabled()) {
     ENVOY_LOG(trace, "Quic listener {}: runtime disabled", config_->name());
@@ -145,8 +137,7 @@ void ActiveQuicListener::processBuffered() {
 
   // If there were more buffered than the limit, schedule again for the next event loop.
   if (quic_dispatcher_->HasChlosBuffered()) {
-    schedule_process_buffered_->scheduleCallbackNextIteration();
-    schedule_process_buffered_enabled_ = true;
+    udp_listener_->activateRead();
   }
 }
 
