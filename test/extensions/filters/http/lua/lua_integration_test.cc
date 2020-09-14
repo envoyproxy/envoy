@@ -24,6 +24,9 @@ public:
         new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
     fake_upstreams_.emplace_back(
         new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+    // Create the xDS upstream.
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
 
   void initializeFilter(const std::string& filter_config, const std::string& domain = "*") {
@@ -94,7 +97,53 @@ public:
       auto* alt_cluster = bootstrap.mutable_static_resources()->add_clusters();
       alt_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       alt_cluster->set_name("alt_cluster");
+
+      auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      xds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      xds_cluster->set_name("xds_cluster");
+      xds_cluster->mutable_http2_protocol_options();
     });
+  }
+
+  void initializeWithRds(const std::string& filter_config, const std::string& route_config_name,
+                         const std::string& initial_route_config) {
+    config_helper_.addFilter(filter_config);
+
+    // Create static clusters.
+    createClusters();
+
+    // Set RDS config source.
+    config_helper_.addConfigModifier(
+        [route_config_name](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          hcm.mutable_rds()->set_route_config_name(route_config_name);
+          envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
+              hcm.mutable_rds()->mutable_config_source()->mutable_api_config_source();
+          rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+          envoy::config::core::v3::GrpcService* grpc_service =
+              rds_api_config_source->add_grpc_services();
+          grpc_service->mutable_envoy_grpc()->set_cluster_name("xds_cluster");
+        });
+
+    on_server_init_function_ = [&]() {
+      AssertionResult result =
+          fake_upstreams_[3]->waitForHttpConnection(*dispatcher_, xds_connection_);
+      RELEASE_ASSERT(result, result.message());
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+                                              {route_config_name}, true));
+      sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+          Config::TypeUrl::get().RouteConfiguration,
+          {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+              initial_route_config)},
+          "1");
+    };
+    initialize();
+    registerTestServerPorts({"http"});
   }
 
   void cleanup() {
@@ -110,6 +159,13 @@ public:
       RELEASE_ASSERT(result, result.message());
       result = fake_upstream_connection_->waitForDisconnect();
       RELEASE_ASSERT(result, result.message());
+    }
+    if (xds_connection_ != nullptr) {
+      AssertionResult result = xds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = xds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      xds_connection_ = nullptr;
     }
   }
 
@@ -594,11 +650,8 @@ typed_config:
   cleanup();
 }
 
-// Test whether LuaPerRoute works properly. Since this test is mainly for configuration, the Lua
-// script can be very simple.
-TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
-  const std::string FILTER_AND_CODE =
-      R"EOF(
+const std::string FILTER_AND_CODE =
+    R"EOF(
 name: lua
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
@@ -618,8 +671,9 @@ typed_config:
           request_handle:headers():add("code", "code_from_byebye")
         end
 )EOF";
-  const std::string INITIAL_ROUTE_CONFIG =
-      R"EOF(
+
+const std::string INITIAL_ROUTE_CONFIG =
+    R"EOF(
 name: basic_lua_routes
 virtual_hosts:
 - name: rds_vhost_1
@@ -654,6 +708,18 @@ virtual_hosts:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         name: byebye.lua
   - match:
+      prefix: "/lua/per/route/inline"
+    route:
+      cluster: lua_cluster
+    typed_per_filter_config:
+      envoy.filters.http.lua:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+        source_code:
+          inline_string: |
+            function envoy_on_request(request_handle)
+              request_handle:headers():add("code", "inline_code_from_inline")
+            end
+  - match:
       prefix: "/lua/per/route/nocode"
     route:
       cluster: lua_cluster
@@ -663,12 +729,48 @@ virtual_hosts:
         name: nocode.lua
 )EOF";
 
+const std::string UPDATE_ROUTE_CONFIG =
+    R"EOF(
+name: basic_lua_routes
+virtual_hosts:
+- name: rds_vhost_1
+  domains: ["lua.per.route"]
+  routes:
+  - match:
+      prefix: "/lua/per/route/hello"
+    route:
+      cluster: lua_cluster
+    typed_per_filter_config:
+      envoy.filters.http.lua:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+        source_code:
+          inline_string: |
+            function envoy_on_request(request_handle)
+              request_handle:headers():add("code", "inline_code_from_hello")
+            end
+  - match:
+      prefix: "/lua/per/route/inline"
+    route:
+      cluster: lua_cluster
+    typed_per_filter_config:
+      envoy.filters.http.lua:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+        source_code:
+          inline_string: |
+            function envoy_on_request(request_handle)
+              request_handle:headers():add("code", "new_inline_code_from_inline")
+            end
+)EOF";
+
+// Test whether LuaPerRoute works properly. Since this test is mainly for configuration, the Lua
+// script can be very simple.
+TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
   initializeWithYaml(FILTER_AND_CODE, INITIAL_ROUTE_CONFIG);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto check_request = [this](const Http::TestRequestHeaderMapImpl& request_headers,
-                              const std::string& expected_value) {
+  auto check_request = [this](Http::TestRequestHeaderMapImpl request_headers,
+                              std::string expected_value) {
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
     waitForNextUpstreamRequest(1);
 
@@ -708,7 +810,6 @@ virtual_hosts:
                                                {":scheme", "http"},
                                                {":authority", "lua.per.route"},
                                                {"x-forwarded-for", "10.0.0.1"}};
-
   check_request(hello_headers, "code_from_hello");
 
   Http::TestRequestHeaderMapImpl byebye_headers{{":method", "GET"},
@@ -717,6 +818,14 @@ virtual_hosts:
                                                 {":authority", "lua.per.route"},
                                                 {"x-forwarded-for", "10.0.0.1"}};
   check_request(byebye_headers, "code_from_byebye");
+
+  // Test whether LuaPerRoute can directly provide inline Lua code.
+  Http::TestRequestHeaderMapImpl inline_headers{{":method", "GET"},
+                                                {":path", "/lua/per/route/inline"},
+                                                {":scheme", "http"},
+                                                {":authority", "lua.per.route"},
+                                                {"x-forwarded-for", "10.0.0.1"}};
+  check_request(inline_headers, "inline_code_from_inline");
 
   // When the name referenced by LuaPerRoute does not exist, Lua filter does nothing.
   Http::TestRequestHeaderMapImpl nocode_headers{{":method", "GET"},
@@ -727,6 +836,68 @@ virtual_hosts:
 
   check_request(nocode_headers, "");
   cleanup();
+}
+
+// Test whether Rds can correctly deliver LuaPerRoute configuration.
+TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
+// When the route configuration is updated dynamically via RDS and the configuration contains an
+// inline Lua code, Envoy may call lua_open in multiple threads to create new lua_State objects.
+// During lua_State creation, 'LuaJIT' uses some static local variables shared by multiple threads
+// to aid memory allocation. Although 'LuaJIT' itself guarantees that there is no thread safety
+// issue here, the use of these static local variables by multiple threads will cause a TSAN alarm.
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+  ENVOY_LOG_MISC(critical, "LuaIntegrationTest::RdsTestOfLuaPerRoute not supported by this "
+                           "compiler configuration");
+#else
+  initializeWithRds(FILTER_AND_CODE, "basic_lua_routes", INITIAL_ROUTE_CONFIG);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto check_request = [this](Http::TestRequestHeaderMapImpl request_headers,
+                              std::string expected_value) {
+    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    waitForNextUpstreamRequest(1);
+
+    auto* entry = upstream_request_->headers().get(Http::LowerCaseString("code"));
+    if (!expected_value.empty()) {
+      EXPECT_EQ(expected_value, entry->value().getStringView());
+    } else {
+      EXPECT_EQ(nullptr, entry);
+    }
+
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    response->waitForEndStream();
+
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  };
+
+  Http::TestRequestHeaderMapImpl hello_headers{{":method", "GET"},
+                                               {":path", "/lua/per/route/hello"},
+                                               {":scheme", "http"},
+                                               {":authority", "lua.per.route"},
+                                               {"x-forwarded-for", "10.0.0.1"}};
+  check_request(hello_headers, "code_from_hello");
+
+  Http::TestRequestHeaderMapImpl inline_headers{{":method", "GET"},
+                                                {":path", "/lua/per/route/inline"},
+                                                {":scheme", "http"},
+                                                {":authority", "lua.per.route"},
+                                                {"x-forwarded-for", "10.0.0.1"}};
+  check_request(inline_headers, "inline_code_from_inline");
+
+  // Update route config by RDS. Test whether RDS can work normally.
+  sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration,
+      {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(UPDATE_ROUTE_CONFIG)},
+      "2");
+  test_server_->waitForCounterGe("http.config_test.rds.basic_lua_routes.update_success", 2);
+
+  check_request(hello_headers, "inline_code_from_hello");
+  check_request(inline_headers, "new_inline_code_from_inline");
+
+  cleanup();
+#endif
 }
 
 } // namespace

@@ -88,12 +88,6 @@ public:
   }
 
   /**
-   * Obtain platform specific null device path
-   * @return const std::string& null device path
-   */
-  static const std::string& nullDevicePath();
-
-  /**
    * Obtain platform specific new line character(s)
    * @return absl::string_view platform specific new line character(s)
    */

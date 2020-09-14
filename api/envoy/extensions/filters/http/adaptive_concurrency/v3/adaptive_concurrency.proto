@@ -51,10 +51,11 @@ message GradientControllerConfig {
         "envoy.config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig."
         "MinimumRTTCalculationParams";
 
-    // The time interval between recalculating the minimum request round-trip time.
+    // The time interval between recalculating the minimum request round-trip time. Has to be
+    // positive.
     google.protobuf.Duration interval = 1 [(validate.rules).duration = {
       required: true
-      gt {}
+      gte {nanos: 1000000}
     }];
 
     // The number of requests to aggregate/sample during the minRTT recalculation window before

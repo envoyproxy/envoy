@@ -98,7 +98,6 @@ TEST_P(ProtocolIntegrationTest, TrailerSupportHttp1) {
 TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
   auto response = makeHeaderOnlyRequest(nullptr, 0);
   // Shut down the server with active connection pool connections.
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   test_server_.reset();
   checkSimpleRequestSuccess(0U, 0U, response.get());
 }
@@ -257,6 +256,34 @@ TEST_P(ProtocolIntegrationTest, AddBodyToResponseAndWaitForIt) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("body", response->body());
+}
+
+TEST_P(ProtocolIntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
+  config_helper_.addFilter(R"EOF(
+  name: continue-headers-only-inject-body-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send a headers only request.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Make sure that the body was injected to the request.
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(upstream_request_->receivedData());
+  EXPECT_EQ(upstream_request_->body().toString(), "body");
+
+  // Send a headers only response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+
+  // Make sure that the body was injected to the response.
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->body(), "body");
 }
 
 TEST_P(ProtocolIntegrationTest, AddEncodedTrailers) {
@@ -802,9 +829,6 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // Envoy will likely connect and proxy some unspecified amount of data before
-  // hitting the buffer limit and disconnecting. Ignore this if it happens.
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   auto response = codec_client_->makeRequestWithBody(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/dynamo/url"},
@@ -850,7 +874,6 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
 
   // Now send an overly large response body. At some point, too much data will
   // be buffered, the stream will be reset, and the connection will disconnect.
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   upstream_request_->encodeData(1024 * 65, false);
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
@@ -1015,10 +1038,6 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
-    // The invalid data will trigger disconnect.
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-  }
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   waitForNextUpstreamRequest();
@@ -1422,7 +1441,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
@@ -1560,7 +1578,6 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
     ASSERT(downstreamProtocol() == Http::CodecClient::Type::HTTP2);
     if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
       auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-      fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
       ASSERT_TRUE(
           fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
       response->waitForEndStream();
@@ -1949,7 +1966,6 @@ TEST_P(DownstreamProtocolIntegrationTest, TestPrefetch) {
 TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeout) {
   config_helper_.setDownstreamMaxStreamDuration(std::chrono::milliseconds(500));
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
@@ -1971,7 +1987,6 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeoutLegacy) {
                                     "false");
   config_helper_.setDownstreamMaxStreamDuration(std::chrono::milliseconds(500));
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
@@ -1991,7 +2006,6 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeoutLegacy) {
 // Make sure that invalid authority headers get blocked at or before the HCM.
 TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
