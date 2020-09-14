@@ -25,6 +25,10 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/context_impl.h"
+#include "extensions/transport_sockets/tls/ssl_socket.h"
+
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/test_host_predicate_config.h"
@@ -226,6 +230,28 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
                                                   downstream_protocol_);
 }
 
+Network::TransportSocketFactoryPtr HttpIntegrationTest::createUpstreamTlsContext() {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string yaml = absl::StrFormat(
+      R"EOF(
+common_tls_context:
+  tls_certificates:
+  - certificate_chain: { filename: "%s" }
+    private_key: { filename: "%s" }
+  validation_context:
+    trusted_ca: { filename: "%s" }
+require_client_certificate: true
+)EOF",
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"),
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"),
+      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+  TestUtility::loadFromYaml(yaml, tls_context);
+  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+      tls_context, factory_context_);
+  static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
+  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+      std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+}
 IntegrationCodecClientPtr
 HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
   auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
