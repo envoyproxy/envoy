@@ -17,6 +17,15 @@
 namespace Envoy {
 namespace Server {
 
+namespace {
+void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_info) {
+  stream_info.onRequestComplete();
+  for (const auto& access_log : config.accessLogs()) {
+    access_log->log(nullptr, nullptr, nullptr, stream_info);
+  }
+}
+} // namespace
+
 ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher), per_handler_stat_prefix_(dispatcher.name() + "."),
       disable_listeners_(false) {}
@@ -245,6 +254,10 @@ void ConnectionHandlerImpl::ActiveTcpSocket::unlink() {
   if (removed->timer_ != nullptr) {
     removed->timer_->disableTimer();
   }
+  // Emit logs if a connection is not established.
+  if (!connected_) {
+    emitLogs(*listener_.config_, *stream_info_);
+  }
   listener_.parent_.dispatcher_.deferredDelete(std::move(removed));
 }
 
@@ -289,10 +302,12 @@ void ConnectionHandlerImpl::ActiveTcpSocket::continueFilterChain(bool success) {
 
 void ConnectionHandlerImpl::ActiveTcpSocket::setDynamicMetadata(const std::string& name,
                                                                 const ProtobufWkt::Struct& value) {
-  (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
+  stream_info_->setDynamicMetadata(name, value);
 }
 
 void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
+  connected_ = true;
+
   // Check if the socket may need to be redirected to another listener.
   ActiveTcpListenerOptRef new_listener;
 
@@ -323,7 +338,7 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
     // Particularly the assigned events need to reset before assigning new events in the follow up.
     accept_filters_.clear();
     // Create a new connection on this listener.
-    listener_.newConnection(std::move(socket_), dynamicMetadata());
+    listener_.newConnection(std::move(socket_), std::move(stream_info_));
   }
 }
 
@@ -363,32 +378,16 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
   if (active_socket->iter_ != active_socket->accept_filters_.end()) {
     active_socket->startTimer();
     LinkedList::moveIntoListBack(std::move(active_socket), sockets_);
+  } else {
+    // If active_socket is about to be destructed, emit logs if a connection is not created.
+    if (!active_socket->connected_) {
+      emitLogs(*config_, *active_socket->stream_info_);
+    }
   }
 }
-
-namespace {
-void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_info) {
-  stream_info.onRequestComplete();
-  for (const auto& access_log : config.accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, stream_info);
-  }
-}
-} // namespace
 
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
-    Network::ConnectionSocketPtr&& socket,
-    const envoy::config::core::v3::Metadata& dynamic_metadata) {
-  auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
-      parent_.dispatcher_.timeSource(), StreamInfo::FilterState::LifeSpan::Connection);
-  stream_info->setDownstreamLocalAddress(socket->localAddress());
-  stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
-  stream_info->setDownstreamDirectRemoteAddress(socket->directRemoteAddress());
-
-  // merge from the given dynamic metadata if it's not empty
-  if (dynamic_metadata.filter_metadata_size() > 0) {
-    stream_info->dynamicMetadata().MergeFrom(dynamic_metadata);
-  }
-
+    Network::ConnectionSocketPtr&& socket, std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
   if (filter_chain == nullptr) {
