@@ -487,17 +487,6 @@ void UpstreamRequest::resetStream() {
   }
 
   filter_->resetStream();
-  // TODO(snowp): blla
-  // if (conn_pool_->cancelAnyPendingStream()) {
-  //   ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.callbacks());
-  //   ASSERT(!upstream_);
-  // }
-
-  // if (upstream_) {
-  //   ENVOY_STREAM_LOG(debug, "resetting pool request", *parent_.callbacks());
-  //   // upstream_->resetStream();
-  //   // clearRequestEncoder();
-  // }
 }
 
 void UpstreamRequest::setupPerTryTimeout() {
