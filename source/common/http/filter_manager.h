@@ -31,7 +31,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // corresponding data. Those functions handle state updates and data storage (if needed)
   // according to the status returned by filter's callback functions.
   bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
-  bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& headers_only);
+  bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& end_stream,
+                                        bool& headers_only);
   bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
                                      bool& buffer_was_streaming);
   bool commonHandleAfterTrailersCallback(FilterTrailersStatus status);
@@ -195,9 +196,6 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   FilterHeadersStatus decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
     is_grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
     FilterHeadersStatus status = handle_->decodeHeaders(headers, end_stream);
-    if (end_stream) {
-      handle_->decodeComplete();
-    }
     return status;
   }
 
@@ -206,7 +204,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   void requestRouteConfigUpdate(
       Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
-  absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
+  absl::optional<Router::ConfigConstSharedPtr> routeConfig();
 
   StreamDecoderFilterSharedPtr handle_;
   bool is_grpc_request_{};
@@ -431,8 +429,7 @@ public:
    * Update the current route configuration.
    */
   virtual void
-  requestRouteConfigUpdate(Event::Dispatcher& thread_local_dispatcher,
-                           Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+  requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
 
   /**
    * Returns the current active span.

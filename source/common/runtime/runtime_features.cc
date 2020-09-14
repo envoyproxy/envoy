@@ -76,11 +76,13 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
     "envoy.reloadable_features.listener_in_place_filterchain_update",
+    "envoy.reloadable_features.new_tcp_connection_pool",
     "envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2",
     "envoy.reloadable_features.preserve_query_string_in_path_redirects",
     "envoy.reloadable_features.preserve_upstream_date",
     "envoy.reloadable_features.stop_faking_paths",
     "envoy.reloadable_features.strict_1xx_and_204_response_headers",
+    "envoy.reloadable_features.tls_use_io_handle_bio",
 };
 
 // This is a section for officially sanctioned runtime features which are too
@@ -94,8 +96,6 @@ constexpr const char* runtime_features[] = {
 constexpr const char* disabled_runtime_features[] = {
     // TODO(asraa) flip this feature after codec errors are handled
     "envoy.reloadable_features.new_codec_behavior",
-    // TODO(alyssawilk) flip true after the release.
-    "envoy.reloadable_features.new_tcp_connection_pool",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
 };
