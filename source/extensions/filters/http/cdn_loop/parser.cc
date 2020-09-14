@@ -333,7 +333,7 @@ StatusOr<ParsedCdnInfo> parseCdnInfo(const ParseContext& input) {
 }
 
 StatusOr<ParsedCdnInfoList> parseCdnInfoList(const ParseContext& input) {
-  std::vector<std::string_view> cdn_infos;
+  std::vector<absl::string_view> cdn_infos;
   ParseContext context = input;
 
   context.setNext(skipOptionalWhitespace(context));
