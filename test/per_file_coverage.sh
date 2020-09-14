@@ -85,10 +85,10 @@ DIRECTORY_THRESHOLD=$DEFAULT_COVERAGE_THRESHOLD
 # Set their low bar as their current coverage level.
 get_coverage_target() {
   DIRECTORY_THRESHOLD=$DEFAULT_COVERAGE_THRESHOLD
-  for FILE_PERCENT in ${KNOWN_LOW_COVERAGE[@]}
+  for FILE_PERCENT in "${KNOWN_LOW_COVERAGE[@]}"
   do
-    if [[ $FILE_PERCENT =~ "$1:" ]]; then
-      DIRECTORY_THRESHOLD=$(echo $FILE_PERCENT | sed 's/.*://')
+    if [[ $FILE_PERCENT =~ $1: ]]; then
+      DIRECTORY_THRESHOLD="${FILE_PERCENT//*:/}"
       return
     fi
   done
@@ -96,10 +96,11 @@ get_coverage_target() {
 
 # Make sure that for each directory with code, coverage doesn't dip
 # below the default coverage threshold.
-for DIRECTORY in $(find source/* -type d)
+SOURCES=$(find source/* -type d)
+while read -r DIRECTORY
 do
-  get_coverage_target $DIRECTORY
-  COVERAGE_VALUE=$(lcov -e $COVERAGE_DATA  "$DIRECTORY/*" -o /dev/null | grep line |  cut -d ' ' -f 4)
+  get_coverage_target "$DIRECTORY"
+  COVERAGE_VALUE=$(lcov -e "$COVERAGE_DATA"  "${DIRECTORY}/*" -o /dev/null | grep line |  cut -d ' ' -f 4)
   COVERAGE_VALUE=${COVERAGE_VALUE%?}
   # If the coverage number is 'n' (no data found) there is 0% coverage. This is
   # probably a directory without source code, so we skip checks.
@@ -112,10 +113,10 @@ do
     continue;
   fi;
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${DIRECTORY_THRESHOLD}" | bc)
-  if test ${COVERAGE_FAILED} -eq 1; then
-    echo Code coverage for ${DIRECTORY} is lower than limit of ${DIRECTORY_THRESHOLD} \(${COVERAGE_VALUE}\)
+  if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
+    echo "Code coverage for ${DIRECTORY} is lower than limit of ${DIRECTORY_THRESHOLD} (${COVERAGE_VALUE})"
     FAILED=1
   fi
-done
+done <<< "$SOURCES"
 
 exit $FAILED
