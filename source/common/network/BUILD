@@ -227,6 +227,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "generic_listener_filter_lib",
+    hdrs = ["generic_listener_filter.h"],
+    deps = [
+        "//include/envoy/network:filter_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "listener_lib",
     srcs = [
         "base_listener_impl.cc",

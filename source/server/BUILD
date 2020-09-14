@@ -80,6 +80,7 @@ envoy_cc_library(
         "//source/common/common:non_copyable",
         "//source/common/event:deferred_task",
         "//source/common/network:connection_lib",
+        "//source/common/network:generic_listener_filter_lib",
         "//source/common/network:listener_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
