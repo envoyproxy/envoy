@@ -63,7 +63,7 @@ static_resources:
           settings:
             op_timeout: 5s
 )EOF",
-                                       TestEnvironment::nullDevicePath());
+                                       Platform::null_device_path);
 
 // This is a configuration with command stats enabled.
 const std::string CONFIG_WITH_COMMAND_STATS = CONFIG + R"EOF(
@@ -156,7 +156,7 @@ static_resources:
           settings:
             op_timeout: 5s
 )EOF",
-                                                        TestEnvironment::nullDevicePath());
+                                                        Platform::null_device_path);
 
 const std::string CONFIG_WITH_ROUTES = CONFIG_WITH_ROUTES_BASE + R"EOF(
           prefix_routes:
@@ -197,8 +197,7 @@ const std::string CONFIG_WITH_DOWNSTREAM_AUTH_PASSWORD_SET = CONFIG + R"EOF(
           downstream_auth_password: { inline_string: somepassword }
 )EOF";
 
-const std::string CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS =
-    fmt::format(R"EOF(
+const std::string CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS = fmt::format(R"EOF(
 admin:
   access_log_path: {}
   address:
@@ -278,7 +277,7 @@ static_resources:
             - prefix: "baz:"
               cluster: cluster_2
 )EOF",
-                TestEnvironment::nullDevicePath());
+                                                                      Platform::null_device_path);
 
 // This is a configuration with fault injection enabled.
 const std::string CONFIG_WITH_FAULT_INJECTION = CONFIG + R"EOF(

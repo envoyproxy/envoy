@@ -32,7 +32,7 @@ public:
    * @param now the current time.
    */
   virtual void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
-                   std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs,
+                   const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs,
                    MonotonicTime now) PURE;
 };
 

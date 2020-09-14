@@ -24,7 +24,7 @@
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
@@ -63,7 +63,7 @@ public:
     )EOF",
                  Envoy::Upstream::Cluster::InitializePhase::Secondary);
 
-    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
+    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_, _));
     cluster_->initialize([this] { initialized_ = true; });
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(testing::Return(&async_stream_));
     subscription_->start({"fare"});

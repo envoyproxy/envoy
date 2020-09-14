@@ -86,7 +86,6 @@ public:
   void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  absl::optional<Router::ConfigConstSharedPtr> routeConfig() override { return {}; }
 
   // Http::AsyncClient::Stream
   void sendHeaders(RequestHeaderMap& headers, bool end_stream) override;
@@ -375,7 +374,7 @@ private:
     Utility::sendLocalReply(
         remote_closed_,
         Utility::EncodeFunctions{
-            nullptr,
+            nullptr, nullptr,
             [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
               if (modify_headers != nullptr) {
                 modify_headers(*headers);

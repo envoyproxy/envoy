@@ -1,19 +1,12 @@
 #include "common/config/udpa_resource.h"
 
+#include "test/common/config/udpa_test_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
 using ::testing::ElementsAre;
 using ::testing::Pair;
-using ::testing::UnorderedElementsAre;
-
-#define EXPECT_CONTEXT_PARAMS(context_params, ...)                                                 \
-  {                                                                                                \
-    std::map<std::string, std::string> param_map((context_params).begin(),                         \
-                                                 (context_params).end());                          \
-    EXPECT_THAT(param_map, UnorderedElementsAre(__VA_ARGS__));                                     \
-  }
 
 namespace Envoy {
 namespace Config {
@@ -64,7 +57,7 @@ TEST(UdpaResourceNameTest, DecodeSuccess) {
   EXPECT_EQ("f123%/?#o", resource_name.authority());
   EXPECT_EQ("envoy.config.listener.v3.Listener", resource_name.resource_type());
   EXPECT_THAT(resource_name.id(), ElementsAre("b%:/?#[]ar", "", "baz"));
-  EXPECT_CONTEXT_PARAMS(resource_name.context().params(), Pair("%#[]&=", "bar"),
+  EXPECT_CONTEXT_PARAMS(resource_name.context(), Pair("%#[]&=", "bar"),
                         Pair("%#[]&=ab", "cde%#[]&=f"), Pair("foo", "%#[]&="));
 }
 
@@ -75,7 +68,7 @@ TEST(UdpaResourceLocatorTest, DecodeSuccess) {
   EXPECT_EQ("f123%/?#o", resource_locator.authority());
   EXPECT_EQ("envoy.config.listener.v3.Listener", resource_locator.resource_type());
   EXPECT_THAT(resource_locator.id(), ElementsAre("b%:/?#[]ar", "", "baz"));
-  EXPECT_CONTEXT_PARAMS(resource_locator.exact_context().params(), Pair("%#[]&=", "bar"),
+  EXPECT_CONTEXT_PARAMS(resource_locator.exact_context(), Pair("%#[]&=", "bar"),
                         Pair("%#[]&=ab", "cde%#[]&=f"), Pair("foo", "%#[]&="));
   EXPECT_EQ(2, resource_locator.directives().size());
   EXPECT_EQ("some_en%#[],try", resource_locator.directives()[0].entry());
@@ -152,7 +145,7 @@ TEST(UdpaResourceLocatorTest, Schemes) {
     EXPECT_EQ("foo", resource_locator.authority());
     EXPECT_EQ("bar", resource_locator.resource_type());
     EXPECT_THAT(resource_locator.id(), ElementsAre("baz", "blah"));
-    EXPECT_CONTEXT_PARAMS(resource_locator.exact_context().params(), Pair("a", "b"));
+    EXPECT_CONTEXT_PARAMS(resource_locator.exact_context(), Pair("a", "b"));
     EXPECT_EQ(1, resource_locator.directives().size());
     EXPECT_EQ("m", resource_locator.directives()[0].entry());
     EXPECT_EQ("udpa://foo/bar/baz/blah?a=b#entry=m",
@@ -165,7 +158,7 @@ TEST(UdpaResourceLocatorTest, Schemes) {
     EXPECT_EQ("foo", resource_locator.authority());
     EXPECT_EQ("bar", resource_locator.resource_type());
     EXPECT_THAT(resource_locator.id(), ElementsAre("baz", "blah"));
-    EXPECT_CONTEXT_PARAMS(resource_locator.exact_context().params(), Pair("a", "b"));
+    EXPECT_CONTEXT_PARAMS(resource_locator.exact_context(), Pair("a", "b"));
     EXPECT_EQ(1, resource_locator.directives().size());
     EXPECT_EQ("m", resource_locator.directives()[0].entry());
     EXPECT_EQ("http://foo/bar/baz/blah?a=b#entry=m",

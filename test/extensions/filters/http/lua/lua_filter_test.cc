@@ -12,6 +12,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -90,7 +91,8 @@ public:
     // Setup filter config for Lua filter.
     config_ = std::make_shared<FilterConfig>(proto_config, tls_, cluster_manager_, api_);
     // Setup per route config for Lua filter.
-    per_route_config_ = std::make_shared<FilterConfigPerRoute>(per_route_proto_config, tls_, api_);
+    per_route_config_ =
+        std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
   }
 
   void setupFilter() {
@@ -111,6 +113,7 @@ public:
         .WillOnce(testing::ReturnRef(metadata_));
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Api::MockApi> api_;
   Upstream::MockClusterManager cluster_manager_;
@@ -2201,6 +2204,11 @@ TEST_F(LuaHttpFilterTest, LuaFilterBase64Escape) {
     function envoy_on_response(response_handle)
       local base64Encoded = response_handle:base64Escape("barfoo")
       response_handle:logTrace(base64Encoded)
+
+      local resp_body_buf = response_handle:body()
+      local resp_body = resp_body_buf:getBytes(0, resp_body_buf:length())
+      local b64_resp_body = response_handle:base64Escape(resp_body)
+      response_handle:logTrace(b64_resp_body)
     end
   )EOF"};
 
@@ -2213,9 +2221,17 @@ TEST_F(LuaHttpFilterTest, LuaFilterBase64Escape) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("YmFyZm9v")));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers, false));
+
+  // Base64 encoding should also work for binary data.
+  uint8_t buffer[34] = {31, 139, 8,  0, 0, 0, 0, 0,   0,   255, 202, 72,  205, 201, 201, 47, 207,
+                        47, 202, 73, 1, 4, 0, 0, 255, 255, 173, 32,  235, 249, 10,  0,   0,  0};
+  Buffer::OwnedImpl response_body(buffer, 34);
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace,
+                                  StrEq("H4sIAAAAAAAA/8pIzcnJL88vykkBBAAA//+tIOv5CgAAAA==")));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
 }
 
 } // namespace
