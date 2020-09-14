@@ -244,7 +244,7 @@ public:
 
     for (const auto& header_to_remove : headers_to_remove) {
       auto* entry = check_response.mutable_ok_response()->mutable_headers_to_remove();
-      entry->Add(header_to_remove.first.c_str());
+      entry->Add(std::string(header_to_remove.first));
     }
 
     // Entries in this headers are not present in the original request headers.
