@@ -436,8 +436,8 @@ void UpstreamRequest::resetStream() {
     span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
   }
 
-  // TODO(snowp): We need some weay of calling into the filters to notify them about the reset.
-  // Let's add a way to reset the filters. if (conn_pool_->cancelAnyPendingRequest()) {
+  // TODO(snowp): blla
+  // if (conn_pool_->cancelAnyPendingStream()) {
   //   ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.callbacks());
   //   ASSERT(!upstream_);
   // }
