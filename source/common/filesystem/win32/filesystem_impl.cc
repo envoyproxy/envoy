@@ -32,7 +32,8 @@ Api::IoCallBoolResult FileImplWin32::open(FlagSet in) {
   }
 
   auto flags = translateFlag(in);
-  fd_ = CreateFileA(path_.c_str(), flags.access_, NULL, NULL, flags.creation_, NULL, NULL);
+  fd_ = CreateFileA(path_.c_str(), flags.access_, FILE_SHARE_READ | FILE_SHARE_WRITE, 0,
+                    flags.creation_, 0, NULL);
   if (fd_ == INVALID_HANDLE) {
     return resultFailure(false, ::GetLastError());
   }
@@ -104,8 +105,7 @@ bool InstanceImplWin32::directoryExists(const std::string& path) {
 }
 
 ssize_t InstanceImplWin32::fileSize(const std::string& path) {
-  auto fd =
-      CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL);
+  auto fd = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, NULL);
   if (fd == INVALID_HANDLE) {
     return -1;
   }
