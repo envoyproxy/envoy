@@ -37,8 +37,19 @@ private:
     PendingResolution(AppleDnsResolverImpl& parent, ResolveCb callback,
                       Event::Dispatcher& dispatcher, DNSServiceRef sd_ref,
                       const std::string& dns_name)
-        : parent_(parent), callback_(callback), dispatcher_(dispatcher), individual_sd_ref_(sd_ref),
-          dns_name_(dns_name) {}
+        : parent_(parent), callback_(callback), dispatcher_(dispatcher),
+          /* (taken and edited from dns_sd.h):
+           * For efficiency, clients that perform many concurrent operations may want to use a
+           * single Unix Domain Socket connection with the background daemon, instead of having a
+           * separate connection for each independent operation. To use this mode, clients first
+           * call DNSServiceCreateConnection(&SharedRef) to initialize the main DNSServiceRef.
+           * For each subsequent operation that is to share that same connection, the client copies
+           * the SharedRef, and then passes the address of that copy, setting the ShareConnection
+           * flag to tell the library that this DNSServiceRef is not a typical uninitialized
+           * DNSServiceRef; it's a copy of an existing DNSServiceRef whose connection information
+           * should be reused.
+           */
+          individual_sd_ref_(sd_ref), dns_name_(dns_name) {}
     ~PendingResolution();
 
     // Network::ActiveDnsQuery
@@ -77,7 +88,7 @@ private:
   void initializeMainSdRef();
   void deallocateMainSdRef();
   void onEventCallback(uint32_t events);
-  void addPendingQuery(PendingResolution* query) { queries_with_pending_cb_.push_back(query); }
+  void addPendingQuery(PendingResolution* query);
   void flushPendingQueries();
 
   Event::Dispatcher& dispatcher_;
@@ -87,8 +98,9 @@ private:
   // callback with the kDNSServiceFlagsMoreComing flag might refer to addresses for various
   // PendingResolutions. Therefore, the resolver needs to have a container of queries pending
   // calling their own callback_s until a DNSServiceGetAddrInfoReply is called with
-  // kDNSServiceFlagsMoreComing not set.
-  std::list<PendingResolution*> queries_with_pending_cb_;
+  // kDNSServiceFlagsMoreComing not set or an error status is received in
+  // DNSServiceGetAddrInfoReply.
+  std::set<PendingResolution*> queries_with_pending_cb_;
 };
 
 } // namespace Network
