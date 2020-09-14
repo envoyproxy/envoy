@@ -135,6 +135,7 @@ private:
       // TODO(goaway): implement
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
+    bool streamErrorOnInvalidHttpMessage() const override { return false; }
     void encodeMetadata(const MetadataMapVector&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   private:

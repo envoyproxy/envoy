@@ -1,4 +1,5 @@
-ADDITIONAL_VISIBILITY = []
+EXTENSION_CONFIG_VISIBILITY = ["//visibility:public"]
+EXTENSION_PACKAGE_VISIBILITY = ["//visibility:public"]
 EXTENSIONS = {
     "envoy.clusters.dynamic_forward_proxy":           "//source/extensions/clusters/dynamic_forward_proxy:cluster",
     "envoy.filters.connection_pools.http.generic":    "//source/extensions/upstreams/http/generic:config",
