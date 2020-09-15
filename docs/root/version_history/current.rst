@@ -109,7 +109,6 @@ New Features
   that track headers and body sizes of requests and responses.
 * stats: allow configuring histogram buckets for stats sinks and admin endpoints that support it.
 * tap: added :ref:`generic body matcher<envoy_v3_api_msg_config.tap.v3.HttpGenericBodyMatch>` to scan http requests and responses for text or hex patterns.
-* tcp: switched the TCP connection pool to the new "shared" connection pool, sharing a common code base with HTTP and HTTP/2. Any unexpected behavioral changes can be temporarily reverted by setting `envoy.reloadable_features.new_tcp_connection_pool` to false.
 * tcp_proxy: allow earlier network filters to set metadataMatchCriteria on the connection StreamInfo to influence load balancing.
 * tls: introduce new :ref:`extension point<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_handshaker>` for overriding :ref:`TLS handshaker <arch_overview_ssl>` behavior.
 * tls: switched from using socket BIOs to using custom BIOs that know how to interact with IoHandles. The feature can be disabled by setting runtime feature `envoy.reloadable_features.tls_use_io_handle_bio` to false.
