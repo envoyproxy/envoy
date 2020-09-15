@@ -42,15 +42,20 @@ enum ConfigStatus {
   // Management server has sent the config to client and received ACK.
   SYNCED = 1;
 
-  // Config is not sent.
+  // Config is not sent from the management server; or the client haven't
+  // received the requested config.
   NOT_SENT = 2;
 
   // Management server has sent the config to client but hasn’t received
   // ACK/NACK.
   STALE = 3;
 
-  // Management server has sent the config to client but received NACK.
+  // Management server has sent the config to client but received NACK; or the
+  // client has received the config but replied with NACK.
   ERROR = 4;
+
+  // The client has received the config and repied with ACK.
+  ACKED = 5;
 }
 
 // Request for client status of clients identified by a list of NodeMatchers.
