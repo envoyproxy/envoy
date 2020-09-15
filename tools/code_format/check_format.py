@@ -1127,7 +1127,7 @@ if __name__ == "__main__":
   owned_directories = format_checker.ownedDirectories(error_messages)
 
   if os.path.isfile(args.target_path):
-    error_messages += format_checker.checkFormat("./" + args.target_path, args)
+    error_messages += format_checker.checkFormat("./" + args.target_path)
   else:
     results = []
 
