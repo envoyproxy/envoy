@@ -22,6 +22,9 @@ health_check_config {
 }
 actions {
     respond {
+        http_respond {
+            status: "1"
+        }
         tcp_respond {
             data: "3"
         }

@@ -38,8 +38,8 @@ private:
   // Determines whether the client gets reused or not after respondHeaders()
   bool reuse_connection_ = true;
 
-  HttpHealthCheckerImplTestBase http_test_base_;
-  TcpHealthCheckerImplTestBase tcp_test_base_;
+  HttpHealthCheckerImplTestBase* http_test_base_;
+  TcpHealthCheckerImplTestBase* tcp_test_base_;
 };
 
 } // namespace Upstream

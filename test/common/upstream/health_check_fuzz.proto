@@ -18,8 +18,8 @@ message TcpRespond {
 }
 
 message Respond {
-  HttpRespond http_respond = 1;
-  TcpRespond tcp_respond = 2;
+  HttpRespond http_respond = 1 [(validate.rules).message.required = true];
+  TcpRespond tcp_respond = 2 [(validate.rules).message.required = true];
 }
 
 enum RaiseEvent {
