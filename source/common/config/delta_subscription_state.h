@@ -11,8 +11,8 @@
 #include "common/common/logger.h"
 #include "common/config/api_version.h"
 #include "common/config/pausable_ack_queue.h"
-#include "common/config/watch_map.h"
 #include "common/config/udpa_resource.h"
+#include "common/config/watch_map.h"
 
 #include "absl/container/node_hash_map.h"
 

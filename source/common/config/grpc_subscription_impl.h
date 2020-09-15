@@ -68,7 +68,6 @@ public:
                                  const udpa::core::v1::ResourceLocator& collection_locator,
                                  Event::Dispatcher& dispatcher,
                                  std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
-
 };
 
 } // namespace Config

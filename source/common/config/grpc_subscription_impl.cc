@@ -1,9 +1,9 @@
 #include "common/config/grpc_subscription_impl.h"
-#include "common/config/udpa_resource.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/common/utility.h"
+#include "common/config/udpa_resource.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -133,8 +133,6 @@ GrpcCollectionSubscriptionImpl::GrpcCollectionSubscriptionImpl(
                                *this, resource_decoder_, false);
   stats_.update_attempt_.inc();
 }
-
-
 
 } // namespace Config
 } // namespace Envoy
