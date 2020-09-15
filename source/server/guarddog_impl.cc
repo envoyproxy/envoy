@@ -100,10 +100,9 @@ void GuardDogImpl::step() {
                  static_cast<size_t>(ceil(multi_kill_fraction_ * watched_dogs_.size())));
 
     for (auto& watched_dog : watched_dogs_) {
-      uint64_t touch_count = watched_dog->dog_->touchCount();
-      if (watched_dog->last_touch_count_ != touch_count) {
-        // Watchdog was touched since guarddog last checked; update time and continue.
-        watched_dog->last_touch_count_ = touch_count;
+      if (watched_dog->dog_->touchCount() > 0) {
+        // Watchdog was touched since guarddog last checked; update time and reset the count.
+        watched_dog->dog_->resetTouchCount();
         watched_dog->last_touch_time_ = now;
         continue;
       }
@@ -230,7 +229,7 @@ void GuardDogImpl::invokeGuardDogActions(
 
 GuardDogImpl::WatchedDog::WatchedDog(Stats::Scope& stats_scope, const std::string& thread_name,
                                      const WatchDogImplSharedPtr& watch_dog)
-    : dog_(watch_dog), last_touch_count_(dog_->touchCount()),
+    : dog_(watch_dog),
       miss_counter_(stats_scope.counterFromStatName(
           Stats::StatNameManagedStorage(fmt::format("server.{}.watchdog_miss", thread_name),
                                         stats_scope.symbolTable())

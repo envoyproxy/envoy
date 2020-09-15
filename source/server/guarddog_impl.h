@@ -118,7 +118,6 @@ private:
                const WatchDogImplSharedPtr& watch_dog);
 
     const WatchDogImplSharedPtr dog_;
-    uint64_t last_touch_count_;
     MonotonicTime last_touch_time_;
     absl::optional<MonotonicTime> last_alert_time_;
     bool miss_alerted_{};
