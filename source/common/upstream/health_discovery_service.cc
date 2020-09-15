@@ -343,8 +343,8 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
   // Set initial hashes for possible delta updates.
-  config_hash_ = MessageUtil::hash(cluster);
-  socket_match_hash_ = RepeatedPtrUtil::hash(cluster.transport_socket_matches());
+  config_hash_ = MessageUtil::hash(cluster_);
+  socket_match_hash_ = RepeatedPtrUtil::hash(cluster_.transport_socket_matches());
 
   info_ = info_factory.createClusterInfo(
       {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
