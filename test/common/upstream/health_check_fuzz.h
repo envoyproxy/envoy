@@ -6,8 +6,7 @@
 namespace Envoy {
 namespace Upstream {
 
-class HealthCheckFuzz
-    : public HttpHealthCheckerImplTestBase { // TODO: once added tcp/grpc, switch this to an
+class HealthCheckFuzz { // TODO: once added tcp/grpc, switch this to an
                                              // abstract health checker test class that can handle
                                              // one of the three types
 public:
@@ -22,16 +21,25 @@ public:
   Type type_;
 
 private:
+  void initializeAndReplayHttp(test::common::upstream::HealthCheckTestCase input);
+  void initializeAndReplayTcp(test::common::upstream::HealthCheckTestCase input);
   void respondHttp(const test::fuzz::Headers& headers, absl::string_view status);
-  void triggerIntervalTimer();
-  void triggerTimeoutTimer(bool last_action);
-  void allocHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
+  void respondTcp();
+  void triggerIntervalTimerHttp();
+  void triggerIntervalTimerTcp();
+  void triggerTimeoutTimerHttp(bool last_action);
+  void triggerTimeoutTimerTcp(bool last_action);
+  void allocHttpHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
+  void allocTcpHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void raiseEvent(const test::common::upstream::RaiseEvent& event, bool last_action);
 
   void replay(const test::common::upstream::HealthCheckTestCase& input);
 
   // Determines whether the client gets reused or not after respondHeaders()
   bool reuse_connection_ = true;
+
+  HttpHealthCheckerImplTestBase http_test_base_;
+  TcpHealthCheckerImplTestBase tcp_test_base_;
 };
 
 } // namespace Upstream
