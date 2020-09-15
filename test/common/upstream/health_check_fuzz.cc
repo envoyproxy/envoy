@@ -38,8 +38,7 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
   ON_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillByDefault(testing::Return(45000));
   // If has an initial jitter, this calls onIntervalBase and finishes startup
-  if (input.health_check_config().initial_jitter().seconds() != 0 ||
-      input.health_check_config().initial_jitter().nanos() >= 500000) {
+  if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
     test_sessions_[0]->interval_timer_->invokeCallback();
   }
   if (input.health_check_config().has_reuse_connection()) {
@@ -69,31 +68,29 @@ void HealthCheckFuzz::respondHttp(const test::fuzz::Headers& headers, absl::stri
     client_will_close =
         absl::EqualsIgnoreCase(response_headers->Connection()->value().getStringView(),
                                Http::Headers::get().ConnectionValues.Close);
-  }
-
-  // If client already will close from connection header, no need for this check.
-  if (response_headers->ProxyConnection() && !client_will_close) {
+  } else if (response_headers->ProxyConnection()) {
     client_will_close =
         absl::EqualsIgnoreCase(response_headers->ProxyConnection()->value().getStringView(),
                                Http::Headers::get().ConnectionValues.Close);
   }
 
-  ENVOY_LOG_MISC(trace, "Responded headers {}", response_headers);
+  ENVOY_LOG_MISC(trace, "Responded headers {}", *response_headers.get());
   test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), true);
 
   if (!reuse_connection_ || client_will_close) {
     ENVOY_LOG_MISC(trace, "Creating client and stream because shouldClose() is true");
-    expectClientCreate(0);
-    expectStreamCreate(0);
-    test_sessions_[0]->interval_timer_->invokeCallback();
+    triggerIntervalTimer(true);
   }
 }
 
-void HealthCheckFuzz::triggerIntervalTimer() {
+void HealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
   // Interval timer needs to be explicitly enabled, usually by decodeHeaders.
   if (!test_sessions_[0]->interval_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Interval timer is disabled. Skipping trigger interval timer.");
     return;
+  }
+  if (expect_client_create) {
+    expectClientCreate(0);
   }
   expectStreamCreate(0);
   ENVOY_LOG_MISC(trace, "Triggered interval timer");
@@ -111,9 +108,7 @@ void HealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
                                                        // and enables interval
   if (!last_action) {
     ENVOY_LOG_MISC(trace, "Creating client and stream from network timeout");
-    expectClientCreate(0);
-    expectStreamCreate(0);
-    test_sessions_[0]->interval_timer_->invokeCallback();
+    triggerIntervalTimer(true);
   }
 }
 
@@ -143,9 +138,7 @@ void HealthCheckFuzz::raiseEvent(const test::common::upstream::RaiseEvent& event
     test_sessions_[0]->client_connection_->raiseEvent(eventType);
     if (!last_action && eventType != Network::ConnectionEvent::Connected) {
       ENVOY_LOG_MISC(trace, "Creating client and stream from close event");
-      expectClientCreate(0);
-      expectStreamCreate(0);
-      test_sessions_[0]->interval_timer_->invokeCallback();
+      triggerIntervalTimer(true);
     }
     break;
   }
@@ -164,11 +157,6 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
     case test::common::upstream::Action::kRespond: {
       switch (type_) {
       case HealthCheckFuzz::Type::HTTP: {
-        // TODO: Hardcoded check on status Required because can't find documentation about required
-        // validations for strings in protoc-gen-validate.
-        if (event.respond().http_respond().status().empty()) {
-          return;
-        }
         respondHttp(event.respond().http_respond().headers(),
                     event.respond().http_respond().status());
         break;
@@ -180,7 +168,7 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
       break;
     }
     case test::common::upstream::Action::kTriggerIntervalTimer: {
-      triggerIntervalTimer();
+      triggerIntervalTimer(false);
       break;
     }
     case test::common::upstream::Action::kTriggerTimeoutTimer: {

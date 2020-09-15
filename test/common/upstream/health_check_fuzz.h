@@ -23,7 +23,7 @@ public:
 
 private:
   void respondHttp(const test::fuzz::Headers& headers, absl::string_view status);
-  void triggerIntervalTimer();
+  void triggerIntervalTimer(bool expect_client_create);
   void triggerTimeoutTimer(bool last_action);
   void allocHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void raiseEvent(const test::common::upstream::RaiseEvent& event, bool last_action);
