@@ -116,19 +116,6 @@ public:
                                    const HostDescriptionConstSharedPtr& host) PURE;
 };
 
-struct HealthCheckerHash {
-  size_t operator()(const envoy::config::core::v3::HealthCheck& health_check) const {
-    return MessageUtil::hash(health_check);
-  }
-};
-
-struct HealthCheckerEqualTo {
-  bool operator()(const envoy::config::core::v3::HealthCheck& lhs,
-                  const envoy::config::core::v3::HealthCheck& rhs) const {
-    return Protobuf::util::MessageDifferencer::Equals(lhs, rhs);
-  }
-};
-
 using HealthCheckEventLoggerPtr = std::unique_ptr<HealthCheckEventLogger>;
 
 } // namespace Upstream

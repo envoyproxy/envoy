@@ -9,7 +9,6 @@
 #include "envoy/service/health/v3/hds.pb.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
-#include "envoy/upstream/locality_endpoint.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/backoff_strategy.h"
@@ -19,6 +18,7 @@
 #include "common/grpc/async_client_impl.h"
 #include "common/network/resolver_impl.h"
 #include "common/upstream/health_checker_impl.h"
+#include "common/upstream/locality_endpoint.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "server/transport_socket_config_impl.h"
