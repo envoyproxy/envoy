@@ -79,10 +79,6 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
   return io_handle;
 }
 
-IoHandlePtr SocketInterfaceImpl::socket(os_fd_t fd) {
-  return std::make_unique<IoSocketHandleImpl>(fd);
-}
-
 bool SocketInterfaceImpl::ipFamilySupported(int domain) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   const Api::SysCallSocketResult result = os_sys_calls.socket(domain, SOCK_STREAM, 0);

@@ -454,6 +454,20 @@ struct NiceMockConnectionStats {
   NiceMock<Stats::MockCounter> delayed_close_timeouts_;
 };
 
+TEST_P(ConnectionImplTest, ConnectionHash) {
+  setUpBasicConnection();
+
+  MockConnectionStats client_connection_stats;
+  client_connection_->setConnectionStats(client_connection_stats.toBufferStats());
+
+  std::vector<uint8_t> hash1;
+  std::vector<uint8_t> hash2;
+  ConnectionImplBase::addIdToHashKey(hash1, client_connection_->id());
+  client_connection_->hashKey(hash2);
+  ASSERT_EQ(hash1, hash2);
+  disconnect(false);
+}
+
 TEST_P(ConnectionImplTest, ConnectionStats) {
   setUpBasicConnection();
 
