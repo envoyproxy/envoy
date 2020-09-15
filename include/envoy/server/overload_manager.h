@@ -43,7 +43,9 @@ public:
       return true;
     }
 
-    return random_generator.random() < action_value_ * Random::RandomGenerator::max();
+    return random_generator.random() <
+           static_cast<Random::RandomGenerator::result_type>(
+               action_value_ * static_cast<float>(Random::RandomGenerator::max()));
   }
 
 private:
