@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     external_deps = [
         "abseil_synchronization",
     ],
+    tags = ["skip_on_windows"],
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/registry",
@@ -34,6 +35,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_name = "envoy.watchdog.abort_action",
+    tags = ["skip_on_windows"],
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:guarddog_config_interface",

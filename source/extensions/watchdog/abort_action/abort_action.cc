@@ -53,6 +53,8 @@ void AbortAction::run(
   }
 
   // Abort from the action since the signaled thread hasn't yet crashed the process.
+  // panicing in the action gives flexibility since it doesn't depend on
+  // external code to kill the process if the signal fails.
   PANIC(fmt::format("Failed to kill thread with id {}, aborting from Watchdog AbortAction instead.",
                     raw_tid));
 }
