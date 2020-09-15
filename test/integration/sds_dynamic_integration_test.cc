@@ -493,7 +493,6 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, BasicSuccess) {
   };
 
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // There is a race condition here; there are two static clusters:
   // backend cluster_0 with sds and sds_cluster. cluster_0 is created first, its init_manager
@@ -517,7 +516,6 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
     sendSdsResponse(getWrongSecret(client_cert_));
   };
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Make a simple request, should get 503
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
