@@ -38,6 +38,8 @@ void AbortAction::run(
     return;
   }
 
+  // The following liens of code won't be considered coverage by code coverage
+  // tools since they would run in DEATH tests.
   int64_t raw_tid = thread_last_checkin_pairs[0].first.getId();
 
   // Assume POSIX-compatible system and signal to the thread.
