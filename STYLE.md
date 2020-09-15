@@ -109,7 +109,7 @@ A few general notes on our error handling philosophy:
   - Untrusted network traffic OR
   - Raised by the Envoy process environment and are *likely* to happen
 * Examples of likely environnmental errors include any type of network error, disk IO error, bad
-  data returned by an API call, bad data read from runtime files, etc.  Errors in the Envoy
+  data returned by an API call, bad data read from runtime files, etc. Errors in the Envoy
   environment that are *unlikely* to happen after process initialization, should lead to process
   death, under the assumption that the additional burden of defensive coding and testing is not an
   effective use of time for an error that should not happen given proper system setup. Examples of
