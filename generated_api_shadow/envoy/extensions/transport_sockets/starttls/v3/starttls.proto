@@ -26,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#not-implemented-hide:] Configuration for StartTls transport socket.
 // StartTls transport socket wraps two sockets:
-// - raw_buffer socket which is used at the begining of the session
+// - raw_buffer socket which is used at the beginning of the session
 // - TLS socket used when a protocol negotiates a switch to encrypted traffic.
 message StartTlsConfig {
   // Configuration for clear-text socket used at the beginning of the session.
