@@ -319,7 +319,10 @@ class FormatChecker:
     text = self.readFile(file_path)
     if not re.search("^\s*namespace\s+%s\s*{" % self.namespace_check, text, re.MULTILINE) and \
       not nolint in text:
-      return ["Unable to find %s namespace or %s for file: %s" % (self.namespace_check, nolint, file_path)]
+      return [
+          "Unable to find %s namespace or %s for file: %s" %
+          (self.namespace_check, nolint, file_path)
+      ]
     return []
 
   def packageNameForProto(self, file_path):
@@ -856,10 +859,10 @@ class FormatChecker:
   #   - "12,13d13"
   #   - "7a8,9"
   def executeCommand(self,
-                    command,
-                    error_message,
-                    file_path,
-                    regex=re.compile(r"^(\d+)[a|c|d]?\d*(?:,\d+[a|c|d]?\d*)?$")):
+                     command,
+                     error_message,
+                     file_path,
+                     regex=re.compile(r"^(\d+)[a|c|d]?\d*(?:,\d+[a|c|d]?\d*)?$")):
     try:
       output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
       if output:
@@ -983,7 +986,7 @@ class FormatChecker:
                                   args=(dir_name + "/" + file_name, error_messages))
         result_list.append(result)
       result = pool.apply_async(self.checkFormatReturnTraceOnError,
-                                args=(dir_name + "/" + file_name,))		
+                                args=(dir_name + "/" + file_name,))
       result_list.append(result)
 
   # checkErrorMessages iterates over the list with error messages and prints
