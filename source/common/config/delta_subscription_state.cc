@@ -137,10 +137,32 @@ DeltaSubscriptionState::getNextRequestAckless() {
     }
     names_removed_.clear();
   }
-  std::copy(names_added_.begin(), names_added_.end(),
+  std::vector<std::string> resource_names_added;
+  std::vector<std::string> resource_names_removed;
+  std::vector<udpa::core::v1::ResourceLocator> resource_urls_added;
+  std::vector<udpa::core::v1::ResourceLocator> resource_urls_removed;
+  for (std::string const& resource : names_added_) {
+    if (resource.substr(0, 7) == "udpa://") {
+      resource_urls_added.push_back(UdpaResourceIdentifier::decodeUrl(resource));
+    } else {
+      resource_names_added.push_back(resource);
+    }
+  }
+  for (std::string const& resource : names_removed_) {
+    if (resource.substr(0, 7) == "udpa://") {
+      resource_urls_removed.push_back(UdpaResourceIdentifier::decodeUrl(resource));
+    } else {
+      resource_names_removed.push_back(resource);
+    }
+  }
+  std::move(resource_names_added.begin(), resource_names_added.end(),
             Protobuf::RepeatedFieldBackInserter(request.mutable_resource_names_subscribe()));
-  std::copy(names_removed_.begin(), names_removed_.end(),
+  std::move(resource_names_removed.begin(), resource_names_removed.end(),
             Protobuf::RepeatedFieldBackInserter(request.mutable_resource_names_unsubscribe()));
+  std::move(resource_urls_added.begin(), resource_urls_added.end(),
+            Protobuf::RepeatedFieldBackInserter(request.mutable_udpa_resources_subscribe()));
+  std::move(resource_urls_removed.begin(), resource_urls_removed.end(),
+            Protobuf::RepeatedFieldBackInserter(request.mutable_udpa_resources_unsubscribe()));
   names_added_.clear();
   names_removed_.clear();
 

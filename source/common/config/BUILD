@@ -76,6 +76,7 @@ envoy_cc_library(
     hdrs = ["delta_subscription_state.h"],
     deps = [
         ":api_version_lib",
+        ":udpa_resource_lib",
         ":pausable_ack_queue_lib",
         ":utility_lib",
         ":watch_map_lib",

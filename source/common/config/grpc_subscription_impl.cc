@@ -129,15 +129,12 @@ GrpcCollectionSubscriptionImpl::GrpcCollectionSubscriptionImpl(
     std::chrono::milliseconds init_fetch_timeout, bool is_aggregated)
     : GrpcSubscriptionImpl(grpc_mux, callbacks, resource_decoder, stats, type_url, dispatcher,
                            init_fetch_timeout, is_aggregated) {
-  setCollectionlocator(collection_locator);
-}
-
-void GrpcCollectionSubscriptionImpl::setCollectionlocator(
-    const udpa::core::v1::ResourceLocator& collection_locator) {
   watch_ = grpc_mux_->addWatch(type_url_, {UdpaResourceIdentifier::encodeUrl(collection_locator)},
                                *this, resource_decoder_, false);
   stats_.update_attempt_.inc();
 }
+
+
 
 } // namespace Config
 } // namespace Envoy
