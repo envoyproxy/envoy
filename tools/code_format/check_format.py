@@ -205,10 +205,10 @@ class FormatChecker:
         "./tools/clang_tools",
     ]
     self.include_dir_order = command_line_args.include_dir_order
-    self.excluded_prefixes = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
-                     "./source/extensions/extensions_build_config.bzl",
-                     "./bazel/toolchains/configs/", "./tools/testdata/check_format/",
-                     "./tools/pyformat/", "./third_party/")
+    self.excluded_prefixes = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-",
+                              "./.cache", "./source/extensions/extensions_build_config.bzl",
+                              "./bazel/toolchains/configs/", "./tools/testdata/check_format/",
+                              "./tools/pyformat/", "./third_party/")
     if command_line_args.add_excluded_prefixes:
       self.excluded_prefixes += tuple(command_line_args.add_excluded_prefixes)
 
