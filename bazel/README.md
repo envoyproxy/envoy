@@ -219,8 +219,8 @@ for how to update or override dependencies.
    in your shell for buildifier to work.
 1. `go get -u github.com/bazelbuild/buildtools/buildozer` to install buildozer. You may need to set `BUILDOZER_BIN` to `$GOPATH/bin/buildozer`
    in your shell for buildozer to work.
-1. `bazel build //source/exe:envoy-static` from the Envoy source directory. For Windows, run
-   `bazel build -c opt //source/exe:envoy-static`.
+1. `bazel build //source/exe:envoy-static` from the Envoy source directory. Add `-c opt` for an optimized release build or
+   `-c dbg` for an unoptimized, fully instrumented debugging build.
 
 ## Building Envoy with the CI Docker image
 
