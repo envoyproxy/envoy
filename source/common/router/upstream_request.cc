@@ -55,20 +55,6 @@ UpstreamRequestFilter::UpstreamRequestFilter(UpstreamRequest& parent,
 
 UpstreamRequestFilter::~UpstreamRequestFilter() {
   clearRequestEncoder();
-
-  // If desired, fire the per-try histogram when the UpstreamRequest
-  // completes.
-  if (parent_.record_timeout_budget_) {
-    Event::Dispatcher& dispatcher = parent_.parent_.callbacks()->dispatcher();
-    const MonotonicTime end_time = dispatcher.timeSource().monotonicTime();
-    const std::chrono::milliseconds response_time =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_);
-    Upstream::ClusterTimeoutBudgetStatsOptRef tb_stats =
-        parent_.parent_.cluster()->timeoutBudgetStats();
-    tb_stats->get().upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
-        FilterUtility::percentageOfTimeout(response_time,
-                                           parent_.parent_.timeout().per_try_timeout_));
-  }
 }
 
 void UpstreamRequestFilter::resetStream() {
@@ -88,7 +74,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  std::unique_ptr<GenericConnPool>&& conn_pool)
     : parent_(parent), outlier_detection_timeout_recorded_(false), retried_(false),
       grpc_rq_success_deferred_(false), upstream_canary_(false), awaiting_headers_(true),
-      encode_complete_(false), decode_complete_(false),
+      encode_complete_(false), decode_complete_(false), destroyed_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
       filter_manager_(*this, parent_.callbacks()->dispatcher(), *parent_.callbacks()->connection(),
                       parent_.callbacks()->streamId(), true,
@@ -139,7 +125,9 @@ UpstreamRequest::~UpstreamRequest() {
         responseTrailers() ? &responseTrailers()->get() : nullptr, filter_manager_.streamInfo());
   }
 
-  filter_manager_.destroyFilters();
+  if (!destroyed_) {
+    onDeferredDelete();
+  }
 }
 
 void UpstreamRequest::onDecoderFilterBelowWriteBufferLowWatermark() {
@@ -269,6 +257,20 @@ void UpstreamRequestFilter::onDestroy() {
       // TODO(snowp): Do we need to reset the upstream here?
       //  ASSERT(!upstream_);
     }
+  }
+
+  // If desired, fire the per-try histogram when the UpstreamRequest
+  // completes.
+  if (parent_.record_timeout_budget_) {
+    Event::Dispatcher& dispatcher = parent_.parent_.callbacks()->dispatcher();
+    const MonotonicTime end_time = dispatcher.timeSource().monotonicTime();
+    const std::chrono::milliseconds response_time =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_);
+    Upstream::ClusterTimeoutBudgetStatsOptRef tb_stats =
+        parent_.parent_.cluster()->timeoutBudgetStats();
+    tb_stats->get().upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
+        FilterUtility::percentageOfTimeout(response_time,
+                                           parent_.parent_.timeout().per_try_timeout_));
   }
 }
 

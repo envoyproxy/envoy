@@ -148,6 +148,7 @@ private:
   bool encoding_headers_only_ : 1;
   bool await_stream_ : 1;
   bool continue_headers_encoded_ : 1;
+  bool destroyed_ : 1;
 
   ActiveUpstreamRequest active_request_{*this};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
@@ -164,6 +165,11 @@ public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool);
   ~UpstreamRequest() override;
 
+  void onDeferredDelete() {
+    ASSERT(!destroyed_);
+    destroyed_ = true;
+    filter_manager_.destroyFilters();
+  }
   void encodeUpstreamHeaders(bool end_stream);
   void encodeUpstreamData(Buffer::Instance& data, bool end_stream);
   void encodeUpstreamTrailers(Http::RequestTrailerMap& trailers);
@@ -278,6 +284,7 @@ private:
   bool awaiting_headers_ : 1;
   bool encode_complete_ : 1;
   bool decode_complete_ : 1;
+  bool destroyed_ : 1;
 
   Http::ResponseHeaderMapPtr continue_to_encode_;
   Http::ResponseHeaderMapPtr headers_to_encode_;
