@@ -95,13 +95,6 @@ function cp_binary_for_image_build() {
       bazel-bin/"${ENVOY_BIN}"{,.dwp}
 }
 
-function bazel_build () {
-    # build options are turned to string before building
-    # echo "BAZEL BUILD: ${BAZEL_BUILD_OPTIONS[@]/#/X}"
-    _build=(build "${BAZEL_BUILD_OPTIONS[@]}" "$@")
-    bazel "${_build[@]}"
-}
-
 function bazel_binary_build() {
   BINARY_TYPE="$1"
   if [[ "${BINARY_TYPE}" == "release" ]]; then
@@ -311,7 +304,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test @envoy//test/server:server_test
 
   echo "Building binary..."
-  bazel_build "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   collect_build_profile build
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
@@ -319,7 +312,7 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   echo "Validating API structure..."
   ./tools/api/validate_structure.py
   echo "Building API..."
-  bazel_build -c fastbuild @envoy_api_canonical//envoy/...
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api_canonical//envoy/...
   echo "Testing API..."
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api_canonical//test/... @envoy_api_canonical//tools/... \
     @envoy_api_canonical//tools:tap2pcap_test
@@ -352,7 +345,7 @@ elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   setup_gcc_toolchain
   echo "bazel Coverity Scan build"
   echo "Building..."
-  /build/cov-analysis/bin/cov-build --dir "${ENVOY_BUILD_DIR}"/cov-int bazel_build --action_env=LD_PRELOAD \
+  /build/cov-analysis/bin/cov-build --dir "${ENVOY_BUILD_DIR}"/cov-int bazel build --action_env=LD_PRELOAD "${BAZEL_BUILD_OPTIONS[@]}" \
     -c opt "${ENVOY_BUILD_TARGET}"
   # tar up the coverity results
   tar czvf "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz -C "${ENVOY_BUILD_DIR}" cov-int
