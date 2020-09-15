@@ -315,9 +315,7 @@ ClusterManagerImpl::ClusterManagerImpl(
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."
                     "DeltaAggregatedResources"),
           dyn_resources.ads_config().transport_api_version(), random_, stats_,
-          Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
-          Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade"));
+          Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
     } else {
       ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
           local_info,
@@ -336,9 +334,7 @@ ClusterManagerImpl::ClusterManagerImpl(
                     "StreamAggregatedResources"),
           dyn_resources.ads_config().transport_api_version(), random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
-          bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
-          Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade"));
+          bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
     }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();

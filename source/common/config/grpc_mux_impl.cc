@@ -29,6 +29,21 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
   Config::Utility::checkLocalInfo("ads", local_info);
 }
 
+GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
+                         Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
+                         const Protobuf::MethodDescriptor& service_method,
+                         envoy::config::core::v3::ApiVersion transport_api_version,
+                         Random::RandomGenerator& random, Stats::Scope& scope,
+                         const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node)
+    : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
+                   rate_limit_settings),
+      local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
+      first_stream_request_(true), transport_api_version_(transport_api_version),
+      enable_type_url_downgrade_and_upgrade_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade")) {
+  Config::Utility::checkLocalInfo("ads", local_info);
+}
+
 void GrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
 void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {

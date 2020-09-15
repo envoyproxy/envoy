@@ -20,6 +20,7 @@
 #include "common/config/api_version.h"
 #include "common/config/grpc_stream.h"
 #include "common/config/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -37,7 +38,12 @@ public:
               envoy::config::core::v3::ApiVersion transport_api_version,
               Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
-              const bool enable_type_url_downgrade_and_upgrade = false);
+              bool enable_type_url_downgrade_and_upgrade);
+  GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
+              Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
+              envoy::config::core::v3::ApiVersion transport_api_version,
+              Random::RandomGenerator& random, Stats::Scope& scope,
+              const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node);
   ~GrpcMuxImpl() override = default;
 
   void start() override;

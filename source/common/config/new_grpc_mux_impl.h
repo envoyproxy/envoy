@@ -16,6 +16,7 @@
 #include "common/config/pausable_ack_queue.h"
 #include "common/config/watch_map.h"
 #include "common/grpc/common.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Config {
@@ -36,7 +37,14 @@ public:
                  Random::RandomGenerator& random, Stats::Scope& scope,
                  const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info,
-                 const bool enable_type_url_downgrade_and_upgrade = false);
+                 bool enable_type_url_downgrade_and_upgrade);
+
+  NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
+                 const Protobuf::MethodDescriptor& service_method,
+                 envoy::config::core::v3::ApiVersion transport_api_version,
+                 Random::RandomGenerator& random, Stats::Scope& scope,
+                 const RateLimitSettings& rate_limit_settings,
+                 const LocalInfo::LocalInfo& local_info);
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
