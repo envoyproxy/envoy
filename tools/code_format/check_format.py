@@ -780,7 +780,7 @@ class FormatChecker:
 
   def fixBuildLine(self, file_path, line, line_number):
     if (self.envoy_build_rule_check and not self.isStarlarkFile(file_path) and
-        not self.sWorkspaceFile(file_path) and not self.isExternalBuildFile(file_path)):
+        not self.isWorkspaceFile(file_path) and not self.isExternalBuildFile(file_path)):
       line = line.replace("@envoy//", "//")
     return line
 
@@ -829,7 +829,7 @@ class FormatChecker:
 
     if not file_path.endswith(DOCS_SUFFIX):
       if not file_path.endswith(PROTO_SUFFIX):
-        error_messages += self.fixHeaderOrder(file_path, self.include_dir_order)
+        error_messages += self.fixHeaderOrder(file_path)
       error_messages += self.clangFormat(file_path)
     if file_path.endswith(PROTO_SUFFIX) and self.isApiFile(file_path):
       package_name, error_message = self.packageNameForProto(file_path)
