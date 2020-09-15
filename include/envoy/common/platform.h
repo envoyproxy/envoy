@@ -31,6 +31,7 @@
 #undef GetMessage
 #undef interface
 #undef TRUE
+#undef IGNORE
 
 #include <io.h>
 #include <stdint.h>

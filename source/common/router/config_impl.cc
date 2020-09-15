@@ -420,11 +420,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
         std::make_unique<TlsContextMatchCriteriaImpl>(route.match().tls_context());
   }
 
-  // Only set include_vh_rate_limits_ to true if the rate limit policy for the route is empty
-  // or the route set `include_vh_rate_limits` to true.
+  // Returns true if include_vh_rate_limits is explicitly set to true otherwise it defaults to false
+  // which is similar to VhRateLimitOptions::Override and will only use virtual host rate limits if
+  // the route is empty
   include_vh_rate_limits_ =
-      (rate_limit_policy_.empty() ||
-       PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false));
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false);
 
   if (route.route().has_cors()) {
     cors_policy_ =

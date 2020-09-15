@@ -788,9 +788,10 @@ message RouteAction {
     google.protobuf.Duration grpc_timeout_offset = 3;
   }
 
-  reserved 12, 18, 19, 16, 22, 21, 10, 26, 31;
+  reserved 12, 18, 19, 16, 22, 21, 10, 14, 26, 31;
 
-  reserved "request_mirror_policy", "internal_redirect_action", "max_internal_redirects";
+  reserved "request_mirror_policy", "include_vh_rate_limits", "internal_redirect_action",
+      "max_internal_redirects";
 
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -991,12 +992,6 @@ message RouteAction {
   // Specifies a set of rate limit configurations that could be applied to the
   // route.
   repeated RateLimit rate_limits = 13;
-
-  // Specifies if the rate limit filter should include the virtual host rate
-  // limits. By default, if the route configured rate limits, the virtual host
-  // :ref:`rate_limits <envoy_api_field_config.route.v4alpha.VirtualHost.rate_limits>` are not applied to the
-  // request.
-  google.protobuf.BoolValue include_vh_rate_limits = 14;
 
   // Specifies a list of hash policies to use for ring hash load balancing. Each
   // hash policy is evaluated individually and the combined result is used to
