@@ -188,7 +188,9 @@ UNOWNED_EXTENSIONS = {
 }
 # yapf: enable
 
+
 class FormatChecker:
+
   def __init__(self, command_line_args):
     self.operation_type = command_line_args.operation_type
     self.target_path = command_line_args.target_path
@@ -208,7 +210,7 @@ class FormatChecker:
     ]
     self.include_dir_order = command_line_args.include_dir_order
     if command_line_args.add_excluded_prefixes:
-      EXCLUDED_PREFIXES += tuple(command_line_args.add_excluded_prefixes)    
+      EXCLUDED_PREFIXES += tuple(command_line_args.add_excluded_prefixes)
 
   # Map a line transformation function across each line of a file,
   # writing the result lines as requested.
@@ -238,35 +240,29 @@ class FormatChecker:
       error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format remains off")
     return error_message
 
-
   # Obtain all the lines in a given file.
   def readLines(self, path):
     return self.readFile(path).split('\n')
 
-
   # Read a UTF-8 encoded file as a str.
   def readFile(self, path):
     return pathlib.Path(path).read_text(encoding='utf-8')
-
 
   # lookPath searches for the given executable in all directories in PATH
   # environment variable. If it cannot be found, empty string is returned.
   def lookPath(self, executable):
     return shutil.which(executable) or ''
 
-
   # pathExists checks whether the given path exists. This function assumes that
   # the path is absolute and evaluates environment variables.
   def pathExists(self, executable):
     return os.path.exists(os.path.expandvars(executable))
-
 
   # executableByOthers checks whether the given path has execute permission for
   # others.
   def executableByOthers(self, executable):
     st = os.stat(os.path.expandvars(executable))
     return bool(st.st_mode & stat.S_IXOTH)
-
 
   # Check whether all needed external tools (clang-format, buildifier, buildozer) are
   # available.
@@ -286,7 +282,8 @@ class FormatChecker:
           "Examples:\n"
           "    export CLANG_FORMAT=clang-format-10.0.0\n"
           "    export CLANG_FORMAT=/opt/bin/clang-format-10\n"
-          "    export CLANG_FORMAT=/usr/local/opt/llvm@10/bin/clang-format".format(CLANG_FORMAT_PATH))
+          "    export CLANG_FORMAT=/usr/local/opt/llvm@10/bin/clang-format".format(
+              CLANG_FORMAT_PATH))
 
     def checkBazelTool(name, path, var):
       bazel_tool_abs_path = self.lookPath(path)
@@ -313,7 +310,6 @@ class FormatChecker:
 
     return error_messages
 
-
   def checkNamespace(self, file_path):
     for excluded_path in self.namespace_check_excluded_paths:
       if file_path.startswith(excluded_path):
@@ -326,7 +322,6 @@ class FormatChecker:
       return ["Unable to find %s namespace or %s for file: %s" % (self.namespace_check, nolint, file_path)]
     return []
 
-
   def packageNameForProto(self, file_path):
     package_name = None
     error_message = []
@@ -338,12 +333,10 @@ class FormatChecker:
 
     return [package_name, error_message]
 
-
   # To avoid breaking the Lyft import, we just check for path inclusion here.
   def allowlistedForProtobufDeps(self, file_path):
     return (file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL) or \
             any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_ALLOWLIST))
-
 
   # Real-world time sources should not be instantiated in the source, except for a few
   # specific cases. They should be passed down from where they are instantied to where
@@ -353,40 +346,32 @@ class FormatChecker:
       return True
     return file_path in REAL_TIME_ALLOWLIST
 
-
   def allowlistedForRegisterFactory(self, file_path):
     if not file_path.startswith("./test/"):
       return True
 
     return any(file_path.startswith(prefix) for prefix in REGISTER_FACTORY_TEST_ALLOWLIST)
 
-
   def allowlistedForSerializeAsString(self, file_path):
     return file_path in SERIALIZE_AS_STRING_ALLOWLIST or file_path.endswith(DOCS_SUFFIX)
-
 
   def allowlistedForJsonStringToMessage(self, file_path):
     return file_path in JSON_STRING_TO_MESSAGE_ALLOWLIST
 
-
   def allowlistedForHistogramSiSuffix(self, name):
     return name in HISTOGRAM_WITH_SI_SUFFIX_ALLOWLIST
-
 
   def allowlistedForStdRegex(self, file_path):
     return file_path.startswith("./test") or file_path in STD_REGEX_ALLOWLIST or file_path.endswith(
         DOCS_SUFFIX)
 
-
   def allowlistedForGrpcInit(self, file_path):
     return file_path in GRPC_INIT_ALLOWLIST
-
 
   def allowlistedForUnpackTo(self, file_path):
     return file_path.startswith("./test") or file_path in [
         "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
     ]
-
 
   def denylistedForExceptions(self, file_path):
     # Returns true when it is a non test header file or the file_path is in DENYLIST or
@@ -396,7 +381,6 @@ class FormatChecker:
 
     return (file_path.endswith('.h') and not file_path.startswith("./test/")) or file_path in EXCEPTION_DENYLIST \
         or self.isInSubdir(file_path, 'tools/testdata')
-
 
   def findSubstringAndReturnError(self, pattern, file_path, error_message):
     text = self.readFile(file_path)
@@ -408,14 +392,11 @@ class FormatChecker:
       return error_messages
     return []
 
-
   def errorIfNoSubstringFound(self, pattern, file_path, error_message):
     return [] if pattern in self.readFile(file_path) else [file_path + ": " + error_message]
 
-
   def isApiFile(self, file_path):
     return file_path.startswith(self.api_prefix) or file_path.startswith(self.api_shadow_root)
-
 
   def isBuildFile(self, file_path):
     basename = os.path.basename(file_path)
@@ -423,26 +404,21 @@ class FormatChecker:
       return True
     return False
 
-
   def isExternalBuildFile(self, file_path):
     return self.isBuildFile(file_path) and (file_path.startswith("./bazel/external/") or
-                                      file_path.startswith("./tools/clang_tools"))
-
+                                            file_path.startswith("./tools/clang_tools"))
 
   def isStarlarkFile(self, file_path):
     return file_path.endswith(".bzl")
 
-
   def isWorkspaceFile(self, file_path):
     return os.path.basename(file_path) == "WORKSPACE"
-
 
   def isBuildFixerExcludedFile(self, file_path):
     for excluded_path in self.build_fixer_check_excluded_paths:
       if file_path.startswith(excluded_path):
         return True
     return False
-
 
   def hasInvalidAngleBracketDirectory(self, line):
     if not line.startswith(INCLUDE_ANGLE):
@@ -453,7 +429,6 @@ class FormatChecker:
       return False
     subdir = path[0:slash]
     return subdir in SUBDIR_SET
-
 
   def checkCurrentReleaseNotes(self, file_path, error_messages):
     first_word_of_prior_line = ''
@@ -497,7 +472,8 @@ class FormatChecker:
         match = VERSION_HISTORY_NEW_LINE_REGEX.match(line)
         if not match:
           reportError("Version history line malformed. "
-                      "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s" % line)
+                      "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s" %
+                      line)
         else:
           first_word = match.groups()[0]
           next_word = match.groups()[1]
@@ -522,7 +498,6 @@ class FormatChecker:
       elif prior_line:
         prior_line += line
 
-
   def checkFileContents(self, file_path, checker):
     error_messages = []
 
@@ -545,7 +520,6 @@ class FormatChecker:
 
     return error_messages
 
-
   def fixSourceLine(self, line, line_number):
     # Strip double space after '.'  This may prove overenthusiastic and need to
     # be restricted to comments and metadata files but works for now.
@@ -564,7 +538,6 @@ class FormatChecker:
 
     return line
 
-
   # We want to look for a call to condvar.waitFor, but there's no strong pattern
   # to the variable name of the condvar. If we just look for ".waitFor" we'll also
   # pick up time_system_.waitFor(...), and we don't want to return true for that
@@ -580,7 +553,6 @@ class FormatChecker:
       return False
     return True
 
-
   # Determines whether the filename is either in the specified subdirectory, or
   # at the top level. We consider files in the top level for the benefit of
   # the check_format testcases in tools/testdata/check_format.
@@ -592,7 +564,6 @@ class FormatChecker:
       if filename.startswith('./' + subdir + '/'):
         return True
     return False
-
 
   # Determines if given token exists in line without leading or trailing token characters
   # e.g. will return True for a line containing foo() but not foo_bar() or baz_foo
@@ -608,11 +579,10 @@ class FormatChecker:
         break
       if index == 0 or not (line[index - 1].isalnum() or line[index - 1] == '_'):
         if index + len(token) >= len(line) or not (line[index + len(token)].isalnum() or
-                                                  line[index + len(token)] == '_'):
+                                                   line[index + len(token)] == '_'):
           return True
       index = index + 1
     return False
-
 
   def checkSourceLine(self, line, file_path, reportError):
     # Check fixable errors. These may have been fixed already.
@@ -620,7 +590,8 @@ class FormatChecker:
       reportError("over-enthusiastic spaces")
     if self.isInSubdir(file_path, 'source', 'include') and X_ENVOY_USED_DIRECTLY_REGEX.match(line):
       reportError(
-          "Please do not use the raw literal x-envoy in source code.  See Envoy::Http::PrefixValue.")
+          "Please do not use the raw literal x-envoy in source code.  See Envoy::Http::PrefixValue."
+      )
     if self.hasInvalidAngleBracketDirectory(line):
       reportError("envoy includes should not have angle brackets")
     for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
@@ -768,7 +739,7 @@ class FormatChecker:
       grpc_init_or_shutdown = line.find("grpc_init()")
       grpc_shutdown = line.find("grpc_shutdown()")
       if grpc_init_or_shutdown == -1 or (grpc_shutdown != -1 and
-                                        grpc_shutdown < grpc_init_or_shutdown):
+                                         grpc_shutdown < grpc_init_or_shutdown):
         grpc_init_or_shutdown = grpc_shutdown
       if grpc_init_or_shutdown != -1:
         comment = line.find("// ")
@@ -785,22 +756,23 @@ class FormatChecker:
                       "statuses instead.")
 
     if "lua_pushlightuserdata" in line:
-      reportError("Don't use lua_pushlightuserdata, since it can cause unprotected error in call to" +
-                  "Lua API (bad light userdata pointer) on ARM64 architecture. See " +
-                  "https://github.com/LuaJIT/LuaJIT/issues/450#issuecomment-433659873 for details.")
-
+      reportError(
+          "Don't use lua_pushlightuserdata, since it can cause unprotected error in call to" +
+          "Lua API (bad light userdata pointer) on ARM64 architecture. See " +
+          "https://github.com/LuaJIT/LuaJIT/issues/450#issuecomment-433659873 for details.")
 
   def checkBuildLine(self, line, file_path, reportError):
-    if "@bazel_tools" in line and not (self.isStarlarkFile(file_path) or file_path.startswith("./bazel/") or
-                                      "python/runfiles" in line):
+    if "@bazel_tools" in line and not (self.isStarlarkFile(file_path) or
+                                       file_path.startswith("./bazel/") or
+                                       "python/runfiles" in line):
       reportError("unexpected @bazel_tools reference, please indirect via a definition in //bazel")
     if not self.allowlistedForProtobufDeps(file_path) and '"protobuf"' in line:
       reportError("unexpected direct external dependency on protobuf, use "
                   "//source/common/protobuf instead.")
     if (self.envoy_build_rule_check and not self.isStarlarkFile(file_path) and
-        not self.isWorkspaceFile(file_path) and not self.isExternalBuildFile(file_path) and "@envoy//" in line):
+        not self.isWorkspaceFile(file_path) and not self.isExternalBuildFile(file_path) and
+        "@envoy//" in line):
       reportError("Superfluous '@envoy//' prefix")
-
 
   def fixBuildLine(self, file_path, line, line_number):
     if (self.envoy_build_rule_check and not self.isStarlarkFile(file_path) and
@@ -808,16 +780,14 @@ class FormatChecker:
       line = line.replace("@envoy//", "//")
     return line
 
-
   def fixBuildPath(self, file_path):
-    self.evaluateLines(file_path,
-                  functools.partial(fixBuildLine, file_path))
+    self.evaluateLines(file_path, functools.partial(fixBuildLine, file_path))
 
     error_messages = []
 
     # TODO(htuch): Add API specific BUILD fixer script.
-    if not self.isBuildFixerExcludedFile(
-        file_path) and not self.isApiFile(file_path) and not self.isStarlarkFile(file_path) and not self.isWorkspaceFile(file_path):
+    if not self.isBuildFixerExcludedFile(file_path) and not self.isApiFile(
+        file_path) and not self.isStarlarkFile(file_path) and not self.isWorkspaceFile(file_path):
       if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
         error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
 
@@ -825,18 +795,16 @@ class FormatChecker:
       error_messages += ["buildifier rewrite failed for file: %s" % file_path]
     return error_messages
 
-
   def checkBuildPath(self, file_path):
     error_messages = []
 
-    if not self.isBuildFixerExcludedFile(
-        file_path) and not self.isApiFile(file_path) and not self.isStarlarkFile(file_path) and not self.isWorkspaceFile(file_path):
+    if not self.isBuildFixerExcludedFile(file_path) and not self.isApiFile(
+        file_path) and not self.isStarlarkFile(file_path) and not self.isWorkspaceFile(file_path):
       command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
       error_messages += self.executeCommand(command, "envoy_build_fixer check failed", file_path)
-    
+
     if self.isBuildFile(file_path) and (file_path.startswith(self.api_prefix + "envoy") or
-                                  file_path.startswith(self.api_shadow_root +
-                                                        "envoy")):
+                                        file_path.startswith(self.api_shadow_root + "envoy")):
       found = False
       for line in self.readLines(file_path):
         if "api_proto_package(" in line:
@@ -849,7 +817,6 @@ class FormatChecker:
     error_messages += self.executeCommand(command, "buildifier check failed", file_path)
     error_messages += self.checkFileContents(file_path, self.checkBuildLine)
     return error_messages
-
 
   def fixSourcePath(self, file_path):
     self.evaluateLines(file_path, fixSourceLine)
@@ -866,7 +833,6 @@ class FormatChecker:
         error_messages += error_message
     return error_messages
 
-
   def checkSourcePath(self, file_path):
     error_messages = self.checkFileContents(file_path, self.checkSourceLine)
 
@@ -874,7 +840,7 @@ class FormatChecker:
       if not file_path.endswith(PROTO_SUFFIX):
         error_messages += self.checkNamespace(file_path)
         command = ("%s --include_dir_order %s --path %s | diff %s -" %
-                  (HEADER_ORDER_PATH, self.include_dir_order, file_path, file_path))
+                   (HEADER_ORDER_PATH, self.include_dir_order, file_path, file_path))
         error_messages += self.executeCommand(command, "header_order.py check failed", file_path)
       command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
       error_messages += self.executeCommand(command, "clang-format check failed", file_path)
@@ -885,12 +851,12 @@ class FormatChecker:
         error_messages += error_message
     return error_messages
 
-
   # Example target outputs are:
   #   - "26,27c26"
   #   - "12,13d13"
   #   - "7a8,9"
-  def executeCommand(self, command,
+  def executeCommand(self,
+                    command,
                     error_message,
                     file_path,
                     regex=re.compile(r"^(\d+)[a|c|d]?\d*(?:,\d+[a|c|d]?\d*)?$")):
@@ -909,21 +875,18 @@ class FormatChecker:
           error_messages.append("  %s:%s" % (file_path, num))
       return error_messages
 
-
   def fixHeaderOrder(self, file_path):
-    command = "%s --rewrite --include_dir_order %s --path %s" % (HEADER_ORDER_PATH, self.include_dir_order,
-                                                                file_path)
+    command = "%s --rewrite --include_dir_order %s --path %s" % (HEADER_ORDER_PATH,
+                                                                 self.include_dir_order, file_path)
     if os.system(command) != 0:
       return ["header_order.py rewrite error: %s" % (file_path)]
     return []
-
 
   def clangFormat(self, file_path):
     command = "%s -i %s" % (CLANG_FORMAT_PATH, file_path)
     if os.system(command) != 0:
       return ["clang-format rewrite error: %s" % (file_path)]
     return []
-
 
   def checkFormat(self, file_path):
     if file_path.startswith(EXCLUDED_PREFIXES):
@@ -936,7 +899,8 @@ class FormatChecker:
     # Apply fixes first, if asked, and then run checks. If we wind up attempting to fix
     # an issue, but there's still an error, that's a problem.
     try_to_fix = self.operation_type == "fix"
-    if self.isBuildFile(file_path) or self.isStarlarkFile(file_path) or self.isWorkspaceFile(file_path):
+    if self.isBuildFile(file_path) or self.isStarlarkFile(file_path) or self.isWorkspaceFile(
+        file_path):
       if try_to_fix:
         error_messages += self.xBuildPath(file_path)
       error_messages += self.checkBuildPath(file_path)
@@ -949,14 +913,12 @@ class FormatChecker:
       return ["From %s" % file_path] + error_messages
     return error_messages
 
-
   def checkFormatReturnTraceOnError(self, file_path):
     """Run checkFormat and return the traceback of any exception."""
     try:
       return self.checkFormat(file_path)
     except:
       return traceback.format_exc().split("\n")
-
 
   def checkOwners(self, dir_name, owned_directories, error_messages):
     """Checks to make sure a given directory is present either in CODEOWNERS or OWNED_EXTENSIONS
@@ -973,7 +935,6 @@ class FormatChecker:
     if not found and dir_name not in UNOWNED_EXTENSIONS:
       error_messages.append("New directory %s appears to not have owners in CODEOWNERS" % dir_name)
 
-
   def checkApiShadowStarlarkFiles(self, file_path, error_messages):
     command = "diff -u "
     command += file_path + " "
@@ -987,7 +948,6 @@ class FormatChecker:
       shutil.copy(file_path, api_shadow_starlark_path)
 
     return error_messages
-
 
   def checkFormatVisitor(self, arg, dir_name, names):
     """Run checkFormat in parallel for the given files.
@@ -1022,9 +982,9 @@ class FormatChecker:
         result = pool.apply_async(self.checkApiShadowStarlarkFiles,
                                   args=(dir_name + "/" + file_name, error_messages))
         result_list.append(result)
-      result = pool.apply_async(self.checkFormatReturnTraceOnError, args=(dir_name + "/" + file_name,))		
+      result = pool.apply_async(self.checkFormatReturnTraceOnError,
+                                args=(dir_name + "/" + file_name,))		
       result_list.append(result)
-
 
   # checkErrorMessages iterates over the list with error messages and prints
   # errors and returns a bool based on whether there were any errors.
@@ -1064,6 +1024,7 @@ class FormatChecker:
       return owned
     except IOError:
       return []  # for the check format tests.
+
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Check or fix file format.")
@@ -1137,7 +1098,7 @@ if __name__ == "__main__":
       # results (results is passed by reference, and is used as an output).
       for root, _, files in os.walk(args.target_path):
         format_checker.checkFormatVisitor((pool, results, owned_directories, error_messages), root,
-                           [f for f in files if path_predicate(f)])
+                                          [f for f in files if path_predicate(f)])
 
       # Close the pool to new tasks, wait for all of the running tasks to finish,
       # then collect the error messages.
