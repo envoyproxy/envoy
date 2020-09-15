@@ -180,6 +180,7 @@ public:
     MOCK_METHOD(Network::Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
     MOCK_METHOD(Api::IoCallUint64Result, send, (const Network::UdpSendData&), (override));
     MOCK_METHOD(Api::IoCallUint64Result, flush, (), (override));
+    MOCK_METHOD(void, activateRead, (), (override));
 
   private:
     ConnectionHandlerTest& parent_;
