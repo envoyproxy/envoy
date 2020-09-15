@@ -15,14 +15,12 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-/**
- * Class for detecting abusive peers and validating additional constraints imposed by Envoy.
- * This class does not check protocol compliance with the H/2 standard, as this is checked by
- * protocol framer/codec. Currently implemented constraints:
- * 1. detection of control frame (i.e. PING) initiated floods.
- * 2. detection of outbound DATA or HEADER frame floods.
- * 4. zero length, PRIORITY and WINDOW_UPDATE floods.
- */
+//  Class for detecting abusive peers and validating additional constraints imposed by Envoy.
+//  This class does not check protocol compliance with the H/2 standard, as this is checked by
+//  protocol framer/codec. Currently implemented constraints:
+//  1. detection of control frame (i.e. PING) initiated floods.
+//  2. detection of outbound DATA or HEADER frame floods.
+//  4. zero length, PRIORITY and WINDOW_UPDATE floods.
 
 class ProtocolConstraints {
 public:
@@ -31,11 +29,26 @@ public:
   explicit ProtocolConstraints(CodecStats& stats,
                                const envoy::config::core::v3::Http2ProtocolOptions& http2_options);
 
-  ReleasorProc incrementOutboundFrameCount(bool is_outbound_flood_monitored_control_frame);
+  // Return ok status if no protocol constraints were violated.
+  // Return error status of the first detected violation. Subsequent violations of constraints
+  // do not reset the error status or increment stat counters.
   Status status() { return status_; }
 
-  Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length);
+  // Increment counters of pending (buffered for sending to the peer) outbound frames.
+  // If the `is_outbound_flood_monitored_control_frame` is false only the counter for all frame
+  // types is incremented. If the `is_outbound_flood_monitored_control_frame` is true, both the
+  // control frame and all frame types counters are incremented.
+  // Returns callable for decrementing frame counters when frames was successfully written to
+  // the underlying transport socket object.
+  // To check if outbound frame constraints were violated call the `status()` method.
+  // TODO(yanavlasov): return StatusOr<ReleasorProc> when flood checks are implemented for both
+  // directions.
+  ReleasorProc incrementOutboundFrameCount(bool is_outbound_flood_monitored_control_frame);
 
+  // Track received frames of various types.
+  // Return an error status if inbound frame constraints were violated.
+  Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length);
+  // Increment the number of DATA frames sent to the peer.
   void incrementOutboundDataFrameCount() { ++outbound_data_frames_; }
 
 private:
