@@ -25,7 +25,7 @@ public:
   Thread::ThreadId threadId() const override { return thread_id_; }
   // Accessors for use by GuardDogImpl to tell if the watchdog was touched recently and reset the
   // count back to 0 when it has.
-  uint64_t touchCount() const { return touch_count_.load(); }
+  uint32_t touchCount() const { return touch_count_.load(); }
   void resetTouchCount() { touch_count_.store(0); }
 
   // Server::WatchDog
