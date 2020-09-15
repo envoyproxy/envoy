@@ -158,6 +158,7 @@ TEST_F(ProtocolConstraintsTest, Priority) {
   // Create one stream
   nghttp2_frame_hd frame;
   frame.type = NGHTTP2_HEADERS;
+  frame.length = 1;
   frame.flags = NGHTTP2_FLAG_END_HEADERS;
   EXPECT_TRUE(constraints.trackInboundFrames(&frame, 0).ok());
 
@@ -178,6 +179,7 @@ TEST_F(ProtocolConstraintsTest, WindowUpdate) {
   // Create one stream
   nghttp2_frame_hd frame;
   frame.type = NGHTTP2_HEADERS;
+  frame.length = 1;
   frame.flags = NGHTTP2_FLAG_END_HEADERS;
   EXPECT_TRUE(constraints.trackInboundFrames(&frame, 0).ok());
   // Send 2 DATA frames
