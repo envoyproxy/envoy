@@ -20,19 +20,6 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                envoy::config::core::v3::ApiVersion transport_api_version,
                                Random::RandomGenerator& random, Stats::Scope& scope,
                                const RateLimitSettings& rate_limit_settings,
-                               const LocalInfo::LocalInfo& local_info,
-                               bool enable_type_url_downgrade_and_upgrade)
-    : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
-                   rate_limit_settings),
-      local_info_(local_info), transport_api_version_(transport_api_version),
-      enable_type_url_downgrade_and_upgrade_(enable_type_url_downgrade_and_upgrade) {}
-
-NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
-                               Event::Dispatcher& dispatcher,
-                               const Protobuf::MethodDescriptor& service_method,
-                               envoy::config::core::v3::ApiVersion transport_api_version,
-                               Random::RandomGenerator& random, Stats::Scope& scope,
-                               const RateLimitSettings& rate_limit_settings,
                                const LocalInfo::LocalInfo& local_info)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),

@@ -24,6 +24,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -56,13 +57,12 @@ public:
 
   {}
 
-  void setup(const bool enable_type_url_downgrade_and_upgrade = false) {
+  void setup() {
     grpc_mux_ = std::make_unique<GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_, true,
-        enable_type_url_downgrade_and_upgrade);
+        envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_, true);
   }
 
   void setup(const RateLimitSettings& custom_rate_limit_settings) {
@@ -727,7 +727,10 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
 // Send discovery request with v2 resource type_url, receive discovery response with v3 resource
 // type_url.
 TEST_F(GrpcMuxImplTest, WatchV2ResourceV3) {
-  setup(true);
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.enable_type_url_downgrade_and_upgrade", "true"}});
+  setup();
   InSequence s;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
@@ -815,7 +818,10 @@ TEST_F(GrpcMuxImplTest, WatchV2ResourceV3) {
 // Send discovery request with v3 resource type_url, receive discovery response with v2 resource
 // type_url.
 TEST_F(GrpcMuxImplTest, WatchV3ResourceV2) {
-  setup(true);
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.enable_type_url_downgrade_and_upgrade", "true"}});
+  setup();
   InSequence s;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
