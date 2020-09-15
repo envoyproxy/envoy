@@ -278,7 +278,7 @@ public:
         .WillOnce(Return(FilterHeadersStatus::Continue));
     EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
     decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
-    decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false);
+    decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
     return altered_response_headers;
   }
 
@@ -499,7 +499,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
 
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
         // Drain 2 so that on the 2nd iteration we will hit zero.
         data.drain(2);
@@ -555,7 +555,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponse) {
         filter->callbacks_->encode100ContinueHeaders(std::move(continue_headers));
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
         data.drain(4);
         return Http::okStatus();
@@ -595,7 +595,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithEncoderFiltersProxy
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false);
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
   doRemoteClose();
 }
@@ -621,7 +621,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithEncoderFilters) {
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false);
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
   doRemoteClose();
 }
@@ -654,7 +654,7 @@ TEST_F(HttpConnectionManagerImplTest, PauseResume100Continue) {
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[1]->callbacks_->encodeHeaders(std::move(response_headers), false);
+  decoder_filters_[1]->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
   doRemoteClose();
 }
@@ -708,7 +708,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithDecoderPause) {
 
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
         data.drain(4);
         return Http::okStatus();
@@ -1453,7 +1453,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
 
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
         filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
         data.drain(4);
         return Http::okStatus();
@@ -1523,7 +1523,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
 
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
         filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
         data.drain(4);
         return Http::okStatus();
@@ -1591,7 +1591,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
 
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
         filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
         data.drain(4);
         return Http::okStatus();
@@ -1658,7 +1658,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
 
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
         filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
 
         data.drain(4);
@@ -1740,7 +1740,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
 
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
         filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
 
         data.drain(4);
@@ -1824,7 +1824,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
 
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
         filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
 
         data.drain(4);
@@ -1909,7 +1909,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{
             {":status", "200"}, {"x-envoy-decorator-operation", "testOp"}}};
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
         filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
 
         data.drain(4);
@@ -1967,7 +1967,7 @@ TEST_F(HttpConnectionManagerImplTest,
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{
             {":status", "200"}, {"x-envoy-decorator-operation", "testOp"}}};
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
         data.drain(4);
         return Http::okStatus();
@@ -2025,7 +2025,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
 
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
         data.drain(4);
         return Http::okStatus();
@@ -2113,7 +2113,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
 
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-        filter->callbacks_->encodeHeaders(std::move(response_headers), false);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
         ResponseTrailerMapPtr response_trailers{new TestResponseTrailerMapImpl{{"x-trailer", "1"}}};
         filter->callbacks_->encodeTrailers(std::move(response_trailers));
@@ -2261,7 +2261,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
 
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-        filter->callbacks_->encodeHeaders(std::move(response_headers), false);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
         ResponseTrailerMapPtr response_trailers{new TestResponseTrailerMapImpl{{"x-trailer", "1"}}};
         filter->callbacks_->encodeTrailers(std::move(response_trailers));
@@ -2306,7 +2306,7 @@ TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
 
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
         data.drain(4);
         return Http::okStatus();
@@ -2700,7 +2700,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterUpstreamHeaders) 
 
     ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
     EXPECT_CALL(*idle_timer, enableTimer(_, _));
-    filter->callbacks_->encodeHeaders(std::move(response_headers), false);
+    filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
     EXPECT_CALL(*idle_timer, disableTimer());
     idle_timer->invokeCallback();
@@ -2756,7 +2756,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
     ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
     EXPECT_CALL(*idle_timer, enableTimer(_, _));
     filter->callbacks_->streamInfo().setResponseCodeDetails("");
-    filter->callbacks_->encodeHeaders(std::move(response_headers), false);
+    filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
     EXPECT_CALL(*idle_timer, enableTimer(_, _));
     decoder->decodeData(data, false);
@@ -3007,7 +3007,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnEncodeHeaders) {
     EXPECT_CALL(*request_timer, disableTimer()).Times(2);
     ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
     filter->callbacks_->streamInfo().setResponseCodeDetails("");
-    filter->callbacks_->encodeHeaders(std::move(response_headers), false);
+    filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
     return Http::okStatus();
   }));
 
@@ -3304,7 +3304,7 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
         filter->decoder_callbacks_->streamInfo().setResponseCodeDetails("");
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{
             {":status", "101"}, {"Connection", "upgrade"}, {"upgrade", "foo"}}};
-        filter->decoder_callbacks_->encodeHeaders(std::move(response_headers), false);
+        filter->decoder_callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
         data.drain(4);
         return Http::okStatus();
@@ -3436,7 +3436,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
   expectOnDestroy();
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true);
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
   // Fake a protocol error that races with the drain timeout. This will cause a local close.
   // Also fake the local close not closing immediately.
@@ -3536,7 +3536,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
   EXPECT_CALL(*codec_, shutdownNotice());
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
-  filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
   EXPECT_EQ(ssl_connection_.get(), filter->callbacks_->connection()->ssl().get());
 
   EXPECT_CALL(*codec_, goAway());
@@ -3583,7 +3583,7 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
 
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true);
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 }
 
 TEST_F(HttpConnectionManagerImplTest, DisconnectOnProxyConnectionDisconnect) {
@@ -3618,7 +3618,7 @@ TEST_F(HttpConnectionManagerImplTest, DisconnectOnProxyConnectionDisconnect) {
 
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true);
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 }
 
 TEST_F(HttpConnectionManagerImplTest, ResponseStartBeforeRequestComplete) {
@@ -3657,7 +3657,7 @@ TEST_F(HttpConnectionManagerImplTest, ResponseStartBeforeRequestComplete) {
         EXPECT_EQ("", headers.getServerValue());
       }));
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
-  filter->callbacks_->encodeHeaders(std::move(response_headers), false);
+  filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
   // Finish the request.
   EXPECT_CALL(*filter, decodeData(_, true));
@@ -3867,7 +3867,7 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
   EXPECT_CALL(*idle_timer, enableTimer(_, _));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
-  filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
@@ -3935,7 +3935,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDuration) {
 
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
-  filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
@@ -3984,7 +3984,8 @@ TEST_F(HttpConnectionManagerImplTest, IntermediateBufferingEarlyResponse) {
         // Now filter 2 will send a complete response.
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
-        decoder_filters_[1]->callbacks_->encodeHeaders(std::move(response_headers), true);
+        decoder_filters_[1]->callbacks_->encodeHeaders(std::move(response_headers), true,
+                                                       "details");
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -4144,7 +4145,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInTrailersCallback) {
   // invoke encodeHeaders
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[0]->callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false);
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false, "details");
 
   // set up encodeData expectations
   EXPECT_CALL(*encoder_filters_[1], encodeData(_, false))
@@ -4236,7 +4237,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInDataCallbackNoTrailers)
   // invoke encodeHeaders
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[0]->callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false);
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false, "details");
 
   // set up encodeData expectations
   EXPECT_CALL(*encoder_filters_[1], encodeData(_, true))
@@ -4323,7 +4324,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback) {
 
   decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[1]->callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false);
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false, "details");
 
   EXPECT_CALL(*encoder_filters_[1], encodeData(_, false))
       .WillOnce(Return(FilterDataStatus::Continue));
@@ -4396,7 +4397,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback_NoDataFram
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[0]->callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false);
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false, "details");
 
   EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterTrailersStatus {
@@ -4460,7 +4461,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback_ContinueAf
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[0]->callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false);
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false, "details");
 
   EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterTrailersStatus {
@@ -4544,7 +4545,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyDuringDecodeData) {
 
   decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[1]->callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false);
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false, "details");
   Buffer::OwnedImpl data1("good");
   decoder_filters_[1]->callbacks_->encodeData(data1, false);
   Buffer::OwnedImpl data2("bye");
@@ -4601,7 +4602,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInline) {
 
   decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[1]->callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
 }
 
 TEST_F(HttpConnectionManagerImplTest, Filter) {
@@ -4709,7 +4710,7 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   expectOnDestroy();
   decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[1]->callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
 }
 
 TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOnWithLazyCreation) {
@@ -4894,7 +4895,7 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false);
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
   MockDownstreamWatermarkCallbacks callbacks;
   decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
@@ -5011,7 +5012,7 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false);
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
   // Now overload the buffer with response data. The filter returns
   // StopIterationAndBuffer, which will trigger an early response.
@@ -5054,7 +5055,7 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsAfterHeaders) {
       .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false);
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
   // Now overload the buffer with response data. The filter returns
   // StopIterationAndBuffer, which will trigger an early reset.
@@ -5200,7 +5201,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamHeaders) {
 
   decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[1]->callbacks_->encodeHeaders(
-      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), false);
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), false, "details");
 
   Buffer::OwnedImpl response_body("response");
   decoder_filters_[1]->callbacks_->encodeData(response_body, true);
@@ -5246,7 +5247,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamData) {
 
   decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[1]->callbacks_->encodeHeaders(
-      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), false);
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), false, "details");
 
   Buffer::OwnedImpl response_body("response");
   decoder_filters_[1]->callbacks_->encodeData(response_body, true);
@@ -5295,7 +5296,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueAndEndStreamTrailers) {
 
   decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[1]->callbacks_->encodeHeaders(
-      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), false);
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), false, "details");
 
   Buffer::OwnedImpl response_body("response");
   decoder_filters_[1]->callbacks_->encodeData(response_body, false);
@@ -5348,7 +5349,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueDontEndStreamInjectBody) {
 
   decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[1]->callbacks_->encodeHeaders(
-      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true);
+      makeHeaderMap<TestResponseHeaderMapImpl>({{":status", "200"}}), true, "details");
 
   EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
       .WillOnce(Return(FilterDataStatus::Continue));
@@ -5399,7 +5400,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyContinuation) {
 
   decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[1]->callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
 
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::Continue));
@@ -5514,7 +5515,7 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithAllContinue) {
 
   decoder_filters_[2]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[2]->callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
 }
 
 // This test verifies proper sequences of decodeData() and encodeData() are called
@@ -5602,7 +5603,7 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithStopAndContinue) {
 
   decoder_filters_[2]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[2]->callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
 
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
@@ -5693,7 +5694,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataNoTrailers) {
 
   decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[1]->callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false);
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false, "details");
   Buffer::OwnedImpl response_body("response");
   decoder_filters_[1]->callbacks_->encodeData(response_body, true);
 
@@ -5784,7 +5785,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataTrailers) {
 
   decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[1]->callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false);
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false, "details");
   Buffer::OwnedImpl response_body("response");
   decoder_filters_[1]->callbacks_->encodeData(response_body, false);
   decoder_filters_[1]->callbacks_->encodeTrailers(
@@ -5879,7 +5880,7 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
   EXPECT_EQ(ssl_connection_.get(), encoder_filters_[1]->callbacks_->connection()->ssl().get());
   decoder_filters_[2]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[2]->callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false);
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false, "details");
   Buffer::OwnedImpl response_body("response");
   decoder_filters_[2]->callbacks_->encodeData(response_body, false);
   decoder_filters_[2]->callbacks_->encodeTrailers(
@@ -5978,7 +5979,7 @@ TEST_F(HttpConnectionManagerImplTest, DisableHttp1KeepAliveWhenOverloaded) {
 
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
         data.drain(4);
         return Http::okStatus();
@@ -6037,7 +6038,7 @@ TEST_P(DrainH2HttpConnectionManagerImplTest, DisableHttp2KeepAliveWhenOverloaded
 
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
         data.drain(4);
         return Http::okStatus();
@@ -6115,7 +6116,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnEncodingPat
       }));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false);
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
 
   // Invoke encodeData while all iteration is stopped and make sure the filters do not have
   // encodeData called.
@@ -6167,7 +6168,7 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDraining) {
 
         ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
         filter->callbacks_->streamInfo().setResponseCodeDetails("");
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
         data.drain(4);
         return Http::okStatus();
@@ -6589,7 +6590,7 @@ TEST_F(HttpConnectionManagerImplTest, TestUpstreamResponseHeadersSize) {
 
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[0]->callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestUpstreamResponseBodySize) {
@@ -6639,7 +6640,7 @@ TEST_F(HttpConnectionManagerImplTest, TestUpstreamResponseBodySize) {
 
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
   decoder_filters_[0]->callbacks_->encodeHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false);
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false, "details");
 
   EXPECT_CALL(response_encoder_, encodeData(_, true));
   expectOnDestroy();
@@ -6684,7 +6685,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
 
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
-  filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
   EXPECT_EQ(1U, stats_.named_.downstream_rq_2xx_.value());
   EXPECT_EQ(1U, listener_stats_.downstream_rq_2xx_.value());

@@ -416,8 +416,10 @@ public:
    *
    * @param headers supplies the headers to be encoded.
    * @param end_stream supplies whether this is a header only request/response.
+   * @param details supplies the details of why this response was sent.
    */
-  virtual void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) PURE;
+  virtual void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
+                             absl::string_view details) PURE;
 
   /**
    * Called with data to be encoded, optionally indicating end of stream.

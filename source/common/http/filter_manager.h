@@ -173,7 +173,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override;
-  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
+  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
+                     absl::string_view details) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
   void encodeMetadata(MetadataMapPtr&& metadata_map_ptr) override;
