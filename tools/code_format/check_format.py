@@ -15,10 +15,6 @@ import traceback
 import shutil
 import paths
 
-EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
-                     "./source/extensions/extensions_build_config.bzl",
-                     "./bazel/toolchains/configs/", "./tools/testdata/check_format/",
-                     "./tools/pyformat/", "./third_party/")
 SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".md", ".mm", ".proto",
             ".rst")
 DOCS_SUFFIX = (".md", ".rst")
@@ -209,8 +205,12 @@ class FormatChecker:
         "./tools/clang_tools",
     ]
     self.include_dir_order = command_line_args.include_dir_order
+    self.excluded_prefixes = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
+                     "./source/extensions/extensions_build_config.bzl",
+                     "./bazel/toolchains/configs/", "./tools/testdata/check_format/",
+                     "./tools/pyformat/", "./third_party/")
     if command_line_args.add_excluded_prefixes:
-      EXCLUDED_PREFIXES += tuple(command_line_args.add_excluded_prefixes)
+      self.excluded_prefixes += tuple(command_line_args.add_excluded_prefixes)
 
   # Map a line transformation function across each line of a file,
   # writing the result lines as requested.
@@ -784,7 +784,7 @@ class FormatChecker:
     return line
 
   def fixBuildPath(self, file_path):
-    self.evaluateLines(file_path, functools.partial(fixBuildLine, file_path))
+    self.evaluateLines(file_path, functools.partial(self.fixBuildLine, file_path))
 
     error_messages = []
 
@@ -822,7 +822,7 @@ class FormatChecker:
     return error_messages
 
   def fixSourcePath(self, file_path):
-    self.evaluateLines(file_path, fixSourceLine)
+    self.evaluateLines(file_path, self.fixSourceLine)
 
     error_messages = []
 
@@ -892,7 +892,7 @@ class FormatChecker:
     return []
 
   def checkFormat(self, file_path):
-    if file_path.startswith(EXCLUDED_PREFIXES):
+    if file_path.startswith(self.excluded_prefixes):
       return []
 
     if not file_path.endswith(SUFFIXES):
