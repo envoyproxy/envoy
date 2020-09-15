@@ -45,7 +45,7 @@ void truncate(std::string& str, absl::optional<uint32_t> max_length) {
 
 // Matches newline pattern in a StartTimeFormatter format string.
 const std::regex& getStartTimeNewlinePattern() {
-  CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n");
+  CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*(E|O)?n");
 }
 const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
 
