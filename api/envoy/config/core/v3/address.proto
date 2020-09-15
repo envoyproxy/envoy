@@ -30,6 +30,17 @@ message Pipe {
   uint32 mode = 2 [(validate.rules).uint32 = {lte: 511}];
 }
 
+// [#not-implemented-hide:] The address represents an envoy internal listener.
+// TODO(lambdai): Make this address available for listener and endpoint.
+message EnvoyInternalAddress {
+  oneof address_name_specifier {
+    option (validate.required) = true;
+
+    // [#not-implemented-hide:] The :ref:`listener name <envoy_api_field_config.listener.v3.Listener.name>` of the destination internal listener.
+    string server_listener_name = 1;
+  }
+}
+
 // [#next-free-field: 7]
 message SocketAddress {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.SocketAddress";
@@ -129,6 +140,9 @@ message Address {
     SocketAddress socket_address = 1;
 
     Pipe pipe = 2;
+
+    // [#not-implemented-hide:]
+    EnvoyInternalAddress envoy_internal_address = 3;
   }
 }
 
