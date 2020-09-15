@@ -1121,9 +1121,9 @@ void Filter::handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus
   }
 }
 
-void Filter::onUpstream100ContinueHeaders(Http::ResponseHeaderMap& headers,
+void Filter::onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
                                           UpstreamRequest& upstream_request) {
-  chargeUpstreamCode(100, headers, upstream_request.upstreamHost(), false);
+  chargeUpstreamCode(100, *headers, upstream_request.upstreamHost(), false);
   ENVOY_STREAM_LOG(debug, "upstream 100 continue", *callbacks_);
 
   downstream_response_started_ = true;
@@ -1145,7 +1145,7 @@ void Filter::onUpstream100ContinueHeaders(Http::ResponseHeaderMap& headers,
   // invariant.
   if (!downstream_100_continue_headers_encoded_) {
     downstream_100_continue_headers_encoded_ = true;
-    callbacks_->encode100ContinueHeaders(headers);
+    callbacks_->encode100ContinueHeaders(std::move(headers));
   }
 }
 
@@ -1176,18 +1176,18 @@ void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
   LinkedList::moveIntoList(std::move(final_upstream_request), upstream_requests_);
 }
 
-void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& headers,
+void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
                                UpstreamRequest& upstream_request, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
 
-  modify_headers_(headers);
+  modify_headers_(*headers);
   // When grpc-status appears in response headers, convert grpc-status to HTTP status code
   // for outlier detection. This does not currently change any stats or logging and does not
   // handle the case when an error grpc-status is sent as a trailer.
   absl::optional<Grpc::Status::GrpcStatus> grpc_status;
   uint64_t grpc_to_http_status = 0;
   if (grpc_request_) {
-    grpc_status = Grpc::Common::getGrpcStatus(headers);
+    grpc_status = Grpc::Common::getGrpcStatus(*headers);
     if (grpc_status.has_value()) {
       grpc_to_http_status = Grpc::Utility::grpcToHttpStatus(grpc_status.value());
     }
@@ -1200,7 +1200,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& 
       upstream_request.upstreamHost()->outlierDetector().putHttpResponseCode(response_code);
     }
 
-    if (headers.EnvoyImmediateHealthCheckFail() != nullptr) {
+    if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
       upstream_request.upstreamHost()->healthChecker().setUnhealthy();
     }
   }
@@ -1214,10 +1214,10 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& 
       // We already retried this request (presumably for a per try timeout) so
       // we definitely won't retry it again. Check if we would have retried it
       // if we could.
-      could_not_retry = retry_state_->wouldRetryFromHeaders(headers);
+      could_not_retry = retry_state_->wouldRetryFromHeaders(*headers);
     } else {
       const RetryStatus retry_status =
-          retry_state_->shouldRetryHeaders(headers, [this]() -> void { doRetry(); });
+          retry_state_->shouldRetryHeaders(*headers, [this]() -> void { doRetry(); });
       if (retry_status == RetryStatus::Yes) {
         pending_retries_++;
         if (upstream_request.upstreamHost()) {
@@ -1248,7 +1248,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& 
   if (route_entry_->internalRedirectPolicy().enabled() &&
       route_entry_->internalRedirectPolicy().shouldRedirectForResponseCode(
           static_cast<Http::Code>(response_code)) &&
-      setupRedirect(headers, upstream_request)) {
+      setupRedirect(*headers, upstream_request)) {
     return;
     // If the redirect could not be handled, fail open and let it pass to the
     // next downstream.
@@ -1280,27 +1280,27 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& 
     std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         response_received_time - downstream_request_complete_time_);
     if (!config_.suppress_envoy_headers_) {
-      headers.setEnvoyUpstreamServiceTime(ms.count());
+      headers->setEnvoyUpstreamServiceTime(ms.count());
     }
   }
 
   upstream_request.upstreamCanary(
-      (headers.EnvoyUpstreamCanary() && headers.EnvoyUpstreamCanary()->value() == "true") ||
+      (headers->EnvoyUpstreamCanary() && headers->EnvoyUpstreamCanary()->value() == "true") ||
       (upstream_request.upstreamHost() && upstream_request.upstreamHost()->canary()));
-  chargeUpstreamCode(response_code, headers, upstream_request.upstreamHost(), false);
+  chargeUpstreamCode(response_code, *headers, upstream_request.upstreamHost(), false);
   if (!Http::CodeUtility::is5xx(response_code)) {
     handleNon5xxResponseHeaders(grpc_status, upstream_request, end_stream, grpc_to_http_status);
   }
 
   // Append routing cookies
   for (const auto& header_value : downstream_set_cookies_) {
-    headers.addReferenceKey(Http::Headers::get().SetCookie, header_value);
+    headers->addReferenceKey(Http::Headers::get().SetCookie, header_value);
   }
 
   // TODO(zuercher): If access to response_headers_to_add (at any level) is ever needed outside
   // Router::Filter we'll need to find a better location for this work. One possibility is to
   // provide finalizeResponseHeaders functions on the Router::Config and VirtualHost interfaces.
-  route_entry_->finalizeResponseHeaders(headers, callbacks_->streamInfo());
+  route_entry_->finalizeResponseHeaders(*headers, callbacks_->streamInfo());
 
   downstream_response_started_ = true;
   final_upstream_request_ = &upstream_request;
@@ -1311,7 +1311,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& 
 
   callbacks_->streamInfo().setResponseCodeDetails(
       StreamInfo::ResponseCodeDetails::get().ViaUpstream);
-  callbacks_->encodeHeaders(headers, end_stream);
+  callbacks_->encodeHeaders(std::move(headers), end_stream);
 }
 
 void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
@@ -1331,7 +1331,7 @@ void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_re
   callbacks_->encodeData(data, end_stream);
 }
 
-void Filter::onUpstreamTrailers(Http::ResponseTrailerMap& trailers,
+void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
                                 UpstreamRequest& upstream_request) {
   // This should be true because when we saw headers we either reset the stream
   // (hence wouldn't have made it to onUpstreamTrailers) or all other in-flight
@@ -1339,7 +1339,7 @@ void Filter::onUpstreamTrailers(Http::ResponseTrailerMap& trailers,
   ASSERT(upstream_requests_.size() == 1);
 
   if (upstream_request.grpcRqSuccessDeferred()) {
-    absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(trailers);
+    absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*trailers);
     if (grpc_status &&
         !Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status.value()))) {
       upstream_request.upstreamHost()->stats().rq_success_.inc();
@@ -1350,7 +1350,7 @@ void Filter::onUpstreamTrailers(Http::ResponseTrailerMap& trailers,
 
   onUpstreamComplete(upstream_request);
 
-  callbacks_->encodeTrailers(trailers);
+  callbacks_->encodeTrailers(std::move(trailers));
 }
 
 void Filter::onUpstreamMetadata(Http::MetadataMapVector& metadata) {

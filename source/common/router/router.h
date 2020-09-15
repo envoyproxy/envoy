@@ -257,13 +257,13 @@ class RouterFilterInterface {
 public:
   virtual ~RouterFilterInterface() = default;
 
-  virtual void onUpstream100ContinueHeaders(Http::ResponseHeaderMap& headers,
+  virtual void onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
                                             UpstreamRequest& upstream_request) PURE;
-  virtual void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& headers,
+  virtual void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
                                  UpstreamRequest& upstream_request, bool end_stream) PURE;
   virtual void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
                               bool end_stream) PURE;
-  virtual void onUpstreamTrailers(Http::ResponseTrailerMap& trailers,
+  virtual void onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
                                   UpstreamRequest& upstream_request) PURE;
   virtual void onUpstreamMetadata(Http::MetadataMapVector& metadata_map) PURE;
   virtual void onUpstreamReset(Http::StreamResetReason reset_reason,
@@ -429,13 +429,13 @@ public:
   }
 
   // RouterFilterInterface
-  void onUpstream100ContinueHeaders(Http::ResponseHeaderMap& headers,
+  void onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
                                     UpstreamRequest& upstream_request) override;
-  void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMap& headers,
+  void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
                          UpstreamRequest& upstream_request, bool end_stream) override;
   void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
                       bool end_stream) override;
-  void onUpstreamTrailers(Http::ResponseTrailerMap& trailers,
+  void onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
                           UpstreamRequest& upstream_request) override;
   void onUpstreamMetadata(Http::MetadataMapVector& metadata_map) override;
   void onUpstreamReset(Http::StreamResetReason reset_reason, absl::string_view transport_failure,

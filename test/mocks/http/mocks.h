@@ -163,16 +163,6 @@ public:
                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                        absl::string_view details);
 
-  void setContinueHeaders(ResponseHeaderMapPtr&& headers) override {
-    continue_headers_ = std::move(headers);
-  }
-  void setResponseHeaders(ResponseHeaderMapPtr&& headers) override {
-    response_headers_ = std::move(headers);
-  }
-  void setResponseTrailers(ResponseTrailerMapPtr&& trailers) override {
-    response_trailers_ = std::move(trailers);
-  }
-
   ResponseHeaderMapOptRef continueHeaders() override {
     return continue_headers_ ? absl::make_optional(std::ref(*continue_headers_)) : absl::nullopt;
   }
@@ -183,16 +173,9 @@ public:
     return response_trailers_ ? absl::make_optional(std::ref(*response_trailers_)) : absl::nullopt;
   }
 
-  void encode100ContinueHeaders(ResponseHeaderMap& headers) override {
-    encode100ContinueHeaders_(headers);
-  }
-  void encodeHeaders(ResponseHeaderMap& headers, bool end_stream) override {
-    encodeHeaders_(headers, end_stream);
-  }
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
     encode100ContinueHeaders_(*headers);
   }
-  void encodeTrailers(ResponseTrailerMap& trailers) override { encodeTrailers_(trailers); }
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override {
     encodeHeaders_(*headers, end_stream);
   }

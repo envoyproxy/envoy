@@ -185,7 +185,7 @@ void UpstreamRequest::encode100ContinueHeaders(Http::ResponseHeaderMap& headers)
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
   ASSERT(100 == Http::Utility::getResponseStatus(headers));
-  parent_.onUpstream100ContinueHeaders(headers, *this);
+  parent_.onUpstream100ContinueHeaders(std::move(continue_to_encode_), *this);
 }
 
 void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -238,14 +238,11 @@ void UpstreamRequest::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_s
 
   // Transfer the headers to the HCM at this point, as the router will destroy the upstream request
   // before passing it along.
-  parent_.callbacks()->setResponseHeaders(std::move(headers_to_encode_));
-  parent_.onUpstreamHeaders(response_code, parent_.callbacks()->responseHeaders()->get(), *this,
-                            end_stream);
+  parent_.onUpstreamHeaders(response_code, std::move(headers_to_encode_), *this, end_stream);
 }
 
 void UpstreamRequest::encodeTrailers(Http::ResponseTrailerMap&) {
-  parent_.callbacks()->setResponseTrailers(std::move(trailers_to_encode_));
-  parent_.onUpstreamTrailers(parent_.callbacks()->responseTrailers()->get(), *this);
+  parent_.onUpstreamTrailers(std::move(trailers_to_encode_), *this);
 }
 void UpstreamRequest::encodeMetadata(Http::MetadataMapVector& metadata) {
   parent_.onUpstreamMetadata(metadata);
