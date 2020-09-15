@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/macros.h"
@@ -29,6 +30,21 @@ public:
 
   float value() const { return action_value_; }
   bool isSaturated() const { return action_value_ == 1; }
+  bool isInactive() const { return action_value_ == 0; }
+
+  /**
+   * Converts the overload action state to a boolean. The return value will be true with probability
+   * of the level of saturation.
+   */
+  bool isRandomizedActive(Random::RandomGenerator& random_generator) const {
+    if (isInactive()) {
+      return false;
+    } else if (isSaturated()) {
+      return true;
+    }
+
+    return random_generator.random() < action_value_ * Random::RandomGenerator::max();
+  }
 
 private:
   float action_value_;
