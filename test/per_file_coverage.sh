@@ -68,6 +68,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/transport_sockets/tls/private_key:76.9"
 "source/extensions/watchdog:84.9"
 "source/extensions/watchdog/profile_action:84.9"
+"source/extensions/watchdog/abort_action:45.0"
 "source/server:94.6"
 "source/server/config_validation:76.8"
 "source/server/admin:95.5"
