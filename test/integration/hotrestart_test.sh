@@ -284,12 +284,13 @@ do
 done
 
 # Hotrestart in specified UDS
-# Run one of the tests with real symbol tables. No need to do all of them.
+# Real symbol tables are the default, so I had run just one with fake symbol tables
+# (Switch the "0" and "1" in the second arg in the two run_testsuite calls below).
 if [ "$TEST_INDEX" = "0" ]; then
-  run_testsuite "${HOT_RESTART_JSON_V4}" "0" "/tmp/envoy_domain_socket" "600" || exit 1
+  run_testsuite "${HOT_RESTART_JSON_V4}" "0" "${SOCKET_DIR}/envoy_domain_socket" "600" || exit 1
 fi
 
-run_testsuite "${HOT_RESTART_JSON_V4}" "1" "/tmp/envoy_domain_socket" "600" || exit 1
+run_testsuite "${HOT_RESTART_JSON_V4}" "1" "${SOCKET_DIR}/envoy_domain_socket" "600" || exit 1
 
 start_test disabling hot_restart by command line.
 CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --disable-hot-restart 2>&1)
@@ -299,11 +300,11 @@ check [ "disabled" = "${CLI_HOT_RESTART_VERSION}" ]
 start_test socket-mode for socket path
 run_in_background_saving_pid "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
       --restart-epoch 0  --base-id 0 --base-id-path "${BASE_ID_PATH}" \
-      --socket-path /tmp/envoy_domain_socket --socket-mode 644 \
+      --socket-path "${SOCKET_DIR}"/envoy_domain_socket --socket-mode 644 \
       --service-cluster cluster --service-node node --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" \
       --admin-address-path "${ADMIN_ADDRESS_PATH_0}"
 sleep 3
-EXPECTED_SOCKET_MODE=$(stat -c '%a' '/tmp/envoy_domain_socket_parent_0')
+EXPECTED_SOCKET_MODE=$(stat -c '%a' "${SOCKET_DIR}"/envoy_domain_socket_parent_0)
 check [ "644" = "${EXPECTED_SOCKET_MODE}" ]
 kill ${BACKGROUND_PID}
 wait ${BACKGROUND_PID}
