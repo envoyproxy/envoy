@@ -136,8 +136,8 @@ FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTri
   return FileEventPtr{new FileEventImpl(
       *this, fd,
       [this, cb](uint32_t events) {
-        cb(events);
         touchWatchdogs();
+        cb(events);
       },
       trigger, events)};
 }
@@ -169,16 +169,16 @@ TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
 Event::SchedulableCallbackPtr DispatcherImpl::createSchedulableCallback(std::function<void()> cb) {
   ASSERT(isThreadSafe());
   return base_scheduler_.createSchedulableCallback([this, cb]() {
-    cb();
     touchWatchdogs();
+    cb();
   });
 }
 
 TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
   return scheduler_->createTimer(
       [this, cb]() {
-        cb();
         touchWatchdogs();
+        cb();
       },
       *this);
 }
