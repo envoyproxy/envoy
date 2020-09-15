@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/common/exception.h"
 
 #include "absl/strings/string_view.h"

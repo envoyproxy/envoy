@@ -90,7 +90,8 @@ TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
         std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
     unexpected_response->set_type_url(type_url);
     unexpected_response->set_system_version_info("0");
-    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "0")).Times(0);
+    // empty response should call onConfigUpdate on wildcard watch
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "0"));
     grpc_mux_->onDiscoveryResponse(std::move(unexpected_response), control_plane_stats_);
   }
   {
@@ -118,7 +119,7 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
   setup();
 
   const std::string& type_url = Config::TypeUrl::get().VirtualHost;
-  auto watch = grpc_mux_->addWatch(type_url, {"domain1.test"}, callbacks_, resource_decoder_);
+  auto watch = grpc_mux_->addWatch(type_url, {"prefix"}, callbacks_, resource_decoder_, true);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -133,9 +134,9 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
   vhost.add_domains("domain2.test");
 
   response->add_resources()->mutable_resource()->PackFrom(vhost);
-  response->mutable_resources()->at(0).set_name("vhost_1");
-  response->mutable_resources()->at(0).add_aliases("domain1.test");
-  response->mutable_resources()->at(0).add_aliases("domain2.test");
+  response->mutable_resources()->at(0).set_name("prefix/vhost_1");
+  response->mutable_resources()->at(0).add_aliases("prefix/domain1.test");
+  response->mutable_resources()->at(0).add_aliases("prefix/domain2.test");
 
   grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
 
@@ -153,7 +154,7 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
   setup();
 
   const std::string& type_url = Config::TypeUrl::get().VirtualHost;
-  auto watch = grpc_mux_->addWatch(type_url, {"domain1.test"}, callbacks_, resource_decoder_);
+  auto watch = grpc_mux_->addWatch(type_url, {"prefix"}, callbacks_, resource_decoder_, true);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -164,7 +165,7 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
 
   response->add_resources();
   response->mutable_resources()->at(0).set_name("not-found");
-  response->mutable_resources()->at(0).add_aliases("domain1.test");
+  response->mutable_resources()->at(0).add_aliases("prefix/domain1.test");
 
   grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
 
