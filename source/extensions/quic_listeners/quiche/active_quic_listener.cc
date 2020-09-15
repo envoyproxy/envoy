@@ -119,7 +119,9 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData& data) {
   // On event loop runs where this listener reads or has packets posted to it, process buffered
   // packets on the next loop. This ensures that the limit of processed client hellos per loop is
   // honored, and that buffered client hellos are processed in a timely fashion.
-  udp_listener_->activateRead();
+  if (quic_dispatcher_->HasChlosBuffered()) {
+    udp_listener_->activateRead();
+  }
 }
 
 void ActiveQuicListener::onReadReady() {
