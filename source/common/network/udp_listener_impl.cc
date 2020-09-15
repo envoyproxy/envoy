@@ -157,8 +157,8 @@ void UdpListenerWorkerRouterImpl::deliver(UdpListenerCallbacks& current, UdpRecv
   if (!dest.has_value() || *dest == current.workerId()) {
     current.onDataWorker(data);
   } else {
-    RELEASE_ASSERT(*dest < workers_.size(),
-                   "UdpListenerCallbacks::destination returned out-of-range value");
+    ASSERT(*dest < workers_.size(),
+           "UdpListenerCallbacks::destination returned out-of-range value");
     auto* worker = workers_[*dest];
 
     // When a listener is being removed, packets could be processed on some workers after the
