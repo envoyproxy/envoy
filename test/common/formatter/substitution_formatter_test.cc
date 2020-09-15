@@ -2168,8 +2168,8 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     EXPECT_EQ("%E4n", formatter.format(request_header, response_header, response_trailer,
                                        stream_info, body));
   }
-}
 #endif
+}
 
 TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
   StreamInfo::MockStreamInfo stream_info;
