@@ -37,7 +37,9 @@ message StartTlsConfig {
       [(validate.rules).message = {required: true}];
 
   // Maximum number of bytes allowed to be exchanged in clear-text.
-  // If the number of bytes exchanged in clear-text exceeds this value
-  // connection is terminated. Value of zero means no limit. Defaults to zero.
+  // StartTls transport socket monitors how many bytes are
+  // exchanged in the initial clear-text phase and when that number
+  // exceeds this configuration value, the connection is terminated.
+  // Value of zero means no limit. Defaults to zero.
   google.protobuf.UInt32Value max_cleartext_bytes = 3;
 }
