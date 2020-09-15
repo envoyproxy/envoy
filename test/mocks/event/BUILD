@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -25,5 +26,14 @@ envoy_cc_mock(
         "//include/envoy/ssl:context_interface",
         "//test/mocks/buffer:buffer_mocks",
         "//test/test_common:test_time_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "wrapped_dispatcher",
+    srcs = ["wrapped_dispatcher.cc"],
+    hdrs = ["wrapped_dispatcher.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
     ],
 )
