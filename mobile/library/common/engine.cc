@@ -110,16 +110,6 @@ void Engine::recordCounter(const std::string& elements, uint64_t count) {
   }
 }
 
-void Engine::flushStats() {
-  // The server will be null if the post-init callback has not been completed within run().
-  // In this case, we can simply ignore the flush.
-  if (server_) {
-    // Stats must be flushed from the main thread.
-    // Dispatching should be moved after https://github.com/lyft/envoy-mobile/issues/720
-    server_->dispatcher().post([this]() -> void { server_->flushStats(); });
-  }
-}
-
 Http::Dispatcher& Engine::httpDispatcher() { return *http_dispatcher_; }
 
 } // namespace Envoy

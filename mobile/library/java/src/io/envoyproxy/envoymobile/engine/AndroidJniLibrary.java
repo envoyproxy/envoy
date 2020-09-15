@@ -49,11 +49,4 @@ public class AndroidJniLibrary {
    * @return The resulting status of the operation.
    */
   protected static native int setPreferredNetwork(int network);
-
-  /**
-   * Flush the stats sinks outside of a flushing interval. Note: stats flushing
-   * may not be synchronous. Therefore, this function may return prior to flushing
-   * taking place.
-   */
-  protected static native void flushStats();
 }

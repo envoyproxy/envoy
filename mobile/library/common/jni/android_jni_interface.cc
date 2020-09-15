@@ -29,11 +29,3 @@ Java_io_envoyproxy_envoymobile_engine_AndroidJniLibrary_setPreferredNetwork(JNIE
   __android_log_write(ANDROID_LOG_INFO, "[Envoy]", "setting preferred network");
   return set_preferred_network(static_cast<envoy_network_t>(network));
 }
-
-extern "C" JNIEXPORT void JNICALL
-Java_io_envoyproxy_envoymobile_engine_AndroidJniLibrary_flushStats(JNIEnv* env,
-                                                                   jclass // class
-) {
-  __android_log_write(ANDROID_LOG_INFO, "[Envoy]", "triggering stats flush");
-  flush_stats();
-}

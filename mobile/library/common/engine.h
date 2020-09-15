@@ -42,13 +42,6 @@ public:
    */
   void recordCounter(const std::string& elements, uint64_t count);
 
-  /**
-   * Flush the stats sinks outside of a flushing interval.
-   * Note: stats flushing may not be synchronous.
-   * Therefore, this function may return prior to flushing taking place.
-   */
-  void flushStats();
-
 private:
   envoy_status_t run(std::string config, std::string log_level);
 
