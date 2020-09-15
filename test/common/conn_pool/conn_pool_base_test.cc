@@ -141,7 +141,7 @@ TEST_F(ConnPoolImplBaseTest, NoPrefetchIfDegraded) {
 
 TEST_F(ConnPoolImplBaseTest, ExplicitPrefetch) {
   // Create more than one connection per new stream.
-  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1));
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
   EXPECT_CALL(pool_, instantiateActiveClient).Times(AnyNumber());
 
   // With global prefetch off, we won't prefetch.
@@ -160,7 +160,7 @@ TEST_F(ConnPoolImplBaseTest, ExplicitPrefetch) {
 
 TEST_F(ConnPoolImplBaseTest, ExplicitPrefetchNotHealthy) {
   // Create more than one connection per new stream.
-  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1));
+  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
 
   // Prefetch won't occur if the host is not healthy.
   host_->healthFlagSet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH);

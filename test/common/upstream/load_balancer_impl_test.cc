@@ -1710,10 +1710,10 @@ TEST_P(RandomLoadBalancerTest, Normal) {
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2));
+  EXPECT_CALL(random_, random()).WillOnce(Return(2));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->peekAnotherHost(nullptr));
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3));
+  EXPECT_CALL(random_, random()).WillOnce(Return(3));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->peekAnotherHost(nullptr));
 
   EXPECT_CALL(random_, random()).Times(0);

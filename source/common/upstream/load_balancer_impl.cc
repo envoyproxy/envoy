@@ -858,7 +858,8 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
 }
 
 HostConstSharedPtr RandomLoadBalancer::peekAnotherHost(LoadBalancerContext* context) {
-  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random(true));
+  uint64_t random_hash = random(true);
+  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random_hash);
   if (!hosts_source) {
     return nullptr;
   }
@@ -868,11 +869,12 @@ HostConstSharedPtr RandomLoadBalancer::peekAnotherHost(LoadBalancerContext* cont
     return nullptr;
   }
 
-  return hosts_to_use[random(true) % hosts_to_use.size()];
+  return hosts_to_use[random_hash % hosts_to_use.size()];
 }
 
 HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* context) {
-  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random(false));
+  uint64_t random_hash = random(false);
+  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random_hash);
   if (!hosts_source) {
     return nullptr;
   }
@@ -882,7 +884,7 @@ HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* conte
     return nullptr;
   }
 
-  return hosts_to_use[random(false) % hosts_to_use.size()];
+  return hosts_to_use[random_hash % hosts_to_use.size()];
 }
 
 SubsetSelectorImpl::SubsetSelectorImpl(

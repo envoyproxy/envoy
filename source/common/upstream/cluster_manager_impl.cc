@@ -839,7 +839,7 @@ void ClusterManagerImpl::maybePrefetch(
   //  per-upstream prefetch.
   //
   //  Once we do this, this should loop capped number of times while shouldPrefetch is true.
-  if (cluster_entry->cluster_info_->peekaheadRatio() > 1.1) {
+  if (cluster_entry->cluster_info_->peekaheadRatio() > 1.0) {
     ConnectionPool::Instance* prefetch_pool = pick_prefetch_pool();
     if (prefetch_pool) {
       prefetch_pool->maybePrefetch(cluster_entry->cluster_info_->peekaheadRatio());
