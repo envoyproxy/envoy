@@ -17,6 +17,7 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
+
 #include "server/watchdog_impl.h"
 
 #include "absl/types/optional.h"

@@ -23,15 +23,11 @@ public:
       : thread_id_(thread_id), timer_interval_(interval) {}
 
   Thread::ThreadId threadId() const override { return thread_id_; }
-  uint64_t touchCount() const {
-    return touch_count_.load();
-  }
+  uint64_t touchCount() const { return touch_count_.load(); }
 
   // Server::WatchDog
   void startWatchdog(Event::Dispatcher& dispatcher) override;
-  void touch() override {
-    ++touch_count_;
-  }
+  void touch() override { touch_count_.fetch_add(1); }
 
 private:
   const Thread::ThreadId thread_id_;

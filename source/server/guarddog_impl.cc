@@ -230,8 +230,7 @@ void GuardDogImpl::invokeGuardDogActions(
 
 GuardDogImpl::WatchedDog::WatchedDog(Stats::Scope& stats_scope, const std::string& thread_name,
                                      const WatchDogImplSharedPtr& watch_dog)
-    : dog_(watch_dog),
-      last_touch_count_(dog_->touchCount()),
+    : dog_(watch_dog), last_touch_count_(dog_->touchCount()),
       miss_counter_(stats_scope.counterFromStatName(
           Stats::StatNameManagedStorage(fmt::format("server.{}.watchdog_miss", thread_name),
                                         stats_scope.symbolTable())
