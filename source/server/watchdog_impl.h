@@ -4,7 +4,6 @@
 #include <chrono>
 
 #include "envoy/common/time.h"
-#include "envoy/event/dispatcher.h"
 #include "envoy/server/watchdog.h"
 
 namespace Envoy {

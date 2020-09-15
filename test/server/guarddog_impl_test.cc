@@ -117,7 +117,7 @@ protected:
    * This does everything but the final forceCheckForTest() that should cause
    * death for the single kill case.
    */
-  void SetupForDeath() {
+  void setupForDeath() {
     InSequence s;
     initGuardDog(fakestats_, config_kill_);
     unpet_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread",
@@ -131,7 +131,7 @@ protected:
    * This does everything but the final forceCheckForTest() that should cause
    * death for the multiple kill case.
    */
-  void SetupForMultiDeath() {
+  void setupForMultiDeath() {
     InSequence s;
     initGuardDog(fakestats_, config_multikill_);
     auto unpet_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
@@ -195,7 +195,7 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(GuardDogDeathTest, KillDeathTest) {
   // Is it German for "The Function"? Almost...
   auto die_function = [&]() -> void {
-    SetupForDeath();
+    setupForDeath();
     time_system_->advanceTimeWait(std::chrono::milliseconds(401)); // 400 ms past death.
     guard_dog_->forceCheckForTest();
   };
@@ -209,12 +209,12 @@ TEST_P(GuardDogAlmostDeadTest, KillNoFinalCheckTest) {
   // This does everything the death test does, except allow enough time to
   // expire to reach the death panic. The death test does not verify that there
   // was not a crash *before* the expected line, so this test checks that.
-  SetupForDeath();
+  setupForDeath();
 }
 
 TEST_P(GuardDogDeathTest, MultiKillDeathTest) {
   auto die_function = [&]() -> void {
-    SetupForMultiDeath();
+    setupForMultiDeath();
     time_system_->advanceTimeWait(std::chrono::milliseconds(2)); // 1 ms past multi-death.
     guard_dog_->forceCheckForTest();
   };
@@ -225,7 +225,7 @@ TEST_P(GuardDogAlmostDeadTest, MultiKillNoFinalCheckTest) {
   // This does everything the death test does not except the final force check that
   // should actually result in dying. The death test does not verify that there
   // was not a crash *before* the expected line, so this test checks that.
-  SetupForMultiDeath();
+  setupForMultiDeath();
 }
 
 TEST_P(GuardDogDeathTest, MultiKillThresholdDeathTest) {
