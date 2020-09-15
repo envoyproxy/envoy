@@ -39,7 +39,7 @@ public:
   ~ActiveQuicListener() override;
 
   void onListenerShutdown();
-  uint64_t eventLoopsWithBufferedChlos() const { return event_loops_with_buffered_chlo_; }
+  uint64_t eventLoopsWithBufferedChlosForTest() const { return event_loops_with_buffered_chlo_; }
 
   // Network::UdpListenerCallbacks
   void onReadReady() override;

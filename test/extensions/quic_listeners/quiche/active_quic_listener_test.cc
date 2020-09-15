@@ -347,7 +347,7 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   // The first kNumSessionsToCreatePerLoop were processed immediately, the next
   // kNumSessionsToCreatePerLoop were buffered for the next run of the event loop, and the last one
   // was buffered to the subsequent event loop.
-  EXPECT_EQ(2, quic_listener_->eventLoopsWithBufferedChlos());
+  EXPECT_EQ(2, quic_listener_->eventLoopsWithBufferedChlosForTest());
 
   for (size_t i = 1; i <= count; ++i) {
     EXPECT_FALSE(buffered_packets->HasBufferedPackets(quic::test::TestConnectionId(i)));
