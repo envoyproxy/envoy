@@ -6,7 +6,7 @@ health_check_config {
         seconds: 1
     }
     unhealthy_threshold {
-        value: 2
+        value: 1
     }
     healthy_threshold: {
         value: 2
@@ -21,9 +21,16 @@ health_check_config {
     }
 }
 actions {
+    raise_event: CONNECTED
+}
+actions {
     respond {
         tcp_respond {
-            data: "2"
+            data: "1"
         }
     }
+}
+
+actions {
+    raise_event: REMOTE_CLOSE
 }

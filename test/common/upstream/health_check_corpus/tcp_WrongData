@@ -20,8 +20,10 @@ health_check_config {
         }]
     }
 }
-respond {
-    tcp_respond {
-        data: "3"
+actions {
+    respond {
+        tcp_respond {
+            data: "3"
+        }
     }
 }

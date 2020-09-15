@@ -21,6 +21,7 @@ void HealthCheckFuzz::allocTcpHealthCheckerFromProto(
     tcp_test_base_.health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
       *tcp_test_base_.cluster_, config, tcp_test_base_.dispatcher_, tcp_test_base_.runtime_, tcp_test_base_.random_,
       HealthCheckEventLoggerPtr(tcp_test_base_.event_logger_storage_.release()));
+  ENVOY_LOG_MISC(trace, "Created Tcp Health Checker");
 }
 
 void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTestCase input) {
@@ -88,6 +89,7 @@ void HealthCheckFuzz::initializeAndReplayTcp(test::common::upstream::HealthCheck
   if (input.health_check_config().has_reuse_connection()) {
     reuse_connection_ = input.health_check_config().reuse_connection().value();
   }
+  //TODO: Hardcode a raise event connection here?
   replay(input);
 }
 
@@ -132,14 +134,19 @@ void HealthCheckFuzz::respondHttp(const test::fuzz::Headers& headers, absl::stri
   }
 }
 
-void HealthCheckFuzz::respondTcp() { //Add an argument here
+void HealthCheckFuzz::respondTcp(std::string data) { //Add an argument here
   
+  Buffer::OwnedImpl response;
+  response.add(&data, data.length());
 
-
-
+  ENVOY_LOG_MISC(trace, "Responded with {}. Length (in bytes) = {}. This is the string passed in.", data, data.length());
+  ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer generated from the string.", response.toString());
+  //onData(Buffer::Instance& data)
+  tcp_test_base_.read_filter_->onData(response, true);
 
   if (!reuse_connection_) {
-
+    tcp_test_base_.expectClientCreate();
+    tcp_test_base_.interval_timer_->invokeCallback();
   }
 }
 
@@ -228,7 +235,12 @@ void HealthCheckFuzz::raiseEvent(const test::common::upstream::RaiseEvent& event
     break;
   }
   case HealthCheckFuzz::Type::TCP: {
-    //TODO: raise event
+    tcp_test_base_.connection_->raiseEvent(eventType);
+    if (!last_action && eventType != Network::ConnectionEvent::Connected) {
+      ENVOY_LOG_MISC(trace, "Creating client from close event");
+      tcp_test_base_.expectClientCreate();
+      tcp_test_base_.interval_timer_->invokeCallback();
+    }
     break;
   }
   default:
@@ -257,7 +269,7 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
       }
       // TODO: TCP and gRPC
       case HealthCheckFuzz::Type::TCP: {
-        respondTcp();
+        respondTcp(event.respond().tcp_respond().data());
         break;
       }
       default:

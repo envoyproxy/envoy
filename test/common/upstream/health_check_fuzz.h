@@ -24,7 +24,7 @@ private:
   void initializeAndReplayHttp(test::common::upstream::HealthCheckTestCase input);
   void initializeAndReplayTcp(test::common::upstream::HealthCheckTestCase input);
   void respondHttp(const test::fuzz::Headers& headers, absl::string_view status);
-  void respondTcp();
+  void respondTcp(std::string data);
   void triggerIntervalTimerHttp();
   void triggerIntervalTimerTcp();
   void triggerTimeoutTimerHttp(bool last_action);
