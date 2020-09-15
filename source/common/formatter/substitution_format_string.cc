@@ -1,7 +1,6 @@
 #include "common/formatter/substitution_format_string.h"
 
 #include "common/formatter/substitution_formatter.h"
-#include "common/http/headers.h"
 
 namespace Envoy {
 namespace Formatter {
@@ -24,17 +23,6 @@ FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   return nullptr;
-}
-
-std::string SubstitutionFormatStringUtils::getContentType(
-    const envoy::config::core::v3::SubstitutionFormatString& config) {
-  if (!config.content_type().empty()) {
-    return config.content_type();
-  }
-  return config.format_case() ==
-                 envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat
-             ? Http::Headers::get().ContentTypeValues.Json
-             : Http::Headers::get().ContentTypeValues.Text;
 }
 
 } // namespace Formatter

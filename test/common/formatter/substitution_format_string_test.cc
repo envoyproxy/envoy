@@ -94,24 +94,5 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {
   }
 }
 
-TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigContentType) {
-  const std::string yaml = R"EOF(
-  text_format: "<h1>Sample html</h1>"
-  content_type: "text/html; charset=UTF-8"
-)EOF";
-  TestUtility::loadFromYaml(yaml, config_);
-  const std::string contentType = SubstitutionFormatStringUtils::getContentType(config_);
-  EXPECT_EQ("text/html; charset=UTF-8", contentType);
-}
-
-TEST_F(SubstitutionFormatStringUtilsTest, TestDefaultContentType) {
-  const std::string yaml = R"EOF(
-  text_format: "Sample Text"
-)EOF";
-  TestUtility::loadFromYaml(yaml, config_);
-  const std::string contentType = SubstitutionFormatStringUtils::getContentType(config_);
-  EXPECT_EQ("text/plain", contentType);
-}
-
 } // namespace Formatter
 } // namespace Envoy
