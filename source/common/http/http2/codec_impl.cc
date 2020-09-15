@@ -28,6 +28,7 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+// TODO(alyssawilk) docs.
 class Http2ResponseCodeDetailValues {
 public:
   // Invalid HTTP header field was received and stream is going to be
@@ -45,9 +46,9 @@ public:
   const absl::string_view inbound_empty_frame_flood = "http2.inbound_empty_frames_flood";
   // Envoy was configured to drop requests with header keys beginning with underscores.
   const absl::string_view invalid_underscore = "http2.unexpected_underscore";
-  // The upstream refused the stream.
+  // The peer refused the stream.
   const absl::string_view remote_refused = "http2.remote_refuse";
-  // The upstream reset the stream.
+  // The peer reset the stream.
   const absl::string_view remote_reset = "http2.remote_reset";
 
   const absl::string_view errorDetails(int error_code) const {

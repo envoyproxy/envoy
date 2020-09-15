@@ -57,10 +57,10 @@ const std::string& queryParamsError() { CONSTRUCT_ON_FIRST_USE(std::string, "err
 const std::string& queryParamsCode() { CONSTRUCT_ON_FIRST_USE(std::string, "code"); }
 const std::string& queryParamsState() { CONSTRUCT_ON_FIRST_USE(std::string, "state"); }
 
-constexpr char REDIRECT_RACE[] = "oath.race_redirect";
-constexpr char REDIRECT_LOGGED_IN[] = "oath.logged_in";
-constexpr char REDIRECT_FOR_CREDENTIALS[] = "oath.missing_credentials";
-constexpr char SIGN_OUT[] = "oath.sign_out";
+constexpr absl::string_view REDIRECT_RACE = "oath.race_redirect";
+constexpr absl::string_view REDIRECT_LOGGED_IN = "oath.logged_in";
+constexpr absl::string_view REDIRECT_FOR_CREDENTIALS = "oath.missing_credentials";
+constexpr absl::string_view SIGN_OUT = "oath.sign_out";
 
 template <class T>
 std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_protos) {
