@@ -165,6 +165,7 @@ ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImp
 void ConnectionHandlerImpl::ActiveTcpListener::updateListenerConfig(
     Network::ListenerConfig& config) {
   ENVOY_LOG(trace, "replacing listener ", config_->listenerTag(), " by ", config.listenerTag());
+  ASSERT(&config_->connectionBalancer() == &config.connectionBalancer());
   config_ = &config;
 }
 

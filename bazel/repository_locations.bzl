@@ -125,16 +125,6 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         use_category = ["dataplane", "controlplane"],
         cpe = "N/A",
     ),
-    com_github_apache_thrift = dict(
-        project_name = "Apache Thrift",
-        project_url = "http://thrift.apache.org/",
-        version = "0.11.0",
-        sha256 = "7d59ac4fdcb2c58037ebd4a9da5f9a49e3e034bf75b3f26d9fe48ba3d8806e6b",
-        strip_prefix = "thrift-{version}",
-        urls = ["https://files.pythonhosted.org/packages/c6/b4/510617906f8e0c5660e7d96fbc5585113f83ad547a3989b80297ac72a74c/thrift-{version}.tar.gz"],
-        use_category = ["dataplane"],
-        cpe = "cpe:2.3:a:apache:thrift:*",
-    ),
     com_github_c_ares_c_ares = dict(
         project_name = "c-ares",
         project_url = "https://c-ares.haxx.se/",
@@ -520,7 +510,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     ),
     io_opencensus_cpp = dict(
         project_name = "OpenCensus C++",
-        project_url = "https://pypi.org/project/six/",
+        project_url = "https://github.com/census-instrumentation/opencensus-cpp",
         # 2020-06-01
         version = "7877337633466358ed680f9b26967da5b310d7aa",
         sha256 = "12ff300fa804f97bd07e2ff071d969e09d5f3d7bbffeac438c725fa52a51a212",
@@ -643,7 +633,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         version = "2.4.1",
         sha256 = "2177cbd14118999e1d76fec628ca78ace7e6f841219dbc6035027c796bbe1a2a",
         strip_prefix = "kafka_2.12-{version}",
-        urls = ["http://us.mirrors.quenda.co/apache/kafka/{version}/kafka_2.12-{version}.tgz"],
+        urls = ["https://mirrors.gigenet.com/apache/kafka/{version}/kafka_2.12-{version}.tgz"],
         use_category = ["test"],
     ),
     kafka_python_client = dict(
