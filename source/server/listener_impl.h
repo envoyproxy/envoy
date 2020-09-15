@@ -305,8 +305,10 @@ public:
   Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
     return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
   }
-  Network::UdpListenerWorkerRouter* udpListenerWorkerRouter() override {
-    return udp_listener_worker_router_.get();
+  Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
+    return udp_listener_worker_router_
+               ? Network::UdpListenerWorkerRouterOptRef(*udp_listener_worker_router_)
+               : absl::nullopt;
   }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
 

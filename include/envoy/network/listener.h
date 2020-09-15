@@ -22,6 +22,9 @@ namespace Network {
 class ActiveUdpListenerFactory;
 class UdpListenerWorkerRouter;
 
+using UdpListenerWorkerRouterOptRef =
+    absl::optional<std::reference_wrapper<UdpListenerWorkerRouter>>;
+
 /**
  * ListenSocketFactory is a member of ListenConfig to provide listen socket.
  * Listeners created from the same ListenConfig instance have listening sockets
@@ -138,16 +141,16 @@ public:
   virtual ActiveUdpListenerFactory* udpListenerFactory() PURE;
 
   /**
-   * @return factory pointer if writing on UDP socket, otherwise return
-   * nullptr.
+   * @return factory if writing on UDP socket, otherwise return
+   * nullopt.
    */
   virtual UdpPacketWriterFactoryOptRef udpPacketWriterFactory() PURE;
 
   /**
    * @return the ``UdpListenerWorkerRouter`` for this listener. This will
-   * be non-null iff this is a UDP listener.
+   * be non-empty iff this is a UDP listener.
    */
-  virtual UdpListenerWorkerRouter* udpListenerWorkerRouter() PURE;
+  virtual UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() PURE;
 
   /**
    * @return traffic direction of the listener.

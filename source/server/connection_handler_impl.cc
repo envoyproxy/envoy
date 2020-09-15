@@ -592,11 +592,11 @@ ActiveUdpListenerBase::ActiveUdpListenerBase(uint32_t worker_id, Network::Connec
                                              Network::ListenerConfig* config)
     : ConnectionHandlerImpl::ActiveListenerImplBase(parent, config), worker_id_(worker_id),
       parent_(parent), udp_listener_(std::move(listener)) {
-  config_->udpListenerWorkerRouter()->registerWorker(*this);
+  config_->udpListenerWorkerRouter()->get().registerWorker(*this);
 }
 
 ActiveUdpListenerBase::~ActiveUdpListenerBase() {
-  config_->udpListenerWorkerRouter()->unregisterWorker(*this);
+  config_->udpListenerWorkerRouter()->get().unregisterWorker(*this);
 }
 
 void ActiveUdpListenerBase::post(Network::UdpRecvData&& data) {
@@ -620,7 +620,7 @@ void ActiveUdpListenerBase::post(Network::UdpRecvData&& data) {
 }
 
 void ActiveUdpListenerBase::onData(Network::UdpRecvData&& data) {
-  config_->udpListenerWorkerRouter()->deliver(*this, std::move(data));
+  config_->udpListenerWorkerRouter()->get().deliver(*this, std::move(data));
 }
 
 ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_id, Network::ConnectionHandler& parent,

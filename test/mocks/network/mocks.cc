@@ -37,7 +37,7 @@ MockListenerConfig::MockListenerConfig()
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, udpListenerWorkerRouter()).WillByDefault(Invoke([this]() {
-    return udp_listener_worker_router_.get();
+    return UdpListenerWorkerRouterOptRef(*udp_listener_worker_router_);
   }));
 }
 MockListenerConfig::~MockListenerConfig() = default;

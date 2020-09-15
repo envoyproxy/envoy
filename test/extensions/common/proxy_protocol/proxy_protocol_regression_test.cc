@@ -72,7 +72,9 @@ public:
   const std::string& name() const override { return name_; }
   Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
   Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override { return absl::nullopt; }
-  Network::UdpListenerWorkerRouter* udpListenerWorkerRouter() override { return nullptr; }
+  Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
+    return absl::nullopt;
+  }
   ResourceLimit& openConnections() override { return open_connections_; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
