@@ -102,14 +102,6 @@ envoy_status_t set_preferred_network(envoy_network_t network);
 void record_counter(const char* elements, uint64_t count);
 
 /**
- * Flush the stats sinks outside of a flushing interval.
- * Note: flushing before the engine has started will result in a no-op.
- * Note: stats flushing may not be synchronous.
- * Therefore, this function may return prior to flushing taking place.
- */
-void flush_stats();
-
-/**
  * Statically register APIs leveraging platform libraries.
  * Warning: Must be completed before any calls to run_engine().
  * @param name, identifier of the platform API

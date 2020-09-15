@@ -34,16 +34,16 @@ public class AndroidAppLifecycleMonitor implements ActivityLifecycleCallbacks {
 
   @Override
   public void onActivityPaused(Activity activity) {
-    AndroidJniLibrary.flushStats();
+    /* Use for stats flushing when https://github.com/lyft/envoy-mobile/issues/754 is resolved */
   }
 
   @Override
   public void onActivityStopped(Activity activity) {
-    AndroidJniLibrary.flushStats();
+    /* Use for stats flushing when https://github.com/lyft/envoy-mobile/issues/754 is resolved */
   }
 
   @Override
   public void onActivityDestroyed(Activity activity) {
-    AndroidJniLibrary.flushStats();
+    /* Use for stats flushing when https://github.com/lyft/envoy-mobile/issues/754 is resolved */
   }
 }

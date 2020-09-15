@@ -72,12 +72,6 @@ void record_counter(const char* elements, uint64_t count) {
   }
 }
 
-void flush_stats() {
-  if (auto e = engine_.lock()) {
-    e->flushStats();
-  }
-}
-
 envoy_status_t register_platform_api(const char* name, void* api) {
   Envoy::Api::External::registerApi(std::string(name), api);
   return ENVOY_SUCCESS;
