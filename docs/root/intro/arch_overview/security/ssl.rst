@@ -187,7 +187,7 @@ Client TLS authentication filter :ref:`configuration reference
 Custom handshaker extension
 ---------------------------
 
-The :ref:`CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_handshaker>`
+The :ref:`CommonTlsContext <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_handshaker>`
 has a ``custom_handshaker`` extension which can be used to override SSL handshake
 behavior entirely. This is useful for implementing any TLS behavior which is
 difficult to express with callbacks. It is not necessary to write a custom
