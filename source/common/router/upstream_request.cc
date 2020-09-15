@@ -181,7 +181,6 @@ Http::ResponseTrailerMapOptRef UpstreamRequest::responseTrailers() {
 }
 
 void UpstreamRequest::encode100ContinueHeaders(Http::ResponseHeaderMap& headers) {
-  ENVOY_LOG_MISC(info, "SEEING 100 CONTINUE");
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
   ASSERT(100 == Http::Utility::getResponseStatus(headers));
@@ -196,28 +195,6 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
 void UpstreamRequest::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
-  // TODO(snowp): Find a good place for this
-  // // We drop 1xx other than 101 on the floor; 101 upgrade headers need to be passed to the client
-  // as
-  // // part of the final response. 100-continue headers are handled in
-  // onUpstream100ContinueHeaders.
-  // //
-  // // We could in principle handle other headers here, but this might result in the double
-  // invocation
-  // // of decodeHeaders() (once for informational, again for non-informational), which is likely an
-  // // easy to miss corner case in the filter and HCM contract.
-  // //
-  // // This filtering is done early in upstream request, unlike 100 coalescing which is performed
-  // in
-  // // the router filter, since the filtering only depends on the state of a single upstream, and
-  // we
-  // // don't want to confuse accounting such as onFirstUpstreamRxByteReceived() with informational
-  // // headers.
-  // const uint64_t response_code = Http::Utility::getResponseStatus(headers);
-  // if (Http::CodeUtility::is1xx(response_code) &&
-  //     response_code != enumToInt(Http::Code::SwitchingProtocols)) {
-  //   return;
-  // }
   const uint64_t response_code = Http::Utility::getResponseStatus(headers);
 
   // TODO(rodaine): This is actually measuring after the headers are parsed and not the first
@@ -231,13 +208,6 @@ void UpstreamRequest::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_s
   }
   filter_manager_.streamInfo().response_code_ = static_cast<uint32_t>(response_code);
 
-  // if (paused_for_connect_ && response_code == 200) {
-  //   encodeBodyAndTrailers();
-  //   paused_for_connect_ = false;
-  // }
-
-  // Transfer the headers to the HCM at this point, as the router will destroy the upstream request
-  // before passing it along.
   parent_.onUpstreamHeaders(response_code, std::move(headers_to_encode_), *this, end_stream);
 }
 
@@ -296,7 +266,7 @@ void UpstreamRequestFilter::onDestroy() {
   if (!parent_.decode_complete_) {
     if (conn_pool_->cancelAnyPendingStream()) {
       ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.parent_.callbacks());
-      // ASSERT(!upstream_);
+       ASSERT(!upstream_);
     }
   }
 }
@@ -332,14 +302,11 @@ void UpstreamRequestFilter::ActiveUpstreamRequest::decodeHeaders(
 
 void UpstreamRequestFilter::ActiveUpstreamRequest::decodeData(Buffer::Instance& data,
                                                               bool end_stream) {
-  ENVOY_LOG_MISC(info, "SEEING UPSTRAEM DECODE DATA {}", data.length());
   ScopeTrackerScopeState scope(&parent_.decoder_callbacks_->scope(),
                                parent_.decoder_callbacks_->dispatcher());
 
   parent_.parent_.filter_manager_.streamInfo().addBytesReceived(data.length());
   parent_.decoder_callbacks_->encodeData(data, end_stream);
-  // parent_.parent_.filter_manager_.decodeData(data, end_stream);
-  // parent_.parent_.encodeUpstreamData(data, end_stream);
 }
 
 void UpstreamRequestFilter::ActiveUpstreamRequest::decodeTrailers(
@@ -347,13 +314,11 @@ void UpstreamRequestFilter::ActiveUpstreamRequest::decodeTrailers(
   ScopeTrackerScopeState scope(&parent_.parent_.parent_.callbacks()->scope(),
                                parent_.parent_.parent_.callbacks()->dispatcher());
 
-  // parent_.maybeEndDecode(true);
   if (!parent_.parent_.parent_.config().upstream_logs_.empty()) {
     parent_.parent_.upstream_trailers_ =
         Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*trailers);
   }
   parent_.decoder_callbacks_->encodeTrailers(std::move(trailers));
-  // parent_.onUpstreamTrailers(trailers, *this);
 }
 const RouteEntry& UpstreamRequestFilter::ActiveUpstreamRequest::routeEntry() const {
   return *parent_.parent_.parent_.routeEntry();
@@ -365,12 +330,12 @@ const Network::Connection& UpstreamRequestFilter::ActiveUpstreamRequest::connect
 
 void UpstreamRequestFilter::ActiveUpstreamRequest::decodeMetadata(
     Http::MetadataMapPtr&& metadata_map) {
+  ScopeTrackerScopeState scope(&parent_.parent_.parent_.callbacks()->scope(), parent_.parent_.parent_.callbacks()->dispatcher());
+
   parent_.decoder_callbacks_->encodeMetadata(std::move(metadata_map));
-  // parent_.onUpstreamMetadata(std::move(metadata_map));
 }
 
 Http::FilterDataStatus UpstreamRequestFilter::decodeData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG_MISC(info, "SEEING DOWNSTREAM DECODE DATA {} {}", data.length(), end_stream);
   ENVOY_STREAM_LOG(trace, "proxying {} bytes", *parent_.parent_.callbacks(), data.length());
   decoder_callbacks_->streamInfo().addBytesSent(data.length());
   upstream_->encodeData(data, end_stream);
@@ -419,8 +384,6 @@ void UpstreamRequest::encodeUpstreamHeaders(bool end_stream) {
 
   filter_manager_.maybeEndDecode(end_stream);
   filter_manager_.decodeHeaders(*parent_.downstreamHeaders(), end_stream);
-
-  // conn_pool_->newStream(this);
 }
 
 void UpstreamRequest::encodeUpstreamData(Buffer::Instance& data, bool end_stream) {
@@ -438,11 +401,6 @@ void UpstreamRequest::encodeUpstreamTrailers(Http::RequestTrailerMap& trailers) 
 
 void UpstreamRequest::encodeUpstreamMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
   filter_manager_.decodeMetadata(*metadata_map_ptr);
-  // if (!upstream_) {
-  //   ENVOY_STREAM_LOG(trace, "upstream_ not ready. Store metadata_map to encode later: {}",
-  //                    *parent_.callbacks(), *metadata_map_ptr);
-  //   downstream_metadata_map_vector_.emplace_back(std::move(metadata_map_ptr));
-  // } else {
 }
 
 void UpstreamRequestFilter::ActiveUpstreamRequest::onResetStream(
@@ -607,49 +565,11 @@ void UpstreamRequestFilter::onPoolReady(
   calling_encode_headers_ = false;
 
   if (!paused_for_connect_ && !decoding_headers_) {
-    ENVOY_LOG_MISC(info, "CONTINUING DECODING");
     decoder_callbacks_->continueDecoding();
   }
 
   await_stream_ = false;
 }
-
-// void UpstreamRequest::encodeBodyAndTrailers() {
-//   // It is possible to get reset in the middle of an encodeHeaders() call. This happens for
-//   // example in the HTTP/2 codec if the frame cannot be encoded for some reason. This should
-//   never
-//   // happen but it's unclear if we have covered all cases so protect against it and test for it.
-//   // One specific example of a case where this happens is if we try to encode a total header size
-//   // that is too big in HTTP/2 (64K currently).
-//   if (parent_.deferred_reset_reason_) {
-//     onResetStream(deferred_reset_reason_.value(), absl::string_view());
-//   } else {
-//     // Encode metadata after headers and before any other frame type.
-//     if (!downstream_metadata_map_vector_.empty()) {
-//       ENVOY_STREAM_LOG(debug, "Send metadata onPoolReady. {}", *parent_.callbacks(),
-//                        downstream_metadata_map_vector_);
-//       upstream_->encodeMetadata(downstream_metadata_map_vector_);
-//       downstream_metadata_map_vector_.clear();
-//       if (shouldSendEndStream()) {
-//         Buffer::OwnedImpl empty_data("");
-//         upstream_->encodeData(empty_data, true);
-//       }
-//     }
-
-//     if (buffered_request_body_) {
-//       stream_info_.addBytesSent(buffered_request_body_->length());
-//       upstream_->encodeData(*buffered_request_body_, encode_complete_ && !encode_trailers_);
-//     }
-
-//     if (encode_trailers_) {
-//       upstream_->encodeTrailers(*parent_.downstreamTrailers());
-//     }
-
-//     if (encode_complete_) {
-//       upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
-//     }
-//   }
-// }
 
 const ScopeTrackedObject& UpstreamRequest::scope() { return parent_.callbacks()->scope(); }
 
