@@ -33,7 +33,6 @@ public:
   RawAsyncStream* startRaw(absl::string_view service_full_name, absl::string_view method_name,
                            RawAsyncStreamCallbacks& callbacks,
                            const Http::AsyncClient::StreamOptions& options) override;
-  Event::Dispatcher* dispatcher() override;
 
 private:
   Upstream::ClusterManager& cm_;

@@ -69,7 +69,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
                                                // going to invoke check call.
   cluster_ = callbacks_->clusterInfo();
   initiating_call_ = true;
-  client_->check(*this, check_request_, callbacks_->activeSpan(), callbacks_->streamInfo());
+  client_->check(*this, callbacks_->dispatcher(), check_request_, callbacks_->activeSpan(),
+                 callbacks_->streamInfo());
   initiating_call_ = false;
 }
 

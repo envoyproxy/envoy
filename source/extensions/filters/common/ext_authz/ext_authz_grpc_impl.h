@@ -44,15 +44,16 @@ class GrpcClientImpl : public Client,
                        public Logger::Loggable<Logger::Id::ext_authz> {
 public:
   // TODO(gsagula): remove `use_alpha` param when V2Alpha gets deprecated.
-  GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client, bool internal_timeout,
+  GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client, bool timeout_starts_at_check_creation,
                  const absl::optional<std::chrono::milliseconds>& timeout,
                  envoy::config::core::v3::ApiVersion transport_api_version, bool use_alpha);
   ~GrpcClientImpl() override;
 
   // ExtAuthz::Client
   void cancel() override;
-  void check(RequestCallbacks& callbacks, const envoy::service::auth::v3::CheckRequest& request,
-             Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) override;
+  void check(RequestCallbacks& callbacks, Event::Dispatcher& dispatcher,
+             const envoy::service::auth::v3::CheckRequest& request, Tracing::Span& parent_span,
+             const StreamInfo::StreamInfo& stream_info) override;
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
@@ -71,7 +72,7 @@ private:
   Grpc::AsyncClient<envoy::service::auth::v3::CheckRequest, envoy::service::auth::v3::CheckResponse>
       async_client_;
   Grpc::AsyncRequest* request_{};
-  bool internal_timeout_{};
+  bool timeout_starts_at_check_creation_{};
   absl::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
   const Protobuf::MethodDescriptor& service_method_;

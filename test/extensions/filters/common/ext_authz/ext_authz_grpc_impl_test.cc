@@ -37,12 +37,12 @@ class ExtAuthzGrpcClientTest : public testing::TestWithParam<Params> {
 public:
   ExtAuthzGrpcClientTest() : async_client_(new Grpc::MockAsyncClient()), timeout_(10) {}
 
-  void initialize(const Params& param, bool internal_timeout = false) {
+  void initialize(const Params& param, bool timeout_starts_at_check_creation = false) {
     api_version_ = std::get<0>(param);
     use_alpha_ = std::get<1>(param);
-    client_ =
-        std::make_unique<GrpcClientImpl>(Grpc::RawAsyncClientPtr{async_client_}, internal_timeout,
-                                         timeout_, api_version_, use_alpha_);
+    client_ = std::make_unique<GrpcClientImpl>(Grpc::RawAsyncClientPtr{async_client_},
+                                               timeout_starts_at_check_creation, timeout_,
+                                               api_version_, use_alpha_);
   }
 
   void expectCallSend(envoy::service::auth::v3::CheckRequest& request) {
@@ -81,6 +81,7 @@ public:
   Grpc::MockAsyncRequest async_request_;
   GrpcClientImplPtr client_;
   MockRequestCallbacks request_callbacks_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   Tracing::MockSpan span_;
   bool use_alpha_{};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
@@ -120,7 +121,8 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOk) {
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, Tracing::NullSpan::instance(),
+                 stream_info_);
 
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
@@ -144,7 +146,8 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, Tracing::NullSpan::instance(),
+                 stream_info_);
 
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
@@ -167,7 +170,8 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDenied) {
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, Tracing::NullSpan::instance(),
+                 stream_info_);
 
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
@@ -191,7 +195,8 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedGrpcUnknownStatus) {
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, Tracing::NullSpan::instance(),
+                 stream_info_);
 
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
@@ -218,7 +223,8 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, Tracing::NullSpan::instance(),
+                 stream_info_);
 
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
@@ -236,7 +242,8 @@ TEST_P(ExtAuthzGrpcClientTest, UnknownError) {
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, Tracing::NullSpan::instance(),
+                 stream_info_);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
@@ -249,7 +256,8 @@ TEST_P(ExtAuthzGrpcClientTest, CancelledAuthorizationRequest) {
 
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _)).WillOnce(Return(&async_request_));
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, Tracing::NullSpan::instance(),
+                 stream_info_);
 
   EXPECT_CALL(async_request_, cancel());
   client_->cancel();
@@ -261,7 +269,8 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationRequestTimeout) {
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, Tracing::NullSpan::instance(),
+                 stream_info_);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
@@ -272,14 +281,14 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationRequestTimeout) {
 TEST_P(ExtAuthzGrpcClientTest, AuthorizationInternalRequestTimeout) {
   initialize(GetParam(), true);
 
-  EXPECT_CALL(*async_client_, dispatcher());
-  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&async_client_->dispatcher_);
+  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(*timer, enableTimer(timeout_.value(), _));
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSendWithNoTimeout(request);
 
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, Tracing::NullSpan::instance(),
+                 stream_info_);
 
   EXPECT_CALL(async_request_, cancel());
   EXPECT_CALL(request_callbacks_,
@@ -291,14 +300,14 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationInternalRequestTimeout) {
 TEST_P(ExtAuthzGrpcClientTest, AuthorizationInternalRequestTimeoutCancelled) {
   initialize(GetParam(), true);
 
-  EXPECT_CALL(*async_client_, dispatcher());
-  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&async_client_->dispatcher_);
+  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(*timer, enableTimer(timeout_.value(), _));
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSendWithNoTimeout(request);
 
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, Tracing::NullSpan::instance(),
+                 stream_info_);
 
   EXPECT_CALL(async_request_, cancel());
   EXPECT_CALL(request_callbacks_, onComplete_(_)).Times(0);
@@ -307,22 +316,6 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationInternalRequestTimeoutCancelled) {
   timer->timer_destroyed_ = &timer_destroyed;
   client_->cancel();
   EXPECT_EQ(timer_destroyed, true);
-}
-
-// Test that the internal timer is not used when dispatcher is nullptr.
-TEST_P(ExtAuthzGrpcClientTest, AuthorizationRequestInternalTimeoutWithNoDispatcher) {
-  initialize(GetParam(), true);
-  EXPECT_CALL(*async_client_, dispatcher()).WillOnce(Return(nullptr));
-
-  envoy::service::auth::v3::CheckRequest request;
-  // if expectCallSend succeeds with internal_timeout, while dispatcher is nullptr, it proves that
-  // the timeout was set on the request.
-  expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
-
-  // cancel to make sure the assert in the dtor is not triggered
-  EXPECT_CALL(async_request_, cancel());
-  client_->cancel();
 }
 
 // Test the client when an OK response is received with dynamic metadata in that OK response.
@@ -353,7 +346,8 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
-  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, Tracing::NullSpan::instance(),
+                 stream_info_);
 
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);

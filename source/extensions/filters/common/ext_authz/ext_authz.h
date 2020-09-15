@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/http/codes.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/stream_info/stream_info.h"
@@ -98,11 +99,12 @@ public:
    * passed request parameters to make a permit/deny decision.
    * @param callback supplies the completion callbacks.
    *        NOTE: The callback may happen within the calling stack.
+   * @param dispatcher is the dispatcher of the current thread.
    * @param request is the proto message with the attributes of the specific payload.
    * @param parent_span source for generating an egress child span as part of the trace.
    * @param stream_info supplies the client's stream info.
    */
-  virtual void check(RequestCallbacks& callback,
+  virtual void check(RequestCallbacks& callback, Event::Dispatcher& dispatcher,
                      const envoy::service::auth::v3::CheckRequest& request,
                      Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) PURE;
 };

@@ -187,8 +187,6 @@ public:
         Internal::startUntyped(client_.get(), service_method, callbacks, options));
   }
 
-  Event::Dispatcher* dispatcher() { return client_->dispatcher(); }
-
   AsyncClient* operator->() { return this; }
   void operator=(RawAsyncClientPtr&& client) { client_ = std::move(client); }
   void reset() { client_.reset(); }

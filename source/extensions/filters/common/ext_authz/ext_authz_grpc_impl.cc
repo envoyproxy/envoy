@@ -17,12 +17,13 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client, bool internal_timeout,
+GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
+                               bool timeout_starts_at_check_creation,
                                const absl::optional<std::chrono::milliseconds>& timeout,
                                envoy::config::core::v3::ApiVersion transport_api_version,
                                bool use_alpha)
-    : async_client_(std::move(async_client)), internal_timeout_(internal_timeout),
-      timeout_(timeout),
+    : async_client_(std::move(async_client)),
+      timeout_starts_at_check_creation_(timeout_starts_at_check_creation), timeout_(timeout),
       service_method_(Grpc::VersionedMethods("envoy.service.auth.v3.Authorization.Check",
                                              "envoy.service.auth.v2.Authorization.Check",
                                              "envoy.service.auth.v2alpha.Authorization.Check")
@@ -38,24 +39,24 @@ void GrpcClientImpl::cancel() {
   timeout_timer_.reset();
 }
 
-void GrpcClientImpl::check(RequestCallbacks& callbacks,
+void GrpcClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& dispatcher,
                            const envoy::service::auth::v3::CheckRequest& request,
                            Tracing::Span& parent_span, const StreamInfo::StreamInfo&) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
   Http::AsyncClient::RequestOptions options;
-  if (internal_timeout_ && timeout_.has_value()) {
-    auto* dispatcher = async_client_->dispatcher();
-    if (dispatcher) {
-      timeout_timer_ = dispatcher->createTimer([this]() -> void { onTimeout(); });
+  if (timeout_.has_value()) {
+    if (timeout_starts_at_check_creation_) {
+      // TODO(yuval-k): We currently use dispatcher based timeout even if the underlying client is
+      // google gRPC client, which has it's own timeout mechanism. We may want to change that if
+      // using the google gRPC client timeout is more efficient.
+      timeout_timer_ = dispatcher.createTimer([this]() -> void { onTimeout(); });
       timeout_timer_->enableTimer(timeout_.value());
+    } else {
+      // no starting timer on check creation, set the timeout on the request.
+      options.setTimeout(timeout_);
     }
-  }
-
-  // no internal timer, set the timeout on the request.
-  if (timeout_timer_ == nullptr) {
-    options.setTimeout(timeout_);
   }
 
   ENVOY_LOG(trace, "Sending CheckRequest: {}", request.DebugString());
@@ -107,6 +108,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
 }
 
 void GrpcClientImpl::onTimeout() {
+  ENVOY_LOG(trace, "CheckRequest timed-out");
   ASSERT(request_ != nullptr);
   request_->cancel();
   // let the client know of failure:

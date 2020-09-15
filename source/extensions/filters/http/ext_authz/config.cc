@@ -28,7 +28,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
                                      context.runtime(), context.httpContext(), stats_prefix);
   Http::FilterFactoryCb callback;
 
-  bool internal_timeout = Runtime::runtimeFeatureEnabled(
+  const bool timeout_starts_at_check_creation = Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.ext_authz_measure_timeout_on_check_created");
 
   if (proto_config.has_http_service()) {
@@ -37,7 +37,8 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
                                                            timeout, DefaultTimeout);
     const auto client_config =
         std::make_shared<Extensions::Filters::Common::ExtAuthz::ClientConfig>(
-            proto_config, internal_timeout, timeout_ms, proto_config.http_service().path_prefix());
+            proto_config, timeout_starts_at_check_creation, timeout_ms,
+            proto_config.http_service().path_prefix());
     callback = [filter_config, client_config,
                 &context](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
@@ -53,13 +54,13 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     callback = [grpc_service = proto_config.grpc_service(), &context, filter_config, timeout_ms,
                 transport_api_version = proto_config.transport_api_version(),
                 use_alpha = proto_config.hidden_envoy_deprecated_use_alpha(),
-                internal_timeout](Http::FilterChainFactoryCallbacks& callbacks) {
+                timeout_starts_at_check_creation](Http::FilterChainFactoryCallbacks& callbacks) {
       const auto async_client_factory =
           context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
               grpc_service, context.scope(), true);
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-          async_client_factory->create(), internal_timeout, std::chrono::milliseconds(timeout_ms),
-          transport_api_version, use_alpha);
+          async_client_factory->create(), timeout_starts_at_check_creation,
+          std::chrono::milliseconds(timeout_ms), transport_api_version, use_alpha);
       callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{
           std::make_shared<Filter>(filter_config, std::move(client))});
     };

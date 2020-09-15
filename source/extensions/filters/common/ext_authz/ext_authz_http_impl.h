@@ -63,7 +63,8 @@ private:
 class ClientConfig {
 public:
   ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-               bool internal_timeout, uint32_t timeout, absl::string_view path_prefix);
+               bool timeout_starts_at_check_creation, uint32_t timeout,
+               absl::string_view path_prefix);
 
   /**
    * Returns the name of the authorization cluster.
@@ -116,7 +117,7 @@ public:
    * Returns the configured request header parser.
    */
   const Router::HeaderParser& requestHeaderParser() const { return *request_headers_parser_; }
-  bool internalTimeout() const { return internal_timeout_; }
+  bool timeoutStartsAtCheckCreation() const { return timeout_starts_at_check_creation_; }
 
 private:
   static MatcherSharedPtr
@@ -136,7 +137,7 @@ private:
   const MatcherSharedPtr upstream_header_to_append_matchers_;
   const Http::LowerCaseStrPairVector authorization_headers_to_add_;
   const std::string cluster_name_;
-  const bool internal_timeout_;
+  const bool timeout_starts_at_check_creation_;
   const std::chrono::milliseconds timeout_;
   const std::string path_prefix_;
   const std::string tracing_name_;
@@ -161,8 +162,9 @@ public:
 
   // ExtAuthz::Client
   void cancel() override;
-  void check(RequestCallbacks& callbacks, const envoy::service::auth::v3::CheckRequest& request,
-             Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) override;
+  void check(RequestCallbacks& callbacks, Event::Dispatcher& dispatcher,
+             const envoy::service::auth::v3::CheckRequest& request, Tracing::Span& parent_span,
+             const StreamInfo::StreamInfo& stream_info) override;
 
   // Http::AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& message) override;

@@ -39,15 +39,15 @@ class ExtAuthzHttpClientTest : public testing::Test {
 public:
   ExtAuthzHttpClientTest() : async_request_{&async_client_} { initialize(EMPTY_STRING); }
 
-  void initialize(const std::string& yaml, bool internal_timeout = false) {
-    config_ = createConfig(yaml, internal_timeout);
+  void initialize(const std::string& yaml, bool timeout_starts_at_check_creation = false) {
+    config_ = createConfig(yaml, timeout_starts_at_check_creation);
     client_ = std::make_unique<RawHttpClientImpl>(cm_, config_);
     ON_CALL(cm_, httpAsyncClientForCluster(config_->cluster()))
         .WillByDefault(ReturnRef(async_client_));
   }
 
   ClientConfigSharedPtr createConfig(const std::string& yaml = EMPTY_STRING,
-                                     bool internal_timeout = false,
+                                     bool timeout_starts_at_check_creation = false,
                                      uint32_t timeout = REQUEST_TIMEOUT,
                                      const std::string& path_prefix = "/bar") {
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
@@ -99,7 +99,8 @@ public:
     } else {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    return std::make_shared<ClientConfig>(proto_config, internal_timeout, timeout, path_prefix);
+    return std::make_shared<ClientConfig>(proto_config, timeout_starts_at_check_creation, timeout,
+                                          path_prefix);
   }
 
   Http::RequestMessagePtr sendRequest(absl::node_hash_map<std::string, std::string>&& headers) {
@@ -123,7 +124,7 @@ public:
     const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
     auto check_response = TestCommon::makeMessageResponse(expected_headers);
 
-    client_->check(request_callbacks_, request, parent_span_, stream_info_);
+    client_->check(request_callbacks_, dispatcher_, request, parent_span_, stream_info_);
     EXPECT_CALL(request_callbacks_,
                 onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
     client_->onSuccess(async_request_, std::move(check_response));
@@ -137,6 +138,7 @@ public:
   ClientConfigSharedPtr config_;
   std::unique_ptr<RawHttpClientImpl> client_;
   MockRequestCallbacks request_callbacks_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   Tracing::MockSpan parent_span_;
   Tracing::MockSpan child_span_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
@@ -288,7 +290,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
   const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
   envoy::service::auth::v3::CheckRequest request;
-  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, parent_span_, stream_info_);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
@@ -312,7 +314,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   const HeaderValuePair header2{"x-authz-header2", "value"};
   EXPECT_CALL(async_client_,
               send_(AllOf(ContainsPairAsHeader(header1), ContainsPairAsHeader(header2)), _, _));
-  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, parent_span_, stream_info_);
 
   // Check for child span tagging when the request is allowed.
   EXPECT_CALL(child_span_, setTag(Eq("ext_authz_http_status"), Eq("OK")));
@@ -357,7 +359,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeadersFromStreamInf
   EXPECT_CALL(stream_info, getRequestHeaders()).WillOnce(Return(&request_headers));
 
   envoy::service::auth::v3::CheckRequest request;
-  client_->check(request_callbacks_, request, parent_span_, stream_info);
+  client_->check(request_callbacks_, dispatcher_, request, parent_span_, stream_info);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
@@ -375,7 +377,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
-  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, parent_span_, stream_info_);
 
   const auto check_response_headers =
       TestCommon::makeHeaderValueOption({{":status", "200", false},
@@ -398,7 +400,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
 
   envoy::service::auth::v3::CheckRequest request;
-  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, parent_span_, stream_info_);
 
   // Check for child span tagging when the request is denied.
   EXPECT_CALL(child_span_, setTag(Eq("ext_authz_http_status"), Eq("Forbidden")));
@@ -419,7 +421,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
       CheckStatus::Denied, Http::Code::Unauthorized, expected_body, expected_headers);
 
   envoy::service::auth::v3::CheckRequest request;
-  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, parent_span_, stream_info_);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
@@ -437,7 +439,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
           {{"x-foo", "bar", false}, {":status", "401", false}, {"foo", "bar", false}}));
 
   envoy::service::auth::v3::CheckRequest request;
-  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, parent_span_, stream_info_);
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
   const auto check_response_headers = TestCommon::makeHeaderValueOption({{":method", "post", false},
@@ -452,7 +454,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
 TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestError) {
   envoy::service::auth::v3::CheckRequest request;
 
-  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, parent_span_, stream_info_);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
@@ -465,7 +467,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
   envoy::service::auth::v3::CheckRequest request;
 
-  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, parent_span_, stream_info_);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
@@ -477,7 +479,7 @@ TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
   envoy::service::auth::v3::CheckRequest request;
 
   EXPECT_CALL(async_client_, send_(_, _, _)).WillOnce(Return(&async_request_));
-  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, parent_span_, stream_info_);
 
   EXPECT_CALL(async_request_, cancel());
   client_->cancel();
@@ -488,12 +490,11 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationInternalRequestTimeout) {
   initialize("", true);
   envoy::service::auth::v3::CheckRequest request;
 
-  EXPECT_CALL(async_client_, dispatcher());
-  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&async_client_.dispatcher_);
+  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(REQUEST_TIMEOUT), _));
 
   EXPECT_CALL(async_client_, send_(_, _, _)).WillOnce(Return(&async_request_));
-  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, parent_span_, stream_info_);
 
   EXPECT_CALL(async_request_, cancel());
   EXPECT_CALL(request_callbacks_,
@@ -506,12 +507,11 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationInternalRequestTimeoutCancelled) {
   initialize("", true);
   envoy::service::auth::v3::CheckRequest request;
 
-  EXPECT_CALL(async_client_, dispatcher());
-  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&async_client_.dispatcher_);
+  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(REQUEST_TIMEOUT), _));
 
   EXPECT_CALL(async_client_, send_(_, _, _)).WillOnce(Return(&async_request_));
-  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+  client_->check(request_callbacks_, dispatcher_, request, parent_span_, stream_info_);
 
   // make sure cancel resets the timer:
   EXPECT_CALL(async_request_, cancel());
@@ -529,8 +529,8 @@ TEST_F(ExtAuthzHttpClientTest, NoCluster) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("ext_authz")).Times(0);
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
-  client_->check(request_callbacks_, envoy::service::auth::v3::CheckRequest{}, parent_span_,
-                 stream_info_);
+  client_->check(request_callbacks_, dispatcher_, envoy::service::auth::v3::CheckRequest{},
+                 parent_span_, stream_info_);
 }
 
 } // namespace
