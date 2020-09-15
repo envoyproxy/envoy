@@ -27,8 +27,8 @@ void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_in
 } // namespace
 
 ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
-                                             absl::optional<uint32_t> worker_id)
-    : worker_id_(worker_id), dispatcher_(dispatcher),
+                                             absl::optional<uint32_t> worker_index)
+    : worker_index_(worker_index), dispatcher_(dispatcher),
       per_handler_stat_prefix_(dispatcher.name() + "."), disable_listeners_(false) {}
 
 void ConnectionHandlerImpl::incNumConnections() { ++num_handler_connections_; }
@@ -56,8 +56,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     details.listener_ = std::move(tcp_listener);
   } else {
     ASSERT(config.udpListenerFactory() != nullptr, "UDP listener factory is not initialized.");
-    ASSERT(worker_id_.has_value());
-    details.listener_ = config.udpListenerFactory()->createActiveUdpListener(*worker_id_, *this,
+    ASSERT(worker_index_.has_value());
+    details.listener_ = config.udpListenerFactory()->createActiveUdpListener(*worker_index_, *this,
                                                                              dispatcher_, config);
     Network::UdpListenerCallbacks* udp_listener =
         dynamic_cast<ActiveUdpListenerBase*>(details.listener_.get());
@@ -588,10 +588,11 @@ ConnectionHandlerImpl::ActiveListenerDetails::udpListener() {
   return (val != nullptr) ? absl::make_optional(*val) : absl::nullopt;
 }
 
-ActiveUdpListenerBase::ActiveUdpListenerBase(uint32_t worker_id, Network::ConnectionHandler& parent,
+ActiveUdpListenerBase::ActiveUdpListenerBase(uint32_t worker_index,
+                                             Network::ConnectionHandler& parent,
                                              Network::UdpListenerPtr&& listener,
                                              Network::ListenerConfig* config)
-    : ConnectionHandlerImpl::ActiveListenerImplBase(parent, config), worker_id_(worker_id),
+    : ConnectionHandlerImpl::ActiveListenerImplBase(parent, config), worker_index_(worker_index),
       parent_(parent), udp_listener_(std::move(listener)) {
   config_->udpListenerWorkerRouter()->get().registerWorker(*this);
 }
@@ -624,33 +625,37 @@ void ActiveUdpListenerBase::onData(Network::UdpRecvData&& data) {
   config_->udpListenerWorkerRouter()->get().deliver(*this, std::move(data));
 }
 
-ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_id, Network::ConnectionHandler& parent,
+ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index,
+                                           Network::ConnectionHandler& parent,
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
-    : ActiveRawUdpListener(worker_id, parent, config.listenSocketFactory().getListenSocket(),
+    : ActiveRawUdpListener(worker_index, parent, config.listenSocketFactory().getListenSocket(),
                            dispatcher, config) {}
 
-ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_id, Network::ConnectionHandler& parent,
+ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index,
+                                           Network::ConnectionHandler& parent,
                                            Network::SocketSharedPtr listen_socket_ptr,
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
-    : ActiveRawUdpListener(worker_id, parent, *listen_socket_ptr, listen_socket_ptr, dispatcher,
+    : ActiveRawUdpListener(worker_index, parent, *listen_socket_ptr, listen_socket_ptr, dispatcher,
                            config) {}
 
-ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_id, Network::ConnectionHandler& parent,
+ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index,
+                                           Network::ConnectionHandler& parent,
                                            Network::Socket& listen_socket,
                                            Network::SocketSharedPtr listen_socket_ptr,
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
-    : ActiveRawUdpListener(worker_id, parent, listen_socket,
+    : ActiveRawUdpListener(worker_index, parent, listen_socket,
                            dispatcher.createUdpListener(listen_socket_ptr, *this), config) {}
 
-ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_id, Network::ConnectionHandler& parent,
+ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index,
+                                           Network::ConnectionHandler& parent,
                                            Network::Socket& listen_socket,
                                            Network::UdpListenerPtr&& listener,
                                            Network::ListenerConfig& config)
-    : ActiveUdpListenerBase(worker_id, parent, std::move(listener), &config), read_filter_(nullptr),
-      listen_socket_(listen_socket) {
+    : ActiveUdpListenerBase(worker_index, parent, std::move(listener), &config),
+      read_filter_(nullptr), listen_socket_(listen_socket) {
   // Create the filter chain on creating a new udp listener
   config_->filterChainFactory().createUdpListenerFilterChain(*this, *this);
 

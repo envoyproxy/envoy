@@ -23,7 +23,7 @@ public:
       : tls_(tls), api_(api), hooks_(hooks) {}
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(uint32_t id, OverloadManager& overload_manager,
+  WorkerPtr createWorker(uint32_t index, OverloadManager& overload_manager,
                          const std::string& worker_name) override;
 
 private:

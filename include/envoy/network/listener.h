@@ -290,9 +290,9 @@ public:
   virtual UdpPacketWriter& udpPacketWriter() PURE;
 
   /**
-   * Returns the id of this worker, in the range of [0, concurrency).
+   * Returns the index of this worker, in the range of [0, concurrency).
    */
-  virtual uint32_t workerId() const PURE;
+  virtual uint32_t workerIndex() const PURE;
 
   /**
    * Called whenever data is received on the underlying udp socket, on

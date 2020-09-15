@@ -133,15 +133,15 @@ UdpListenerWorkerRouterImpl::UdpListenerWorkerRouterImpl(uint32_t concurrency)
 void UdpListenerWorkerRouterImpl::registerWorker(UdpListenerCallbacks& listener) {
   absl::WriterMutexLock lock(&mutex_);
 
-  ASSERT(listener.workerId() < workers_.size());
-  workers_.at(listener.workerId()) = &listener;
+  ASSERT(listener.workerIndex() < workers_.size());
+  workers_.at(listener.workerIndex()) = &listener;
 }
 
 void UdpListenerWorkerRouterImpl::unregisterWorker(UdpListenerCallbacks& listener) {
   absl::WriterMutexLock lock(&mutex_);
 
-  ASSERT(workers_.at(listener.workerId()) == &listener);
-  workers_.at(listener.workerId()) = nullptr;
+  ASSERT(workers_.at(listener.workerIndex()) == &listener);
+  workers_.at(listener.workerIndex()) = nullptr;
 }
 
 void UdpListenerWorkerRouterImpl::deliver(UdpListenerCallbacks& current, UdpRecvData&& data) {
@@ -154,7 +154,7 @@ void UdpListenerWorkerRouterImpl::deliver(UdpListenerCallbacks& current, UdpRecv
     dest = current.destination(data, workers_.size());
   }
 
-  if (!dest.has_value() || *dest == current.workerId()) {
+  if (!dest.has_value() || *dest == current.workerIndex()) {
     current.onDataWorker(data);
   } else {
     ASSERT(*dest < workers_.size(),

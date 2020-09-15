@@ -144,7 +144,7 @@ public:
   MOCK_METHOD(void, onWriteReady, (const Socket& socket));
   MOCK_METHOD(void, onReceiveError, (Api::IoError::IoErrorCode err));
   MOCK_METHOD(Network::UdpPacketWriter&, udpPacketWriter, ());
-  MOCK_METHOD(uint32_t, workerId, (), (const));
+  MOCK_METHOD(uint32_t, workerIndex, (), (const));
   MOCK_METHOD(void, onDataWorker, (Network::UdpRecvData & data));
   MOCK_METHOD(absl::optional<uint32_t>, destination,
               (const Network::UdpRecvData& data, uint32_t concurrency));

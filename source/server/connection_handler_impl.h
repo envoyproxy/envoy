@@ -65,7 +65,7 @@ class ConnectionHandlerImpl : public Network::ConnectionHandler,
                               NonCopyable,
                               Logger::Loggable<Logger::Id::conn_handler> {
 public:
-  ConnectionHandlerImpl(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_id);
+  ConnectionHandlerImpl(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index);
 
   // Network::ConnectionHandler
   uint64_t numConnections() const override { return num_handler_connections_; }
@@ -355,7 +355,7 @@ private:
   ActiveListenerDetailsOptRef findActiveListenerByTag(uint64_t listener_tag);
 
   // This has a value on worker threads, and no value on the main thread.
-  const absl::optional<uint32_t> worker_id_;
+  const absl::optional<uint32_t> worker_index_;
   Event::Dispatcher& dispatcher_;
   const std::string per_handler_stat_prefix_;
   std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerDetails>> listeners_;
@@ -366,13 +366,13 @@ private:
 class ActiveUdpListenerBase : public ConnectionHandlerImpl::ActiveListenerImplBase,
                               public Network::UdpListenerCallbacks {
 public:
-  ActiveUdpListenerBase(uint32_t worker_id, Network::ConnectionHandler& parent,
+  ActiveUdpListenerBase(uint32_t worker_index, Network::ConnectionHandler& parent,
                         Network::UdpListenerPtr&& listener, Network::ListenerConfig* config);
   ~ActiveUdpListenerBase() override;
 
   // Network::UdpListenerCallbacks
   void onData(Network::UdpRecvData&& data) override;
-  uint32_t workerId() const override { return worker_id_; }
+  uint32_t workerIndex() const override { return worker_index_; }
   void post(Network::UdpRecvData&& data) override;
   absl::optional<uint32_t> destination(const Network::UdpRecvData&, uint32_t) override {
     // By default, route to the current worker.
@@ -383,7 +383,7 @@ public:
   Network::Listener* listener() override { return udp_listener_.get(); }
 
 protected:
-  const uint32_t worker_id_;
+  const uint32_t worker_index_;
   Network::ConnectionHandler& parent_;
   Network::UdpListenerPtr udp_listener_;
 };
@@ -395,15 +395,15 @@ class ActiveRawUdpListener : public ActiveUdpListenerBase,
                              public Network::UdpListenerFilterManager,
                              public Network::UdpReadFilterCallbacks {
 public:
-  ActiveRawUdpListener(uint32_t worker_id, Network::ConnectionHandler& parent,
+  ActiveRawUdpListener(uint32_t worker_index, Network::ConnectionHandler& parent,
                        Event::Dispatcher& dispatcher, Network::ListenerConfig& config);
-  ActiveRawUdpListener(uint32_t worker_id, Network::ConnectionHandler& parent,
+  ActiveRawUdpListener(uint32_t worker_index, Network::ConnectionHandler& parent,
                        Network::SocketSharedPtr listen_socket_ptr, Event::Dispatcher& dispatcher,
                        Network::ListenerConfig& config);
-  ActiveRawUdpListener(uint32_t worker_id, Network::ConnectionHandler& parent,
+  ActiveRawUdpListener(uint32_t worker_index, Network::ConnectionHandler& parent,
                        Network::Socket& listen_socket, Network::SocketSharedPtr listen_socket_ptr,
                        Event::Dispatcher& dispatcher, Network::ListenerConfig& config);
-  ActiveRawUdpListener(uint32_t worker_id, Network::ConnectionHandler& parent,
+  ActiveRawUdpListener(uint32_t worker_index, Network::ConnectionHandler& parent,
                        Network::Socket& listen_socket, Network::UdpListenerPtr&& listener,
                        Network::ListenerConfig& config);
 
