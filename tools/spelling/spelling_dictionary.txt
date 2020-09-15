@@ -862,6 +862,7 @@ pausable
 pcall
 pcap
 pclose
+performant
 pfctl
 pipelined
 pipelining
