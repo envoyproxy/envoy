@@ -139,6 +139,7 @@ public:
   Network::TransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
                                 const envoy::config::core::v3::Metadata* metadata) const;
+  void updateClusterInfo(ClusterInfoConstSharedPtr cluster) { cluster_ = cluster; }
 
 protected:
   ClusterInfoConstSharedPtr cluster_;

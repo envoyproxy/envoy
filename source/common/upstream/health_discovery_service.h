@@ -102,8 +102,7 @@ private:
   bool added_via_api_;
   bool initialized_ = false;
   uint64_t config_hash_;
-  uint64_t endpoints_hash_;
-  uint64_t health_checkers_hash_;
+  uint64_t socket_match_hash_;
 
   HostVectorSharedPtr hosts_;
   HostsPerLocalitySharedPtr hosts_per_locality_;
@@ -119,7 +118,8 @@ private:
       Random::RandomGenerator& random, Event::Dispatcher& dispatcher, Api::Api& api);
   void
   updateHosts(const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
-                  locality_endpoints);
+                  locality_endpoints,
+              bool update_socket_matches);
 };
 
 using HdsClusterPtr = std::shared_ptr<HdsCluster>;

@@ -344,8 +344,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
   priority_set_.getOrCreateHostSet(0);
   // Set initial hashes for possible delta updates.
   config_hash_ = MessageUtil::hash(cluster);
-  endpoints_hash_ = RepeatedPtrUtil::hash(cluster_.load_assignment().endpoints());
-  health_checkers_hash_ = RepeatedPtrUtil::hash(cluster_.health_checks());
+  socket_match_hash_ = RepeatedPtrUtil::hash(cluster.transport_socket_matches());
 
   info_ = info_factory.createClusterInfo(
       {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
@@ -398,32 +397,24 @@ void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluste
     config_hash_ = config_hash;
     cluster_ = std::move(cluster);
 
-    // Always update our info_.
-    info_ = info_factory.createClusterInfo(
-        {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
-         local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
+    // Check to see if our list of socket matches have changed. If they have, create a new matcher
+    // in info_.
+    bool update_socket_matches = false;
+    uint64_t socket_match_hash = RepeatedPtrUtil::hash(cluster_.transport_socket_matches());
+    if (socket_match_hash_ != socket_match_hash) {
+      socket_match_hash_ = socket_match_hash;
+      update_socket_matches = true;
+      info_ = info_factory.createClusterInfo(
+          {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_,
+           cm, local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
+    }
 
     // Check to see if anything in the endpoints list has changed.
-    const auto& endpoints = cluster_.load_assignment().endpoints();
-    const uint64_t endpoints_hash = RepeatedPtrUtil::hash(endpoints);
-    if (endpoints_hash_ != endpoints_hash) {
-      ENVOY_LOG(debug, "endpoints have changed, updating");
-
-      // Endpoints have changed, update the data structures.
-      endpoints_hash_ = endpoints_hash;
-      updateHosts(endpoints);
-    }
+    updateHosts(cluster_.load_assignment().endpoints(), update_socket_matches);
 
     // Check to see if any of the health checkers have changed.
-    const uint64_t health_checkers_hash = RepeatedPtrUtil::hash(cluster_.health_checks());
-    if (health_checkers_hash_ != health_checkers_hash) {
-      ENVOY_LOG(debug, "health checkers have changed, updating");
-
-      // Health checkers have changed, so update the data structures.
-      health_checkers_hash_ = health_checkers_hash;
-      updateHealthchecks(cluster_.health_checks(), access_log_manager, runtime, random, dispatcher,
-                         api);
-    }
+    updateHealthchecks(cluster_.health_checks(), access_log_manager, runtime, random, dispatcher,
+                       api);
   }
 }
 
@@ -460,7 +451,8 @@ void HdsCluster::updateHealthchecks(
 }
 void HdsCluster::updateHosts(
     const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
-        locality_endpoints) {
+        locality_endpoints,
+    bool update_socket_matches) {
   // Create the data structures needed for PrioritySet::update.
   HostVectorSharedPtr hosts = std::make_shared<std::vector<HostSharedPtr>>();
   std::vector<HostSharedPtr> hosts_added;
@@ -481,6 +473,12 @@ void HdsCluster::updateHosts(
       if (host_pair != hosts_map_.end()) {
         // If we have this exact pair, save the shared pointer.
         host = host_pair->second;
+
+        // If our socket_matcher changed, update this host with the new info.
+        if (update_socket_matches) {
+          // We can guarantee this is a HostImpl, so we call its member function.
+          static_cast<HostImpl&>(*host).updateClusterInfo(info_);
+        }
       } else {
         // We do not have this endpoint saved, so create a new one.
         host = std::make_shared<HostImpl>(
