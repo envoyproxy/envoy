@@ -101,6 +101,7 @@ private:
   Ssl::ContextManager& ssl_context_manager_;
   bool added_via_api_;
   bool initialized_ = false;
+  uint64_t config_hash_;
   uint64_t endpoints_hash_;
   uint64_t health_checkers_hash_;
 
@@ -210,7 +211,6 @@ private:
 
   std::vector<std::string> clusters_;
   std::vector<HdsClusterPtr> hds_clusters_;
-  absl::flat_hash_map<uint64_t, HdsClusterPtr> hds_clusters_hash_map_;
   absl::flat_hash_map<std::string, HdsClusterPtr> hds_clusters_name_map_;
 
   Event::TimerPtr hds_stream_response_timer_;

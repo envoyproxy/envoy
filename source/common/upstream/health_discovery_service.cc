@@ -236,37 +236,27 @@ void HdsDelegate::processMessage(
   ASSERT(message);
   std::vector<HdsClusterPtr> hds_clusters;
   // Maps to replace the current member variable versions.
-  absl::flat_hash_map<uint64_t, HdsClusterPtr> new_hds_clusters_hash_map;
   absl::flat_hash_map<std::string, HdsClusterPtr> new_hds_clusters_name_map;
 
   for (const auto& cluster_health_check : message->cluster_health_checks()) {
-    const uint64_t cluster_config_hash = MessageUtil::hash(cluster_health_check);
     HdsClusterPtr cluster_ptr;
 
-    // If this cluster with the exact configuration is already being tracked, skip it.
-    auto cluster_map_pair = hds_clusters_hash_map_.find(cluster_config_hash);
-    if (cluster_map_pair != hds_clusters_hash_map_.end()) {
-      // This cluster with the exact same configuration already exists, so just reuse it.
-      ENVOY_LOG(debug, "HDS Cluster already exists with this configuration, skipping.");
-      cluster_ptr = cluster_map_pair->second;
-    } else {
-      // Create a new configuration for a cluster based on our different or new config.
-      auto cluster_config = createClusterConfig(cluster_health_check);
+    // Create a new configuration for a cluster based on our different or new config.
+    auto cluster_config = createClusterConfig(cluster_health_check);
 
-      // If this particular cluster configuration happens to have a name, then it is possible
-      // this particular cluster exists in the name map. We check and if we found a match,
-      // attempt to update this cluster. If no match was found, either the cluster name is empty
-      // or we have not seen a cluster by this name before. In either case, create a new cluster.
-      auto cluster_map_pair = hds_clusters_name_map_.find(cluster_health_check.cluster_name());
-      if (cluster_map_pair != hds_clusters_name_map_.end()) {
-        // We have a previous cluster with this name, update.
-        cluster_ptr = cluster_map_pair->second;
-        updateHdsCluster(cluster_ptr, cluster_config);
-      } else {
-        // There is no cluster with this name previously or its an empty string, so just create a
-        // new cluster.
-        cluster_ptr = createHdsCluster(cluster_config);
-      }
+    // If this particular cluster configuration happens to have a name, then it is possible
+    // this particular cluster exists in the name map. We check and if we found a match,
+    // attempt to update this cluster. If no match was found, either the cluster name is empty
+    // or we have not seen a cluster by this name before. In either case, create a new cluster.
+    auto cluster_map_pair = hds_clusters_name_map_.find(cluster_health_check.cluster_name());
+    if (cluster_map_pair != hds_clusters_name_map_.end()) {
+      // We have a previous cluster with this name, update.
+      cluster_ptr = cluster_map_pair->second;
+      updateHdsCluster(cluster_ptr, cluster_config);
+    } else {
+      // There is no cluster with this name previously or its an empty string, so just create a
+      // new cluster.
+      cluster_ptr = createHdsCluster(cluster_config);
     }
 
     // If this had a non-empty name, add this cluster to the name map so it can be updated in the
@@ -278,11 +268,9 @@ void HdsDelegate::processMessage(
 
     // Add to our remaining data structures.
     hds_clusters.push_back(cluster_ptr);
-    new_hds_clusters_hash_map.insert({cluster_config_hash, cluster_ptr});
   }
 
   // Overwrite our map data structures.
-  hds_clusters_hash_map_ = std::move(new_hds_clusters_hash_map);
   hds_clusters_name_map_ = std::move(new_hds_clusters_name_map);
   hds_clusters_ = std::move(hds_clusters);
 }
@@ -355,6 +343,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
   // Set initial hashes for possible delta updates.
+  config_hash_ = MessageUtil::hash(cluster);
   endpoints_hash_ = RepeatedPtrUtil::hash(cluster_.load_assignment().endpoints());
   health_checkers_hash_ = RepeatedPtrUtil::hash(cluster_.health_checks());
 
@@ -402,33 +391,39 @@ void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluste
                         ThreadLocal::SlotAllocator& tls,
                         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
                         AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime) {
-  cluster_ = std::move(cluster);
 
-  // Always update our info_.
-  info_ = info_factory.createClusterInfo(
-      {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
-       local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
+  // check to see if the config changed. If it did, update.
+  const uint64_t config_hash = MessageUtil::hash(cluster);
+  if (config_hash_ != config_hash) {
+    config_hash_ = config_hash;
+    cluster_ = std::move(cluster);
 
-  // Check to see if anything in the endpoints list has changed.
-  const auto& endpoints = cluster_.load_assignment().endpoints();
-  const uint64_t endpoints_hash = RepeatedPtrUtil::hash(endpoints);
-  if (endpoints_hash_ != endpoints_hash) {
-    ENVOY_LOG(debug, "endpoints have changed, updating");
+    // Always update our info_.
+    info_ = info_factory.createClusterInfo(
+        {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
+         local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
 
-    // Endpoints have changed, update the data structures.
-    endpoints_hash_ = endpoints_hash;
-    updateHosts(endpoints);
-  }
+    // Check to see if anything in the endpoints list has changed.
+    const auto& endpoints = cluster_.load_assignment().endpoints();
+    const uint64_t endpoints_hash = RepeatedPtrUtil::hash(endpoints);
+    if (endpoints_hash_ != endpoints_hash) {
+      ENVOY_LOG(debug, "endpoints have changed, updating");
 
-  // Check to see if any of the health checkers have changed.
-  const uint64_t health_checkers_hash = RepeatedPtrUtil::hash(cluster_.health_checks());
-  if (health_checkers_hash_ != health_checkers_hash) {
-    ENVOY_LOG(debug, "health checkers have changed, updating");
+      // Endpoints have changed, update the data structures.
+      endpoints_hash_ = endpoints_hash;
+      updateHosts(endpoints);
+    }
 
-    // Health checkers have changed, so update the data structures.
-    health_checkers_hash_ = health_checkers_hash;
-    updateHealthchecks(cluster_.health_checks(), access_log_manager, runtime, random, dispatcher,
-                       api);
+    // Check to see if any of the health checkers have changed.
+    const uint64_t health_checkers_hash = RepeatedPtrUtil::hash(cluster_.health_checks());
+    if (health_checkers_hash_ != health_checkers_hash) {
+      ENVOY_LOG(debug, "health checkers have changed, updating");
+
+      // Health checkers have changed, so update the data structures.
+      health_checkers_hash_ = health_checkers_hash;
+      updateHealthchecks(cluster_.health_checks(), access_log_manager, runtime, random, dispatcher,
+                         api);
+    }
   }
 }
 
