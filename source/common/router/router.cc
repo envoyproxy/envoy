@@ -774,6 +774,7 @@ void Filter::onRequestComplete() {
     }
 
     for (auto& upstream_request : upstream_requests_) {
+      ENVOY_LOG_MISC(info, "IN REQ COMPLETE {}", upstream_request->createPerTryTimeoutOnRequestComplete());
       if (upstream_request->createPerTryTimeoutOnRequestComplete()) {
         upstream_request->setupPerTryTimeout();
       }

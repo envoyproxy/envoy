@@ -266,7 +266,8 @@ void UpstreamRequestFilter::onDestroy() {
   if (!parent_.decode_complete_) {
     if (conn_pool_->cancelAnyPendingStream()) {
       ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.parent_.callbacks());
-       ASSERT(!upstream_);
+      // TODO(snowp): Do we need to reset the upstream here?
+      //  ASSERT(!upstream_);
     }
   }
 }
@@ -302,6 +303,11 @@ void UpstreamRequestFilter::ActiveUpstreamRequest::decodeHeaders(
 
 void UpstreamRequestFilter::ActiveUpstreamRequest::decodeData(Buffer::Instance& data,
                                                               bool end_stream) {
+  if (parent_.deferred_reset_reason_) {
+    onResetStream(parent_.deferred_reset_reason_.value(), absl::string_view());
+    return;
+  }
+
   ScopeTrackerScopeState scope(&parent_.decoder_callbacks_->scope(),
                                parent_.decoder_callbacks_->dispatcher());
 
@@ -311,6 +317,11 @@ void UpstreamRequestFilter::ActiveUpstreamRequest::decodeData(Buffer::Instance& 
 
 void UpstreamRequestFilter::ActiveUpstreamRequest::decodeTrailers(
     Http::ResponseTrailerMapPtr&& trailers) {
+  if (parent_.deferred_reset_reason_) {
+    onResetStream(parent_.deferred_reset_reason_.value(), absl::string_view());
+    return;
+  }
+
   ScopeTrackerScopeState scope(&parent_.parent_.parent_.callbacks()->scope(),
                                parent_.parent_.parent_.callbacks()->dispatcher());
 
@@ -336,6 +347,11 @@ void UpstreamRequestFilter::ActiveUpstreamRequest::decodeMetadata(
 }
 
 Http::FilterDataStatus UpstreamRequestFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+  if (deferred_reset_reason_) {
+    active_request_.onResetStream(deferred_reset_reason_.value(), absl::string_view());
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
   ENVOY_STREAM_LOG(trace, "proxying {} bytes", *parent_.parent_.callbacks(), data.length());
   decoder_callbacks_->streamInfo().addBytesSent(data.length());
   upstream_->encodeData(data, end_stream);
@@ -345,8 +361,13 @@ Http::FilterDataStatus UpstreamRequestFilter::decodeData(Buffer::Instance& data,
   }
   return Http::FilterDataStatus::StopIterationNoBuffer;
 }
+
 Http::FilterTrailersStatus
 UpstreamRequestFilter::decodeTrailers(Http::RequestTrailerMap& trailers) {
+  if (deferred_reset_reason_) {
+    active_request_.onResetStream(deferred_reset_reason_.value(), absl::string_view());
+    return Http::FilterTrailersStatus::StopIteration;
+  }
   ENVOY_STREAM_LOG(trace, "proxying trailers", *parent_.parent_.callbacks());
   upstream_->encodeTrailers(trailers);
   parent_.upstream_timing_.onLastUpstreamTxByteSent(
@@ -408,6 +429,7 @@ void UpstreamRequestFilter::ActiveUpstreamRequest::onResetStream(
   ScopeTrackerScopeState scope(&parent_.parent_.parent_.callbacks()->scope(),
                                parent_.parent_.parent_.callbacks()->dispatcher());
 
+ENVOY_LOG_MISC(info, "SEEING RESET STREAM");
   if (parent_.parent_.span_ != nullptr) {
     // Add tags about reset.
     parent_.parent_.span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
@@ -520,6 +542,7 @@ void UpstreamRequestFilter::onPoolReady(
   parent_.parent_.callbacks()->streamInfo().setUpstreamSslConnection(
       info.downstreamSslConnection());
 
+  ENVOY_LOG_MISC(info, "IN POOL READY {} {}", parent_.parent_.downstreamEndStream(), parent_.create_per_try_timeout_on_request_complete_);
   if (parent_.parent_.downstreamEndStream()) {
     parent_.setupPerTryTimeout();
   } else {
@@ -563,6 +586,11 @@ void UpstreamRequestFilter::onPoolReady(
   calling_encode_headers_ = true;
   upstream_->encodeHeaders(*parent_.requestHeaders(), encoding_headers_only_);
   calling_encode_headers_ = false;
+
+  if (deferred_reset_reason_) {
+    active_request_.onResetStream(deferred_reset_reason_.value(), absl::string_view());
+    return;
+  }
 
   if (!paused_for_connect_ && !decoding_headers_) {
     decoder_callbacks_->continueDecoding();

@@ -1637,6 +1637,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStat) {
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), false);
   test_time_.advanceTimeWait(std::chrono::milliseconds(80));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeData(data, true);
 }
 
@@ -1680,6 +1681,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatFailure) {
       new Http::TestResponseHeaderMapImpl{{":status", "500"}});
   response_decoder->decodeHeaders(std::move(response_headers), false);
   test_time_.advanceTimeWait(std::chrono::milliseconds(80));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeData(data, true);
 }
 
@@ -1720,6 +1722,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatOnlyGlobal) {
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), false);
   test_time_.advanceTimeWait(std::chrono::milliseconds(80));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeData(data, true);
 }
 
@@ -1765,6 +1768,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "504"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder1->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
