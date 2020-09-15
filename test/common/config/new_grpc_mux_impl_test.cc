@@ -46,13 +46,13 @@ public:
         control_plane_connected_state_(
             stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)) {}
 
-  void setup() {
+  void setup(const bool enable_type_url_downgrade_and_upgrade = false) {
     grpc_mux_ = std::make_unique<NewGrpcMuxImpl>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
         envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_,
-        local_info_);
+        local_info_, enable_type_url_downgrade_and_upgrade);
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -169,7 +169,7 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
 
 // Watch v2 resource type_url, receive discovery response with v3 resource type_url.
 TEST_F(NewGrpcMuxImplTest, V3ResourceResponseV2ResourceWatch) {
-  setup();
+  setup(true);
 
   // Watch for v2 resource type_url.
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
@@ -222,7 +222,7 @@ TEST_F(NewGrpcMuxImplTest, V3ResourceResponseV2ResourceWatch) {
 
 // Watch v3 resource type_url, receive discovery response with v2 resource type_url.
 TEST_F(NewGrpcMuxImplTest, V2ResourceResponseV3ResourceWatch) {
-  setup();
+  setup(true);
 
   // Watch for v3 resource type_url.
   const std::string& v3_type_url =

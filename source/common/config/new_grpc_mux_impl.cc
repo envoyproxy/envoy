@@ -20,10 +20,12 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                envoy::config::core::v3::ApiVersion transport_api_version,
                                Random::RandomGenerator& random, Stats::Scope& scope,
                                const RateLimitSettings& rate_limit_settings,
-                               const LocalInfo::LocalInfo& local_info)
+                               const LocalInfo::LocalInfo& local_info,
+                               bool enable_type_url_downgrade_and_upgrade)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
-      local_info_(local_info), transport_api_version_(transport_api_version) {}
+      local_info_(local_info), transport_api_version_(transport_api_version),
+      enable_type_url_downgrade_and_upgrade_(enable_type_url_downgrade_and_upgrade) {}
 
 ScopedResume NewGrpcMuxImpl::pause(const std::string& type_url) {
   return pause(std::vector<std::string>{type_url});
@@ -45,6 +47,7 @@ ScopedResume NewGrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
 }
 
 void NewGrpcMuxImpl::registerVersionedTypeUrl(const std::string& type_url) {
+
   TypeUrlMap& type_url_map = typeUrlMap();
   if (type_url_map.find(type_url) != type_url_map.end()) {
     return;
@@ -65,7 +68,8 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
             message->system_version_info());
   auto sub = subscriptions_.find(message->type_url());
   // If this type url is not watched, try another version type url.
-  if (sub == subscriptions_.end()) {
+  if (enable_type_url_downgrade_and_upgrade_ && sub == subscriptions_.end()) {
+    ENVOY_LOG(debug, "fuck.\n");
     const std::string& type_url = message->type_url();
     registerVersionedTypeUrl(type_url);
     TypeUrlMap& type_url_map = typeUrlMap();
@@ -130,7 +134,9 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
-    registerVersionedTypeUrl(type_url);
+    if (enable_type_url_downgrade_and_upgrade_) {
+      registerVersionedTypeUrl(type_url);
+    }
     addSubscription(type_url, use_namespace_matching);
     return addWatch(type_url, resources, callbacks, resource_decoder, use_namespace_matching);
   }

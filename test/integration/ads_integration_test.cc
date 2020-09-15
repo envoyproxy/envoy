@@ -117,6 +117,8 @@ TEST_P(AdsIntegrationTest, Failure) {
 
 // Validate that xds can support a mix of v2 and v3 type url.
 TEST_P(AdsIntegrationTest, MixV2V3TypeUrlInDiscoveryResponse) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade", "true");
   initialize();
 
   // Send initial configuration.

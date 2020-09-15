@@ -94,6 +94,8 @@ constexpr const char* runtime_features[] = {
 // When features are added here, there should be a tracking bug assigned to the
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
+    // Allow Envoy to upgrade or downgrade version of type url.
+    "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade",
     // TODO(asraa) flip this feature after codec errors are handled
     "envoy.reloadable_features.new_codec_behavior",
     // Sentinel and test flag.

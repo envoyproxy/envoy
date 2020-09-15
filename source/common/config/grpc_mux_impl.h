@@ -36,7 +36,8 @@ public:
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               envoy::config::core::v3::ApiVersion transport_api_version,
               Random::RandomGenerator& random, Stats::Scope& scope,
-              const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node);
+              const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
+              const bool enable_type_url_downgrade_and_upgrade = false);
   ~GrpcMuxImpl() override = default;
 
   void start() override;
@@ -139,6 +140,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
   bool first_stream_request_;
+
   absl::node_hash_map<std::string, ApiState> api_state_;
   // Envoy's dependency ordering.
   std::list<std::string> subscriptions_;
@@ -148,6 +150,7 @@ private:
   // This string is a type URL.
   std::unique_ptr<std::queue<std::string>> request_queue_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
+  bool enable_type_url_downgrade_and_upgrade_;
 };
 
 using GrpcMuxImplPtr = std::unique_ptr<GrpcMuxImpl>;

@@ -10,6 +10,7 @@
 #include "common/config/type_to_endpoint.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Config {
@@ -28,15 +29,18 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   Config::Utility::checkLocalInfo(type_url, local_info_);
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
+  auto& runtime_snapshot = runtime_.snapshot();
 
   const auto transport_api_version = config.api_config_source().transport_api_version();
   if (transport_api_version == envoy::config::core::v3::ApiVersion::V2 &&
-      runtime_.snapshot().runtimeFeatureEnabled(
+      runtime_snapshot.runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_deprecated_v2_api_warning")) {
-    runtime_.snapshot().countDeprecatedFeatureUse();
+    runtime_snapshot.countDeprecatedFeatureUse();
     ENVOY_LOG(warn,
               "xDS of version v2 has been deprecated and will be removed in subsequent versions");
   }
+  const bool enable_type_url_downgrade_and_upgrade = runtime_snapshot.runtimeFeatureEnabled(
+      "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade");
 
   switch (config.config_source_specifier_case()) {
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath: {
@@ -73,7 +77,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               dispatcher_, sotwGrpcMethod(type_url, api_config_source.transport_api_version()),
               api_config_source.transport_api_version(), random_, scope,
               Utility::parseRateLimitSettings(api_config_source),
-              api_config_source.set_node_on_first_message_only()),
+              api_config_source.set_node_on_first_message_only(),
+              enable_type_url_downgrade_and_upgrade),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated*/ false);
@@ -85,7 +90,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                   ->create(),
               dispatcher_, deltaGrpcMethod(type_url, api_config_source.transport_api_version()),
               api_config_source.transport_api_version(), random_, scope,
-              Utility::parseRateLimitSettings(api_config_source), local_info_),
+              Utility::parseRateLimitSettings(api_config_source), local_info_,
+              enable_type_url_downgrade_and_upgrade),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config), false);
     }

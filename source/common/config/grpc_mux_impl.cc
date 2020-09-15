@@ -19,11 +19,13 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          const Protobuf::MethodDescriptor& service_method,
                          envoy::config::core::v3::ApiVersion transport_api_version,
                          Random::RandomGenerator& random, Stats::Scope& scope,
-                         const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node)
+                         const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
+                         bool enable_type_url_downgrade_and_upgrade)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
-      first_stream_request_(true), transport_api_version_(transport_api_version) {
+      first_stream_request_(true), transport_api_version_(transport_api_version),
+      enable_type_url_downgrade_and_upgrade_(enable_type_url_downgrade_and_upgrade) {
   Config::Utility::checkLocalInfo("ads", local_info);
 }
 
@@ -76,7 +78,9 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
     api_state_[type_url].request_.mutable_node()->MergeFrom(local_info_.node());
     api_state_[type_url].subscribed_ = true;
     subscriptions_.emplace_back(type_url);
-    registerVersionedTypeUrl(type_url);
+    if (enable_type_url_downgrade_and_upgrade_) {
+      registerVersionedTypeUrl(type_url);
+    }
   }
 
   // This will send an updated request on each subscription.
@@ -137,19 +141,19 @@ void GrpcMuxImpl::onDiscoveryResponse(
     control_plane_stats.identifier_.set(message->control_plane().identifier());
   }
   // If this type url is not watched(no subscriber or no watcher), try another version of type url.
-  if (api_state_.count(type_url) == 0) {
+  if (enable_type_url_downgrade_and_upgrade_ && api_state_.count(type_url) == 0) {
     registerVersionedTypeUrl(type_url);
     TypeUrlMap& type_url_map = typeUrlMap();
     if (type_url_map.find(type_url) != type_url_map.end()) {
       type_url = type_url_map[type_url];
     }
-    if (api_state_.count(type_url) == 0) {
-      // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
-      // protocol violation
-      ENVOY_LOG(warn, "Ignoring the message for type URL {} as it has no current subscribers.",
-                type_url);
-      return;
-    }
+  }
+  if (api_state_.count(type_url) == 0) {
+    // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
+    // protocol violation
+    ENVOY_LOG(warn, "Ignoring the message for type URL {} as it has no current subscribers.",
+              type_url);
+    return;
   }
   if (api_state_[type_url].watches_.empty()) {
     // update the nonce as we are processing this response.

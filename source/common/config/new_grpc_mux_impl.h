@@ -35,7 +35,8 @@ public:
                  envoy::config::core::v3::ApiVersion transport_api_version,
                  Random::RandomGenerator& random, Stats::Scope& scope,
                  const RateLimitSettings& rate_limit_settings,
-                 const LocalInfo::LocalInfo& local_info);
+                 const LocalInfo::LocalInfo& local_info,
+                 const bool enable_type_url_downgrade_and_upgrade = false);
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
@@ -153,6 +154,8 @@ private:
   const LocalInfo::LocalInfo& local_info_;
 
   const envoy::config::core::v3::ApiVersion transport_api_version_;
+
+  const bool enable_type_url_downgrade_and_upgrade_;
 };
 
 using NewGrpcMuxImplPtr = std::unique_ptr<NewGrpcMuxImpl>;

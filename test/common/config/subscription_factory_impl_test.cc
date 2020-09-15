@@ -300,7 +300,12 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedApi) {
       envoy::config::core::v3::ApiVersion::V2);
   NiceMock<Runtime::MockSnapshot> snapshot;
   EXPECT_CALL(runtime_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
-  EXPECT_CALL(snapshot, runtimeFeatureEnabled(_)).WillOnce(Return(true));
+  EXPECT_CALL(snapshot, runtimeFeatureEnabled(
+                            "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade"))
+      .WillOnce(Return(false));
+  EXPECT_CALL(snapshot,
+              runtimeFeatureEnabled("envoy.reloadable_features.enable_deprecated_v2_api_warning"))
+      .WillOnce(Return(true));
   EXPECT_CALL(snapshot, countDeprecatedFeatureUse());
 
   Upstream::ClusterManager::ClusterSet primary_clusters;
