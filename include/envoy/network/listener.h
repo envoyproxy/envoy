@@ -315,6 +315,8 @@ public:
   virtual void post(Network::UdpRecvData&& data) PURE;
 };
 
+using UdpListenerCallbacksOptRef = absl::optional<std::reference_wrapper<UdpListenerCallbacks>>;
+
 /**
  * An abstract socket listener. Free the listener to stop listening on the socket.
  */

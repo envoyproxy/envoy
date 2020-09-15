@@ -74,7 +74,7 @@ public:
   void addListener(absl::optional<uint64_t> overridden_listener,
                    Network::ListenerConfig& config) override;
   void removeListeners(uint64_t listener_tag) override;
-  Network::UdpListenerCallbacks* getUdpListenerCallbacks(uint64_t listener_tag) override;
+  Network::UdpListenerCallbacksOptRef getUdpListenerCallbacks(uint64_t listener_tag) override;
   void removeFilterChains(uint64_t listener_tag,
                           const std::list<const Network::FilterChain*>& filter_chains,
                           std::function<void()> completion) override;
@@ -349,9 +349,10 @@ private:
     ActiveTcpListenerOptRef tcpListener();
     UdpListenerCallbacksOptRef udpListener();
   };
+  using ActiveListenerDetailsOptRef = absl::optional<std::reference_wrapper<ActiveListenerDetails>>;
 
   ActiveTcpListenerOptRef findActiveTcpListenerByAddress(const Network::Address::Instance& address);
-  ActiveListenerDetails* findActiveListenerByTag(uint64_t listener_tag);
+  ActiveListenerDetailsOptRef findActiveListenerByTag(uint64_t listener_tag);
 
   // This has a value on worker threads, and no value on the main thread.
   const absl::optional<uint32_t> worker_id_;

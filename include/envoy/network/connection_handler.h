@@ -54,10 +54,10 @@ public:
 
   /**
    * Get the ``UdpListenerCallbacks`` associated with ``listener_tag``. This will be
-   * nullptr for non-UDP listeners and for ``listener_tag`` values that have already been
+   * absl::nullopt for non-UDP listeners and for ``listener_tag`` values that have already been
    * removed.
    */
-  virtual UdpListenerCallbacks* getUdpListenerCallbacks(uint64_t listener_tag) PURE;
+  virtual UdpListenerCallbacksOptRef getUdpListenerCallbacks(uint64_t listener_tag) PURE;
 
   /**
    * Remove the filter chains and the connections in the listener. All connections owned

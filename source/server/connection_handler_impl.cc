@@ -80,31 +80,31 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
   }
 }
 
-ConnectionHandlerImpl::ActiveListenerDetails*
+ConnectionHandlerImpl::ActiveListenerDetailsOptRef
 ConnectionHandlerImpl::findActiveListenerByTag(uint64_t listener_tag) {
   // TODO(mattklein123): We should probably use a hash table here to lookup the tag
   // instead of iterating through the listener list.
   for (auto& listener : listeners_) {
     if (listener.second.listener_->listener() != nullptr &&
         listener.second.listener_->listenerTag() == listener_tag) {
-      return &listener.second;
+      return listener.second;
     }
   }
 
-  return nullptr;
+  return absl::nullopt;
 }
 
-Network::UdpListenerCallbacks*
+Network::UdpListenerCallbacksOptRef
 ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag) {
-  auto* listener = findActiveListenerByTag(listener_tag);
-  if (listener != nullptr) {
+  auto listener = findActiveListenerByTag(listener_tag);
+  if (listener.has_value()) {
     // If the tag matches this must be a UDP listener.
-    auto udp_listener = listener->udpListener();
+    auto udp_listener = listener->get().udpListener();
     ASSERT(udp_listener.has_value());
-    return &udp_listener->get();
+    return udp_listener;
   }
 
-  return nullptr;
+  return absl::nullopt;
 }
 
 void ConnectionHandlerImpl::removeFilterChains(
@@ -514,13 +514,14 @@ void ConnectionHandlerImpl::ActiveTcpListener::post(Network::ConnectionSocketPtr
 
   parent_.dispatcher_.post(
       [socket_to_rebalance, tag = config_->listenerTag(), &parent = parent_]() {
-        auto* listener = parent.findActiveListenerByTag(tag);
-        if (listener != nullptr) {
+        auto listener = parent.findActiveListenerByTag(tag);
+        if (listener.has_value()) {
           // If the tag matches this must be a TCP listener.
           ASSERT(absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
-              listener->typed_listener_));
+              listener->get().typed_listener_));
           auto& tcp_listener =
-              absl::get<std::reference_wrapper<ActiveTcpListener>>(listener->typed_listener_).get();
+              absl::get<std::reference_wrapper<ActiveTcpListener>>(listener->get().typed_listener_)
+                  .get();
           tcp_listener.onAcceptWorker(std::move(socket_to_rebalance->socket),
                                       tcp_listener.config_->handOffRestoredDestinationConnections(),
                                       true);
@@ -612,9 +613,9 @@ void ActiveUdpListenerBase::post(Network::UdpRecvData&& data) {
 
   udp_listener_->dispatcher().post(
       [data_to_post, tag = config_->listenerTag(), &parent = parent_]() {
-        Network::UdpListenerCallbacks* listener = parent.getUdpListenerCallbacks(tag);
-        if (listener != nullptr) {
-          listener->onDataWorker(*data_to_post);
+        Network::UdpListenerCallbacksOptRef listener = parent.getUdpListenerCallbacks(tag);
+        if (listener.has_value()) {
+          listener->get().onDataWorker(*data_to_post);
         }
       });
 }
