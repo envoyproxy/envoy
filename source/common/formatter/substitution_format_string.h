@@ -30,7 +30,7 @@ public:
   /**
    * Returns content-type from config SubstitutionFormatString
    */
-  static absl::string_view
+  static std::string
   getContentType(const envoy::config::core::v3::SubstitutionFormatString& config);
 };
 

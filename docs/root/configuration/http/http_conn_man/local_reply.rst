@@ -49,7 +49,7 @@ The response body content type can be customized. If not specified, the content 
 
 Local reply format can be specified as :ref:`SubstitutionFormatString <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>`. It supports :ref:`text_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format>` and :ref:`json_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format>`.
 
-If local reply format is :ref:`text_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format>` then content-type can be modified further via :ref:`content_type <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.content_type>`. Supported content-type values include `text/html; charset=UTF-8` and `text/plain` with default value being `text/plain`.
+Optionally, content-type can be modified further via :ref:`content_type <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.content_type>` field. If not specified, default content-type is `text/plain` for :ref:`text_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format>` and `application/json` for :ref:`json_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format>`.
 
 Example of a LocalReplyConfig with `body_format` field.
 

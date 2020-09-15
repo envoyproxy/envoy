@@ -26,12 +26,15 @@ FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
   return nullptr;
 }
 
-absl::string_view SubstitutionFormatStringUtils::getContentType(
+std::string SubstitutionFormatStringUtils::getContentType(
     const envoy::config::core::v3::SubstitutionFormatString& config) {
-  if (config.content_type() == Http::Headers::get().ContentTypeValues.Html) {
-    return Http::Headers::get().ContentTypeValues.Html;
+  if (!config.content_type().empty()) {
+    return config.content_type();
   }
-  return Http::Headers::get().ContentTypeValues.Text;
+  return config.format_case() ==
+                 envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat
+             ? Http::Headers::get().ContentTypeValues.Json
+             : Http::Headers::get().ContentTypeValues.Text;
 }
 
 } // namespace Formatter
