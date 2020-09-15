@@ -1,6 +1,6 @@
 #include "common/http/path_utility.h"
 
-#include "test/common/http/path_utility_fuzz.pb.h"
+#include "test/common/http/path_utility_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 
@@ -8,6 +8,13 @@ namespace Envoy {
 namespace Fuzz {
 namespace {
 DEFINE_PROTO_FUZZER(const test::common::http::PathUtilityTestCase& input) {
+  try {
+    TestUtility::validate(input);
+  } catch (const ProtoValidationException& e) {
+    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
+    return;
+  }
+
   switch (input.path_utility_selector_case()) {
   case test::common::http::PathUtilityTestCase::kCanonicalPath: {
     auto request_headers = fromHeaders<Http::TestRequestHeaderMapImpl>(

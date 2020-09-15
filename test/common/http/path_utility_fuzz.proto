@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package test.common.http;
 
+import "validate/validate.proto";
 import "test/fuzz/common.proto";
 
 message CanonicalPath {
