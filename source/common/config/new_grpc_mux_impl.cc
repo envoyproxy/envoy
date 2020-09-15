@@ -82,7 +82,6 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   auto sub = subscriptions_.find(message->type_url());
   // If this type url is not watched, try another version type url.
   if (enable_type_url_downgrade_and_upgrade_ && sub == subscriptions_.end()) {
-    ENVOY_LOG(debug, "fuck.\n");
     const std::string& type_url = message->type_url();
     registerVersionedTypeUrl(type_url);
     TypeUrlMap& type_url_map = typeUrlMap();
