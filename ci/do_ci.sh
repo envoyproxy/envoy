@@ -12,8 +12,11 @@ if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositor
 fi
 
 SRCDIR="${PWD}"
-. "$(dirname "$0")"/setup_cache.sh
-. "$(dirname "$0")"/build_setup.sh $build_setup_args
+NO_BUILD_SETUP="${NO_BUILD_SETUP:-}"
+if [[ -z "$NO_BUILD_SETUP" ]]; then
+    . "$(dirname "$0")"/setup_cache.sh
+    . "$(dirname "$0")"/build_setup.sh $build_setup_args
+fi
 cd "${SRCDIR}"
 
 if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
@@ -398,6 +401,23 @@ elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."
   docs/build.sh
+  exit 0
+elif [[ "$CI_TARGET" == "verify_examples" ]]; then
+  echo "verify examples..."
+  docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
+  images=($(docker image list --format "{{.Repository}}"))
+  tags=($(docker image list --format "{{.Tag}}"))
+  for i in "${!images[@]}"; do
+      if [[ "${images[i]}" =~ "envoy" ]]; then
+          docker tag "${images[$i]}:${tags[$i]}" "${images[$i]}:latest"
+      fi
+  done
+  docker images
+  sudo apt-get update -y
+  sudo apt-get install -y -qq --no-install-recommends redis-tools
+  export DOCKER_NO_PULL=1
+  umask 027
+  ci/verify_examples.sh
   exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

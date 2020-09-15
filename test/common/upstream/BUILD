@@ -283,6 +283,8 @@ envoy_cc_test(
     srcs = ["hds_test.cc"],
     deps = [
         "//source/common/upstream:health_discovery_service_lib",
+        "//source/common/upstream:transport_socket_match_lib",
+        "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
@@ -295,6 +297,8 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_info_factory_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
