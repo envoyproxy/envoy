@@ -900,13 +900,14 @@ TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
         auto* route_config = hcm.mutable_route_config();
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
         auto* route = virtual_host->mutable_routes(0);
-        route->mutable_route()->mutable_max_grpc_timeout()->set_seconds(60 * 60);
+        route->mutable_route()
+            ->mutable_max_stream_duration()
+            ->mutable_grpc_timeout_header_max()
+            ->set_seconds(60 * 60);
       });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  // With upstream request timeout Envoy should send a gRPC-Status "DEADLINE EXCEEDED".
-  // TODO: Properly map request timeout to "DEADLINE EXCEEDED" instead of "SERVICE UNAVAILABLE".
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
@@ -919,8 +920,9 @@ TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_NE(response->headers().GrpcStatus(), nullptr);
-  EXPECT_EQ("14", response->headers().getGrpcStatusValue()); // Service Unavailable
-  EXPECT_LT(0, test_server_->counter("cluster.cluster_0.upstream_rq_timeout")->value());
+  EXPECT_EQ("4", response->headers().getGrpcStatusValue()); // Deadline exceeded.
+  EXPECT_LT(0,
+            test_server_->counter("http.config_test.downstream_rq_max_duration_reached")->value());
 }
 
 // Interleave two requests and responses and make sure that idle timeout is handled correctly.

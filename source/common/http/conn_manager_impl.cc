@@ -711,10 +711,10 @@ void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_response_for_timeout")) {
-    sendLocalReply(request_headers_ != nullptr &&
-                       Grpc::Common::isGrpcRequestHeaders(*request_headers_),
-                   Http::Code::RequestTimeout, "downstream duration timeout", nullptr,
-                   absl::nullopt, StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
+    sendLocalReply(
+        request_headers_ != nullptr && Grpc::Common::isGrpcRequestHeaders(*request_headers_),
+        Http::Code::RequestTimeout, "downstream duration timeout", nullptr,
+        4 /* deadline exceeded */, StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
   } else {
     filter_manager_.streamInfo().setResponseCodeDetails(
         StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
@@ -1135,6 +1135,73 @@ void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() { refreshCachedRoute(nullptr); }
 
+void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
+  if (!filter_manager_.streamInfo().route_entry_ || !request_headers_) {
+    return;
+  }
+  auto& route = filter_manager_.streamInfo().route_entry_;
+
+  auto grpc_timeout = Grpc::Common::getGrpcTimeout(*request_headers_);
+  std::chrono::milliseconds timeout = std::chrono::milliseconds(0);
+
+  if (!grpc_timeout || !route->grpcTimeoutHeaderMax()) {
+    // Either there is no grpc-timeout header or special timeouts for it are not
+    // configured. Use stream duration.
+    if (route->maxStreamDuration()) {
+      timeout = route->maxStreamDuration().value();
+    } else {
+      // Fall back to HCM config.
+      const auto max_stream_duration = connection_manager_.config_.maxStreamDuration();
+      if (max_stream_duration.has_value() && max_stream_duration.value().count()) {
+        timeout = max_stream_duration.value();
+      }
+    }
+  } else {
+    // Start with the timeout equal to the gRPC timeout header.
+    timeout = grpc_timeout.value();
+    // If there's a valid cap, apply it.
+    if ((timeout > route->grpcTimeoutHeaderMax().value() ||
+         timeout == std::chrono::milliseconds(0)) &&
+        route->grpcTimeoutHeaderMax().value() != std::chrono::milliseconds(0)) {
+      timeout = route->grpcTimeoutHeaderMax().value();
+    }
+
+    // Use the configured offset iff the timeout will stay positive.
+    if (timeout != std::chrono::milliseconds(0) && route->grpcTimeoutHeaderOffset()) {
+      const auto offset = route->grpcTimeoutHeaderOffset().value();
+      if (offset < timeout) {
+        timeout -= offset;
+      }
+    }
+  }
+  // If the timeout is infinite, unregister any existing max duration timer.
+  if (timeout == std::chrono::milliseconds(0)) {
+    if (max_stream_duration_timer_) {
+      max_stream_duration_timer_->disableTimer();
+    }
+    return;
+  }
+
+  // See how long this stream has been alive, and adjust the timeout
+  // accordingly.
+  std::chrono::duration time_used = std::chrono::duration_cast<std::chrono::milliseconds>(
+      connection_manager_.timeSource().monotonicTime() -
+      filter_manager_.streamInfo().startTimeMonotonic());
+  if (timeout > time_used) {
+    timeout -= time_used;
+  } else {
+    timeout = std::chrono::milliseconds(0);
+  }
+
+  // Finally create (if necessary) and enable the timer.
+  if (!max_stream_duration_timer_) {
+    max_stream_duration_timer_ =
+        connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
+            [this]() -> void { onStreamMaxDurationReached(); });
+  }
+  max_stream_duration_timer_->enableTimer(timeout);
+}
+
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::RouteCallback& cb) {
   Router::RouteConstSharedPtr route;
   if (request_headers_ != nullptr) {
@@ -1160,6 +1227,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
 
   filter_manager_.streamInfo().setUpstreamClusterInfo(cached_cluster_info_.value());
   refreshCachedTracingCustomTags();
+  refreshDurationTimeout();
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {

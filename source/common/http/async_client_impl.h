@@ -255,6 +255,15 @@ private:
       }
     }
     absl::optional<std::chrono::milliseconds> idleTimeout() const override { return absl::nullopt; }
+    absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+      return absl::nullopt;
+    }
+    absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
+      return absl::nullopt;
+    }
+    absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
+      return absl::nullopt;
+    }
     absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
       return absl::nullopt;
     }
