@@ -906,7 +906,7 @@ class FormatChecker:
     if self.isBuildFile(file_path) or self.isStarlarkFile(file_path) or self.isWorkspaceFile(
         file_path):
       if try_to_fix:
-        error_messages += self.xBuildPath(file_path)
+        error_messages += self.fixBuildPath(file_path)
       error_messages += self.checkBuildPath(file_path)
     else:
       if try_to_fix:
