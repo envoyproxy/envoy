@@ -280,9 +280,8 @@ Network::ConnectionHandler::ActiveListenerPtr ActiveQuicListenerFactory::createA
 
 #else
   if (concurrency_ != 1) {
-    ENVOY_LOG(
-        warn,
-        "Kernel BPF filter is not supported on this platform. QUIC performance may be degraded.");
+    ENVOY_LOG(warn, "Efficient routing of QUIC packets to the correct worker is not supported or "
+                    "not implemented by Envoy on this platform. QUIC performance may be degraded.");
   }
 #endif
 
