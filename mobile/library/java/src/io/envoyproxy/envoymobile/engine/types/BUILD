@@ -8,6 +8,7 @@ java_library(
         "EnvoyHTTPCallbacks.java",
         "EnvoyHTTPFilter.java",
         "EnvoyHTTPFilterFactory.java",
+        "EnvoyOnEngineRunning.java",
         "EnvoyStatus.java",
     ],
     visibility = ["//visibility:public"],

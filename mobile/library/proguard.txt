@@ -11,6 +11,10 @@
     native <methods>;
 }
 
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning {
+   <methods>;
+}
+
 -keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmBridgeUtility {
    <methods>;
 }

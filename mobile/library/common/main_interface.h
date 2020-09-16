@@ -106,6 +106,7 @@ void record_counter(const char* elements, uint64_t count);
  * Warning: Must be completed before any calls to run_engine().
  * @param name, identifier of the platform API
  * @param api, type-erased c struct containing function pointers and context.
+ * @return envoy_status_t, the resulting status of the operation.
  */
 envoy_status_t register_platform_api(const char* name, void* api);
 

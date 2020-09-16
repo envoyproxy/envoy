@@ -19,6 +19,7 @@ open class EngineBuilder(
 ) {
   private var logLevel = LogLevel.INFO
   private var engineType: () -> EnvoyEngine = { EnvoyEngineImpl() }
+  private var onEngineRunning: (() -> Unit)? = null
 
   private var statsDomain = "0.0.0.0"
   private var connectTimeoutSeconds = 30
@@ -119,6 +120,18 @@ open class EngineBuilder(
   }
 
   /**
+   * Set a closure to be called when the engine finishes its async startup and begins running.
+   *
+   * @param closure the closure to be called.
+   *
+   * @return this builder.
+   */
+  fun setOnEngineRunning(closure: () -> Unit): EngineBuilder {
+    this.onEngineRunning = closure
+    return this
+  }
+
+  /**
    * Add the App Version of the App using this Envoy Client.
    *
    * @param appVersion the version.
@@ -162,7 +175,7 @@ open class EngineBuilder(
   fun build(): Engine {
     return when (configuration) {
       is Custom -> {
-        EngineImpl(engineType(), configuration.yaml, logLevel)
+        EngineImpl(engineType(), configuration.yaml, logLevel, onEngineRunning)
       }
       is Standard -> {
         EngineImpl(
@@ -172,7 +185,7 @@ open class EngineBuilder(
             dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
             filterChain, statsFlushSeconds, appVersion, appId, virtualClusters
           ),
-          logLevel
+          logLevel, onEngineRunning
         )
       }
     }

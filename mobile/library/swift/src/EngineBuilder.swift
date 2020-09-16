@@ -23,6 +23,7 @@ public final class EngineBuilder: NSObject {
   private var appId: String = "unspecified"
   private var filterChain: [EnvoyHTTPFilterFactory] = []
   private var virtualClusters: String = "[]"
+  private var onEngineRunning: (() -> Void)?
 
   // MARK: - Public
 
@@ -120,6 +121,17 @@ public final class EngineBuilder: NSObject {
     return self
   }
 
+  /// Set a closure to be called when the engine finishes its async startup and begins running.
+  ///
+  /// - parameter closure: The closure to be called.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setOnEngineRunning(closure: @escaping () -> Void) -> EngineBuilder {
+    self.onEngineRunning = closure
+    return self
+  }
+
   /// Add the App Version of the App using this Envoy Client.
   ///
   /// - parameter appVersion: The version.
@@ -160,7 +172,8 @@ public final class EngineBuilder: NSObject {
     let engine = self.engineType.init()
     switch self.base {
     case .custom(let yaml):
-      return EngineImpl(configYAML: yaml, logLevel: self.logLevel, engine: engine)
+      return EngineImpl(configYAML: yaml, logLevel: self.logLevel, engine: engine,
+                        onEngineRunning: self.onEngineRunning)
     case .standard:
       let config = EnvoyConfiguration(
         statsDomain: self.statsDomain,
@@ -173,7 +186,8 @@ public final class EngineBuilder: NSObject {
         appVersion: self.appVersion,
         appId: self.appId,
         virtualClusters: self.virtualClusters)
-      return EngineImpl(config: config, logLevel: self.logLevel, engine: engine)
+      return EngineImpl(config: config, logLevel: self.logLevel, engine: engine,
+                        onEngineRunning: self.onEngineRunning)
     }
   }
 

@@ -254,6 +254,13 @@ typedef void* (*envoy_on_cancel_f)(void* context);
  */
 typedef void (*envoy_on_exit_f)(void* context);
 
+/**
+ * Called when the envoy has finished its async setup and returned post-init callbacks.
+ * @param context, contains the necessary state to carry out platform-specific dispatch and
+ * execution.
+ */
+typedef void (*envoy_on_engine_running_f)(void* context);
+
 #ifdef __cplusplus
 } // function pointers
 #endif
@@ -269,13 +276,16 @@ typedef struct {
   envoy_on_error_f on_error;
   envoy_on_complete_f on_complete;
   envoy_on_cancel_f on_cancel;
-  void* context; // Will be passed through to callbacks to provide dispatch and execution state.
+  // Context passed through to callbacks to provide dispatch and execution state.
+  void* context;
 } envoy_http_callbacks;
 
 /**
- * Interface to handle Engine callbacks.
+ * Interface that can handle engine callbacks.
  */
 typedef struct {
+  envoy_on_engine_running_f on_engine_running;
   envoy_on_exit_f on_exit;
+  // Context passed through to callbacks to provide dispatch and execution state.
   void* context;
 } envoy_engine_callbacks;

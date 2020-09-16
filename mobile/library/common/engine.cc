@@ -59,6 +59,9 @@ envoy_status_t Engine::run(const std::string config, const std::string log_level
           ASSERT(api_listener.has_value());
           http_dispatcher_->ready(server_->dispatcher(), server_->serverFactoryContext().scope(),
                                   api_listener.value());
+          if (callbacks_.on_engine_running != nullptr) {
+            callbacks_.on_engine_running(callbacks_.context);
+          }
         });
   } // mutex_
 
