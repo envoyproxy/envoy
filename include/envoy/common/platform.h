@@ -291,7 +291,7 @@ struct mmsghdr {
 
 // Used for retrieving TCP round-trip time.
 #if defined(__linux__)
-// On Linux, default listen backlog size to net.core.somaxconn which is runtime configurable
+// On Linux, default to the actual TCP_INFO defined in kernel's netinet/tcp.h header.
 #define ENVOY_TCP_INFO TCP_INFO
 #else
 // Define ENVOY_TCP_INFO to an unused value.
