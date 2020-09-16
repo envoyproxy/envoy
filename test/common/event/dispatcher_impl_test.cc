@@ -173,6 +173,49 @@ TEST_F(SchedulableCallbackImplTest, ScheduleChainingAndCancellation) {
   dispatcher_->run(Dispatcher::RunType::Block);
 }
 
+TEST_F(SchedulableCallbackImplTest, RescheduleNext) {
+  DispatcherImpl* dispatcher_impl = static_cast<DispatcherImpl*>(dispatcher_.get());
+  ReadyWatcher prepare_watcher;
+  evwatch_prepare_new(&dispatcher_impl->base(), onWatcherReady, &prepare_watcher);
+
+  ReadyWatcher watcher0;
+  createCallback([&]() {
+    watcher0.ready();
+    // Callback 1 was scheduled from the previous iteration, expect it to fire in the current
+    // iteration despite the attempt to reschedule.
+    callbacks_[1]->scheduleCallbackNextIteration();
+    // Callback 2 expected to execute next iteration because current because current called before
+    // next.
+    callbacks_[2]->scheduleCallbackCurrentIteration();
+    callbacks_[2]->scheduleCallbackNextIteration();
+    // Callback 3 expected to execute next iteration because next because next was called before
+    // current.
+    callbacks_[3]->scheduleCallbackNextIteration();
+    callbacks_[3]->scheduleCallbackCurrentIteration();
+  });
+
+  ReadyWatcher watcher1;
+  createCallback([&]() { watcher1.ready(); });
+  ReadyWatcher watcher2;
+  createCallback([&]() { watcher2.ready(); });
+  ReadyWatcher watcher3;
+  createCallback([&]() { watcher3.ready(); });
+
+  // Schedule callbacks 0 and 1 outside the loop, both will run in the same iteration of the event
+  // loop.
+  callbacks_[0]->scheduleCallbackCurrentIteration();
+  callbacks_[1]->scheduleCallbackNextIteration();
+
+  InSequence s;
+  EXPECT_CALL(prepare_watcher, ready());
+  EXPECT_CALL(watcher0, ready());
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(prepare_watcher, ready());
+  EXPECT_CALL(watcher3, ready());
+  dispatcher_->run(Dispatcher::RunType::Block);
+}
+
 class TestDeferredDeletable : public DeferredDeletable {
 public:
   TestDeferredDeletable(std::function<void()> on_destroy) : on_destroy_(on_destroy) {}
