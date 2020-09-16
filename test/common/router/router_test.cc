@@ -678,12 +678,11 @@ TEST_F(RouterTest, AddCookie) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
 
-  absl::string_view rc_details2 = "via_upstream";
-  EXPECT_CALL(callbacks_.stream_info_, setResponseCodeDetails(rc_details2));
-  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_EQ(callbacks_.details_, "via_upstream");
   // When the router filter gets reset we should cancel the pool request.
   router_.onDestroy();
 }
@@ -952,8 +951,6 @@ TEST_F(RouterTest, ResponseCodeDetailsSetByUpstream) {
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-  absl::string_view rc_details = StreamInfo::ResponseCodeDetails::get().ViaUpstream;
-  EXPECT_CALL(callbacks_.stream_info_, setResponseCodeDetails(rc_details));
   EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));

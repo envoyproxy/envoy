@@ -8,6 +8,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 #include "common/http/utility.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -352,7 +353,6 @@ void ActiveStreamDecoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  parent_.stream_info_.setResponseCodeDetails(details);
   parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, grpc_status, details);
 }
 
@@ -366,7 +366,9 @@ void ActiveStreamDecoderFilter::encode100ContinueHeaders(ResponseHeaderMapPtr&& 
   }
 }
 
-void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
+void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
+                                              absl::string_view details) {
+  parent_.stream_info_.setResponseCodeDetails(details);
   parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
   parent_.encodeHeaders(nullptr, *parent_.filter_manager_callbacks_.responseHeaders(), end_stream);
 }
@@ -769,10 +771,15 @@ FilterManager::commonDecodePrefix(ActiveStreamDecoderFilter* filter,
 }
 
 void FilterManager::sendLocalReply(
-    bool is_grpc_request, Code code, absl::string_view body,
+    bool old_was_grpc_request, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   const bool is_head_request = state_.is_head_request_;
+  bool is_grpc_request = old_was_grpc_request;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unify_grpc_handling")) {
+    is_grpc_request = state_.is_grpc_request_;
+  }
+
   stream_info_.setResponseCodeDetails(details);
 
   filter_manager_callbacks_.onLocalReply(code);
@@ -792,7 +799,6 @@ void FilterManager::sendLocalReply(
     //
     sendDirectLocalReply(code, body, modify_headers, state_.is_head_request_, grpc_status);
   } else {
-    stream_info_.setResponseCodeDetails(details);
     // If we land in this branch, response headers have already been sent to the client.
     // All we can do at this point is reset the stream.
     ENVOY_STREAM_LOG(debug, "Resetting stream due to {}. Prior headers have already been sent",

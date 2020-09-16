@@ -609,6 +609,7 @@ TEST(HttpUtility, SendLocalReply) {
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks, encodeData(_, true));
+  EXPECT_CALL(callbacks, streamInfo());
   Utility::sendLocalReply(
       is_reset, callbacks,
       Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
@@ -618,6 +619,7 @@ TEST(HttpUtility, SendLocalGrpcReply) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
 
+  EXPECT_CALL(callbacks, streamInfo());
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(), "200");
@@ -645,6 +647,7 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
 }
   )EOF";
 
+  EXPECT_CALL(callbacks, streamInfo());
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(), "200");
@@ -663,6 +666,7 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
 TEST(HttpUtility, RateLimitedGrpcStatus) {
   MockStreamDecoderFilterCallbacks callbacks;
 
+  EXPECT_CALL(callbacks, streamInfo()).Times(testing::AnyNumber());
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
@@ -691,6 +695,7 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
 
+  EXPECT_CALL(callbacks, streamInfo());
   EXPECT_CALL(callbacks, encodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() -> void {
     is_reset = true;
   }));
@@ -703,6 +708,7 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
 TEST(HttpUtility, SendLocalReplyHeadRequest) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
+  EXPECT_CALL(callbacks, streamInfo());
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getContentLengthValue(), fmt::format("{}", strlen("large")));

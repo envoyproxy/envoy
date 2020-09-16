@@ -14,3 +14,12 @@ table.docutils div.line-block {
   overflow-wrap: break-word;
   max-width: 1000px;
 }
+
+/* To style the API version label of a search result item */
+.api-version-label {
+  border-radius: 20%;
+  background-color: #c0c0c0;
+  color: #ffffff;
+  margin-left: 4px;
+  padding: 4px;
+}

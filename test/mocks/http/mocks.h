@@ -176,7 +176,10 @@ public:
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
     encode100ContinueHeaders_(*headers);
   }
-  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override {
+  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
+                     absl::string_view details) override {
+    details_ = details;
+    stream_info_.setResponseCodeDetails(details);
     encodeHeaders_(*headers, end_stream);
   }
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override { encodeTrailers_(*trailers); }
@@ -207,6 +210,7 @@ public:
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
   testing::NiceMock<MockScopedTrackedObject> scope_;
+  // TODO(alyssawilk) remove this and use stream info consistently.
   std::string details_;
   bool is_grpc_request_{};
   bool is_head_request_{false};
