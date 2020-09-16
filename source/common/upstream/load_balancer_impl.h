@@ -108,7 +108,7 @@ protected:
 
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
-  std::list<uint64_t> stashed_random_;
+  std::deque<uint64_t> stashed_random_;
   Random::RandomGenerator& random_;
   const uint32_t default_healthy_panic_percent_;
   // The priority-ordered set of hosts to use for load balancing.
@@ -401,7 +401,7 @@ private:
   virtual void refreshHostSource(const HostsSource& source) PURE;
   virtual double hostWeight(const Host& host) PURE;
   virtual HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
-                                                const HostsSource& source) const PURE;
+                                                const HostsSource& source) PURE;
   virtual HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                                 const HostsSource& source) PURE;
 
@@ -436,13 +436,12 @@ private:
   }
   double hostWeight(const Host& host) override { return host.weight(); }
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
-                                        const HostsSource& source) const override {
-    uint64_t* peekahead_index = const_cast<uint64_t*>(&peekahead_index_);
+                                        const HostsSource& source) override {
     auto i = rr_indexes_.find(source);
     if (i == rr_indexes_.end()) {
       return nullptr;
     }
-    return hosts_to_use[(i->second + (*peekahead_index)++) % hosts_to_use.size()];
+    return hosts_to_use[(i->second + (peekahead_index_)++) % hosts_to_use.size()];
   }
 
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
@@ -547,7 +546,7 @@ private:
            std::pow(host.stats().rq_active_.value() + 1, active_request_bias_);
   }
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
-                                        const HostsSource& source) const override;
+                                        const HostsSource& source) override;
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
 
@@ -575,6 +574,9 @@ public:
   // Upstream::LoadBalancerBase
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
+
+protected:
+  HostConstSharedPtr peekOrChoose(LoadBalancerContext* context, bool peek);
 };
 
 /**

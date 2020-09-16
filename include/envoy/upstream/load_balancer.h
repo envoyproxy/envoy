@@ -101,7 +101,7 @@ public:
   virtual HostConstSharedPtr chooseHost(LoadBalancerContext* context) PURE;
 
   /**
-   * Returns a best effort prediction the Nth host to be picked, or nullptr if not predictable.
+   * Returns a best effort prediction of the next host to be picked, or nullptr if not predictable.
    * Advances with subsequent calls, so while the first call will return the next host to be picked,
    * a subsequent call will return the second host to be picked.
    * @param context supplies the context which is used in host selection.

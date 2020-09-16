@@ -827,7 +827,7 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
 }
 
 HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPeek(const HostVector&,
-                                                                const HostsSource&) const {
+                                                                const HostsSource&) {
   // LeastRequestLoadBalancer can not do deterministic prefetching, because
   // any other thread might select the least-requested-host between prefetch and
   // host-pick, and change the rq_active checks.
@@ -858,22 +858,15 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
 }
 
 HostConstSharedPtr RandomLoadBalancer::peekAnotherHost(LoadBalancerContext* context) {
-  uint64_t random_hash = random(true);
-  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random_hash);
-  if (!hosts_source) {
-    return nullptr;
-  }
-
-  const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
-  if (hosts_to_use.empty()) {
-    return nullptr;
-  }
-
-  return hosts_to_use[random_hash % hosts_to_use.size()];
+  return peekOrChoose(context, true);
 }
 
 HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* context) {
-  uint64_t random_hash = random(false);
+  return peekOrChoose(context, false);
+}
+
+HostConstSharedPtr RandomLoadBalancer::peekOrChoose(LoadBalancerContext* context, bool peek) {
+  uint64_t random_hash = random(peek);
   const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random_hash);
   if (!hosts_source) {
     return nullptr;
