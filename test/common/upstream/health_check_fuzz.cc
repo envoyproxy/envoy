@@ -37,11 +37,6 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
     break;
   }
   case envoy::config::core::v3::HealthCheck::kTcpHealthCheck: {
-    if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
-      //delete tcp_test_base_;
-      return;
-      //tcp_test_base_->interval_timer_->invokeCallback(); //This calls timeout timer callback haha
-    }
     type_ = HealthCheckFuzz::Type::TCP;
     tcp_test_base_ = new TcpHealthCheckerImplTestBase;
     initializeAndReplayTcp(input);
@@ -58,7 +53,6 @@ void HealthCheckFuzz::initializeAndReplayHttp(test::common::upstream::HealthChec
   try {
     allocHttpHealthCheckerFromProto(input.health_check_config());
   } catch (EnvoyException& e) {
-    delete http_test_base_;
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     return;
   }
@@ -91,9 +85,13 @@ void HealthCheckFuzz::initializeAndReplayTcp(test::common::upstream::HealthCheck
   try {
     allocTcpHealthCheckerFromProto(input.health_check_config());
   } catch (EnvoyException& e) {
-    delete tcp_test_base_;
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     return;
+  }
+  if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
+      //delete tcp_test_base_;
+      return;
+      //tcp_test_base_->interval_timer_->invokeCallback(); //This calls timeout timer callback haha
   }
   tcp_test_base_->cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(tcp_test_base_->cluster_->info_, "tcp://127.0.0.1:80")};
@@ -178,6 +176,9 @@ void HealthCheckFuzz::triggerIntervalTimerHttp(bool expect_client_create) {
     ENVOY_LOG_MISC(trace, "Interval timer is disabled. Skipping trigger interval timer.");
     return;
   }
+  if (expect_client_create) {
+    http_test_base_->expectClientCreate(0);
+  }
   http_test_base_->expectStreamCreate(0);
   ENVOY_LOG_MISC(trace, "Triggered interval timer");
   http_test_base_->test_sessions_[0]->interval_timer_->invokeCallback();
@@ -188,13 +189,6 @@ void HealthCheckFuzz::triggerIntervalTimerTcp() {
     ENVOY_LOG_MISC(trace, "Interval timer is disabled. Skipping trigger interval timer.");
     return;
   }
-<<<<<<< HEAD
-=======
-  if (expect_client_create) {
-    expectClientCreate(0);
-  }
-  expectStreamCreate(0);
->>>>>>> health-check-fuzz
   ENVOY_LOG_MISC(trace, "Triggered interval timer");
   tcp_test_base_->interval_timer_->invokeCallback();
 }
