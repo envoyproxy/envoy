@@ -1864,6 +1864,8 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():tlsVersion())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():urlEncodedPemEncodedPeerCertificate())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():urlEncodedPemEncodedPeerCertificateChain())
+
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():sessionId())
       end
     end
   )EOF"};
@@ -1951,6 +1953,10 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
   EXPECT_CALL(*connection_info, urlEncodedPemEncodedPeerCertificateChain())
       .WillOnce(ReturnRef(peer_cert_chain));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(peer_cert_chain)));
+
+  const std::string id = "12345";
+  EXPECT_CALL(*connection_info, sessionId()).WillRepeatedly(ReturnRef(id));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(id)));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }

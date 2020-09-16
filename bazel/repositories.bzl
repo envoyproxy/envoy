@@ -12,6 +12,7 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.tracers.lightstep",
     "envoy.tracers.datadog",
     "envoy.tracers.opencensus",
+    "envoy.watchdog.abort_action",
 ]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
@@ -674,8 +675,6 @@ def _com_github_curl():
         build_file_content = BUILD_ALL_CONTENT + """
 cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
 """,
-        patches = ["@envoy//bazel/foreign_cc:curl-revert-cmake-minreqver.patch"],
-        patch_args = ["-p1"],
         **location
     )
     native.bind(
