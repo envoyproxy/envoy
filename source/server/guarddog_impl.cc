@@ -103,14 +103,14 @@ void GuardDogImpl::step() {
       if (watched_dog->dog_->touchCount() > 0) {
         // Watchdog was touched since the guard dog last checked; update time and reset the count.
         watched_dog->dog_->resetTouchCount();
-        watched_dog->last_touch_time_ = now;
+        watched_dog->last_checkin_ = now;
         continue;
       }
 
-      const auto ltt = watched_dog->last_touch_time_;
+      const auto last_checkin = watched_dog->last_checkin_;
       const auto tid = watched_dog->dog_->threadId();
-      const auto delta = now - ltt;
-      if (watched_dog->last_alert_time_ && watched_dog->last_alert_time_.value() < ltt) {
+      const auto delta = now - last_checkin;
+      if (watched_dog->last_alert_time_ && watched_dog->last_alert_time_.value() < last_checkin) {
         watched_dog->miss_alerted_ = false;
         watched_dog->megamiss_alerted_ = false;
       }
@@ -118,28 +118,28 @@ void GuardDogImpl::step() {
         if (!watched_dog->miss_alerted_) {
           watchdog_miss_counter_.inc();
           watched_dog->miss_counter_.inc();
-          watched_dog->last_alert_time_ = ltt;
+          watched_dog->last_alert_time_ = last_checkin;
           watched_dog->miss_alerted_ = true;
-          miss_threads.emplace_back(tid, ltt);
+          miss_threads.emplace_back(tid, last_checkin);
         }
       }
       if (delta > megamiss_timeout_) {
         if (!watched_dog->megamiss_alerted_) {
           watchdog_megamiss_counter_.inc();
           watched_dog->megamiss_counter_.inc();
-          watched_dog->last_alert_time_ = ltt;
+          watched_dog->last_alert_time_ = last_checkin;
           watched_dog->megamiss_alerted_ = true;
-          mega_miss_threads.emplace_back(tid, ltt);
+          mega_miss_threads.emplace_back(tid, last_checkin);
         }
       }
       if (killEnabled() && delta > kill_timeout_) {
-        invokeGuardDogActions(WatchDogAction::KILL, {{tid, ltt}}, now);
+        invokeGuardDogActions(WatchDogAction::KILL, {{tid, last_checkin}}, now);
 
         PANIC(fmt::format("GuardDog: one thread ({}) stuck for more than watchdog_kill_timeout",
                           watched_dog->dog_->threadId().debugString()));
       }
       if (multikillEnabled() && delta > multi_kill_timeout_) {
-        multi_kill_threads.emplace_back(tid, ltt);
+        multi_kill_threads.emplace_back(tid, last_checkin);
 
         if (multi_kill_threads.size() >= required_for_multi_kill) {
           invokeGuardDogActions(WatchDogAction::MULTIKILL, multi_kill_threads, now);
@@ -218,11 +218,12 @@ void GuardDogImpl::stop() {
 
 void GuardDogImpl::invokeGuardDogActions(
     WatchDogAction::WatchdogEvent event,
-    std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs, MonotonicTime now) {
+    std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_last_checkin_pairs,
+    MonotonicTime now) {
   const auto& registered_actions = events_to_actions_.find(event);
   if (registered_actions != events_to_actions_.end()) {
     for (auto& action : registered_actions->second) {
-      action->run(event, thread_ltt_pairs, now);
+      action->run(event, thread_last_checkin_pairs, now);
     }
   }
 }

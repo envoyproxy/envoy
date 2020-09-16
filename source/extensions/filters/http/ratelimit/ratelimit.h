@@ -31,6 +31,11 @@ namespace RateLimitFilter {
 enum class FilterRequestType { Internal, External, Both };
 
 /**
+ * Type of virtual host rate limit options
+ */
+enum class VhRateLimitOptions { Override, Include, Ignore };
+
+/**
  * Global configuration for the HTTP rate limit filter.
  */
 class FilterConfig {
@@ -92,6 +97,22 @@ private:
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
+public:
+  FilterConfigPerRoute(
+      const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute& config)
+      : vh_rate_limits_(config.vh_rate_limits()) {}
+
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
+  virtualHostRateLimits() const {
+    return vh_rate_limits_;
+  }
+
+private:
+  const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
+      vh_rate_limits_;
+};
+
 /**
  * HTTP rate limit filter. Depending on the route configuration, this filter calls the global
  * rate limiting service before allowing further filter iteration.
@@ -134,6 +155,7 @@ private:
                                     const Http::HeaderMap& headers) const;
   void populateResponseHeaders(Http::HeaderMap& response_headers);
   void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
+  VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
 
   Http::Context& httpContext() { return config_->httpContext(); }
 
@@ -143,6 +165,7 @@ private:
   Filters::Common::RateLimit::ClientPtr client_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   State state_{State::NotStarted};
+  VhRateLimitOptions vh_rate_limits_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;
