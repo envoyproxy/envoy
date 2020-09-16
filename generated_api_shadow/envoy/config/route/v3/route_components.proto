@@ -338,7 +338,9 @@ message WeightedCluster {
 
     // Specifies a list of HTTP headers that should be removed from each request when
     // this cluster is selected through the enclosing :ref:`envoy_api_msg_config.route.v3.RouteAction`.
-    repeated string request_headers_to_remove = 9;
+    repeated string request_headers_to_remove = 9 [(validate.rules).repeated = {
+      items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
+    }];
 
     // Specifies a list of headers to be added to responses when this cluster is selected
     // through the enclosing :ref:`envoy_api_msg_config.route.v3.RouteAction`.
@@ -352,7 +354,9 @@ message WeightedCluster {
 
     // Specifies a list of headers to be removed from responses when this cluster is selected
     // through the enclosing :ref:`envoy_api_msg_config.route.v3.RouteAction`.
-    repeated string response_headers_to_remove = 6;
+    repeated string response_headers_to_remove = 6 [(validate.rules).repeated = {
+      items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
+    }];
 
     // The per_filter_config field can be used to provide weighted cluster-specific
     // configurations for filters. The key should match the filter name, such as
@@ -441,7 +445,7 @@ message RouteMatch {
     // (WebSocket and the like) as they are normalized in Envoy as HTTP/1.1 style
     // upgrades.
     // This is the only way to match CONNECT requests for HTTP/1.1. For HTTP/2,
-    // where CONNECT requests may have a path, the path matchers will work if
+    // where Extended CONNECT requests may have a path, the path matchers will work if
     // there is a path present.
     // Note that CONNECT support is currently considered alpha in Envoy.
     // [#comment:TODO(htuch): Replace the above comment with an alpha tag.
@@ -454,7 +458,7 @@ message RouteMatch {
     ];
   }
 
-  // Indicates that prefix/path matching should be case insensitive. The default
+  // Indicates that prefix/path matching should be case sensitive. The default
   // is true.
   google.protobuf.BoolValue case_sensitive = 4;
 
@@ -557,7 +561,7 @@ message CorsPolicy {
       [deprecated = true, (validate.rules).repeated = {items {string {max_bytes: 1024}}}];
 }
 
-// [#next-free-field: 36]
+// [#next-free-field: 37]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -771,6 +775,31 @@ message RouteAction {
     ConnectConfig connect_config = 3;
   }
 
+  // [#not-implemented-hide:]
+  message MaxStreamDuration {
+    // Specifies the maximum duration allowed for streams on the route. If not specified, the value
+    // from the :ref:`max_stream_duration
+    // <envoy_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>` field in
+    // :ref:`HttpConnectionManager.common_http_protocol_options
+    // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options>`
+    // is used.
+    google.protobuf.Duration max_stream_duration = 1;
+
+    // If present, and the request contains a `grpc-timeout header
+    // <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_, use that value as the
+    // *max_stream_duration*, but limit the applied timeout to the maximum value specified here.
+    // If set to 0, the `grpc-timeout` header is used without modification.
+    google.protobuf.Duration grpc_max_timeout = 2;
+
+    // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by
+    // subtracting the provided duration from the header. This is useful for allowing Envoy to set
+    // its global timeout to be less than that of the deadline imposed by the calling client, which
+    // makes it more likely that Envoy will handle the timeout instead of having the call canceled
+    // by the client. If, after applying the offset, the resulting timeout is zero or negative,
+    // the stream will timeout immediately.
+    google.protobuf.Duration grpc_timeout_offset = 3;
+  }
+
   reserved 12, 18, 19, 16, 22, 21;
 
   oneof cluster_specifier {
@@ -977,7 +1006,9 @@ message RouteAction {
   // limits. By default, if the route configured rate limits, the virtual host
   // :ref:`rate_limits <envoy_api_field_config.route.v3.VirtualHost.rate_limits>` are not applied to the
   // request.
-  google.protobuf.BoolValue include_vh_rate_limits = 14;
+  //
+  // This field is deprecated. Please use :ref:`vh_rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits>`
+  google.protobuf.BoolValue include_vh_rate_limits = 14 [deprecated = true];
 
   // Specifies a list of hash policies to use for ring hash load balancing. Each
   // hash policy is evaluated individually and the combined result is used to
@@ -1056,6 +1087,10 @@ message RouteAction {
   // it'll take precedence over the virtual host level hedge policy entirely
   // (e.g.: policies are not merged, most internal one becomes the enforced policy).
   HedgePolicy hedge_policy = 27;
+
+  // Specifies the maximum stream duration for this route.
+  // [#not-implemented-hide:]
+  MaxStreamDuration max_stream_duration = 36;
 
   RequestMirrorPolicy hidden_envoy_deprecated_request_mirror_policy = 10 [deprecated = true];
 }

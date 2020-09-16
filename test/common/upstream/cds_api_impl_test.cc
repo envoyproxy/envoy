@@ -13,7 +13,8 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -39,7 +40,7 @@ protected:
     cds_ = CdsApiImpl::create(cds_config, cm_, store_, validation_visitor_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
-    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
+    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_, _));
     cds_->initialize();
     cds_callbacks_ = cm_.subscription_factory_.callbacks_;
   }

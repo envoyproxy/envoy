@@ -60,6 +60,7 @@ public:
   MOCK_METHOD(void, close, (ConnectionCloseType type));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(uint64_t, id, (), (const));
+  MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&), (const));
   MOCK_METHOD(bool, initializeReadFilters, ());
   MOCK_METHOD(std::string, nextProtocol, (), (const));
   MOCK_METHOD(void, noDelay, (bool enable));
@@ -106,6 +107,7 @@ public:
   MOCK_METHOD(void, close, (ConnectionCloseType type));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(uint64_t, id, (), (const));
+  MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&), (const));
   MOCK_METHOD(bool, initializeReadFilters, ());
   MOCK_METHOD(std::string, nextProtocol, (), (const));
   MOCK_METHOD(void, noDelay, (bool enable));
@@ -155,6 +157,7 @@ public:
   MOCK_METHOD(void, close, (ConnectionCloseType type));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(uint64_t, id, (), (const));
+  MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&), (const));
   MOCK_METHOD(bool, initializeReadFilters, ());
   MOCK_METHOD(std::string, nextProtocol, (), (const));
   MOCK_METHOD(void, noDelay, (bool enable));

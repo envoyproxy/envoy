@@ -237,7 +237,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
   // before tcp_client starts writing.
   tcp_client->waitForHalfClose();
 
-  ASSERT_TRUE(tcp_client->write(data, true));
+  ASSERT_TRUE(tcp_client->write(data, true, true, std::chrono::milliseconds(30000)));
 
   test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
   ASSERT_TRUE(fake_upstream_connection->readDisable(false));
@@ -604,7 +604,6 @@ TEST_P(TcpProxyIntegrationTest, TestCloseOnHealthFailure) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(10));
 
   ASSERT_TRUE(fake_upstream_health_connection->waitForData(8));
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   ASSERT_TRUE(fake_upstream_health_connection->close());
   ASSERT_TRUE(fake_upstream_health_connection->waitForDisconnect());
 

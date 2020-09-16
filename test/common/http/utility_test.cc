@@ -421,6 +421,39 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
   }
 }
 
+TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
+  envoy::config::core::v3::Http1ProtocolOptions http1_options;
+  Protobuf::BoolValue hcm_value;
+
+  // nothing explicitly configured, default to false (i.e. default stream error behavior for HCM)
+  EXPECT_FALSE(
+      Utility::parseHttp1Settings(http1_options, hcm_value).stream_error_on_invalid_http_message_);
+
+  // http1_options.stream_error overrides HCM.stream_error
+  http1_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
+  hcm_value.set_value(false);
+  EXPECT_TRUE(
+      Utility::parseHttp1Settings(http1_options, hcm_value).stream_error_on_invalid_http_message_);
+
+  // http1_options.stream_error overrides HCM.stream_error (flip boolean value)
+  http1_options.mutable_override_stream_error_on_invalid_http_message()->set_value(false);
+  hcm_value.set_value(true);
+  EXPECT_FALSE(
+      Utility::parseHttp1Settings(http1_options, hcm_value).stream_error_on_invalid_http_message_);
+
+  http1_options.clear_override_stream_error_on_invalid_http_message();
+
+  // fallback to HCM.stream_error
+  hcm_value.set_value(true);
+  EXPECT_TRUE(
+      Utility::parseHttp1Settings(http1_options, hcm_value).stream_error_on_invalid_http_message_);
+
+  // fallback to HCM.stream_error (flip boolean value)
+  hcm_value.set_value(false);
+  EXPECT_FALSE(
+      Utility::parseHttp1Settings(http1_options, hcm_value).stream_error_on_invalid_http_message_);
+}
+
 TEST(HttpUtility, getLastAddressFromXFF) {
   {
     const std::string first_address = "192.0.2.10";
@@ -576,6 +609,7 @@ TEST(HttpUtility, SendLocalReply) {
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks, encodeData(_, true));
+  EXPECT_CALL(callbacks, streamInfo());
   Utility::sendLocalReply(
       is_reset, callbacks,
       Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
@@ -585,6 +619,7 @@ TEST(HttpUtility, SendLocalGrpcReply) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
 
+  EXPECT_CALL(callbacks, streamInfo());
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(), "200");
@@ -612,6 +647,7 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
 }
   )EOF";
 
+  EXPECT_CALL(callbacks, streamInfo());
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(), "200");
@@ -630,6 +666,7 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
 TEST(HttpUtility, RateLimitedGrpcStatus) {
   MockStreamDecoderFilterCallbacks callbacks;
 
+  EXPECT_CALL(callbacks, streamInfo()).Times(testing::AnyNumber());
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
@@ -658,6 +695,7 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
 
+  EXPECT_CALL(callbacks, streamInfo());
   EXPECT_CALL(callbacks, encodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() -> void {
     is_reset = true;
   }));
@@ -670,6 +708,7 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
 TEST(HttpUtility, SendLocalReplyHeadRequest) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
+  EXPECT_CALL(callbacks, streamInfo());
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getContentLengthValue(), fmt::format("{}", strlen("large")));
@@ -714,6 +753,13 @@ TEST(HttpUtility, TestExtractHostPathFromUri) {
   Utility::extractHostPathFromUri("/:/adsf", host, path);
   EXPECT_EQ(host, "");
   EXPECT_EQ(path, "/:/adsf");
+}
+
+TEST(HttpUtility, LocalPathFromFilePath) {
+  EXPECT_EQ("/", Utility::localPathFromFilePath(""));
+  EXPECT_EQ("c:/", Utility::localPathFromFilePath("c:/"));
+  EXPECT_EQ("Z:/foo/bar", Utility::localPathFromFilePath("Z:/foo/bar"));
+  EXPECT_EQ("/foo/bar", Utility::localPathFromFilePath("foo/bar"));
 }
 
 TEST(HttpUtility, TestPrepareHeaders) {
