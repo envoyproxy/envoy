@@ -351,19 +351,18 @@ TEST_F(FileSystemImplTest, ExistingReadOnlyFileAndWrite) {
   EXPECT_EQ("existing file", contents);
 }
 
-TEST(FileSystemImplTest, TestIoFileError) {
+TEST_F(FileSystemImplTest, TestIoFileError) {
   IoFileError error1(HANDLE_ERROR_PERM);
   EXPECT_EQ(IoFileError::IoErrorCode::Permission, error1.getErrorCode());
   EXPECT_EQ(errorDetails(HANDLE_ERROR_PERM), error1.getErrorDetails());
 
-
   IoFileError error2(HANDLE_ERROR_INVALID);
-  EXPECT_EQ(IoFileError::IoErrorCode::BadFd, error1.getErrorCode());
-  EXPECT_EQ(errorDetails(HANDLE_ERROR_PERM), error1.getErrorDetails());
+  EXPECT_EQ(IoFileError::IoErrorCode::BadFd, error2.getErrorCode());
+  EXPECT_EQ(errorDetails(HANDLE_ERROR_INVALID), error2.getErrorDetails());
 
   int not_known_error = 42;
   IoFileError error3(not_known_error);
-  EXPECT_EQ(IoFileError::IoErrorCode::UnknownError, error1.getErrorCode());
+  EXPECT_EQ(IoFileError::IoErrorCode::UnknownError, error3.getErrorCode());
 }
 
 } // namespace Filesystem

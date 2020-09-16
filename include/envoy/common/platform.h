@@ -61,7 +61,7 @@ typedef ptrdiff_t ssize_t;
 typedef uint32_t mode_t;
 
 typedef SOCKET os_fd_t;
-using os_h_t = HANDLE;
+typedef HANDLE os_h_t;
 
 typedef unsigned int sa_family_t;
 
@@ -211,7 +211,7 @@ constexpr absl::string_view null_device_path{"NUL"};
 #endif
 
 typedef int os_fd_t;
-using os_h_t = int;
+typedef int os_h_t;
 
 #define INVALID_HANDLE -1
 #define INVALID_SOCKET -1
