@@ -296,8 +296,8 @@ struct mmsghdr {
 #else
 // Define ENVOY_TCP_INFO to an unused value.
 #define ENVOY_TCP_INFO -1
-// Define tcp_info to an empty struct.
+// Define tcp_info to a struct with just the fields needed to compile on other platforms.
 struct tcp_info {
-  uint32_t empty;
+  uint32_t tcpi_rtt;
 };
 #endif
