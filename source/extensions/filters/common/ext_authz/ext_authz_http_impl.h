@@ -63,8 +63,7 @@ private:
 class ClientConfig {
 public:
   ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-               bool timeout_starts_at_check_creation, uint32_t timeout,
-               absl::string_view path_prefix);
+               uint32_t timeout, absl::string_view path_prefix);
 
   /**
    * Returns the name of the authorization cluster.
@@ -117,7 +116,6 @@ public:
    * Returns the configured request header parser.
    */
   const Router::HeaderParser& requestHeaderParser() const { return *request_headers_parser_; }
-  bool timeoutStartsAtCheckCreation() const { return timeout_starts_at_check_creation_; }
 
 private:
   static MatcherSharedPtr
@@ -137,7 +135,6 @@ private:
   const MatcherSharedPtr upstream_header_to_append_matchers_;
   const Http::LowerCaseStrPairVector authorization_headers_to_add_;
   const std::string cluster_name_;
-  const bool timeout_starts_at_check_creation_;
   const std::chrono::milliseconds timeout_;
   const std::string path_prefix_;
   const std::string tracing_name_;

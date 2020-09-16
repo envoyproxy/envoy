@@ -126,8 +126,7 @@ bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher
 
 // Config
 ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-                           bool timeout_starts_at_check_creation, uint32_t timeout,
-                           absl::string_view path_prefix)
+                           uint32_t timeout, absl::string_view path_prefix)
     : enable_case_sensitive_string_matcher_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher")),
       request_header_matchers_(
@@ -142,8 +141,7 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
       upstream_header_to_append_matchers_(toUpstreamMatchers(
           config.http_service().authorization_response().allowed_upstream_headers_to_append(),
           enable_case_sensitive_string_matcher_)),
-      cluster_name_(config.http_service().server_uri().cluster()),
-      timeout_starts_at_check_creation_(timeout_starts_at_check_creation), timeout_(timeout),
+      cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
       path_prefix_(path_prefix),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
       request_headers_parser_(Router::HeaderParser::configure(
@@ -273,7 +271,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& di
                        .setParentSpan(parent_span)
                        .setChildSpanName(config_->tracingName());
 
-    if (config_->timeoutStartsAtCheckCreation()) {
+    if (timeoutStartsAtCheckCreation()) {
       timeout_timer_ = dispatcher.createTimer([this]() -> void { onTimeout(); });
       timeout_timer_->enableTimer(config_->timeout());
     } else {

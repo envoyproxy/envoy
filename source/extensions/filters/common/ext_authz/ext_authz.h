@@ -12,6 +12,7 @@
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/http_tracer.h"
 
+#include "common/runtime/runtime_features.h"
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -107,6 +108,15 @@ public:
   virtual void check(RequestCallbacks& callback, Event::Dispatcher& dispatcher,
                      const envoy::service::auth::v3::CheckRequest& request,
                      Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) PURE;
+
+protected:
+  /**
+   * @return should we start the request time out when the check request is created.
+   */
+  static bool timeoutStartsAtCheckCreation() {
+    return Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.ext_authz_measure_timeout_on_check_created");
+  }
 };
 
 using ClientPtr = std::unique_ptr<Client>;

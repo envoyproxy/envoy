@@ -351,11 +351,9 @@ attributes:
 
   void expectCheckRequestTimedout(bool timeout_on_check) {
     setMeasureTimeoutOnCheckCreated(this->config_helper_, timeout_on_check);
-    // we are timing out, so we will have an unexpected disconnect.
     initializeConfig(true);
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
     HttpIntegrationTest::initialize();
-    fake_upstreams_.back()->set_allow_unexpected_disconnects(true);
     initiateClientConnection(4);
 
     response_->waitForEndStream();
@@ -524,10 +522,8 @@ public:
 
   void expectCheckRequestTimedout(bool timeout_on_check) {
     setMeasureTimeoutOnCheckCreated(this->config_helper_, timeout_on_check);
-    // we are timing out, so we will have an unexpected disconnect.
     initializeConfig(true);
     HttpIntegrationTest::initialize();
-    fake_upstreams_.back()->set_allow_unexpected_disconnects(true);
     initiateClientConnection();
 
     response_->waitForEndStream();

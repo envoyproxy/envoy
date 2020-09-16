@@ -30,8 +30,9 @@ void Filter::callCheck() {
   config_->stats().total_.inc();
 
   calling_check_ = true;
-  client_->check(*this, check_request_, Tracing::NullSpan::instance(),
-                 filter_callbacks_->connection().streamInfo());
+  auto& connection = filter_callbacks_->connection();
+  client_->check(*this, connection.dispatcher(), check_request_, Tracing::NullSpan::instance(),
+                 connection.streamInfo());
   calling_check_ = false;
 }
 
