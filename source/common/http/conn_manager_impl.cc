@@ -1494,8 +1494,9 @@ void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
 
 void ConnectionManagerImpl::ActiveStream::onRequestDataTooLarge() {
   connection_manager_.stats_.named_.downstream_rq_too_large_.inc();
-  filter_manager_.sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
-      Code::PayloadTooLarge, CodeUtility::toString(Code::PayloadTooLarge), nullptr, absl::nullopt,
+  filter_manager_.sendLocalReply(
+      Grpc::Common::hasGrpcContentType(*request_headers_), Code::PayloadTooLarge,
+      CodeUtility::toString(Code::PayloadTooLarge), nullptr, absl::nullopt,
       StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
 }
 

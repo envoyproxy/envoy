@@ -79,11 +79,10 @@ public:
 
 class RouterUpstreamLogTest : public testing::Test {
 public:
-
-~RouterUpstreamLogTest() {
-  EXPECT_CALL(callbacks_.dispatcher_, clearDeferredDeleteList());
-  callbacks_.dispatcher_.clearDeferredDeleteList();
-}
+  ~RouterUpstreamLogTest() {
+    EXPECT_CALL(callbacks_.dispatcher_, clearDeferredDeleteList());
+    callbacks_.dispatcher_.clearDeferredDeleteList();
+  }
   void init(absl::optional<envoy::config::accesslog::v3::AccessLog> upstream_log) {
     envoy::extensions::filters::http::router::v3::Router router_proto;
 
