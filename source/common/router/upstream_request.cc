@@ -271,14 +271,6 @@ void UpstreamRequestFilter::enableDataFromDownstreamForFlowControl() {
   }
 }
 void UpstreamRequestFilter::onDestroy() {
-  if (!parent_.decode_complete_) {
-    if (conn_pool_->cancelAnyPendingStream()) {
-      ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.parent_.callbacks());
-      // TODO(snowp): Do we need to reset the upstream here?
-      //  ASSERT(!upstream_);
-    }
-  }
-
   // If desired, fire the per-try histogram when the UpstreamRequest
   // completes.
   if (parent_.record_timeout_budget_) {
@@ -465,10 +457,6 @@ void UpstreamRequestFilter::ActiveUpstreamRequest::onResetStream(
                                   Http::Utility::resetReasonToString(reason));
   }
 
-  if (parent_.conn_pool_->cancelAnyPendingStream()) {
-    ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.parent_.parent_.callbacks());
-    ASSERT(!parent_.upstream_);
-  }
   parent_.clearRequestEncoder();
   parent_.parent_.awaiting_headers_ = false;
   if (!parent_.calling_encode_headers_) {
