@@ -33,8 +33,9 @@ IoHandlePtr TestIoSocketHandle::accept(struct sockaddr* addr, socklen_t* addrlen
   return std::make_unique<TestIoSocketHandle>(writev_override_, result.rc_, socket_v6only_);
 }
 
-IoHandlePtr TestSocketInterface::makeSocket(int socket_fd, bool socket_v6only) const {
-  return std::make_unique<TestIoSocketHandle>(writev_override_proc_, socket_fd, socket_v6only);
+IoHandlePtr TestSocketInterface::makeSocket(int socket_fd, bool socket_v6only, int domain) const {
+  return std::make_unique<TestIoSocketHandle>(writev_override_proc_, socket_fd, socket_v6only,
+                                              domain);
 }
 
 } // namespace Network
