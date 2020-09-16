@@ -1132,6 +1132,36 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
   const auto second_match =
       socket_matchers[1]->resolve(second_health_checker_base->transportSocketMatchMetadata().get());
   EXPECT_EQ(second_match.name_, "test_socket");
+
+  // Create a new Message, this we leave the transport socket the same but change the health check's
+  // filter. This means that the health checker changes but the transport_socket_matches in the
+  // ClusterHealthCheck does not.
+  message.reset(createSimpleMessage());
+  add_transport_socket_matches(message->mutable_cluster_health_checks(0), "test_match",
+                               "something_new");
+
+  hds_delegate_->onReceiveMessage(std::move(message));
+  // Get our new health checker to match against.
+  const auto third_clusters = hds_delegate_->hdsClusters();
+  ASSERT_EQ(third_clusters.size(), 1);
+  // Check that this new pointer is actually the same pointer to the first cluster.
+  ASSERT_EQ(third_clusters[0], first_clusters[0]);
+  const auto third_hcs = third_clusters[0]->healthCheckers();
+  ASSERT_EQ(third_hcs.size(), 1);
+
+  // Check that since we made a change to our HC, it is a new pointer.
+  EXPECT_TRUE(first_hcs[0] != third_hcs[0]);
+
+  HealthCheckerImplBase* third_health_checker_base =
+      dynamic_cast<HealthCheckerImplBase*>(third_hcs[0].get());
+
+  // Check that our socket matchers is still a size 2. This is because createClusterInfo(_) is never
+  // called again since there was no update to transportSocketMatches.
+  ASSERT_EQ(socket_matchers.size(), 2);
+  const auto third_match =
+      socket_matchers[1]->resolve(third_health_checker_base->transportSocketMatchMetadata().get());
+  // Since this again does not match, it uses default.
+  EXPECT_EQ(third_match.name_, "default");
 }
 
 } // namespace Upstream
