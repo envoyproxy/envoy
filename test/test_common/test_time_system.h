@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/time.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 
 #include "common/common/assert.h"
@@ -48,13 +49,14 @@ public:
   /**
    * Advances time forward by the specified duration, running any timers
    * scheduled to fire, and blocking until the timer callbacks are complete.
-   * See also advanceTimeAsync(), which does not block.
+   * See also advanceTimeAndRun(), which provides the option to run a specific
+   * dispatcher or scheduler after advancing the time.
    *
    * This function should be used in multi-threaded tests, where other
    * threads are running dispatcher loops. Integration tests should usually
    * use this variant.
    *
-   * @param duration The amount of time to sleep.
+   * @param duration The amount of time to advance.
    */
   virtual void advanceTimeWaitImpl(const Duration& duration) PURE;
   template <class D> void advanceTimeWait(const D& duration = false) {
@@ -62,20 +64,32 @@ public:
   }
 
   /**
-   * Advances time forward by the specified duration. Timers may be triggered on
-   * their threads, but unlike advanceTimeWait(), this method does not block
-   * waiting for them to complete.
+   * Advances time forward by the specified duration. Timers on event loops outside the current
+   * thread may trigger, but unlike advanceTimeWait(), this method does not block waiting for them
+   * to complete. This method also takes in a parameter the dispatcher or scheduler for the current
+   * thread, which will be run in the requested mode after advancing the time forward.
    *
-   * This function should be used in single-threaded tests, in scenarios where
-   * after time is advanced, the main test thread will run a dispatcher
-   * loop. Unit tests will often use this variant.
+   * This function should be used in single-threaded tests that want to advance time and then run
+   * the test thread event loop. Unit tests will often use this variant.
    *
-   * @param duration The amount of time to sleep.
+   * @param duration The amount of time to advance.
+   * @param dispatcher_or_scheduler The event loop to run after advancing time forward.
+   * @param mode The mode to use when running the event loop.
+   */
+  template <class D, class DispatcherOrScheduler>
+  void advanceTimeAndRun(const D& duration, DispatcherOrScheduler& dispatcher_or_scheduler,
+                         Dispatcher::RunType mode) {
+    advanceTimeAsyncImpl(std::chrono::duration_cast<Duration>(duration));
+    dispatcher_or_scheduler.run(mode);
+  }
+
+  /**
+   * Helper function used by the implementation of advanceTimeAndRun which just advances time
+   * forward by the specified amount.
+   *
+   * @param duration The amount of time to advance.
    */
   virtual void advanceTimeAsyncImpl(const Duration& duration) PURE;
-  template <class D> void advanceTimeAsync(const D& duration = false) {
-    advanceTimeAsyncImpl(std::chrono::duration_cast<Duration>(duration));
-  }
 
   /**
    * Waits for the specified duration to expire, or for the condition to be satisfied, whichever

@@ -1060,8 +1060,10 @@ public:
                                           Dispatcher& dispatcher, Event::Timer& timer) {
     const auto start = time_system.monotonicTime();
     EXPECT_TRUE(timer.enabled());
-    while (true) {
-      dispatcher.run(Dispatcher::RunType::NonBlock);
+    dispatcher.run(Dispatcher::RunType::NonBlock);
+    while (timer.enabled()) {
+      time_system.advanceTimeAndRun(std::chrono::microseconds(1), dispatcher,
+                                    Dispatcher::RunType::NonBlock);
 #ifdef WIN32
       // The event loop runs for a single iteration in NonBlock mode on Windows. A few iterations
       // are required to ensure that next iteration callbacks have a chance to run before time
@@ -1069,11 +1071,6 @@ public:
       dispatcher.run(Dispatcher::RunType::NonBlock);
       dispatcher.run(Dispatcher::RunType::NonBlock);
 #endif
-      if (timer.enabled()) {
-        time_system.advanceTimeAsync(std::chrono::microseconds(1));
-      } else {
-        break;
-      }
     }
     return time_system.monotonicTime() - start;
   }
