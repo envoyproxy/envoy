@@ -936,5 +936,83 @@ TEST_F(HdsTest, TestUpdateHealthCheckers) {
   checkHdsCounters(2, 0, 0, 2);
 }
 
+// Test to see that if clusters with an empty name get used, there are two clusters.
+// Also test to see that if two clusters with the same non-empty name are used, only have
+// One cluster.
+TEST_F(HdsTest, TestClusterSameName) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message = createComplexSpecifier(2, 1, 1);
+  // Set both clusters to have an empty name.
+  message->mutable_cluster_health_checks(0)->set_cluster_name("");
+  message->mutable_cluster_health_checks(1)->set_cluster_name("");
+
+  // Create a new active connection on request, setting its status to connected
+  // to mock a found endpoint.
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+      .WillRepeatedly(Invoke(
+          [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
+             Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
+            Network::MockClientConnection* connection =
+                new NiceMock<Network::MockClientConnection>();
+
+            // pretend our endpoint was connected to.
+            connection->raiseEvent(Network::ConnectionEvent::Connected);
+
+            // return this new, connected endpoint.
+            return connection;
+          }));
+
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  hds_delegate_->sendResponse();
+
+  // Get the clusters from HDS
+  auto original_clusters = hds_delegate_->hdsClusters();
+
+  // Make sure that even though they have the same name, since they are empty there are two and they
+  // do not point to the same thing.
+  ASSERT_EQ(original_clusters.size(), 2);
+  ASSERT_TRUE(original_clusters[0] != original_clusters[1]);
+
+  // Create message with 3 clusters this time so we force an update.
+  message = createComplexSpecifier(3, 1, 1);
+  // Set both clusters to have empty names empty name.
+  message->mutable_cluster_health_checks(0)->set_cluster_name("");
+  message->mutable_cluster_health_checks(1)->set_cluster_name("");
+
+  // Test that we still get requested number of clusters, even with repeated names on update since
+  // they are empty.
+  hds_delegate_->onReceiveMessage(std::move(message));
+  auto new_clusters = hds_delegate_->hdsClusters();
+
+  // Check that since the names are empty, we do not reuse and just reconstruct.
+  ASSERT_EQ(new_clusters.size(), 3);
+  ASSERT_TRUE(original_clusters[0] != new_clusters[0]);
+  ASSERT_TRUE(original_clusters[1] != new_clusters[1]);
+
+  // Create a new message.
+  message = createComplexSpecifier(2, 1, 1);
+  // Set both clusters to have the same, non-empty name.
+  message->mutable_cluster_health_checks(0)->set_cluster_name("anna");
+  message->mutable_cluster_health_checks(1)->set_cluster_name("anna");
+
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Check that since they both have the same name, only one of them gets used.
+  auto final_clusters = hds_delegate_->hdsClusters();
+  ASSERT_EQ(final_clusters.size(), 1);
+
+  // Check to see that HDS got three requests, and updated three times with it.
+  checkHdsCounters(3, 0, 0, 3);
+}
+
 } // namespace Upstream
 } // namespace Envoy

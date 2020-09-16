@@ -239,42 +239,43 @@ void HdsDelegate::processMessage(
   absl::flat_hash_map<std::string, HdsClusterPtr> new_hds_clusters_name_map;
 
   for (const auto& cluster_health_check : message->cluster_health_checks()) {
-    HdsClusterPtr cluster_ptr;
+    if (!new_hds_clusters_name_map.contains(cluster_health_check.cluster_name())) {
+      HdsClusterPtr cluster_ptr;
 
-    // Create a new configuration for a cluster based on our different or new config.
-    auto cluster_config = createClusterConfig(cluster_health_check);
+      // Create a new configuration for a cluster based on our different or new config.
+      auto cluster_config = createClusterConfig(cluster_health_check);
 
-    // If this particular cluster configuration happens to have a name, then it is possible
-    // this particular cluster exists in the name map. We check and if we found a match,
-    // attempt to update this cluster. If no match was found, either the cluster name is empty
-    // or we have not seen a cluster by this name before. In either case, create a new cluster.
-    auto cluster_map_pair = hds_clusters_name_map_.find(cluster_health_check.cluster_name());
-    if (cluster_map_pair != hds_clusters_name_map_.end()) {
-      // We have a previous cluster with this name, update.
-      cluster_ptr = cluster_map_pair->second;
-      updateHdsCluster(cluster_ptr, cluster_config);
-    } else {
-      // There is no cluster with this name previously or its an empty string, so just create a
-      // new cluster.
-      cluster_ptr = createHdsCluster(cluster_config);
-    }
-
-    // If this had a non-empty name, add this cluster to the name map so it can be updated in the
-    // future.
-    if (!cluster_health_check.cluster_name().empty()) {
-      if (new_hds_clusters_name_map.contains(cluster_health_check.cluster_name())) {
-        ENVOY_LOG(warn, "An HDS Cluster with the cluster_name has already been created by this "
-                        "specifier, recreating anyways.");
+      // If this particular cluster configuration happens to have a name, then it is possible
+      // this particular cluster exists in the name map. We check and if we found a match,
+      // attempt to update this cluster. If no match was found, either the cluster name is empty
+      // or we have not seen a cluster by this name before. In either case, create a new cluster.
+      auto cluster_map_pair = hds_clusters_name_map_.find(cluster_health_check.cluster_name());
+      if (cluster_map_pair != hds_clusters_name_map_.end()) {
+        // We have a previous cluster with this name, update.
+        cluster_ptr = cluster_map_pair->second;
+        updateHdsCluster(cluster_ptr, cluster_config);
+      } else {
+        // There is no cluster with this name previously or its an empty string, so just create a
+        // new cluster.
+        cluster_ptr = createHdsCluster(cluster_config);
       }
-      // Since this cluster has a name, add it to our by-name map.
-      new_hds_clusters_name_map.insert({cluster_health_check.cluster_name(), cluster_ptr});
-    } else {
-      ENVOY_LOG(warn, "HDS Cluster has no cluster_name, it will be recreated instead of updated on "
-                      "every reconfiguration.");
-    }
 
-    // Add to our remaining data structures.
-    hds_clusters.push_back(cluster_ptr);
+      // If this cluster does not have a name, do not add it to the name map since cluster_name is
+      // an optional field, and reconstruct these clusters on every update.
+      if (!cluster_health_check.cluster_name().empty()) {
+        // Since this cluster has a name, add it to our by-name map so we can update it later.
+        new_hds_clusters_name_map.insert({cluster_health_check.cluster_name(), cluster_ptr});
+      } else {
+        ENVOY_LOG(warn,
+                  "HDS Cluster has no cluster_name, it will be recreated instead of updated on "
+                  "every reconfiguration.");
+      }
+
+      // Add this cluster to the flat list for health checking.
+      hds_clusters.push_back(cluster_ptr);
+    } else {
+      ENVOY_LOG(warn, "An HDS Cluster with this cluster_name has already been added, not using.");
+    }
   }
 
   // Overwrite our map data structures.
