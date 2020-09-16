@@ -187,39 +187,39 @@ TEST(ConnectionSocketImpl, LastRoundTripTimeAlwaysReturnsEmptyOptional) {
 
 #endif
 
-  /*
-   * A simple implementation to test some of ListenSocketImpl's accessors without requiring
-   * stack interaction.
-   */
-  class TestListenSocket : public ListenSocketImpl {
-  public:
-    TestListenSocket(Address::InstanceConstSharedPtr address)
-        : ListenSocketImpl(std::make_unique<Network::IoSocketHandleImpl>(), address) {}
-    Socket::Type socketType() const override { return Socket::Type::Stream; }
-  };
+/*
+ * A simple implementation to test some of ListenSocketImpl's accessors without requiring
+ * stack interaction.
+ */
+class TestListenSocket : public ListenSocketImpl {
+public:
+  TestListenSocket(Address::InstanceConstSharedPtr address)
+      : ListenSocketImpl(std::make_unique<Network::IoSocketHandleImpl>(), address) {}
+  Socket::Type socketType() const override { return Socket::Type::Stream; }
+};
 
-  TEST_P(ListenSocketImplTestTcp, SetLocalAddress) {
-    std::string address_str = "10.1.2.3";
-    if (version_ == Address::IpVersion::v6) {
-      address_str = "1::2";
-    }
-
-    Address::InstanceConstSharedPtr address = Network::Utility::parseInternetAddress(address_str);
-
-    TestListenSocket socket(Utility::getIpv4AnyAddress());
-
-    socket.setLocalAddress(address);
-
-    EXPECT_EQ(socket.localAddress(), address);
+TEST_P(ListenSocketImplTestTcp, SetLocalAddress) {
+  std::string address_str = "10.1.2.3";
+  if (version_ == Address::IpVersion::v6) {
+    address_str = "1::2";
   }
 
-  TEST_P(ListenSocketImplTestUdp, BindSpecificPort) { testBindSpecificPort(); }
+  Address::InstanceConstSharedPtr address = Network::Utility::parseInternetAddress(address_str);
 
-  // Validate that we get port allocation when binding to port zero.
-  TEST_P(ListenSocketImplTestTcp, BindPortZero) { testBindPortZero(); }
+  TestListenSocket socket(Utility::getIpv4AnyAddress());
 
-  TEST_P(ListenSocketImplTestUdp, BindPortZero) { testBindPortZero(); }
+  socket.setLocalAddress(address);
 
-} // namespace
+  EXPECT_EQ(socket.localAddress(), address);
+}
+
+TEST_P(ListenSocketImplTestUdp, BindSpecificPort) { testBindSpecificPort(); }
+
+// Validate that we get port allocation when binding to port zero.
+TEST_P(ListenSocketImplTestTcp, BindPortZero) { testBindPortZero(); }
+
+TEST_P(ListenSocketImplTestUdp, BindPortZero) { testBindPortZero(); }
+
 } // namespace
 } // namespace Network
+} // namespace Envoy
