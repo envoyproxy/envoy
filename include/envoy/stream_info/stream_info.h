@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 
+#include "common/common/logger.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -203,6 +204,7 @@ struct UpstreamTiming {
    * Sets the time when the last byte of the request was sent upstream.
    */
   void onLastUpstreamRxByteReceived(TimeSource& time_source) {
+    ENVOY_LOG_MISC(info, "LAST RX BYTE REC");
     ASSERT(!last_upstream_rx_byte_received_);
     last_upstream_rx_byte_received_ = time_source.monotonicTime();
   }

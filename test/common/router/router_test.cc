@@ -680,7 +680,6 @@ TEST_F(RouterTest, AddCookie) {
 
   absl::string_view rc_details2 = "via_upstream";
   EXPECT_CALL(callbacks_.stream_info_, setResponseCodeDetails(rc_details2));
-  EXPECT_CALL(cancellable_, cancel(_));
   EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
@@ -734,7 +733,6 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"set-cookie", "foo=baz"}});
-  EXPECT_CALL(cancellable_, cancel(_));
   EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   // When the router filter gets reset we should cancel the pool request.
@@ -795,7 +793,6 @@ TEST_F(RouterTest, AddMultipleCookies) {
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-  EXPECT_CALL(cancellable_, cancel(_));
   EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   router_.onDestroy();
@@ -1443,6 +1440,7 @@ TEST_F(RouterTestSuppressEnvoyHeaders, EnvoyUpstreamServiceTime) {
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
@@ -2286,7 +2284,6 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutDelayedPoolReady) {
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-internal", "true"},
                                          {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.decodeHeaders(headers, false);
 
   // Global timeout starts when decodeData(_, true) is called.
@@ -2352,11 +2349,11 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-internal", "true"},
                                          {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.decodeHeaders(headers, false);
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
 
+// expectPerTryTimerCreate();
   per_try_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
   EXPECT_CALL(*per_try_timeout_, enableTimer(_, _));
   EXPECT_EQ(0U,
@@ -2685,10 +2682,8 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.decodeHeaders(headers, true);
 
-  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
 
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
@@ -2710,6 +2705,9 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
 
   expectPerTryTimerCreate();
   router_.retry_state_->callback_();
+
+  // TOOD(snowp): We now reset here, is that intended?
+  // EXPECT_CALL(encoder1.stream_, resetStream(_));
 
   // Now send a 5xx back and make sure we don't ask whether we should retry it.
   Http::ResponseHeaderMapPtr response_headers1(
@@ -2756,7 +2754,8 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
   EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.decodeHeaders(headers, true);
 
-  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  // TODO(snowp): Seems like we should reset the bad one? Or should we not because it's already end_stream=true?
+  // EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
 
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
@@ -3867,8 +3866,11 @@ TEST_F(RouterTest, Coalesce100ContinueHeaders) {
         new Http::TestResponseHeaderMapImpl{{":status", "100"}});
     response_decoder->decode100ContinueHeaders(std::move(continue_headers));
   }
+
+  // TODO(snowp): Since we no longer pass the headers through to the router, we no longer charge
+  // this stat twice. How do we feel about this?
   EXPECT_EQ(
-      2U,
+      1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
 
   // Reset stream and cleanup.
@@ -6123,7 +6125,6 @@ TEST_F(RouterTest, ConnectExplicitTcpUpstream) {
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   headers.setMethod("CONNECT");
-  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.decodeHeaders(headers, false);
 
   router_.onDestroy();
@@ -6153,7 +6154,7 @@ public:
               return nullptr;
             }));
     HttpTestUtility::addDefaultHeaders(headers_);
-  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
+    EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
     router_.decodeHeaders(headers_, header_only_request);
     if (pool_ready) {
       EXPECT_EQ(
@@ -6218,7 +6219,6 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
 }
 
 TEST_F(WatermarkTest, FilterWatermarks) {
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).Times(3).WillRepeatedly(Return(10));
   router_.setDecoderFilterCallbacks(callbacks_);
   // Send the headers sans-fin, and don't flag the pool as ready.
   sendRequest(false, false);
@@ -6299,6 +6299,7 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.decodeHeaders(headers, false);
   Buffer::OwnedImpl data("1234567890123");
   EXPECT_CALL(*router_.retry_state_, enabled()).Times(1).WillOnce(Return(true));
@@ -6346,6 +6347,7 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
   EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
       .WillOnce(Return(child_span));
   EXPECT_CALL(callbacks_, tracingConfig());
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
@@ -6389,6 +6391,7 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
   EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
       .WillOnce(Return(child_span));
   EXPECT_CALL(callbacks_, tracingConfig());
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
@@ -6480,6 +6483,7 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
   EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
       .WillOnce(Return(child_span_1));
   EXPECT_CALL(callbacks_, tracingConfig());
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());

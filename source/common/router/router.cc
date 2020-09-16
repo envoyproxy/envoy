@@ -774,7 +774,8 @@ void Filter::onRequestComplete() {
     }
 
     for (auto& upstream_request : upstream_requests_) {
-      ENVOY_LOG_MISC(info, "IN REQ COMPLETE {}", upstream_request->createPerTryTimeoutOnRequestComplete());
+      ENVOY_LOG_MISC(info, "IN REQ COMPLETE {}",
+                     upstream_request->createPerTryTimeoutOnRequestComplete());
       if (upstream_request->createPerTryTimeoutOnRequestComplete()) {
         upstream_request->setupPerTryTimeout();
       }
@@ -1414,6 +1415,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
     }
   }
 
+  upstream_request.onDeferredDelete();
   callbacks_->dispatcher().deferredDelete(upstream_request.removeFromList(upstream_requests_));
   cleanup();
 }

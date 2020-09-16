@@ -484,7 +484,7 @@ public:
   FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
                 const Network::Connection& connection, uint64_t stream_id, bool proxy_100_continue,
                 uint32_t buffer_limit, FilterChainFactory& filter_chain_factory,
-                const LocalReply::LocalReply& local_reply, Http::Protocol protocol,
+                const LocalReply::LocalReply& local_reply, absl::optional<Http::Protocol> protocol,
                 TimeSource& time_source, StreamInfo::FilterStateSharedPtr parent_filter_state,
                 StreamInfo::FilterState::LifeSpan filter_state_life_span)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),

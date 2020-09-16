@@ -34,6 +34,14 @@ struct StreamInfoImpl : public StreamInfo {
                 FilterStateImpl::LazyCreateAncestor(std::move(parent_filter_state), life_span),
                 FilterState::LifeSpan::FilterChain)) {}
 
+  StreamInfoImpl(absl::optional<Http::Protocol> protocol, TimeSource& time_source,
+                 FilterStateSharedPtr parent_filter_state, FilterState::LifeSpan life_span)
+      : StreamInfoImpl(
+            protocol, time_source,
+            std::make_shared<FilterStateImpl>(
+                FilterStateImpl::LazyCreateAncestor(std::move(parent_filter_state), life_span),
+                FilterState::LifeSpan::FilterChain)) {}
+
   SystemTime startTime() const override { return start_time_; }
 
   MonotonicTime startTimeMonotonic() const override { return start_time_monotonic_; }
@@ -57,6 +65,7 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   void setUpstreamTiming(const UpstreamTiming& upstream_timing) override {
+    ENVOY_LOG_MISC(info, "CALLING UPSTREAM TIMING");
     upstream_timing_ = upstream_timing;
   }
 

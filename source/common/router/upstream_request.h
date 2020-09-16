@@ -65,7 +65,7 @@ struct UpstreamRequestFilter : public Http::StreamDecoderFilter,
     conn_pool_->newStream(this);
     decoding_headers_ = false;
 
-    if (!await_stream_) {
+    if (!await_stream_ && !paused_for_connect_) {
       return Http::FilterHeadersStatus::Continue;
     }
 
@@ -117,7 +117,6 @@ struct UpstreamRequestFilter : public Http::StreamDecoderFilter,
     UpstreamRequestFilter& parent_;
   };
 
-  void maybeEndDecode(bool end_stream);
   void clearRequestEncoder();
 
 private:
@@ -165,11 +164,8 @@ public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool);
   ~UpstreamRequest() override;
 
-  void onDeferredDelete() {
-    ASSERT(!destroyed_);
-    destroyed_ = true;
-    filter_manager_.destroyFilters();
-  }
+  void onDeferredDelete();
+
   void encodeUpstreamHeaders(bool end_stream);
   void encodeUpstreamData(Buffer::Instance& data, bool end_stream);
   void encodeUpstreamTrailers(Http::RequestTrailerMap& trailers);
@@ -262,6 +258,7 @@ public:
   RouterFilterInterface& parent() { return parent_; }
 
 private:
+  void maybeEndDecode(bool end_stream);
   Http::RequestTrailerMapPtr request_trailers_;
 
   RouterFilterInterface& parent_;

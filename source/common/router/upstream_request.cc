@@ -53,9 +53,7 @@ UpstreamRequestFilter::UpstreamRequestFilter(UpstreamRequest& parent,
       paused_for_connect_(false), calling_encode_headers_(false), decoding_headers_(false),
       encoding_headers_only_(false), await_stream_(true), continue_headers_encoded_(false) {}
 
-UpstreamRequestFilter::~UpstreamRequestFilter() {
-  clearRequestEncoder();
-}
+UpstreamRequestFilter::~UpstreamRequestFilter() { clearRequestEncoder(); }
 
 void UpstreamRequestFilter::resetStream() {
   if (conn_pool_->cancelAnyPendingStream()) {
@@ -74,14 +72,14 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  std::unique_ptr<GenericConnPool>&& conn_pool)
     : parent_(parent), outlier_detection_timeout_recorded_(false), retried_(false),
       grpc_rq_success_deferred_(false), upstream_canary_(false), awaiting_headers_(true),
-      encode_complete_(false), decode_complete_(false), destroyed_(false),
+      encode_complete_(false), decode_complete_(false), destroyed_(false), create_per_try_timeout_on_request_complete_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
       filter_manager_(*this, parent_.callbacks()->dispatcher(), *parent_.callbacks()->connection(),
                       parent_.callbacks()->streamId(), true,
                       std::numeric_limits<uint32_t>::max(), // TODO(snowp): This should probably not
                                                             // be infinite!
                       // parent_.callbacks()->decoderBufferLimit(),
-                      filter_factory_, noopLocalReply(), conn_pool->protocol().value(),
+                      filter_factory_, noopLocalReply(), conn_pool->protocol(),
                       parent_.callbacks()->dispatcher().timeSource(), nullptr,
                       StreamInfo::FilterState::FilterChain) {
   auto filter = std::make_shared<UpstreamRequestFilter>(*this, std::move(conn_pool));
@@ -101,6 +99,17 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 }
 
 UpstreamRequest::~UpstreamRequest() {
+
+  if (!destroyed_) {
+    ENVOY_LOG_MISC(info, "IN DTOR");
+    onDeferredDelete();
+  }
+}
+  void UpstreamRequest::onDeferredDelete() {
+    ENVOY_LOG_MISC(info, "DONG DEFERRED DELELTE");
+    ASSERT(!destroyed_);
+    destroyed_ = true;
+
   if (per_try_timeout_ != nullptr) {
     // Allows for testing.
     per_try_timeout_->disableTimer();
@@ -125,10 +134,8 @@ UpstreamRequest::~UpstreamRequest() {
         responseTrailers() ? &responseTrailers()->get() : nullptr, filter_manager_.streamInfo());
   }
 
-  if (!destroyed_) {
-    onDeferredDelete();
+    filter_manager_.destroyFilters();
   }
-}
 
 void UpstreamRequest::onDecoderFilterBelowWriteBufferLowWatermark() {
   parent_.cluster()->stats().upstream_flow_control_drained_total_.inc();
@@ -176,7 +183,8 @@ void UpstreamRequest::encode100ContinueHeaders(Http::ResponseHeaderMap& headers)
 }
 
 void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
-  // TODO probably missing something here.
+  ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
+  maybeEndDecode(end_stream);
   parent_.onUpstreamData(data, *this, end_stream);
 }
 
@@ -188,7 +196,7 @@ void UpstreamRequest::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_s
   // TODO(rodaine): This is actually measuring after the headers are parsed and not the first
   // byte.
   upstream_timing_.onFirstUpstreamRxByteReceived(parent_.callbacks()->dispatcher().timeSource());
-  // maybeEndDecode(end_stream);
+  maybeEndDecode(end_stream);
 
   awaiting_headers_ = false;
   if (!parent_.config().upstream_logs_.empty()) {
@@ -200,6 +208,7 @@ void UpstreamRequest::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_s
 }
 
 void UpstreamRequest::encodeTrailers(Http::ResponseTrailerMap&) {
+  maybeEndDecode(true);
   parent_.onUpstreamTrailers(std::move(trailers_to_encode_), *this);
 }
 void UpstreamRequest::encodeMetadata(Http::MetadataMapVector& metadata) {
@@ -300,6 +309,11 @@ void UpstreamRequestFilter::ActiveUpstreamRequest::decodeHeaders(
     parent_.parent_.upstream_headers_ =
         Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*headers);
   }
+
+  if (parent_.paused_for_connect_ && response_code == 200) {
+    parent_.decoder_callbacks_->continueDecoding();
+  }
+
   parent_.decoder_callbacks_->encodeHeaders(std::move(headers), end_stream);
 }
 
@@ -343,7 +357,8 @@ const Network::Connection& UpstreamRequestFilter::ActiveUpstreamRequest::connect
 
 void UpstreamRequestFilter::ActiveUpstreamRequest::decodeMetadata(
     Http::MetadataMapPtr&& metadata_map) {
-  ScopeTrackerScopeState scope(&parent_.parent_.parent_.callbacks()->scope(), parent_.parent_.parent_.callbacks()->dispatcher());
+  ScopeTrackerScopeState scope(&parent_.parent_.parent_.callbacks()->scope(),
+                               parent_.parent_.parent_.callbacks()->dispatcher());
 
   parent_.decoder_callbacks_->encodeMetadata(std::move(metadata_map));
 }
@@ -386,11 +401,11 @@ Http::FilterMetadataStatus UpstreamRequestFilter::decodeMetadata(Http::MetadataM
 
   return Http::FilterMetadataStatus::Continue;
 }
-void UpstreamRequestFilter::maybeEndDecode(bool end_stream) {
+void UpstreamRequest::maybeEndDecode(bool end_stream) {
   if (end_stream) {
-    parent_.upstream_timing_.onLastUpstreamRxByteReceived(
-        parent_.parent_.callbacks()->dispatcher().timeSource());
-    parent_.decode_complete_ = true;
+    upstream_timing_.onLastUpstreamRxByteReceived(
+        parent_.callbacks()->dispatcher().timeSource());
+    decode_complete_ = true;
   }
 }
 
@@ -431,7 +446,7 @@ void UpstreamRequestFilter::ActiveUpstreamRequest::onResetStream(
   ScopeTrackerScopeState scope(&parent_.parent_.parent_.callbacks()->scope(),
                                parent_.parent_.parent_.callbacks()->dispatcher());
 
-ENVOY_LOG_MISC(info, "SEEING RESET STREAM");
+  ENVOY_LOG_MISC(info, "SEEING RESET STREAM");
   if (parent_.parent_.span_ != nullptr) {
     // Add tags about reset.
     parent_.parent_.span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
@@ -544,7 +559,8 @@ void UpstreamRequestFilter::onPoolReady(
   parent_.parent_.callbacks()->streamInfo().setUpstreamSslConnection(
       info.downstreamSslConnection());
 
-  ENVOY_LOG_MISC(info, "IN POOL READY {} {}", parent_.parent_.downstreamEndStream(), parent_.create_per_try_timeout_on_request_complete_);
+  ENVOY_LOG_MISC(info, "IN POOL READY {} {}", parent_.parent_.downstreamEndStream(),
+                 parent_.create_per_try_timeout_on_request_complete_);
   if (parent_.parent_.downstreamEndStream()) {
     parent_.setupPerTryTimeout();
   } else {
@@ -589,12 +605,18 @@ void UpstreamRequestFilter::onPoolReady(
   upstream_->encodeHeaders(*parent_.requestHeaders(), encoding_headers_only_);
   calling_encode_headers_ = false;
 
+  if (encoding_headers_only_) {
+    parent_.upstream_timing_.onLastUpstreamTxByteSent(
+        parent_.parent_.callbacks()->dispatcher().timeSource());
+  }
+
   if (deferred_reset_reason_) {
     active_request_.onResetStream(deferred_reset_reason_.value(), absl::string_view());
     return;
   }
 
   if (!paused_for_connect_ && !decoding_headers_) {
+    paused_for_connect_ = false;
     decoder_callbacks_->continueDecoding();
   }
 
