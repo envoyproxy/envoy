@@ -407,7 +407,7 @@ void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluste
     // Check to see if our list of socket matches have changed. If they have, create a new matcher
     // in info_.
     bool update_socket_matches = false;
-    uint64_t socket_match_hash = RepeatedPtrUtil::hash(cluster_.transport_socket_matches());
+    const uint64_t socket_match_hash = RepeatedPtrUtil::hash(cluster_.transport_socket_matches());
     if (socket_match_hash_ != socket_match_hash) {
       socket_match_hash_ = socket_match_hash;
       update_socket_matches = true;
@@ -432,7 +432,7 @@ void HdsCluster::updateHealthchecks(
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers;
   HealthCheckerMap health_checkers_map;
 
-  for (auto& health_check : health_checks) {
+  for (const auto& health_check : health_checks) {
     // Check to see if this exact same health_check config already has a health checker.
     auto health_checker = health_checkers_map_.find(health_check);
     if (health_checker != health_checkers_map_.end()) {
