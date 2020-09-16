@@ -59,7 +59,7 @@ public:
         failure_mode_allow_(config.failure_mode_allow()),
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
-        pack_as_bytes_(config.with_request_body().pack_as_bytes()),
+        pack_as_bytes_(config.request_body_options().pack_as_bytes()),
         status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
         runtime_(runtime), http_context_(http_context),
         filter_enabled_(config.has_filter_enabled()
@@ -226,8 +226,7 @@ private:
                     const Router::RouteConstSharedPtr& route);
   void continueDecoding();
   bool isBufferFull() const;
-  bool skipCheckForRoute(const Router::RouteConstSharedPtr& route,
-                         const Router::RouteSpecificFilterConfig* specific_per_route_config) const;
+  bool skipCheckForRoute(const Router::RouteConstSharedPtr& route) const;
 
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling

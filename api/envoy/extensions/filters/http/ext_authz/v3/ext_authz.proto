@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
@@ -64,6 +64,11 @@ message ExtAuthz {
   // A ``x-envoy-auth-partial-body: false|true`` metadata header will be added to the authorization
   // request message indicating if the body data is partial.
   BufferSettings with_request_body = 5;
+
+  // Dictates how request body is sent to the external the external authorization service. This is
+  // effective when :ref:`with_request_body <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>`
+  // is set to buffer request body.
+  RequestBodyOptions request_body_options = 13;
 
   // Clears route cache in order to allow the external authorization service to correctly affect
   // routing decisions. Filter clears all cached routes when:
@@ -138,6 +143,13 @@ message BufferSettings {
   // If true, the body sent to the external authorization service is set with raw bytes, instead of
   // UTF-8 string.
   bool pack_as_bytes = 3;
+}
+
+// Configuration for request body.
+message RequestBodyOptions {
+  // If true, the body sent to the external authorization service is set with raw bytes, instead of
+  // UTF-8 string.
+  bool pack_as_bytes = 1;
 }
 
 // HttpService is used for raw HTTP communication between the filter and the authorization service.

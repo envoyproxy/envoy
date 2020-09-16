@@ -473,6 +473,7 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestData) {
       cluster_name: "ext_authz_server"
   with_request_body:
     max_request_bytes: 10
+  request_body_options:
     pack_as_bytes: true
   )EOF");
 

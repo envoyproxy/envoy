@@ -137,8 +137,7 @@ void CheckRequestUtils::setHttpRequest(
     if (pack_as_bytes) {
       httpreq.set_raw_body(std::move(data));
     } else {
-      // TODO(dio): Replace the following line with httpreq.set_utf8_body(std::move(data)); when
-      // AttributeContext_HttpRequest.body is removed.
+      // TODO(dio): Replace the following with set_utf8_body when set_body is removed.
       httpreq.set_body(std::move(data));
     }
 

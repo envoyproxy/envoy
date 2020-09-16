@@ -97,6 +97,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   failure_mode_allow: true
   with_request_body:
     max_request_bytes: 100
+  request_body_options:
     pack_as_bytes: true
   )EOF";
 
