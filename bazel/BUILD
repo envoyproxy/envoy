@@ -85,6 +85,33 @@ config_setting(
 )
 
 config_setting(
+    name = "clang_cl_opt_build",
+    values = {
+        "cpu": "x64_windows",
+        "define": "clang_cl=1",
+        "compilation_mode": "opt",
+    },
+)
+
+config_setting(
+    name = "clang_cl_dbg_build",
+    values = {
+        "cpu": "x64_windows",
+        "define": "clang_cl=1",
+        "compilation_mode": "dbg",
+    },
+)
+
+config_setting(
+    name = "clang_cl_fastbuild_build",
+    values = {
+        "cpu": "x64_windows",
+        "define": "clang_cl=1",
+        "compilation_mode": "fastbuild",
+    },
+)
+
+config_setting(
     name = "opt_build",
     values = {"compilation_mode": "opt"},
 )

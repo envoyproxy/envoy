@@ -1,0 +1,29 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index ec1cfa782..6fe4b1bc2 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -39,6 +39,9 @@
+ # (From Daniel Stenberg) The gcc command line use neither -g nor any -O options. As a developer, I also treasure our configure scripts's --enable-debug option that sets a long range of "picky" compiler options.
+ cmake_minimum_required(VERSION 3.2...3.16 FATAL_ERROR)
+ 
++# Work around new assumptions of inappropriate /MT flag injection since 3.15
++cmake_policy(SET CMP0091 OLD)
++
+ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake;${CMAKE_MODULE_PATH}")
+ include(Utilities)
+ include(Macros)
+diff --git a/lib/CMakeLists.txt b/lib/CMakeLists.txt
+index 911c9096d..ed37775b2 100644
+--- a/lib/CMakeLists.txt
++++ b/lib/CMakeLists.txt
+@@ -88,10 +88,6 @@ add_library(
+   ALIAS ${LIB_NAME}
+   )
+ 
+-if(MSVC AND NOT BUILD_SHARED_LIBS)
+-  set_target_properties(${LIB_NAME} PROPERTIES STATIC_LIBRARY_FLAGS ${CMAKE_EXE_LINKER_FLAGS})
+-endif()
+-
+ if(NOT BUILD_SHARED_LIBS)
+     set_target_properties(${LIB_NAME} PROPERTIES INTERFACE_COMPILE_DEFINITIONS CURL_STATICLIB)
+ endif()

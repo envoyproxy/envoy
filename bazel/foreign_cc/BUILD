@@ -138,7 +138,9 @@ envoy_cmake_external(
         "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/zlib",
         "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib/include",
         "CMAKE_CXX_COMPILER_FORCED": "on",
-        "CMAKE_C_FLAGS_BAZEL": "-fPIC",
+        # TODO(wrowe,sunjayBhatia): Confirm this is redundant on clang/gcc builds
+        # and delete these three lines before merge
+        # "CMAKE_C_FLAGS_BAZEL": "-fPIC",
         # Note we use Bazel's flags (not _RELEASE/_DEBUG CMake flags), but this toggle
         # also works around a bug in CMP0091 logic which re-injected a badly placed -M flag.
         # See https://github.com/bazelbuild/rules_foreign_cc/issues/426
@@ -219,7 +221,6 @@ envoy_cmake_external(
 envoy_cmake_external(
     name = "zlib",
     cache_entries = {
-        "BUILD_SHARED_LIBS": "off",
         "CMAKE_CXX_COMPILER_FORCED": "on",
         "CMAKE_C_COMPILER_FORCED": "on",
         "SKIP_BUILD_EXAMPLES": "on",
