@@ -101,9 +101,7 @@ public:
   Upstream::ClusterManager* clusterManager() override { return cluster_manager_.get(); }
   std::list<Stats::SinkPtr>& statsSinks() override { return stats_sinks_; }
   std::chrono::milliseconds statsFlushInterval() const override { return stats_flush_interval_; }
-
   const Watchdog& mainThreadWatchdogConfig() const override { return *main_thread_watchdog_; }
-
   const Watchdog& workerWatchdogConfig() const override { return *worker_watchdog_; }
 
 private:
