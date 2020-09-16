@@ -55,6 +55,14 @@ UpstreamRequestFilter::UpstreamRequestFilter(UpstreamRequest& parent,
 
 UpstreamRequestFilter::~UpstreamRequestFilter() { clearRequestEncoder(); }
 
+void UpstreamRequestFilter::resetWatermarks() {
+  while (downstream_data_disabled_ != 0) {
+    parent_.parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
+    parent_.parent_.cluster()->stats().upstream_flow_control_drained_total_.inc();
+    --downstream_data_disabled_;
+  }
+}
+
 void UpstreamRequestFilter::resetStream() {
   if (conn_pool_->cancelAnyPendingStream()) {
     ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.parent_.callbacks());
@@ -134,6 +142,8 @@ void UpstreamRequest::onDeferredDelete() {
         parent_.downstreamHeaders(), responseHeaders() ? &responseHeaders()->get() : nullptr,
         responseTrailers() ? &responseTrailers()->get() : nullptr, filter_manager_.streamInfo());
   }
+
+  filter_->resetWatermarks();
 
   filter_manager_.destroyFilters();
 }

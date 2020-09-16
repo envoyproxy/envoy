@@ -52,6 +52,7 @@ struct UpstreamRequestFilter : public Http::StreamDecoderFilter,
   UpstreamRequestFilter(UpstreamRequest& parent, std::unique_ptr<GenericConnPool>&& conn_pool);
   ~UpstreamRequestFilter();
 
+  void resetWatermarks();
   void resetStream();
   void disableDataFromDownstreamForFlowControl();
   void enableDataFromDownstreamForFlowControl();
