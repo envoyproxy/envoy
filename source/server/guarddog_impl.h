@@ -48,14 +48,14 @@ public:
 
     /**
      * Called from GuardDogImpl to indicate that it has evaluated all watch-dogs up to a particular
-     * point in time. Called while the Guarddog mutex is held.
+     * point in time. Called while the GuardDog mutex is held.
      */
     virtual void signalFromImpl() {}
 
     /**
      * Called from GuardDog tests to block until the implementation has reached the desired
-     * condition. Called while the Guarddog mutex is held.
-     * @param mutex The Guarddog's mutex for use by Thread::CondVar::wait.
+     * condition. Called while the GuardDog mutex is held.
+     * @param mutex The GuardDog's mutex for use by Thread::CondVar::wait.
      */
     virtual void waitFromTest(Thread::MutexBasicLockable& /*mutex*/) {}
   };
