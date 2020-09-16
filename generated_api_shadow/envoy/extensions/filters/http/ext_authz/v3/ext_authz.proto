@@ -262,13 +262,7 @@ message CheckSettings {
   //
   // .. note::
   //
-  //   These settings are only applised to a filter configured with a
+  //   These settings are only applied to a filter configured with a
   //   :ref:`grpc_service<envoy_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>`.
   map<string, string> context_extensions = 1;
-
-  // [#not-implemented-hide:] This set per check settings to let the filter to buffer the client
-  // request body and send it within the authorization request. A ``x-envoy-auth-partial-body: false|true``
-  // metadata header will be added to the authorization request message indicating if the body data
-  // is partial.
-  BufferSettings with_request_body = 2;
 }

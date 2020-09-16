@@ -263,7 +263,7 @@ message CheckSettings {
   //
   // .. note::
   //
-  //   These settings are only applised to a filter configured with a
+  //   These settings are only applied to a filter configured with a
   //   :ref:`grpc_service<envoy_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>`.
   map<string, string> context_extensions = 1;
 }
