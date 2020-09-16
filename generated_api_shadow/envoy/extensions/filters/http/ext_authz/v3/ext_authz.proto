@@ -138,10 +138,6 @@ message BufferSettings {
   // The authorization request will be dispatched and no 413 HTTP error will be returned by the
   // filter.
   bool allow_partial_message = 2;
-
-  // If true, the body sent to the external authorization service is set with raw bytes, instead of
-  // UTF-8 string.
-  bool pack_as_bytes = 3;
 }
 
 // Configuration for request body.
