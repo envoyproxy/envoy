@@ -30,7 +30,7 @@ typed_config:
   rules:
     action: DENY
     policies:
-      deny-policy:
+      "deny policy":
         permissions:
           - header: { name: ":method", exact_match: "GET" }
         principals:
@@ -143,7 +143,7 @@ TEST_P(RBACIntegrationTest, Denied) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_),
-              testing::HasSubstr("RBAC rbac_access_denied_matched_policy_none"));
+              testing::HasSubstr("RBAC rbac_access_denied_matched_policy[none]"));
 }
 
 TEST_P(RBACIntegrationTest, DeniedWithDenyAction) {
@@ -165,8 +165,9 @@ TEST_P(RBACIntegrationTest, DeniedWithDenyAction) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
+  // Note the whitespace in the policy id is replaced by '_'.
   EXPECT_THAT(waitForAccessLog(access_log_name_),
-              testing::HasSubstr("RBAC rbac_access_denied_matched_policy_deny-policy"));
+              testing::HasSubstr("RBAC rbac_access_denied_matched_policy[deny_policy]"));
 }
 
 TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {

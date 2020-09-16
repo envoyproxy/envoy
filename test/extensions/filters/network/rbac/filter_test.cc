@@ -179,7 +179,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
 
   EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush)).Times(2);
   EXPECT_CALL(stream_info_, setResponseFlag(StreamInfo::ResponseFlag::UnauthorizedRBAC)).Times(2);
-  EXPECT_CALL(stream_info_, setResponseCodeDetails("rbac_access_denied_matched_policy_none"))
+  EXPECT_CALL(stream_info_, setResponseCodeDetails("rbac_access_denied_matched_policy[none]"))
       .Times(2);
 
   // Call onData() twice, should only increase stats once.

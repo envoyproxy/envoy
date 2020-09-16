@@ -11,7 +11,7 @@ as well as the incoming request's HTTP headers. This filter also supports policy
 and shadow mode, shadow mode won't effect real users, it is used to test that a new set of policies
 work before rolling out to production.
 
-When a request is denied, the access log will set the flag `RBAC`, this helps to distinguish the
+When a request is denied, the access log response flag segment will be set to `RBAC`, this helps to distinguish the
 deny from Envoy RBAC filter and the upstream backend. The :ref:`RESPONSE_CODE_DETAILS<config_access_log_format_response_code_details>`
 will include the name of the matched policy that caused the deny ("none" if none matched).
 

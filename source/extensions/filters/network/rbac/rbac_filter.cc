@@ -97,7 +97,7 @@ RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode
     // Check authorization decision and do Action operations
     bool allowed = engine->handleAction(
         callbacks_->connection(), callbacks_->connection().streamInfo(), &effective_policy_id);
-    std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
+    const std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
     if (allowed) {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
         ENVOY_LOG(debug, "shadow allowed, matched policy {}", log_policy_id);

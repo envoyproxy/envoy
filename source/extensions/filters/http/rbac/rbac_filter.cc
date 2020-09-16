@@ -108,7 +108,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
     std::string effective_policy_id;
     bool allowed = engine->handleAction(*callbacks_->connection(), headers,
                                         callbacks_->streamInfo(), &effective_policy_id);
-    std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
+    const std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
     if (allowed) {
       ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
       config_->stats().allowed_.inc();

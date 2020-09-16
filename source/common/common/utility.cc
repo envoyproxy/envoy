@@ -1,5 +1,6 @@
 #include "common/common/utility.h"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
@@ -380,6 +381,20 @@ std::string StringUtil::removeTokens(absl::string_view source, absl::string_view
   auto end = std::remove_if(values.begin(), values.end(),
                             [&](absl::string_view t) { return tokens_to_remove.count(t) != 0; });
   return absl::StrJoin(values.begin(), end, joiner);
+}
+
+std::string StringUtil::replaceCharacters(absl::string_view source,
+                                          absl::string_view characters_to_replace, char replace) {
+  std::string replaced(source);
+  absl::string_view::size_type pos = 0;
+  while (true) {
+    pos = source.find_first_of(characters_to_replace, pos);
+    if (pos == absl::string_view::npos) {
+      break;
+    }
+    replaced[pos++] = replace;
+  };
+  return replaced;
 }
 
 uint32_t StringUtil::itoa(char* out, size_t buffer_size, uint64_t i) {
