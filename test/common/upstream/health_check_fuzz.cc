@@ -35,6 +35,11 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
     break;
   }
   case envoy::config::core::v3::HealthCheck::kTcpHealthCheck: {
+    if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
+      //delete tcp_test_base_;
+      return;
+      //tcp_test_base_->interval_timer_->invokeCallback(); //This calls timeout timer callback haha
+    }
     type_ = HealthCheckFuzz::Type::TCP;
     tcp_test_base_ = new TcpHealthCheckerImplTestBase;
     initializeAndReplayTcp(input);
@@ -96,11 +101,11 @@ void HealthCheckFuzz::initializeAndReplayTcp(test::common::upstream::HealthCheck
   }
 
   //TODO: Get rid of this hardcoded check
-  if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
+  /*if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
     delete tcp_test_base_;
     return;
     //tcp_test_base_->interval_timer_->invokeCallback(); //This calls timeout timer callback haha
-  }
+  }*/
   replay(input);
 }
 
