@@ -63,11 +63,7 @@ TEST_F(FileSystemImplTest, DirectoryExists) {
 }
 
 TEST_F(FileSystemImplTest, FileSize) {
-#ifdef WIN32
-  EXPECT_EQ(0, file_system_.fileSize("NUL"));
-#else
-  EXPECT_EQ(0, file_system_.fileSize("/dev/null"));
-#endif
+  EXPECT_EQ(0, file_system_.fileSize(std::string(Platform::null_device_path)));
   EXPECT_EQ(-1, file_system_.fileSize("/dev/blahblahblah"));
   const std::string data = "test string\ntest";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
@@ -353,6 +349,21 @@ TEST_F(FileSystemImplTest, ExistingReadOnlyFileAndWrite) {
 
   auto contents = TestEnvironment::readFileToStringForTest(file_path);
   EXPECT_EQ("existing file", contents);
+}
+
+TEST(FileSystemImplTest, TestIoFileError) {
+  IoFileError error1(HANDLE_ERROR_PERM);
+  EXPECT_EQ(IoFileError::IoErrorCode::Permission, error1.getErrorCode());
+  EXPECT_EQ(errorDetails(HANDLE_ERROR_PERM), error1.getErrorDetails());
+
+
+  IoFileError error2(HANDLE_ERROR_INVALID);
+  EXPECT_EQ(IoFileError::IoErrorCode::BadFd, error1.getErrorCode());
+  EXPECT_EQ(errorDetails(HANDLE_ERROR_PERM), error1.getErrorDetails());
+
+  int not_known_error = 42;
+  IoFileError error3(not_known_error);
+  EXPECT_EQ(IoFileError::IoErrorCode::UnknownError, error1.getErrorCode());
 }
 
 } // namespace Filesystem
