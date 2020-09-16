@@ -1,19 +1,17 @@
+#include <unordered_map>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/overload/v3/overload.pb.h"
-#include "envoy/server/resource_monitor_config.h"
-#include "envoy/registry/registry.h"
 #include "envoy/server/resource_monitor.h"
+#include "envoy/server/resource_monitor_config.h"
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/registry.h"
 
 #include "absl/strings/str_cat.h"
-#include <unordered_map>
 
 namespace Envoy {
-
-namespace Extensions {
-namespace ResourceMonitors {
 
 class FakeResourceMonitorFactory;
 
@@ -52,8 +50,6 @@ private:
   FakeResourceMonitor* monitor_{nullptr};
 };
 
-REGISTER_FACTORY(FakeResourceMonitorFactory, Server::Configuration::ResourceMonitorFactory);
-
 FakeResourceMonitor::~FakeResourceMonitor() { factory_.onMonitorDestroyed(this); }
 
 void FakeResourceMonitor::updateResourceUsage(Callbacks& callbacks) {
@@ -74,9 +70,6 @@ Server::ResourceMonitorPtr FakeResourceMonitorFactory::createResourceMonitor(
   monitor_ = monitor.get();
   return monitor;
 }
-
-} // namespace ResourceMonitors
-} // namespace Extensions
 
 class OverloadIntegrationTest : public HttpProtocolIntegrationTest {
 protected:
@@ -115,15 +108,15 @@ protected:
   }
 
   void updateResource(double pressure) {
-    auto factory = dynamic_cast<Extensions::ResourceMonitors::FakeResourceMonitorFactory*>(
-        Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
-            Extensions::ResourceMonitors::FakeResourceMonitor::kName));
-    ASSERT(factory != nullptr);
-    auto* monitor = factory->monitor();
+    auto* monitor = fake_resource_monitor_factory_.monitor();
     if (monitor != nullptr) {
       monitor->setResourcePressure(pressure);
     }
   }
+
+  FakeResourceMonitorFactory fake_resource_monitor_factory_;
+  Registry::InjectFactory<Server::Configuration::ResourceMonitorFactory> inject_factory_{
+      fake_resource_monitor_factory_};
 };
 
 INSTANTIATE_TEST_SUITE_P(Protocols, OverloadIntegrationTest,
