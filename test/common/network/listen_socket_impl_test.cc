@@ -7,6 +7,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 
+#include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -15,7 +16,13 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::DoAll;
+using testing::Eq;
+using testing::Invoke;
+using testing::NiceMock;
+using testing::Optional;
 using testing::Return;
+using testing::WithArg;
 
 namespace Envoy {
 namespace Network {
@@ -139,39 +146,80 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ListenSocketImplTestUdp,
 
 TEST_P(ListenSocketImplTestTcp, BindSpecificPort) { testBindSpecificPort(); }
 
-/*
- * A simple implementation to test some of ListenSocketImpl's accessors without requiring
- * stack interaction.
- */
-class TestListenSocket : public ListenSocketImpl {
-public:
-  TestListenSocket(Address::InstanceConstSharedPtr address)
-      : ListenSocketImpl(std::make_unique<Network::IoSocketHandleImpl>(), address) {}
-  Socket::Type socketType() const override { return Socket::Type::Stream; }
-};
+#if defined(__linux__)
 
-TEST_P(ListenSocketImplTestTcp, SetLocalAddress) {
-  std::string address_str = "10.1.2.3";
-  if (version_ == Address::IpVersion::v6) {
-    address_str = "1::2";
-  }
+TEST(ConnectionSocketImpl, LastRoundTripTimeReturnsEmptyOptionalIfGetSocketFails) {
+  std::unique_ptr<MockIoHandle> io_handle = std::make_unique<NiceMock<MockIoHandle>>();
+  EXPECT_CALL(*io_handle, getOption(_, _, _, _)).WillOnce(Return(Api::SysCallIntResult{-1, -1}));
+  ConnectionSocketImpl socket{std::move(io_handle),
+                              std::make_shared<NiceMock<MockResolvedAddress>>("", ""),
+                              std::make_shared<NiceMock<MockResolvedAddress>>("", "")};
 
-  Address::InstanceConstSharedPtr address = Network::Utility::parseInternetAddress(address_str);
-
-  TestListenSocket socket(Utility::getIpv4AnyAddress());
-
-  socket.setLocalAddress(address);
-
-  EXPECT_EQ(socket.localAddress(), address);
+  EXPECT_THAT(socket.lastRoundTripTime(), Eq(absl::optional<std::chrono::milliseconds>{}));
 }
 
-TEST_P(ListenSocketImplTestUdp, BindSpecificPort) { testBindSpecificPort(); }
+TEST(ConnectionSocketImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
+  std::unique_ptr<MockIoHandle> io_handle = std::make_unique<NiceMock<MockIoHandle>>();
+  EXPECT_CALL(*io_handle, getOption(_, _, _, _))
+      .WillOnce(DoAll(WithArg<2>(Invoke([](void* optval) {
+                        static_cast<struct tcp_info*>(optval)->tcpi_rtt = 35;
+                      })),
+                      Return(Api::SysCallIntResult{0, 0})));
+  ConnectionSocketImpl socket{std::move(io_handle),
+                              std::make_shared<NiceMock<MockResolvedAddress>>("", ""),
+                              std::make_shared<NiceMock<MockResolvedAddress>>("", "")};
 
-// Validate that we get port allocation when binding to port zero.
-TEST_P(ListenSocketImplTestTcp, BindPortZero) { testBindPortZero(); }
+  EXPECT_THAT(socket.lastRoundTripTime(), Eq(absl::optional<std::chrono::milliseconds>{35}));
+}
 
-TEST_P(ListenSocketImplTestUdp, BindPortZero) { testBindPortZero(); }
+#endif
+
+#if !defined(__linux__)
+
+TEST(ConnectionInfo, LastRoundTripTimeAlwaysReturnsEmptyOptional) {
+  std::unique_ptr<MockIoHandle> io_handle = std::make_unique<NiceMock<MockIoHandle>>();
+  EXPECT_CALL(*io_handle, getOption(_, _, _, _)).WillOnce(Return(Api::SysCallIntResult{-1, -1}));
+  ConnectionSocketImpl socket{std::move(io_handle),
+                              std::make_shared<NiceMock<MockResolvedAddress>>("", ""),
+                              std::make_shared<NiceMock<MockResolvedAddress>>("", "")};
+
+  EXPECT_THAT(socket.lastRoundTripTime(), Eq(absl::optional<std::chrono::milliseconds>{}));
+
+#endif
+
+  /*
+   * A simple implementation to test some of ListenSocketImpl's accessors without requiring
+   * stack interaction.
+   */
+  class TestListenSocket : public ListenSocketImpl {
+  public:
+    TestListenSocket(Address::InstanceConstSharedPtr address)
+        : ListenSocketImpl(std::make_unique<Network::IoSocketHandleImpl>(), address) {}
+    Socket::Type socketType() const override { return Socket::Type::Stream; }
+  };
+
+  TEST_P(ListenSocketImplTestTcp, SetLocalAddress) {
+    std::string address_str = "10.1.2.3";
+    if (version_ == Address::IpVersion::v6) {
+      address_str = "1::2";
+    }
+
+    Address::InstanceConstSharedPtr address = Network::Utility::parseInternetAddress(address_str);
+
+    TestListenSocket socket(Utility::getIpv4AnyAddress());
+
+    socket.setLocalAddress(address);
+
+    EXPECT_EQ(socket.localAddress(), address);
+  }
+
+  TEST_P(ListenSocketImplTestUdp, BindSpecificPort) { testBindSpecificPort(); }
+
+  // Validate that we get port allocation when binding to port zero.
+  TEST_P(ListenSocketImplTestTcp, BindPortZero) { testBindPortZero(); }
+
+  TEST_P(ListenSocketImplTestUdp, BindPortZero) { testBindPortZero(); }
 
 } // namespace
+} // namespace
 } // namespace Network
-} // namespace Envoy
