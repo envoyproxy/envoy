@@ -83,7 +83,7 @@ public:
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),
             std::make_unique<EnvoyQuicAlarmFactory>(*dispatcher_, *connection_helper_.GetClock()),
             quic::kQuicDefaultConnectionIdLength, connection_handler_, listener_config_,
-            listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_, nullptr),
+            listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_),
         connection_id_(quic::test::TestConnectionId(1)) {
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
