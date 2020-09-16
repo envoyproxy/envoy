@@ -54,7 +54,7 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:opt_build": [] if test else ["-ggdb3", "-gsplit-dwarf"],
                repository + "//bazel:fastbuild_build": [],
                repository + "//bazel:dbg_build": ["-ggdb3", "-gsplit-dwarf"],
-               repository + "//bazel:windows_opt_build": [],
+               repository + "//bazel:windows_opt_build": [] if test else ["-Z7"],
                repository + "//bazel:windows_fastbuild_build": [],
                repository + "//bazel:windows_dbg_build": [],
                repository + "//bazel:clang_cl_opt_build": [] if test else ["-Z7", "-fstandalone-debug"],
