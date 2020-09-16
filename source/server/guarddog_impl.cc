@@ -101,7 +101,7 @@ void GuardDogImpl::step() {
 
     for (auto& watched_dog : watched_dogs_) {
       if (watched_dog->dog_->touchCount() > 0) {
-        // Watchdog was touched since guarddog last checked; update time and reset the count.
+        // Watchdog was touched since the guard dog last checked; update time and reset the count.
         watched_dog->dog_->resetTouchCount();
         watched_dog->last_touch_time_ = now;
         continue;
