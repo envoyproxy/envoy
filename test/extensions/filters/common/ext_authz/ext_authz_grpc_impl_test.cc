@@ -13,6 +13,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -37,11 +38,10 @@ class ExtAuthzGrpcClientTest : public testing::TestWithParam<Params> {
 public:
   ExtAuthzGrpcClientTest() : async_client_(new Grpc::MockAsyncClient()), timeout_(10) {}
 
-  void initialize(const Params& param, bool timeout_starts_at_check_creation = false) {
+  void initialize(const Params& param) {
     api_version_ = std::get<0>(param);
     use_alpha_ = std::get<1>(param);
-    client_ = std::make_unique<GrpcClientImpl>(Grpc::RawAsyncClientPtr{async_client_},
-                                               timeout_starts_at_check_creation, timeout_,
+    client_ = std::make_unique<GrpcClientImpl>(Grpc::RawAsyncClientPtr{async_client_}, timeout_,
                                                api_version_, use_alpha_);
   }
 
@@ -56,22 +56,12 @@ public:
                             "envoy.service.auth.{}.Authorization", api_version_, use_alpha_),
                         service_full_name);
               EXPECT_EQ("Check", method_name);
-              EXPECT_EQ(timeout_->count(), options.timeout->count());
-              return &async_request_;
-            }));
-  }
-  void expectCallSendWithNoTimeout(envoy::service::auth::v3::CheckRequest& request) {
-    EXPECT_CALL(*async_client_,
-                sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(*(client_.get())), _, _))
-        .WillOnce(
-            Invoke([this](absl::string_view service_full_name, absl::string_view method_name,
-                          Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
-                          const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
-              EXPECT_EQ(TestUtility::getVersionedServiceFullName(
-                            "envoy.service.auth.{}.Authorization", api_version_, use_alpha_),
-                        service_full_name);
-              EXPECT_EQ("Check", method_name);
-              EXPECT_FALSE(options.timeout.has_value());
+              if (Runtime::runtimeFeatureEnabled(
+                      "envoy.reloadable_features.ext_authz_measure_timeout_on_check_created")) {
+                EXPECT_FALSE(options.timeout.has_value());
+              } else {
+                EXPECT_EQ(timeout_->count(), options.timeout->count());
+              }
               return &async_request_;
             }));
   }
@@ -265,6 +255,9 @@ TEST_P(ExtAuthzGrpcClientTest, CancelledAuthorizationRequest) {
 
 // Test the client when the request times out.
 TEST_P(ExtAuthzGrpcClientTest, AuthorizationRequestTimeout) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.ext_authz_measure_timeout_on_check_created", "false"}});
   initialize(GetParam());
 
   envoy::service::auth::v3::CheckRequest request;
@@ -279,13 +272,16 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationRequestTimeout) {
 
 // Test the client when the request times out on an internal timeout.
 TEST_P(ExtAuthzGrpcClientTest, AuthorizationInternalRequestTimeout) {
-  initialize(GetParam(), true);
+  initialize(GetParam());
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.ext_authz_measure_timeout_on_check_created", "true"}});
 
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(*timer, enableTimer(timeout_.value(), _));
 
   envoy::service::auth::v3::CheckRequest request;
-  expectCallSendWithNoTimeout(request);
+  expectCallSend(request);
 
   client_->check(request_callbacks_, dispatcher_, request, Tracing::NullSpan::instance(),
                  stream_info_);
@@ -298,13 +294,17 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationInternalRequestTimeout) {
 
 // Test when the client is cancelled with internal timeout.
 TEST_P(ExtAuthzGrpcClientTest, AuthorizationInternalRequestTimeoutCancelled) {
-  initialize(GetParam(), true);
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.ext_authz_measure_timeout_on_check_created", "true"}});
+
+  initialize(GetParam());
 
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(*timer, enableTimer(timeout_.value(), _));
 
   envoy::service::auth::v3::CheckRequest request;
-  expectCallSendWithNoTimeout(request);
+  expectCallSend(request);
 
   client_->check(request_callbacks_, dispatcher_, request, Tracing::NullSpan::instance(),
                  stream_info_);

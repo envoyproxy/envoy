@@ -13,6 +13,7 @@
 #include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -39,15 +40,14 @@ class ExtAuthzHttpClientTest : public testing::Test {
 public:
   ExtAuthzHttpClientTest() : async_request_{&async_client_} { initialize(EMPTY_STRING); }
 
-  void initialize(const std::string& yaml, bool timeout_starts_at_check_creation = false) {
-    config_ = createConfig(yaml, timeout_starts_at_check_creation);
+  void initialize(const std::string& yaml) {
+    config_ = createConfig(yaml);
     client_ = std::make_unique<RawHttpClientImpl>(cm_, config_);
     ON_CALL(cm_, httpAsyncClientForCluster(config_->cluster()))
         .WillByDefault(ReturnRef(async_client_));
   }
 
   ClientConfigSharedPtr createConfig(const std::string& yaml = EMPTY_STRING,
-                                     bool timeout_starts_at_check_creation = false,
                                      uint32_t timeout = REQUEST_TIMEOUT,
                                      const std::string& path_prefix = "/bar") {
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
@@ -99,8 +99,7 @@ public:
     } else {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    return std::make_shared<ClientConfig>(proto_config, timeout_starts_at_check_creation, timeout,
-                                          path_prefix);
+    return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix);
   }
 
   Http::RequestMessagePtr sendRequest(absl::node_hash_map<std::string, std::string>&& headers) {
@@ -487,7 +486,11 @@ TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
 
 // Test the client when the request times out on an internal timeout.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationInternalRequestTimeout) {
-  initialize("", true);
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.ext_authz_measure_timeout_on_check_created", "true"}});
+
+  initialize("");
   envoy::service::auth::v3::CheckRequest request;
 
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
@@ -504,7 +507,11 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationInternalRequestTimeout) {
 
 // Test when the client is cancelled with internal timeout.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationInternalRequestTimeoutCancelled) {
-  initialize("", true);
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.ext_authz_measure_timeout_on_check_created", "true"}});
+
+  initialize("");
   envoy::service::auth::v3::CheckRequest request;
 
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
