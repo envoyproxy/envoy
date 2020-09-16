@@ -83,14 +83,14 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       encode_complete_(false), decode_complete_(false), destroyed_(false),
       create_per_try_timeout_on_request_complete_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
-      filter_manager_(*this, parent_.callbacks()->dispatcher(), *parent_.callbacks()->connection(),
-                      parent_.callbacks()->streamId(), true,
-                      // std::numeric_limits<uint32_t>::max(), // TODO(snowp): This should probably not
-                      //                                       // be infinite!
-                      parent_.callbacks()->decoderBufferLimit(),
-                      filter_factory_, noopLocalReply(), conn_pool->protocol(),
-                      parent_.callbacks()->dispatcher().timeSource(), nullptr,
-                      StreamInfo::FilterState::FilterChain) {
+      filter_manager_(
+          *this, parent_.callbacks()->dispatcher(), *parent_.callbacks()->connection(),
+          parent_.callbacks()->streamId(), true,
+          // std::numeric_limits<uint32_t>::max(), // TODO(snowp): This should probably not
+          //                                       // be infinite!
+          parent_.callbacks()->decoderBufferLimit(), filter_factory_, noopLocalReply(),
+          conn_pool->protocol(), parent_.callbacks()->dispatcher().timeSource(), nullptr,
+          StreamInfo::FilterState::FilterChain) {
   auto filter = std::make_shared<UpstreamRequestFilter>(*this, std::move(conn_pool));
   filter_manager_.addStreamDecoderFilter(filter);
   filter_ = filter.get();
