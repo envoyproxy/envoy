@@ -66,6 +66,10 @@ TraceSegmentPtr toSegmentObject(const SegmentContext& segment_context) {
   return new_segment;
 }
 
+const Http::LowerCaseString& authenticationTokenKey() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "Authentication");
+}
+
 } // namespace
 
 TraceSegmentReporter::TraceSegmentReporter(
@@ -85,8 +89,7 @@ TraceSegmentReporter::TraceSegmentReporter(
 
 void TraceSegmentReporter::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   if (!simple_authentication_token_.empty()) {
-    metadata.setReferenceKey(Http::CustomHeaders::get().Authorization,
-                             simple_authentication_token_);
+    metadata.setReferenceKey(authenticationTokenKey(), simple_authentication_token_);
   }
 }
 
