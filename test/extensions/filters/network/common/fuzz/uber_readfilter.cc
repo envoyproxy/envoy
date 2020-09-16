@@ -119,9 +119,9 @@ void UberFilterFuzzer::fuzz(
       break;
     }
     case test::extensions::filters::network::Action::kAdvanceTime: {
-      time_source_.advanceTimeAsync(
-          std::chrono::milliseconds(action.advance_time().milliseconds()));
-      factory_context_.dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+      time_source_.advanceTimeAndRun(
+          std::chrono::milliseconds(action.advance_time().milliseconds()),
+          factory_context_.dispatcher(), Event::Dispatcher::RunType::NonBlock);
       break;
     }
     default: {

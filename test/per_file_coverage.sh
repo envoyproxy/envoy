@@ -51,7 +51,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common/expr:92.2"
 "source/extensions/filters/common/rbac:87.1"
 "source/extensions/filters/common/fault:94.3"
-"source/extensions/filters/common/lua:95.9"
 "source/extensions/grpc_credentials:92.0"
 "source/extensions/health_checkers:95.9"
 "source/extensions/health_checkers/redis:95.9"
@@ -66,9 +65,10 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/transport_sockets/tls:94.2"
 "source/extensions/transport_sockets/tls/ocsp:95.3"
 "source/extensions/transport_sockets/tls/private_key:76.9"
-"source/extensions/watchdog:84.9"
+"source/extensions/watchdog:69.6" # Death tests within extensions
 "source/extensions/watchdog/profile_action:84.9"
-"source/server:94.7"
+"source/extensions/watchdog/abort_action:42.9" # Death tests don't report LCOV
+"source/server:94.6"
 "source/server/config_validation:76.8"
 "source/server/admin:95.5"
 )
