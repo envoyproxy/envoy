@@ -2705,7 +2705,7 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
   expectPerTryTimerCreate();
   router_.retry_state_->callback_();
 
-  // TOOD(snowp): We now reset here, is that intended?
+  // TODO(snowp): We now reset here, is that intended?
   // EXPECT_CALL(encoder1.stream_, resetStream(_));
 
   // Now send a 5xx back and make sure we don't ask whether we should retry it.
