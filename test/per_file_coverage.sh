@@ -66,9 +66,9 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/transport_sockets/tls:94.2"
 "source/extensions/transport_sockets/tls/ocsp:95.3"
 "source/extensions/transport_sockets/tls/private_key:76.9"
-"source/extensions/watchdog:70.8" # Death tests within extensions
+"source/extensions/watchdog:69.6" # Death tests within extensions
 "source/extensions/watchdog/profile_action:84.9"
-"source/extensions/watchdog/abort_action:45.0" # Death tests don't report LCOV
+"source/extensions/watchdog/abort_action:42.9" # Death tests don't report LCOV
 "source/server:94.6"
 "source/server/config_validation:76.8"
 "source/server/admin:95.5"
