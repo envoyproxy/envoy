@@ -62,4 +62,14 @@ message SubstitutionFormatString {
     //
     google.protobuf.Struct json_format = 2 [(validate.rules).message = {required: true}];
   }
+
+  // Specify a *content_type* field.
+  // If this field is not set then ``text/plain`` is used for *text_format* and
+  // ``application/json`` is used for *json_format*.
+  //
+  // .. code-block::
+  //
+  //   content_type: "text/html; charset=UTF-8"
+  //
+  string content_type = 4;
 }
