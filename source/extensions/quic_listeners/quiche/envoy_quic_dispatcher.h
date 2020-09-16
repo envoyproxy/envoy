@@ -15,7 +15,6 @@
 #include <string>
 
 #include "envoy/network/listener.h"
-#include "common/runtime/runtime_protos.h"
 #include "server/connection_handler_impl.h"
 
 namespace Envoy {
