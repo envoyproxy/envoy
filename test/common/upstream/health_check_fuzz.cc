@@ -88,26 +88,30 @@ void HealthCheckFuzz::initializeAndReplayTcp(test::common::upstream::HealthCheck
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     return;
   }
-  if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
+  /*if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
       //delete tcp_test_base_;
       return;
       //tcp_test_base_->interval_timer_->invokeCallback(); //This calls timeout timer callback haha
-  }
+  }*/
   tcp_test_base_->cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(tcp_test_base_->cluster_->info_, "tcp://127.0.0.1:80")};
+  //tcp_test_base_->cluster_->prioritySet().getMockHostSet(0)->runCallbacks(
+  //    {tcp_test_base_->cluster_->prioritySet().getMockHostSet(0)->hosts_.back()}, {});
   tcp_test_base_->expectSessionCreate();
   tcp_test_base_->expectClientCreate();
   tcp_test_base_->health_checker_->start();
+  ENVOY_LOG_MISC(trace, "Right after starting health checker interval enabled = {}", tcp_test_base_->interval_timer_->enabled_);
+  ENVOY_LOG_MISC(trace, "Right after starting health checker timeout enabled = {}", tcp_test_base_->timeout_timer_->enabled_);
   if (input.health_check_config().has_reuse_connection()) {
     reuse_connection_ = input.health_check_config().reuse_connection().value();
   }
 
   //TODO: Get rid of this hardcoded check
-  /*if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
-    delete tcp_test_base_;
-    return;
-    //tcp_test_base_->interval_timer_->invokeCallback(); //This calls timeout timer callback haha
-  }*/
+  if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
+    tcp_test_base_->interval_timer_->invokeCallback(); //This calls timeout timer callback haha
+  }
+  ENVOY_LOG_MISC(trace, "Before action loop interval enabled = {}", tcp_test_base_->interval_timer_->enabled_);
+  ENVOY_LOG_MISC(trace, "Before action loop timeout enabled = {}", tcp_test_base_->timeout_timer_->enabled_);
   replay(input);
 }
 
@@ -142,6 +146,7 @@ void HealthCheckFuzz::respondHttp(const test::fuzz::Headers& headers, absl::stri
       std::move(response_headers), true);
 
   //Interval timer gets turned on from decodeHeaders()
+  //TODO: What happens if respond respond before an interval timeframe finishes...that is a perfectly valid scenario
   if (!reuse_connection_ || client_will_close) {
     ENVOY_LOG_MISC(trace, "Creating client and stream because shouldClose() is true");
     triggerIntervalTimerHttp(true);
@@ -185,6 +190,8 @@ void HealthCheckFuzz::triggerIntervalTimerHttp(bool expect_client_create) {
 }
 
 void HealthCheckFuzz::triggerIntervalTimerTcp() {
+  ENVOY_LOG_MISC(trace, "Trigger interval timer - interval enabled = {}", tcp_test_base_->interval_timer_->enabled_);
+  ENVOY_LOG_MISC(trace, "Trigger interval timer - timeout enabled = {}", tcp_test_base_->timeout_timer_->enabled_);
   if (!tcp_test_base_->interval_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Interval timer is disabled. Skipping trigger interval timer.");
     return;
@@ -194,6 +201,8 @@ void HealthCheckFuzz::triggerIntervalTimerTcp() {
 }
 
 void HealthCheckFuzz::triggerTimeoutTimerHttp(bool last_action) {
+  ENVOY_LOG_MISC(trace, "Trigger timeout timer - interval enabled = {}", tcp_test_base_->interval_timer_->enabled_);
+  ENVOY_LOG_MISC(trace, "Trigger timeout timer - timeout enabled = {}", tcp_test_base_->timeout_timer_->enabled_);
   // Timeout timer needs to be explicitly enabled, usually by a call to onIntervalBase().
   if (!http_test_base_->test_sessions_[0]->timeout_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping trigger timeout timer.");
@@ -306,6 +315,7 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
       }
       case HealthCheckFuzz::Type::TCP: {
         triggerIntervalTimerTcp();
+        break;
       }
       default:
         break;

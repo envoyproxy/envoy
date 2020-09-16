@@ -2953,6 +2953,9 @@ TEST_F(TcpHealthCheckerImplTest, Success) {
   EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
+  ENVOY_LOG_MISC(trace, "Right after starting health checker interval enabled = {}", interval_timer_->enabled_);
+  ENVOY_LOG_MISC(trace, "Right after starting health checker timeout enabled = {}", timeout_timer_->enabled_);
+
   connection_->runHighWatermarkCallbacks();
   connection_->runLowWatermarkCallbacks();
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
@@ -3047,22 +3050,19 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutThenRemoteClose) {
   EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
 
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks(
-      {cluster_->prioritySet().getMockHostSet(0)->hosts_.back()}, {});
+      {cluster_->prioritySet().getMockHostSet(0)->hosts_.back()}, {}); //TODO: This line might have something to do with it
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   Buffer::OwnedImpl response;
-  ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer before adding.",
-                 response.toString());
   addUint8(response, 1);
-  ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer generated from the string.",
-                 response.toString());
   read_filter_->onData(response, false);
 
   EXPECT_CALL(*connection_, close(_));
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+  ENVOY_LOG_MISC(trace, "Timeout timer invoked.");
   timeout_timer_->invokeCallback();
   EXPECT_EQ(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->getActiveHealthFailureType(),
             Host::ActiveHealthFailureType::TIMEOUT);
@@ -3071,6 +3071,7 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutThenRemoteClose) {
   expectClientCreate();
   EXPECT_CALL(*connection_, write(_, _));
   EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
+  ENVOY_LOG_MISC(trace, "Interval timer invoked.");
   interval_timer_->invokeCallback();
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
@@ -3087,6 +3088,7 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutThenRemoteClose) {
   expectClientCreate();
   EXPECT_CALL(*connection_, write(_, _));
   EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
+  ENVOY_LOG_MISC(trace, "Interval timer invoked.");
   interval_timer_->invokeCallback();
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
