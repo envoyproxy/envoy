@@ -618,9 +618,9 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
 }
 
 int StreamHandleWrapper::luaBase64Escape(lua_State* state) {
-  // Get input string.
-  absl::string_view input = luaL_checkstring(state, 2);
-  auto output = absl::Base64Escape(input);
+  size_t input_size;
+  const char* input = luaL_checklstring(state, 2, &input_size);
+  auto output = absl::Base64Escape(absl::string_view(input, input_size));
   lua_pushlstring(state, output.data(), output.length());
 
   return 1;
@@ -647,8 +647,16 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
 
 FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
-    ThreadLocal::SlotAllocator&, Api::Api&)
-    : disabled_(config.disabled()), name_(config.name()) {}
+    Server::Configuration::ServerFactoryContext& context)
+    : main_thread_dispatcher_(context.dispatcher()), disabled_(config.disabled()),
+      name_(config.name()) {
+  if (disabled_ || !name_.empty()) {
+    return;
+  }
+  // Read and parse the inline Lua code defined in the route configuration.
+  const std::string code_str = Config::DataSource::read(config.source_code(), true, context.api());
+  per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());
+}
 
 void Filter::onDestroy() {
   destroyed_ = true;

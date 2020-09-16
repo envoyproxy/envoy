@@ -268,7 +268,7 @@ private:
   bool refused_{};
 };
 
-class TestDnsServer : public ListenerCallbacks {
+class TestDnsServer : public TcpListenerCallbacks {
 public:
   TestDnsServer(Event::Dispatcher& dispatcher)
       : dispatcher_(dispatcher), record_ttl_(0), stream_info_(dispatcher.timeSource()) {}
@@ -390,6 +390,9 @@ public:
   const std::string& logicalName() const override { return antagonistic_name_; }
   const Address::Ip* ip() const override { return instance_.ip(); }
   const Address::Pipe* pipe() const override { return instance_.pipe(); }
+  const Address::EnvoyInternalAddress* envoyInternalAddress() const override {
+    return instance_.envoyInternalAddress();
+  }
   const sockaddr* sockAddr() const override { return instance_.sockAddr(); }
   socklen_t sockAddrLen() const override { return instance_.sockAddrLen(); }
   Address::Type type() const override { return instance_.type(); }

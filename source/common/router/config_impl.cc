@@ -1056,9 +1056,10 @@ void ConnectRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
 }
 
 RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
-                                                   const StreamInfo::StreamInfo&,
+                                                   const StreamInfo::StreamInfo& stream_info,
                                                    uint64_t random_value) const {
-  if (Http::HeaderUtility::isConnect(headers)) {
+  if (Http::HeaderUtility::isConnect(headers) &&
+      RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;
@@ -1127,7 +1128,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
       routes_.emplace_back(new ConnectRouteEntryImpl(*this, route, factory_context, validator));
       break;
     }
-    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
+    default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
 

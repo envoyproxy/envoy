@@ -754,7 +754,7 @@ TEST_F(ConfigurationImplTest, KillTimeoutWithoutSkew) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(std::chrono::milliseconds(1000), config.wdKillTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(1000), config.watchdogConfig().killTimeout());
 }
 
 TEST_F(ConfigurationImplTest, CanSkewsKillTimeout) {
@@ -772,8 +772,8 @@ TEST_F(ConfigurationImplTest, CanSkewsKillTimeout) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_LT(std::chrono::milliseconds(1000), config.wdKillTimeout());
-  EXPECT_GE(std::chrono::milliseconds(1500), config.wdKillTimeout());
+  EXPECT_LT(std::chrono::milliseconds(1000), config.watchdogConfig().killTimeout());
+  EXPECT_GE(std::chrono::milliseconds(1500), config.watchdogConfig().killTimeout());
 }
 
 TEST_F(ConfigurationImplTest, DoesNotSkewIfKillTimeoutDisabled) {
@@ -790,7 +790,7 @@ TEST_F(ConfigurationImplTest, DoesNotSkewIfKillTimeoutDisabled) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(std::chrono::milliseconds(0), config.wdKillTimeout());
+  EXPECT_EQ(std::chrono::milliseconds(0), config.watchdogConfig().killTimeout());
 }
 
 } // namespace

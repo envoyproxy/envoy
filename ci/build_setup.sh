@@ -82,11 +82,10 @@ export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
 # Use https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_repository_cache_hardlinks
 # to save disk space.
 export BAZEL_BUILD_OPTIONS=" ${BAZEL_OPTIONS} --verbose_failures --show_task_finish --experimental_generate_json_trace_profile \
-  --build_event_json_file=${BUILD_DIR}/build_event.json \
   --test_output=errors --repository_cache=${BUILD_DIR}/repository_cache --experimental_repository_cache_hardlinks \
   ${BAZEL_BUILD_EXTRA_OPTIONS} ${BAZEL_EXTRA_TEST_OPTIONS}"
 
-[[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HEAPCHECK="
+[[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --flaky_test_attempts=2 --test_env=HEAPCHECK="
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean --expunge
 

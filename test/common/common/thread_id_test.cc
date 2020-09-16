@@ -46,5 +46,10 @@ TEST(ThreadId, Hashability) {
   }));
 }
 
+TEST(ThreadId, CanGetId) {
+  Thread::ThreadId tid(10);
+  EXPECT_EQ(tid.getId(), 10);
+}
+
 } // namespace
 } // namespace Envoy
