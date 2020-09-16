@@ -177,7 +177,7 @@ message Http1ProtocolOptions {
   google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 7;
 }
 
-// [#next-free-field: 15]
+// [#next-free-field: 17]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.Http2ProtocolOptions";
@@ -345,6 +345,22 @@ message Http2ProtocolOptions {
   // <https://www.iana.org/assignments/http2-parameters/http2-parameters.xhtml#settings>`_ for
   // standardized identifiers.
   repeated SettingsParameter custom_settings_parameters = 13;
+
+  // Send HTTP/2 PING frames at this period, in order to test that the connection is still alive.
+  // If not specified, no keepalive PING frames will be sent.
+  google.protobuf.Duration connection_keepalive_interval = 15
+      [(validate.rules).duration = {gt {nanos: 1000000}}];
+
+  // How long to wait for a response to a keepalive PING. If a response is not received within this
+  // time period, the connection will be aborted.
+  //
+  // If configured, this value must be less than :ref:`connection_keepalive_interval
+  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.connection_keepalive_interval>`.
+  //
+  // This setting is required if :ref:`connection_keepalive_interval
+  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.connection_keepalive_interval>` is set.
+  google.protobuf.Duration connection_keepalive_timeout = 16
+      [(validate.rules).duration = {gt {nanos: 1000000}}];
 }
 
 // [#not-implemented-hide:]

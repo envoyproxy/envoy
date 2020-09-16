@@ -541,10 +541,16 @@ private:
   virtual Status checkInboundFrameLimits(int32_t stream_id) PURE;
   void releaseOutboundFrame();
   void releaseOutboundControlFrame();
+  void sendKeepalive();
+  void onKeepaliveResponseTimeout();
 
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
   bool pending_deferred_reset_ : 1;
+  Event::TimerPtr keepalive_send_timer_;
+  Event::TimerPtr keepalive_timeout_timer_;
+  std::chrono::milliseconds keepalive_interval_;
+  std::chrono::milliseconds keepalive_timeout_;
 };
 
 /**

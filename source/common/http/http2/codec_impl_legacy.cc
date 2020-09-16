@@ -545,13 +545,50 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           http2_options.max_inbound_window_update_frames_per_data_frame_sent().value()),
       skip_encoding_empty_trailers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_skip_encoding_empty_trailers")),
-      dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {}
+      dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {
+  if (http2_options.has_connection_keepalive_interval()) {
+    ASSERT(http2_options.has_connection_keepalive_timeout(),
+           "Validated in `initializeAndValidateOptions()`");
+
+    keepalive_interval_ = std::chrono::milliseconds(
+        PROTOBUF_GET_MS_REQUIRED(http2_options, connection_keepalive_interval));
+    keepalive_timeout_ = std::chrono::milliseconds(
+        PROTOBUF_GET_MS_REQUIRED(http2_options, connection_keepalive_timeout));
+
+    keepalive_send_timer_ = connection.dispatcher().createTimer([this]() { sendKeepalive(); });
+    keepalive_timeout_timer_ =
+        connection.dispatcher().createTimer([this]() { onKeepaliveResponseTimeout(); });
+
+    keepalive_send_timer_->enableTimer(keepalive_interval_);
+  }
+}
 
 ConnectionImpl::~ConnectionImpl() {
   for (const auto& stream : active_streams_) {
     stream->destroy();
   }
   nghttp2_session_del(session_);
+}
+
+void ConnectionImpl::sendKeepalive() {
+  SystemTime now = connection_.dispatcher().timeSource().systemTime();
+  uint64_t ms_since_epoch =
+      std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+  ENVOY_CONN_LOG(trace, "Sending keepalive PING {}", connection_, ms_since_epoch);
+
+  // The last parameter is an opaque 8-byte buffer, so this cast is safe.
+  int rc = nghttp2_submit_ping(session_, 0 /*flags*/, reinterpret_cast<uint8_t*>(&ms_since_epoch));
+  ASSERT(rc == 0);
+  sendPendingFrames();
+
+  keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
+  keepalive_send_timer_->enableTimer(keepalive_interval_);
+}
+
+void ConnectionImpl::onKeepaliveResponseTimeout() {
+  ENVOY_CONN_LOG(debug, "Closing connection due to keepalive timeout", connection_);
+  stats_.keepalive_timeout_.inc();
+  connection_.close(Network::ConnectionCloseType::NoFlush);
 }
 
 Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
