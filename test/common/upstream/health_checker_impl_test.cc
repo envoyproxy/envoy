@@ -2885,7 +2885,7 @@ TEST(TcpHealthCheckMatcher, match) {
   EXPECT_TRUE(TcpHealthCheckMatcher::match(segments, buffer));
 }
 
-class TcpHealthCheckerImplTest : public testing::Test, public HealthCheckerTestBase {
+class TcpHealthCheckerImplTest : public testing::Test, public TcpHealthCheckerImplTestBase {
 public:
   void allocHealthChecker(const std::string& yaml, bool avoid_boosting = true) {
     health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
@@ -2939,23 +2939,6 @@ public:
 
     allocHealthChecker(yaml);
   }
-
-  void expectSessionCreate() {
-    interval_timer_ = new Event::MockTimer(&dispatcher_);
-    timeout_timer_ = new Event::MockTimer(&dispatcher_);
-  }
-
-  void expectClientCreate() {
-    connection_ = new NiceMock<Network::MockClientConnection>();
-    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection_));
-    EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(SaveArg<0>(&read_filter_));
-  }
-
-  std::shared_ptr<TcpHealthCheckerImpl> health_checker_;
-  Network::MockClientConnection* connection_{};
-  Event::MockTimer* timeout_timer_{};
-  Event::MockTimer* interval_timer_{};
-  Network::ReadFilterSharedPtr read_filter_;
 };
 
 TEST_F(TcpHealthCheckerImplTest, Success) {
@@ -2977,7 +2960,11 @@ TEST_F(TcpHealthCheckerImplTest, Success) {
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   Buffer::OwnedImpl response;
+  ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer before adding.",
+                 response.toString());
   addUint8(response, 2);
+  ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer generated from the string.",
+                 response.toString());
   read_filter_->onData(response, false);
 }
 
@@ -3002,7 +2989,11 @@ TEST_F(TcpHealthCheckerImplTest, DataWithoutReusingConnection) {
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush)).Times(1);
 
   Buffer::OwnedImpl response;
+  ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer before adding.",
+                 response.toString());
   addUint8(response, 2);
+  ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer generated from the string.",
+                 response.toString());
   read_filter_->onData(response, false);
 
   // These are the expected metric results after testing.
@@ -3027,7 +3018,11 @@ TEST_F(TcpHealthCheckerImplTest, WrongData) {
 
   // Not the expected response
   Buffer::OwnedImpl response;
+  // ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer before adding.",
+  // response.toString());
   addUint8(response, 3);
+  // ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer generated from the string.",
+  // response.toString());
   read_filter_->onData(response, false);
 
   // These are the expected metric results after testing.
@@ -3057,7 +3052,11 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutThenRemoteClose) {
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   Buffer::OwnedImpl response;
+  ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer before adding.",
+                 response.toString());
   addUint8(response, 1);
+  ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer generated from the string.",
+                 response.toString());
   read_filter_->onData(response, false);
 
   EXPECT_CALL(*connection_, close(_));
@@ -3102,7 +3101,7 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   InSequence s;
 
   setupData(1);
-  health_checker_->start();
+  health_checker_->start(); //Weird, this is beforehand
 
   expectSessionCreate();
   expectClientCreate();

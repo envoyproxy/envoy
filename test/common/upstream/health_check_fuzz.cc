@@ -28,7 +28,7 @@ void HealthCheckFuzz::allocTcpHealthCheckerFromProto(
 
 void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTestCase input) {
   switch (input.health_check_config().health_checker_case()) {
-  case envoy::config::core::v3::HealthCheck::kHttpHealthCheck: {
+  case envoy::config::core::v3::HealthCheck::kHttpHealthCheck: { //TODO: Put delete here?
     type_ = HealthCheckFuzz::Type::HTTP;
     http_test_base_ = new HttpHealthCheckerImplTestBase;
     initializeAndReplayHttp(input);
@@ -49,7 +49,7 @@ void HealthCheckFuzz::initializeAndReplayHttp(test::common::upstream::HealthChec
   try {
     allocHttpHealthCheckerFromProto(input.health_check_config());
   } catch (EnvoyException& e) {
-    delete (http_test_base_);
+    delete http_test_base_;
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     return;
   }
@@ -82,7 +82,7 @@ void HealthCheckFuzz::initializeAndReplayTcp(test::common::upstream::HealthCheck
   try {
     allocTcpHealthCheckerFromProto(input.health_check_config());
   } catch (EnvoyException& e) {
-    delete (tcp_test_base_);
+    delete tcp_test_base_;
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     return;
   }
@@ -94,10 +94,13 @@ void HealthCheckFuzz::initializeAndReplayTcp(test::common::upstream::HealthCheck
   if (input.health_check_config().has_reuse_connection()) {
     reuse_connection_ = input.health_check_config().reuse_connection().value();
   }
+
+  //TODO: Get rid of this hardcoded check
   if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
-    tcp_test_base_->interval_timer_->invokeCallback();
+    delete tcp_test_base_;
+    return;
+    //tcp_test_base_->interval_timer_->invokeCallback(); //This calls timeout timer callback haha
   }
-  // TODO: Hardcode a raise event connection here?
   replay(input);
 }
 
