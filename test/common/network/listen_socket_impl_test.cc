@@ -20,7 +20,6 @@ using testing::DoAll;
 using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::Optional;
 using testing::Return;
 using testing::WithArg;
 
@@ -176,7 +175,7 @@ TEST(ConnectionSocketImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
 
 #if !defined(__linux__)
 
-TEST(ConnectionInfo, LastRoundTripTimeAlwaysReturnsEmptyOptional) {
+TEST(ConnectionSocketImpl, LastRoundTripTimeAlwaysReturnsEmptyOptional) {
   std::unique_ptr<MockIoHandle> io_handle = std::make_unique<NiceMock<MockIoHandle>>();
   EXPECT_CALL(*io_handle, getOption(_, _, _, _)).WillOnce(Return(Api::SysCallIntResult{-1, -1}));
   ConnectionSocketImpl socket{std::move(io_handle),
@@ -184,6 +183,7 @@ TEST(ConnectionInfo, LastRoundTripTimeAlwaysReturnsEmptyOptional) {
                               std::make_shared<NiceMock<MockResolvedAddress>>("", "")};
 
   EXPECT_THAT(socket.lastRoundTripTime(), Eq(absl::optional<std::chrono::milliseconds>{}));
+}
 
 #endif
 
