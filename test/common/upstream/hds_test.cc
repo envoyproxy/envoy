@@ -184,8 +184,8 @@ protected:
   }
 
   void
-  add_transport_socket_matches(envoy::service::health::v3::ClusterHealthCheck* cluster_health_check,
-                               std::string match, std::string criteria) {
+  addTransportSocketMatches(envoy::service::health::v3::ClusterHealthCheck* cluster_health_check,
+                            std::string match, std::string criteria) {
     // Add transport socket matches to specified cluster and its first health check.
     const std::string match_yaml = absl::StrFormat(
         R"EOF(
@@ -532,8 +532,7 @@ TEST_F(HdsTest, TestSocketContext) {
 
   // Create Message with transport sockets.
   message.reset(createSimpleMessage());
-  add_transport_socket_matches(message->mutable_cluster_health_checks(0), "test_match",
-                               "test_match");
+  addTransportSocketMatches(message->mutable_cluster_health_checks(0), "test_match", "test_match");
 
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection));
@@ -1091,8 +1090,7 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
 
   // Create Message, with a non-valid match and process.
   message.reset(createSimpleMessage());
-  add_transport_socket_matches(message->mutable_cluster_health_checks(0), "bad_match",
-                               "test_match");
+  addTransportSocketMatches(message->mutable_cluster_health_checks(0), "bad_match", "test_match");
   hds_delegate_->onReceiveMessage(std::move(message));
 
   // Get our health checker to match against.
@@ -1110,8 +1108,7 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
 
   // Create a new Message, this time with a good match.
   message.reset(createSimpleMessage());
-  add_transport_socket_matches(message->mutable_cluster_health_checks(0), "test_match",
-                               "test_match");
+  addTransportSocketMatches(message->mutable_cluster_health_checks(0), "test_match", "test_match");
   hds_delegate_->onReceiveMessage(std::move(message));
 
   // Get our new health checker to match against.
@@ -1137,8 +1134,8 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
   // filter. This means that the health checker changes but the transport_socket_matches in the
   // ClusterHealthCheck does not.
   message.reset(createSimpleMessage());
-  add_transport_socket_matches(message->mutable_cluster_health_checks(0), "test_match",
-                               "something_new");
+  addTransportSocketMatches(message->mutable_cluster_health_checks(0), "test_match",
+                            "something_new");
 
   hds_delegate_->onReceiveMessage(std::move(message));
   // Get our new health checker to match against.
