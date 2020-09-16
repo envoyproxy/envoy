@@ -25,6 +25,7 @@ enum RaiseEvent {
 
 message Action {
   oneof action_selector {
+    option (validate.required) = true;
     Respond respond = 1;
     google.protobuf.Empty trigger_interval_timer = 2;
     //TODO: respondBody, respondTrailers
