@@ -141,7 +141,8 @@ protected:
     auto proof_source = std::make_unique<TestProofSource>();
     filter_chain_ = &proof_source->filterChain();
     crypto_config_peer.ResetProofSource(std::move(proof_source));
-    simulated_time_system_.advanceTimeAsync(std::chrono::milliseconds(100));
+    simulated_time_system_.advanceTimeAndRun(std::chrono::milliseconds(100), *dispatcher_,
+                                             Event::Dispatcher::RunType::NonBlock);
 
     // The state of whether client hellos can be buffered or not is different before and after
     // the first packet processed by the listener. This only matters in tests. Force an event
