@@ -1146,31 +1146,31 @@ TEST_F(DispatcherWithWatchdogTest, PeriodicTouchTimer) {
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 
-TEST_F(DispatcherWithWatchdogTest, TouchAfterSchedulableCallback) {
+TEST_F(DispatcherWithWatchdogTest, TouchBeforeSchedulableCallback) {
   ReadyWatcher watcher;
 
   auto cb = dispatcher_->createSchedulableCallback([&]() { watcher.ready(); });
   cb->scheduleCallbackCurrentIteration();
 
   InSequence s;
-  EXPECT_CALL(watcher, ready());
   EXPECT_CALL(*watchdog_, touch());
+  EXPECT_CALL(watcher, ready());
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 
-TEST_F(DispatcherWithWatchdogTest, TouchAfterTimer) {
+TEST_F(DispatcherWithWatchdogTest, TouchBeforeTimer) {
   ReadyWatcher watcher;
 
   auto timer = dispatcher_->createTimer([&]() { watcher.ready(); });
   timer->enableTimer(std::chrono::milliseconds(0));
 
   InSequence s;
-  EXPECT_CALL(watcher, ready());
   EXPECT_CALL(*watchdog_, touch());
+  EXPECT_CALL(watcher, ready());
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 
-TEST_F(DispatcherWithWatchdogTest, TouchAfterFdEvent) {
+TEST_F(DispatcherWithWatchdogTest, TouchBeforeFdEvent) {
   os_fd_t fd = os_sys_calls_.socket(AF_INET6, SOCK_STREAM, 0).rc_;
   ASSERT_TRUE(SOCKET_VALID(fd));
 
@@ -1182,8 +1182,8 @@ TEST_F(DispatcherWithWatchdogTest, TouchAfterFdEvent) {
   file_event->activate(FileReadyType::Read);
 
   InSequence s;
-  EXPECT_CALL(watcher, ready());
   EXPECT_CALL(*watchdog_, touch());
+  EXPECT_CALL(watcher, ready());
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 
