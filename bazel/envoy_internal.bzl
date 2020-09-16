@@ -13,6 +13,7 @@ def envoy_copts(repository, test = False):
         "-Wold-style-cast",
         "-Wformat",
         "-Wformat-security",
+        "-Wrange-loop-analysis",
         "-Wvla",
     ]
 
