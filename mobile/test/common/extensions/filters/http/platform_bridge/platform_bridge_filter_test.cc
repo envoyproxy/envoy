@@ -72,6 +72,8 @@ TEST_F(PlatformBridgeFilterTest, NullImplementation) {
   Http::TestResponseTrailerMapImpl response_trailers{{"x-test-trailer", "test trailer"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
 
+  filter_->onDestroy();
+
   free(null_filter);
 }
 
@@ -84,6 +86,10 @@ TEST_F(PlatformBridgeFilterTest, PartialNullImplementation) {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     invocations->init_filter_calls++;
     return context;
+  };
+  noop_filter->release_filter = [](const void* context) -> void {
+    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    invocations->release_filter_calls++;
   };
   setUpFilter("platform_filter_name: PartialNullImplementation\n", noop_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
@@ -105,6 +111,9 @@ TEST_F(PlatformBridgeFilterTest, PartialNullImplementation) {
 
   Http::TestResponseTrailerMapImpl response_trailers{{"x-test-trailer", "test trailer"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
+
+  filter_->onDestroy();
+  EXPECT_EQ(invocations.release_filter_calls, 1);
 
   free(noop_filter);
 }
