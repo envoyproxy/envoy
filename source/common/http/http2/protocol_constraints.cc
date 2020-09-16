@@ -25,9 +25,7 @@ ProtocolConstraints::incrementOutboundFrameCount(bool is_outbound_flood_monitore
   if (is_outbound_flood_monitored_control_frame) {
     ++outbound_control_frames_;
   }
-  if (status_.ok()) {
-    status_ = checkOutboundQueueLimits();
-  }
+  status_.Update(checkOutboundQueueLimits());
   return is_outbound_flood_monitored_control_frame ? control_frame_buffer_releasor_
                                                    : frame_buffer_releasor_;
 }
@@ -44,6 +42,11 @@ void ProtocolConstraints::releaseOutboundControlFrame() {
 }
 
 Status ProtocolConstraints::checkOutboundQueueLimits() {
+  // Stop checking for further violations after the first failure.
+  if (!status_.ok()) {
+    return status_;
+  }
+
   if (outbound_frames_ > max_outbound_frames_) {
     stats_.outbound_flood_.inc();
     return bufferFloodError("Too many frames in the outbound queue.");
@@ -83,13 +86,16 @@ Status ProtocolConstraints::trackInboundFrames(const nghttp2_frame_hd* hd,
     break;
   }
 
-  if (status_.ok()) {
-    status_ = checkInboundFrameLimits();
-  }
+  status_.Update(checkInboundFrameLimits());
   return status_;
 }
 
 Status ProtocolConstraints::checkInboundFrameLimits() {
+  // Stop checking for further violations after the first failure.
+  if (!status_.ok()) {
+    return status_;
+  }
+
   if (consecutive_inbound_frames_with_empty_payload_ >
       max_consecutive_inbound_frames_with_empty_payload_) {
     stats_.inbound_empty_frames_flood_.inc();

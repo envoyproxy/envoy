@@ -32,7 +32,7 @@ public:
   // Return ok status if no protocol constraints were violated.
   // Return error status of the first detected violation. Subsequent violations of constraints
   // do not reset the error status or increment stat counters.
-  Status status() { return status_; }
+  const Status& status() const { return status_; }
 
   // Increment counters of pending (buffered for sending to the peer) outbound frames.
   // If the `is_outbound_flood_monitored_control_frame` is false only the counter for all frame
