@@ -10,7 +10,7 @@ import "google/protobuf/empty.proto";
 message HttpRespond { //TODO: Split this across headers, body, and trailers?
   test.fuzz.Headers headers = 1;
   //https://github.com/nodejs/http-parser/blob/master/http_parser.c#L852
-  string status = 2 [(validate.rules).string.pattern = "[0-9]+$*"];
+  string status = 2 [(validate.rules).string = {pattern: "[0-9]+$*", min_len: 1}];
 }
 
 message TcpRespond {
@@ -30,6 +30,7 @@ enum RaiseEvent {
 
 message Action {
   oneof action_selector {
+    option (validate.required) = true;
     Respond respond = 1;
     google.protobuf.Empty trigger_interval_timer = 2;
     //TODO: respondBody, respondTrailers

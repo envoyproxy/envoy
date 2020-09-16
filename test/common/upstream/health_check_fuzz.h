@@ -23,14 +23,19 @@ public:
 private:
   void initializeAndReplayHttp(test::common::upstream::HealthCheckTestCase input);
   void initializeAndReplayTcp(test::common::upstream::HealthCheckTestCase input);
+
   void respondHttp(const test::fuzz::Headers& headers, absl::string_view status);
   void respondTcp(std::string data, bool last_action);
-  void triggerIntervalTimerHttp();
+  
+  void triggerIntervalTimerHttp(bool expect_client_create);
   void triggerIntervalTimerTcp();
+  
   void triggerTimeoutTimerHttp(bool last_action);
   void triggerTimeoutTimerTcp(bool last_action);
+  
   void allocHttpHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void allocTcpHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
+  
   void raiseEvent(const test::common::upstream::RaiseEvent& event, bool last_action);
 
   void replay(const test::common::upstream::HealthCheckTestCase& input);

@@ -32,6 +32,8 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
     type_ = HealthCheckFuzz::Type::HTTP;
     http_test_base_ = new HttpHealthCheckerImplTestBase;
     initializeAndReplayHttp(input);
+    delete http_test_base_;
+    ENVOY_LOG_MISC(trace, "Deleted http test base");
     break;
   }
   case envoy::config::core::v3::HealthCheck::kTcpHealthCheck: {
@@ -43,6 +45,8 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
     type_ = HealthCheckFuzz::Type::TCP;
     tcp_test_base_ = new TcpHealthCheckerImplTestBase;
     initializeAndReplayTcp(input);
+    delete tcp_test_base_;
+    ENVOY_LOG_MISC(trace, "Deleted tcp test base");
     break;
   }
   default:
@@ -72,9 +76,9 @@ void HealthCheckFuzz::initializeAndReplayHttp(test::common::upstream::HealthChec
   http_test_base_->health_checker_->start();
   ON_CALL(http_test_base_->runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillByDefault(testing::Return(45000));
+
   // If has an initial jitter, this calls onIntervalBase and finishes startup
-  if (input.health_check_config().initial_jitter().seconds() != 0 ||
-      input.health_check_config().initial_jitter().nanos() >= 500000) {
+  if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
     http_test_base_->test_sessions_[0]->interval_timer_->invokeCallback();
   }
   if (input.health_check_config().has_reuse_connection()) {
@@ -129,24 +133,20 @@ void HealthCheckFuzz::respondHttp(const test::fuzz::Headers& headers, absl::stri
     client_will_close =
         absl::EqualsIgnoreCase(response_headers->Connection()->value().getStringView(),
                                Http::Headers::get().ConnectionValues.Close);
-  }
-
-  // If client already will close from connection header, no need for this check.
-  if (response_headers->ProxyConnection() && !client_will_close) {
+  } else if (response_headers->ProxyConnection()) {
     client_will_close =
         absl::EqualsIgnoreCase(response_headers->ProxyConnection()->value().getStringView(),
                                Http::Headers::get().ConnectionValues.Close);
   }
 
-  ENVOY_LOG_MISC(trace, "Responded headers {}", response_headers);
+  ENVOY_LOG_MISC(trace, "Responded headers {}", *response_headers.get());
   http_test_base_->test_sessions_[0]->stream_response_callbacks_->decodeHeaders(
       std::move(response_headers), true);
 
+  //Interval timer gets turned on from decodeHeaders()
   if (!reuse_connection_ || client_will_close) {
     ENVOY_LOG_MISC(trace, "Creating client and stream because shouldClose() is true");
-    http_test_base_->expectClientCreate(0);
-    http_test_base_->expectStreamCreate(0);
-    http_test_base_->test_sessions_[0]->interval_timer_->invokeCallback(); //This gets turned on from decodeHeaders
+    triggerIntervalTimerHttp(true);
   }
 }
 
@@ -172,7 +172,7 @@ void HealthCheckFuzz::respondTcp(std::string data, bool last_action) { // Add an
   }
 }
 
-void HealthCheckFuzz::triggerIntervalTimerHttp() {
+void HealthCheckFuzz::triggerIntervalTimerHttp(bool expect_client_create) {
   // Interval timer needs to be explicitly enabled, usually by decodeHeaders.
   if (!http_test_base_->test_sessions_[0]->interval_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Interval timer is disabled. Skipping trigger interval timer.");
@@ -188,6 +188,13 @@ void HealthCheckFuzz::triggerIntervalTimerTcp() {
     ENVOY_LOG_MISC(trace, "Interval timer is disabled. Skipping trigger interval timer.");
     return;
   }
+<<<<<<< HEAD
+=======
+  if (expect_client_create) {
+    expectClientCreate(0);
+  }
+  expectStreamCreate(0);
+>>>>>>> health-check-fuzz
   ENVOY_LOG_MISC(trace, "Triggered interval timer");
   tcp_test_base_->interval_timer_->invokeCallback();
 }
@@ -204,9 +211,7 @@ void HealthCheckFuzz::triggerTimeoutTimerHttp(bool last_action) {
                                           // and enables interval
   if (!last_action) {
     ENVOY_LOG_MISC(trace, "Creating client and stream from network timeout");
-    http_test_base_->expectClientCreate(0);
-    http_test_base_->expectStreamCreate(0);
-    http_test_base_->test_sessions_[0]->interval_timer_->invokeCallback();
+    triggerIntervalTimerHttp(true);
   }
 }
 
@@ -251,9 +256,7 @@ void HealthCheckFuzz::raiseEvent(const test::common::upstream::RaiseEvent& event
     http_test_base_->test_sessions_[0]->client_connection_->raiseEvent(eventType);
     if (!last_action && eventType != Network::ConnectionEvent::Connected) {
       ENVOY_LOG_MISC(trace, "Creating client and stream from close event");
-      http_test_base_->expectClientCreate(0);
-      http_test_base_->expectStreamCreate(0);
-      http_test_base_->test_sessions_[0]->interval_timer_->invokeCallback(); //Interval timer is guaranteed to be on from raiseEvent not connected - calls onResetStream which handles failure, turning interval timer on and timeout off
+      triggerIntervalTimerHttp(true); //Interval timer is guaranteed to be on from raiseEvent not connected - calls onResetStream which handles failure, turning interval timer on and timeout off
     }
     break;
   }
@@ -277,20 +280,16 @@ void HealthCheckFuzz::raiseEvent(const test::common::upstream::RaiseEvent& event
 }
 
 void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& input) {
-  for (int i = 0; i < input.actions().size(); ++i) {
+  constexpr auto max_actions = 64;
+  for (int i = 0; i < std::min(max_actions, input.actions().size()); ++i) {
     const auto& event = input.actions(i);
-    const bool last_action = i == input.actions().size() - 1;
+    const bool last_action = i == std::min(max_actions, input.actions().size()) - 1;
     ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
     switch (event.action_selector_case()) { // TODO: Once added implementations for tcp and gRPC,
                                             // move this to a separate method, handleHttp
     case test::common::upstream::Action::kRespond: {
       switch (type_) {
       case HealthCheckFuzz::Type::HTTP: {
-        // TODO: Hardcoded check on status Required because can't find documentation about required
-        // validations for strings in protoc-gen-validate.
-        if (event.respond().http_respond().status().empty()) {
-          return;
-        }
         respondHttp(event.respond().http_respond().headers(),
                     event.respond().http_respond().status());
         break;
@@ -308,7 +307,7 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
     case test::common::upstream::Action::kTriggerIntervalTimer: {
       switch (type_) {
       case HealthCheckFuzz::Type::HTTP: {
-        triggerIntervalTimerHttp();
+        triggerIntervalTimerHttp(false);
         break;
       }
       case HealthCheckFuzz::Type::TCP: {
@@ -344,7 +343,7 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
     }
   }
   // TODO: Cleanup?
-  switch (type_) {
+  /*switch (type_) {
   case HealthCheckFuzz::Type::HTTP: {
     delete http_test_base_;
     ENVOY_LOG_MISC(trace, "Deleted http test base");
@@ -357,7 +356,7 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
   }
   default:
     break;
-  }
+  }*/
 }
 
 } // namespace Upstream
