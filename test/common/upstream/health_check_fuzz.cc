@@ -11,15 +11,17 @@ namespace Upstream {
 void HealthCheckFuzz::allocHttpHealthCheckerFromProto(
     const envoy::config::core::v3::HealthCheck& config) {
   http_test_base_->health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-      *http_test_base_->cluster_, config, http_test_base_->dispatcher_, http_test_base_->runtime_, http_test_base_->random_,
+      *http_test_base_->cluster_, config, http_test_base_->dispatcher_, http_test_base_->runtime_,
+      http_test_base_->random_,
       HealthCheckEventLoggerPtr(http_test_base_->event_logger_storage_.release()));
   ENVOY_LOG_MISC(trace, "Created Test Http Health Checker");
 }
 
 void HealthCheckFuzz::allocTcpHealthCheckerFromProto(
-  const envoy::config::core::v3::HealthCheck& config) {
-    tcp_test_base_->health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
-      *tcp_test_base_->cluster_, config, tcp_test_base_->dispatcher_, tcp_test_base_->runtime_, tcp_test_base_->random_,
+    const envoy::config::core::v3::HealthCheck& config) {
+  tcp_test_base_->health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
+      *tcp_test_base_->cluster_, config, tcp_test_base_->dispatcher_, tcp_test_base_->runtime_,
+      tcp_test_base_->random_,
       HealthCheckEventLoggerPtr(tcp_test_base_->event_logger_storage_.release()));
   ENVOY_LOG_MISC(trace, "Created Tcp Health Checker");
 }
@@ -47,7 +49,7 @@ void HealthCheckFuzz::initializeAndReplayHttp(test::common::upstream::HealthChec
   try {
     allocHttpHealthCheckerFromProto(input.health_check_config());
   } catch (EnvoyException& e) {
-    delete(http_test_base_);
+    delete (http_test_base_);
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     return;
   }
@@ -80,20 +82,22 @@ void HealthCheckFuzz::initializeAndReplayTcp(test::common::upstream::HealthCheck
   try {
     allocTcpHealthCheckerFromProto(input.health_check_config());
   } catch (EnvoyException& e) {
-    delete(tcp_test_base_);
+    delete (tcp_test_base_);
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     return;
   }
   tcp_test_base_->cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-    makeTestHost(tcp_test_base_->cluster_->info_, "tcp://127.0.0.1:80")
-  };
+      makeTestHost(tcp_test_base_->cluster_->info_, "tcp://127.0.0.1:80")};
   tcp_test_base_->expectSessionCreate();
   tcp_test_base_->expectClientCreate();
   tcp_test_base_->health_checker_->start();
   if (input.health_check_config().has_reuse_connection()) {
     reuse_connection_ = input.health_check_config().reuse_connection().value();
   }
-  //TODO: Hardcode a raise event connection here?
+  if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
+    tcp_test_base_->interval_timer_->invokeCallback();
+  }
+  // TODO: Hardcode a raise event connection here?
   replay(input);
 }
 
@@ -127,29 +131,36 @@ void HealthCheckFuzz::respondHttp(const test::fuzz::Headers& headers, absl::stri
   }
 
   ENVOY_LOG_MISC(trace, "Responded headers {}", response_headers);
-  http_test_base_->test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), true);
+  http_test_base_->test_sessions_[0]->stream_response_callbacks_->decodeHeaders(
+      std::move(response_headers), true);
 
   if (!reuse_connection_ || client_will_close) {
     ENVOY_LOG_MISC(trace, "Creating client and stream because shouldClose() is true");
     http_test_base_->expectClientCreate(0);
     http_test_base_->expectStreamCreate(0);
-    http_test_base_->test_sessions_[0]->interval_timer_->invokeCallback();
+    http_test_base_->test_sessions_[0]->interval_timer_->invokeCallback(); //This gets turned on from decodeHeaders
   }
 }
 
-void HealthCheckFuzz::respondTcp(std::string data) { //Add an argument here
-  
+void HealthCheckFuzz::respondTcp(std::string data, bool last_action) { // Add an argument here
+  if (!tcp_test_base_->timeout_timer_->enabled_) {
+    ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping response.");
+    return;
+  }
   Buffer::OwnedImpl response;
-  response.add(&data, data.length());
+  response.add(data);
 
-  ENVOY_LOG_MISC(trace, "Responded with {}. Length (in bytes) = {}. This is the string passed in.", data, data.length());
-  ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer generated from the string.", response.toString());
-  //onData(Buffer::Instance& data)
+  ENVOY_LOG_MISC(trace, "Responded with {}. Length (in bytes) = {}. This is the string passed in.",
+                 data, data.length());
+  // onData(Buffer::Instance& data)
   tcp_test_base_->read_filter_->onData(response, true);
-
-  if (!reuse_connection_) {
+  
+  //The interval timer may not be on. If it's not on, return. An http response will automatically turn on interval and turn off timer,
+  //but for tcp it doesnt if the data doesnt match. If it doesnt match, it only sets the host to unhealthy.
+  //If it doesn't hit, it will leave timeout on and interval off.
+  if (!reuse_connection_ && !last_action && tcp_test_base_->interval_timer_->enabled_) {
     tcp_test_base_->expectClientCreate();
-    tcp_test_base_->interval_timer_->invokeCallback();
+    tcp_test_base_->interval_timer_->invokeCallback(); //Note: this will crash in asan mode if interval timer is disabled
   }
 }
 
@@ -180,8 +191,9 @@ void HealthCheckFuzz::triggerTimeoutTimerHttp(bool last_action) {
     return;
   }
   ENVOY_LOG_MISC(trace, "Triggered timeout timer");
-  http_test_base_->test_sessions_[0]->timeout_timer_->invokeCallback(); // This closes the client, turns off timeout
-                                                       // and enables interval
+  http_test_base_->test_sessions_[0]
+      ->timeout_timer_->invokeCallback(); // This closes the client, turns off timeout
+                                          // and enables interval
   if (!last_action) {
     ENVOY_LOG_MISC(trace, "Creating client and stream from network timeout");
     http_test_base_->expectClientCreate(0);
@@ -197,7 +209,7 @@ void HealthCheckFuzz::triggerTimeoutTimerTcp(bool last_action) {
   }
   ENVOY_LOG_MISC(trace, "Triggered timeout timer");
   tcp_test_base_->timeout_timer_->invokeCallback(); // This closes the client, turns off timeout
-                                                   // and enables interval
+                                                    // and enables interval
   if (!last_action) {
     ENVOY_LOG_MISC(trace, "Creating client and stream from network timeout");
     tcp_test_base_->expectClientCreate();
@@ -227,21 +239,26 @@ void HealthCheckFuzz::raiseEvent(const test::common::upstream::RaiseEvent& event
   }
 
   switch (type_) {
-  case HealthCheckFuzz::Type::HTTP: {
+  case HealthCheckFuzz::Type::HTTP: { //TODO: Do I need check for timeout timer enabled here?
     http_test_base_->test_sessions_[0]->client_connection_->raiseEvent(eventType);
     if (!last_action && eventType != Network::ConnectionEvent::Connected) {
       ENVOY_LOG_MISC(trace, "Creating client and stream from close event");
       http_test_base_->expectClientCreate(0);
       http_test_base_->expectStreamCreate(0);
-      http_test_base_->test_sessions_[0]->interval_timer_->invokeCallback();
+      http_test_base_->test_sessions_[0]->interval_timer_->invokeCallback(); //Interval timer is guaranteed to be on from raiseEvent not connected - calls onResetStream which handles failure, turning interval timer on and timeout off
     }
     break;
   }
   case HealthCheckFuzz::Type::TCP: {
     tcp_test_base_->connection_->raiseEvent(eventType);
     if (!last_action && eventType != Network::ConnectionEvent::Connected) {
+      if (!tcp_test_base_->interval_timer_->enabled_) { //Note: related to the TODO below. This will mean that both timers are disabled, meaning any action after hitting this will be voided.
+        return;
+      }
       ENVOY_LOG_MISC(trace, "Creating client from close event");
       tcp_test_base_->expectClientCreate();
+      //The interval timer may not be enabled from close event - gets set to enabled when called with (_, _), this calls it with a number
+      //It calls it with a number if expect close is false (like 4 different code paths). TODO: Figure out what to do in this scenario.
       tcp_test_base_->interval_timer_->invokeCallback();
     }
     break;
@@ -272,7 +289,7 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
       }
       // TODO: TCP and gRPC
       case HealthCheckFuzz::Type::TCP: {
-        respondTcp(event.respond().tcp_respond().data());
+        respondTcp(event.respond().tcp_respond().data(), last_action);
         break;
       }
       default:
@@ -309,7 +326,7 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
       }
       break;
     }
-    //Shared method across all three
+    // Shared method across all three
     case test::common::upstream::Action::kRaiseEvent: {
       raiseEvent(event.raise_event(), last_action);
       break;
@@ -320,18 +337,18 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
   }
   // TODO: Cleanup?
   switch (type_) {
-      case HealthCheckFuzz::Type::HTTP: {
-        delete http_test_base_;
-        ENVOY_LOG_MISC(trace, "Deleted http test base");
-        break;
-      }
-      case HealthCheckFuzz::Type::TCP: {
-        delete tcp_test_base_;
-        ENVOY_LOG_MISC(trace, "Deleted tcp test base");
-        break;
-      }
-      default:
-        break;
+  case HealthCheckFuzz::Type::HTTP: {
+    delete http_test_base_;
+    ENVOY_LOG_MISC(trace, "Deleted http test base");
+    break;
+  }
+  case HealthCheckFuzz::Type::TCP: {
+    delete tcp_test_base_;
+    ENVOY_LOG_MISC(trace, "Deleted tcp test base");
+    break;
+  }
+  default:
+    break;
   }
 }
 

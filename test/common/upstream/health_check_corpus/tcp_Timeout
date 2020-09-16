@@ -29,11 +29,10 @@ actions {
             status: "1"
         }
         tcp_respond {
-            data: "1"
+            data: "\x01"
         }
     }
 }
-
 actions {
     raise_event: REMOTE_CLOSE
 }

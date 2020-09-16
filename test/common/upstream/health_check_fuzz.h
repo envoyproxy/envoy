@@ -7,8 +7,8 @@ namespace Envoy {
 namespace Upstream {
 
 class HealthCheckFuzz { // TODO: once added tcp/grpc, switch this to an
-                                             // abstract health checker test class that can handle
-                                             // one of the three types
+                        // abstract health checker test class that can handle
+                        // one of the three types
 public:
   HealthCheckFuzz() = default;
   void initializeAndReplay(test::common::upstream::HealthCheckTestCase input);
@@ -24,7 +24,7 @@ private:
   void initializeAndReplayHttp(test::common::upstream::HealthCheckTestCase input);
   void initializeAndReplayTcp(test::common::upstream::HealthCheckTestCase input);
   void respondHttp(const test::fuzz::Headers& headers, absl::string_view status);
-  void respondTcp(std::string data);
+  void respondTcp(std::string data, bool last_action);
   void triggerIntervalTimerHttp();
   void triggerIntervalTimerTcp();
   void triggerTimeoutTimerHttp(bool last_action);
