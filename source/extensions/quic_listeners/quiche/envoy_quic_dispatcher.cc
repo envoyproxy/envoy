@@ -16,13 +16,13 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
     uint8_t expected_server_connection_id_length, Network::ConnectionHandler& connection_handler,
     Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats,
     Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
-    Network::Socket& listen_socket, Runtime::FeatureFlag* enabled)
+    Network::Socket& listen_socket)
     : quic::QuicDispatcher(&quic_config, crypto_config, version_manager, std::move(helper),
                            std::make_unique<EnvoyQuicCryptoServerStreamHelper>(),
                            std::move(alarm_factory), expected_server_connection_id_length),
       connection_handler_(connection_handler), listener_config_(listener_config),
       listener_stats_(listener_stats), per_worker_stats_(per_worker_stats), dispatcher_(dispatcher),
-      listen_socket_(listen_socket), enabled_(enabled) {
+      listen_socket_(listen_socket) {
   // Set send buffer twice of max flow control window to ensure that stream send
   // buffer always takes all the data.
   // The max amount of data buffered is the per-stream high watermark + the max
@@ -71,10 +71,6 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   per_worker_stats_.downstream_cx_active_.inc();
   per_worker_stats_.downstream_cx_total_.inc();
   return quic_session;
-}
-
-bool EnvoyQuicDispatcher::ShouldCreateOrBufferPacketForConnection(const quic::ReceivedPacketInfo&) {
-  return (enabled_ == nullptr) || enabled_->enabled();
 }
 
 } // namespace Quic

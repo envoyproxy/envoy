@@ -68,7 +68,7 @@ ActiveQuicListener::ActiveQuicListener(
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
-      per_worker_stats_, dispatcher, listen_socket_, &enabled_);
+      per_worker_stats_, dispatcher, listen_socket_);
 
   // Create udp_packet_writer
   Network::UdpPacketWriterPtr udp_packet_writer =
@@ -97,6 +97,9 @@ void ActiveQuicListener::onListenerShutdown() {
 }
 
 void ActiveQuicListener::onDataWorker(Network::UdpRecvData& data) {
+  if (!enabled_.enabled()) {
+    return;
+  }
 
   quic::QuicSocketAddress peer_address(
       envoyIpAddressToQuicSocketAddress(data.addresses_.peer_->ip()));
