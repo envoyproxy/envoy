@@ -70,7 +70,6 @@ enum ClientConfigStatus {
   CLIENT_NACKED = 3;
 }
 
-
 // Request for client status of clients identified by a list of NodeMatchers.
 message ClientStatusRequest {
   option (udpa.annotations.versioning).previous_message_type =
@@ -97,7 +96,7 @@ message PerXdsConfig {
   // Client config status is populated by xDS clients. Will not be present if
   // the CSDS server is an xDS server. No matter what the client config status
   // is, xDS clients should always dump the most recent accepted xDS config.
-  ClientConfigStatus client_status = 7;;
+  ClientConfigStatus client_status = 7;
 
   oneof per_xds_config {
     admin.v4alpha.ListenersConfigDump listener_config = 2;
