@@ -10,9 +10,14 @@
 #include "test/common/upstream/utility.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/mocks/upstream/health_check_event_logger.h"
+#include "test/mocks/upstream/host.h"
+#include "test/mocks/upstream/host_set.h"
+#include "test/mocks/upstream/priority_set.h"
 
 using testing::_;
 using testing::DoAll;

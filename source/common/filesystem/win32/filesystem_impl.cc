@@ -96,6 +96,11 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
   // 0x1a will be treated as EOF
   std::ifstream file(path, std::ios_base::binary);
   if (file.fail()) {
+    auto last_error = ::GetLastError();
+    if (last_error == ERROR_FILE_NOT_FOUND) {
+      throw EnvoyException(absl::StrCat("Invalid path: ", path));
+    }
+
     throw EnvoyException(absl::StrCat("unable to read file: ", path));
   }
 

@@ -14,7 +14,7 @@
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/host.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
 
@@ -407,7 +407,8 @@ TEST_F(ThriftRouterTest, PoolOverflowFailure) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*too many connections.*"));
         EXPECT_TRUE(end_stream);
       }));
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(ConnectionPool::PoolFailureReason::Overflow);
+  context_.cluster_manager_.tcp_conn_pool_.poolFailure(ConnectionPool::PoolFailureReason::Overflow,
+                                                       true);
 }
 
 TEST_F(ThriftRouterTest, PoolConnectionFailureWithOnewayMessage) {

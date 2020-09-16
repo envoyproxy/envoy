@@ -11,6 +11,7 @@ Architecture overview
   observability/observability
   security/security
   operations/operations
+  compression/libraries
   other_features/other_features
   other_protocols/other_protocols
   advanced/advanced

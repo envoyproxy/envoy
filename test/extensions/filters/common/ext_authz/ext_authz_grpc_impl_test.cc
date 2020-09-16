@@ -12,7 +12,7 @@
 #include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

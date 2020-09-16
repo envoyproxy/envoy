@@ -22,7 +22,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/squash:squash_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:environment_lib",
         "@envoy_api//envoy/extensions/filters/http/squash/v3:pkg_cc_proto",
     ],

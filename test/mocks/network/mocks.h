@@ -123,10 +123,10 @@ public:
   WriteFilterCallbacks* write_callbacks_{};
 };
 
-class MockListenerCallbacks : public ListenerCallbacks {
+class MockTcpListenerCallbacks : public TcpListenerCallbacks {
 public:
-  MockListenerCallbacks();
-  ~MockListenerCallbacks() override;
+  MockTcpListenerCallbacks();
+  ~MockTcpListenerCallbacks() override;
 
   void onAccept(ConnectionSocketPtr&& socket) override { onAccept_(socket); }
 
@@ -359,6 +359,7 @@ public:
   MOCK_METHOD(ConnectionBalancer&, connectionBalancer, ());
   MOCK_METHOD(ResourceLimit&, openConnections, ());
   MOCK_METHOD(uint32_t, tcpBacklogSize, (), (const));
+  MOCK_METHOD(Init::Manager&, initManager, ());
 
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
@@ -436,6 +437,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, connect, (os_fd_t), (const));
   MOCK_METHOD(const Address::Ip*, ip, (), (const));
   MOCK_METHOD(const Address::Pipe*, pipe, (), (const));
+  MOCK_METHOD(Address::EnvoyInternalAddress*, envoyInternalAddress, (), (const));
   MOCK_METHOD(IoHandlePtr, socket, (Socket::Type), (const));
   MOCK_METHOD(Address::Type, type, (), (const));
   MOCK_METHOD(const sockaddr*, sockAddr, (), (const));
