@@ -262,8 +262,15 @@ void HdsDelegate::processMessage(
     // If this had a non-empty name, add this cluster to the name map so it can be updated in the
     // future.
     if (!cluster_health_check.cluster_name().empty()) {
+      if (new_hds_clusters_name_map.contains(cluster_health_check.cluster_name())) {
+        ENVOY_LOG(warn, "An HDS Cluster with the cluster_name has already been created by this "
+                        "specifier, recreating anyways.");
+      }
       // Since this cluster has a name, add it to our by-name map.
       new_hds_clusters_name_map.insert({cluster_health_check.cluster_name(), cluster_ptr});
+    } else {
+      ENVOY_LOG(warn, "HDS Cluster has no cluster_name, it will be recreated instead of updated on "
+                      "every reconfiguration.");
     }
 
     // Add to our remaining data structures.
@@ -476,8 +483,13 @@ void HdsCluster::updateHosts(
 
         // If our socket_matcher changed, update this host with the new info.
         if (update_socket_matches) {
-          // We can guarantee this is a HostImpl, so we call its member function.
-          static_cast<HostImpl&>(*host).updateClusterInfo(info_);
+
+          // ClusterInfo only exists in hosts_impls (from parent class HostDescriptionImpl). So if
+          // it is a HostImpl, update it.
+          HostImpl* host_impl_ptr = dynamic_cast<HostImpl*>(host.get());
+          if (host_impl_ptr != nullptr) {
+            host_impl_ptr->updateClusterInfo(info_);
+          }
         }
       } else {
         // We do not have this endpoint saved, so create a new one.
