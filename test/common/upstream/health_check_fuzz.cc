@@ -148,13 +148,10 @@ void HealthCheckFuzz::raiseEvent(const test::common::upstream::RaiseEvent& event
 }
 
 void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& input) {
-  for (int i = 0; i < input.actions().size(); ++i) {
-    if (i == 64) {
-      ENVOY_LOG_MISC(trace, "Action limit hit. Returning.");
-      return;
-    }
+  constexpr auto max_actions = 64;
+  for (int i = 0; i < std::min(max_actions, input.actions().size()); ++i) {
     const auto& event = input.actions(i);
-    const bool last_action = (i == input.actions().size() - 1 || i == 63);
+    const bool last_action = i == std::min(max_actions, input.actions().size()) - 1;
     ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
     switch (event.action_selector_case()) { // TODO: Once added implementations for tcp and gRPC,
                                             // move this to a separate method, handleHttp
