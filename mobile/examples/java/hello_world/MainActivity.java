@@ -52,7 +52,12 @@ public class MainActivity extends Activity {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
 
-    engine = new AndroidEngineBuilder(getApplication()).build();
+    engine = new AndroidEngineBuilder(getApplication())
+                 .setOnEngineRunning(() -> {
+                   Log.d("MainActivity", "Envoy async internal setup completed");
+                   return null;
+                 })
+                 .build();
 
     recyclerView = (RecyclerView)findViewById(R.id.recycler_view);
     recyclerView.setLayoutManager(new LinearLayoutManager(this));

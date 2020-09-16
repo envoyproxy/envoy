@@ -7,6 +7,13 @@
 
 #import <UIKit/UIKit.h>
 
+static void ios_on_engine_running(void *context) {
+  EnvoyEngineImpl *engineImpl = (__bridge EnvoyEngineImpl *)context;
+  if (engineImpl.onEngineRunning) {
+    engineImpl.onEngineRunning();
+  }
+}
+
 static void ios_on_exit(void *context) {
   // Currently nothing needs to happen in iOS on exit. Just log.
   NSLog(@"[Envoy] library is exiting");
@@ -149,7 +156,9 @@ static void ios_http_filter_release(const void *context) {
   return kEnvoySuccess;
 }
 
-- (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel {
+- (int)runWithConfig:(EnvoyConfiguration *)config
+            logLevel:(NSString *)logLevel
+     onEngineRunning:(nullable void (^)())onEngineRunning {
   NSString *templateYAML = [[NSString alloc] initWithUTF8String:config_template];
   NSString *resolvedYAML = [config resolveTemplate:templateYAML];
   if (resolvedYAML == nil) {
@@ -160,16 +169,20 @@ static void ios_http_filter_release(const void *context) {
     [self registerFilterFactory:filterFactory];
   }
 
-  return [self runWithConfigYAML:resolvedYAML logLevel:logLevel];
+  return [self runWithConfigYAML:resolvedYAML logLevel:logLevel onEngineRunning:onEngineRunning];
 }
 
-- (int)runWithConfigYAML:(NSString *)configYAML logLevel:(NSString *)logLevel {
+- (int)runWithConfigYAML:(NSString *)configYAML
+                logLevel:(NSString *)logLevel
+         onEngineRunning:(nullable void (^)())onEngineRunning {
+  self.onEngineRunning = onEngineRunning;
   [self startObservingLifecycleNotifications];
 
   // Envoy exceptions will only be caught here when compiled for 64-bit arches.
   // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Exceptions/Articles/Exceptions64Bit.html
   @try {
-    envoy_engine_callbacks native_callbacks = {ios_on_exit, NULL};
+    envoy_engine_callbacks native_callbacks = {ios_on_engine_running, ios_on_exit,
+                                               (__bridge void *)(self)};
     return (int)run_engine(_engineHandle, native_callbacks, configYAML.UTF8String,
                            logLevel.UTF8String);
   } @catch (NSException *exception) {
