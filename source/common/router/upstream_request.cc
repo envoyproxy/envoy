@@ -77,9 +77,9 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
       filter_manager_(*this, parent_.callbacks()->dispatcher(), *parent_.callbacks()->connection(),
                       parent_.callbacks()->streamId(), true,
-                      std::numeric_limits<uint32_t>::max(), // TODO(snowp): This should probably not
-                                                            // be infinite!
-                      // parent_.callbacks()->decoderBufferLimit(),
+                      // std::numeric_limits<uint32_t>::max(), // TODO(snowp): This should probably not
+                      //                                       // be infinite!
+                      parent_.callbacks()->decoderBufferLimit(),
                       filter_factory_, noopLocalReply(), conn_pool->protocol(),
                       parent_.callbacks()->dispatcher().timeSource(), nullptr,
                       StreamInfo::FilterState::FilterChain) {
@@ -139,11 +139,11 @@ void UpstreamRequest::onDeferredDelete() {
 }
 
 void UpstreamRequest::onDecoderFilterBelowWriteBufferLowWatermark() {
-  parent_.cluster()->stats().upstream_flow_control_drained_total_.inc();
-  parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
+  filter_->enableDataFromDownstreamForFlowControl();
+  // parent_.cluster()->stats().upstream_flow_control_drained_total_.inc();
 }
 void UpstreamRequest::onDecoderFilterAboveWriteBufferHighWatermark() {
-  parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
+  filter_->disableDataFromDownstreamForFlowControl();
 }
 void UpstreamRequest::setContinueHeaders(Http::ResponseHeaderMapPtr&& response_headers) {
   continue_to_encode_ = std::move(response_headers);

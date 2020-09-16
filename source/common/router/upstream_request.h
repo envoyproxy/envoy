@@ -221,7 +221,7 @@ public:
   }
   Tracing::Span& activeSpan() override { return *span_; }
   void onResponseDataTooLarge() override {}
-  void onRequestDataTooLarge() override {}
+  void onRequestDataTooLarge() override { onDecoderFilterAboveWriteBufferHighWatermark(); }
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
