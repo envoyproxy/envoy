@@ -115,8 +115,9 @@ envoy_cmake_external(
         "CMAKE_USE_GSSAPI": "off",
         "HTTP_ONLY": "on",
         "CMAKE_INSTALL_LIBDIR": "lib",
-        # Explicitly enable Unix sockets and disable crypto for Windows
-        "USE_UNIX_SOCKETS": "on",
+        # Explicitly enable Unix sockets, once afunix.h is correctly detected
+        # "USE_UNIX_SOCKETS": "on",
+        # Explicitly disable "Windows" crypto for Windows
         "CURL_DISABLE_CRYPTO_AUTH": "on",
         # C-Ares.
         "ENABLE_ARES": "on",
@@ -138,6 +139,10 @@ envoy_cmake_external(
         "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib/include",
         "CMAKE_CXX_COMPILER_FORCED": "on",
         "CMAKE_C_FLAGS_BAZEL": "-fPIC",
+        # Note we use Bazel's flags (not _RELEASE/_DEBUG CMake flags), but this toggle
+        # also works around a bug in CMP0091 logic which re-injected a badly placed -M flag.
+        # See https://github.com/bazelbuild/rules_foreign_cc/issues/426
+        "CURL_STATIC_CRT": "on",
     },
     defines = ["CURL_STATICLIB"],
     generate_crosstool_file = True,
