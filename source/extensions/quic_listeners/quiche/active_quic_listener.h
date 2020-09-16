@@ -39,7 +39,9 @@ public:
   ~ActiveQuicListener() override;
 
   void onListenerShutdown();
-  uint64_t eventLoopsWithBufferedChlosForTest() const { return event_loops_with_buffered_chlo_; }
+  uint64_t eventLoopsWithBufferedChlosForTest() const {
+    return event_loops_with_buffered_chlo_for_test_;
+  }
 
   // Network::UdpListenerCallbacks
   void onReadReady() override;
@@ -71,7 +73,7 @@ private:
   Network::UdpPacketWriter* udp_packet_writer_;
 
   // The number of runs of the event loop in which at least one CHLO was buffered.
-  uint64_t event_loops_with_buffered_chlo_{0};
+  uint64_t event_loops_with_buffered_chlo_for_test_{0};
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;

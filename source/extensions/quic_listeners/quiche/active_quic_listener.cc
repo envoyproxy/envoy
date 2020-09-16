@@ -132,7 +132,7 @@ void ActiveQuicListener::onReadReady() {
   }
 
   if (quic_dispatcher_->HasChlosBuffered()) {
-    event_loops_with_buffered_chlo_++;
+    event_loops_with_buffered_chlo_for_test_++;
   }
 
   quic_dispatcher_->ProcessBufferedChlos(kNumSessionsToCreatePerLoop);
