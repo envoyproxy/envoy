@@ -20,15 +20,12 @@ namespace SkyWalking {
 
 class TracerTest : public testing::Test {
 public:
-  TracerTest()
-      : tracing_stats_{
-            SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))} {}
-
   void setupTracer(const std::string& yaml_string) {
     EXPECT_CALL(mock_dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
       return timer_;
     }));
+
     timer_ = new NiceMock<Event::MockTimer>();
 
     auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
@@ -59,7 +56,8 @@ protected:
   Event::TimerCb timer_cb_;
 
   envoy::config::trace::v3::ClientConfig client_config_;
-  SkyWalkingTracerStats tracing_stats_;
+  SkyWalkingTracerStats tracing_stats_{
+      SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))};
   TracerPtr tracer_;
 };
 

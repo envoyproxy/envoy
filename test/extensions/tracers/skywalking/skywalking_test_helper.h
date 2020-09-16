@@ -43,6 +43,7 @@ public:
     }
     Tracing::Decision decision;
     decision.traced = sampled;
+    decision.reason = Tracing::Reason::Sampling;
 
     auto segment_context =
         std::make_shared<SegmentContext>(std::move(previous_span_context), decision, random);

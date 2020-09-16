@@ -20,10 +20,6 @@ namespace SkyWalking {
 
 class TraceSegmentReporterTest : public testing::Test {
 public:
-  TraceSegmentReporterTest()
-      : tracing_stats_{
-            SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))} {}
-
   void setupTraceSegmentReporter(const std::string& yaml_string) {
     EXPECT_CALL(mock_dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
@@ -61,7 +57,8 @@ protected:
   Event::TimerCb timer_cb_;
 
   envoy::config::trace::v3::ClientConfig client_config_;
-  SkyWalkingTracerStats tracing_stats_;
+  SkyWalkingTracerStats tracing_stats_{
+      SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))};
   TraceSegmentReporterPtr reporter_;
 };
 
