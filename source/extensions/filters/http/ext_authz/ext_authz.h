@@ -59,6 +59,7 @@ public:
         failure_mode_allow_(config.failure_mode_allow()),
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
+        pack_as_bytes_(config.with_request_body().pack_as_bytes()),
         status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
         runtime_(runtime), http_context_(http_context),
         filter_enabled_(config.has_filter_enabled()
@@ -87,6 +88,8 @@ public:
   bool clearRouteCache() const { return clear_route_cache_; }
 
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
+
+  bool packAsBytes() const { return pack_as_bytes_; }
 
   Http::Code statusOnError() const { return status_on_error_; }
 
@@ -130,6 +133,7 @@ private:
   const bool failure_mode_allow_;
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
+  const bool pack_as_bytes_;
   const Http::Code status_on_error_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
@@ -222,7 +226,8 @@ private:
                     const Router::RouteConstSharedPtr& route);
   void continueDecoding();
   bool isBufferFull() const;
-  bool skipCheckForRoute(const Router::RouteConstSharedPtr& route) const;
+  bool skipCheckForRoute(const Router::RouteConstSharedPtr& route,
+                         const Router::RouteSpecificFilterConfig* specific_per_route_config) const;
 
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling
