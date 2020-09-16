@@ -592,8 +592,7 @@ TEST_F(OverloadManagerImplTest, Shutdown) {
 
 TEST(OverloadActionState, RandomizedActive) {
   Random::MockRandomGenerator random_gen;
-  const auto random_number = Random::RandomGenerator::max() / 2;
-  EXPECT_CALL(random_gen, random()).WillOnce(Return(random_number)).WillOnce(Return(random_number));
+  EXPECT_CALL(random_gen, random()).Times(2).WillRepeatedly(Return(Random::RandomGenerator::max() / 2));
 
   EXPECT_FALSE(OverloadActionState::inactive().isRandomizedActive(random_gen));
   EXPECT_TRUE(OverloadActionState::saturated().isRandomizedActive(random_gen));
