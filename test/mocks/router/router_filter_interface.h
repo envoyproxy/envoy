@@ -25,7 +25,7 @@ public:
               (Buffer::Instance & data, UpstreamRequest& upstream_request, bool end_stream));
   MOCK_METHOD(void, onUpstreamTrailers,
               (Envoy::Http::ResponseTrailerMapPtr && trailers, UpstreamRequest& upstream_request));
-  MOCK_METHOD(void, onUpstreamMetadata, (Envoy::Http::MetadataMapPtr && metadata_map));
+  MOCK_METHOD(void, onUpstreamMetadata, (Envoy::Http::MetadataMapVector & metadata_map));
   MOCK_METHOD(void, onUpstreamReset,
               (Envoy::Http::StreamResetReason reset_reason, absl::string_view transport_failure,
                UpstreamRequest& upstream_request));
