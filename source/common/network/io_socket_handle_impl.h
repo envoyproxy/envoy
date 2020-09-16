@@ -34,7 +34,9 @@ class IoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::I
 public:
   explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
                               int domain = 1)
-      : fd_(fd), socket_v6only_(socket_v6only), domain_(domain) {}
+      : fd_(fd), socket_v6only_(socket_v6only), domain_(domain) {
+    RELEASE_ASSERT(domain != -1, "caught in the trap");
+  }
 
   // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;
