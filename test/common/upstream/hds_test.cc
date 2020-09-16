@@ -696,16 +696,27 @@ TEST_F(HdsTest, TestSameSpecifier) {
   // Create Message
   message.reset(createSimpleMessage());
 
-  Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection_));
+  // Create a new active connection on request, setting its status to connected
+  // to mock a found endpoint.
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+      .WillRepeatedly(Invoke(
+          [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
+             Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
+            Network::MockClientConnection* connection =
+                new NiceMock<Network::MockClientConnection>();
+
+            // pretend our endpoint was connected to.
+            connection->raiseEvent(Network::ConnectionEvent::Connected);
+
+            // return this new, connected endpoint.
+            return connection;
+          }));
+
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
-  EXPECT_CALL(*connection_, setBufferLimits(_));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_));
-  // Process message
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   hds_delegate_->onReceiveMessage(std::move(message));
-  connection_->raiseEvent(Network::ConnectionEvent::Connected);
   hds_delegate_->sendResponse();
 
   // Try to change the specifier, but it is the same.
@@ -714,6 +725,13 @@ TEST_F(HdsTest, TestSameSpecifier) {
 
   // Check to see that HDS got two requests, but only used the specifier one time.
   checkHdsCounters(2, 0, 0, 1);
+
+  // Try to change the specifier, but use a new specifier this time.
+  message = createComplexSpecifier(1, 1, 2);
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Check that both requests and updates increased, meaning we did an update.
+  checkHdsCounters(3, 0, 0, 2);
 }
 
 // Test to see that if a cluster is added or removed, the ones that did not change are reused.
