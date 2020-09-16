@@ -183,6 +183,34 @@ protected:
     return msg;
   }
 
+  void
+  add_transport_socket_matches(envoy::service::health::v3::ClusterHealthCheck* cluster_health_check,
+                               std::string match, std::string criteria) {
+    // Add transport socket matches to specified cluster and its first health check.
+    const std::string match_yaml = absl::StrFormat(
+        R"EOF(
+transport_socket_matches:
+- name: "test_socket"
+  match:
+    %s: "true"
+  transport_socket:
+    name: "envoy.transport_sockets.raw_buffer"
+)EOF",
+        match);
+    cluster_health_check->MergeFrom(
+        TestUtility::parseYaml<envoy::service::health::v3::ClusterHealthCheck>(match_yaml));
+
+    // Add transport socket match criteria to our health check, for filtering matches.
+    const std::string criteria_yaml = absl::StrFormat(
+        R"EOF(
+transport_socket_match_criteria:
+  %s: "true"
+)EOF",
+        criteria);
+    cluster_health_check->mutable_health_checks(0)->MergeFrom(
+        TestUtility::parseYaml<envoy::config::core::v3::HealthCheck>(criteria_yaml));
+  }
+
   Event::SimulatedTimeSystem time_system_;
   envoy::config::core::v3::Node node_;
   Event::MockDispatcher dispatcher_;
@@ -502,31 +530,10 @@ TEST_F(HdsTest, TestSocketContext) {
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
-  // Create Message.
+  // Create Message with transport sockets.
   message.reset(createSimpleMessage());
-
-  // Add transport socket matches to message.
-  const std::string match_yaml = absl::StrFormat(
-      R"EOF(
-transport_socket_matches:
-- name: "test_socket"
-  match:
-    test_match: "true"
-  transport_socket:
-    name: "envoy.transport_sockets.raw_buffer"
-)EOF");
-  auto* cluster_health_check = message->mutable_cluster_health_checks(0);
-  cluster_health_check->MergeFrom(
-      TestUtility::parseYaml<envoy::service::health::v3::ClusterHealthCheck>(match_yaml));
-
-  // Add transport socket match criteria to our health check, for filtering matches.
-  const std::string criteria_yaml = absl::StrFormat(
-      R"EOF(
-transport_socket_match_criteria:
-  test_match: "true"
-)EOF");
-  cluster_health_check->mutable_health_checks(0)->MergeFrom(
-      TestUtility::parseYaml<envoy::config::core::v3::HealthCheck>(criteria_yaml));
+  add_transport_socket_matches(message->mutable_cluster_health_checks(0), "test_match",
+                               "test_match");
 
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection));
@@ -1030,6 +1037,101 @@ TEST_F(HdsTest, TestClusterSameName) {
 
   // Check to see that HDS got three requests, and updated three times with it.
   checkHdsCounters(3, 0, 0, 3);
+}
+
+// Test that a transport_socket_matches and transport_socket_match_criteria filter fail when not
+// matching, and then after an update the same cluster is used but now matches.
+TEST_F(HdsTest, TestUpdateSocketContext) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create a new active connection on request, setting its status to connected
+  // to mock a found endpoint.
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+      .WillRepeatedly(Invoke(
+          [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
+             Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
+            Network::MockClientConnection* connection =
+                new NiceMock<Network::MockClientConnection>();
+
+            // pretend our endpoint was connected to.
+            connection->raiseEvent(Network::ConnectionEvent::Connected);
+
+            // return this new, connected endpoint.
+            return connection;
+          }));
+
+  // Pull out socket_matcher object normally internal to createClusterInfo, to test that a matcher
+  // would match the expected socket.
+  std::vector<std::unique_ptr<TransportSocketMatcherImpl>> socket_matchers;
+  EXPECT_CALL(test_factory_, createClusterInfo(_))
+      .WillRepeatedly(Invoke([&](const ClusterInfoFactory::CreateClusterInfoParams& params) {
+        // Build scope, factory_context as does ProdClusterInfoFactory.
+        Envoy::Stats::ScopePtr scope =
+            params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
+        Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+            params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
+            params.dispatcher_, params.random_, params.stats_, params.singleton_manager_,
+            params.tls_, params.validation_visitor_, params.api_);
+
+        // Create a mock socket_factory for the scope of this unit test.
+        std::unique_ptr<Envoy::Network::TransportSocketFactory> socket_factory =
+            std::make_unique<Network::MockTransportSocketFactory>();
+
+        // set socket_matcher object in test scope.
+        socket_matchers.push_back(std::make_unique<Envoy::Upstream::TransportSocketMatcherImpl>(
+            params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope));
+
+        // But still use the fake cluster_info_.
+        return cluster_info_;
+      }));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+
+  // Create Message, with a non-valid match and process.
+  message.reset(createSimpleMessage());
+  add_transport_socket_matches(message->mutable_cluster_health_checks(0), "bad_match",
+                               "test_match");
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Get our health checker to match against.
+  const auto first_clusters = hds_delegate_->hdsClusters();
+  ASSERT_EQ(first_clusters.size(), 1);
+  const auto first_hcs = first_clusters[0]->healthCheckers();
+  ASSERT_EQ(first_hcs.size(), 1);
+
+  // Check that our fails so it uses default.
+  HealthCheckerImplBase* first_health_checker_base =
+      dynamic_cast<HealthCheckerImplBase*>(first_hcs[0].get());
+  const auto first_match =
+      socket_matchers[0]->resolve(first_health_checker_base->transportSocketMatchMetadata().get());
+  EXPECT_EQ(first_match.name_, "default");
+
+  // Create a new Message, this time with a good match.
+  message.reset(createSimpleMessage());
+  add_transport_socket_matches(message->mutable_cluster_health_checks(0), "test_match",
+                               "test_match");
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Get our new health checker to match against.
+  const auto second_clusters = hds_delegate_->hdsClusters();
+  ASSERT_EQ(second_clusters.size(), 1);
+  // Check that this new pointer is actually the same pointer to the first cluster.
+  ASSERT_EQ(second_clusters[0], first_clusters[0]);
+  const auto second_hcs = second_clusters[0]->healthCheckers();
+  ASSERT_EQ(second_hcs.size(), 1);
+
+  // Check that since we made no change to our health checkers, the pointer was reused.
+  EXPECT_EQ(first_hcs[0], second_hcs[0]);
+
+  // Check that our match hits.
+  HealthCheckerImplBase* second_health_checker_base =
+      dynamic_cast<HealthCheckerImplBase*>(second_hcs[0].get());
+  ASSERT_EQ(socket_matchers.size(), 2);
+  const auto second_match =
+      socket_matchers[1]->resolve(second_health_checker_base->transportSocketMatchMetadata().get());
+  EXPECT_EQ(second_match.name_, "test_socket");
 }
 
 } // namespace Upstream
