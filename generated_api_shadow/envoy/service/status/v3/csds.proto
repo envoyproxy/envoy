@@ -34,7 +34,7 @@ service ClientStatusDiscoveryService {
   }
 }
 
-// Status of a config.
+// Status of a config from a management server view.
 enum ConfigStatus {
   // Status info is not available/unknown.
   UNKNOWN = 0;
@@ -42,20 +42,31 @@ enum ConfigStatus {
   // Management server has sent the config to client and received ACK.
   SYNCED = 1;
 
-  // Config is not sent from the management server; or the client haven't
-  // received the requested config.
+  // Config is not sent.
   NOT_SENT = 2;
 
   // Management server has sent the config to client but hasn’t received
   // ACK/NACK.
   STALE = 3;
 
-  // Management server has sent the config to client but received NACK; or the
-  // client has received the config but replied with NACK.
+  // Management server has sent the config to client but received NACK.
   ERROR = 4;
+}
 
-  // The client has received the config and repied with ACK.
-  ACKED = 5;
+// Config status from a client-side view.
+enum ClientSideConfigStatus {
+  // Config status is not available/unknown.
+  CLIENT_UNKNOWN = 0;
+
+  // Client requested the config but hasn't received any config from management
+  // server yet.
+  CLIENT_REQUESTED = 1;
+
+  // Client received the config and replied with ACK.
+  CLIENT_ACKED = 2;
+
+  // Client received the config and replied with NACK.
+  CLIENT_NACKED = 3;
 }
 
 // Request for client status of clients identified by a list of NodeMatchers.
@@ -78,6 +89,7 @@ message PerXdsConfig {
       "envoy.service.status.v2.PerXdsConfig";
 
   ConfigStatus status = 1;
+  ClientSideConfigStatus client_side_config_status = 7;
 
   oneof per_xds_config {
     admin.v3.ListenersConfigDump listener_config = 2;
