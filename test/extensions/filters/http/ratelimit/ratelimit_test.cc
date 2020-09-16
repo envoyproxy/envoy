@@ -485,7 +485,7 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
                     ->statsScope()
                     .counterFromStatName(ratelimit_failure_mode_allowed_)
                     .value());
-  EXPECT_EQ("rate_limiter_error", filter_callbacks_.details_);
+  EXPECT_EQ("rate_limiter_error", filter_callbacks_.details());
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponse) {
@@ -525,7 +525,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
   EXPECT_EQ(
       1U,
       filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_429_).value());
-  EXPECT_EQ("request_rate_limited", filter_callbacks_.details_);
+  EXPECT_EQ("request_rate_limited", filter_callbacks_.details());
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {
