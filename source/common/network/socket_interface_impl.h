@@ -27,7 +27,7 @@ public:
   };
 
 protected:
-  virtual IoHandlePtr makeSocket(int socket_fd, bool socket_v6only) const;
+  virtual IoHandlePtr makeSocket(int socket_fd, bool socket_v6only, int domain) const;
 };
 
 DECLARE_FACTORY(SocketInterfaceImpl);

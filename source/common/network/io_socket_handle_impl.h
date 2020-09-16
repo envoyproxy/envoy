@@ -13,12 +13,28 @@ namespace Envoy {
 namespace Network {
 
 /**
+ * On different platforms the sockaddr struct for unix domain
+ * sockets is different. We use this function to get the
+ * length of the platform specific struct.
+ */
+static constexpr socklen_t udsAddressLength() {
+#if defined(__APPLE__)
+  return sizeof(sockaddr);
+#elif defined(WIN32)
+  return sizeof(sockaddr_un);
+#else
+  return sizeof(sa_family_t);
+#endif
+}
+
+/**
  * IoHandle derivative for sockets
  */
 class IoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
 public:
-  explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false)
-      : fd_(fd), socket_v6only_(socket_v6only) {}
+  explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
+                              int domain = 1)
+      : fd_(fd), socket_v6only_(socket_v6only), domain_(domain) {}
 
   // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;
@@ -57,7 +73,7 @@ public:
                                   socklen_t optlen) override;
   Api::SysCallIntResult getOption(int level, int optname, void* optval, socklen_t* optlen) override;
   Api::SysCallIntResult setBlocking(bool blocking) override;
-  absl::optional<int> domain() override;
+  int domain() override;
   Address::InstanceConstSharedPtr localAddress() override;
   Address::InstanceConstSharedPtr peerAddress() override;
   Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
@@ -85,6 +101,7 @@ protected:
 
   os_fd_t fd_;
   int socket_v6only_{false};
+  int domain_;
 
   // The minimum cmsg buffer size to filled in destination address, packets dropped and gso
   // size when receiving a packet. It is possible for a received packet to contain both IPv4

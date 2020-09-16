@@ -421,20 +421,7 @@ Api::SysCallIntResult IoSocketHandleImpl::setBlocking(bool blocking) {
   return Api::OsSysCallsSingleton::get().setsocketblocking(fd_, blocking);
 }
 
-absl::optional<int> IoSocketHandleImpl::domain() {
-  sockaddr_storage addr;
-  socklen_t len = sizeof(addr);
-  Api::SysCallIntResult result;
-
-  result = Api::OsSysCallsSingleton::get().getsockname(
-      fd_, reinterpret_cast<struct sockaddr*>(&addr), &len);
-
-  if (result.rc_ == 0) {
-    return {addr.ss_family};
-  }
-
-  return absl::nullopt;
-}
+int IoSocketHandleImpl::domain() { return domain_; }
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
   sockaddr_storage ss;
@@ -459,12 +446,8 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
     throw EnvoyException(
         fmt::format("getpeername failed for '{}': {}", fd_, errorDetails(result.errno_)));
   }
-#ifdef __APPLE__
-  if (ss_len == sizeof(sockaddr) && ss.ss_family == AF_UNIX)
-#else
-  if (ss_len == sizeof(sa_family_t) && ss.ss_family == AF_UNIX)
-#endif
-  {
+
+  if (ss_len == udsAddressLength() && ss.ss_family == AF_UNIX) {
     // For Unix domain sockets, can't find out the peer name, but it should match our own
     // name for the socket (i.e. the path should match, barring any namespace or other
     // mechanisms to hide things, of which there are many).
