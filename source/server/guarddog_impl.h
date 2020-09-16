@@ -105,10 +105,10 @@ private:
 
   using WatchDogAction = envoy::config::bootstrap::v3::Watchdog::WatchdogAction;
   // Helper function to invoke all the GuardDogActions registered for an Event.
-  void
-  invokeGuardDogActions(WatchDogAction::WatchdogEvent event,
-                        std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs,
-                        MonotonicTime now);
+  void invokeGuardDogActions(
+      WatchDogAction::WatchdogEvent event,
+      std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_last_checkin_pairs,
+      MonotonicTime now);
 
   struct WatchedDog {
     WatchedDog(Stats::Scope& stats_scope, const std::string& thread_name,

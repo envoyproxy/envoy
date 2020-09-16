@@ -22,7 +22,7 @@ public:
                 Server::Configuration::GuardDogActionFactoryContext& context);
 
   void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
-           const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs,
+           const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_last_checkin_pairs,
            MonotonicTime now) override;
 
 private:

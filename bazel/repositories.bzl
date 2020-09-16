@@ -12,6 +12,7 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.tracers.lightstep",
     "envoy.tracers.datadog",
     "envoy.tracers.opencensus",
+    "envoy.watchdog.abort_action",
 ]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP

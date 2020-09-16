@@ -203,6 +203,7 @@ EXTENSIONS = {
     # Watchdog actions
     #
     "envoy.watchdog.profile_action":                    "//source/extensions/watchdog/profile_action:config",
+    "envoy.watchdog.abort_action":                      "//source/extensions/watchdog/abort_action:config",
 
 }
 
