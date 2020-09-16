@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <string>
 
-#include "common/common/logger.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -16,6 +15,7 @@
 #include "envoy/upstream/host_description.h"
 
 #include "common/common/assert.h"
+#include "common/common/logger.h"
 #include "common/protobuf/protobuf.h"
 #include "common/singleton/const_singleton.h"
 

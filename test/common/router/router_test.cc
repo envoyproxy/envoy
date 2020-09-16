@@ -2353,7 +2353,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
 
-// expectPerTryTimerCreate();
+  // expectPerTryTimerCreate();
   per_try_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
   EXPECT_CALL(*per_try_timeout_, enableTimer(_, _));
   EXPECT_EQ(0U,
@@ -2684,7 +2684,6 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
 
-
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
       putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
@@ -2754,8 +2753,8 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
   EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
   router_.decodeHeaders(headers, true);
 
-  // TODO(snowp): Seems like we should reset the bad one? Or should we not because it's already end_stream=true?
-  // EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  // TODO(snowp): Seems like we should reset the bad one? Or should we not because it's already
+  // end_stream=true? EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
 
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,

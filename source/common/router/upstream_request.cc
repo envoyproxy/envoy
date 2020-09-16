@@ -72,7 +72,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  std::unique_ptr<GenericConnPool>&& conn_pool)
     : parent_(parent), outlier_detection_timeout_recorded_(false), retried_(false),
       grpc_rq_success_deferred_(false), upstream_canary_(false), awaiting_headers_(true),
-      encode_complete_(false), decode_complete_(false), destroyed_(false), create_per_try_timeout_on_request_complete_(false),
+      encode_complete_(false), decode_complete_(false), destroyed_(false),
+      create_per_try_timeout_on_request_complete_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
       filter_manager_(*this, parent_.callbacks()->dispatcher(), *parent_.callbacks()->connection(),
                       parent_.callbacks()->streamId(), true,
@@ -105,10 +106,10 @@ UpstreamRequest::~UpstreamRequest() {
     onDeferredDelete();
   }
 }
-  void UpstreamRequest::onDeferredDelete() {
-    ENVOY_LOG_MISC(info, "DONG DEFERRED DELELTE");
-    ASSERT(!destroyed_);
-    destroyed_ = true;
+void UpstreamRequest::onDeferredDelete() {
+  ENVOY_LOG_MISC(info, "DONG DEFERRED DELELTE");
+  ASSERT(!destroyed_);
+  destroyed_ = true;
 
   if (per_try_timeout_ != nullptr) {
     // Allows for testing.
@@ -134,8 +135,8 @@ UpstreamRequest::~UpstreamRequest() {
         responseTrailers() ? &responseTrailers()->get() : nullptr, filter_manager_.streamInfo());
   }
 
-    filter_manager_.destroyFilters();
-  }
+  filter_manager_.destroyFilters();
+}
 
 void UpstreamRequest::onDecoderFilterBelowWriteBufferLowWatermark() {
   parent_.cluster()->stats().upstream_flow_control_drained_total_.inc();
@@ -403,8 +404,7 @@ Http::FilterMetadataStatus UpstreamRequestFilter::decodeMetadata(Http::MetadataM
 }
 void UpstreamRequest::maybeEndDecode(bool end_stream) {
   if (end_stream) {
-    upstream_timing_.onLastUpstreamRxByteReceived(
-        parent_.callbacks()->dispatcher().timeSource());
+    upstream_timing_.onLastUpstreamRxByteReceived(parent_.callbacks()->dispatcher().timeSource());
     decode_complete_ = true;
   }
 }
