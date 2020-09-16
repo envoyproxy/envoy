@@ -10,9 +10,9 @@ namespace RBAC {
 namespace {
 
 TEST(ResponseDetail, ResponseDetail) {
-    EXPECT_EQ(RBAC::responseDetail("abdfxy"), "rbac_access_denied_matched_policy[abdfxy]");
-    EXPECT_EQ(RBAC::responseDetail("ab df  xy"), "rbac_access_denied_matched_policy[ab_df__xy]");
-    EXPECT_EQ(RBAC::responseDetail("a \t\f\v\n\ry"), "rbac_access_denied_matched_policy[a______y]");
+  EXPECT_EQ(RBAC::responseDetail("abdfxy"), "rbac_access_denied_matched_policy[abdfxy]");
+  EXPECT_EQ(RBAC::responseDetail("ab df  xy"), "rbac_access_denied_matched_policy[ab_df__xy]");
+  EXPECT_EQ(RBAC::responseDetail("a \t\f\v\n\ry"), "rbac_access_denied_matched_policy[a______y]");
 }
 
 } // namespace
