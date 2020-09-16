@@ -46,6 +46,7 @@ configure_make(
         # TODO(htuch): Remove when #6084 is fixed
         "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
         "//bazel:msan_build": {"ENVOY_CONFIG_MSAN": "1"},
+        "//bazel:windows_dbg_build": {"WINDOWS_DBG_BUILD": "debug"},
         "//conditions:default": {},
     }),
     lib_source = "@com_github_luajit_luajit//:all",
@@ -55,7 +56,6 @@ configure_make(
         "//bazel:windows_x86_64": ["lua51.lib"],
         "//conditions:default": ["libluajit-5.1.a"],
     }),
-    tags = ["skip_on_windows"],
 )
 
 configure_make(
@@ -67,6 +67,7 @@ configure_make(
         # TODO(htuch): Remove when #6084 is fixed
         "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
         "//bazel:msan_build": {"ENVOY_CONFIG_MSAN": "1"},
+        "//bazel:windows_dbg_build": {"WINDOWS_DBG_BUILD": "debug"},
         "//conditions:default": {},
     }),
     lib_source = "@com_github_moonjit_moonjit//:all",
@@ -76,7 +77,6 @@ configure_make(
         "//bazel:windows_x86_64": ["lua51.lib"],
         "//conditions:default": ["libluajit-5.1.a"],
     }),
-    tags = ["skip_on_windows"],
 )
 
 envoy_cmake_external(
@@ -115,8 +115,9 @@ envoy_cmake_external(
         "CMAKE_USE_GSSAPI": "off",
         "HTTP_ONLY": "on",
         "CMAKE_INSTALL_LIBDIR": "lib",
-        # Explicitly enable Unix sockets and disable crypto for Windows
-        "USE_UNIX_SOCKETS": "on",
+        # Explicitly enable Unix sockets, once afunix.h is correctly detected
+        # "USE_UNIX_SOCKETS": "on",
+        # Explicitly disable "Windows" crypto for Windows
         "CURL_DISABLE_CRYPTO_AUTH": "on",
         # C-Ares.
         "ENABLE_ARES": "on",
@@ -138,6 +139,10 @@ envoy_cmake_external(
         "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib/include",
         "CMAKE_CXX_COMPILER_FORCED": "on",
         "CMAKE_C_FLAGS_BAZEL": "-fPIC",
+        # Note we use Bazel's flags (not _RELEASE/_DEBUG CMake flags), but this toggle
+        # also works around a bug in CMP0091 logic which re-injected a badly placed -M flag.
+        # See https://github.com/bazelbuild/rules_foreign_cc/issues/426
+        "CURL_STATIC_CRT": "on",
     },
     defines = ["CURL_STATICLIB"],
     generate_crosstool_file = True,
@@ -218,8 +223,32 @@ envoy_cmake_external(
         "CMAKE_CXX_COMPILER_FORCED": "on",
         "CMAKE_C_COMPILER_FORCED": "on",
         "SKIP_BUILD_EXAMPLES": "on",
+
+        # The following entries are for zlib-ng. Since zlib and zlib-ng are compatible source
+        # codes and CMake ignores unknown cache entries, it is fine to combine it into one
+        # dictionary.
+        #
+        # Reference: https://github.com/zlib-ng/zlib-ng#build-options.
+        "ZLIB_COMPAT": "on",
+        "ZLIB_ENABLE_TESTS": "off",
+
+        # Warning: Turning WITH_OPTIM to "on" doesn't pass ZlibCompressorImplTest.CallingChecksum.
+        "WITH_OPTIM": "on",
+        # However turning off SSE4 fixes it.
+        "WITH_SSE4": "off",
+
+        # Warning: Turning WITH_NEW_STRATEGIES to "on" doesn't pass gzip compressor fuzz test.
+        # Turning this off means falling into NO_QUICK_STRATEGY route.
+        "WITH_NEW_STRATEGIES": "off",
+
+        # Only allow aligned address.
+        # Reference: https://github.com/zlib-ng/zlib-ng#advanced-build-options.
+        "UNALIGNED_OK": "off",
     },
-    lib_source = "@net_zlib//:all",
+    lib_source = select({
+        "//bazel:zlib_ng": "@com_github_zlib_ng_zlib_ng//:all",
+        "//conditions:default": "@net_zlib//:all",
+    }),
     static_libraries = select({
         "//bazel:windows_x86_64": ["zlibstatic.lib"],
         "//conditions:default": ["libz.a"],

@@ -20,7 +20,7 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -854,7 +854,7 @@ TEST_F(AsyncClientImplTest, ResetInOnHeaders) {
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
       static_cast<Http::AsyncStreamImpl*>(stream);
   filter_callbacks->encodeHeaders(
-      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false, "details");
 }
 
 TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {

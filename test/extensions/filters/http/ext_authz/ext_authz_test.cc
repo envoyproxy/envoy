@@ -27,7 +27,7 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -238,7 +238,7 @@ TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
       1U,
       filter_callbacks_.clusterInfo()->statsScope().counterFromString("ext_authz.error").value());
   EXPECT_EQ(1U, config_->stats().error_.value());
-  EXPECT_EQ("ext_authz_error", filter_callbacks_.details_);
+  EXPECT_EQ("ext_authz_error", filter_callbacks_.details());
 }
 
 // Test when failure_mode_allow is set and the response from the authorization service is Error that
@@ -793,7 +793,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
   EXPECT_EQ(
       1U,
       filter_callbacks_.clusterInfo()->statsScope().counterFromString("ext_authz.denied").value());
-  EXPECT_EQ("ext_authz_denied", filter_callbacks_.details_);
+  EXPECT_EQ("ext_authz_denied", filter_callbacks_.details());
 }
 
 // Verifies that specified metadata is passed along in the check request

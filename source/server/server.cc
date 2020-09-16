@@ -32,9 +32,9 @@
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
-#include "common/network/listener_impl.h"
 #include "common/network/socket_interface.h"
 #include "common/network/socket_interface_impl.h"
+#include "common/network/tcp_listener_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
@@ -491,8 +491,12 @@ void InstanceImpl::initialize(const Options& options,
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
-  if (bootstrap_.dynamic_resources().has_lds_config()) {
-    listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config());
+  if (bootstrap_.dynamic_resources().has_lds_config() ||
+      bootstrap_.dynamic_resources().has_lds_resources_locator()) {
+    listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config(),
+                                    bootstrap_.dynamic_resources().has_lds_resources_locator()
+                                        ? &bootstrap_.dynamic_resources().lds_resources_locator()
+                                        : nullptr);
   }
 
   // We have to defer RTDS initialization until after the cluster manager is
@@ -513,7 +517,8 @@ void InstanceImpl::initialize(const Options& options,
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, *api_);
+  guard_dog_ =
+      std::make_unique<Server::GuardDogImpl>(stats_store_, config_.watchdogConfig(), *api_);
 }
 
 void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
@@ -542,11 +547,11 @@ void InstanceImpl::onRuntimeReady() {
 
   // If there is no global limit to the number of active connections, warn on startup.
   // TODO (tonya11en): Move this functionality into the overload manager.
-  if (!runtime().snapshot().get(Network::ListenerImpl::GlobalMaxCxRuntimeKey)) {
+  if (!runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
     ENVOY_LOG(warn,
               "there is no configured limit to the number of allowed active connections. Set a "
               "limit via the runtime key {}",
-              Network::ListenerImpl::GlobalMaxCxRuntimeKey);
+              Network::TcpListenerImpl::GlobalMaxCxRuntimeKey);
   }
 }
 

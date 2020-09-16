@@ -92,8 +92,8 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
     return Network::FilterStatus::Continue;
   case ParseState::Continue:
     // do nothing but create the event
-    file_event_ = cb.dispatcher().createFileEvent(
-        socket.ioHandle().fd(),
+    file_event_ = socket.ioHandle().createFileEvent(
+        cb.dispatcher(),
         [this](uint32_t events) {
           if (events & Event::FileReadyType::Closed) {
             config_->stats().connection_closed_.inc();
@@ -166,14 +166,13 @@ ParseState Filter::onRead() {
   //
   // TODO(ggreenway): write an integration test to ensure the events work as expected on all
   // platforms.
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result = os_syscalls.recv(cb_->socket().ioHandle().fd(), buf_,
-                                                         config_->maxClientHelloSize(), MSG_PEEK);
+  const auto result = cb_->socket().ioHandle().recv(buf_, config_->maxClientHelloSize(), MSG_PEEK);
   ENVOY_LOG(trace, "tls inspector: recv: {}", result.rc_);
 
-  if (SOCKET_FAILURE(result.rc_) && result.errno_ == SOCKET_ERROR_AGAIN) {
-    return ParseState::Continue;
-  } else if (result.rc_ < 0) {
+  if (!result.ok()) {
+    if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+      return ParseState::Continue;
+    }
     config_->stats().read_error_.inc();
     return ParseState::Error;
   }

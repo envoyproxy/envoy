@@ -174,6 +174,24 @@ TEST_F(AuthenticatorTest, TestJwtWithNonExistKid) {
   expectVerifyStatus(Status::JwtVerificationFail, headers);
 }
 
+// This test verifies the Jwt without "iss" work
+TEST_F(AuthenticatorTest, TestJwtWithoutIss) {
+  jwks_ = Jwks::createFrom(ES256PublicKey, Jwks::JWKS);
+  EXPECT_TRUE(jwks_->getStatus() == Status::Ok);
+
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
+      .WillOnce(Invoke([this](const envoy::config::core::v3::HttpUri&, Tracing::Span&,
+                              JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
+
+  // Test OK pubkey and its cache
+  Http::TestRequestHeaderMapImpl headers{
+      {"Authorization", "Bearer " + std::string(ES256WithoutIssToken)}};
+
+  expectVerifyStatus(Status::Ok, headers);
+}
+
 // This test verifies if Jwt is missing, proper status is called.
 TEST_F(AuthenticatorTest, TestMissedJWT) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(0);

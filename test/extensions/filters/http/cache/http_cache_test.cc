@@ -1,7 +1,9 @@
 #include <chrono>
+#include <string>
 
 #include "extensions/filters/http/cache/cache_headers_utils.h"
 #include "extensions/filters/http/cache/http_cache.h"
+#include "extensions/filters/http/cache/inline_headers_handles.h"
 
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/mocks/http/mocks.h"
@@ -22,19 +24,32 @@ namespace {
 
 struct LookupRequestTestCase {
   std::string test_name, request_cache_control, response_cache_control;
-  SystemTime request_time, response_time;
+  SystemTime request_time, response_date;
   CacheEntryStatus expected_cache_entry_status;
+  std::string expected_age;
 };
 
 using Seconds = std::chrono::seconds;
 
+envoy::extensions::filters::http::cache::v3alpha::CacheConfig getConfig() {
+  // Allows 'accept' to be varied in the tests.
+  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
+  const auto& add_accept = config.mutable_allowed_vary_headers()->Add();
+  add_accept->set_exact("accept");
+  return config;
+}
+
 class LookupRequestTest : public testing::TestWithParam<LookupRequestTestCase> {
 public:
+  LookupRequestTest() : vary_allow_list_(getConfig().allowed_vary_headers()) {}
+
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   Http::TestRequestHeaderMapImpl request_headers_{{":path", "/"},
                                                   {":method", "GET"},
                                                   {"x-forwarded-proto", "https"},
                                                   {":authority", "example.com"}};
+
+  VaryHeader vary_allow_list_;
 
   static const SystemTime& currentTime() {
     CONSTRUCT_ON_FIRST_USE(SystemTime, Event::SimulatedTimeSystem().systemTime());
@@ -46,104 +61,114 @@ public:
                             /*request_cache_control=*/"no-cache",
                             /*response_cache_control=*/"public, max-age=3600",
                             /*request_time=*/currentTime(),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"0"},
                            {"response_requires_revalidation",
                             /*request_cache_control=*/"",
                             /*response_cache_control=*/"no-cache",
                             /*request_time=*/currentTime(),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
-                           {"future_response_time",
-                            /*request_cache_control=*/"",
-                            /*response_cache_control=*/"public, max-age=3600",
-                            /*request_time=*/currentTime(),
-                            /*response_time=*/currentTime() + Seconds(1),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"0"},
                            {"request_max_age_satisfied",
                             /*request_cache_control=*/"max-age=10",
                             /*response_cache_control=*/"public, max-age=3600",
                             /*request_time=*/currentTime() + Seconds(9),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::Ok},
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::Ok,
+                            /*expected_age=*/"9"},
                            {"request_max_age_unsatisfied",
                             /*request_cache_control=*/"max-age=10",
                             /*response_cache_control=*/"public, max-age=3600",
                             /*request_time=*/currentTime() + Seconds(11),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"11"},
                            {"request_min_fresh_satisfied",
                             /*request_cache_control=*/"min-fresh=1000",
                             /*response_cache_control=*/"public, max-age=2000",
                             /*request_time=*/currentTime() + Seconds(999),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::Ok},
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::Ok,
+                            /*expected_age=*/"999"},
                            {"request_min_fresh_unsatisfied",
                             /*request_cache_control=*/"min-fresh=1000",
                             /*response_cache_control=*/"public, max-age=2000",
                             /*request_time=*/currentTime() + Seconds(1001),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1001"},
                            {"request_max_age_satisfied_but_min_fresh_unsatisfied",
                             /*request_cache_control=*/"max-age=1500, min-fresh=1000",
                             /*response_cache_control=*/"public, max-age=2000",
                             /*request_time=*/currentTime() + Seconds(1001),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1001"},
                            {"request_max_age_satisfied_but_max_stale_unsatisfied",
                             /*request_cache_control=*/"max-age=1500, max-stale=400",
                             /*response_cache_control=*/"public, max-age=1000",
                             /*request_time=*/currentTime() + Seconds(1401),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1401"},
                            {"request_max_stale_satisfied_but_min_fresh_unsatisfied",
                             /*request_cache_control=*/"min-fresh=1000, max-stale=500",
                             /*response_cache_control=*/"public, max-age=2000",
                             /*request_time=*/currentTime() + Seconds(1001),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1001"},
                            {"request_max_stale_satisfied_but_max_age_unsatisfied",
                             /*request_cache_control=*/"max-age=1200, max-stale=500",
                             /*response_cache_control=*/"public, max-age=1000",
                             /*request_time=*/currentTime() + Seconds(1201),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1201"},
                            {"request_min_fresh_satisfied_but_max_age_unsatisfied",
                             /*request_cache_control=*/"max-age=500, min-fresh=400",
                             /*response_cache_control=*/"public, max-age=1000",
                             /*request_time=*/currentTime() + Seconds(501),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"501"},
                            {"expired",
                             /*request_cache_control=*/"",
                             /*response_cache_control=*/"public, max-age=1000",
                             /*request_time=*/currentTime() + Seconds(1001),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1001"},
                            {"expired_but_max_stale_satisfied",
                             /*request_cache_control=*/"max-stale=500",
                             /*response_cache_control=*/"public, max-age=1000",
                             /*request_time=*/currentTime() + Seconds(1499),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::Ok},
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::Ok,
+                            /*expected_age=*/"1499"},
                            {"expired_max_stale_unsatisfied",
                             /*request_cache_control=*/"max-stale=500",
                             /*response_cache_control=*/"public, max-age=1000",
                             /*request_time=*/currentTime() + Seconds(1501),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1501"},
                            {"expired_max_stale_satisfied_but_response_must_revalidate",
                             /*request_cache_control=*/"max-stale=500",
                             /*response_cache_control=*/"public, max-age=1000, must-revalidate",
                             /*request_time=*/currentTime() + Seconds(1499),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::RequiresValidation},
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1499"},
                            {"fresh_and_response_must_revalidate",
                             /*request_cache_control=*/"",
                             /*response_cache_control=*/"public, max-age=1000, must-revalidate",
                             /*request_time=*/currentTime() + Seconds(999),
-                            /*response_time=*/currentTime(),
-                            /*expected_result=*/CacheEntryStatus::Ok},
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::Ok,
+                            /*expected_age=*/"999"},
 
     );
   }
@@ -152,8 +177,11 @@ public:
 LookupResult makeLookupResult(const LookupRequest& lookup_request,
                               const Http::TestResponseHeaderMapImpl& response_headers,
                               uint64_t content_length = 0) {
+  // For the purpose of the test, set the response_time to the date header value.
+  ResponseMetadata metadata = {CacheHeadersUtils::httpTime(response_headers.Date())};
   return lookup_request.makeLookupResult(
-      std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers), content_length);
+      std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers), std::move(metadata),
+      content_length);
 }
 
 INSTANTIATE_TEST_SUITE_P(ResultMatchesExpectation, LookupRequestTest,
@@ -163,16 +191,18 @@ INSTANTIATE_TEST_SUITE_P(ResultMatchesExpectation, LookupRequestTest,
 TEST_P(LookupRequestTest, ResultWithoutBodyMatchesExpectation) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
                                    GetParam().request_cache_control);
-  const SystemTime request_time = GetParam().request_time, response_time = GetParam().response_time;
-  const LookupRequest lookup_request(request_headers_, request_time);
+  const SystemTime request_time = GetParam().request_time, response_date = GetParam().response_date;
+  const LookupRequest lookup_request(request_headers_, request_time, vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"cache-control", GetParam().response_cache_control},
-       {"date", formatter_.fromTime(response_time)}});
+       {"date", formatter_.fromTime(response_date)}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
 
   EXPECT_EQ(GetParam().expected_cache_entry_status, lookup_response.cache_entry_status_);
   ASSERT_TRUE(lookup_response.headers_);
   EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_THAT(*lookup_response.headers_,
+              HeaderHasValueRef(Http::Headers::get().Age, GetParam().expected_age));
   EXPECT_EQ(lookup_response.content_length_, 0);
   EXPECT_TRUE(lookup_response.response_ranges_.empty());
   EXPECT_FALSE(lookup_response.has_trailers_);
@@ -181,11 +211,11 @@ TEST_P(LookupRequestTest, ResultWithoutBodyMatchesExpectation) {
 TEST_P(LookupRequestTest, ResultWithBodyMatchesExpectation) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
                                    GetParam().request_cache_control);
-  const SystemTime request_time = GetParam().request_time, response_time = GetParam().response_time;
-  const LookupRequest lookup_request(request_headers_, request_time);
+  const SystemTime request_time = GetParam().request_time, response_date = GetParam().response_date;
+  const LookupRequest lookup_request(request_headers_, request_time, vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"cache-control", GetParam().response_cache_control},
-       {"date", formatter_.fromTime(response_time)}});
+       {"date", formatter_.fromTime(response_date)}});
   const uint64_t content_length = 5;
   const LookupResult lookup_response =
       makeLookupResult(lookup_request, response_headers, content_length);
@@ -193,13 +223,15 @@ TEST_P(LookupRequestTest, ResultWithBodyMatchesExpectation) {
   EXPECT_EQ(GetParam().expected_cache_entry_status, lookup_response.cache_entry_status_);
   ASSERT_TRUE(lookup_response.headers_);
   EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_THAT(*lookup_response.headers_,
+              HeaderHasValueRef(Http::Headers::get().Age, GetParam().expected_age));
   EXPECT_EQ(lookup_response.content_length_, content_length);
   EXPECT_TRUE(lookup_response.response_ranges_.empty());
   EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
 TEST_F(LookupRequestTest, ExpiredViaFallbackheader) {
-  const LookupRequest lookup_request(request_headers_, currentTime());
+  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"expires", formatter_.fromTime(currentTime() - Seconds(5))},
        {"date", formatter_.fromTime(currentTime())}});
@@ -209,7 +241,7 @@ TEST_F(LookupRequestTest, ExpiredViaFallbackheader) {
 }
 
 TEST_F(LookupRequestTest, NotExpiredViaFallbackheader) {
-  const LookupRequest lookup_request(request_headers_, currentTime());
+  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"expires", formatter_.fromTime(currentTime() + Seconds(5))},
        {"date", formatter_.fromTime(currentTime())}});
@@ -222,7 +254,7 @@ TEST_F(LookupRequestTest, NotExpiredViaFallbackheader) {
 // https://httpwg.org/specs/rfc7234.html#header.pragma
 TEST_F(LookupRequestTest, PragmaNoCacheFallback) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma, "no-cache");
-  const LookupRequest lookup_request(request_headers_, currentTime());
+  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
@@ -233,7 +265,7 @@ TEST_F(LookupRequestTest, PragmaNoCacheFallback) {
 TEST_F(LookupRequestTest, PragmaNoCacheFallbackExtraDirectivesIgnored) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma,
                                    "no-cache, custom-directive=custom-value");
-  const LookupRequest lookup_request(request_headers_, currentTime());
+  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
@@ -243,7 +275,8 @@ TEST_F(LookupRequestTest, PragmaNoCacheFallbackExtraDirectivesIgnored) {
 
 TEST_F(LookupRequestTest, PragmaFallbackOtherValuesIgnored) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma, "max-age=0");
-  const LookupRequest lookup_request(request_headers_, currentTime() + std::chrono::seconds(5));
+  const LookupRequest lookup_request(request_headers_, currentTime() + Seconds(5),
+                                     vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
@@ -254,7 +287,8 @@ TEST_F(LookupRequestTest, PragmaFallbackOtherValuesIgnored) {
 TEST_F(LookupRequestTest, PragmaNoFallback) {
   request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma, "no-cache");
   request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "max-age=10");
-  const LookupRequest lookup_request(request_headers_, currentTime() + std::chrono::seconds(5));
+  const LookupRequest lookup_request(request_headers_, currentTime() + Seconds(5),
+                                     vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
@@ -262,10 +296,10 @@ TEST_F(LookupRequestTest, PragmaNoFallback) {
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
 }
 
-TEST_F(LookupRequestTest, SatisfiableRange) {
-  // add range to headers
-  request_headers_.addReference(Http::Headers::get().Range, "bytes=1-99,3-,-2");
-  const LookupRequest lookup_request(request_headers_, currentTime());
+TEST_F(LookupRequestTest, SingleSatisfiableRange) {
+  // add range info to headers
+  request_headers_.addReference(Http::Headers::get().Range, "bytes=1-99");
+  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_);
 
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())},
@@ -281,28 +315,49 @@ TEST_F(LookupRequestTest, SatisfiableRange) {
   EXPECT_EQ(lookup_response.content_length_, 4);
 
   // checks that the ranges have been adjusted to the content's length
-  EXPECT_EQ(lookup_response.response_ranges_.size(), 3);
+  EXPECT_EQ(lookup_response.response_ranges_.size(), 1);
 
   EXPECT_EQ(lookup_response.response_ranges_[0].begin(), 1);
   EXPECT_EQ(lookup_response.response_ranges_[0].end(), 4);
   EXPECT_EQ(lookup_response.response_ranges_[0].length(), 3);
 
-  EXPECT_EQ(lookup_response.response_ranges_[1].begin(), 3);
-  EXPECT_EQ(lookup_response.response_ranges_[1].end(), 4);
-  EXPECT_EQ(lookup_response.response_ranges_[1].length(), 1);
+  EXPECT_FALSE(lookup_response.has_trailers_);
+}
 
-  EXPECT_EQ(lookup_response.response_ranges_[2].begin(), 2);
-  EXPECT_EQ(lookup_response.response_ranges_[2].end(), 4);
-  EXPECT_EQ(lookup_response.response_ranges_[2].length(), 2);
+TEST_F(LookupRequestTest, MultipleSatisfiableRanges) {
+  // Because we do not support multi-part responses for now, we are limiting parsing of a single
+  // range. Thus, multiple ranges are ignored, and a usual "::Ok" should be expected. If multi-part
+  // responses are implemented (and the parsing limit is changed), this test should be adjusted.
 
+  // add range info to headers
+  request_headers_.addCopy(Http::Headers::get().Range.get(), "bytes=1-99,3-,-3");
+
+  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_);
+
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"date", formatter_.fromTime(currentTime())},
+       {"cache-control", "public, max-age=3600"},
+       {"content-length", "4"}});
+  const uint64_t content_length = 4;
+  const LookupResult lookup_response =
+      makeLookupResult(lookup_request, response_headers, content_length);
+
+  ASSERT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
+
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 4);
+
+  // Check that the ranges have been ignored since we don't support multi-part responses.
+  EXPECT_EQ(lookup_response.response_ranges_.size(), 0);
   EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
 TEST_F(LookupRequestTest, NotSatisfiableRange) {
-  // add range headers
-  request_headers_.addReference(Http::Headers::get().Range, "bytes=5-99,100-");
+  // add range info to headers
+  request_headers_.addReference(Http::Headers::get().Range, "bytes=100-");
 
-  const LookupRequest lookup_request(request_headers_, currentTime());
+  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_);
 
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())},
@@ -572,6 +627,17 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(ParseInvalidRangeHeaderTest, InvalidRangeReturnsEmpty) {
   std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(range(), 5);
   ASSERT_EQ(0, result_vector.size());
+}
+
+TEST_F(LookupRequestTest, VariedHeaders) {
+  request_headers_.addCopy("accept", "image/*");
+  request_headers_.addCopy("other-header", "abc123");
+  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_);
+  const Http::RequestHeaderMap& result = lookup_request.getVaryHeaders();
+
+  ASSERT_TRUE(result.get(Http::LowerCaseString("accept")));
+  ASSERT_EQ(result.get(Http::LowerCaseString("accept"))->value().getStringView(), "image/*");
+  ASSERT_FALSE(result.get(Http::LowerCaseString("other-header")));
 }
 
 } // namespace

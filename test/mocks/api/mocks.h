@@ -59,6 +59,7 @@ public:
   SysCallIntResult getsockopt(os_fd_t sockfd, int level, int optname, void* optval,
                               socklen_t* optlen) override;
 
+  MOCK_METHOD(SysCallSocketResult, accept, (os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen));
   MOCK_METHOD(SysCallIntResult, bind, (os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen));
   MOCK_METHOD(SysCallIntResult, ioctl, (os_fd_t sockfd, unsigned long int request, void* argp));
   MOCK_METHOD(SysCallIntResult, close, (os_fd_t));
@@ -91,6 +92,7 @@ public:
   MOCK_METHOD(SysCallSizeResult, write, (os_fd_t sockfd, const void* buffer, size_t length));
   MOCK_METHOD(bool, supportsMmsg, (), (const));
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
+  MOCK_METHOD(bool, supportsIpTransparent, (), (const));
 
   // Map from (sockfd,level,optname) to boolean socket option.
   using SockOptKey = std::tuple<os_fd_t, int, int>;

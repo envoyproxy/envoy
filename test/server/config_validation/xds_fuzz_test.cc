@@ -1,5 +1,3 @@
-/* #include "common/protobuf/utility.h" */
-
 #include "test/fuzz/fuzz_runner.h"
 #include "test/server/config_validation/xds_fuzz.h"
 #include "test/server/config_validation/xds_fuzz.pb.validate.h"

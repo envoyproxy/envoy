@@ -147,10 +147,19 @@ void AuthenticatorImpl::startVerify() {
   }
 
   ENVOY_LOG(debug, "{}: Verifying JWT token of issuer {}", name(), jwt_->iss_);
-  // Check if token extracted from the location contains the issuer specified by config.
-  if (!curr_token_->isIssuerSpecified(jwt_->iss_)) {
-    doneWithStatus(Status::JwtUnknownIssuer);
-    return;
+  if (!jwt_->iss_.empty()) {
+    // Check if token extracted from the location contains the issuer specified by config.
+    if (!curr_token_->isIssuerSpecified(jwt_->iss_)) {
+      doneWithStatus(Status::JwtUnknownIssuer);
+      return;
+    }
+  } else {
+    // If provider is not specified, in allow_missing_or_failed or allow_missing case,
+    // the issuer specified in "iss" payload is required in order to lookup provider.
+    if (!provider_) {
+      doneWithStatus(Status::JwtUnknownIssuer);
+      return;
+    }
   }
 
   // TODO(qiwzhang): Cross-platform-wise the below unix_timestamp code is wrong as the

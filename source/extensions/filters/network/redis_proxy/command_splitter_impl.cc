@@ -152,6 +152,7 @@ SplitRequestPtr SimpleRequest::create(Router& router,
   }
 
   if (!request_ptr->handle_) {
+    command_stats.error_.inc();
     callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
     return nullptr;
   }

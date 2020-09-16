@@ -27,13 +27,14 @@ public:
   /**
    * Callback function for when the GuardDog observes an event.
    * @param event the event the GuardDog observes.
-   * @param thread_ltt_pairs pairs of the relevant thread to the event, and the
-   *  last time touched (LTT) of those threads with their watchdog.
+   * @param thread_last_checkin_pairs pair of the relevant thread to the event, and the
+   *  last check in time of those threads with their watchdog.
    * @param now the current time.
    */
-  virtual void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
-                   std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs,
-                   MonotonicTime now) PURE;
+  virtual void
+  run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
+      const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_last_checkin_pairs,
+      MonotonicTime now) PURE;
 };
 
 using GuardDogActionPtr = std::unique_ptr<GuardDogAction>;

@@ -337,7 +337,7 @@ public:
         ENVOY_LOG_MISC(debug, "Setting dispatching action  on {} in state {} {}", stream_index_,
                        static_cast<int>(request_.stream_state_),
                        static_cast<int>(response_.stream_state_));
-        auto request_action = stream_action.request().directional_action_selector_case();
+        auto request_action = stream_action.dispatching_action().directional_action_selector_case();
         if (request_action == test::common::http::DirectionalAction::kHeaders) {
           EXPECT_CALL(request_.request_decoder_, decodeHeaders_(_, _))
               .WillOnce(InvokeWithoutArgs(
@@ -385,7 +385,8 @@ public:
 // the buffer via swap() or modified with mutate().
 class ReorderBuffer {
 public:
-  ReorderBuffer(Connection& connection) : connection_(connection) {}
+  ReorderBuffer(Connection& connection, const bool& should_close_connection)
+      : connection_(connection), should_close_connection_(should_close_connection) {}
 
   void add(Buffer::Instance& data) {
     bufs_.emplace_back();
@@ -397,6 +398,10 @@ public:
     while (!bufs_.empty()) {
       Buffer::OwnedImpl& buf = bufs_.front();
       while (buf.length() > 0) {
+        if (should_close_connection_) {
+          ENVOY_LOG_MISC(trace, "Buffer dispatch disabled, stopping drain");
+          return codecClientError("preventing buffer drain due to connection closure");
+        }
         status = connection_.dispatch(buf);
         if (!status.ok()) {
           ENVOY_LOG_MISC(trace, "Error status: {}", status.message());
@@ -439,6 +444,9 @@ public:
 
   Connection& connection_;
   std::deque<Buffer::OwnedImpl> bufs_;
+  // A reference to a flag indicating whether the reorder buffer is allowed to dispatch data to
+  // the connection (reference to should_close_connection).
+  const bool& should_close_connection_;
 };
 
 using HttpStreamPtr = std::unique_ptr<HttpStream>;
@@ -494,8 +502,14 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         headers_with_underscores_action);
   }
 
-  ReorderBuffer client_write_buf{*server};
-  ReorderBuffer server_write_buf{*client};
+  // We track whether the connection should be closed for HTTP/1, since stream resets imply
+  // connection closes.
+  bool should_close_connection = false;
+
+  // The buffers will be blocked from dispatching data if should_close_connection is set to true.
+  // This prevents sending data if a stream reset occurs during the test cleanup when using HTTP/1.
+  ReorderBuffer client_write_buf{*server, should_close_connection};
+  ReorderBuffer server_write_buf{*client, should_close_connection};
 
   ON_CALL(client_connection, write(_, _))
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
@@ -544,10 +558,6 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     }
     return status;
   };
-
-  // We track whether the connection should be closed for HTTP/1, since stream resets imply
-  // connection closes.
-  bool should_close_connection = false;
 
   constexpr auto max_actions = 1024;
   bool codec_error = false;

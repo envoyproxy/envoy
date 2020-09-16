@@ -2,6 +2,7 @@
 
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
+#include "common/network/address_impl.h"
 
 using testing::Return;
 
@@ -21,6 +22,7 @@ void UberFilterFuzzer::reset() {
   Event::MockDispatcher& mock_dispatcher =
       dynamic_cast<Event::MockDispatcher&>(read_filter_callbacks_->connection_.dispatcher_);
   mock_dispatcher.clearDeferredDeleteList();
+  factory_context_.admin_.config_tracker_.config_tracker_callbacks_.clear();
   read_filter_.reset();
 }
 
@@ -93,7 +95,6 @@ void UberFilterFuzzer::fuzz(
     checkInvalidInputForFuzzer(filter_name, message.get());
     ENVOY_LOG_MISC(info, "Config content after decoded: {}", message->DebugString());
     cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
-
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "Controlled exception in filter setup {}", e.what());
     return;
@@ -118,9 +119,9 @@ void UberFilterFuzzer::fuzz(
       break;
     }
     case test::extensions::filters::network::Action::kAdvanceTime: {
-      time_source_.advanceTimeAsync(
-          std::chrono::milliseconds(action.advance_time().milliseconds()));
-      factory_context_.dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+      time_source_.advanceTimeAndRun(
+          std::chrono::milliseconds(action.advance_time().milliseconds()),
+          factory_context_.dispatcher(), Event::Dispatcher::RunType::NonBlock);
       break;
     }
     default: {

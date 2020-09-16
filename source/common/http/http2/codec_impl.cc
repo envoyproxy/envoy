@@ -28,6 +28,7 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+// TODO(alyssawilk) docs.
 class Http2ResponseCodeDetailValues {
 public:
   // Invalid HTTP header field was received and stream is going to be
@@ -45,6 +46,10 @@ public:
   const absl::string_view inbound_empty_frame_flood = "http2.inbound_empty_frames_flood";
   // Envoy was configured to drop requests with header keys beginning with underscores.
   const absl::string_view invalid_underscore = "http2.unexpected_underscore";
+  // The peer refused the stream.
+  const absl::string_view remote_refused = "http2.remote_refuse";
+  // The peer reset the stream.
+  const absl::string_view remote_reset = "http2.remote_reset";
 
   const absl::string_view errorDetails(int error_code) const {
     switch (error_code) {
@@ -227,9 +232,14 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   if (pending_send_data_.length() > 0) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.
+    // However, for empty trailers, we don't need to to save the trailers.
     ASSERT(!pending_trailers_to_encode_);
-    pending_trailers_to_encode_ = cloneTrailers(trailers);
-    createPendingFlushTimer();
+    const bool skip_encoding_empty_trailers =
+        trailers.empty() && parent_.skip_encoding_empty_trailers_;
+    if (!skip_encoding_empty_trailers) {
+      pending_trailers_to_encode_ = cloneTrailers(trailers);
+      createPendingFlushTimer();
+    }
   } else {
     submitTrailers(trailers);
     auto status = parent_.sendPendingFrames();
@@ -917,8 +927,13 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
         // the connection.
         reason = StreamResetReason::LocalReset;
       } else {
-        reason = error_code == NGHTTP2_REFUSED_STREAM ? StreamResetReason::RemoteRefusedStreamReset
-                                                      : StreamResetReason::RemoteReset;
+        if (error_code == NGHTTP2_REFUSED_STREAM) {
+          reason = StreamResetReason::RemoteRefusedStreamReset;
+          stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
+        } else {
+          reason = StreamResetReason::RemoteReset;
+          stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
+        }
       }
 
       stream->runResetCallbacks(reason);
@@ -1272,6 +1287,8 @@ ConnectionImpl::Http2Options::Http2Options(
 
   if (http2_options.allow_metadata()) {
     nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
+  } else {
+    ENVOY_LOG(trace, "Codec does not have Metadata frame support.");
   }
 
   // nghttp2 v1.39.2 lowered the internal flood protection limit from 10K to 1K of ACK frames.
@@ -1450,7 +1467,8 @@ Status ServerConnectionImpl::checkInboundFrameLimits(int32_t stream_id) {
     return bufferFloodError("Too many consecutive frames with an empty payload");
   }
 
-  if (inbound_priority_frames_ > max_inbound_priority_frames_per_stream_ * (1 + inbound_streams_)) {
+  if (inbound_priority_frames_ >
+      static_cast<uint64_t>(max_inbound_priority_frames_per_stream_) * (1 + inbound_streams_)) {
     ENVOY_CONN_LOG(trace,
                    "error reading frame: Too many PRIORITY frames received in this HTTP/2 session.",
                    connection_);
