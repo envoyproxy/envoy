@@ -154,6 +154,8 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   std::unique_ptr<GenericUpstream> upstream_;
   uint32_t downstream_data_disabled_{};
+
+  friend UpstreamRequest;
 };
 
 // The base request for Upstream.
@@ -174,6 +176,8 @@ public:
   void maybeEndEncode(bool end_stream) { filter_manager_.maybeEndDecode(end_stream); }
 
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
+
+  UpstreamToDownstream& upstreamToDownstream() { return filter_->active_request_; }
 
   // Http::FilterManagerCallbacks
   void encodeHeaders(Http::ResponseHeaderMap& response_headers, bool end_stream) override;

@@ -96,8 +96,8 @@ public:
         mock_router_filter_, std::make_unique<NiceMock<Router::MockGenericConnPool>>()));
     auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
     EXPECT_CALL(*data, connection()).Times(AnyNumber()).WillRepeatedly(ReturnRef(connection_));
-    tcp_upstream_ =
-        std::make_unique<TcpUpstream>(mock_router_filter_.requests_.front().get(), std::move(data));
+    tcp_upstream_ = std::make_unique<TcpUpstream>(
+        &mock_router_filter_.requests_.front().get()->upstreamToDownstream(), std::move(data));
   }
   ~TcpUpstreamTest() override { EXPECT_CALL(mock_router_filter_, config()).Times(AnyNumber()); }
 
