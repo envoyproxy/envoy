@@ -299,5 +299,5 @@ struct mmsghdr {
 // Define tcp_info to an empty struct.
 struct tcp_info {
   uint32_t empty;
-}
+};
 #endif
