@@ -79,6 +79,11 @@ public:
 
 class RouterUpstreamLogTest : public testing::Test {
 public:
+
+~RouterUpstreamLogTest() {
+  EXPECT_CALL(callbacks_.dispatcher_, clearDeferredDeleteList());
+  callbacks_.dispatcher_.clearDeferredDeleteList();
+}
   void init(absl::optional<envoy::config::accesslog::v3::AccessLog> upstream_log) {
     envoy::extensions::filters::http::router::v3::Router router_proto;
 
@@ -144,6 +149,7 @@ public:
 
     Http::TestRequestHeaderMapImpl headers(request_headers_init);
     HttpTestUtility::addDefaultHeaders(headers);
+    EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
     router_->decodeHeaders(headers, true);
 
     EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
@@ -185,6 +191,7 @@ public:
                                            {"x-envoy-internal", "true"},
                                            {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
     HttpTestUtility::addDefaultHeaders(headers);
+    EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
     router_->decodeHeaders(headers, true);
 
     router_->retry_state_->expectResetRetry();

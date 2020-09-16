@@ -325,7 +325,7 @@ void UpstreamRequestFilter::ActiveUpstreamRequest::decodeHeaders(
     parent_.decoder_callbacks_->continueDecoding();
   }
 
-  parent_.decoder_callbacks_->encodeHeaders(std::move(headers), end_stream);
+  parent_.decoder_callbacks_->encodeHeaders(std::move(headers), end_stream, StreamInfo::ResponseCodeDetails::get().ViaUpstream);
 }
 
 void UpstreamRequestFilter::ActiveUpstreamRequest::decodeData(Buffer::Instance& data,

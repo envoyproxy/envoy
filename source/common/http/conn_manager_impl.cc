@@ -1015,6 +1015,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   }
 
   filter_manager_.decodeHeaders(*request_headers_, end_stream);
+  if (end_stream) {
+    filter_manager_.streamInfo().onLastDownstreamRxByteReceived();
+    ENVOY_STREAM_LOG(debug, "request end stream", *this);
+  }
 
   // Reset it here for both global and overridden cases.
   resetIdleTimer();
@@ -1084,6 +1088,10 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
   filter_manager_.streamInfo().addBytesReceived(data.length());
 
   filter_manager_.decodeData(data, end_stream);
+  if (end_stream) {
+    filter_manager_.streamInfo().onLastDownstreamRxByteReceived();
+    ENVOY_STREAM_LOG(debug, "request end stream", *this);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& trailers) {
@@ -1095,6 +1103,8 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& 
   request_trailers_ = std::move(trailers);
   filter_manager_.maybeEndDecode(true);
   filter_manager_.decodeTrailers(*request_trailers_);
+  filter_manager_.streamInfo().onLastDownstreamRxByteReceived();
+  ENVOY_STREAM_LOG(debug, "request end stream", *this);
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeMetadata(MetadataMapPtr&& metadata_map) {
@@ -1484,7 +1494,7 @@ void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
 
 void ConnectionManagerImpl::ActiveStream::onRequestDataTooLarge() {
   connection_manager_.stats_.named_.downstream_rq_too_large_.inc();
-  filter_manager_.sendLocalReply(
+  filter_manager_.sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
       Code::PayloadTooLarge, CodeUtility::toString(Code::PayloadTooLarge), nullptr, absl::nullopt,
       StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
 }

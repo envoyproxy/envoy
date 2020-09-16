@@ -727,10 +727,6 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
 void FilterManager::maybeEndDecode(bool end_stream) {
   ASSERT(!state_.remote_complete_);
   state_.remote_complete_ = end_stream;
-  if (end_stream) {
-    stream_info_.onLastDownstreamRxByteReceived();
-    ENVOY_STREAM_LOG(debug, "request end stream", *this);
-  }
 }
 
 void FilterManager::disarmRequestTimeout() { filter_manager_callbacks_.disarmRequestTimeout(); }
