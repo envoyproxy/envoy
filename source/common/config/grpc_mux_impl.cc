@@ -124,7 +124,7 @@ void GrpcMuxImpl::registerVersionedTypeUrl(const std::string& type_url) {
     return;
   }
   // If type_url is v3, earlier_type_url will contain v2 type url.
-  absl::optional<std::string> earlier_type_url = ApiTypeOracle::getEarlierTypeUrl(type_url);
+  const absl::optional<std::string> earlier_type_url = ApiTypeOracle::getEarlierTypeUrl(type_url);
   // Register v2 to v3 and v3 to v2 type_url mapping in the hash map.
   if (earlier_type_url.has_value()) {
     type_url_map[earlier_type_url.value()] = type_url;
@@ -166,6 +166,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
       // this update. no need to send a discovery request, as we don't watch for anything.
       api_state_[type_url].request_.set_version_info(message->version_info());
     } else {
+      // No watches and we have resources - this should not happen. send a NACK (by not
+      // updating the version).
       ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
       queueDiscoveryRequest(type_url);
     }

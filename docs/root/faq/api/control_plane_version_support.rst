@@ -30,6 +30,11 @@ typical rollout sequence might look like:
 4. Support for v2 is removed in the management server. The management server moves to v3 exclusively
    internally and can support newer fields.
 
+5. Client can send discovery request with v2 resource type url and process discovery response with 
+   v3 resource type url. Client can also send discovery request with v3 resource type url and process 
+   discovery response with v2 resource type url. The upgrade and downgrade of type url is disabled 
+   by default and protected by a runtime guard *envoy.reloadable_features.enable_type_url_downgrade_and_upgrade*.
+
 If you are operating a managed control plane as-a-service, you will likely need to support a wide
 range of client versions. In this scenario, you will require long term support for multiple major
 API transport and resource versions. Strategies for managing this support are described :ref:`here

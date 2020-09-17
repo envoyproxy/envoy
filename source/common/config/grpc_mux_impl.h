@@ -140,7 +140,6 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
   bool first_stream_request_;
-
   absl::node_hash_map<std::string, ApiState> api_state_;
   // Envoy's dependency ordering.
   std::list<std::string> subscriptions_;
