@@ -73,7 +73,7 @@ void HttpHealthCheckerImplTestBase::expectClientCreate(size_t index) {
   expectClientCreate(index, health_checker_map_);
 }
 
-void TcpHealthCheckerImplTestBase::expectSessionCreate() { //Flip these around
+void TcpHealthCheckerImplTestBase::expectSessionCreate() { // Flip these around
   timeout_timer_ = new Event::MockTimer(&dispatcher_);
   interval_timer_ = new Event::MockTimer(&dispatcher_);
 }

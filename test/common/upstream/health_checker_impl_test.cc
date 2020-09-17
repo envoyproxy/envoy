@@ -2953,8 +2953,10 @@ TEST_F(TcpHealthCheckerImplTest, Success) {
   EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  ENVOY_LOG_MISC(trace, "Right after starting health checker interval enabled = {}", interval_timer_->enabled_);
-  ENVOY_LOG_MISC(trace, "Right after starting health checker timeout enabled = {}", timeout_timer_->enabled_);
+  ENVOY_LOG_MISC(trace, "Right after starting health checker interval enabled = {}",
+                 interval_timer_->enabled_);
+  ENVOY_LOG_MISC(trace, "Right after starting health checker timeout enabled = {}",
+                 timeout_timer_->enabled_);
 
   connection_->runHighWatermarkCallbacks();
   connection_->runLowWatermarkCallbacks();
@@ -3050,7 +3052,8 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutThenRemoteClose) {
   EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
 
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks(
-      {cluster_->prioritySet().getMockHostSet(0)->hosts_.back()}, {}); //TODO: This line might have something to do with it
+      {cluster_->prioritySet().getMockHostSet(0)->hosts_.back()},
+      {}); // TODO: This line might have something to do with it
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
@@ -3103,7 +3106,7 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   InSequence s;
 
   setupData(1);
-  health_checker_->start(); //Weird, this is beforehand
+  health_checker_->start(); // Weird, this is beforehand
 
   expectSessionCreate();
   expectClientCreate();
