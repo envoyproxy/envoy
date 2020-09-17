@@ -13,7 +13,7 @@ There are 5 identities:
   its private key.
 - **Upstream localhost**: It has the certificate *upstreamlocalhostcert.pem*, which is signed by
   the **Upstream CA** using the config *upstreamlocalhostcert.cfg*. *upstreamlocalhostkey.pem* is
-  its private key. The different between this certificate and **Upstream** is that this certifcate
+  its private key. The different between this certificate and **Upstream** is that this certificate
   has a SAN for "localhost".
 
 # How to update certificates
