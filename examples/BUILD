@@ -10,6 +10,8 @@ envoy_package()
 filegroup(
     name = "configs",
     srcs = [
+        "cache/front-envoy.yaml",
+        "cache/service-envoy.yaml",
         "cors/backend/front-envoy.yaml",
         "cors/backend/service-envoy.yaml",
         "cors/frontend/front-envoy.yaml",

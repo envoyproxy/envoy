@@ -21,9 +21,9 @@ TEST(ExampleConfigsTest, All) {
 
 #if defined(__APPLE__) || defined(WIN32)
   // freebind/freebind.yaml is not supported on macOS or Windows and is disabled via Bazel.
-  EXPECT_EQ(35UL, ConfigTest::run(directory));
+  EXPECT_EQ(37UL, ConfigTest::run(directory));
 #else
-  EXPECT_EQ(36UL, ConfigTest::run(directory));
+  EXPECT_EQ(38UL, ConfigTest::run(directory));
 #endif
 
   ConfigTest::testMerge();

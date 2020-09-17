@@ -3,7 +3,7 @@
 TESTFILTER="${1:-*}"
 FAILED=()
 SRCDIR="${SRCDIR:-$(pwd)}"
-EXCLUDED_BUILD_CONFIGS=${EXCLUDED_BUILD_CONFIGS:-"^./jaeger-native-tracing|docker-compose"}
+EXCLUDED_BUILD_CONFIGS=${EXCLUDED_BUILD_CONFIGS:-"^./cache/responses.yaml|^./jaeger-native-tracing|docker-compose"}
 
 
 trap_errors () {
