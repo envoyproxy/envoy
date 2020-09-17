@@ -164,12 +164,20 @@ public:
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
     encode100ContinueHeaders_(*headers);
   }
-  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override {
+  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
+                     absl::string_view details) override {
+    stream_info_.setResponseCodeDetails(details);
     encodeHeaders_(*headers, end_stream);
   }
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override { encodeTrailers_(*trailers); }
   void encodeMetadata(MetadataMapPtr&& metadata_map) override {
     encodeMetadata_(std::move(metadata_map));
+  }
+  absl::string_view details() {
+    if (stream_info_.responseCodeDetails()) {
+      return stream_info_.responseCodeDetails().value();
+    }
+    return "";
   }
 
   MOCK_METHOD(void, continueDecoding, ());
@@ -195,7 +203,6 @@ public:
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
   testing::NiceMock<MockScopedTrackedObject> scope_;
-  std::string details_;
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool stream_destroyed_{};

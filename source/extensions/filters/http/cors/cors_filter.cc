@@ -109,9 +109,8 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
     response_headers->setInline(access_control_max_age_handle.handle(), maxAge());
   }
 
-  decoder_callbacks_->streamInfo().setResponseCodeDetails(
-      HttpResponseCodeDetails::get().CorsResponse);
-  decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+  decoder_callbacks_->encodeHeaders(std::move(response_headers), true,
+                                    HttpResponseCodeDetails::get().CorsResponse);
 
   return Http::FilterHeadersStatus::StopIteration;
 }
