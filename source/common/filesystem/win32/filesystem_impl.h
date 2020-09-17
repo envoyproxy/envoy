@@ -14,13 +14,11 @@ public:
   ~FileImplWin32();
 
 protected:
-
   Api::IoCallBoolResult open(FlagSet flag) override;
   Api::IoCallSizeResult write(absl::string_view buffer) override;
   Api::IoCallBoolResult close() override;
 
 private:
-
   struct FlagsAndMode {
     DWORD access_ = 0;
     DWORD creation_ = 0;
