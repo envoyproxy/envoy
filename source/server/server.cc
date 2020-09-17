@@ -524,8 +524,10 @@ void InstanceImpl::initialize(const Options& options,
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  guard_dog_ =
-      std::make_unique<Server::GuardDogImpl>(stats_store_, config_.watchdogConfig(), *api_);
+  main_thread_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
+      stats_store_, config_.mainThreadWatchdogConfig(), *api_, "main_thread");
+  worker_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
+      stats_store_, config_.workerWatchdogConfig(), *api_, "workers");
 }
 
 void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
@@ -563,7 +565,7 @@ void InstanceImpl::onRuntimeReady() {
 }
 
 void InstanceImpl::startWorkers() {
-  listener_manager_->startWorkers(*guard_dog_);
+  listener_manager_->startWorkers(*worker_guard_dog_);
   initialization_timer_->complete();
   // Update server stats as soon as initialization is done.
   updateServerStats();
@@ -673,13 +675,13 @@ void InstanceImpl::run() {
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
-  auto watchdog =
-      guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "main_thread");
+  auto watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
+                                                         "main_thread");
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");
-  guard_dog_->stopWatching(watchdog);
+  main_thread_guard_dog_->stopWatching(watchdog);
   watchdog.reset();
 
   terminate();
