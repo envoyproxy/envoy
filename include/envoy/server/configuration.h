@@ -90,9 +90,14 @@ public:
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
 
   /**
-   * @return const Watchdog& the configuration of the watchdog.
+   * @return const Watchdog& the configuration of the main thread watchdog.
    */
-  virtual const Watchdog& watchdogConfig() const PURE;
+  virtual const Watchdog& mainThreadWatchdogConfig() const PURE;
+
+  /**
+   * @return const Watchdog& the configuration of the worker watchdog.
+   */
+  virtual const Watchdog& workerWatchdogConfig() const PURE;
 };
 
 /**
