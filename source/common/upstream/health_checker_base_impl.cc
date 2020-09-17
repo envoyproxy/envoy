@@ -369,24 +369,20 @@ HealthCheckerImplBase::ActiveHealthCheckSession::clearPendingFlag(HealthTransiti
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
-  ENVOY_LOG_MISC(trace, "Called interval base");
   onInterval();
   timeout_timer_->enableTimer(parent_.timeout_);
   parent_.stats_.attempt_.inc();
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onTimeoutBase() {
-  ENVOY_LOG_MISC(trace, "Called timeout base");
   onTimeout();
   handleFailure(envoy::data::core::v3::NETWORK);
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onInitialInterval() {
   if (parent_.initial_jitter_.count() == 0) {
-    ENVOY_LOG_MISC(trace, "On initial interval immediatly called onIntervalBase()");
     onIntervalBase();
   } else {
-    ENVOY_LOG_MISC(trace, "On initial interval only enabled interval timer");
     interval_timer_->enableTimer(
         std::chrono::milliseconds(parent_.intervalWithJitter(0, parent_.initial_jitter_)));
   }
