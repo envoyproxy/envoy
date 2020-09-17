@@ -17,4 +17,24 @@ private:
   T* latched_instance_;
 };
 
+// Note this class is not thread-safe, and should be called exceedingly carefully.
+template <class T> class TestScopedInjectableLoader {
+public:
+  TestScopedInjectableLoader(std::unique_ptr<T>&& instance)
+      : instance_(std::move(instance)), previous_instance_(InjectableSingleton<T>::getExisting()) {
+    InjectableSingleton<T>::clear();
+    InjectableSingleton<T>::initialize(instance_.get());
+  }
+  ~TestScopedInjectableLoader() {
+    InjectableSingleton<T>::clear();
+    if (previous_instance_) {
+      InjectableSingleton<T>::initialize(previous_instance_);
+    }
+  }
+
+private:
+  std::unique_ptr<T> instance_;
+  T* const previous_instance_;
+};
+
 } // namespace Envoy

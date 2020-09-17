@@ -335,6 +335,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:retry_priority_factory_mocks",
         "//test/mocks/upstream:retry_priority_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
