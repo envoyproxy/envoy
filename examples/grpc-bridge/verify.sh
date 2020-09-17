@@ -10,7 +10,7 @@ export MANUAL=true
 
 run_log "Generate protocol stubs"
 docker-compose -f docker-compose-protos.yaml up
-docker container prune -f
+docker rm grpc-bridge_stubs_go_1 grpc-bridge_stubs_python_1
 
 ls client/kv/kv_pb2.py
 ls server/kv/kv.pb.go
