@@ -32,16 +32,23 @@ ApiTypeOracle::getEarlierVersionMessageTypeName(const std::string& message_type)
   return absl::nullopt;
 }
 
-const absl::optional<std::string> ApiTypeOracle::getEarlierTypeUrl(const std::string& type_url) {
-  size_t type_name_start = type_url.find('/');
-  if (type_name_start == std::string::npos) {
-    return {};
+const absl::string_view ApiTypeOracle::typeUrlToDescriptorFullName(absl::string_view type_url) {
+  const size_t pos = type_url.rfind('/');
+  if (pos != absl::string_view::npos) {
+    type_url = type_url.substr(pos + 1);
   }
-  std::string message_type = type_url.substr(type_name_start + 1);
-  absl::optional<std::string> old_message_type =
-      ApiTypeOracle::getEarlierVersionMessageTypeName(message_type);
-  if (old_message_type.has_value()) {
-    return "type.googleapis.com/" + old_message_type.value();
+  return type_url;
+}
+
+const std::string ApiTypeOracle::descriptorFullNameToTypeUrl(std::string& type) {
+  return "type.googleapis.com/" + type;
+}
+
+const absl::optional<std::string> ApiTypeOracle::getEarlierTypeUrl(const std::string& type_url) {
+  const std::string type{typeUrlToDescriptorFullName(type_url)};
+  absl::optional<std::string> old_type = ApiTypeOracle::getEarlierVersionMessageTypeName(type);
+  if (old_type.has_value()) {
+    return descriptorFullNameToTypeUrl(old_type.value());
   }
   return {};
 }
