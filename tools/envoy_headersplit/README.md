@@ -1,5 +1,5 @@
 # Envoy Header Split
-Tool for spliting monolithic header files in Envoy to speed up compilation
+Tool for splitting monolithic header files in Envoy to speed up compilation
 
 Steps to divide Envoy mock headers:
 
