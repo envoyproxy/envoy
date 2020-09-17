@@ -499,11 +499,6 @@ public:
            fmt::format("unexpected terminal filter state: {}", state_.filter_call_state_));
   }
 
-  bool decodeComplete() {
-    // TODO(snowp): Add another state variable?
-    return true;
-  }
-
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
