@@ -121,12 +121,13 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   bool end_stream = false;
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
+  uint64_t reserve_size = 16384;
   while (keep_reading) {
     // We use 2 slices here so that we can use the remainder of an existing buffer chain element
     // if there is extra space. 16K read is arbitrary and can be tuned later.
     Buffer::RawSlice slices[2];
     uint64_t slices_to_commit = 0;
-    uint64_t num_slices = read_buffer.reserve(16384, slices, 2);
+    uint64_t num_slices = read_buffer.reserve(reserve_size, slices, 2);
     for (uint64_t i = 0; i < num_slices; i++) {
       auto result = sslReadIntoSlice(slices[i]);
       if (result.commit_slice_) {
@@ -157,8 +158,24 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
     if (slices_to_commit > 0) {
       read_buffer.commit(slices, slices_to_commit);
       if (callbacks_->shouldDrainReadBuffer()) {
-        callbacks_->setReadBufferReady();
-        keep_reading = false;
+        // Verify that SSL_get_read_ahead is disabled. SSL_pending does not provide an accurate
+        // answer when read-ahead is enabled. As far as we can tell BoringSSL does not implement
+        // read-ahead, so the odds of us ever failing this sanity check are effectively zero.
+        ASSERT(!SSL_get_read_ahead(rawSsl()));
+
+        // Query the SSL implementation for the number of bytes available for immediate read from
+        // internal buffers, and do one last read iteration if bytes are available. This is
+        // important to ensure read resumption works correctly after calls to
+        // Network::Connection::readDisable().
+        int pending_bytes = SSL_pending(rawSsl());
+        ASSERT(pending_bytes < 16 * 1024, "SSL record should be at most 16KB");
+        if (pending_bytes > 0) {
+          ASSERT(keep_reading);
+          reserve_size = pending_bytes;
+        } else {
+          callbacks_->setReadBufferReady();
+          keep_reading = false;
+        }
       }
     }
   }

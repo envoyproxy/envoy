@@ -19,6 +19,7 @@
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
+#include "test/integration/autonomous_upstream.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
@@ -175,6 +176,103 @@ TEST_P(SslIntegrationTest, AdminCertEndpoint) {
       lookupPort("admin"), "GET", "/certs", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+class RawWriteSslIntegrationTest : public SslIntegrationTest {
+protected:
+  std::unique_ptr<Http::TestRequestHeaderMapImpl>
+  testFragmentedRequestWithBufferLimit(std::list<std::string> request_chunks,
+                                       uint32_t buffer_limit) {
+    autonomous_upstream_ = true;
+    config_helper_.setBufferLimits(buffer_limit, buffer_limit);
+    initialize();
+
+    // write_request_cb will write each of the items in request_chunks as a separate SSL_write.
+    auto write_request_cb = [&request_chunks](Network::ClientConnection& client) {
+      if (!request_chunks.empty()) {
+        Buffer::OwnedImpl buffer(request_chunks.front());
+        client.write(buffer, false);
+        request_chunks.pop_front();
+      }
+    };
+
+    auto client_transport_socket_factory_ptr =
+        createClientSslTransportSocketFactory({}, *context_manager_, *api_);
+    std::string response;
+    auto connection = createConnectionDriver(
+        lookupPort("http"), write_request_cb,
+        [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+          response.append(data.toString());
+        },
+        client_transport_socket_factory_ptr->createTransportSocket({}));
+
+    // Drive the connection until we get a response.
+    while (response.empty()) {
+      connection->run(Event::Dispatcher::RunType::NonBlock);
+    }
+    EXPECT_THAT(response, testing::HasSubstr("HTTP/1.1 200 OK\r\n"));
+
+    connection->close();
+    return reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
+        ->lastRequestHeaders();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RawWriteSslIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/12304
+TEST_P(RawWriteSslIntegrationTest, HighWatermarkReadResumptionProcessingHeaders) {
+  // The raw writer will perform a separate SSL_write for each of the chunks below. Chunk sizes were
+  // picked such that the connection's high watermark will trigger while processing the last SSL
+  // record containing the request headers. Verify that read resumption works correctly after
+  // hitting the receive buffer high watermark.
+  std::list<std::string> request_chunks = {
+      "GET / HTTP/1.1\r\nHost: host\r\n",
+      "key1:" + std::string(14000, 'a') + "\r\n",
+      "key2:" + std::string(16000, 'b') + "\r\n\r\n",
+  };
+
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> upstream_headers =
+      testFragmentedRequestWithBufferLimit(request_chunks, 15 * 1024);
+  ASSERT_TRUE(upstream_headers != nullptr);
+  EXPECT_EQ(upstream_headers->Host()->value(), "host");
+  EXPECT_EQ(std::string(14000, 'a'),
+            upstream_headers->get(Envoy::Http::LowerCaseString("key1"))->value().getStringView());
+  EXPECT_EQ(std::string(16000, 'b'),
+            upstream_headers->get(Envoy::Http::LowerCaseString("key2"))->value().getStringView());
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/12304
+TEST_P(RawWriteSslIntegrationTest, HighWatermarkReadResumptionProcesingBody) {
+  // The raw writer will perform a separate SSL_write for each of the chunks below. Chunk sizes were
+  // picked such that the connection's high watermark will trigger while processing the last SSL
+  // record containing the POST body. Verify that read resumption works correctly after hitting the
+  // receive buffer high watermark.
+  std::list<std::string> request_chunks = {
+      "POST / HTTP/1.1\r\nHost: host\r\ncontent-length: 30000\r\n\r\n",
+      std::string(14000, 'a'),
+      std::string(16000, 'a'),
+  };
+
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> upstream_headers =
+      testFragmentedRequestWithBufferLimit(request_chunks, 15 * 1024);
+  ASSERT_TRUE(upstream_headers != nullptr);
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/12304
+TEST_P(RawWriteSslIntegrationTest, HighWatermarkReadResumptionProcesingLargerBody) {
+  std::list<std::string> request_chunks = {
+      "POST / HTTP/1.1\r\nHost: host\r\ncontent-length: 150000\r\n\r\n",
+  };
+  for (int i = 0; i < 10; ++i) {
+    request_chunks.push_back(std::string(15000, 'a'));
+  }
+
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> upstream_headers =
+      testFragmentedRequestWithBufferLimit(request_chunks, 16 * 1024);
+  ASSERT_TRUE(upstream_headers != nullptr);
 }
 
 // Validate certificate selection across different certificate types and client TLS versions.

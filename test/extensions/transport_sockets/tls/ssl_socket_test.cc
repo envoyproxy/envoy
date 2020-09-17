@@ -12,6 +12,7 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
+#include "common/network/connection_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
@@ -4567,8 +4568,10 @@ protected:
     read_filter_ = std::make_shared<Network::MockReadFilter>();
   }
 
-  void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size,
-                           uint32_t write_size, uint32_t num_writes, bool reserve_write_space) {
+  void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t min_expected_chunk_size,
+                           uint32_t max_expected_chunk_size, uint32_t write_size,
+                           uint32_t num_writes, bool reserve_write_space,
+                           bool bypass_client_connection) {
     initialize();
 
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
@@ -4592,7 +4595,8 @@ protected:
     EXPECT_CALL(*read_filter_, onNewConnection());
     EXPECT_CALL(*read_filter_, onData(_, _))
         .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
-          EXPECT_GE(expected_chunk_size, data.length());
+          EXPECT_LE(min_expected_chunk_size, data.length());
+          EXPECT_GE(max_expected_chunk_size, data.length());
           filter_seen += data.length();
           data.drain(data.length());
           if (filter_seen == (write_size * num_writes)) {
@@ -4619,7 +4623,15 @@ protected:
         data.commit(iovecs, 2);
       }
 
-      client_connection_->write(data, false);
+      if (bypass_client_connection) {
+        auto result = client_transport_socket_->doWrite(data, false);
+        ASSERT_EQ(Network::PostIoAction::KeepOpen, result.action_);
+        ASSERT_EQ(write_size, result.bytes_processed_);
+        ASSERT_FALSE(result.end_stream_read_);
+      } else {
+        client_connection_->write(data, false);
+        dynamic_cast<Network::ConnectionImpl*>(client_connection_.get())->flushWriteBuffer();
+      }
     }
 
     dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -4741,17 +4753,23 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, SslReadBufferLimitTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(SslReadBufferLimitTest, NoLimit) {
-  readBufferLimitTest(0, 256 * 1024, 256 * 1024, 1, false);
+  readBufferLimitTest(0, 1, 256 * 1024, 256 * 1024, 1, false, false);
 }
 
-TEST_P(SslReadBufferLimitTest, NoLimitReserveSpace) { readBufferLimitTest(0, 512, 512, 1, true); }
+TEST_P(SslReadBufferLimitTest, NoLimitReserveSpace) {
+  readBufferLimitTest(0, 512, 512, 512, 1, true, false);
+}
 
 TEST_P(SslReadBufferLimitTest, NoLimitSmallWrites) {
-  readBufferLimitTest(0, 256 * 1024, 1, 256 * 1024, false);
+  readBufferLimitTest(0, 1, 256 * 1024, 1, 256 * 1024, false, false);
 }
 
 TEST_P(SslReadBufferLimitTest, SomeLimit) {
-  readBufferLimitTest(32 * 1024, 32 * 1024, 256 * 1024, 1, false);
+  readBufferLimitTest(32 * 1024, 32 * 1024, 32 * 1024, 256 * 1024, 1, false, false);
+}
+
+TEST_P(SslReadBufferLimitTest, DrainToSslRecordBoundary) {
+  readBufferLimitTest(16 * 1024, 20 * 1024, 20 * 1024, 10 * 1024, 10, false, true);
 }
 
 TEST_P(SslReadBufferLimitTest, WritesSmallerThanBufferLimit) { singleWriteTest(5 * 1024, 1024); }
