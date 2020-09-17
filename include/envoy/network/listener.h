@@ -298,16 +298,7 @@ public:
    * Called whenever data is received on the underlying udp socket, on
    * the destination worker for the datagram according to ``destination()``.
    */
-  virtual void onDataWorker(Network::UdpRecvData& data) PURE;
-
-  /**
-   * Returns the worker id that ``data`` should be delivered to. A return value
-   * of ``absl::nullopt`` indicates the packet should be processed on the current
-   * worker. The return value must be in the range [0, concurrency), or ``absl::nullopt``.
-   * @param concurrency specifies the concurrency, which is the upper bound for worker id.
-   */
-  virtual absl::optional<uint32_t> destination(const Network::UdpRecvData& data,
-                                               uint32_t concurrency) PURE;
+  virtual void onDataWorker(Network::UdpRecvData&& data) PURE;
 
   /**
    * Posts ``data`` to be delivered on this worker.
@@ -408,7 +399,7 @@ public:
    * Deliver ``data`` to the correct worker by calling ``onDataWorker()``
    * or ``post()`` on one of the registered workers.
    */
-  virtual void deliver(UdpListenerCallbacks& current, UdpRecvData&& data) PURE;
+  virtual void deliver(uint32_t dest_worker_index, UdpRecvData&& data) PURE;
 };
 
 using UdpListenerWorkerRouterPtr = std::unique_ptr<UdpListenerWorkerRouter>;

@@ -656,7 +656,7 @@ private:
   public:
     FakeListener(FakeUpstream& parent)
         : parent_(parent), name_("fake_upstream"),
-          udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>()),
+          udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>(1)),
           udp_writer_factory_(std::make_unique<Network::UdpDefaultWriterFactory>()),
           udp_listener_worker_router_(1), init_manager_(nullptr) {}
 

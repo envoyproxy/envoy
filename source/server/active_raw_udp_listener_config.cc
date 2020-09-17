@@ -11,10 +11,14 @@
 namespace Envoy {
 namespace Server {
 
+ActiveRawUdpListenerFactory::ActiveRawUdpListenerFactory(uint32_t concurrency)
+    : concurrency_(concurrency) {}
+
 Network::ConnectionHandler::ActiveListenerPtr ActiveRawUdpListenerFactory::createActiveUdpListener(
     uint32_t worker_id, Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
     Network::ListenerConfig& config) {
-  return std::make_unique<ActiveRawUdpListener>(worker_id, parent, dispatcher, config);
+  return std::make_unique<ActiveRawUdpListener>(worker_id, concurrency_, parent, dispatcher,
+                                                config);
 }
 
 ProtobufTypes::MessagePtr ActiveRawUdpListenerConfigFactory::createEmptyConfigProto() {
@@ -23,8 +27,8 @@ ProtobufTypes::MessagePtr ActiveRawUdpListenerConfigFactory::createEmptyConfigPr
 
 Network::ActiveUdpListenerFactoryPtr
 ActiveRawUdpListenerConfigFactory::createActiveUdpListenerFactory(
-    const Protobuf::Message& /*message*/, uint32_t /*concurrency*/) {
-  return std::make_unique<Server::ActiveRawUdpListenerFactory>();
+    const Protobuf::Message& /*message*/, uint32_t concurrency) {
+  return std::make_unique<Server::ActiveRawUdpListenerFactory>(concurrency);
 }
 
 std::string ActiveRawUdpListenerConfigFactory::name() const {

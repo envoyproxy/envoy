@@ -68,7 +68,7 @@ public:
 
   void registerWorker(UdpListenerCallbacks& listener) override;
   void unregisterWorker(UdpListenerCallbacks& listener) override;
-  void deliver(UdpListenerCallbacks& current, UdpRecvData&& data) override;
+  void deliver(uint32_t dest_worker_id, UdpRecvData&& data) override;
 
 private:
   absl::Mutex mutex_;

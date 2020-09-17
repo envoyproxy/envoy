@@ -251,7 +251,9 @@ protected:
   }
 
   void TearDown() override {
-    quic_listener_->onListenerShutdown();
+    if (quic_listener_ != nullptr) {
+      quic_listener_->onListenerShutdown();
+    }
     // Trigger alarm to fire before listener destruction.
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     Runtime::LoaderSingleton::clear();
@@ -313,9 +315,10 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
       .WillOnce(Return(false));
   auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
   options->emplace_back(std::move(option));
+  quic_listener_.reset();
   EXPECT_THROW_WITH_REGEX(
       std::make_unique<ActiveQuicListener>(
-          0, *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_,
+          0, 1, *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_,
           options, false,
           ActiveQuicListenerFactoryPeer::runtimeEnabled(
               static_cast<ActiveQuicListenerFactory*>(listener_factory_.get()))),

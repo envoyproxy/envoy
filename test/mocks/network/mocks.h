@@ -145,9 +145,7 @@ public:
   MOCK_METHOD(void, onReceiveError, (Api::IoError::IoErrorCode err));
   MOCK_METHOD(Network::UdpPacketWriter&, udpPacketWriter, ());
   MOCK_METHOD(uint32_t, workerIndex, (), (const));
-  MOCK_METHOD(void, onDataWorker, (Network::UdpRecvData & data));
-  MOCK_METHOD(absl::optional<uint32_t>, destination,
-              (const Network::UdpRecvData& data, uint32_t concurrency));
+  MOCK_METHOD(void, onDataWorker, (Network::UdpRecvData && data));
   MOCK_METHOD(void, post, (Network::UdpRecvData && data));
 };
 
@@ -492,16 +490,6 @@ public:
   MOCK_METHOD(Network::UdpPacketWriterBuffer, getNextWriteLocation,
               (const Address::Ip* local_ip, const Address::Instance& peer_address));
   MOCK_METHOD(Api::IoCallUint64Result, flush, ());
-};
-
-class MockUdpListenerWorkerRouter : public UdpListenerWorkerRouter {
-public:
-  MockUdpListenerWorkerRouter();
-  ~MockUdpListenerWorkerRouter() override;
-
-  MOCK_METHOD(void, registerWorker, (UdpListenerCallbacks & listener));
-  MOCK_METHOD(void, unregisterWorker, (UdpListenerCallbacks & listener));
-  MOCK_METHOD(void, deliver, (UdpListenerCallbacks & current, UdpRecvData&& data));
 };
 
 class MockUdpListener : public UdpListener {

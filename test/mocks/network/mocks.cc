@@ -7,6 +7,7 @@
 
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"
+#include "common/network/udp_listener_impl.h"
 #include "common/network/utility.h"
 
 #include "test/test_common/printers.h"
@@ -26,8 +27,7 @@ namespace Network {
 
 MockListenerConfig::MockListenerConfig()
     : socket_(std::make_shared<testing::NiceMock<MockListenSocket>>()),
-      udp_listener_worker_router_(
-          std::make_unique<testing::NiceMock<MockUdpListenerWorkerRouter>>()) {
+      udp_listener_worker_router_(std::make_unique<UdpListenerWorkerRouterImpl>(1)) {
   ON_CALL(*this, filterChainFactory()).WillByDefault(ReturnRef(filter_chain_factory_));
   ON_CALL(*this, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
   ON_CALL(socket_factory_, localAddress()).WillByDefault(ReturnRef(socket_->localAddress()));
@@ -184,14 +184,6 @@ MockTransportSocketCallbacks::~MockTransportSocketCallbacks() = default;
 
 MockUdpPacketWriter::MockUdpPacketWriter() = default;
 MockUdpPacketWriter::~MockUdpPacketWriter() = default;
-
-MockUdpListenerWorkerRouter::MockUdpListenerWorkerRouter() {
-  ON_CALL(*this, deliver(_, _))
-      .WillByDefault(Invoke(
-          [](UdpListenerCallbacks& current, UdpRecvData&& data) { current.onDataWorker(data); }));
-}
-
-MockUdpListenerWorkerRouter::~MockUdpListenerWorkerRouter() = default;
 
 MockUdpListener::MockUdpListener() {
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));

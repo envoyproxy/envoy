@@ -9,11 +9,16 @@ namespace Server {
 
 class ActiveRawUdpListenerFactory : public Network::ActiveUdpListenerFactory {
 public:
+  ActiveRawUdpListenerFactory(uint32_t concurrency);
+
   Network::ConnectionHandler::ActiveListenerPtr
   createActiveUdpListener(uint32_t worker_id, Network::ConnectionHandler& parent,
                           Event::Dispatcher& disptacher, Network::ListenerConfig& config) override;
 
   bool isTransportConnectionless() const override { return true; }
+
+private:
+  const uint32_t concurrency_;
 };
 
 // This class uses a protobuf config to create a UDP listener factory which

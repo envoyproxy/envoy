@@ -366,25 +366,33 @@ private:
 class ActiveUdpListenerBase : public ConnectionHandlerImpl::ActiveListenerImplBase,
                               public Network::UdpListenerCallbacks {
 public:
-  ActiveUdpListenerBase(uint32_t worker_index, Network::ConnectionHandler& parent,
-                        Network::Socket& listen_socket, Network::UdpListenerPtr&& listener,
-                        Network::ListenerConfig* config);
+  ActiveUdpListenerBase(uint32_t worker_index, uint32_t concurrency,
+                        Network::ConnectionHandler& parent, Network::Socket& listen_socket,
+                        Network::UdpListenerPtr&& listener, Network::ListenerConfig* config);
   ~ActiveUdpListenerBase() override;
 
   // Network::UdpListenerCallbacks
-  void onData(Network::UdpRecvData&& data) override;
-  uint32_t workerIndex() const override { return worker_index_; }
-  void post(Network::UdpRecvData&& data) override;
-  absl::optional<uint32_t> destination(const Network::UdpRecvData&, uint32_t) override {
-    // By default, route to the current worker.
-    return absl::nullopt;
-  }
+  void onData(Network::UdpRecvData&& data) override final;
+  uint32_t workerIndex() const override final { return worker_index_; }
+  void post(Network::UdpRecvData&& data) override final;
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return udp_listener_.get(); }
 
 protected:
+  /**
+   * Returns the worker id that ``data`` should be delivered to. A return value
+   * of ``absl::nullopt`` indicates the packet should be processed on the current
+   * worker. The return value must be in the range [0, concurrency), or ``absl::nullopt``.
+   * @param concurrency specifies the concurrency, which is the upper bound for worker id.
+   */
+  virtual absl::optional<uint32_t> destination(const Network::UdpRecvData& /*data*/) {
+    // By default, route to the current worker.
+    return absl::nullopt;
+  }
+
   const uint32_t worker_index_;
+  const uint32_t concurrency_;
   Network::ConnectionHandler& parent_;
   Network::Socket& listen_socket_;
   Network::UdpListenerPtr udp_listener_;
@@ -397,17 +405,20 @@ class ActiveRawUdpListener : public ActiveUdpListenerBase,
                              public Network::UdpListenerFilterManager,
                              public Network::UdpReadFilterCallbacks {
 public:
-  ActiveRawUdpListener(uint32_t worker_index, Network::ConnectionHandler& parent,
-                       Event::Dispatcher& dispatcher, Network::ListenerConfig& config);
-  ActiveRawUdpListener(uint32_t worker_index, Network::ConnectionHandler& parent,
+  ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
+                       Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
+                       Network::ListenerConfig& config);
+  ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
+                       Network::ConnectionHandler& parent,
                        Network::SocketSharedPtr listen_socket_ptr, Event::Dispatcher& dispatcher,
                        Network::ListenerConfig& config);
-  ActiveRawUdpListener(uint32_t worker_index, Network::ConnectionHandler& parent,
-                       Network::Socket& listen_socket, Network::SocketSharedPtr listen_socket_ptr,
-                       Event::Dispatcher& dispatcher, Network::ListenerConfig& config);
-  ActiveRawUdpListener(uint32_t worker_index, Network::ConnectionHandler& parent,
-                       Network::Socket& listen_socket, Network::UdpListenerPtr&& listener,
+  ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
+                       Network::ConnectionHandler& parent, Network::Socket& listen_socket,
+                       Network::SocketSharedPtr listen_socket_ptr, Event::Dispatcher& dispatcher,
                        Network::ListenerConfig& config);
+  ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
+                       Network::ConnectionHandler& parent, Network::Socket& listen_socket,
+                       Network::UdpListenerPtr&& listener, Network::ListenerConfig& config);
 
   // Network::UdpListenerCallbacks
   void onReadReady() override;
@@ -416,7 +427,7 @@ public:
   Network::UdpPacketWriter& udpPacketWriter() override { return *udp_packet_writer_; }
 
   // Network::UdpWorker
-  void onDataWorker(Network::UdpRecvData& data) override;
+  void onDataWorker(Network::UdpRecvData&& data) override;
 
   // ActiveListenerImplBase
   void pauseListening() override { udp_listener_->disable(); }

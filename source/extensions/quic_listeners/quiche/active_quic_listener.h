@@ -24,13 +24,13 @@ public:
   // TODO(bencebeky): Tune this value.
   static const size_t kNumSessionsToCreatePerLoop = 16;
 
-  ActiveQuicListener(uint32_t worker_id, Event::Dispatcher& dispatcher,
+  ActiveQuicListener(uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
                      Network::ConnectionHandler& parent, Network::ListenerConfig& listener_config,
                      const quic::QuicConfig& quic_config, Network::Socket::OptionsSharedPtr options,
                      bool kernel_worker_routing,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled);
 
-  ActiveQuicListener(uint32_t worker_id, Event::Dispatcher& dispatcher,
+  ActiveQuicListener(uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
                      Network::ConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
@@ -50,9 +50,8 @@ public:
     // No-op. Quic can't do anything upon listener error.
   }
   Network::UdpPacketWriter& udpPacketWriter() override { return *udp_packet_writer_; }
-  void onDataWorker(Network::UdpRecvData& data) override;
-  absl::optional<uint32_t> destination(const Network::UdpRecvData& data,
-                                       uint32_t concurrency) override;
+  void onDataWorker(Network::UdpRecvData&& data) override;
+  absl::optional<uint32_t> destination(const Network::UdpRecvData& data) override;
 
   // ActiveListenerImplBase
   void pauseListening() override;
@@ -86,7 +85,7 @@ public:
 
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveListenerPtr
-  createActiveUdpListener(uint32_t worker_id, Network::ConnectionHandler& parent,
+  createActiveUdpListener(uint32_t worker_index, Network::ConnectionHandler& parent,
                           Event::Dispatcher& disptacher, Network::ListenerConfig& config) override;
   bool isTransportConnectionless() const override { return false; }
 

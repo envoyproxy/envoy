@@ -134,6 +134,7 @@ void UdpListenerWorkerRouterImpl::registerWorker(UdpListenerCallbacks& listener)
   absl::WriterMutexLock lock(&mutex_);
 
   ASSERT(listener.workerIndex() < workers_.size());
+  ASSERT(workers_.at(listener.workerIndex()) == nullptr);
   workers_.at(listener.workerIndex()) = &listener;
 }
 
@@ -144,28 +145,17 @@ void UdpListenerWorkerRouterImpl::unregisterWorker(UdpListenerCallbacks& listene
   workers_.at(listener.workerIndex()) = nullptr;
 }
 
-void UdpListenerWorkerRouterImpl::deliver(UdpListenerCallbacks& current, UdpRecvData&& data) {
+void UdpListenerWorkerRouterImpl::deliver(uint32_t dest_worker_index, UdpRecvData&& data) {
   absl::ReaderMutexLock lock(&mutex_);
 
-  absl::optional<uint32_t> dest;
+  ASSERT(dest_worker_index < workers_.size(),
+         "UdpListenerCallbacks::destination returned out-of-range value");
+  auto* worker = workers_[dest_worker_index];
 
-  // For concurrency == 1, the packet will always go to the current worker.
-  if (workers_.size() > 1) {
-    dest = current.destination(data, workers_.size());
-  }
-
-  if (!dest.has_value() || *dest == current.workerIndex()) {
-    current.onDataWorker(data);
-  } else {
-    ASSERT(*dest < workers_.size(),
-           "UdpListenerCallbacks::destination returned out-of-range value");
-    auto* worker = workers_[*dest];
-
-    // When a listener is being removed, packets could be processed on some workers after the
-    // listener is removed from other workers, which could result in a nullptr for that worker.
-    if (worker != nullptr) {
-      worker->post(std::move(data));
-    }
+  // When a listener is being removed, packets could be processed on some workers after the
+  // listener is removed from other workers, which could result in a nullptr for that worker.
+  if (worker != nullptr) {
+    worker->post(std::move(data));
   }
 }
 
