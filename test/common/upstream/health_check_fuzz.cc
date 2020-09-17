@@ -1,6 +1,7 @@
 #include "test/common/upstream/health_check_fuzz.h"
 
 #include <chrono>
+#include <memory>
 
 #include "test/common/upstream/utility.h"
 #include "test/fuzz/utility.h"
@@ -242,31 +243,27 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
   switch (input.health_check_config().health_checker_case()) {
   case envoy::config::core::v3::HealthCheck::kHttpHealthCheck: {
     type_ = HealthCheckFuzz::Type::HTTP;
-    http_fuzz_test_ = new HttpHealthCheckFuzz;
+    http_fuzz_test_ = std::make_unique<HttpHealthCheckFuzz>();
     try { // Catches exceptions realted to initializing health checker
       http_fuzz_test_->initialize(input);
     } catch (EnvoyException& e) {
-      delete http_fuzz_test_;
       ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
       return;
     }
     replay(input);
-    delete http_fuzz_test_;
     ENVOY_LOG_MISC(trace, "Deleted http fuzz test base");
     break;
   }
   case envoy::config::core::v3::HealthCheck::kTcpHealthCheck: {
     type_ = HealthCheckFuzz::Type::TCP;
-    tcp_fuzz_test_ = new TcpHealthCheckFuzz;
+    tcp_fuzz_test_ = std::make_unique<TcpHealthCheckFuzz>();
     try { // Catches exceptions realted to initializing health checker
       tcp_fuzz_test_->initialize(input);
     } catch (EnvoyException& e) {
       ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-      delete tcp_fuzz_test_;
       return;
     }
     replay(input);
-    delete tcp_fuzz_test_;
     ENVOY_LOG_MISC(trace, "Deleted tcp fuzz test base");
     break;
   }

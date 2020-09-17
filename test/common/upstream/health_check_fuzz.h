@@ -1,4 +1,7 @@
 #pragma once
+
+#include <memory>
+
 #include "test/common/upstream/health_check_fuzz.pb.validate.h"
 #include "test/common/upstream/health_checker_impl_test_utils.h"
 #include "test/fuzz/common.pb.h"
@@ -51,8 +54,8 @@ private:
   void replay(const test::common::upstream::HealthCheckTestCase& input);
 
   Type type_;
-  HttpHealthCheckFuzz* http_fuzz_test_;
-  TcpHealthCheckFuzz* tcp_fuzz_test_;
+  std::unique_ptr<HttpHealthCheckFuzz> http_fuzz_test_;
+  std::unique_ptr<TcpHealthCheckFuzz> tcp_fuzz_test_;
 };
 
 } // namespace Upstream
