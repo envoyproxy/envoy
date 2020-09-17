@@ -19,7 +19,7 @@ static constexpr FlagSet DefaultFlags{
 
 class FileSystemImplTest : public testing::Test {
 protected:
-  os_h_t getFd(File* file) {
+  filesystem_os_id_t getFd(File* file) {
 #ifdef WIN32
     auto file_impl = dynamic_cast<FileImplWin32*>(file);
 #else
@@ -239,7 +239,7 @@ TEST_F(FileSystemImplTest, OpenTwice) {
   EXPECT_EQ(getFd(file.get()), INVALID_HANDLE);
 
   const Api::IoCallBoolResult result1 = file->open(DefaultFlags);
-  const os_h_t initial_fd = getFd(file.get());
+  const filesystem_os_id_t initial_fd = getFd(file.get());
   EXPECT_TRUE(result1.rc_);
   EXPECT_TRUE(file->isOpen());
 

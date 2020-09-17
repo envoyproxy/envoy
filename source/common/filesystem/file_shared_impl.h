@@ -45,7 +45,7 @@ public:
   std::string path() const override;
 
 protected:
-  os_h_t fd_;
+  filesystem_os_id_t fd_;
   const std::string path_;
 };
 
