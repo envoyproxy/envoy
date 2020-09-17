@@ -31,8 +31,8 @@ generate_x509_cert() {
 # $1=<certificate name> $2=<CA name>
 generate_ocsp_response() {
   # Generate an OCSP request
-  openssl ocsp -CAfile $2cert.pem -issuer $2cert.pem \
-    -cert $1cert.pem -reqout $1_ocsp_req.der
+  openssl ocsp -CAfile "${2}cert.pem" -issuer "${2}cert.pem" \
+    -cert "${1}cert.pem" -reqout "${1}_ocsp_req.der"
 
   # Generate the OCSP response
   # Note: A database of certs is necessary to generate ocsp
@@ -41,12 +41,12 @@ generate_ocsp_response() {
   # tracked in this index, all ocsp response will have a cert status
   # "unknown", but are still valid responses and the cert status should
   # not matter for integration tests
-  touch $2_index.txt
-  openssl ocsp -CA $2cert.pem \
-    -rkey $2key.pem -rsigner $2cert.pem -index $2_index.txt \
-    -reqin $1_ocsp_req.der -respout $1_ocsp_resp.der -ndays 730
+  touch "${2}_index.txt"
+  openssl ocsp -CA "${2}cert.pem" \
+    -rkey "${2}key.pem" -rsigner "${2}cert.pem" -index "${2}_index.txt" \
+    -reqin "${1}_ocsp_req.der" -respout "${1}_ocsp_resp.der" -ndays 730
 
-  rm $1_ocsp_req.der $2_index.txt
+  rm "${1}_ocsp_req.der" "${2}_index.txt"
 }
 
 # Generate cert for the CA.

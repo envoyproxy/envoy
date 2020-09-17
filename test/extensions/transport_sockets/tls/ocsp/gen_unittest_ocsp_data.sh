@@ -17,7 +17,7 @@ cleanup() {
 TEST_OCSP_DIR="${TEST_TMPDIR}/ocsp_test_data"
 mkdir -p "${TEST_OCSP_DIR}"
 
-rm -f ${TEST_OCSP_DIR}/*
+rm -f "${TEST_OCSP_DIR}"/*
 
 cd "$TEST_OCSP_DIR" || exit 1
 
@@ -27,9 +27,9 @@ cd "$TEST_OCSP_DIR" || exit 1
 
 # $1=<certificate name> $2=<CA name>
 generate_config() {
-touch $1_index.txt
-echo "unique_subject = no" > $1_index.txt.attr
-echo 1000 > $1_serial
+touch "${1}_index.txt"
+echo "unique_subject = no" > "${1}_index.txt.attr"
+echo 1000 > "${1}_serial"
 
 (cat << EOF
 [ req ]
@@ -138,8 +138,8 @@ revoke_certificate() {
 
 # $1=<test name> $2=<CA name>
 dump_ocsp_details() {
-  openssl ocsp -respin $1_ocsp_resp.der -issuer $2_cert.pem -resp_text \
-    -out $1_ocsp_resp_details.txt
+  openssl ocsp -respin "${1}_ocsp_resp.der" -issuer "${2}_cert.pem" -resp_text \
+    -out "${1}_ocsp_resp_details.txt"
 }
 
 # Set up the CA
