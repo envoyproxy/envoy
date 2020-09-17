@@ -14,6 +14,24 @@ using Envoy::Api::SysCallIntResult;
 using Envoy::Api::SysCallSizeResult;
 
 namespace Envoy {
+
+namespace {
+/**
+ * On different platforms the sockaddr struct for unix domain
+ * sockets is different. We use this function to get the
+ * length of the platform specific struct.
+ */
+static constexpr socklen_t udsAddressLength() {
+#if defined(__APPLE__)
+  return sizeof(sockaddr);
+#elif defined(WIN32)
+  return sizeof(sockaddr_un);
+#else
+  return sizeof(sa_family_t);
+#endif
+}
+} // namespace
+
 namespace Network {
 
 IoSocketHandleImpl::~IoSocketHandleImpl() {
@@ -196,7 +214,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg
     return getAddressFromSockAddrOrDie(ss, sizeof(sockaddr_in), fd);
   }
   return nullptr;
-}
+} // namespace Network
 
 absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader(
 #ifdef SO_RXQ_OVFL
@@ -208,7 +226,7 @@ absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader(
     const cmsghdr&) {
 #endif
   return absl::nullopt;
-}
+} // namespace Envoy
 
 Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     const uint64_t num_slice, uint32_t self_port,
