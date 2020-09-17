@@ -10,6 +10,7 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
+#include "test/test_common/logging.h"
 
 #include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
@@ -349,16 +350,27 @@ attributes:
     cleanup();
   }
 
+  void initiateAndWait() {
+    initiateClientConnection(4);
+    response_->waitForEndStream();
+  }
+
   void expectCheckRequestTimedout(bool timeout_on_check) {
     setMeasureTimeoutOnCheckCreated(this->config_helper_, timeout_on_check);
     initializeConfig(true);
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
     HttpIntegrationTest::initialize();
-    initiateClientConnection(4);
+    if (timeout_on_check) {
+      EXPECT_LOG_CONTAINS("trace", "CheckRequest timed-out", initiateAndWait());
+    } else if (clientType() == Grpc::ClientType::GoogleGrpc) {
+      EXPECT_LOG_CONTAINS("trace", "CheckRequest call failed with status: DeadlineExceeded", initiateAndWait());
+    } else {
+      EXPECT_LOG_CONTAINS("debug", "upstream request timeout", initiateAndWait());
+    }
 
-    response_->waitForEndStream();
     EXPECT_TRUE(response_->complete());
     EXPECT_EQ("403", response_->headers().getStatusValue());
+
     cleanup();
   }
 
@@ -520,13 +532,22 @@ public:
     cleanup();
   }
 
+  void initiateAndWait() {
+    initiateClientConnection();
+    response_->waitForEndStream();
+  }
+
   void expectCheckRequestTimedout(bool timeout_on_check) {
     setMeasureTimeoutOnCheckCreated(this->config_helper_, timeout_on_check);
     initializeConfig(true);
     HttpIntegrationTest::initialize();
-    initiateClientConnection();
 
-    response_->waitForEndStream();
+    if (timeout_on_check) {
+      EXPECT_LOG_CONTAINS("trace", "CheckRequest timed-out", initiateAndWait());
+    } else {
+      EXPECT_LOG_CONTAINS("debug", "':status', '504'", initiateAndWait());
+    }
+
     EXPECT_TRUE(response_->complete());
     EXPECT_EQ("403", response_->headers().getStatusValue());
     cleanup();
