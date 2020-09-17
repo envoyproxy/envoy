@@ -367,7 +367,8 @@ class ActiveUdpListenerBase : public ConnectionHandlerImpl::ActiveListenerImplBa
                               public Network::UdpListenerCallbacks {
 public:
   ActiveUdpListenerBase(uint32_t worker_index, Network::ConnectionHandler& parent,
-                        Network::UdpListenerPtr&& listener, Network::ListenerConfig* config);
+                        Network::Socket& listen_socket, Network::UdpListenerPtr&& listener,
+                        Network::ListenerConfig* config);
   ~ActiveUdpListenerBase() override;
 
   // Network::UdpListenerCallbacks
@@ -385,6 +386,7 @@ public:
 protected:
   const uint32_t worker_index_;
   Network::ConnectionHandler& parent_;
+  Network::Socket& listen_socket_;
   Network::UdpListenerPtr udp_listener_;
 };
 
@@ -437,7 +439,6 @@ public:
 private:
   Network::UdpListenerReadFilterPtr read_filter_;
   Network::UdpPacketWriterPtr udp_packet_writer_;
-  Network::Socket& listen_socket_;
 };
 
 } // namespace Server

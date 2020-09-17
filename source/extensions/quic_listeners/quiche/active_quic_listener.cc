@@ -35,10 +35,11 @@ ActiveQuicListener::ActiveQuicListener(
     Network::SocketSharedPtr listen_socket, Network::ListenerConfig& listener_config,
     const quic::QuicConfig& quic_config, Network::Socket::OptionsSharedPtr options,
     bool kernel_worker_routing, const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
-    : Server::ActiveUdpListenerBase(
-          worker_id, parent, dispatcher.createUdpListener(listen_socket, *this), &listener_config),
+    : Server::ActiveUdpListenerBase(worker_id, parent, *listen_socket,
+                                    dispatcher.createUdpListener(listen_socket, *this),
+                                    &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
-      kernel_worker_routing_(kernel_worker_routing), listen_socket_(*listen_socket),
+      kernel_worker_routing_(kernel_worker_routing),
       enabled_(enabled, Runtime::LoaderSingleton::get()) {
   if (options != nullptr) {
     const bool ok = Network::Socket::applyOptions(

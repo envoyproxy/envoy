@@ -68,7 +68,6 @@ private:
   quic::QuicVersionManager version_manager_;
   std::unique_ptr<EnvoyQuicDispatcher> quic_dispatcher_;
   const bool kernel_worker_routing_;
-  Network::Socket& listen_socket_;
   Runtime::FeatureFlag enabled_;
   Network::UdpPacketWriter* udp_packet_writer_;
 

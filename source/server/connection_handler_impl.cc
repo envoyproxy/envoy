@@ -590,10 +590,11 @@ ConnectionHandlerImpl::ActiveListenerDetails::udpListener() {
 
 ActiveUdpListenerBase::ActiveUdpListenerBase(uint32_t worker_index,
                                              Network::ConnectionHandler& parent,
+                                             Network::Socket& listen_socket,
                                              Network::UdpListenerPtr&& listener,
                                              Network::ListenerConfig* config)
     : ConnectionHandlerImpl::ActiveListenerImplBase(parent, config), worker_index_(worker_index),
-      parent_(parent), udp_listener_(std::move(listener)) {
+      parent_(parent), listen_socket_(listen_socket), udp_listener_(std::move(listener)) {
   config_->udpListenerWorkerRouter()->get().registerWorker(*this);
 }
 
@@ -654,8 +655,8 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index,
                                            Network::Socket& listen_socket,
                                            Network::UdpListenerPtr&& listener,
                                            Network::ListenerConfig& config)
-    : ActiveUdpListenerBase(worker_index, parent, std::move(listener), &config),
-      read_filter_(nullptr), listen_socket_(listen_socket) {
+    : ActiveUdpListenerBase(worker_index, parent, listen_socket, std::move(listener), &config),
+      read_filter_(nullptr) {
   // Create the filter chain on creating a new udp listener
   config_->filterChainFactory().createUdpListenerFilterChain(*this, *this);
 
