@@ -478,7 +478,7 @@ private:
   // Adds buffer fragment for a new outbound frame to the supplied Buffer::OwnedImpl.
   // Returns true on success or false if outbound queue limits were exceeded.
   bool addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
-  virtual void checkProtocolConstraintsStatus() PURE;
+  virtual void checkOutboundFrameLimits() PURE;
   virtual bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
 
   bool dispatching_ : 1;
@@ -515,7 +515,7 @@ private:
   // mitigation on the downstream connections, which causes an exception to be thrown in the middle
   // of the clean-up loop, leaving resources in a half cleaned up state.
   // TODO(yanavlasov): add flood mitigation for upstream connections as well.
-  void checkProtocolConstraintsStatus() override {}
+  void checkOutboundFrameLimits() override {}
   bool trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return true; }
 
   Http::ConnectionCallbacks& callbacks_;
@@ -539,7 +539,7 @@ private:
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   int onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
-  void checkProtocolConstraintsStatus() override;
+  void checkOutboundFrameLimits() override;
   bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
 

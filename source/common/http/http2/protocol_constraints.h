@@ -51,10 +51,11 @@ public:
   // Increment the number of DATA frames sent to the peer.
   void incrementOutboundDataFrameCount() { ++outbound_data_frames_; }
 
+  Status checkOutboundFrameLimits();
+
 private:
   void releaseOutboundFrame();
   void releaseOutboundControlFrame();
-  Status checkOutboundQueueLimits();
   Status checkInboundFrameLimits();
 
   Status status_;

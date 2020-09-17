@@ -851,7 +851,7 @@ Status ConnectionImpl::addOutboundFrameFragment(Buffer::OwnedImpl& output, const
   std::swap(is_outbound_flood_monitored_control_frame, is_outbound_flood_monitored_control_frame_);
   auto releasor =
       protocol_constraints_.incrementOutboundFrameCount(is_outbound_flood_monitored_control_frame);
-  RETURN_IF_ERROR(checkProtocolConstraintsStatus());
+  RETURN_IF_ERROR(checkOutboundFrameLimits());
 
   output.add(data, length);
   output.addDrainTracker(releasor);
@@ -1397,8 +1397,9 @@ Status ServerConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd,
   return result;
 }
 
-Status ServerConnectionImpl::checkProtocolConstraintsStatus() {
-  return dispatching_downstream_data_ ? protocol_constraints_.status() : okStatus();
+Status ServerConnectionImpl::checkOutboundFrameLimits() {
+  return dispatching_downstream_data_ ? protocol_constraints_.checkOutboundFrameLimits()
+                                      : okStatus();
 }
 
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
@@ -1417,7 +1418,7 @@ Http::Status ServerConnectionImpl::innerDispatch(Buffer::Instance& data) {
   Cleanup cleanup([this]() { dispatching_downstream_data_ = false; });
 
   // Make sure downstream outbound queue was not flooded by the upstream frames.
-  RETURN_IF_ERROR(protocol_constraints_.status());
+  RETURN_IF_ERROR(checkOutboundFrameLimits());
   return ConnectionImpl::innerDispatch(data);
 }
 

@@ -486,7 +486,7 @@ private:
   // Adds buffer fragment for a new outbound frame to the supplied Buffer::OwnedImpl.
   // Returns Ok Status on success or error if outbound queue limits were exceeded.
   Status addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
-  virtual Status checkProtocolConstraintsStatus() PURE;
+  virtual Status checkOutboundFrameLimits() PURE;
   virtual Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
 
   bool dispatching_ : 1;
@@ -523,7 +523,7 @@ private:
   // mitigation on the downstream connections, however there is currently no mechanism for
   // handling these types of errors.
   // TODO(yanavlasov): add flood mitigation for upstream connections as well.
-  Status checkProtocolConstraintsStatus() override { return okStatus(); }
+  Status checkOutboundFrameLimits() override { return okStatus(); }
   Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return okStatus(); }
 
   Http::ConnectionCallbacks& callbacks_;
@@ -547,7 +547,7 @@ private:
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   Status onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
-  Status checkProtocolConstraintsStatus() override;
+  Status checkOutboundFrameLimits() override;
   Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
 

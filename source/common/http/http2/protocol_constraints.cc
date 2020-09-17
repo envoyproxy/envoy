@@ -25,7 +25,6 @@ ProtocolConstraints::incrementOutboundFrameCount(bool is_outbound_flood_monitore
   if (is_outbound_flood_monitored_control_frame) {
     ++outbound_control_frames_;
   }
-  status_.Update(checkOutboundQueueLimits());
   return is_outbound_flood_monitored_control_frame ? control_frame_buffer_releasor_
                                                    : frame_buffer_releasor_;
 }
@@ -41,7 +40,7 @@ void ProtocolConstraints::releaseOutboundControlFrame() {
   releaseOutboundFrame();
 }
 
-Status ProtocolConstraints::checkOutboundQueueLimits() {
+Status ProtocolConstraints::checkOutboundFrameLimits() {
   // Stop checking for further violations after the first failure.
   if (!status_.ok()) {
     return status_;
@@ -49,11 +48,11 @@ Status ProtocolConstraints::checkOutboundQueueLimits() {
 
   if (outbound_frames_ > max_outbound_frames_) {
     stats_.outbound_flood_.inc();
-    return bufferFloodError("Too many frames in the outbound queue.");
+    return status_ = bufferFloodError("Too many frames in the outbound queue.");
   }
   if (outbound_control_frames_ > max_outbound_control_frames_) {
     stats_.outbound_control_flood_.inc();
-    return bufferFloodError("Too many control frames in the outbound queue.");
+    return status_ = bufferFloodError("Too many control frames in the outbound queue.");
   }
   return okStatus();
 }

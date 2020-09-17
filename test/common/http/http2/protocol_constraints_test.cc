@@ -31,9 +31,9 @@ TEST_F(ProtocolConstraintsTest, OutboundControlFrameFlood) {
   ProtocolConstraints constraints(http2CodecStats(), options_);
   constraints.incrementOutboundFrameCount(true);
   constraints.incrementOutboundFrameCount(true);
-  EXPECT_TRUE(constraints.status().ok());
+  EXPECT_TRUE(constraints.checkOutboundFrameLimits().ok());
   constraints.incrementOutboundFrameCount(true);
-  EXPECT_FALSE(constraints.status().ok());
+  EXPECT_FALSE(constraints.checkOutboundFrameLimits().ok());
   EXPECT_TRUE(isBufferFloodError(constraints.status()));
   EXPECT_EQ("Too many control frames in the outbound queue.", constraints.status().message());
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_control_flood").value());
@@ -46,11 +46,11 @@ TEST_F(ProtocolConstraintsTest, OutboundFrameFlood) {
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
-  EXPECT_TRUE(constraints.status().ok());
+  EXPECT_TRUE(constraints.checkOutboundFrameLimits().ok());
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
-  EXPECT_FALSE(constraints.status().ok());
+  EXPECT_FALSE(constraints.checkOutboundFrameLimits().ok());
   EXPECT_TRUE(isBufferFloodError(constraints.status()));
   EXPECT_EQ("Too many frames in the outbound queue.", constraints.status().message());
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
@@ -66,13 +66,13 @@ TEST_F(ProtocolConstraintsTest, OutboundFrameFloodStatusIsIdempotent) {
   constraints.incrementOutboundFrameCount(true);
   constraints.incrementOutboundFrameCount(true);
   constraints.incrementOutboundFrameCount(true);
-  EXPECT_TRUE(isBufferFloodError(constraints.status()));
+  EXPECT_TRUE(isBufferFloodError(constraints.checkOutboundFrameLimits()));
   EXPECT_EQ("Too many control frames in the outbound queue.", constraints.status().message());
   // Then trigger flood check for all frame types
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
   constraints.incrementOutboundFrameCount(false);
-  EXPECT_FALSE(constraints.status().ok());
+  EXPECT_FALSE(constraints.checkOutboundFrameLimits().ok());
   EXPECT_TRUE(isBufferFloodError(constraints.status()));
   // The status should still reflect the first violation
   EXPECT_EQ("Too many control frames in the outbound queue.", constraints.status().message());
@@ -114,7 +114,7 @@ TEST_F(ProtocolConstraintsTest, OutboundAndInboundFrameFloodStatusIsIdempotent) 
   constraints.incrementOutboundFrameCount(true);
   constraints.incrementOutboundFrameCount(true);
   constraints.incrementOutboundFrameCount(true);
-  EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(constraints.status()));
+  EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(constraints.checkOutboundFrameLimits()));
   EXPECT_EQ(1, stats_store_.counter("http2.inbound_empty_frames_flood").value());
   EXPECT_EQ(0, stats_store_.counter("http2.outbound_control_flood").value());
 }
