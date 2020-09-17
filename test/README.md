@@ -130,7 +130,7 @@ respectively. `envoy_benchmark_test` rules call the benchmark binary from a
 [script](https://github.com/envoyproxy/envoy/blob/master/bazel/test_for_benchmark_wrapper.sh)
 which runs the benchmark with a minimal number of iterations and skipping
 expensive benchmarks to quickly verify that the binary is able to run to
-completion. In order to collect meaningful bechmarks, `bazel run -c opt` the
+completion. In order to collect meaningful benchmarks, `bazel run -c opt` the
 benchmark binary target on a quiescent machine.
 
 If you would like to detect when your benchmark test is running under the
