@@ -21,7 +21,8 @@ def getWorkspace():
 
 
 def getExecutionRoot(workspace):
-  # If compilation database exists, use its execution root
+  # If compilation database exists, use its execution root, this allows setting
+  # breakpoints with clangd navigation easier.
   try:
     compdb = pathlib.Path(workspace, "compile_commands.json").read_text()
     return json.loads(compdb)[0]['directory']
