@@ -713,19 +713,16 @@ TEST_F(HttpInspectorTestWithBufferIoSocket, InlineRecv) {
   io_handle_->getBufferForTest().add(header);
   const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http10};
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
-  
+
   EXPECT_EQ(Network::FilterStatus::Continue, init(true));
   EXPECT_EQ(1, cfg_->stats().http10_found_.value());
 }
 
 // Verify createFileEvent of BufferedIoSocketHandleImpl.
-TEST_F(HttpInspectorTestWithBufferIoSocket, InlineRecvAndScheduleEvent) {
-}
+TEST_F(HttpInspectorTestWithBufferIoSocket, InlineRecvAndScheduleEvent) {}
 
 // Verify sending data from peer socket triggers read event.
-TEST_F(HttpInspectorTestWithBufferIoSocket, InlineRecvAndSendByPeer) {
-}
-
+TEST_F(HttpInspectorTestWithBufferIoSocket, InlineRecvAndSendByPeer) {}
 
 } // namespace
 } // namespace HttpInspector

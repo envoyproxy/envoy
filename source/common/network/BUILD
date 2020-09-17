@@ -461,7 +461,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "peer_buffer_lib",
-    srcs = ["peer_buffer.cc"],
     hdrs = ["peer_buffer.h"],
     deps = [
         ":utility_lib",
