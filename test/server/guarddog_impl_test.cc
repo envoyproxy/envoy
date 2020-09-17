@@ -84,7 +84,7 @@ protected:
   }
 
   void initGuardDog(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config) {
-    guard_dog_ = std::make_unique<GuardDogImpl>(stats_scope, config, *api_,
+    guard_dog_ = std::make_unique<GuardDogImpl>(stats_scope, config, *api_, "server",
                                                 std::make_unique<DebugTestInterlock>());
   }
 
