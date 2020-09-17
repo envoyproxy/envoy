@@ -49,7 +49,9 @@ enum ConfigStatus {
   // ACK/NACK.
   STALE = 3;
 
-  // Management server has sent the config to client but received NACK.
+  // Management server has sent the config to client but received NACK. The
+  // attached config dump will be the latest config (the rejected one), since
+  // it is the persisted version in the management server.
   ERROR = 4;
 }
 
@@ -94,12 +96,11 @@ message PerXdsConfig {
   // CSDS server is an xDS client.
   ConfigStatus status = 1 [(udpa.annotations.field_migrate).oneof_promotion = "status_config"];
 
-  oneof status_config {
-    // Client config status is populated by xDS clients. Will not be present if
-    // the CSDS server is an xDS server. No matter what the client config status
-    // is, xDS clients should always dump the most recent accepted xDS config.
-    ClientConfigStatus client_status = 7;
-  }
+  // Client config status is populated by xDS clients. Will not be present if
+  // the CSDS server is an xDS server. No matter what the client config status
+  // is, xDS clients should always dump the most recent accepted xDS config.
+  ClientConfigStatus client_status = 7
+      [(udpa.annotations.field_migrate).oneof_promotion = "status_config"];
 
   oneof per_xds_config {
     admin.v3.ListenersConfigDump listener_config = 2;

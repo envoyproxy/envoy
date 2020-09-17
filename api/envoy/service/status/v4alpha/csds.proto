@@ -9,7 +9,6 @@ import "envoy/type/matcher/v4alpha/node.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -49,7 +48,9 @@ enum ConfigStatus {
   // ACK/NACK.
   STALE = 3;
 
-  // Management server has sent the config to client but received NACK.
+  // Management server has sent the config to client but received NACK. The
+  // attached config dump will be the latest config (the rejected one), since
+  // it is the persisted version in the management server.
   ERROR = 4;
 }
 
