@@ -47,8 +47,8 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& dispa
   if (timeout_.has_value()) {
     if (timeoutStartsAtCheckCreation()) {
       // TODO(yuval-k): We currently use dispatcher based timeout even if the underlying client is
-      // google gRPC client, which has it's own timeout mechanism. We may want to change that if
-      // using the google gRPC client timeout is more efficient.
+      // google gRPC client, which has it's own timeout mechanism. We may want to change that in
+      // the future if the implementations converge.
       timeout_timer_ = dispatcher.createTimer([this]() -> void { onTimeout(); });
       timeout_timer_->enableTimer(timeout_.value());
     } else {
