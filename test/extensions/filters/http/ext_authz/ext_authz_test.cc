@@ -101,6 +101,51 @@ class HttpFilterTestParam
     : public HttpFilterTestBase<testing::TestWithParam<CreateFilterConfigFunc*>> {
 public:
   void SetUp() override { initialize(""); }
+
+  envoy::service::auth::v3::CheckRequest checkRequestForPerRoutePackAsBytes(bool pack_as_bytes) {
+    envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
+    FilterConfigPerRoute auth_per_route(settings);
+
+    auto test_set_pack_as_bytes = [&](bool as_bytes) {
+      initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  with_request_body:
+    max_request_bytes: 10
+  )EOF");
+      settings.mutable_check_settings()->mutable_request_body_options()->set_pack_as_bytes(
+          as_bytes);
+      auth_per_route = FilterConfigPerRoute(settings);
+    };
+
+    ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+    ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+        .WillByDefault(Return(&auth_per_route));
+    prepareCheck();
+
+    test_set_pack_as_bytes(pack_as_bytes);
+    envoy::service::auth::v3::CheckRequest check_request;
+    EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+        .WillOnce(WithArgs<0, 1>(
+            Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                       const envoy::service::auth::v3::CheckRequest& check_param) -> void {
+              request_callbacks_ = &callbacks;
+              check_request = check_param;
+            })));
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers_, false));
+
+    data_.add("foo");
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+    data_.add("bar");
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
+    EXPECT_EQ(Http::FilterTrailersStatus::StopIteration,
+              filter_->decodeTrailers(request_trailers_));
+
+    return check_request;
+  }
 };
 
 template <bool failure_mode_allow_value, bool http_client>
@@ -1145,6 +1190,19 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+}
+
+// Test that how we pack request body can be overriden on route.
+TEST_P(HttpFilterTestParam, PackRequestBodyAsBytesOnRoute) {
+  const auto check_request = checkRequestForPerRoutePackAsBytes(false);
+  EXPECT_EQ(data_.length(), check_request.attributes().request().http().body().size());
+  EXPECT_EQ(0, check_request.attributes().request().http().raw_body().size());
+}
+
+TEST_P(HttpFilterTestParam, PackRequestBodyAsUtf8OnRoute) {
+  const auto check_request = checkRequestForPerRoutePackAsBytes(true);
+  EXPECT_EQ(0, check_request.attributes().request().http().body().size());
+  EXPECT_EQ(data_.length(), check_request.attributes().request().http().raw_body().size());
 }
 
 // Test that the request continues when the filter_callbacks has no route.

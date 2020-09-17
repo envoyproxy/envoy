@@ -176,7 +176,12 @@ public:
       : context_extensions_(config.has_check_settings()
                                 ? config.check_settings().context_extensions()
                                 : ContextExtensionsMap()),
-        disabled_(config.disabled()) {}
+        disabled_(config.disabled()),
+        pack_as_bytes_(config.has_check_settings()
+                           ? (config.check_settings().has_request_body_options()
+                                  ? config.check_settings().request_body_options().pack_as_bytes()
+                                  : false)
+                           : false) {}
 
   void merge(const FilterConfigPerRoute& other);
 
@@ -189,11 +194,14 @@ public:
 
   bool disabled() const { return disabled_; }
 
+  bool packAsBytes() const { return pack_as_bytes_; }
+
 private:
   // We save the context extensions as a protobuf map instead of an std::map as this allows us to
   // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
   ContextExtensionsMap context_extensions_;
   bool disabled_;
+  bool pack_as_bytes_;
 };
 
 /**
@@ -254,6 +262,8 @@ private:
   bool buffer_data_{};
   bool skip_check_{false};
   envoy::service::auth::v3::CheckRequest check_request_{};
+
+  mutable const FilterConfigPerRoute* per_route_config_{nullptr};
 };
 
 } // namespace ExtAuthz

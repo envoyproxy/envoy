@@ -59,10 +59,15 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
     }
   }
 
+  bool pack_as_bytes = config_->packAsBytes();
+  if (per_route_config_ != nullptr) {
+    // Per-route pack_as_bytes config overrides the global one.
+    pack_as_bytes = per_route_config_->packAsBytes();
+  }
+
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
       callbacks_, headers, std::move(context_extensions), std::move(metadata_context),
-      check_request_, config_->maxRequestBytes(), config_->packAsBytes(),
-      config_->includePeerCertificate());
+      check_request_, config_->maxRequestBytes(), pack_as_bytes, config_->includePeerCertificate());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *callbacks_);
   state_ = State::Calling;
@@ -306,11 +311,10 @@ bool Filter::skipCheckForRoute(const Router::RouteConstSharedPtr& route) const {
     return true;
   }
 
-  const auto* specific_per_route_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
-          HttpFilterNames::get().ExtAuthorization, route);
-  if (specific_per_route_config != nullptr) {
-    return specific_per_route_config->disabled();
+  per_route_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+      HttpFilterNames::get().ExtAuthorization, route);
+  if (per_route_config_ != nullptr) {
+    return per_route_config_->disabled();
   }
 
   return false;
