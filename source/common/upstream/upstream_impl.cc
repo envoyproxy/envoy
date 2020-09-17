@@ -479,12 +479,12 @@ HostSetImpl::chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler) {
   if (locality_scheduler == nullptr) {
     return {};
   }
-  const std::shared_ptr<LocalityEntry> locality = locality_scheduler->pick();
+  const std::shared_ptr<LocalityEntry> locality = locality_scheduler->pickAndAdd(
+      [](const LocalityEntry& locality) { return locality.effective_weight_; });
   // We don't build a schedule if there are no weighted localities, so we should always succeed.
   ASSERT(locality != nullptr);
   // If we picked it before, its weight must have been positive.
   ASSERT(locality->effective_weight_ > 0);
-  locality_scheduler->add(locality->effective_weight_, locality);
   return locality->index_;
 }
 
@@ -688,8 +688,10 @@ ClusterInfoImpl::ClusterInfoImpl(
                                          Http::DEFAULT_MAX_HEADERS_COUNT))),
       connect_timeout_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, connect_timeout))),
-      prefetch_ratio_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.prefetch_policy(), prefetch_ratio, 1.0)),
+      per_upstream_prefetch_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config.prefetch_policy(), per_upstream_prefetch_ratio, 1.0)),
+      peekahead_ratio_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.prefetch_policy(), predictive_prefetch_ratio, 0)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
