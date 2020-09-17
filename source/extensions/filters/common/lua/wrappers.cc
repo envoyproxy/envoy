@@ -71,22 +71,16 @@ void MetadataMapHelper::setValue(lua_State* state, const ProtobufWkt::Value& val
   switch (kind) {
   case ProtobufWkt::Value::kNullValue:
     return lua_pushnil(state);
-
   case ProtobufWkt::Value::kNumberValue:
     return lua_pushnumber(state, value.number_value());
-
   case ProtobufWkt::Value::kBoolValue:
     return lua_pushboolean(state, value.bool_value());
-
+  case ProtobufWkt::Value::kStructValue:
+    return createTable(state, value.struct_value().fields());
   case ProtobufWkt::Value::kStringValue: {
     const auto& string_value = value.string_value();
     return lua_pushstring(state, string_value.c_str());
   }
-
-  case ProtobufWkt::Value::kStructValue: {
-    return createTable(state, value.struct_value().fields());
-  }
-
   case ProtobufWkt::Value::kListValue: {
     const auto& list = value.list_value();
     const int values_size = list.values_size();

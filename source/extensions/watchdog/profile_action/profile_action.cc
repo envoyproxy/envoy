@@ -49,14 +49,14 @@ ProfileAction::ProfileAction(
 
 void ProfileAction::run(
     envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent /*event*/,
-    const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs,
+    const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_last_checkin_pairs,
     MonotonicTime /*now*/) {
   if (running_profile_) {
     return;
   }
 
   // Check if there's a tid that justifies profiling
-  if (thread_ltt_pairs.empty()) {
+  if (thread_last_checkin_pairs.empty()) {
     ENVOY_LOG_MISC(warn, "Profile Action: No tids were provided.");
     return;
   }

@@ -527,11 +527,12 @@ protected:
   void flushStats() {
     if (manual_flush_) {
       server_->flushStats();
+      server_->dispatcher().run(Event::Dispatcher::RunType::Block);
     } else {
       // Default flush interval is 5 seconds.
-      simTime().advanceTimeAsync(std::chrono::seconds(6));
+      simTime().advanceTimeAndRun(std::chrono::seconds(6), server_->dispatcher(),
+                                  Event::Dispatcher::RunType::Block);
     }
-    server_->dispatcher().run(Event::Dispatcher::RunType::Block);
   }
 
   bool manual_flush_;
