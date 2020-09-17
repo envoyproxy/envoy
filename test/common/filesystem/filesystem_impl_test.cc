@@ -231,6 +231,18 @@ TEST_F(FileSystemImplTest, Open) {
   EXPECT_TRUE(file->isOpen());
 }
 
+TEST_F(FileSystemImplTest, OpenReadOnly) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
+  ::unlink(new_file_path.c_str());
+  static constexpr FlagSet ReadOnlyFlags{1 << Filesystem::File::Operation::Read |
+                                        1 << Filesystem::File::Operation::Create |
+                                        1 << Filesystem::File::Operation::Append};
+  FilePtr file = file_system_.createFile(new_file_path);
+  const Api::IoCallBoolResult result = file->open(ReadOnlyFlags);
+  EXPECT_TRUE(result.rc_);
+  EXPECT_TRUE(file->isOpen());
+}
+
 TEST_F(FileSystemImplTest, OpenTwice) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
   ::unlink(new_file_path.c_str());
