@@ -22,7 +22,8 @@ public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
-               const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+               const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+               Upstream::ClusterConnectivityState& state);
 
   ~ConnPoolImpl() override;
 
@@ -39,7 +40,6 @@ protected:
                          public ResponseDecoderWrapper,
                          public StreamCallbacks {
     StreamWrapper(ResponseDecoder& response_decoder, ActiveClient& parent);
-    ~StreamWrapper() override;
 
     // StreamEncoderWrapper
     void onEncodeComplete() override;
@@ -56,15 +56,18 @@ protected:
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
+    void onStreamDestroy();
+
     ActiveClient& parent_;
+    bool stream_incomplete_{};
     bool encode_complete_{};
-    bool close_connection_{};
     bool decode_complete_{};
+    bool close_connection_{};
   };
 
   using StreamWrapperPtr = std::unique_ptr<StreamWrapper>;
 
-  class ActiveClient : public Envoy::Http::ActiveClient {
+  class ActiveClient : public Envoy::Http::ActiveClient, public CodecClientCallbacks {
   public:
     ActiveClient(ConnPoolImpl& parent);
 
@@ -73,6 +76,11 @@ protected:
     // ConnPoolImplBase::ActiveClient
     bool closingWithIncompleteStream() const override;
     RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
+
+    // CodecClientCallbacks
+    void onStreamPreDecodeComplete() override { stream_wrapper_->decode_complete_ = true; }
+    void onStreamDestroy() override { stream_wrapper_->onStreamDestroy(); }
+    void onStreamReset(Http::StreamResetReason) override {}
 
     StreamWrapperPtr stream_wrapper_;
   };
@@ -100,7 +108,8 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 Upstream::ClusterConnectivityState& state);
 
 } // namespace Http1
 } // namespace Http

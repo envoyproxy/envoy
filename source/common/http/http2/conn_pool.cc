@@ -15,9 +15,10 @@ namespace Http2 {
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                            Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
-                           const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
+                           const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                           Upstream::ClusterConnectivityState& state)
     : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                           transport_socket_options, Protocol::Http2),
+                           transport_socket_options, state, Protocol::Http2),
       random_generator_(random_generator) {}
 
 ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
@@ -93,9 +94,10 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 Upstream::ClusterConnectivityState& state) {
   return std::make_unique<Http::Http2::ProdConnPoolImpl>(
-      dispatcher, random_generator, host, priority, options, transport_socket_options);
+      dispatcher, random_generator, host, priority, options, transport_socket_options, state);
 }
 
 } // namespace Http2

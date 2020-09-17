@@ -299,7 +299,8 @@ public:
     EXPECT_CALL(*mock_host_, cluster()).WillRepeatedly(ReturnRef(*cluster_info_ptr_));
     EXPECT_CALL(*mock_host_description_, locality()).WillRepeatedly(ReturnRef(host_locality_));
     http_conn_pool_ = std::make_unique<Http::Http2::ProdConnPoolImpl>(
-        *dispatcher_, random_, host_ptr_, Upstream::ResourcePriority::Default, nullptr, nullptr);
+        *dispatcher_, random_, host_ptr_, Upstream::ResourcePriority::Default, nullptr, nullptr,
+        state_);
     EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
         .WillRepeatedly(Return(http_conn_pool_.get()));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
@@ -475,6 +476,7 @@ public:
       new NiceMock<Upstream::MockHostDescription>();
   Upstream::HostDescriptionConstSharedPtr host_description_ptr_{mock_host_description_};
   Upstream::HostConstSharedPtr host_ptr_{mock_host_};
+  Upstream::ClusterConnectivityState state_;
   Router::MockShadowWriter* mock_shadow_writer_ = new Router::MockShadowWriter();
   Router::ShadowWriterPtr shadow_writer_ptr_{mock_shadow_writer_};
   Network::ClientConnectionPtr client_connection_;

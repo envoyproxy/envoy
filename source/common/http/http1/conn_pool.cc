@@ -26,9 +26,10 @@ namespace Http1 {
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                            Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
-                           const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
+                           const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                           Upstream::ClusterConnectivityState& state)
     : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                           transport_socket_options, Protocol::Http11),
+                           transport_socket_options, state, Protocol::Http11),
       upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() {
         upstream_ready_enabled_ = false;
         onUpstreamReady();
@@ -58,7 +59,7 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
   } else {
     client.stream_wrapper_.reset();
 
-    if (!pending_streams_.empty() && !upstream_ready_enabled_) {
+    if (hasPendingStreams() && !upstream_ready_enabled_) {
       upstream_ready_enabled_ = true;
       upstream_ready_cb_->scheduleCallbackCurrentIteration();
     }
@@ -73,7 +74,7 @@ ConnPoolImpl::StreamWrapper::StreamWrapper(ResponseDecoder& response_decoder, Ac
   RequestEncoderWrapper::inner_.getStream().addCallbacks(*this);
 }
 
-ConnPoolImpl::StreamWrapper::~StreamWrapper() {
+void ConnPoolImpl::StreamWrapper::onStreamDestroy() {
   // Upstream connection might be closed right after response is complete. Setting delay=true
   // here to attach pending requests in next dispatcher loop to handle that case.
   // https://github.com/envoyproxy/envoy/issues/2715
@@ -108,7 +109,6 @@ void ConnPoolImpl::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, 
 }
 
 void ConnPoolImpl::StreamWrapper::onDecodeComplete() {
-  decode_complete_ = encode_complete_;
   parent_.parent().onResponseComplete(parent_);
 }
 
@@ -117,6 +117,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
           parent, parent.host_->cluster().maxRequestsPerConnection(),
           1 // HTTP1 always has a concurrent-request-limit of 1 per connection.
       ) {
+  codec_client_->setCodecClientCallbacks(*this);
   parent.host_->cluster().stats().upstream_cx_http1_total_.inc();
 }
 
@@ -140,9 +141,10 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 Upstream::ClusterConnectivityState& state) {
   return std::make_unique<Http::Http1::ProdConnPoolImpl>(
-      dispatcher, random_generator, host, priority, options, transport_socket_options);
+      dispatcher, random_generator, host, priority, options, transport_socket_options, state);
 }
 
 } // namespace Http1

@@ -830,8 +830,13 @@ ThreadLocalCluster* ClusterManagerImpl::get(absl::string_view cluster) {
 }
 
 void ClusterManagerImpl::maybePrefetch(
-    ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry,
+    ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry, const ClusterConnectivityState&,
     std::function<ConnectionPool::Instance*()> pick_prefetch_pool) {
+  auto peekahead_ratio = cluster_entry->cluster_info_->peekaheadRatio();
+  if (peekahead_ratio <= 1.0) {
+    return;
+  }
+
   // TODO(alyssawilk) As currently implemented, this will always just prefetch
   // one connection ahead of actually needed connections.
   //
@@ -846,11 +851,9 @@ void ClusterManagerImpl::maybePrefetch(
   //  per-upstream prefetch.
   //
   //  Once we do this, this should loop capped number of times while shouldPrefetch is true.
-  if (cluster_entry->cluster_info_->peekaheadRatio() > 1.0) {
-    ConnectionPool::Instance* prefetch_pool = pick_prefetch_pool();
-    if (prefetch_pool) {
-      prefetch_pool->maybePrefetch(cluster_entry->cluster_info_->peekaheadRatio());
-    }
+  ConnectionPool::Instance* prefetch_pool = pick_prefetch_pool();
+  if (prefetch_pool) {
+    prefetch_pool->maybePrefetch(cluster_entry->cluster_info_->peekaheadRatio());
   }
 }
 
@@ -874,9 +877,10 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
   // performed here in anticipation of the new stream.
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
   // code-enforced.
-  maybePrefetch(entry->second, [&entry, &priority, &protocol, &context]() {
-    return entry->second->connPool(priority, protocol, context, true);
-  });
+  maybePrefetch(entry->second, cluster_manager.cluster_manager_state_,
+                [&entry, &priority, &protocol, &context]() {
+                  return entry->second->connPool(priority, protocol, context, true);
+                });
 
   return ret;
 }
@@ -900,9 +904,10 @@ ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePr
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
   // code-enforced.
   // Now see if another host should be prefetched.
-  maybePrefetch(entry->second, [&entry, &priority, &context]() {
-    return entry->second->tcpConnPool(priority, context, true);
-  });
+  maybePrefetch(entry->second, cluster_manager.cluster_manager_state_,
+                [&entry, &priority, &context]() {
+                  return entry->second->tcpConnPool(priority, context, true);
+                });
 
   return ret;
 }
@@ -1354,8 +1359,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     LoadBalancerContext* context, bool peek) {
   HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
-    ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
-    cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    if (!peek) {
+      ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
+      cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    }
     return nullptr;
   }
 
@@ -1399,7 +1406,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
         return parent_.parent_.factory_.allocateConnPool(
             parent_.thread_local_dispatcher_, host, priority, upstream_protocol,
             !upstream_options->empty() ? upstream_options : nullptr,
-            have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr);
+            have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
+            parent_.cluster_manager_state_);
       });
 
   if (pool.has_value()) {
@@ -1448,7 +1456,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     container.pools_[hash_key] = parent_.parent_.factory_.allocateTcpConnPool(
         parent_.thread_local_dispatcher_, host, priority,
         have_options ? context->downstreamConnection()->socketOptions() : nullptr,
-        have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr);
+        have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
+        parent_.cluster_manager_state_);
   }
 
   return container.pools_[hash_key].get();
@@ -1464,27 +1473,29 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
+    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    ClusterConnectivityState& state) {
   if (protocol == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::Http2::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
-                                         options, transport_socket_options);
+                                         options, transport_socket_options, state);
   } else if (protocol == Http::Protocol::Http3) {
     // Quic connection pool is not implemented.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   } else {
     return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
-                                         options, transport_socket_options);
+                                         options, transport_socket_options, state);
   }
 }
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
+    Network::TransportSocketOptionsSharedPtr transport_socket_options,
+    ClusterConnectivityState& state) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_tcp_connection_pool")) {
     return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
-                                               transport_socket_options);
+                                               transport_socket_options, state);
   } else {
     return Tcp::ConnectionPool::InstancePtr{new Tcp::OriginalConnPoolImpl(
         dispatcher, host, priority, options, transport_socket_options)};

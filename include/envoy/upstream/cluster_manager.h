@@ -73,6 +73,34 @@ using ClusterUpdateCallbacksHandlePtr = std::unique_ptr<ClusterUpdateCallbacksHa
 
 class ClusterManagerFactory;
 
+// These are per-cluster per-thread, so not "global" stats.
+struct ClusterConnectivityState {
+  ~ClusterConnectivityState() {
+    ASSERT(pending_streams_ == 0);
+    ASSERT(active_streams_ == 0);
+    ASSERT(connecting_capacity_ == 0);
+  }
+  void checkAndDecrement(uint32_t& value, uint32_t& delta) {
+    ASSERT(value - delta <= value);
+    value -= delta;
+  }
+
+  void incrPendingStreams(uint32_t delta) { pending_streams_ += delta; }
+  void decrPendingStreams(uint32_t delta) { checkAndDecrement(pending_streams_, delta); }
+  void incrConnectingCapacity(uint32_t delta) { connecting_capacity_ += delta; }
+  void decrConnectingCapacity(uint32_t delta) { checkAndDecrement(connecting_capacity_, delta); }
+  void incrActiveStreams(uint32_t delta) { active_streams_ += delta; }
+  void decrActiveStreams(uint32_t delta) { checkAndDecrement(active_streams_, delta); }
+
+  // Tracks the number of pending streams for this ClusterManager.
+  uint32_t pending_streams_{};
+  // Tracks the number of active streams for this ClusterManager.
+  uint32_t active_streams_{};
+  // Tracks the stream capacity if all connecting connections were connected but
+  // excluding streams which are in use.
+  uint32_t connecting_capacity_{};
+};
+
 /**
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
  * persistent and shared among multiple ongoing requests/connections.
@@ -318,7 +346,8 @@ public:
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, Http::Protocol protocol,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options) PURE;
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   ClusterConnectivityState& state) PURE;
 
   /**
    * Allocate a TCP connection pool for the host. Pools are separated by 'priority' and
@@ -328,7 +357,8 @@ public:
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                      Network::TransportSocketOptionsSharedPtr transport_socket_options) PURE;
+                      Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                      ClusterConnectivityState& state) PURE;
 
   /**
    * Allocate a cluster from configuration proto.

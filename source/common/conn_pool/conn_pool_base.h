@@ -4,6 +4,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/timespan.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/linked_object.h"
 
@@ -46,6 +47,10 @@ public:
   // is less than the concurrent stream limit.
   uint64_t effectiveConcurrentStreamLimit() const {
     return std::min(remaining_streams_, concurrent_stream_limit_);
+  }
+
+  uint64_t currentUnusedCapacity() const {
+    return std::min(remaining_streams_, concurrent_stream_limit_ - numActiveStreams());
   }
 
   // Closes the underlying connection.
@@ -105,7 +110,8 @@ public:
   ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   Upstream::ClusterConnectivityState& state);
   virtual ~ConnPoolImplBase();
 
   // A helper function to get the specific context type from the base class context.
@@ -194,6 +200,23 @@ protected:
 
   float perUpstreamPrefetchRatio() const;
 
+  ConnectionPool::Cancellable*
+  addPendingStream(Envoy::ConnectionPool::PendingStreamPtr&& pending_stream) {
+    LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
+    state_.incrPendingStreams(1);
+    return pending_streams_.front().get();
+  }
+
+  bool hasPendingStreams() const { return !pending_streams_.empty(); }
+  bool hasActiveStreams() const { return num_active_streams_ > 0; }
+
+  void decrConnectingStreamCapacity(int32_t delta) {
+    state_.decrConnectingCapacity(delta);
+    connecting_stream_capacity_ -= delta;
+  }
+
+  Upstream::ClusterConnectivityState& state_;
+
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;
 
@@ -202,7 +225,6 @@ protected:
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 
   std::list<Instance::DrainedCb> drained_callbacks_;
-  std::list<PendingStreamPtr> pending_streams_;
 
   // When calling purgePendingStreams, this list will be used to hold the streams we are about
   // to purge. We need this if one cancelled streams cancels a different pending stream
@@ -217,6 +239,9 @@ protected:
 
   // Clients that are not ready to handle additional streams because they are CONNECTING.
   std::list<ActiveClientPtr> connecting_clients_;
+
+private:
+  std::list<PendingStreamPtr> pending_streams_;
 
   // The number of streams currently attached to clients.
   uint64_t num_active_streams_{0};

@@ -43,7 +43,7 @@ public:
                        Event::Dispatcher& dispatcher,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                       Http::Protocol protocol);
+                       Upstream::ClusterConnectivityState& state, Http::Protocol protocol);
 
   // ConnectionPool::Instance
   void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }

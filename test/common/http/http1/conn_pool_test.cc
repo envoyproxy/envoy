@@ -54,14 +54,14 @@ public:
                       Upstream::ClusterInfoConstSharedPtr cluster,
                       NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb)
       : ConnPoolImpl(dispatcher, random_, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
-                     Upstream::ResourcePriority::Default, nullptr, nullptr),
+                     Upstream::ResourcePriority::Default, nullptr, nullptr, state_),
         api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
         mock_upstream_ready_cb_(upstream_ready_cb) {}
 
   ~ConnPoolImplForTest() override {
     EXPECT_EQ(0U, ready_clients_.size());
     EXPECT_EQ(0U, busy_clients_.size());
-    EXPECT_EQ(0U, pending_streams_.size());
+    EXPECT_FALSE(hasPendingStreams());
   }
 
   struct TestCodecClient {
@@ -123,6 +123,7 @@ public:
     EXPECT_FALSE(upstream_ready_enabled_);
   }
 
+  Upstream::ClusterConnectivityState state_;
   Api::ApiPtr api_;
   Event::MockDispatcher& mock_dispatcher_;
   NiceMock<Random::MockRandomGenerator> random_;
