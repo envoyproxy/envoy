@@ -18,7 +18,7 @@ mkdir -p "${FIXTURE_DIR}"
 DRIVER_DIR="${TEST_SRCDIR}/envoy/test/extensions/filters/network/thrift_proxy/driver"
 
 if [[ -z "${TEST_UDSDIR}" ]]; then
-    TEST_UDSDIR=`mktemp -d /tmp/envoy_test_thrift.XXXXXX`
+    TEST_UDSDIR=$(mktemp -d /tmp/envoy_test_thrift.XXXXXX)
 fi
 
 MODE="$1"
@@ -86,7 +86,7 @@ fi
 "${DRIVER_DIR}/server" "${SERVICE_FLAGS[@]}" &
 SERVER_PID="$!"
 
-trap "kill ${SERVER_PID}" EXIT;
+trap 'kill ${SERVER_PID}' EXIT;
 
 while [[ ! -a "${SOCKET}" ]]; do
     sleep 0.1
