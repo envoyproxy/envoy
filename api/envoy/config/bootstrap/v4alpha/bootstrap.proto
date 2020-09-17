@@ -173,9 +173,8 @@ message Bootstrap {
     gte {nanos: 1000000}
   }];
 
-  // Optional watchdog configuration.
+  // Optional watchdogs configuration.
   // This is used for specifying different watchdogs for the different subsystems.
-  // Only one of *watchdog* or *watchdogs* should be specified.
   Watchdogs watchdogs = 27;
 
   // Configuration for the runtime configuration provider. If not
@@ -331,7 +330,7 @@ message ClusterManager {
 
 // Allows you to specify different watchdog configs for different subsystems.
 // This allows finer tuned policies for the watchdog. If a subsystem is omitted
-// we'll use default values for that system.
+// the default values for that system will be used.
 message Watchdogs {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v3.Watchdogs";
