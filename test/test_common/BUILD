@@ -256,6 +256,7 @@ envoy_cc_test_library(
     deps = [
         ":global_lib",
         ":only_one_thread_lib",
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//source/common/common:thread_lib",
     ],
