@@ -1192,7 +1192,7 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 }
 
-// Test that how we pack request body can be overriden on route.
+// Test that how we pack request body can be overridden on route.
 TEST_P(HttpFilterTestParam, PackRequestBodyAsBytesOnRoute) {
   const auto check_request = checkRequestForPerRoutePackAsBytes(false);
   EXPECT_EQ(data_.length(), check_request.attributes().request().http().body().size());
