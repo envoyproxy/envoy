@@ -57,6 +57,7 @@ envoy_cc_test(
         ":ads_integration_lib",
         ":http_integration_lib",
         "//source/common/config:protobuf_link_hacks",
+        "//source/common/config:udpa_resource_lib",
         "//source/common/protobuf:utility_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:network_utility_lib",

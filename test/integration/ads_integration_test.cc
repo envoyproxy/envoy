@@ -6,6 +6,7 @@
 #include "envoy/grpc/status.h"
 
 #include "common/config/protobuf_link_hacks.h"
+#include "common/config/udpa_resource.h"
 #include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -1191,6 +1192,57 @@ TEST_P(AdsClusterV3Test, XdsBatching) {
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.mutable_dynamic_resources()->clear_cds_config();
     bootstrap.mutable_dynamic_resources()->clear_lds_config();
+
+    auto static_resources = bootstrap.mutable_static_resources();
+    static_resources->add_clusters()->MergeFrom(buildCluster("eds_cluster"));
+    static_resources->add_clusters()->MergeFrom(buildCluster("eds_cluster2"));
+
+    static_resources->add_listeners()->MergeFrom(buildListener("rds_listener", "route_config"));
+    static_resources->add_listeners()->MergeFrom(buildListener("rds_listener2", "route_config2"));
+  });
+
+  on_server_init_function_ = [this]() {
+    createXdsConnection();
+    ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
+    xds_stream_->startGrpcStream();
+
+    const auto eds_type_url =
+        Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+            envoy::config::core::v3::ApiVersion::V3);
+    const auto rds_type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
+        envoy::config::core::v3::ApiVersion::V3);
+
+    EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"eds_cluster2", "eds_cluster"},
+                                        {"eds_cluster2", "eds_cluster"}, {}, true));
+    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        eds_type_url,
+        {buildClusterLoadAssignment("eds_cluster"), buildClusterLoadAssignment("eds_cluster2")},
+        {buildClusterLoadAssignment("eds_cluster"), buildClusterLoadAssignment("eds_cluster2")}, {},
+        "1", false);
+
+    EXPECT_TRUE(compareDiscoveryRequest(rds_type_url, "", {"route_config2", "route_config"},
+                                        {"route_config2", "route_config"}, {}));
+    sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+        rds_type_url,
+        {buildRouteConfig("route_config2", "eds_cluster2"),
+         buildRouteConfig("route_config", "dummy_cluster")},
+        {buildRouteConfig("route_config2", "eds_cluster2"),
+         buildRouteConfig("route_config", "dummy_cluster")},
+        {}, "1", false);
+  };
+
+  initialize();
+}
+
+// Validates that the initial xDS request batches all resources referred to in static config
+TEST_P(AdsClusterV3Test, LdsUdpaUrl) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    const std::string udpa_url_str =
+        "udpa://some-authority/envoy.config.listeners.v3.Listener/my-listeners/*";
+    const auto lds_resource_locator = Config::UdpaResourceIdentifier::decodeUrl(udpa_url_str);
+    bootstrap.mutable_dynamic_resources()->mutable_lds_resources_locator()->MergeFrom(
+        lds_resource_locator);
+    bootstrap.mutable_dynamic_resources()->clear_cds_config();
 
     auto static_resources = bootstrap.mutable_static_resources();
     static_resources->add_clusters()->MergeFrom(buildCluster("eds_cluster"));

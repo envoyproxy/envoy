@@ -49,10 +49,12 @@ public:
         resource_decoder_);
   }
 
-  SubscriptionPtr collectionSubscriptionFromUrl(const std::string& udpa_url) {
+  SubscriptionPtr
+  collectionSubscriptionFromUrl(const std::string& udpa_url,
+                                const envoy::config::core::v3::ConfigSource& config) {
     const auto resource_locator = UdpaResourceIdentifier::decodeUrl(udpa_url);
     return subscription_factory_.collectionSubscriptionFromUrl(
-        resource_locator, {}, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
+        resource_locator, config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
         callbacks_, resource_decoder_);
   }
 
@@ -213,14 +215,50 @@ TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscription) {
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
   // Unix paths start with /, Windows with c:/.
   const std::string file_path = test_path[0] == '/' ? test_path.substr(1) : test_path;
-  collectionSubscriptionFromUrl(fmt::format("file:///{}", file_path))->start({});
+  envoy::config::core::v3::ConfigSource config;
+  collectionSubscriptionFromUrl(fmt::format("file:///{}", file_path), config)->start({});
 }
 
-TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscriptionNonExistentFile){
-    EXPECT_THROW_WITH_MESSAGE(collectionSubscriptionFromUrl("file:///blahblah")->start({}),
-                              EnvoyException,
-                              "envoy::api::v2::Path must refer to an existing path in the system: "
-                              "'/blahblah' does not exist")}
+TEST_F(SubscriptionFactoryTest, GrpcCollectionSubscription) {
+
+  envoy::config::core::v3::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
+  envoy::config::core::v3::GrpcService expected_grpc_service;
+  expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("static_cluster");
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  primary_clusters.insert("static_cluster");
+  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
+  EXPECT_CALL(cm_.async_client_manager_,
+              factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
+      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+        auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
+        EXPECT_CALL(*async_client_factory, create()).WillOnce(Invoke([] {
+          return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+        }));
+        return async_client_factory;
+      }));
+  EXPECT_CALL(random_, random());
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
+  // onConfigUpdateFailed() should not be called for gRPC stream connection failure
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
+
+  collectionSubscriptionFromUrl(
+      "udpa://some-authority/envoy.config.listeners.v3.Listener/my-listeners/"
+      "*?node_type=ingress&client_features.envoy.config.no_bind_to_port=true",
+      config)
+      ->start({});
+}
+
+TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscriptionNonExistentFile) {
+  envoy::config::core::v3::ConfigSource config;
+  EXPECT_THROW_WITH_MESSAGE(collectionSubscriptionFromUrl("file:///blahblah", config)->start({}),
+                            EnvoyException,
+                            "envoy::api::v2::Path must refer to an existing path in the system: "
+                            "'/blahblah' does not exist")
+}
 
 TEST_F(SubscriptionFactoryTest, LegacySubscription) {
   envoy::config::core::v3::ConfigSource config;
