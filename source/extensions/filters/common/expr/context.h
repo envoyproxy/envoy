@@ -44,6 +44,9 @@ constexpr absl::string_view GrpcStatus = "grpc_status";
 // Per-request or per-connection metadata
 constexpr absl::string_view Metadata = "metadata";
 
+// Per-request or per-connection filter state
+constexpr absl::string_view FilterState = "filter_state";
+
 // Connection properties
 constexpr absl::string_view Connection = "connection";
 constexpr absl::string_view MTLS = "mtls";
@@ -108,7 +111,14 @@ public:
   const google::api::expr::runtime::CelList* ListKeys() const override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  CelValue Produce(ProtobufWkt::Arena*) override { return CelValue::CreateMap(this); }
+  CelValue Produce(ProtobufWkt::Arena* arena) override {
+    // Producer is unique per evaluation arena since activation is re-created.
+    arena_ = arena;
+    return CelValue::CreateMap(this);
+  }
+
+protected:
+  ProtobufWkt::Arena* arena_;
 };
 
 class RequestWrapper : public BaseWrapper {
@@ -172,6 +182,15 @@ public:
 
 private:
   const envoy::config::core::v3::Metadata& metadata_;
+};
+
+class FilterStateWrapper : public BaseWrapper {
+public:
+  FilterStateWrapper(const StreamInfo::FilterState& filter_state) : filter_state_(filter_state) {}
+  absl::optional<CelValue> operator[](CelValue key) const override;
+
+private:
+  const StreamInfo::FilterState& filter_state_;
 };
 
 } // namespace Expr

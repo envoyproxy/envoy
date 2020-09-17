@@ -1,4 +1,6 @@
 #include "common/network/utility.h"
+#include "common/router/string_accessor_impl.h"
+#include "common/stream_info/filter_state_impl.h"
 
 #include "extensions/filters/common/expr/context.h"
 
@@ -603,6 +605,32 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(upstream_transport_failure_reason, value.value().StringOrDie().value());
+  }
+}
+
+TEST(Context, FilterStateAttributes) {
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  FilterStateWrapper wrapper(filter_state);
+  ProtobufWkt::Arena arena;
+  wrapper.Produce(&arena);
+
+  const auto key = "filter_state_key";
+  const auto serialized = "filter_state_value";
+  const auto missing = "missing_key";
+
+  auto accessor = std::make_shared<Envoy::Router::StringAccessorImpl>(serialized);
+  filter_state.setData(key, accessor, StreamInfo::FilterState::StateType::ReadOnly);
+
+  {
+    auto value = wrapper[CelValue::CreateStringView(missing)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = wrapper[CelValue::CreateStringView(key)];
+    EXPECT_TRUE(value.has_value());
+    EXPECT_TRUE(value.value().IsBytes());
+    EXPECT_EQ(serialized, value.value().BytesOrDie().value());
   }
 }
 
