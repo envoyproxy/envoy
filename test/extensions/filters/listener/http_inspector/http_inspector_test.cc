@@ -1,5 +1,8 @@
+#include <optional>
+
 #include "common/common/hex.h"
 #include "common/http/utility.h"
+#include "common/network/buffered_io_socket_handle_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 
 #include "extensions/filters/listener/http_inspector/http_inspector.h"
@@ -653,6 +656,76 @@ TEST_F(HttpInspectorTest, Http1WithLargeHeader) {
   }
   EXPECT_EQ(1, cfg_->stats().http10_found_.value());
 }
+
+class HttpInspectorTestWithBufferIoSocket : public testing::Test {
+public:
+  HttpInspectorTestWithBufferIoSocket() : cfg_(std::make_shared<Config>(store_)) {
+    io_handle_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
+    io_handle_peer_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
+    io_handle_->setWritablePeer(io_handle_peer_.get());
+    io_handle_peer_->setWritablePeer(io_handle_.get());
+  }
+  ~HttpInspectorTestWithBufferIoSocket() override {
+    io_handle_->close();
+    io_handle_peer_->close();
+  }
+
+  absl::optional<Network::FilterStatus> init(bool include_inline_recv = true) {
+    filter_ = std::make_unique<Filter>(cfg_);
+
+    EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
+    EXPECT_CALL(socket_, detectedTransportProtocol()).WillRepeatedly(Return("raw_buffer"));
+    EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
+    EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
+    EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
+
+    if (include_inline_recv) {
+      // EXPECT_CALL(dispatcher_,
+      //             createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+      //                              Event::FileReadyType::Read | Event::FileReadyType::Closed))
+      //     .WillOnce(DoAll(SaveArg<1>(&file_event_callback_),
+      //                     ReturnNew<NiceMock<Event::MockFileEvent>>()));
+
+      return filter_->onAccept(cb_);
+    }
+    return std::nullopt;
+  }
+
+  Stats::IsolatedStoreImpl store_;
+  ConfigSharedPtr cfg_;
+  std::unique_ptr<Filter> filter_;
+  Network::MockListenerFilterCallbacks cb_;
+  Network::MockConnectionSocket socket_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  Event::FileReadyCb file_event_callback_;
+  std::unique_ptr<Network::BufferedIoSocketHandleImpl> io_handle_;
+  std::unique_ptr<Network::BufferedIoSocketHandleImpl> io_handle_peer_;
+};
+
+// Verify peek behavior of BufferedIoSocketHandleImpl.
+TEST_F(HttpInspectorTestWithBufferIoSocket, InlineRecv) {
+  const absl::string_view header =
+      "GET /anything HTTP/1.0\r\nhost: google.com\r\nuser-agent: curl/7.64.0\r\naccept: "
+      "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
+      "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
+      "15000\r\ncontent-length: 0\r\n\r\n";
+
+  io_handle_->getBufferForTest().add(header);
+  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http10};
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
+  
+  EXPECT_EQ(Network::FilterStatus::Continue, init(true));
+  EXPECT_EQ(1, cfg_->stats().http10_found_.value());
+}
+
+// Verify createFileEvent of BufferedIoSocketHandleImpl.
+TEST_F(HttpInspectorTestWithBufferIoSocket, InlineRecvAndScheduleEvent) {
+}
+
+// Verify sending data from peer socket triggers read event.
+TEST_F(HttpInspectorTestWithBufferIoSocket, InlineRecvAndSendByPeer) {
+}
+
 
 } // namespace
 } // namespace HttpInspector

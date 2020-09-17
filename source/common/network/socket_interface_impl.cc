@@ -4,6 +4,7 @@
 #include "envoy/extensions/network/socket_interface/v3/default_socket_interface.pb.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/network/io_socket_handle_impl.h"
 
@@ -40,7 +41,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
     domain = AF_UNIX;
   } else {
     ASSERT(addr_type == Address::Type::EnvoyInternal);
-    return std::make_unique<NullIoSocketHandleImpl>();
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const Api::SysCallSocketResult result = Api::OsSysCallsSingleton::get().socket(domain, flags, 0);
