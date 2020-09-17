@@ -255,6 +255,11 @@ message ExtAuthzPerRoute {
 }
 
 // Extra settings for the check request.
+//
+// .. note::
+//
+//   These settings are only applied to a filter configured with a
+//   :ref:`grpc_service<envoy_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>`.
 message CheckSettings {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.CheckSettings";
@@ -269,11 +274,6 @@ message CheckSettings {
   // in order, and the result will be used.
   //
   // Merge semantics for this field are such that keys from more specific configs override.
-  //
-  // .. note::
-  //
-  //   These settings are only applied to a filter configured with a
-  //   :ref:`grpc_service<envoy_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>`.
   map<string, string> context_extensions = 1;
 
   // Allow to override how request body is sent to the external authorization service.

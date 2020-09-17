@@ -97,14 +97,10 @@ message AttributeContext {
 
   // This message defines attributes for an HTTP request.
   // HTTP/1.x, HTTP/2, gRPC are all considered as HTTP requests.
-  // [#next-free-field: 14]
+  // [#next-free-field: 13]
   message HttpRequest {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.auth.v3.AttributeContext.HttpRequest";
-
-    reserved 11;
-
-    reserved "body";
 
     // The unique ID for a request, which can be propagated to downstream
     // systems. The ID should have low probability of collision
@@ -148,14 +144,13 @@ message AttributeContext {
     string protocol = 10;
 
     // The HTTP request body.
-    oneof request_body {
-      // The HTTP request body in bytes.
-      bytes raw_body = 12;
+    string body = 11;
 
-      // [#not-implemented-hide:] The HTTP request body in UTF-8 string.
-      // [#comment:TODO(dio): Use this instead of field body to set request body with UTF-8 string].
-      string utf8_body = 13;
-    }
+    // The HTTP request body in bytes. This is used instead of
+    // :ref:`body <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.body>` when
+    // :ref:`pack_as_bytes <envoy_api_field_extensions.filters.http.ext_authz.v4alpha.RequestBodyOptions.pack_as_bytes>`
+    // is set to true.
+    bytes raw_body = 12;
   }
 
   // The source of a network activity, such as starting a TCP connection.
