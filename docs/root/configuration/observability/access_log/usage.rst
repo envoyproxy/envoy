@@ -356,6 +356,9 @@ The following command operators are supported:
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
     Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
 
+%CONNECTION_ID%
+  ID of the downstream connection.
+
 %GRPC_STATUS%
   gRPC status code which is easy to interpret with text message corresponding with number.
 
