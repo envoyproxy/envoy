@@ -70,6 +70,11 @@ public:
   const HostWithHealthCheckMap health_checker_map_{};
 };
 
+// TODO(zasweq): This class here isn't currently being used in the unit test class.
+// The class here expects the creates the timeout first, then the interval. This is due
+// to the normal expectation call to be opposite, or LIFO (Last in, First Out). The InSequence
+// object makes the tcp health checker unit tests FIFO (First in, First out). We should standarize
+// this amongst the three unit test classes.
 class TcpHealthCheckerImplTestBase : public HealthCheckerTestBase {
 public:
   void expectSessionCreate();
