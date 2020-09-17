@@ -46,7 +46,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, getOption,
               (int level, int optname, void* optval, socklen_t* optlen));
   MOCK_METHOD(Api::SysCallIntResult, setBlocking, (bool blocking));
-  MOCK_METHOD(int, domain, ());
+  MOCK_METHOD(absl::optional<int>, domain, ());
   MOCK_METHOD(Address::InstanceConstSharedPtr, localAddress, ());
   MOCK_METHOD(Address::InstanceConstSharedPtr, peerAddress, ());
   MOCK_METHOD(Event::FileEvent*, createFileEvent_,

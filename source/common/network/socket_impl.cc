@@ -28,7 +28,12 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
   }
 
   auto domain = io_handle_->domain();
-  addr_type_ = domain == AF_UNIX ? Address::Type::Pipe : Address::Type::Ip;
+  // This should never happen in practice but too many tests inject fake fds ...
+  if (!domain.has_value()) {
+    return;
+  }
+
+  addr_type_ = *domain == AF_UNIX ? Address::Type::Pipe : Address::Type::Ip;
 }
 
 Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr address) {
@@ -95,9 +100,12 @@ absl::optional<Address::IpVersion> SocketImpl::ipVersion() const {
       return local_address_->ip()->version();
     } else {
       auto domain = io_handle_->domain();
-      if (domain == AF_INET) {
+      if (!domain.has_value()) {
+        return absl::nullopt;
+      }
+      if (*domain == AF_INET) {
         return Address::IpVersion::v4;
-      } else if (domain == AF_INET6) {
+      } else if (*domain == AF_INET6) {
         return Address::IpVersion::v6;
       } else {
         return absl::nullopt;

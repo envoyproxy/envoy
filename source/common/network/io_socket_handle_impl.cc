@@ -404,7 +404,7 @@ IoHandlePtr IoSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen
     return nullptr;
   }
 
-  return std::make_unique<IoSocketHandleImpl>(result.rc_, socket_v6only_);
+  return std::make_unique<IoSocketHandleImpl>(result.rc_, socket_v6only_, domain_);
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
@@ -425,7 +425,7 @@ Api::SysCallIntResult IoSocketHandleImpl::setBlocking(bool blocking) {
   return Api::OsSysCallsSingleton::get().setsocketblocking(fd_, blocking);
 }
 
-int IoSocketHandleImpl::domain() { return domain_; }
+absl::optional<int> IoSocketHandleImpl::domain() { return domain_; }
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
   sockaddr_storage ss;

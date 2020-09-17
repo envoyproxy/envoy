@@ -33,10 +33,8 @@ static constexpr socklen_t udsAddressLength() {
 class IoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
 public:
   explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
-                              int domain = 1)
-      : fd_(fd), socket_v6only_(socket_v6only), domain_(domain) {
-    RELEASE_ASSERT(domain != -1, "caught in the trap");
-  }
+                              absl::optional<int> domain = absl::nullopt)
+      : fd_(fd), socket_v6only_(socket_v6only), domain_(domain) {}
 
   // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;
@@ -75,7 +73,7 @@ public:
                                   socklen_t optlen) override;
   Api::SysCallIntResult getOption(int level, int optname, void* optval, socklen_t* optlen) override;
   Api::SysCallIntResult setBlocking(bool blocking) override;
-  int domain() override;
+  absl::optional<int> domain() override;
   Address::InstanceConstSharedPtr localAddress() override;
   Address::InstanceConstSharedPtr peerAddress() override;
   Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
@@ -103,7 +101,7 @@ protected:
 
   os_fd_t fd_;
   int socket_v6only_{false};
-  int domain_;
+  absl::optional<int> domain_;
 
   // The minimum cmsg buffer size to filled in destination address, packets dropped and gso
   // size when receiving a packet. It is possible for a received packet to contain both IPv4

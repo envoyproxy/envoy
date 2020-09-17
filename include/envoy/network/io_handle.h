@@ -225,7 +225,7 @@ public:
   /**
    * @return the domain used by underlying socket (see man 2 socket)
    */
-  virtual int domain() PURE;
+  virtual absl::optional<int> domain() PURE;
 
   /**
    * Get local address (ip:port pair)
