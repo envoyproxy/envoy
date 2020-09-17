@@ -1,6 +1,6 @@
 #include "extensions/filters/common/rbac/utility.h"
 
-#include <unordered_map>
+#include <string>
 
 #include "absl/strings/str_replace.h"
 
@@ -18,8 +18,8 @@ RoleBasedAccessControlFilterStats generateStats(const std::string& prefix, Stats
 std::string responseDetail(const std::string& policy_id) {
   // Replace whitespaces in policy_id with '_' to avoid breaking the access log (inconsistent number
   // of segments between log entries when the separator is whitespace).
-  std::unordered_map<std::string, std::string> replacement{{" ", "_"},  {"\t", "_"}, {"\f", "_"},
-                                                           {"\v", "_"}, {"\n", "_"}, {"\r", "_"}};
+  absl::flat_hash_map<std::string, std::string> replacement{{" ", "_"},  {"\t", "_"}, {"\f", "_"},
+                                                            {"\v", "_"}, {"\n", "_"}, {"\r", "_"}};
   std::string sanitized = absl::StrReplaceAll(policy_id, replacement);
   return fmt::format("rbac_access_denied_matched_policy[{}]", sanitized);
 }

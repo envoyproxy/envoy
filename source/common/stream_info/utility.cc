@@ -29,6 +29,7 @@ const std::string ResponseFlagUtils::UPSTREAM_MAX_STREAM_DURATION_REACHED = "UMS
 const std::string ResponseFlagUtils::RESPONSE_FROM_CACHE_FILTER = "RFCF";
 const std::string ResponseFlagUtils::UNAUTHORIZED_RBAC = "RBAC";
 const std::string ResponseFlagUtils::NO_FILTER_CONFIG_FOUND = "NFCF";
+const std::string ResponseFlagUtils::DURATION_TIMEOUT = "DT";
 
 void ResponseFlagUtils::appendString(std::string& result, const std::string& append) {
   if (result.empty()) {
@@ -41,7 +42,7 @@ void ResponseFlagUtils::appendString(std::string& result, const std::string& app
 const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info) {
   std::string result;
 
-  static_assert(ResponseFlag::LastFlag == 0x400000, "A flag has been added. Fix this code.");
+  static_assert(ResponseFlag::LastFlag == 0x800000, "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
     appendString(result, FAILED_LOCAL_HEALTH_CHECK);
@@ -134,6 +135,10 @@ const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info
     appendString(result, NO_FILTER_CONFIG_FOUND);
   }
 
+  if (stream_info.hasResponseFlag(ResponseFlag::DurationTimeout)) {
+    appendString(result, DURATION_TIMEOUT);
+  }
+
   return result.empty() ? NONE : result;
 }
 
@@ -165,6 +170,7 @@ absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(const std::string
       {ResponseFlagUtils::RESPONSE_FROM_CACHE_FILTER, ResponseFlag::ResponseFromCacheFilter},
       {ResponseFlagUtils::UNAUTHORIZED_RBAC, ResponseFlag::UnauthorizedRBAC},
       {ResponseFlagUtils::NO_FILTER_CONFIG_FOUND, ResponseFlag::NoFilterConfigFound},
+      {ResponseFlagUtils::DURATION_TIMEOUT, ResponseFlag::DurationTimeout},
   };
   const auto& it = map.find(flag);
   if (it != map.end()) {

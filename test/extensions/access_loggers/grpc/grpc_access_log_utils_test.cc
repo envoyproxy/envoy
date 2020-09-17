@@ -46,6 +46,7 @@ TEST(UtilityResponseFlagsToAccessLogResponseFlagsTest, All) {
   common_access_log_expected.mutable_response_flags()->mutable_unauthorized_details()->set_reason(
       envoy::data::accesslog::v3::ResponseFlags::Unauthorized::RBAC);
   common_access_log_expected.mutable_response_flags()->set_no_filter_config_found(true);
+  common_access_log_expected.mutable_response_flags()->set_duration_timeout(true);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }

@@ -69,4 +69,14 @@ message SubstitutionFormatString {
   //   empty string, so that empty values are omitted entirely.
   // * for ``json_format`` the keys with null values are omitted in the output structure.
   bool omit_empty_values = 3;
+
+  // Specify a *content_type* field.
+  // If this field is not set then ``text/plain`` is used for *text_format* and
+  // ``application/json`` is used for *json_format*.
+  //
+  // .. code-block::
+  //
+  //   content_type: "text/html; charset=UTF-8"
+  //
+  string content_type = 4;
 }

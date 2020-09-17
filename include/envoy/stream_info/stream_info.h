@@ -78,8 +78,10 @@ enum ResponseFlag {
   ResponseFromCacheFilter = 0x100000,
   // Filter config was not received within the permitted warming deadline.
   NoFilterConfigFound = 0x200000,
+  // Request or connection exceeded the downstream connection duration.
+  DurationTimeout = 0x400000,
   // Request was unauthorized and rejected by RBAC filter.
-  UnauthorizedRBAC = 0x400000,
+  UnauthorizedRBAC = 0x800000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
   LastFlag = UnauthorizedRBAC
 };
