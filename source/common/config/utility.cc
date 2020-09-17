@@ -271,7 +271,8 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
   if (!typed_config.value().empty()) {
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
-    absl::string_view type = TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url());
+    absl::string_view type =
+        Config::ApiTypeOracle::typeUrlToDescriptorFullName(typed_config.type_url());
 
     if (type == typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;

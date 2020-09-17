@@ -25,7 +25,8 @@ RequestIDExtensionSharedPtr RequestIDExtensionFactory::fromProto(
     const envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension&
         config,
     Server::Configuration::FactoryContext& context) {
-  const std::string type{TypeUtil::typeUrlToDescriptorFullName(config.typed_config().type_url())};
+  const std::string type{
+      Config::ApiTypeOracle::typeUrlToDescriptorFullName(config.typed_config().type_url())};
   auto* factory =
       Registry::FactoryRegistry<Server::Configuration::RequestIDExtensionFactory>::getFactoryByType(
           type);
