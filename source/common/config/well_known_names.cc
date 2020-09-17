@@ -82,6 +82,9 @@ TagNameValues::TagNameValues() {
   // tcp.(<stat_prefix>.)<base_stat>
   addRegex(TCP_PREFIX, R"(^tcp\.((.*?)\.)\w+?$)");
 
+  // udp.(<stat_prefix>.)<base_stat>
+  addRegex(UDP_PREFIX, R"(^udp\.((.*?)\.)\w+?$)");
+
   // auth.clientssl.(<stat_prefix>.)<base_stat>
   addRegex(CLIENTSSL_PREFIX, R"(^auth\.clientssl\.((.*?)\.)\w+?$)");
 
