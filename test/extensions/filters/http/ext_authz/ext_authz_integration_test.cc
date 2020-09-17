@@ -363,8 +363,7 @@ attributes:
     if (timeout_on_check) {
       EXPECT_LOG_CONTAINS("trace", "CheckRequest timed-out", initiateAndWait());
     } else if (clientType() == Grpc::ClientType::GoogleGrpc) {
-      EXPECT_LOG_CONTAINS("trace", "CheckRequest call failed with status: DeadlineExceeded",
-                          initiateAndWait());
+      EXPECT_LOG_CONTAINS("trace", "CheckRequest call failed with status", initiateAndWait());
     } else {
       EXPECT_LOG_CONTAINS("debug", "upstream request timeout", initiateAndWait());
     }
