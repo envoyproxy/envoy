@@ -95,6 +95,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
 
   callbacks_->onComplete(std::move(authz_response));
   callbacks_ = nullptr;
+  timeout_timer_.reset();
 }
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
@@ -102,6 +103,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   ENVOY_LOG(trace, "CheckRequest call failed with status: {}",
             Grpc::Utility::grpcStatusToString(status));
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
+  timeout_timer_.reset();
   respondFailure();
 }
 

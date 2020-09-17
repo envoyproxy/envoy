@@ -284,6 +284,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& di
 
 void RawHttpClientImpl::onSuccess(const Http::AsyncClient::Request&,
                                   Http::ResponseMessagePtr&& message) {
+  timeout_timer_.reset();
   callbacks_->onComplete(toResponse(std::move(message)));
   callbacks_ = nullptr;
 }
@@ -291,6 +292,7 @@ void RawHttpClientImpl::onSuccess(const Http::AsyncClient::Request&,
 void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
                                   Http::AsyncClient::FailureReason reason) {
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
+  timeout_timer_.reset();
   callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
   callbacks_ = nullptr;
 }
