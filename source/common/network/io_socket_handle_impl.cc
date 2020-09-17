@@ -21,7 +21,7 @@ namespace {
  * sockets is different. We use this function to get the
  * length of the platform specific struct.
  */
-static constexpr socklen_t udsAddressLength() {
+constexpr socklen_t udsAddressLength() {
 #if defined(__APPLE__)
   return sizeof(sockaddr);
 #elif defined(WIN32)
