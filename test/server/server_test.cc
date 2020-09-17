@@ -194,7 +194,7 @@ protected:
         std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
         std::move(process_context_));
-    EXPECT_TRUE(server_->api().fileSystem().fileExists(TestEnvironment::nullDevicePath()));
+    EXPECT_TRUE(server_->api().fileSystem().fileExists(std::string(Platform::null_device_path)));
   }
 
   void initializeWithHealthCheckParams(const std::string& bootstrap_path, const double timeout,
@@ -213,7 +213,7 @@ protected:
         std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
 
-    EXPECT_TRUE(server_->api().fileSystem().fileExists(TestEnvironment::nullDevicePath()));
+    EXPECT_TRUE(server_->api().fileSystem().fileExists(std::string(Platform::null_device_path)));
   }
 
   Thread::ThreadPtr startTestServer(const std::string& bootstrap_path,
@@ -526,11 +526,12 @@ protected:
   void flushStats() {
     if (manual_flush_) {
       server_->flushStats();
+      server_->dispatcher().run(Event::Dispatcher::RunType::Block);
     } else {
       // Default flush interval is 5 seconds.
-      simTime().advanceTimeAsync(std::chrono::seconds(6));
+      simTime().advanceTimeAndRun(std::chrono::seconds(6), server_->dispatcher(),
+                                  Event::Dispatcher::RunType::Block);
     }
-    server_->dispatcher().run(Event::Dispatcher::RunType::Block);
   }
 
   bool manual_flush_;

@@ -468,6 +468,7 @@ canonicalizing
 cardinality
 casted
 charset
+checkin
 checksum
 chrono
 chroot
@@ -962,6 +963,7 @@ rele
 releasor
 reloadable
 remoting
+renderers
 reparse
 repeatability
 reperform
@@ -1021,6 +1023,7 @@ setsockopt
 sig
 sigaction
 sigactions
+siginfo
 signalstack
 siloed
 sim
