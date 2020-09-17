@@ -199,26 +199,70 @@ absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::str
   return absl::nullopt;
 }
 
-absl::flat_hash_set<std::string> VaryHeader::parseAllowlist() {
-  // TODO(cbdm): Populate the hash_set from
-  // envoy::extensions::filters::http::cache::v3alpha::CacheConfig::allowed_vary_headers.
-  // Need to make sure that the headers we add here are valid values (i.e., not malformed). That
-  // way, we won't have to check this again in isAllowed.
-  return {"x-temporary-standin-header-name"};
+void CacheHeadersUtils::getAllMatchingHeaderNames(
+    const Http::HeaderMap& headers, const std::vector<Matchers::StringMatcherPtr>& ruleset,
+    absl::flat_hash_set<absl::string_view>& out) {
+  headers.iterate([&ruleset, &out](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    absl::string_view header_name = header.key().getStringView();
+    for (const auto& rule : ruleset) {
+      if (rule->match(header_name)) {
+        out.emplace(header_name);
+        break;
+      }
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
 }
 
-bool VaryHeader::isAllowed(const absl::flat_hash_set<std::string>& allowed_headers,
-                           const Http::ResponseHeaderMap& headers) {
-  if (!hasVary(headers)) {
+std::vector<std::string>
+CacheHeadersUtils::parseCommaDelimitedList(const Http::HeaderEntry* entry) {
+  if (!entry) {
+    return {};
+  }
+
+  std::vector<std::string> header_values = absl::StrSplit(entry->value().getStringView(), ',');
+  for (std::string& value : header_values) {
+    // TODO(cbdm): Might be able to improve the performance here by using StringUtil::trim to
+    // remove whitespace.
+    absl::StripAsciiWhitespace(&value);
+  }
+
+  return header_values;
+}
+
+VaryHeader::VaryHeader(
+    const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allow_list) {
+
+  for (const auto& rule : allow_list) {
+    allow_list_.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(rule));
+  }
+}
+
+bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) const {
+  if (!VaryHeader::hasVary(headers)) {
     return true;
   }
 
   std::vector<std::string> varied_headers =
-      parseHeaderValue(headers.get(Http::Headers::get().Vary));
+      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::Headers::get().Vary));
 
-  // If the vary value was malformed, it will not be contained in allowed_headers.
   for (const std::string& header : varied_headers) {
-    if (!allowed_headers.contains(header)) {
+    bool valid = false;
+
+    // "Vary: *" should never be cached per:
+    // https://tools.ietf.org/html/rfc7231#section-7.1.4
+    if (header == "*") {
+      return false;
+    }
+
+    for (const auto& rule : allow_list_) {
+      if (rule->match(header)) {
+        valid = true;
+        break;
+      }
+    }
+
+    if (!valid) {
       return false;
     }
   }
@@ -237,9 +281,9 @@ namespace {
 // https://tools.ietf.org/html/rfc2616#section-4.2.
 
 // Used to separate the values of different headers.
-constexpr std::string_view header_separator = "\n";
+constexpr absl::string_view header_separator = "\n";
 // Used to separate multiple values of a same header.
-constexpr std::string_view in_value_separator = "\r";
+constexpr absl::string_view in_value_separator = "\r";
 }; // namespace
 
 std::string VaryHeader::createVaryKey(const Http::HeaderEntry* vary_header,
@@ -252,7 +296,7 @@ std::string VaryHeader::createVaryKey(const Http::HeaderEntry* vary_header,
 
   std::string vary_key = "vary-key\n";
 
-  for (const std::string& header : parseHeaderValue(vary_header)) {
+  for (const std::string& header : CacheHeadersUtils::parseCommaDelimitedList(vary_header)) {
     // TODO(cbdm): Can add some bucketing logic here based on header. For example, we could
     // normalize the values for accept-language by making all of {en-CA, en-GB, en-US} into
     // "en". This way we would not need to store multiple versions of the same payload, and any
@@ -269,40 +313,19 @@ std::string VaryHeader::createVaryKey(const Http::HeaderEntry* vary_header,
   return vary_key;
 }
 
-std::vector<std::string> VaryHeader::parseHeaderValue(const Http::HeaderEntry* vary_header) {
-  if (!vary_header) {
-    return {};
-  }
-
-  ASSERT(vary_header->key() == "vary");
-
-  // Vary header value should follow rules set per:
-  // https://tools.ietf.org/html/rfc7231#section-7.1.4
-
-  std::vector<std::string> header_values =
-      absl::StrSplit(vary_header->value().getStringView(), ',');
-  for (std::string& value : header_values) {
-    // TODO(cbdm): Might be able to improve the performance here: (1) could use StringUtil::trim to
-    // remove whitespace; (2) lowering the case might not be necessary depending on the
-    // functionality of isAllowed (e.g., if a hash-set, could hash ignoring case).
-    absl::StripAsciiWhitespace(&value);
-    absl::AsciiStrToLower(&value);
-  }
-
-  return header_values;
-}
-
 Http::RequestHeaderMapPtr
-VaryHeader::possibleVariedHeaders(const absl::flat_hash_set<std::string>& allowed_headers,
-                                  const Http::RequestHeaderMap& request_headers) {
+VaryHeader::possibleVariedHeaders(const Http::RequestHeaderMap& request_headers) const {
   Http::RequestHeaderMapPtr possible_headers =
       Http::createHeaderMap<Http::RequestHeaderMapImpl>({});
 
-  for (const std::string& header : allowed_headers) {
+  absl::flat_hash_set<absl::string_view> header_names;
+  CacheHeadersUtils::getAllMatchingHeaderNames(request_headers, allow_list_, header_names);
+
+  for (const absl::string_view& header : header_names) {
     std::vector<absl::string_view> values;
     Http::HeaderUtility::getAllOfHeader(request_headers, header, values);
     for (const absl::string_view& value : values) {
-      possible_headers->addCopy(Http::LowerCaseString(header), value);
+      possible_headers->addCopy(Http::LowerCaseString(std::string{header}), value);
     }
   }
 

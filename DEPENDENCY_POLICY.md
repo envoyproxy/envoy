@@ -93,6 +93,25 @@ basis:
 Where possible, we prefer the latest release version for external dependencies, rather than master
 branch GitHub SHA tarballs.
 
+## Dependency patches
+
+Occasionally it is necessary to introduce an Envoy-side patch to a dependency in a `.patch` file.
+These are typically applied in [bazel/repositories.bzl](bazel/repositories.bzl). Our policy on this
+is as follows:
+
+* Patch files impede dependency updates. They are expedient at creation time but are a maintenance
+  penalty. They reduce the velocity and increase the effort of upgrades in response to security
+  vulnerabilities in external dependencies.
+
+* No patch will be accepted without a sincere and sustained effort to upstream the patch to the
+  dependency's canonical repository.
+
+* There should exist a plan-of-record, filed as an issue in Envoy or the upstream GitHub tracking
+  elimination of the patch.
+
+* Every patch must have comments at its point-of-use in [bazel/repositories.bzl](bazel/repositories.bzl)
+  providing a rationale and detailing the tracking issue.
+
 ## Policy exceptions
 
 The following dependencies are exempt from the policy:

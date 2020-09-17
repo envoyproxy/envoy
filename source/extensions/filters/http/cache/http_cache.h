@@ -188,7 +188,7 @@ class LookupRequest {
 public:
   // Prereq: request_headers's Path(), Scheme(), and Host() are non-null.
   LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
-                const absl::flat_hash_set<std::string>& allowed_vary_headers);
+                const VaryHeader& vary_allow_list);
 
   const RequestCacheControl& requestCacheControl() const { return request_cache_control_; }
 
@@ -220,7 +220,7 @@ private:
   std::vector<RawByteRange> request_range_spec_;
   // Time when this LookupRequest was created (in response to an HTTP request).
   SystemTime timestamp_;
-  // The subset of this request's headers that are listed in
+  // The subset of this request's headers that match one of the rules in
   // envoy::extensions::filters::http::cache::v3alpha::CacheConfig::allowed_vary_headers. If a cache
   // storage implementation forwards lookup requests to a remote cache server that supports *vary*
   // headers, that server may need to see these headers. For local implementations, it may be

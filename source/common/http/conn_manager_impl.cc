@@ -440,6 +440,7 @@ void ConnectionManagerImpl::onIdleTimeout() {
   }
 }
 
+// TODO(#13142): Add DurationTimeout response flag for HCM.
 void ConnectionManagerImpl::onConnectionDurationTimeout() {
   ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
   stats_.named_.downstream_cx_max_duration_reached_.inc();
@@ -650,12 +651,10 @@ void ConnectionManagerImpl::ActiveStream::completeRequest() {
     filter_manager_.streamInfo().setResponseFlag(
         StreamInfo::ResponseFlag::DownstreamConnectionTermination);
   }
-  if (connection_manager_.codec_->protocol() < Protocol::Http2) {
-    // For HTTP/2 there are still some reset cases where details are not set.
-    // For HTTP/1 there shouldn't be any. Regression-proof this.
+  // TODO(danzh) bring HTTP/3 to parity here.
+  if (connection_manager_.codec_->protocol() != Protocol::Http3) {
     ASSERT(filter_manager_.streamInfo().responseCodeDetails().has_value());
   }
-
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
   if (filter_manager_.streamInfo().healthCheck()) {
     connection_manager_.config_.tracingStats().health_check_.inc();
