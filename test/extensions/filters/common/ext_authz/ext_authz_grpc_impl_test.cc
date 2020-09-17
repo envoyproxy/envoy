@@ -128,7 +128,6 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOk) {
   client_->onSuccess(std::move(check_response), span_);
   // make sure the internal timeout timer is destroyed
   EXPECT_EQ(timer_destroyed, true);
-
 }
 
 // Test the client when an ok response is received.

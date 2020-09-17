@@ -60,8 +60,8 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/ext_authz:config",
         "//test/integration:http_integration_lib",
-        "//test/test_common:utility_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",

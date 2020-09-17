@@ -471,7 +471,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestError) {
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
   client_->onFailure(async_request_, Http::AsyncClient::FailureReason::Reset);
   // make sure the internal timeout timer is destroyed
-  //EXPECT_EQ(timer_destroyed, true);
+  // EXPECT_EQ(timer_destroyed, true);
 }
 
 // Test the client when a call to authorization server returns a 5xx error status.
