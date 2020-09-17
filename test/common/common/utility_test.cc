@@ -411,26 +411,6 @@ TEST(StringUtil, StringViewRemoveTokens) {
   EXPECT_EQ(StringUtil::removeTokens("one,two;three ", ",;", {"two"}, ","), "one,three");
 }
 
-TEST(StringUtil, replaceCharacters) {
-  // Empty source.
-  EXPECT_EQ(StringUtil::replaceCharacters("", "@#$", '_'), "");
-  // Empty characthers to replace.
-  EXPECT_EQ(StringUtil::replaceCharacters("abcd", "", '_'), "abcd");
-  // No occurrences of characthers to replace.
-  EXPECT_EQ(StringUtil::replaceCharacters("abcd", "@#$", '_'), "abcd");
-  // Duplicate occurrences of characthers to replace.
-  EXPECT_EQ(StringUtil::replaceCharacters("a@b#c$d", "###", '_'), "a@b_c$d");
-  // All replaced.
-  EXPECT_EQ(StringUtil::replaceCharacters("@#$", "@#$", '_'), "___");
-  // Partial replaced.
-  EXPECT_EQ(StringUtil::replaceCharacters("a@b#c$d", "@#$", '_'), "a_b_c_d");
-  EXPECT_EQ(StringUtil::replaceCharacters("a@b#c$d", "@$", '_'), "a_b#c_d");
-  EXPECT_EQ(StringUtil::replaceCharacters("a@b#c$d", "#", '_'), "a@b_c$d");
-  EXPECT_EQ(StringUtil::replaceCharacters("a@b#c$d", "a", '_'), "_@b#c$d");
-  EXPECT_EQ(StringUtil::replaceCharacters("a@b#c$d", "d", '_'), "a@b#c$_");
-  EXPECT_EQ(StringUtil::replaceCharacters("a@b#c$d", "b#c", '_'), "a@___$d");
-}
-
 TEST(StringUtil, removeCharacters) {
   IntervalSetImpl<size_t> removals;
   removals.insert(3, 5);

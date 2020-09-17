@@ -336,19 +336,6 @@ public:
                                   absl::string_view joiner);
 
   /**
-   * Replaces all occurrences of 'characters_to_replace' from a source string view by the character
-   * 'replace'.
-   * @param source supplies the string view to be replaced.
-   * @param characters_to_replace supplies a set of characters which should be replaced.
-   * @param replace supplies the character used to replace the occurrences of characters in
-   * 'characters_to_replace'.
-   * @return string with all occurrences of characthers in 'characters_to_replace' replaced by the
-   * character 'replace'.
-   */
-  static std::string replaceCharacters(absl::string_view source,
-                                       absl::string_view characters_to_replace, char replace);
-
-  /**
    * Size-bounded string copying and concatenation
    */
   static size_t strlcpy(char* dst, const char* src, size_t size);
