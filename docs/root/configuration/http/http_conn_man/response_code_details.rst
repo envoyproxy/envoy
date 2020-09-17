@@ -6,7 +6,7 @@ Response Code Details
 If _%RESPONSE_CODE_DETAILS%_ is configured on via `access logging<config_access_log_format_response_code_details>`,
 or :ref:`custom headers<config_http_conn_man_headers_custom_request_headers>` Envoy will communicate the defailed
 reason a given stream ended.
-This page lists the details sent by the HttpConnectionManager, Router filter, and cocecs.  It is not comprehensive as
+This page lists the details sent by the HttpConnectionManager, Router filter, and cocecs. It is not comprehensive as
 any other filters may send their own local replies with custom details.
 
 Below are the list of reasons the HttpConnectionManager or Router filter may send responses or reset streams.
