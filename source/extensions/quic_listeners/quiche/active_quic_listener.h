@@ -51,7 +51,7 @@ public:
   }
   Network::UdpPacketWriter& udpPacketWriter() override { return *udp_packet_writer_; }
   void onDataWorker(Network::UdpRecvData&& data) override;
-  absl::optional<uint32_t> destination(const Network::UdpRecvData& data) override;
+  uint32_t destination(const Network::UdpRecvData& data) const override;
 
   // ActiveListenerImplBase
   void pauseListening() override;

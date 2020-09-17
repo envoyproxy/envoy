@@ -381,14 +381,12 @@ public:
 
 protected:
   /**
-   * Returns the worker id that ``data`` should be delivered to. A return value
-   * of ``absl::nullopt`` indicates the packet should be processed on the current
-   * worker. The return value must be in the range [0, concurrency), or ``absl::nullopt``.
-   * @param concurrency specifies the concurrency, which is the upper bound for worker id.
+   * Returns the worker index that ``data`` should be delivered to. The return value must be in the
+   * range [0, concurrency).
    */
-  virtual absl::optional<uint32_t> destination(const Network::UdpRecvData& /*data*/) {
+  virtual uint32_t destination(const Network::UdpRecvData& /*data*/) const {
     // By default, route to the current worker.
-    return absl::nullopt;
+    return worker_index_;
   }
 
   const uint32_t worker_index_;

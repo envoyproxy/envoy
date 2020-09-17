@@ -160,10 +160,10 @@ void ActiveQuicListener::shutdownListener() {
   quic_dispatcher_->StopAcceptingNewConnections();
 }
 
-absl::optional<uint32_t> ActiveQuicListener::destination(const Network::UdpRecvData& data) {
+uint32_t ActiveQuicListener::destination(const Network::UdpRecvData& data) const {
   if (kernel_worker_routing_) {
     // The kernel has already routed the packet correctly. Make it stay on the current worker.
-    return absl::nullopt;
+    return worker_index_;
   }
 
   // This implementation is not as performant as it could be. It will result in most packets being
@@ -177,7 +177,7 @@ absl::optional<uint32_t> ActiveQuicListener::destination(const Network::UdpRecvD
   // ``ActiveQuicListenerFactory::createActiveUdpListener``
   const uint64_t packet_length = data.buffer_->length();
   if (packet_length < 9) {
-    return absl::nullopt;
+    return worker_index_;
   }
 
   uint8_t first_octet;
@@ -189,7 +189,7 @@ absl::optional<uint32_t> ActiveQuicListener::destination(const Network::UdpRecvD
     // The connection id starts from 7th byte.
     // Minimum length of a long header packet is 14.
     if (packet_length < 14) {
-      return absl::nullopt;
+      return worker_index_;
     }
 
     data.buffer_->copyOut(6, sizeof(connection_id_snippet), &connection_id_snippet);

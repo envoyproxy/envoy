@@ -596,6 +596,7 @@ ActiveUdpListenerBase::ActiveUdpListenerBase(uint32_t worker_index, uint32_t con
     : ConnectionHandlerImpl::ActiveListenerImplBase(parent, config), worker_index_(worker_index),
       concurrency_(concurrency), parent_(parent), listen_socket_(listen_socket),
       udp_listener_(std::move(listener)) {
+  ASSERT(worker_index_ < concurrency_);
   config_->udpListenerWorkerRouter()->get().registerWorker(*this);
 }
 
@@ -624,18 +625,18 @@ void ActiveUdpListenerBase::post(Network::UdpRecvData&& data) {
 }
 
 void ActiveUdpListenerBase::onData(Network::UdpRecvData&& data) {
-  absl::optional<uint32_t> dest;
+  uint32_t dest = worker_index_;
 
   // For concurrency == 1, the packet will always go to the current worker.
   if (concurrency_ > 1) {
     dest = destination(data);
-    ASSERT(dest.value_or(0) < concurrency_);
+    ASSERT(dest < concurrency_);
   }
 
-  if (!dest.has_value() || *dest == worker_index_) {
+  if (dest == worker_index_) {
     onDataWorker(std::move(data));
   } else {
-    config_->udpListenerWorkerRouter()->get().deliver(*dest, std::move(data));
+    config_->udpListenerWorkerRouter()->get().deliver(dest, std::move(data));
   }
 }
 
