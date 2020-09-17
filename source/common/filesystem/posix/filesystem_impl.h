@@ -25,9 +25,8 @@ protected:
   Api::IoCallSizeResult write(absl::string_view buffer) override;
   Api::IoCallBoolResult close() override;
 
-  FlagsAndMode translateFlag(FlagSet in);
-
 private:
+  FlagsAndMode translateFlag(FlagSet in);
   friend class FileSystemImplTest;
 };
 

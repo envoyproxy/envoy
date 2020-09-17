@@ -14,18 +14,19 @@ public:
   ~FileImplWin32();
 
 protected:
-  struct FlagsAndMode {
-    DWORD access_ = 0;
-    DWORD creation_ = 0;
-  };
 
   Api::IoCallBoolResult open(FlagSet flag) override;
   Api::IoCallSizeResult write(absl::string_view buffer) override;
   Api::IoCallBoolResult close() override;
 
-  FlagsAndMode translateFlag(FlagSet in);
-
 private:
+
+  struct FlagsAndMode {
+    DWORD access_ = 0;
+    DWORD creation_ = 0;
+  };
+
+  FlagsAndMode translateFlag(FlagSet in);
   friend class FileSystemImplTest;
 };
 
