@@ -253,11 +253,8 @@ message ResponseFlagFilter {
         in: "UMSDR"
         in: "RFCF"
         in: "NFCF"
-<<<<<<< HEAD
-        in: "RBAC"
-=======
         in: "DT"
->>>>>>> master
+        in: "RBAC"
       }
     }
   }];
