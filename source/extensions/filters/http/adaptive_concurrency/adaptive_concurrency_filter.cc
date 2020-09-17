@@ -9,7 +9,6 @@
 
 #include "common/common/assert.h"
 #include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
 
 #include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -39,12 +38,8 @@ Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::Request
   }
 
   if (controller_->forwardingDecision() == Controller::RequestForwardingAction::Block) {
-    absl::string_view body =
-        (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.adaptive_concurrency_details")
-             ? "reached concurrency limit"
-             : "");
-    decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, body, nullptr, absl::nullopt,
-                                       "reached_concurrency_limit");
+    decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "reached concurrency limit",
+                                       nullptr, absl::nullopt, "reached_concurrency_limit");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
