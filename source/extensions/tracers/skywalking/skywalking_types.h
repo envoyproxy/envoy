@@ -177,7 +177,7 @@ public:
   /*
    * Get peer address.
    */
-  const std::string& peer() const { return peer_; }
+  const std::string& peerAddress() const { return peer_address_; }
 
   /*
    * Get span start time.
@@ -244,9 +244,16 @@ public:
   void setOperation(const std::string& operation) { operation_ = operation; }
 
   /*
-   * Set peer address.
+   * Set peer address. It should be downstream remote address currently.
    */
-  void setPeer(const std::string& peer) { peer_ = peer; }
+  void setPeerAddress(const std::string& peer_address) { peer_address_ = peer_address; }
+
+  /*
+   * Set upstream address.
+   */
+  void setUpstreamAddress(const std::string& upstream_address) {
+    upstream_address_ = upstream_address;
+  }
 
   /*
    * Set if the current span has an error.
@@ -312,7 +319,8 @@ private:
   uint64_t end_time_{0};
 
   std::string operation_;
-  std::string peer_;
+  std::string peer_address_;
+  std::string upstream_address_;
 
   bool is_error_{false};
   bool is_entry_span_{true};

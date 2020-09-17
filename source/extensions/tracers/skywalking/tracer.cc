@@ -50,9 +50,12 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
     span_store_->setAsError(value == Tracing::Tags::get().True);
   }
 
-  if (name == Tracing::Tags::get().PeerAddress && !span_store_->isEntrySpan()) {
-    // Set peer when it is an exit span.
-    span_store_->setPeer(std::string(value));
+  if (name == Tracing::Tags::get().PeerAddress) {
+    span_store_->setPeerAddress(std::string(value));
+  }
+
+  if (name == Tracing::Tags::get().UpstreamAddress) {
+    span_store_->setUpstreamAddress(std::string(value));
   }
 
   span_store_->addTag(name, value);

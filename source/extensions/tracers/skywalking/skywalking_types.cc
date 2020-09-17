@@ -128,7 +128,8 @@ SpanStore* SegmentContext::createSpanStore(TimeSource& time_source, SpanStore* p
 void SpanStore::injectContext(Http::RequestHeaderMap& request_headers) const {
   ASSERT(segment_context_);
 
-  std::string target_address = peer_.empty() ? std::string(request_headers.getHostValue()) : peer_;
+  std::string target_address =
+      upstream_address_.empty() ? std::string(request_headers.getHostValue()) : upstream_address_;
 
   // Reference:
   // https://github.com/apache/skywalking/blob/v8.1.0/docs/en/protocols/Skywalking-Cross-Process-Propagation-Headers-Protocol-v3.md.
