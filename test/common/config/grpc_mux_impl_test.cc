@@ -731,30 +731,27 @@ TEST_F(GrpcMuxImplTest, WatchV2ResourceV3) {
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.enable_type_url_downgrade_and_upgrade", "true"}});
   setup();
+
   InSequence s;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
   const std::string& v2_type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   const std::string& v3_type_url =
-      "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment";
-  NiceMock<MockSubscriptionCallbacks> foo_callbacks;
-  auto foo_sub = grpc_mux_->addWatch(v2_type_url, {"x", "y"}, foo_callbacks, resource_decoder);
-  NiceMock<MockSubscriptionCallbacks> bar_callbacks;
-  auto bar_sub = grpc_mux_->addWatch(v2_type_url, {"y", "z"}, bar_callbacks, resource_decoder);
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+          envoy::config::core::v3::ApiVersion::V3);
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
+  auto foo_sub = grpc_mux_->addWatch(v2_type_url, {}, callbacks_, resource_decoder);
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage(v2_type_url, {"y", "z", "x"}, "", true);
+  expectSendMessage(v2_type_url, {}, "", true);
   grpc_mux_->start();
 
   {
-    // Send resource with v3 type url, should invoke onConfigUpdate.
     auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(v3_type_url);
     response->set_version_info("1");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
     response->add_resources()->PackFrom(load_assignment);
-    EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "1")).Times(0);
-    EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1"))
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
         .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
                                             const std::string&) {
           EXPECT_EQ(1, resources.size());
@@ -763,56 +760,9 @@ TEST_F(GrpcMuxImplTest, WatchV2ResourceV3) {
                   resources[0].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
         }));
-    // Send request with v2 type url resources.
-    expectSendMessage(v2_type_url, {"y", "z", "x"}, "1");
+    expectSendMessage(v2_type_url, {}, "1");
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
-
-  {
-    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
-    response->set_type_url(v3_type_url);
-    response->set_version_info("2");
-    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_x;
-    load_assignment_x.set_cluster_name("x");
-    response->add_resources()->PackFrom(load_assignment_x);
-    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_y;
-    load_assignment_y.set_cluster_name("y");
-    response->add_resources()->PackFrom(load_assignment_y);
-    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_z;
-    load_assignment_z.set_cluster_name("z");
-    response->add_resources()->PackFrom(load_assignment_z);
-    EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "2"))
-        .WillOnce(Invoke([&load_assignment_y, &load_assignment_z](
-                             const std::vector<DecodedResourceRef>& resources, const std::string&) {
-          EXPECT_EQ(2, resources.size());
-          const auto& expected_assignment =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
-                  resources[0].get().resource());
-          EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment_y));
-          const auto& expected_assignment_1 =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
-                  resources[1].get().resource());
-          EXPECT_TRUE(TestUtility::protoEqual(expected_assignment_1, load_assignment_z));
-        }));
-    EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "2"))
-        .WillOnce(Invoke([&load_assignment_x, &load_assignment_y](
-                             const std::vector<DecodedResourceRef>& resources, const std::string&) {
-          EXPECT_EQ(2, resources.size());
-          const auto& expected_assignment =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
-                  resources[0].get().resource());
-          EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment_x));
-          const auto& expected_assignment_1 =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
-                  resources[1].get().resource());
-          EXPECT_TRUE(TestUtility::protoEqual(expected_assignment_1, load_assignment_y));
-        }));
-    expectSendMessage(v2_type_url, {"y", "z", "x"}, "2");
-    grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
-  }
-
-  expectSendMessage(v2_type_url, {"x", "y"}, "2");
-  expectSendMessage(v2_type_url, {}, "2");
 }
 
 // Send discovery request with v3 resource type_url, receive discovery response with v2 resource
@@ -822,31 +772,28 @@ TEST_F(GrpcMuxImplTest, WatchV3ResourceV2) {
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.enable_type_url_downgrade_and_upgrade", "true"}});
   setup();
+
   InSequence s;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
   const std::string& v2_type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   const std::string& v3_type_url =
-      "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment";
-  NiceMock<MockSubscriptionCallbacks> foo_callbacks;
-  // Watch v3 type url.
-  auto foo_sub = grpc_mux_->addWatch(v3_type_url, {"x", "y"}, foo_callbacks, resource_decoder);
-  NiceMock<MockSubscriptionCallbacks> bar_callbacks;
-  auto bar_sub = grpc_mux_->addWatch(v3_type_url, {"y", "z"}, bar_callbacks, resource_decoder);
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+          envoy::config::core::v3::ApiVersion::V3);
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
+  auto foo_sub = grpc_mux_->addWatch(v3_type_url, {}, callbacks_, resource_decoder);
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage(v3_type_url, {"y", "z", "x"}, "", true);
+  expectSendMessage(v3_type_url, {}, "", true);
   grpc_mux_->start();
 
   {
-    // Send resource with v2 type url, should invoke onConfigUpdate.
+
     auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(v2_type_url);
     response->set_version_info("1");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
     response->add_resources()->PackFrom(API_DOWNGRADE(load_assignment));
-    EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "1")).Times(0);
-    EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1"))
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
         .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
                                             const std::string&) {
           EXPECT_EQ(1, resources.size());
@@ -855,56 +802,9 @@ TEST_F(GrpcMuxImplTest, WatchV3ResourceV2) {
                   resources[0].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
         }));
-    // Send request with v2 type url resources.
-    expectSendMessage(v3_type_url, {"y", "z", "x"}, "1");
+    expectSendMessage(v3_type_url, {}, "1");
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
-
-  {
-    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
-    response->set_type_url(v2_type_url);
-    response->set_version_info("2");
-    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_x;
-    load_assignment_x.set_cluster_name("x");
-    response->add_resources()->PackFrom(API_DOWNGRADE(load_assignment_x));
-    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_y;
-    load_assignment_y.set_cluster_name("y");
-    response->add_resources()->PackFrom(API_DOWNGRADE(load_assignment_y));
-    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_z;
-    load_assignment_z.set_cluster_name("z");
-    response->add_resources()->PackFrom(API_DOWNGRADE(load_assignment_z));
-    EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "2"))
-        .WillOnce(Invoke([&load_assignment_y, &load_assignment_z](
-                             const std::vector<DecodedResourceRef>& resources, const std::string&) {
-          EXPECT_EQ(2, resources.size());
-          const auto& expected_assignment =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
-                  resources[0].get().resource());
-          EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment_y));
-          const auto& expected_assignment_1 =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
-                  resources[1].get().resource());
-          EXPECT_TRUE(TestUtility::protoEqual(expected_assignment_1, load_assignment_z));
-        }));
-    EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "2"))
-        .WillOnce(Invoke([&load_assignment_x, &load_assignment_y](
-                             const std::vector<DecodedResourceRef>& resources, const std::string&) {
-          EXPECT_EQ(2, resources.size());
-          const auto& expected_assignment =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
-                  resources[0].get().resource());
-          EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment_x));
-          const auto& expected_assignment_1 =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
-                  resources[1].get().resource());
-          EXPECT_TRUE(TestUtility::protoEqual(expected_assignment_1, load_assignment_y));
-        }));
-    expectSendMessage(v3_type_url, {"y", "z", "x"}, "2");
-    grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
-  }
-
-  expectSendMessage(v3_type_url, {"x", "y"}, "2");
-  expectSendMessage(v3_type_url, {}, "2");
 }
 
 } // namespace

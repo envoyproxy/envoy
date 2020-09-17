@@ -177,8 +177,11 @@ TEST_F(NewGrpcMuxImplTest, V3ResourceResponseV2ResourceWatch) {
   setup();
 
   // Watch for v2 resource type_url.
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  auto watch = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_);
+  const std::string& v2_type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& v3_type_url =
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+          envoy::config::core::v3::ApiVersion::V3);
+  auto watch = grpc_mux_->addWatch(v2_type_url, {}, callbacks_, resource_decoder_);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // Cluster is not watched, v3 resource is rejected.
@@ -187,7 +190,8 @@ TEST_F(NewGrpcMuxImplTest, V3ResourceResponseV2ResourceWatch) {
     auto unexpected_response =
         std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
     envoy::config::cluster::v3::Cluster cluster;
-    unexpected_response->set_type_url("type.googleapis.com/envoy.config.cluster.v3.Cluster");
+    unexpected_response->set_type_url(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+        envoy::config::core::v3::ApiVersion::V3));
     unexpected_response->set_system_version_info("0");
     unexpected_response->add_resources()->mutable_resource()->PackFrom(cluster);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "0")).Times(0);
@@ -212,7 +216,7 @@ TEST_F(NewGrpcMuxImplTest, V3ResourceResponseV2ResourceWatch) {
     load_assignment.set_cluster_name("x");
     response->add_resources()->mutable_resource()->PackFrom(load_assignment);
     // Send response that contains resource with v3 type url.
-    response->set_type_url("type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment");
+    response->set_type_url(v3_type_url);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
         .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
                                             const Protobuf::RepeatedPtrField<std::string>&,
@@ -234,7 +238,8 @@ TEST_F(NewGrpcMuxImplTest, V2ResourceResponseV3ResourceWatch) {
 
   // Watch for v3 resource type_url.
   const std::string& v3_type_url =
-      "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment";
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+          envoy::config::core::v3::ApiVersion::V3);
   const std::string& v2_type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   auto watch = grpc_mux_->addWatch(v3_type_url, {}, callbacks_, resource_decoder_);
 

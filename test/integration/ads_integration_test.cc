@@ -124,15 +124,17 @@ TEST_P(AdsIntegrationTest, MixV2V3TypeUrlInDiscoveryResponse) {
   // Send initial configuration.
   // Discovery response with v3 type url.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      "type.googleapis.com/envoy.config.cluster.v3.Cluster", {buildCluster("cluster_0")},
-      {buildCluster("cluster_0")}, {}, "1", false);
+      Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+          envoy::config::core::v3::ApiVersion::V3),
+      {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1", false);
   // Discovery response with v2 type url.
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "1");
   // Discovery response with v3 type url.
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
-      "type.googleapis.com/envoy.config.listener.v3.Listener",
+      Config::getTypeUrl<envoy::config::listener::v3::Listener>(
+          envoy::config::core::v3::ApiVersion::V3),
       {buildListener("listener_0", "route_config_0")},
       {buildListener("listener_0", "route_config_0")}, {}, "1", false);
   // Discovery response with v2 type url.
