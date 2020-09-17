@@ -20,13 +20,17 @@ public:
   static constexpr absl::string_view kName =
       "envoy.resource_monitors.testonly.fake_resource_monitor";
 
-  FakeResourceMonitor(FakeResourceMonitorFactory& factory) : factory_(factory), pressure_(0.0) {}
-  ~FakeResourceMonitor();
+  FakeResourceMonitor(Event::Dispatcher& dispatcher, FakeResourceMonitorFactory& factory)
+      : dispatcher_(dispatcher), factory_(factory), pressure_(0.0) {}
+  ~FakeResourceMonitor() override;
   void updateResourceUsage(Callbacks& callbacks) override;
 
-  void setResourcePressure(double pressure) { pressure_ = pressure; }
+  void setResourcePressure(double pressure) {
+    dispatcher_.post([this, pressure] { pressure_ = pressure; });
+  }
 
 private:
+  Event::Dispatcher& dispatcher_;
   FakeResourceMonitorFactory& factory_;
   double pressure_;
 };
@@ -65,8 +69,8 @@ void FakeResourceMonitorFactory::onMonitorDestroyed(FakeResourceMonitor* monitor
 }
 
 Server::ResourceMonitorPtr FakeResourceMonitorFactory::createResourceMonitor(
-    const Protobuf::Message&, Server::Configuration::ResourceMonitorFactoryContext&) {
-  auto monitor = std::make_unique<FakeResourceMonitor>(*this);
+    const Protobuf::Message&, Server::Configuration::ResourceMonitorFactoryContext& context) {
+  auto monitor = std::make_unique<FakeResourceMonitor>(context.dispatcher(), *this);
   monitor_ = monitor.get();
   return monitor;
 }
