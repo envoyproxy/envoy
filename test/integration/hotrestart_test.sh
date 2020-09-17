@@ -81,10 +81,10 @@ function run_testsuite() {
   local BASE_ID BASE_ID_PATH HOT_RESTART_JSON="$1" FAKE_SYMBOL_TABLE="$2" 
   local SOCKET_PATH=@envoy_domain_socket
   local SOCKET_MODE=0
-  if [ ! -z $3 ] &&  [ ! -z $4 ]
+  if [ ! -z "$3" ] &&  [ ! -z "$4" ]
   then
-     SOCKET_PATH=$3
-     SOCKET_MODE=$4
+     SOCKET_PATH="$3"
+     SOCKET_MODE="$4"
   fi
 
   start_test validation
@@ -299,8 +299,7 @@ run_in_background_saving_pid "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
 sleep 3
 EXPECTED_SOCKET_MODE=$(stat -c '%a' "${SOCKET_DIR}"/envoy_domain_socket_parent_0)
 check [ "644" = "${EXPECTED_SOCKET_MODE}" ]
-kill ${BACKGROUND_PID}
-wait ${BACKGROUND_PID}
-  [[ $? == 0 ]]
+kill "${BACKGROUND_PID}"
+wait "${BACKGROUND_PID}"
 
 echo "PASS"
