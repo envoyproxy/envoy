@@ -621,24 +621,21 @@ TEST_F(SslServerContextImplOcspTest, TestInlineBytesOcspStapleConfigLoads) {
   loadConfigYaml(tls_context_yaml);
 }
 
-TEST_F(SslServerContextImplOcspTest, TestInlineStringOcspStapleConfigLoads) {
-  auto der_response = TestEnvironment::readFileToStringForTest(
-      TestEnvironment::substitute("{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp.der"));
-  auto base64_response = Base64::encode(der_response.c_str(), der_response.length(), true);
-  const std::string tls_context_yaml = fmt::format(R"EOF(
+TEST_F(SslServerContextImplOcspTest, TestInlineStringOcspStapleConfigFails) {
+  const std::string tls_context_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{{{ test_tmpdir }}}}/ocsp_test_data/good_cert.pem"
+        filename: "{{ test_tmpdir }}/ocsp_test_data/good_cert.pem"
       private_key:
-        filename: "{{{{ test_tmpdir }}}}/ocsp_test_data/good_key.pem"
+        filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
       ocsp_staple:
-       inline_string: "{}"
+       inline_string: "abcd"
   ocsp_staple_policy: must_staple
-  )EOF",
-                                                   base64_response);
+  )EOF";
 
-  loadConfigYaml(tls_context_yaml);
+  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(tls_context_yaml), EnvoyException,
+                            "OCSP staple cannot be provided via inline_string");
 }
 
 TEST_F(SslServerContextImplOcspTest, TestMismatchedOcspStapleConfigFails) {

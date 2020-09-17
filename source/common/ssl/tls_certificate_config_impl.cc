@@ -18,7 +18,7 @@ std::vector<uint8_t> readOcspStaple(const envoy::config::core::v3::DataSource& s
   std::string staple = Config::DataSource::read(source, true, api);
   if (source.specifier_case() ==
       envoy::config::core::v3::DataSource::SpecifierCase::kInlineString) {
-    staple = Base64::decode(staple);
+    throw EnvoyException("OCSP staple cannot be provided via inline_string");
   }
 
   return {staple.begin(), staple.end()};
