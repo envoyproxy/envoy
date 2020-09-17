@@ -861,7 +861,7 @@ want to setup a larger cache if you run ASAN builds.
 NOTE: Using docker to run remote cache server described in remote cache docs will likely have
 slower cache performance on macOS due to slow disk performance on Docker for Mac.
 
-Adding the following parameter to Bazel everytime or persist them in `.bazelrc`.
+Adding the following parameter to Bazel every time or persist them in `.bazelrc`.
 
 ```
 --remote_http_cache=http://127.0.0.1:28080/
