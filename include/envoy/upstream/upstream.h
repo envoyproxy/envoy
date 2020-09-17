@@ -735,7 +735,12 @@ public:
   /**
    * @return how many streams should be anticipated per each current stream.
    */
-  virtual float prefetchRatio() const PURE;
+  virtual float perUpstreamPrefetchRatio() const PURE;
+
+  /**
+   * @return how many streams should be anticipated per each current stream.
+   */
+  virtual float peekaheadRatio() const PURE;
 
   /**
    * @return soft limit on size of the cluster's connections read and write buffers.

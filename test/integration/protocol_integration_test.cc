@@ -1945,7 +1945,7 @@ TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
 TEST_P(DownstreamProtocolIntegrationTest, TestPrefetch) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->mutable_prefetch_policy()->mutable_prefetch_ratio()->set_value(1.5);
+    cluster->mutable_prefetch_policy()->mutable_per_upstream_prefetch_ratio()->set_value(1.5);
   });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

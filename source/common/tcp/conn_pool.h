@@ -158,6 +158,9 @@ public:
     TcpAttachContext context(&callbacks);
     return Envoy::ConnectionPool::ConnPoolImplBase::newStream(context);
   }
+  bool maybePrefetch(float prefetch_ratio) override {
+    return Envoy::ConnectionPool::ConnPoolImplBase::maybePrefetch(prefetch_ratio);
+  }
 
   ConnectionPool::Cancellable*
   newPendingStream(Envoy::ConnectionPool::AttachContext& context) override {

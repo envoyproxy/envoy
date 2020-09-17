@@ -55,6 +55,7 @@ public:
   MOCK_METHOD(void, drainConnections, ());
   MOCK_METHOD(void, closeConnections, ());
   MOCK_METHOD(Cancellable*, newConnection, (Tcp::ConnectionPool::Callbacks & callbacks));
+  MOCK_METHOD(bool, maybePrefetch, (float), ());
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
 
   Envoy::ConnectionPool::MockCancellable* newConnectionImpl(Callbacks& cb);

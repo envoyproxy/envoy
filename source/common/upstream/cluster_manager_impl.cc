@@ -822,6 +822,31 @@ ThreadLocalCluster* ClusterManagerImpl::get(absl::string_view cluster) {
   }
 }
 
+void ClusterManagerImpl::maybePrefetch(
+    ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry,
+    std::function<ConnectionPool::Instance*()> pick_prefetch_pool) {
+  // TODO(alyssawilk) As currently implemented, this will always just prefetch
+  // one connection ahead of actually needed connections.
+  //
+  // Instead we want to track the following metrics across the entire connection
+  // pool and use the same algorithm we do for per-upstream prefetch:
+  // ((pending_streams_ + num_active_streams_) * global_prefetch_ratio >
+  //  (connecting_stream_capacity_ + num_active_streams_)))
+  //  and allow multiple prefetches per pick.
+  //  Also cap prefetches such that
+  //  num_unused_prefetch < num hosts
+  //  since if we have more prefetches than hosts, we should consider kicking into
+  //  per-upstream prefetch.
+  //
+  //  Once we do this, this should loop capped number of times while shouldPrefetch is true.
+  if (cluster_entry->cluster_info_->peekaheadRatio() > 1.0) {
+    ConnectionPool::Instance* prefetch_pool = pick_prefetch_pool();
+    if (prefetch_pool) {
+      prefetch_pool->maybePrefetch(cluster_entry->cluster_info_->peekaheadRatio());
+    }
+  }
+}
+
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
                                            absl::optional<Http::Protocol> protocol,
@@ -834,7 +859,19 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
   }
 
   // Select a host and create a connection pool for it if it does not already exist.
-  return entry->second->connPool(priority, protocol, context);
+  auto ret = entry->second->connPool(priority, protocol, context, false);
+
+  // Now see if another host should be prefetched.
+  // httpConnPoolForCluster is called immediately before a call for newStream. newStream doesn't
+  // have the load balancer context needed to make selection decisions so prefetching must be
+  // performed here in anticipation of the new stream.
+  // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
+  // code-enforced.
+  maybePrefetch(entry->second, [&entry, &priority, &protocol, &context]() {
+    return entry->second->connPool(priority, protocol, context, true);
+  });
+
+  return ret;
 }
 
 Tcp::ConnectionPool::Instance*
@@ -848,7 +885,19 @@ ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePr
   }
 
   // Select a host and create a connection pool for it if it does not already exist.
-  return entry->second->tcpConnPool(priority, context);
+  auto ret = entry->second->tcpConnPool(priority, context, false);
+
+  // tcpConnPoolForCluster is called immediately before a call for newConnection. newConnection
+  // doesn't have the load balancer context needed to make selection decisions so prefetching must
+  // be performed here in anticipation of the new connection.
+  // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
+  // code-enforced.
+  // Now see if another host should be prefetched.
+  maybePrefetch(entry->second, [&entry, &priority, &context]() {
+    return entry->second->tcpConnPool(priority, context, true);
+  });
+
+  return ret;
 }
 
 void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
@@ -1292,8 +1341,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
-    LoadBalancerContext* context) {
-  HostConstSharedPtr host = lb_->chooseHost(context);
+    LoadBalancerContext* context, bool peek) {
+  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
     ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
     cluster_info_->stats().upstream_cx_none_healthy_.inc();
@@ -1352,8 +1401,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
-    ResourcePriority priority, LoadBalancerContext* context) {
-  HostConstSharedPtr host = lb_->chooseHost(context);
+    ResourcePriority priority, LoadBalancerContext* context, bool peek) {
+  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
     ENVOY_LOG(debug, "no healthy host for TCP connection pool");
     cluster_info_->stats().upstream_cx_none_healthy_.inc();

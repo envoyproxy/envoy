@@ -59,6 +59,10 @@ private:
 
     // Upstream::LoadBalancer
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
+    // Prefetching not implemented.
+    Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
+      return nullptr;
+    }
 
     const HostInfoMapSharedPtr host_map_;
   };

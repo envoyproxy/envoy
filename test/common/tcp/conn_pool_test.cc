@@ -87,6 +87,13 @@ public:
 
   MOCK_METHOD(void, onConnReleasedForTest, ());
   MOCK_METHOD(void, onConnDestroyedForTest, ());
+  bool maybePrefetch(float ratio) override {
+    if (!test_new_connection_pool_) {
+      return false;
+    }
+    ASSERT(dynamic_cast<ConnPoolImplForTest*>(conn_pool_.get()) != nullptr);
+    return dynamic_cast<ConnPoolImplForTest*>(conn_pool_.get())->maybePrefetch(ratio);
+  }
 
   struct TestConnection {
     Network::MockClientConnection* connection_;
@@ -1041,6 +1048,19 @@ TEST_P(TcpConnPoolImplTest, RequestCapacity) {
   conn_pool_.test_conns_[2].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Test that maybePrefetch is passed up to the base class implementation.
+TEST_P(TcpConnPoolImplTest, TestPrefetch) {
+  if (!test_new_connection_pool_) {
+    return;
+  }
+  EXPECT_FALSE(conn_pool_.maybePrefetch(0));
+
+  conn_pool_.expectConnCreate();
+  ASSERT_TRUE(conn_pool_.maybePrefetch(2));
+
+  conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 /**
  * Test that pending connections are closed when the connection pool is destroyed.
  */
@@ -1084,6 +1104,7 @@ TEST_P(TcpConnPoolImplDestructorTest, TestReadyConnectionsAreClosed) {
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   conn_pool_.reset();
 }
+
 INSTANTIATE_TEST_SUITE_P(ConnectionPools, TcpConnPoolImplTest, testing::Bool());
 INSTANTIATE_TEST_SUITE_P(ConnectionPools, TcpConnPoolImplDestructorTest, testing::Bool());
 
