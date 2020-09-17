@@ -70,5 +70,17 @@ public:
   const HostWithHealthCheckMap health_checker_map_{};
 };
 
+class TcpHealthCheckerImplTestBase : public HealthCheckerTestBase {
+public:
+  void expectSessionCreate();
+  void expectClientCreate();
+
+  std::shared_ptr<TcpHealthCheckerImpl> health_checker_;
+  Network::MockClientConnection* connection_{};
+  Event::MockTimer* timeout_timer_{};
+  Event::MockTimer* interval_timer_{};
+  Network::ReadFilterSharedPtr read_filter_;
+};
+
 } // namespace Upstream
 } // namespace Envoy
