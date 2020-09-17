@@ -130,7 +130,7 @@ void UdpListenerImpl::activateRead() { file_event_->activate(Event::FileReadyTyp
 UdpListenerWorkerRouterImpl::UdpListenerWorkerRouterImpl(uint32_t concurrency)
     : workers_(concurrency) {}
 
-void UdpListenerWorkerRouterImpl::registerWorker(UdpListenerCallbacks& listener) {
+void UdpListenerWorkerRouterImpl::registerWorkerForListener(UdpListenerCallbacks& listener) {
   absl::WriterMutexLock lock(&mutex_);
 
   ASSERT(listener.workerIndex() < workers_.size());
@@ -138,7 +138,7 @@ void UdpListenerWorkerRouterImpl::registerWorker(UdpListenerCallbacks& listener)
   workers_.at(listener.workerIndex()) = &listener;
 }
 
-void UdpListenerWorkerRouterImpl::unregisterWorker(UdpListenerCallbacks& listener) {
+void UdpListenerWorkerRouterImpl::unregisterWorkerForListener(UdpListenerCallbacks& listener) {
   absl::WriterMutexLock lock(&mutex_);
 
   ASSERT(workers_.at(listener.workerIndex()) == &listener);

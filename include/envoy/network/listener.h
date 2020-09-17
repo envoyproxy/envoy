@@ -388,12 +388,12 @@ public:
    * Registers a worker's callbacks for this listener. This worker must accept
    * packets until it calls ``unregisterWorker``.
    */
-  virtual void registerWorker(UdpListenerCallbacks& listener) PURE;
+  virtual void registerWorkerForListener(UdpListenerCallbacks& listener) PURE;
 
   /**
    * Unregisters a worker's callbacks for this listener.
    */
-  virtual void unregisterWorker(UdpListenerCallbacks& listener) PURE;
+  virtual void unregisterWorkerForListener(UdpListenerCallbacks& listener) PURE;
 
   /**
    * Deliver ``data`` to the correct worker by calling ``onDataWorker()``

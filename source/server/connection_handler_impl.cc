@@ -597,11 +597,11 @@ ActiveUdpListenerBase::ActiveUdpListenerBase(uint32_t worker_index, uint32_t con
       concurrency_(concurrency), parent_(parent), listen_socket_(listen_socket),
       udp_listener_(std::move(listener)) {
   ASSERT(worker_index_ < concurrency_);
-  config_->udpListenerWorkerRouter()->get().registerWorker(*this);
+  config_->udpListenerWorkerRouter()->get().registerWorkerForListener(*this);
 }
 
 ActiveUdpListenerBase::~ActiveUdpListenerBase() {
-  config_->udpListenerWorkerRouter()->get().unregisterWorker(*this);
+  config_->udpListenerWorkerRouter()->get().unregisterWorkerForListener(*this);
 }
 
 void ActiveUdpListenerBase::post(Network::UdpRecvData&& data) {
