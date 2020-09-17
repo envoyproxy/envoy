@@ -184,12 +184,10 @@ TEST_F(SchedulableCallbackImplTest, RescheduleNext) {
     // Callback 1 was scheduled from the previous iteration, expect it to fire in the current
     // iteration despite the attempt to reschedule.
     callbacks_[1]->scheduleCallbackNextIteration();
-    // Callback 2 expected to execute next iteration because current because current called before
-    // next.
+    // Callback 2 expected to execute next iteration because current called before next.
     callbacks_[2]->scheduleCallbackCurrentIteration();
     callbacks_[2]->scheduleCallbackNextIteration();
-    // Callback 3 expected to execute next iteration because next because next was called before
-    // current.
+    // Callback 3 expected to execute next iteration because next was called before current.
     callbacks_[3]->scheduleCallbackNextIteration();
     callbacks_[3]->scheduleCallbackCurrentIteration();
   });
