@@ -303,7 +303,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationInternalRequestTimeout) {
 
   EXPECT_CALL(async_request_, cancel());
   EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzTimedoutResponse())));
   timer->invokeCallback();
 }
 

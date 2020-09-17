@@ -32,9 +32,9 @@ const Http::HeaderMap& lengthZeroHeader() {
 // Static response used for creating authorization ERROR responses.
 const Response& errorResponse() {
   CONSTRUCT_ON_FIRST_USE(Response,
-                         Response{CheckStatus::Error, Http::HeaderVector{}, Http::HeaderVector{},
-                                  Http::HeaderVector{}, EMPTY_STRING, Http::Code::Forbidden,
-                                  ProtobufWkt::Struct{}});
+                         Response{CheckStatus::Error, ErrorKind::Other, Http::HeaderVector{},
+                                  Http::HeaderVector{}, Http::HeaderVector{}, EMPTY_STRING,
+                                  Http::Code::Forbidden, ProtobufWkt::Struct{}});
 }
 
 // SuccessResponse used for creating either DENIED or OK authorization responses.
@@ -315,7 +315,9 @@ void RawHttpClientImpl::onTimeout() {
   request_->cancel();
   // let the client know of failure:
   ASSERT(callbacks_ != nullptr);
-  callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
+  Response response = errorResponse();
+  response.error_kind = ErrorKind::Timedout;
+  callbacks_->onComplete(std::make_unique<Response>(response));
   callbacks_ = nullptr;
 }
 
@@ -333,18 +335,19 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   if (status_code == enumToInt(Http::Code::OK)) {
     SuccessResponse ok{message->headers(), config_->upstreamHeaderMatchers(),
                        config_->upstreamHeaderToAppendMatchers(),
-                       Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{},
-                                Http::HeaderVector{}, EMPTY_STRING, Http::Code::OK,
-                                ProtobufWkt::Struct{}}};
+                       Response{CheckStatus::OK, ErrorKind::Other, Http::HeaderVector{},
+                                Http::HeaderVector{}, Http::HeaderVector{}, EMPTY_STRING,
+                                Http::Code::OK, ProtobufWkt::Struct{}}};
     return std::move(ok.response_);
   }
 
   // Create a Denied authorization response.
   SuccessResponse denied{message->headers(), config_->clientHeaderMatchers(),
                          config_->upstreamHeaderToAppendMatchers(),
-                         Response{CheckStatus::Denied, Http::HeaderVector{}, Http::HeaderVector{},
-                                  Http::HeaderVector{}, message->bodyAsString(),
-                                  static_cast<Http::Code>(status_code), ProtobufWkt::Struct{}}};
+                         Response{CheckStatus::Denied, ErrorKind::Other, Http::HeaderVector{},
+                                  Http::HeaderVector{}, Http::HeaderVector{},
+                                  message->bodyAsString(), static_cast<Http::Code>(status_code),
+                                  ProtobufWkt::Struct{}}};
   return std::move(denied.response_);
 }
 

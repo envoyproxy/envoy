@@ -9,7 +9,6 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
-#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -360,12 +359,10 @@ attributes:
     initializeConfig(true);
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
     HttpIntegrationTest::initialize();
+    initiateAndWait();
     if (timeout_on_check) {
-      EXPECT_LOG_CONTAINS("trace", "CheckRequest timed-out", initiateAndWait());
-    } else if (clientType() == Grpc::ClientType::GoogleGrpc) {
-      EXPECT_LOG_CONTAINS("trace", "CheckRequest call failed with status", initiateAndWait());
-    } else {
-      EXPECT_LOG_CONTAINS("debug", "upstream request timeout", initiateAndWait());
+      uint32_t timeouts = test_server_->counter("http.config_test.ext_authz.timeout")->value();
+      EXPECT_EQ(1U, timeouts);
     }
 
     EXPECT_TRUE(response_->complete());
@@ -542,10 +539,10 @@ public:
     initializeConfig(true);
     HttpIntegrationTest::initialize();
 
+    initiateAndWait();
     if (timeout_on_check) {
-      EXPECT_LOG_CONTAINS("trace", "CheckRequest timed-out", initiateAndWait());
-    } else {
-      EXPECT_LOG_CONTAINS("debug", "':status', '504'", initiateAndWait());
+      uint32_t timeouts = test_server_->counter("http.config_test.ext_authz.timeout")->value();
+      EXPECT_EQ(1U, timeouts);
     }
 
     EXPECT_TRUE(response_->complete());

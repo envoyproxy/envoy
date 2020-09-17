@@ -73,6 +73,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     break;
   case Filters::Common::ExtAuthz::CheckStatus::Error:
     config_->stats().error_.inc();
+    if (response->error_kind == Filters::Common::ExtAuthz::ErrorKind::Timedout) {
+      config_->stats().timeout_.inc();
+    }
     break;
   case Filters::Common::ExtAuthz::CheckStatus::Denied:
     config_->stats().denied_.inc();

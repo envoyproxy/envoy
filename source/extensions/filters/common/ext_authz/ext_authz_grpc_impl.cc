@@ -104,7 +104,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
             Grpc::Utility::grpcStatusToString(status));
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
   timeout_timer_.reset();
-  respondFailure();
+  respondFailure(ErrorKind::Other);
 }
 
 void GrpcClientImpl::onTimeout() {
@@ -112,13 +112,14 @@ void GrpcClientImpl::onTimeout() {
   ASSERT(request_ != nullptr);
   request_->cancel();
   // let the client know of failure:
-  respondFailure();
+  respondFailure(ErrorKind::Timedout);
 }
 
-void GrpcClientImpl::respondFailure() {
+void GrpcClientImpl::respondFailure(ErrorKind kind) {
   Response response{};
   response.status = CheckStatus::Error;
   response.status_code = Http::Code::Forbidden;
+  response.error_kind = kind;
   callbacks_->onComplete(std::make_unique<Response>(response));
   callbacks_ = nullptr;
 }

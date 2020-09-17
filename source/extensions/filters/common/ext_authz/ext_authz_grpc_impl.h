@@ -64,7 +64,7 @@ public:
 
 private:
   void onTimeout();
-  void respondFailure();
+  void respondFailure(Filters::Common::ExtAuthz::ErrorKind kind);
   void toAuthzResponseHeader(
       ResponsePtr& response,
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers);

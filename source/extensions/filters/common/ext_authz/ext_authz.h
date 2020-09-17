@@ -46,11 +46,26 @@ enum class CheckStatus {
 };
 
 /**
+ * Possible error kind for Error status..
+ */
+enum class ErrorKind {
+  // Other error.
+  Other,
+  // The request timed out. This will only be set if the timeout is measure when the check request
+  // was created.
+  Timedout,
+};
+
+/**
  * Authorization response object for a RequestCallback.
  */
 struct Response {
   // Call status.
   CheckStatus status;
+
+  // In case status is Error, this will contain the kind of error that occured.
+  ErrorKind error_kind{ErrorKind::Other};
+
   // A set of HTTP headers returned by the authorization server, that will be optionally appended
   // to the request to the upstream server.
   Http::HeaderVector headers_to_append;
