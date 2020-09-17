@@ -254,6 +254,7 @@ message ResponseFlagFilter {
         in: "UMSDR"
         in: "RFCF"
         in: "NFCF"
+        in: "DT"
       }
     }
   }];

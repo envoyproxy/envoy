@@ -78,8 +78,10 @@ enum ResponseFlag {
   ResponseFromCacheFilter = 0x100000,
   // Filter config was not received within the permitted warming deadline.
   NoFilterConfigFound = 0x200000,
+  // Request or connection exceeded the downstream connection duration.
+  DurationTimeout = 0x400000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = NoFilterConfigFound
+  LastFlag = DurationTimeout
 };
 
 /**

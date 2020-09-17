@@ -949,12 +949,13 @@ filter:
       - UMSDR
       - RFCF
       - NFCF
+      - DT
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   path: /dev/null
   )EOF";
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x200000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x400000,
                 "A flag has been added. Fix this code.");
 
   const std::vector<StreamInfo::ResponseFlag> all_response_flags = {
@@ -979,7 +980,8 @@ typed_config:
       StreamInfo::ResponseFlag::DownstreamProtocolError,
       StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached,
       StreamInfo::ResponseFlag::ResponseFromCacheFilter,
-      StreamInfo::ResponseFlag::NoFilterConfigFound};
+      StreamInfo::ResponseFlag::NoFilterConfigFound,
+      StreamInfo::ResponseFlag::DurationTimeout};
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
@@ -1011,7 +1013,7 @@ typed_config:
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\"]]): name: "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\"]]): name: "
       "\"accesslog\"\nfilter {\n "
       " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
@@ -1039,7 +1041,7 @@ typed_config:
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\"]]): name: "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\"]]): name: "
       "\"accesslog\"\nfilter {\n "
       " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "

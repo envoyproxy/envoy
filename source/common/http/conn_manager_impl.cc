@@ -440,6 +440,7 @@ void ConnectionManagerImpl::onIdleTimeout() {
   }
 }
 
+// TODO(#13142): Add DurationTimeout response flag for HCM.
 void ConnectionManagerImpl::onConnectionDurationTimeout() {
   ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
   stats_.named_.downstream_cx_max_duration_reached_.inc();

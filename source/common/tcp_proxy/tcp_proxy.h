@@ -45,6 +45,7 @@ namespace TcpProxy {
   COUNTER(downstream_flow_control_paused_reading_total)                                            \
   COUNTER(downstream_flow_control_resumed_reading_total)                                           \
   COUNTER(idle_timeout)                                                                            \
+  COUNTER(max_downstream_connection_duration)                                                      \
   COUNTER(upstream_flush_total)                                                                    \
   GAUGE(downstream_cx_rx_bytes_buffered, Accumulate)                                               \
   GAUGE(downstream_cx_tx_bytes_buffered, Accumulate)                                               \
@@ -107,6 +108,9 @@ public:
     const TcpProxyStats& stats() { return stats_; }
     const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
     const absl::optional<TunnelingConfig> tunnelingConfig() { return tunneling_config_; }
+    const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectinDuration() const {
+      return max_downstream_connection_duration_;
+    }
 
   private:
     static TcpProxyStats generateStats(Stats::Scope& scope);
@@ -118,6 +122,7 @@ public:
     const TcpProxyStats stats_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
     absl::optional<TunnelingConfig> tunneling_config_;
+    absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -141,6 +146,9 @@ public:
   uint32_t maxConnectAttempts() const { return max_connect_attempts_; }
   const absl::optional<std::chrono::milliseconds>& idleTimeout() {
     return shared_config_->idleTimeout();
+  }
+  const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
+    return shared_config_->maxDownstreamConnectinDuration();
   }
   const absl::optional<TunnelingConfig> tunnelingConfig() {
     return shared_config_->tunnelingConfig();
@@ -243,7 +251,7 @@ public:
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
-  Network::FilterStatus onNewConnection() override { return initializeUpstreamConnection(); }
+  Network::FilterStatus onNewConnection() override;
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
   // Tcp::ConnectionPool::Callbacks
@@ -357,6 +365,7 @@ protected:
   void onIdleTimeout();
   void resetIdleTimer();
   void disableIdleTimer();
+  void onMaxDownstreamConnectionDuration();
 
   const ConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
@@ -364,6 +373,7 @@ protected:
 
   DownstreamCallbacks downstream_callbacks_;
   Event::TimerPtr idle_timer_;
+  Event::TimerPtr connection_duration_timer_;
 
   std::shared_ptr<ConnectionHandle> upstream_handle_;
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
