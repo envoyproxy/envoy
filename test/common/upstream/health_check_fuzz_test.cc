@@ -23,8 +23,6 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::HealthCheckTestCase input) {
     return;
   }
 
-  health_check_fuzz.type_ = HealthCheckFuzz::Type::HTTP;
-
   health_check_fuzz.initializeAndReplay(input);
 }
 
