@@ -69,6 +69,12 @@ TEST_F(OptionsImplTest, InvalidCommandLine) {
                           "Couldn't find match for argument");
 }
 
+TEST_F(OptionsImplTest, InvalidSocketMode) {
+  EXPECT_THROW_WITH_REGEX(
+      createOptionsImpl("envoy --socket-path /foo/envoy_domain_socket --socket-mode foo"),
+      MalformedArgvException, "error: invalid socket-mode 'foo'");
+}
+
 TEST_F(OptionsImplTest, V1Disallowed) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
@@ -89,7 +95,8 @@ TEST_F(OptionsImplTest, All) {
       "/foo/bar "
       "--disable-hot-restart --cpuset-threads --allow-unknown-static-fields "
       "--reject-unknown-dynamic-fields --use-fake-symbol-table 0 --base-id 5 "
-      "--use-dynamic-base-id --base-id-path /foo/baz");
+      "--use-dynamic-base-id --base-id-path /foo/baz "
+      "--socket-path /foo/envoy_domain_socket --socket-mode 644");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
@@ -115,6 +122,8 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(5U, options->baseId());
   EXPECT_TRUE(options->useDynamicBaseId());
   EXPECT_EQ("/foo/baz", options->baseIdPath());
+  EXPECT_EQ("/foo/envoy_domain_socket", options->socketPath());
+  EXPECT_EQ(0644, options->socketMode());
 
   options = createOptionsImpl("envoy --mode init_only");
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
@@ -174,6 +183,8 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setAllowUnkownFields(true);
   options->setRejectUnknownFieldsDynamic(true);
   options->setFakeSymbolTableEnabled(!options->fakeSymbolTableEnabled());
+  options->setSocketPath("/foo/envoy_domain_socket");
+  options->setSocketMode(0644);
 
   EXPECT_EQ(109876, options->baseId());
   EXPECT_EQ(42U, options->concurrency());
@@ -202,6 +213,8 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_TRUE(options->allowUnknownStaticFields());
   EXPECT_TRUE(options->rejectUnknownDynamicFields());
   EXPECT_EQ(!fake_symbol_table_enabled, options->fakeSymbolTableEnabled());
+  EXPECT_EQ("/foo/envoy_domain_socket", options->socketPath());
+  EXPECT_EQ(0644, options->socketMode());
 
   // Validate that CommandLineOptions is constructed correctly.
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
@@ -231,6 +244,8 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(options->hotRestartDisabled(), command_line_options->disable_hot_restart());
   EXPECT_EQ(options->mutexTracingEnabled(), command_line_options->enable_mutex_tracing());
   EXPECT_EQ(options->cpusetThreadsEnabled(), command_line_options->cpuset_threads());
+  EXPECT_EQ(options->socketPath(), command_line_options->socket_path());
+  EXPECT_EQ(options->socketMode(), command_line_options->socket_mode());
 }
 
 TEST_F(OptionsImplTest, DefaultParams) {
@@ -242,6 +257,8 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_EQ(Network::Address::IpVersion::v4, options->localAddressIpVersion());
   EXPECT_EQ(Server::Mode::Serve, options->mode());
   EXPECT_EQ(spdlog::level::warn, options->logLevel());
+  EXPECT_EQ("@envoy_domain_socket", options->socketPath());
+  EXPECT_EQ(0, options->socketMode());
   EXPECT_FALSE(options->hotRestartDisabled());
   EXPECT_FALSE(options->cpusetThreadsEnabled());
 
@@ -254,6 +271,8 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_EQ(envoy::admin::v3::CommandLineOptions::v4,
             command_line_options->local_address_ip_version());
   EXPECT_EQ(envoy::admin::v3::CommandLineOptions::Serve, command_line_options->mode());
+  EXPECT_EQ("@envoy_domain_socket", command_line_options->socket_path());
+  EXPECT_EQ(0, command_line_options->socket_mode());
   EXPECT_FALSE(command_line_options->disable_hot_restart());
   EXPECT_FALSE(command_line_options->cpuset_threads());
   EXPECT_FALSE(command_line_options->allow_unknown_static_fields());

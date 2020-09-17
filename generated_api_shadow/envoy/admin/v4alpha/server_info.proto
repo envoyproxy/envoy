@@ -54,7 +54,7 @@ message ServerInfo {
   CommandLineOptions command_line_options = 6;
 }
 
-// [#next-free-field: 35]
+// [#next-free-field: 37]
 message CommandLineOptions {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v3.CommandLineOptions";
 
@@ -178,4 +178,10 @@ message CommandLineOptions {
 
   // See :option:`--enable-fine-grain-logging` for details.
   bool enable_fine_grain_logging = 34;
+
+  // See :option:`--socket-path` for details.
+  string socket_path = 35;
+
+  // See :option:`--socket-mode` for details.
+  uint32 socket_mode = 36;
 }

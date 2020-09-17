@@ -43,6 +43,8 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, toCommandLineOptions()).WillByDefault(Invoke([] {
     return std::make_unique<envoy::admin::v3::CommandLineOptions>();
   }));
+  ON_CALL(*this, socketPath()).WillByDefault(ReturnRef(socket_path_));
+  ON_CALL(*this, socketMode()).WillByDefault(ReturnPointee(&socket_mode_));
 }
 
 MockOptions::~MockOptions() = default;
