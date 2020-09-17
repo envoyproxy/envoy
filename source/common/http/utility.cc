@@ -318,7 +318,7 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
     if (header.key() == Http::Headers::get().Cookie.get()) {
 
       // Split the cookie header into individual cookies.
-      for (const auto s : StringUtil::splitToken(header.value().getStringView(), ";")) {
+      for (const auto& s : StringUtil::splitToken(header.value().getStringView(), ";")) {
         // Find the key part of the cookie (i.e. the name of the cookie).
         size_t first_non_space = s.find_first_not_of(" ");
         size_t equals_index = s.find('=');
