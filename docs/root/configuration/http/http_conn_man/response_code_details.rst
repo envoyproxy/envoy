@@ -3,7 +3,12 @@
 Response Code Details
 =====================
 
-If _%RESPONSE_CODE_DETAILS%_ is configured on in access logging, every log entry should include the detailed reason that stream ended.
+If _%RESPONSE_CODE_DETAILS%_ is configured on via `access logging<config_access_log_format_response_code_details>`,
+or :ref:`custom headers<config_http_conn_man_headers_custom_request_headers>` Envoy will communicate the defailed
+reason a given stream ended.
+This page lists the details sent by the HttpConnectionManager, Router filter, and cocecs.  It is not comprehensive as
+any other filters may send their own local replies with custom details.
+
 Below are the list of reasons the HttpConnectionManager or Router filter may send responses or reset streams.
 
 .. csv-table::
@@ -39,8 +44,8 @@ Below are the list of reasons the HttpConnectionManager or Router filter may sen
    upgrade_failed, The request was rejected because it attempted an unsupported upgrade.
    upstream_max_stream_duration_reached, The request was destroyed because of it exceeded the configured max stream duration.
    upstream_per_try_timeout, The final upstream try timed out.
-   upstream_reset_after_response_started, The upstream connection was reset after a response was started.
-   upstream_reset_before_response_started, The upstream connection was reset before a response was started.
+   upstream_reset_after_response_started{details}, The upstream connection was reset after a response was started. This may include further details about the cause of the disconnect.
+   upstream_reset_before_response_started{details}, The upstream connection was reset before a response was started This may include further details about the cause of the disconnect.
    upstream_response_timeout, The upstream response timed out.
    via_upstream, The response code was set by the upstream.
 
