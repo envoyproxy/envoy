@@ -1,7 +1,9 @@
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "library/common/extensions/filters/http/assertion/config.h"
 #include "library/common/extensions/filters/http/assertion/filter.h"
 #include "library/common/extensions/filters/http/assertion/filter.pb.h"
 
@@ -493,6 +495,30 @@ match_config:
               sendLocalReply(Http::Code::InternalServerError,
                              "Response Trailers do not match configured expectations", _, _, ""));
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers));
+}
+
+TEST(AssertionFilterFactoryTest, Config) {
+  AssertionFilterFactory factory;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  envoymobile::extensions::filters::http::assertion::Assertion proto_config =
+      *dynamic_cast<envoymobile::extensions::filters::http::assertion::Assertion*>(
+          factory.createEmptyConfigProto().get());
+
+  std::string config_str = R"EOF(
+match_config:
+  http_response_trailers_match:
+    headers:
+      - name: "test-trailer"
+        exact_match: test.code
+)EOF";
+
+  TestUtility::loadFromYamlAndValidate(config_str, proto_config);
+
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "test", context);
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamFilter(_));
+  cb(filter_callbacks);
 }
 
 } // namespace
