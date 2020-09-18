@@ -25,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 14]
+// [#next-free-field: 13]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.ext_authz.v3.ExtAuthz";
@@ -66,11 +66,6 @@ message ExtAuthz {
   // A ``x-envoy-auth-partial-body: false|true`` metadata header will be added to the authorization
   // request message indicating if the body data is partial.
   BufferSettings with_request_body = 5;
-
-  // Dictates how request body is sent to the external the external authorization service. This is
-  // effective when :ref:`with_request_body <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>`
-  // is set to buffer request body.
-  RequestBodyOptions request_body_options = 13;
 
   // Clears route cache in order to allow the external authorization service to correctly affect
   // routing decisions. Filter clears all cached routes when:
@@ -141,16 +136,10 @@ message BufferSettings {
   // The authorization request will be dispatched and no 413 HTTP error will be returned by the
   // filter.
   bool allow_partial_message = 2;
-}
-
-// Configuration for request body.
-message RequestBodyOptions {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.extensions.filters.http.ext_authz.v3.RequestBodyOptions";
 
   // If true, the body sent to the external authorization service is set with raw bytes, instead of
   // UTF-8 string.
-  google.protobuf.BoolValue pack_as_bytes = 1;
+  bool pack_as_bytes = 3;
 }
 
 // HttpService is used for raw HTTP communication between the filter and the authorization service.
@@ -275,13 +264,14 @@ message CheckSettings {
   //
   // You can use this to provide extra context for the external authorization server on specific
   // virtual hosts/routes. For example, adding a context extension on the virtual host level can
-  // give the ext-authz server information on what virtual host is used without needing to parse the
-  // host header. If CheckSettings is specified in multiple per-filter-configs, they will be merged
-  // in order, and the result will be used.
+  // give the external authorization server information on what virtual host is used without needing
+  // to parse the host header. If CheckSettings is specified in multiple per-filter-configs, they
+  // will be merged in order, and the result will be used.
   //
   // Merge semantics for this field are such that keys from more specific configs override.
   map<string, string> context_extensions = 1;
 
-  // Allow to override how request body is sent to the external authorization service.
-  RequestBodyOptions request_body_options = 2;
+  // Allow to override how request body is packed. If true, the body sent to the external
+  // authorization service is set with raw bytes, instead of UTF-8 string.
+  google.protobuf.BoolValue pack_as_bytes = 2;
 }

@@ -115,10 +115,7 @@ public:
   with_request_body:
     max_request_bytes: 10
   )EOF");
-      settings.mutable_check_settings()
-          ->mutable_request_body_options()
-          ->mutable_pack_as_bytes()
-          ->set_value(as_bytes);
+      settings.mutable_check_settings()->mutable_pack_as_bytes()->set_value(as_bytes);
       auth_per_route = FilterConfigPerRoute(settings);
     };
 
@@ -520,7 +517,6 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestData) {
       cluster_name: "ext_authz_server"
   with_request_body:
     max_request_bytes: 10
-  request_body_options:
     pack_as_bytes: true
   )EOF");
 

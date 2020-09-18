@@ -59,8 +59,7 @@ public:
         failure_mode_allow_(config.failure_mode_allow()),
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
-        pack_as_bytes_(
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.request_body_options(), pack_as_bytes, false)),
+        pack_as_bytes_(config.with_request_body().pack_as_bytes()),
         status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
         runtime_(runtime), http_context_(http_context),
         filter_enabled_(config.has_filter_enabled()
@@ -180,10 +179,7 @@ public:
         disabled_(config.disabled()),
         pack_as_bytes_(
             config.has_check_settings()
-                ? (config.check_settings().has_request_body_options()
-                       ? PROTOBUF_GET_OPTIONAL_WRAPPED(
-                             config.check_settings().request_body_options(), pack_as_bytes, bool)
-                       : absl::nullopt)
+                ? PROTOBUF_GET_OPTIONAL_WRAPPED(config.check_settings(), pack_as_bytes, bool)
                 : absl::nullopt) {}
 
   void merge(const FilterConfigPerRoute& other);
