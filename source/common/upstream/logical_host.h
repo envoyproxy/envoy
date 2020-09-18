@@ -57,6 +57,10 @@ public:
     return HostImpl::healthCheckAddress();
   }
 
+  const uint64_t creationTimeMs() const override {
+      return 0;
+  }
+
 private:
   const Network::TransportSocketOptionsSharedPtr override_transport_socket_options_;
   mutable absl::Mutex address_lock_;
@@ -103,6 +107,9 @@ public:
     // Should never be called since real hosts are used only for forwarding and not health
     // checking.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  const uint64_t creationTimeMs() const override {
+      return 0;
   }
   uint32_t priority() const override { return logical_host_->priority(); }
   void priority(uint32_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

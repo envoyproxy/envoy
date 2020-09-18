@@ -148,6 +148,11 @@ public:
    * Set the current priority.
    */
   virtual void priority(uint32_t) PURE;
+
+  /**
+   * @return timestamp in milliseconds of when host was created.
+   */
+  virtual const uint64_t creationTimeMs() const PURE;
 };
 
 using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;

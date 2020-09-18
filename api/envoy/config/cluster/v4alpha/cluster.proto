@@ -445,8 +445,20 @@ message Cluster {
     bool use_http_header = 1;
   }
 
+  enum EndpointWarmingPolicy {
+    WAIT_FOR_FIRST_PASSING_HC = 0;
+    NO_WAIT = 1;
+  }
+
+  // Configuration for slow start mode.
+  // [#next-free-field: 3]
+  message SlowStartConfig {
+    google.protobuf.UInt32Value slow_start_window = 1;
+    EndpointWarmingPolicy endpoint_warming_policy = 2;
+  }
+
   // Common configuration for all load balancer implementations.
-  // [#next-free-field: 8]
+  // [#next-free-field: 9]
   message CommonLbConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.cluster.v3.Cluster.CommonLbConfig";
@@ -571,6 +583,9 @@ message Cluster {
 
     // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
     ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
+
+    // Configuration for slow start mode.
+    SlowStartConfig slow_start_config = 8;
   }
 
   message RefreshRate {

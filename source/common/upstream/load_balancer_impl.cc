@@ -66,6 +66,11 @@ bool hostWeightsAreEqual(const HostVector& hosts) {
   return true;
 }
 
+bool noHostsAreInSlowStart() {
+  // todo(nezdolik) fix this
+  return true;
+}
+
 } // namespace
 
 std::pair<uint32_t, LoadBalancerBase::HostAvailability>
@@ -720,10 +725,11 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     auto& scheduler = scheduler_[source] = Scheduler{};
     refreshHostSource(source);
 
-    // Check if the original host weights are equal and skip EDF creation if they are. When all
-    // original weights are equal we can rely on unweighted host pick to do optimal round robin and
-    // least-loaded host selection with lower memory and CPU overhead.
-    if (hostWeightsAreEqual(hosts)) {
+    // Check if the original host weights are equal and no hosts are in slow start mode, in that
+    // case EDF creation is skipped. When all original weights are equal and no hosts are in slow
+    // start mode we can rely on unweighted host pick to do optimal round robin and least-loaded
+    // host selection with lower memory and CPU overhead.
+    if (hostWeightsAreEqual(hosts) && noHostsAreInSlowStart()) {
       // Skip edf creation.
       return;
     }
@@ -736,11 +742,19 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // We should probably change this to refresh at all times. See the comment in
     // BaseDynamicClusterImpl::updateDynamicHostList about this.
     for (const auto& host : hosts) {
+      auto host_weight = hostWeight(*host);
+      // todo(nezdolik) propagate slow_start_config and endpoint_warming_policy to edf lb base, add
+      // abs to formula
+      if (scheduler.edf_->currentTimeMs() - host->creationTimeMs() > 60) {
+        // todo(nezdolik) parametrize this
+        host_weight *= 0.1;
+      }
+
       // We use a fixed weight here. While the weight may change without
       // notification, this will only be stale until this host is next picked,
       // at which point it is reinserted into the EdfScheduler with its new
       // weight in chooseHost().
-      scheduler.edf_->add(hostWeight(*host), host);
+      scheduler.edf_->add(host_weight, host);
     }
 
     // Cycle through hosts to achieve the intended offset behavior.

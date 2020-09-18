@@ -113,6 +113,9 @@ MaglevLoadBalancer::MaglevLoadBalancer(
   if (!Primes::isPrime(table_size_)) {
     throw EnvoyException("The table size of maglev must be prime number");
   }
+  if (common_config.has_slow_start_config()) {
+    throw EnvoyException("Slow start mode is not supported for maglev lb");
+  }
 }
 
 MaglevLoadBalancerStats MaglevLoadBalancer::generateStats(Stats::Scope& scope) {

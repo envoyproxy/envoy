@@ -43,6 +43,9 @@ RingHashLoadBalancer::RingHashLoadBalancer(
     throw EnvoyException(fmt::format("ring hash: minimum_ring_size ({}) > maximum_ring_size ({})",
                                      min_ring_size_, max_ring_size_));
   }
+  if (common_config.has_slow_start_config()) {
+    throw EnvoyException("Slow start mode is not supported for ring hash lb");
+  }
 }
 
 RingHashLoadBalancerStats RingHashLoadBalancer::generateStats(Stats::Scope& scope) {

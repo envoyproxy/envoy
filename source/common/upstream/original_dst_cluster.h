@@ -51,8 +51,15 @@ public:
    */
   class LoadBalancer : public Upstream::LoadBalancer {
   public:
-    LoadBalancer(const std::shared_ptr<OriginalDstCluster>& parent)
-        : parent_(parent), host_map_(parent->getCurrentHostMap()) {}
+    LoadBalancer(
+        const std::shared_ptr<OriginalDstCluster>&
+            parent /*, const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config*/)
+        : parent_(parent), host_map_(parent->getCurrentHostMap()) {
+      // todo(nezdolik) fix this
+      //   if (common_config.has_slow_start_config()) {
+      //     throw EnvoyException("Slow start mode is not supported for original dst lb");
+      // }
+    }
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;

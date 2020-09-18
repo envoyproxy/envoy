@@ -461,7 +461,16 @@ public:
             least_request_config.has_value() && least_request_config->has_active_request_bias()
                 ? std::make_unique<Runtime::Double>(least_request_config->active_request_bias(),
                                                     runtime)
-                : nullptr) {
+                : nullptr),
+        // todo(nezdolik) move this to base class
+        endpoint_warming_policy(common_config.has_slow_start_config()
+                                    ? common_config.slow_start_config().endpoint_warming_policy()
+                                    : envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT),
+        // todo(nezdolik) move this to base class
+        slow_start_window(common_config.has_slow_start_config()
+                              ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.slow_start_config(),
+                                                                slow_start_window, 0)
+                              : 0) {
     initialize();
   }
 
@@ -521,18 +530,27 @@ private:
   double active_request_bias_{};
 
   const std::unique_ptr<Runtime::Double> active_request_bias_runtime_;
+  const envoy::config::cluster::v3::Cluster::CommonLbConfig::EndpointWarmingPolicy
+      endpoint_warming_policy;
+  const uint32_t slow_start_window;
 };
 
 /**
  * Random load balancer that picks a random host out of all hosts.
  */
-class RandomLoadBalancer : public ZoneAwareLoadBalancerBase {
+class RandomLoadBalancer : public ZoneAwareLoadBalancerBase,
+                                 Logger::Loggable<Logger::Id::upstream> {
 public:
   RandomLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                      ClusterStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                                  common_config) {}
+                                  common_config) {
+    if (common_config.has_slow_start_config()) {
+      // todo(nezdolik) maybe use error status
+      ENVOY_LOG(warn, "Slow start mode is not supported for random lb");
+    }
+  }
 
   // Upstream::LoadBalancerBase
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;

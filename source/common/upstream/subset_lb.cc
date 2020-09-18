@@ -41,6 +41,10 @@ SubsetLoadBalancer::SubsetLoadBalancer(
       scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()) {
   ASSERT(subsets.isEnabled());
 
+  if (common_config.has_slow_start_config()) {
+    throw EnvoyException("Slow start mode is not supported for subset lb");
+  }
+
   if (fallback_policy_ != envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK) {
     HostPredicate predicate;
     if (fallback_policy_ == envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT) {

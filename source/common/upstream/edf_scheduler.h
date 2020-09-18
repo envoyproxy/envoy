@@ -73,6 +73,9 @@ public:
    */
   bool empty() const { return queue_.empty(); }
 
+  // todo(nezdolik) this needs to be integer
+  double currentTimeMs() const { return current_time_; }
+
 private:
   struct EdfEntry {
     double deadline_;
