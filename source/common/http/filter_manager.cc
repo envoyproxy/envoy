@@ -510,19 +510,20 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       // Metadata frame doesn't carry end of stream bit. We need an empty data frame to end the
       // stream.
       addDecodedData(*((*entry).get()), empty_data, true);
+
       // At this point we're no longer going to be decoding a headers only request, so reset this
       // flag. This is propagated to subsequent filters which will allow all of these to decode the
       // data.
       (*entry)->decoding_headers_only_ = false;
-      // Unmark end_stream_ for this filter so that it can receive the data when continue is called.
-      (*entry)->end_stream_ = false;
+
+      // This ensures that when we continue the data we set end_stream = true.
       maybeEndDecode(true);
 
+      // We do this check here in addition to below since we've cleared the entries that would mark this filter
+      // as the last filter.
       if (continue_data_entry == decoder_filters_.end()) {
         continue_data_entry = entry;
       }
-
-      (*entry)->iteration_state_ = ActiveStreamDecoderFilter::IterationState::Continue;
     }
 
     if (!continue_iteration && std::next(entry) != decoder_filters_.end()) {
