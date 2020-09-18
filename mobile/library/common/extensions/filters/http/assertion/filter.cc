@@ -42,17 +42,6 @@ Http::FilterHeadersStatus AssertionFilter::decodeHeaders(Http::RequestHeaderMap&
   }
 
   if (end_stream) {
-    // Check if there are unsatisfied assertions about stream data.
-    Buffer::OwnedImpl empty_buffer;
-    config_->rootMatcher().onRequestBody(empty_buffer, statuses_);
-    auto& match_status = config_->rootMatcher().matchStatus(statuses_);
-    if (!match_status.matches_ && !match_status.might_change_status_) {
-      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
-                                         "Request Body does not match configured expectations",
-                                         nullptr, absl::nullopt, "");
-      return Http::FilterHeadersStatus::StopIteration;
-    }
-
     // Check if there are unsatisfied assertions about stream trailers.
     auto empty_trailers = Http::RequestTrailerMapImpl::create();
     config_->rootMatcher().onHttpRequestTrailers(*empty_trailers, statuses_);
@@ -147,17 +136,6 @@ Http::FilterHeadersStatus AssertionFilter::encodeHeaders(Http::ResponseHeaderMap
   }
 
   if (end_stream) {
-    // Check if there are unsatisfied assertions about stream data.
-    Buffer::OwnedImpl empty_buffer;
-    config_->rootMatcher().onResponseBody(empty_buffer, statuses_);
-    auto& match_status = config_->rootMatcher().matchStatus(statuses_);
-    if (!match_status.matches_ && !match_status.might_change_status_) {
-      decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError,
-                                         "Response Body does not match configured expectations",
-                                         nullptr, absl::nullopt, "");
-      return Http::FilterHeadersStatus::StopIteration;
-    }
-
     // Check if there are unsatisfied assertions about stream trailers.
     auto empty_trailers = Http::ResponseTrailerMapImpl::create();
     config_->rootMatcher().onHttpResponseTrailers(*empty_trailers, statuses_);

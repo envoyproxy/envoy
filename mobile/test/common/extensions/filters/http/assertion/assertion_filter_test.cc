@@ -170,6 +170,23 @@ match_config:
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(*body, false));
 }
 
+TEST_F(AssertionFilterTest, RequestDataNoMatchFastPath) {
+  setUpFilter(R"EOF(
+match_config:
+  http_request_generic_body_match:
+    bytes_limit: 1
+    patterns:
+      - string_match: match_me
+)EOF");
+
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("garbage")};
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "Request Body does not match configured expectations", _, _, ""));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(*body, false));
+}
+
 TEST_F(AssertionFilterTest, RequestDataNoMatchWithEndStream) {
   setUpFilter(R"EOF(
 match_config:
@@ -400,6 +417,23 @@ match_config:
   Buffer::InstancePtr body{new Buffer::OwnedImpl("match_me")};
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(*body, false));
+}
+
+TEST_F(AssertionFilterTest, ResponseDataNoMatchFastPath) {
+  setUpFilter(R"EOF(
+match_config:
+  http_response_generic_body_match:
+    bytes_limit: 1
+    patterns:
+      - string_match: match_me
+)EOF");
+
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("garbage")};
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::InternalServerError,
+                             "Response Body does not match configured expectations", _, _, ""));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(*body, false));
 }
 
 TEST_F(AssertionFilterTest, ResponseDataNoMatchWithEndStream) {
