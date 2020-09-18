@@ -319,13 +319,15 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   const auto& storage_header_name = Http::Headers::get().EnvoyAuthHeadersToRemove;
   // If we are going to construct an Ok response we need to save the
   // headers_to_remove in a variable first.
-  std::vector<Http::LowerCaseString> headers_to_remove{};
+  std::vector<Http::LowerCaseString> headers_to_remove;
   if (status_code == enumToInt(Http::Code::OK)) {
     const Http::HeaderEntry* entry = message->headers().get(storage_header_name);
     if (entry != nullptr) {
       absl::string_view storage_header_value = entry->value().getStringView();
-      for (const auto header_name :
-           StringUtil::splitToken(storage_header_value, ",", false, true)) {
+      std::vector<absl::string_view> header_names = StringUtil::splitToken(
+          storage_header_value, ",", /*keep_empty_string=*/false, /*trim_whitespace=*/true);
+      headers_to_remove.reserve(header_names.size());
+      for (const auto header_name : header_names) {
         headers_to_remove.push_back(Http::LowerCaseString(std::string(header_name)));
       }
     }

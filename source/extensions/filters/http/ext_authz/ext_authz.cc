@@ -164,6 +164,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
   switch (response->status) {
   case CheckStatus::OK: {
+    // Any changes to request headers can affect how the request is going to be
+    // routed. If we are changing the headers we also need to clear the route
+    // cache.
     if (config_->clearRouteCache() &&
         (!response->headers_to_set.empty() || !response->headers_to_append.empty() ||
          !response->headers_to_remove.empty())) {

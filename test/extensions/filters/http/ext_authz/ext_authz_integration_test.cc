@@ -90,7 +90,7 @@ public:
       headers.addCopy(headers_to_append.first, headers_to_append.second);
     }
 
-    // Initialize headers to remove. If the authorization server returns any of
+    // Initialize headers to be removed. If the authorization server returns any of
     // these as a header to remove, it will be removed.
     for (const auto& header_to_remove : headers_to_remove) {
       headers.addCopy(header_to_remove.first, header_to_remove.second);
@@ -425,7 +425,7 @@ public:
 
     // Send back authorization response with "baz" and "bat" headers.
     // Also add multiple values "append-foo" and "append-bar" for key "x-append-bat".
-    // Also tell envoy to remove "remove-me" header before sending to upstream.
+    // Also tell Envoy to remove "remove-me" header before sending to upstream.
     Http::TestResponseHeaderMapImpl response_headers{
         {":status", "200"},
         {"baz", "baz"},
