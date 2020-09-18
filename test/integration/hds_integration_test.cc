@@ -188,6 +188,31 @@ transport_socket_matches:
     return server_health_check_specifier_;
   }
 
+  envoy::service::health::v3::ClusterHealthCheck createSecondCluster(std::string name) {
+    // Add endpoint
+    envoy::service::health::v3::ClusterHealthCheck health_check;
+
+    health_check.set_cluster_name(name);
+    Network::Utility::addressToProtobufAddress(
+        *host2_upstream_->localAddress(),
+        *health_check.add_locality_endpoints()->add_endpoints()->mutable_address());
+    health_check.mutable_locality_endpoints(0)->mutable_locality()->set_region("kounopetra");
+    health_check.mutable_locality_endpoints(0)->mutable_locality()->set_zone("emplisi");
+    health_check.mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("paris");
+
+    health_check.add_health_checks()->mutable_timeout()->set_seconds(MaxTimeout);
+    health_check.mutable_health_checks(0)->mutable_interval()->set_seconds(MaxTimeout);
+    health_check.mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
+    health_check.mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
+    health_check.mutable_health_checks(0)->mutable_grpc_health_check();
+    health_check.mutable_health_checks(0)
+        ->mutable_http_health_check()
+        ->set_hidden_envoy_deprecated_use_http2(false);
+    health_check.mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
+
+    return health_check;
+  }
+
   // Creates a basic HealthCheckSpecifier message containing one endpoint and
   // one TCP health_check
   envoy::service::health::v3::HealthCheckSpecifier makeTcpHealthCheckSpecifier() {
@@ -697,26 +722,8 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
   server_health_check_specifier_ =
       makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
 
-  // Add endpoint
-  auto* health_check = server_health_check_specifier_.add_cluster_health_checks();
-
-  health_check->set_cluster_name("cat");
-  Network::Utility::addressToProtobufAddress(
-      *host2_upstream_->localAddress(),
-      *health_check->add_locality_endpoints()->add_endpoints()->mutable_address());
-  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_region("kounopetra");
-  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("emplisi");
-  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("paris");
-
-  health_check->add_health_checks()->mutable_timeout()->set_seconds(MaxTimeout);
-  health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(MaxTimeout);
-  health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
-  health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
-  health_check->mutable_health_checks(0)->mutable_grpc_health_check();
-  health_check->mutable_health_checks(0)
-      ->mutable_http_health_check()
-      ->set_hidden_envoy_deprecated_use_http2(false);
-  health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
+  // Add Second Cluster
+  server_health_check_specifier_.add_cluster_health_checks()->MergeFrom(createSecondCluster("cat"));
 
   // Server <--> Envoy
   waitForHdsStream();
@@ -1048,26 +1055,8 @@ TEST_P(HdsIntegrationTest, UpdateEndpoints) {
   server_health_check_specifier_ =
       makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
 
-  // Add endpoint
-  auto* health_check = server_health_check_specifier_.add_cluster_health_checks();
-
-  health_check->set_cluster_name("cat");
-  Network::Utility::addressToProtobufAddress(
-      *host2_upstream_->localAddress(),
-      *health_check->add_locality_endpoints()->add_endpoints()->mutable_address());
-  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_region("kounopetra");
-  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("emplisi");
-  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("paris");
-
-  health_check->add_health_checks()->mutable_timeout()->set_seconds(MaxTimeout);
-  health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(MaxTimeout);
-  health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
-  health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
-  health_check->mutable_health_checks(0)->mutable_grpc_health_check();
-  health_check->mutable_health_checks(0)
-      ->mutable_http_health_check()
-      ->set_hidden_envoy_deprecated_use_http2(false);
-  health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
+  // Add Second Cluster.
+  server_health_check_specifier_.add_cluster_health_checks()->MergeFrom(createSecondCluster("cat"));
 
   // Server <--> Envoy
   waitForHdsStream();

@@ -99,6 +99,23 @@ protected:
         singleton_manager_, tls_, validation_visitor_, *api_);
   }
 
+  void expectCreateClientConnection() {
+    // create a new mock connection for each call to creatClientConnection
+    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+        .WillRepeatedly(Invoke(
+            [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
+               Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
+              Network::MockClientConnection* connection =
+                  new NiceMock<Network::MockClientConnection>();
+
+              // pretend our endpoint was connected to.
+              connection->raiseEvent(Network::ConnectionEvent::Connected);
+
+              // return this new, connected endpoint.
+              return connection;
+            }));
+  }
+
   // Creates a HealthCheckSpecifier message that contains one endpoint and one
   // healthcheck
   envoy::service::health::v3::HealthCheckSpecifier* createSimpleMessage() {
@@ -438,19 +455,7 @@ TEST_F(HdsTest, TestSendResponseMultipleEndpoints) {
 
   // Create a new active connection on request, setting its status to connected
   // to mock a found endpoint.
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillRepeatedly(Invoke(
-          [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
-             Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
-            Network::MockClientConnection* connection =
-                new NiceMock<Network::MockClientConnection>();
-
-            // pretend our endpoint was connected to.
-            connection->raiseEvent(Network::ConnectionEvent::Connected);
-
-            // return this new, connected endpoint.
-            return connection;
-          }));
+  expectCreateClientConnection();
 
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
@@ -704,19 +709,7 @@ TEST_F(HdsTest, TestSameSpecifier) {
 
   // Create a new active connection on request, setting its status to connected
   // to mock a found endpoint.
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillRepeatedly(Invoke(
-          [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
-             Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
-            Network::MockClientConnection* connection =
-                new NiceMock<Network::MockClientConnection>();
-
-            // pretend our endpoint was connected to.
-            connection->raiseEvent(Network::ConnectionEvent::Connected);
-
-            // return this new, connected endpoint.
-            return connection;
-          }));
+  expectCreateClientConnection();
 
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
@@ -751,19 +744,7 @@ TEST_F(HdsTest, TestClusterChange) {
 
   // Create a new active connection on request, setting its status to connected
   // to mock a found endpoint.
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillRepeatedly(Invoke(
-          [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
-             Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
-            Network::MockClientConnection* connection =
-                new NiceMock<Network::MockClientConnection>();
-
-            // pretend our endpoint was connected to.
-            connection->raiseEvent(Network::ConnectionEvent::Connected);
-
-            // return this new, connected endpoint.
-            return connection;
-          }));
+  expectCreateClientConnection();
 
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
@@ -828,19 +809,7 @@ TEST_F(HdsTest, TestUpdateEndpoints) {
 
   // Create a new active connection on request, setting its status to connected
   // to mock a found endpoint.
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillRepeatedly(Invoke(
-          [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
-             Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
-            Network::MockClientConnection* connection =
-                new NiceMock<Network::MockClientConnection>();
-
-            // pretend our endpoint was connected to.
-            connection->raiseEvent(Network::ConnectionEvent::Connected);
-
-            // return this new, connected endpoint.
-            return connection;
-          }));
+  expectCreateClientConnection();
 
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
@@ -910,19 +879,7 @@ TEST_F(HdsTest, TestUpdateHealthCheckers) {
 
   // Create a new active connection on request, setting its status to connected
   // to mock a found endpoint.
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillRepeatedly(Invoke(
-          [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
-             Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
-            Network::MockClientConnection* connection =
-                new NiceMock<Network::MockClientConnection>();
-
-            // pretend our endpoint was connected to.
-            connection->raiseEvent(Network::ConnectionEvent::Connected);
-
-            // return this new, connected endpoint.
-            return connection;
-          }));
+  expectCreateClientConnection();
 
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
@@ -976,19 +933,7 @@ TEST_F(HdsTest, TestClusterSameName) {
 
   // Create a new active connection on request, setting its status to connected
   // to mock a found endpoint.
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillRepeatedly(Invoke(
-          [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
-             Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
-            Network::MockClientConnection* connection =
-                new NiceMock<Network::MockClientConnection>();
-
-            // pretend our endpoint was connected to.
-            connection->raiseEvent(Network::ConnectionEvent::Connected);
-
-            // return this new, connected endpoint.
-            return connection;
-          }));
+  expectCreateClientConnection();
 
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
@@ -1047,19 +992,7 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
 
   // Create a new active connection on request, setting its status to connected
   // to mock a found endpoint.
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillRepeatedly(Invoke(
-          [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
-             Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
-            Network::MockClientConnection* connection =
-                new NiceMock<Network::MockClientConnection>();
-
-            // pretend our endpoint was connected to.
-            connection->raiseEvent(Network::ConnectionEvent::Connected);
-
-            // return this new, connected endpoint.
-            return connection;
-          }));
+  expectCreateClientConnection();
 
   // Pull out socket_matcher object normally internal to createClusterInfo, to test that a matcher
   // would match the expected socket.
