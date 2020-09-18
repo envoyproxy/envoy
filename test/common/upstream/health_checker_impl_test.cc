@@ -2885,7 +2885,7 @@ TEST(TcpHealthCheckMatcher, match) {
   EXPECT_TRUE(TcpHealthCheckMatcher::match(segments, buffer));
 }
 
-class TcpHealthCheckerImplTest : public testing::Test, public TcpHealthCheckerImplTestBase {
+class TcpHealthCheckerImplTest : public testing::Test, public HealthCheckerTestBase {
 public:
   void allocHealthChecker(const std::string& yaml, bool avoid_boosting = true) {
     health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
@@ -2939,6 +2939,23 @@ public:
 
     allocHealthChecker(yaml);
   }
+
+  void expectSessionCreate() {
+    interval_timer_ = new Event::MockTimer(&dispatcher_);
+    timeout_timer_ = new Event::MockTimer(&dispatcher_);
+  }
+
+  void expectClientCreate() {
+    connection_ = new NiceMock<Network::MockClientConnection>();
+    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection_));
+    EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(SaveArg<0>(&read_filter_));
+  }
+
+  std::shared_ptr<TcpHealthCheckerImpl> health_checker_;
+  Network::MockClientConnection* connection_{};
+  Event::MockTimer* timeout_timer_{};
+  Event::MockTimer* interval_timer_{};
+  Network::ReadFilterSharedPtr read_filter_;
 };
 
 TEST_F(TcpHealthCheckerImplTest, Success) {
@@ -2953,11 +2970,6 @@ TEST_F(TcpHealthCheckerImplTest, Success) {
   EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  ENVOY_LOG_MISC(trace, "Right after starting health checker interval enabled = {}",
-                 interval_timer_->enabled_);
-  ENVOY_LOG_MISC(trace, "Right after starting health checker timeout enabled = {}",
-                 timeout_timer_->enabled_);
-
   connection_->runHighWatermarkCallbacks();
   connection_->runLowWatermarkCallbacks();
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
@@ -2965,11 +2977,7 @@ TEST_F(TcpHealthCheckerImplTest, Success) {
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   Buffer::OwnedImpl response;
-  ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer before adding.",
-                 response.toString());
   addUint8(response, 2);
-  ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer generated from the string.",
-                 response.toString());
   read_filter_->onData(response, false);
 }
 
@@ -2994,11 +3002,7 @@ TEST_F(TcpHealthCheckerImplTest, DataWithoutReusingConnection) {
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush)).Times(1);
 
   Buffer::OwnedImpl response;
-  ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer before adding.",
-                 response.toString());
   addUint8(response, 2);
-  ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer generated from the string.",
-                 response.toString());
   read_filter_->onData(response, false);
 
   // These are the expected metric results after testing.
@@ -3023,11 +3027,7 @@ TEST_F(TcpHealthCheckerImplTest, WrongData) {
 
   // Not the expected response
   Buffer::OwnedImpl response;
-  // ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer before adding.",
-  // response.toString());
   addUint8(response, 3);
-  // ENVOY_LOG_MISC(trace, "Responded with {}. This is the buffer generated from the string.",
-  // response.toString());
   read_filter_->onData(response, false);
 
   // These are the expected metric results after testing.
@@ -3052,8 +3052,7 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutThenRemoteClose) {
   EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
 
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks(
-      {cluster_->prioritySet().getMockHostSet(0)->hosts_.back()},
-      {}); // TODO: This line might have something to do with it
+      {cluster_->prioritySet().getMockHostSet(0)->hosts_.back()}, {});
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
@@ -3065,7 +3064,6 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutThenRemoteClose) {
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  ENVOY_LOG_MISC(trace, "Timeout timer invoked.");
   timeout_timer_->invokeCallback();
   EXPECT_EQ(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->getActiveHealthFailureType(),
             Host::ActiveHealthFailureType::TIMEOUT);
@@ -3074,7 +3072,6 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutThenRemoteClose) {
   expectClientCreate();
   EXPECT_CALL(*connection_, write(_, _));
   EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
-  ENVOY_LOG_MISC(trace, "Interval timer invoked.");
   interval_timer_->invokeCallback();
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
@@ -3091,7 +3088,6 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutThenRemoteClose) {
   expectClientCreate();
   EXPECT_CALL(*connection_, write(_, _));
   EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
-  ENVOY_LOG_MISC(trace, "Interval timer invoked.");
   interval_timer_->invokeCallback();
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
@@ -3106,7 +3102,7 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   InSequence s;
 
   setupData(1);
-  health_checker_->start(); // Weird, this is beforehand
+  health_checker_->start();
 
   expectSessionCreate();
   expectClientCreate();
