@@ -125,6 +125,12 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   const bool dual_filter_ : 1;
   bool decode_headers_called_ : 1;
   bool encode_headers_called_ : 1;
+  // Whether a filter has indicated that the response should be treated as a headers only
+  // response.
+  bool encoding_headers_only_{false};
+  // Whether a filter has indicated that the request should be treated as a headers only
+  // request.
+  bool decoding_headers_only_{false};
 };
 
 /**
@@ -499,7 +505,7 @@ public:
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_continue_headers_)
-       << DUMP_MEMBER(state_.decoding_headers_only_) << DUMP_MEMBER(state_.encoding_headers_only_)
+      //  << DUMP_MEMBER(state_.decoding_headers_only_) << DUMP_MEMBER(state_.encoding_headers_only_)
        << "\n";
 
     DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.requestHeaders());
@@ -825,12 +831,6 @@ private:
     bool encoder_filters_streaming_{true};
     bool decoder_filters_streaming_{true};
     bool destroyed_{false};
-    // Whether a filter has indicated that the response should be treated as a headers only
-    // response.
-    bool encoding_headers_only_{false};
-    // Whether a filter has indicated that the request should be treated as a headers only
-    // request.
-    bool decoding_headers_only_{false};
 
     // Used to track which filter is the latest filter that has received data.
     ActiveStreamEncoderFilter* latest_data_encoding_filter_{};

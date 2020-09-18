@@ -447,7 +447,13 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
-    (*entry)->end_stream_ = state_.decoding_headers_only_ ||
+
+    // If the previous filter is decoding headers only, so are we unless we start adding data during this filter.
+    // We propagate the decoding_headers_only_ flag forward to further filters, allowing filters to override thie value
+    // for itself and subsequent filters.
+    const auto decoding_headers_only = entry == decoder_filters_.begin() ? false : (*std::prev(entry))->decoding_headers_only_;
+    (*entry)->decoding_headers_only_ = decoding_headers_only;
+    (*entry)->end_stream_ = decoding_headers_only ||
                             (end_stream && continue_data_entry == decoder_filters_.end());
     FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
 
@@ -466,10 +472,10 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
 
     // decoding_headers_only_ is set if the filter returns ContinueAndEndStream.
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(
-        status, end_stream, state_.decoding_headers_only_);
+        status, end_stream, (*entry)->decoding_headers_only_);
 
     // If this filter ended the stream, decodeComplete() should be called for it.
-    if ((*entry)->end_stream_ || state_.decoding_headers_only_) {
+    if ((*entry)->end_stream_ || (*entry)->decoding_headers_only_) {
       (*entry)->handle_->decodeComplete();
     }
 
@@ -484,6 +490,12 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       // Metadata frame doesn't carry end of stream bit. We need an empty data frame to end the
       // stream.
       addDecodedData(*((*entry).get()), empty_data, true);
+      // At this point we're no longer going to be decoding a headers only request, so reset this
+      // flag. This is propagated to subsequent filters which will allow all of these to decode the
+      // data.
+      (*entry)->decoding_headers_only_ = false;
+      // Unmark end_stream_ for this filter so that it can receive the data when continue is called.
+      (*entry)->end_stream_ = false;
     }
 
     if (!continue_iteration && std::next(entry) != decoder_filters_.end()) {
@@ -496,7 +508,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
 
     // Here we handle the case where we have a header only request, but a filter adds a body
     // to it. We need to not raise end_stream = true to further filters during inline iteration.
-    if (end_stream && buffered_request_data_ && continue_data_entry == decoder_filters_.end()) {
+    if ((end_stream || (*entry)->decoding_headers_only_) && buffered_request_data_ && continue_data_entry == decoder_filters_.end()) {
       continue_data_entry = entry;
     }
   }
@@ -514,11 +526,6 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
   ScopeTrackerScopeState scope(&*this, dispatcher_);
   filter_manager_callbacks_.resetIdleTimer();
 
-  // If we previously decided to decode only the headers, do nothing here.
-  if (state_.decoding_headers_only_) {
-    return;
-  }
-
   // If a response is complete or a reset has been sent, filters do not care about further body
   // data. Just drop it.
   if (state_.local_complete_) {
@@ -532,6 +539,11 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       commonDecodePrefix(filter, filter_iteration_start_state);
 
   for (; entry != decoder_filters_.end(); entry++) {
+    // If we previously decided to decode only the headers, do nothing here.
+    if ((*entry)->decoding_headers_only_) {
+      continue;
+    }
+
     // If the filter pointed by entry has stopped for all frame types, return now.
     if (handleDataIfStopAll(**entry, data, state_.decoder_filters_streaming_)) {
       return;
@@ -653,11 +665,6 @@ void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::In
 MetadataMapVector& FilterManager::addDecodedMetadata() { return *getRequestMetadataMapVector(); }
 
 void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTrailerMap& trailers) {
-  // If we previously decided to decode only the headers, do nothing here.
-  if (state_.decoding_headers_only_) {
-    return;
-  }
-
   // See decodeData() above for why we check local_complete_ here.
   if (state_.local_complete_) {
     return;
@@ -668,6 +675,11 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
       commonDecodePrefix(filter, FilterIterationStartState::CanStartFromCurrent);
 
   for (; entry != decoder_filters_.end(); entry++) {
+    // If we previously decided to decode only the headers, do nothing here.
+    if ((*entry)->decoding_headers_only_) {
+      continue;
+    }
+
     // If the filter pointed by entry has stopped for all frame type, return now.
     if ((*entry)->stoppedAll()) {
       return;
@@ -730,7 +742,7 @@ FilterManager::commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_st
   // Only do base state setting on the initial call. Subsequent calls for filtering do not touch
   // the base state.
   if (filter == nullptr) {
-    ASSERT(!state_.local_complete_);
+    // ASSERT(!state_.local_complete_);
     state_.local_complete_ = end_stream;
     return encoder_filters_.begin();
   }
@@ -935,7 +947,13 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeHeaders));
     state_.filter_call_state_ |= FilterCallState::EncodeHeaders;
-    (*entry)->end_stream_ = state_.encoding_headers_only_ ||
+
+    // If the previous filter is encoding headers only, so are we unless we start adding data during this filter.
+    // We propagate the encoding_headers_only_ flag forward to further filters, allowing filters to override thie value
+    // for itself and subsequent filters.
+    const auto encoding_headers_only = entry == encoder_filters_.begin() ? false : (*std::prev(entry))->encoding_headers_only_;
+    (*entry)->encoding_headers_only_ = encoding_headers_only;
+    (*entry)->end_stream_ = encoding_headers_only ||
                             (end_stream && continue_data_entry == encoder_filters_.end());
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, (*entry)->end_stream_);
 
@@ -954,16 +972,16 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
 
     // encoding_headers_only_ is set if the filter returns ContinueAndEndStream.
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(
-        status, end_stream, state_.encoding_headers_only_);
+        status, end_stream, (*entry)->encoding_headers_only_);
 
     // If this filter ended the stream, encodeComplete() should be called for it.
-    if ((*entry)->end_stream_ || state_.encoding_headers_only_) {
+    if ((*entry)->end_stream_ || (*entry)->encoding_headers_only_) {
       (*entry)->handle_->encodeComplete();
     }
 
     // If we're encoding a headers only response, then mark the local as complete. This ensures
     // that we don't attempt to reset the downstream request in doEndStream.
-    if (state_.encoding_headers_only_) {
+    if ((*entry)->encoding_headers_only_) {
       state_.local_complete_ = true;
     }
 
@@ -976,13 +994,14 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
 
     // Here we handle the case where we have a header only response, but a filter adds a body
     // to it. We need to not raise end_stream = true to further filters during inline iteration.
-    if (end_stream && buffered_response_data_ && continue_data_entry == encoder_filters_.end()) {
+    if ((end_stream || (*entry)->encoding_headers_only_) && buffered_response_data_ && continue_data_entry == encoder_filters_.end()) {
       continue_data_entry = entry;
     }
   }
 
-  const bool modified_end_stream = state_.encoding_headers_only_ ||
-                                   (end_stream && continue_data_entry == encoder_filters_.end());
+  const bool encoding_headers_only = encoder_filters_.empty() ? false : encoder_filters_.back()->encoding_headers_only_;
+  const bool modified_end_stream =
+      encoding_headers_only || (end_stream && continue_data_entry == encoder_filters_.end());
   state_.non_100_response_headers_encoded_ = true;
   filter_manager_callbacks_.encodeHeaders(headers, modified_end_stream);
   maybeEndEncode(modified_end_stream);
@@ -1061,18 +1080,25 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
                                FilterIterationStartState filter_iteration_start_state) {
   filter_manager_callbacks_.resetIdleTimer();
 
-  // If we previously decided to encode only the headers, do nothing here.
-  if (state_.encoding_headers_only_) {
-    return;
-  }
-
   // Filter iteration may start at the current filter.
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
       commonEncodePrefix(filter, end_stream, filter_iteration_start_state);
   auto trailers_added_entry = encoder_filters_.end();
 
   const bool trailers_exists_at_start = filter_manager_callbacks_.responseTrailers().has_value();
+  bool skip_encoding_data = false;
   for (; entry != encoder_filters_.end(); entry++) {
+    if ((*entry)->encoding_headers_only_) {
+      skip_encoding_data = true;
+      continue;
+    } else {
+      skip_encoding_data = false;
+    }
+    // If we previously decided to encode only the headers, do nothing here.
+    if ((*entry)->encoding_headers_only_) {
+      continue;
+    }
+
     // If the filter pointed by entry has stopped for all frame type, return now.
     if (handleDataIfStopAll(**entry, data, state_.encoder_filters_streaming_)) {
       return;
@@ -1116,8 +1142,11 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
     }
   }
 
+  if (skip_encoding_data) {
+    return;
+  }
+
   const bool modified_end_stream = end_stream && trailers_added_entry == encoder_filters_.end();
-  ASSERT(!state_.encoding_headers_only_);
   filter_manager_callbacks_.encodeData(data, modified_end_stream);
   maybeEndEncode(modified_end_stream);
 
@@ -1132,15 +1161,19 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
                                    ResponseTrailerMap& trailers) {
   filter_manager_callbacks_.resetIdleTimer();
 
-  // If we previously decided to encode only the headers, do nothing here.
-  if (state_.encoding_headers_only_) {
-    return;
-  }
-
+  bool skip_encoding_trailers = false;
   // Filter iteration may start at the current filter.
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
       commonEncodePrefix(filter, true, FilterIterationStartState::CanStartFromCurrent);
   for (; entry != encoder_filters_.end(); entry++) {
+    // If we previously decided to encode only the headers, do nothing here.
+    if ((*entry)->encoding_headers_only_) {
+      skip_encoding_trailers = true;
+      continue;
+    }
+
+    skip_encoding_trailers = false;
+
     // If the filter pointed by entry has stopped for all frame type, return now.
     if ((*entry)->stoppedAll()) {
       return;
@@ -1156,6 +1189,10 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
     if (!(*entry)->commonHandleAfterTrailersCallback(status)) {
       return;
     }
+  }
+
+  if (skip_encoding_trailers) {
+    return;
   }
 
   filter_manager_callbacks_.encodeTrailers(trailers);
