@@ -115,12 +115,13 @@ private:
     const std::chrono::milliseconds timer_interval_;
     TimerPtr touch_timer_;
   };
+  using WatchdogRegistrationPtr = std::unique_ptr<WatchdogRegistration>;
 
   TimerPtr createTimerInternal(TimerCb cb);
   void updateApproximateMonotonicTimeInternal();
   void runPostCallbacks();
   // Helper used to touch all watchdog after most schedulable, fd, and timer callbacks.
-  void touchWatchdogs();
+  void touchWatchdog();
 
   // Validate that an operation is thread safe, i.e. it's invoked on the same thread that the
   // dispatcher run loop is executing on. We allow run_tid_ to be empty for tests where we don't
@@ -147,7 +148,7 @@ private:
   const ScopeTrackedObject* current_object_{};
   bool deferred_deleting_{};
   MonotonicTime approximate_monotonic_time_;
-  std::list<WatchdogRegistration> watchdog_registrations_;
+  WatchdogRegistrationPtr watchdog_registration_;
 };
 
 } // namespace Event

@@ -1130,18 +1130,13 @@ protected:
 
 // The dispatcher creates a periodic touch timer for each registered watchdog.
 TEST_F(DispatcherWithWatchdogTest, PeriodicTouchTimer) {
-  auto second_watchdog = std::make_shared<Server::MockWatchDog>();
-  dispatcher_->registerWatchdog(second_watchdog, 2 * min_touch_interval_);
-  dispatcher_->run(Dispatcher::RunType::NonBlock);
-
   // Advance by min_touch_interval_, verify that watchdog_ is touched.
   EXPECT_CALL(*watchdog_, touch());
   time_system_.advanceTimeAsync(min_touch_interval_);
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 
-  // Advance by min_touch_interval_ again, verify that watchdog_ and second_watchdog are touched.
+  // Advance by min_touch_interval_ again, verify that watchdog_ is touched.
   EXPECT_CALL(*watchdog_, touch());
-  EXPECT_CALL(*second_watchdog, touch());
   time_system_.advanceTimeAsync(min_touch_interval_);
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 }

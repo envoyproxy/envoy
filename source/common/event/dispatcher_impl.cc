@@ -55,7 +55,9 @@ DispatcherImpl::~DispatcherImpl() { FatalErrorHandler::removeFatalErrorHandler(*
 
 void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
                                       std::chrono::milliseconds min_touch_interval) {
-  watchdog_registrations_.emplace_back(watchdog, *scheduler_, min_touch_interval, *this);
+  ASSERT(!watchdog_registration_, "Each dispatcher can have at most one registered watchdog.");
+  watchdog_registration_ =
+      std::make_unique<WatchdogRegistration>(watchdog, *scheduler_, min_touch_interval, *this);
 }
 
 void DispatcherImpl::initializeStats(Stats::Scope& scope,
@@ -136,7 +138,7 @@ FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTri
   return FileEventPtr{new FileEventImpl(
       *this, fd,
       [this, cb](uint32_t events) {
-        touchWatchdogs();
+        touchWatchdog();
         cb(events);
       },
       trigger, events)};
@@ -169,7 +171,7 @@ TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
 Event::SchedulableCallbackPtr DispatcherImpl::createSchedulableCallback(std::function<void()> cb) {
   ASSERT(isThreadSafe());
   return base_scheduler_.createSchedulableCallback([this, cb]() {
-    touchWatchdogs();
+    touchWatchdog();
     cb();
   });
 }
@@ -177,7 +179,7 @@ Event::SchedulableCallbackPtr DispatcherImpl::createSchedulableCallback(std::fun
 TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
   return scheduler_->createTimer(
       [this, cb]() {
-        touchWatchdogs();
+        touchWatchdog();
         cb();
       },
       *this);
@@ -254,9 +256,9 @@ void DispatcherImpl::runPostCallbacks() {
   }
 }
 
-void DispatcherImpl::touchWatchdogs() {
-  for (auto& registration : watchdog_registrations_) {
-    registration.touchWatchdog();
+void DispatcherImpl::touchWatchdog() {
+  if (watchdog_registration_) {
+    watchdog_registration_->touchWatchdog();
   }
 }
 
