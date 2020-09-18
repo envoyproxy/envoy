@@ -177,7 +177,11 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
           ENVOY_LOG_MISC(debug, "p={}", reinterpret_cast<intptr_t>(p));
         }
       }(),
+#if defined(TCMALLOC)
+      ".*Unable to allocate.*");
+#else
       ".*panic: out of memory.*");
+#endif
 #endif
 }
 

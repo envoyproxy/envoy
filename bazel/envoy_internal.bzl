@@ -57,10 +57,13 @@ def envoy_copts(repository, test = False):
                "//conditions:default": [],
            }) + select({
                repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
-               "//conditions:default": ["-DTCMALLOC"],
-           }) + select({
-               repository + "//bazel:debug_tcmalloc": ["-DENVOY_MEMORY_DEBUG_ENABLED=1"],
-               "//conditions:default": [],
+               repository + "//bazel:disable_tcmalloc_on_linux_x86_64": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
+               repository + "//bazel:gperftools_tcmalloc": ["-DGPERFTOOLS_TCMALLOC"],
+               repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": ["-DGPERFTOOLS_TCMALLOC"],
+               repository + "//bazel:debug_tcmalloc": ["-DENVOY_MEMORY_DEBUG_ENABLED=1", "-DGPERFTOOLS_TCMALLOC"],
+               repository + "//bazel:debug_tcmalloc_on_linux_x86_64": ["-DENVOY_MEMORY_DEBUG_ENABLED=1", "-DGPERFTOOLS_TCMALLOC"],
+               repository + "//bazel:linux_x86_64": ["-DTCMALLOC"],
+               "//conditions:default": ["-DGPERFTOOLS_TCMALLOC"],
            }) + select({
                repository + "//bazel:disable_signal_trace": [],
                "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
@@ -115,6 +118,12 @@ def envoy_stdlib_deps():
 def tcmalloc_external_dep(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": None,
+        repository + "//bazel:disable_tcmalloc_on_linux_x86_64": None,
+        repository + "//bazel:debug_tcmalloc": envoy_external_dep_path("gperftools"),
+        repository + "//bazel:debug_tcmalloc_on_linux_x86_64": envoy_external_dep_path("gperftools"),
+        repository + "//bazel:gperftools_tcmalloc": envoy_external_dep_path("gperftools"),
+        repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": envoy_external_dep_path("gperftools"),
+        repository + "//bazel:linux_x86_64": envoy_external_dep_path("tcmalloc"),
         "//conditions:default": envoy_external_dep_path("gperftools"),
     })
 

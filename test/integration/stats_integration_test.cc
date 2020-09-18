@@ -370,6 +370,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/08/10  12275    37061       38000   Re-organize tls histogram maps to improve continuity.
   // 2020/08/11  12202    37061       38500   router: add new retry back-off strategy
   // 2020/09/11  12973                38993   upstream: predictive prefetch
+  // 2020/09/23                       39244   switch to google tcmalloc
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -390,7 +391,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
     // https://github.com/envoyproxy/envoy/issues/12209
     // EXPECT_MEMORY_EQ(m_per_cluster, 37061);
   }
-  EXPECT_MEMORY_LE(m_per_cluster, 39000); // Round up to allow platform variations.
+  EXPECT_MEMORY_LE(m_per_cluster, 39250); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {

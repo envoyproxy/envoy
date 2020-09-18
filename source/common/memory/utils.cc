@@ -3,15 +3,26 @@
 #include "common/common/assert.h"
 #include "common/memory/stats.h"
 
-#ifdef TCMALLOC
+#if defined(TCMALLOC)
+#include "tcmalloc/malloc_extension.h"
+#elif defined(GPERFTOOLS_TCMALLOC)
 #include "gperftools/malloc_extension.h"
 #endif
 
 namespace Envoy {
 namespace Memory {
 
+namespace {
+#if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC)
+// TODO(zyfjeff): Make max unfreed memory byte configurable
+constexpr uint64_t MAX_UNFREED_MEMORY_BYTE = 100 * 1024 * 1024;
+#endif
+} // namespace
+
 void Utils::releaseFreeMemory() {
-#ifdef TCMALLOC
+#if defined(TCMALLOC)
+  tcmalloc::MallocExtension::ReleaseMemoryToSystem(MAX_UNFREED_MEMORY_BYTE);
+#elif defined(GPERFTOOLS_TCMALLOC)
   MallocExtension::instance()->ReleaseFreeMemory();
 #endif
 }
@@ -23,9 +34,7 @@ void Utils::releaseFreeMemory() {
   Ref: https://github.com/envoyproxy/envoy/pull/9471#discussion_r363825985
 */
 void Utils::tryShrinkHeap() {
-#ifdef TCMALLOC
-  // TODO(zyfjeff): Make max unfreed memory byte configurable
-  static const uint64_t MAX_UNFREED_MEMORY_BYTE = 100 * 1024 * 1024;
+#if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC)
   auto total_physical_bytes = Stats::totalPhysicalBytes();
   auto allocated_size_by_app = Stats::totalCurrentlyAllocated();
 

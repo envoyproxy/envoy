@@ -607,7 +607,8 @@ The following optional features can be disabled on the Bazel build command-line:
 * Google C++ gRPC client with `--define google_grpc=disabled`
 * Backtracing on signals with `--define signal_trace=disabled`
 * Active stream state dump on signals with `--define signal_trace=disabled` or `--define disable_object_dump_on_signal_trace=disabled`
-* tcmalloc with `--define tcmalloc=disabled`
+* tcmalloc with `--define tcmalloc=disabled`. Also you can choose Gperftools' implementation of
+  tcmalloc with `--define tcmalloc=gperftools` which is the default for non-x86 builds.
 * deprecated features with `--define deprecated_features=disabled`
 
 
@@ -626,7 +627,8 @@ The following optional features can be enabled on the Bazel build command-line:
   `--define log_debug_assert_in_release=enabled`. The default behavior is to compile debug assertions out of
   release builds so that the condition is not evaluated. This option has no effect in debug builds.
 * memory-debugging (scribbling over memory after allocation and before freeing) with
-  `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL.
+  `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL and
+  tcmalloc is built from the sources of Gperftools.
 * Default [path normalization](https://github.com/envoyproxy/envoy/issues/6435) with
   `--define path_normalization_by_default=true`. Note this still could be disable by explicit xDS config.
 * Manual stamping via VersionInfo with `--define manual_stamp=manual_stamp`.

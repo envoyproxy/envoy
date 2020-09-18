@@ -789,11 +789,13 @@ TEST(SymbolTableTest, Memory) {
     }
   }
 
-  // Make sure we don't regress. Data as of 2019/05/29:
-  //
+  // Make sure we don't regress.
+  // Data as of 2019/05/29:
   // string_mem_used:        6710912 (libc++), 7759488 (libstdc++).
+  // Data as of 2020/09/23 (switch to https://github.com/google/tcmalloc):
+  // string_mem_used:        6710912 (libc++), 7775872 (libstdc++).
   // symbol_table_mem_used:  1726056 (3.9x) -- does not seem to depend on STL sizes.
-  EXPECT_MEMORY_LE(string_mem_used, 7759488);
+  EXPECT_MEMORY_LE(string_mem_used, 7775872);
   EXPECT_MEMORY_LE(symbol_table_mem_used, string_mem_used / 3);
   EXPECT_MEMORY_EQ(symbol_table_mem_used, 1726056);
 }

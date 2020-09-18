@@ -20,6 +20,12 @@ load(
 def tcmalloc_external_deps(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": [],
+        repository + "//bazel:disable_tcmalloc_on_linux_x86_64": [],
+        repository + "//bazel:debug_tcmalloc": [envoy_external_dep_path("gperftools")],
+        repository + "//bazel:debug_tcmalloc_on_linux_x86_64": [envoy_external_dep_path("gperftools")],
+        repository + "//bazel:gperftools_tcmalloc": [envoy_external_dep_path("gperftools")],
+        repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": [envoy_external_dep_path("gperftools")],
+        repository + "//bazel:linux_x86_64": [envoy_external_dep_path("tcmalloc")],
         "//conditions:default": [envoy_external_dep_path("gperftools")],
     })
 
