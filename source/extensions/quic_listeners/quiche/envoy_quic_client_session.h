@@ -56,7 +56,7 @@ public:
   void OnCanWrite() override;
   void OnGoAway(const quic::QuicGoAwayFrame& frame) override;
   void OnHttp3GoAway(uint64_t stream_id) override;
-  void OnOneRttKeysAvailable() override;
+  void OnTlsHandshakeComplete() override;
   // quic::QuicSpdyClientSessionBase
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
 
