@@ -17,9 +17,6 @@ class FakeResourceMonitorFactory;
 
 class FakeResourceMonitor : public Server::ResourceMonitor {
 public:
-  static constexpr absl::string_view kName =
-      "envoy.resource_monitors.testonly.fake_resource_monitor";
-
   FakeResourceMonitor(Event::Dispatcher& dispatcher, FakeResourceMonitorFactory& factory)
       : dispatcher_(dispatcher), factory_(factory), pressure_(0.0) {}
   ~FakeResourceMonitor() override;
@@ -46,7 +43,9 @@ public:
     return std::make_unique<test::common::config::DummyConfig>();
   }
 
-  std::string name() const override { return std::string(FakeResourceMonitor::kName); }
+  std::string name() const override {
+    return "envoy.resource_monitors.testonly.fake_resource_monitor";
+  }
 
   void onMonitorDestroyed(FakeResourceMonitor* monitor);
 
@@ -63,9 +62,8 @@ void FakeResourceMonitor::updateResourceUsage(Callbacks& callbacks) {
 }
 
 void FakeResourceMonitorFactory::onMonitorDestroyed(FakeResourceMonitor* monitor) {
-  if (monitor_ == monitor) {
-    monitor_ = nullptr;
-  }
+  ASSERT(monitor_ == monitor);
+  monitor_ = nullptr;
 }
 
 Server::ResourceMonitorPtr FakeResourceMonitorFactory::createResourceMonitor(
@@ -107,15 +105,14 @@ protected:
       *bootstrap.mutable_overload_manager() =
           TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(overload_config);
     });
-    updateResource(0);
     HttpIntegrationTest::initialize();
+    updateResource(0);
   }
 
   void updateResource(double pressure) {
     auto* monitor = fake_resource_monitor_factory_.monitor();
-    if (monitor != nullptr) {
-      monitor->setResourcePressure(pressure);
-    }
+    ASSERT(monitor != nullptr);
+    monitor->setResourcePressure(pressure);
   }
 
   FakeResourceMonitorFactory fake_resource_monitor_factory_;
