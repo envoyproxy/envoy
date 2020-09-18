@@ -60,9 +60,9 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
   }
 
   bool pack_as_bytes = config_->packAsBytes();
-  if (per_route_config_ != nullptr) {
-    // Per-route pack_as_bytes config overrides the global one.
-    pack_as_bytes = per_route_config_->packAsBytes();
+  if (per_route_config_ != nullptr && per_route_config_->packAsBytes().has_value()) {
+    // When defined, per-route pack_as_bytes config overrides the global one.
+    pack_as_bytes = per_route_config_->packAsBytes().value();
   }
 
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(

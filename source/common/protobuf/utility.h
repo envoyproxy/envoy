@@ -49,6 +49,12 @@
              DurationUtil::durationToMilliseconds((message).field_name()))                         \
        : absl::nullopt)
 
+// Obtain the optional_type value of a wrapped field (e.g. google.protobuf.BoolValue) if set.
+// Otherwise, return the absl::nullopt.
+#define PROTOBUF_GET_OPTIONAL_WRAPPED(message, field_name, optional_type)                          \
+  ((message).has_##field_name() ? absl::optional<optional_type>((message).field_name().value())    \
+                                : absl::nullopt)
+
 // Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, throw a
 // MissingFieldException.
 #define PROTOBUF_GET_MS_REQUIRED(message, field_name)                                              \

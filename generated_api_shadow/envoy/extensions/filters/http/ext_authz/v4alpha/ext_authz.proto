@@ -9,6 +9,8 @@ import "envoy/config/core/v4alpha/http_uri.proto";
 import "envoy/type/matcher/v4alpha/string.proto";
 import "envoy/type/v3/http_status.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -148,7 +150,7 @@ message RequestBodyOptions {
 
   // If true, the body sent to the external authorization service is set with raw bytes, instead of
   // UTF-8 string.
-  bool pack_as_bytes = 1;
+  google.protobuf.BoolValue pack_as_bytes = 1;
 }
 
 // HttpService is used for raw HTTP communication between the filter and the authorization service.

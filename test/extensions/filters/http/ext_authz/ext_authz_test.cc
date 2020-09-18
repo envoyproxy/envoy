@@ -115,8 +115,10 @@ public:
   with_request_body:
     max_request_bytes: 10
   )EOF");
-      settings.mutable_check_settings()->mutable_request_body_options()->set_pack_as_bytes(
-          as_bytes);
+      settings.mutable_check_settings()
+          ->mutable_request_body_options()
+          ->mutable_pack_as_bytes()
+          ->set_value(as_bytes);
       auth_per_route = FilterConfigPerRoute(settings);
     };
 
