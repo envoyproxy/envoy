@@ -1122,13 +1122,13 @@ TEST_P(HdsIntegrationTest, UpdateEndpoints) {
            ->mutable_address());
 
   // Reset second endpoint for usage in our cluster.
-  AssertionResult result = host2_fake_connection_->close();
-  RELEASE_ASSERT(result, result.message());
-  result = host2_fake_connection_->waitForDisconnect();
-  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(host2_fake_connection_->close());
+  ASSERT_TRUE(host2_fake_connection_->waitForDisconnect());
 
   // Send new specifier.
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  // TODO: add stats reporting and verification for Clusters added/removed/reused and Endpoints
+  // added/removed/reused.
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
   // Set up second endpoint again.
