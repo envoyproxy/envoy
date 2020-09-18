@@ -15,7 +15,7 @@ namespace StreamInfo {
 namespace {
 
 TEST(ResponseFlagUtilsTest, toShortStringConversion) {
-  static_assert(ResponseFlag::LastFlag == 0x200000, "A flag has been added. Fix this code.");
+  static_assert(ResponseFlag::LastFlag == 0x400000, "A flag has been added. Fix this code.");
 
   std::vector<std::pair<ResponseFlag, std::string>> expected = {
       std::make_pair(ResponseFlag::FailedLocalHealthCheck, "LH"),
@@ -39,7 +39,8 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
       std::make_pair(ResponseFlag::DownstreamProtocolError, "DPE"),
       std::make_pair(ResponseFlag::UpstreamMaxStreamDurationReached, "UMSDR"),
       std::make_pair(ResponseFlag::ResponseFromCacheFilter, "RFCF"),
-      std::make_pair(ResponseFlag::NoFilterConfigFound, "NFCF")};
+      std::make_pair(ResponseFlag::NoFilterConfigFound, "NFCF"),
+      std::make_pair(ResponseFlag::DurationTimeout, "DT")};
 
   for (const auto& test_case : expected) {
     NiceMock<MockStreamInfo> stream_info;
@@ -67,7 +68,7 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
 }
 
 TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
-  static_assert(ResponseFlag::LastFlag == 0x200000, "A flag has been added. Fix this code.");
+  static_assert(ResponseFlag::LastFlag == 0x400000, "A flag has been added. Fix this code.");
 
   std::vector<std::pair<std::string, ResponseFlag>> expected = {
       std::make_pair("LH", ResponseFlag::FailedLocalHealthCheck),
@@ -91,7 +92,8 @@ TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
       std::make_pair("DPE", ResponseFlag::DownstreamProtocolError),
       std::make_pair("UMSDR", ResponseFlag::UpstreamMaxStreamDurationReached),
       std::make_pair("RFCF", ResponseFlag::ResponseFromCacheFilter),
-      std::make_pair("NFCF", ResponseFlag::NoFilterConfigFound)};
+      std::make_pair("NFCF", ResponseFlag::NoFilterConfigFound),
+      std::make_pair("DT", ResponseFlag::DurationTimeout)};
 
   EXPECT_FALSE(ResponseFlagUtils::toResponseFlag("NonExistentFlag").has_value());
 

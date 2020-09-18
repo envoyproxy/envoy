@@ -622,7 +622,32 @@ message Cluster {
     //
     // This is limited somewhat arbitrarily to 3 because prefetching connections too aggressively can
     // harm latency more than the prefetching helps.
-    google.protobuf.DoubleValue prefetch_ratio = 1 [(validate.rules).double = {lte: 3.0 gte: 1.0}];
+    google.protobuf.DoubleValue per_upstream_prefetch_ratio = 1
+        [(validate.rules).double = {lte: 3.0 gte: 1.0}];
+
+    // Indicates how many many streams (rounded up) can be anticipated across a cluster for each
+    // stream, useful for low QPS services. This is currently supported for a subset of
+    // deterministic non-hash-based load-balancing algorithms (weighted round robin, random).
+    // Unlike per_upstream_prefetch_ratio this prefetches across the upstream instances in a
+    // cluster, doing best effort predictions of what upstream would be picked next and
+    // pre-establishing a connection.
+    //
+    // For example if prefetching is set to 2 for a round robin HTTP/2 cluster, on the first
+    // incoming stream, 2 connections will be prefetched - one to the first upstream for this
+    // cluster, one to the second on the assumption there will be a follow-up stream.
+    //
+    // Prefetching will be limited to one prefetch per configured upstream in the cluster.
+    //
+    // If this value is not set, or set explicitly to one, Envoy will fetch as many connections
+    // as needed to serve streams in flight, so during warm up and in steady state if a connection
+    // is closed (and per_upstream_prefetch_ratio is not set), there will be a latency hit for
+    // connection establishment.
+    //
+    // If both this and prefetch_ratio are set, Envoy will make sure both predicted needs are met,
+    // basically prefetching max(predictive-prefetch, per-upstream-prefetch), for each upstream.
+    // TODO(alyssawilk) per LB docs and LB overview docs when unhiding.
+    google.protobuf.DoubleValue predictive_prefetch_ratio = 2
+        [(validate.rules).double = {lte: 3.0 gte: 1.0}];
   }
 
   reserved 12, 15, 7, 11, 35, 47;

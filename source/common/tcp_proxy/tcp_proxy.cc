@@ -110,6 +110,11 @@ Config::SharedConfig::SharedConfig(
   if (config.has_tunneling_config()) {
     tunneling_config_ = config.tunneling_config();
   }
+  if (config.has_max_downstream_connection_duration()) {
+    const uint64_t connection_duration =
+        DurationUtil::durationToMilliseconds(config.max_downstream_connection_duration());
+    max_downstream_connection_duration_ = std::chrono::milliseconds(connection_duration);
+  }
 }
 
 Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
@@ -583,6 +588,15 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   return Network::FilterStatus::StopIteration;
 }
 
+Network::FilterStatus Filter::onNewConnection() {
+  if (config_->maxDownstreamConnectionDuration()) {
+    connection_duration_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onMaxDownstreamConnectionDuration(); });
+    connection_duration_timer_->enableTimer(config_->maxDownstreamConnectionDuration().value());
+  }
+  return initializeUpstreamConnection();
+}
+
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   if (upstream_) {
     Tcp::ConnectionPool::ConnectionDataPtr conn_data(upstream_->onDownstreamEvent(event));
@@ -676,6 +690,13 @@ void Filter::onIdleTimeout() {
   config_->stats().idle_timeout_.inc();
 
   // This results in also closing the upstream connection.
+  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+}
+
+void Filter::onMaxDownstreamConnectionDuration() {
+  ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
+  getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::DurationTimeout);
+  config_->stats().max_downstream_connection_duration_.inc();
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
