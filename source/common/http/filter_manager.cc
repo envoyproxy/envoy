@@ -448,13 +448,14 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
 
-    // If the previous filter is decoding headers only, so are we unless we start adding data during this filter.
-    // We propagate the decoding_headers_only_ flag forward to further filters, allowing filters to override thie value
-    // for itself and subsequent filters.
-    const auto decoding_headers_only = entry == decoder_filters_.begin() ? false : (*std::prev(entry))->decoding_headers_only_;
+    // If the previous filter is decoding headers only, so are we unless we start adding data during
+    // this filter. We propagate the decoding_headers_only_ flag forward to further filters,
+    // allowing filters to override thie value for itself and subsequent filters.
+    const auto decoding_headers_only =
+        entry == decoder_filters_.begin() ? false : (*std::prev(entry))->decoding_headers_only_;
     (*entry)->decoding_headers_only_ = decoding_headers_only;
-    (*entry)->end_stream_ = decoding_headers_only ||
-                            (end_stream && continue_data_entry == decoder_filters_.end());
+    (*entry)->end_stream_ =
+        decoding_headers_only || (end_stream && continue_data_entry == decoder_filters_.end());
     FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
 
     ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && (*entry)->end_stream_),
@@ -508,7 +509,8 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
 
     // Here we handle the case where we have a header only request, but a filter adds a body
     // to it. We need to not raise end_stream = true to further filters during inline iteration.
-    if ((end_stream || (*entry)->decoding_headers_only_) && buffered_request_data_ && continue_data_entry == decoder_filters_.end()) {
+    if ((end_stream || (*entry)->decoding_headers_only_) && buffered_request_data_ &&
+        continue_data_entry == decoder_filters_.end()) {
       continue_data_entry = entry;
     }
   }
@@ -948,13 +950,14 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeHeaders));
     state_.filter_call_state_ |= FilterCallState::EncodeHeaders;
 
-    // If the previous filter is encoding headers only, so are we unless we start adding data during this filter.
-    // We propagate the encoding_headers_only_ flag forward to further filters, allowing filters to override thie value
-    // for itself and subsequent filters.
-    const auto encoding_headers_only = entry == encoder_filters_.begin() ? false : (*std::prev(entry))->encoding_headers_only_;
+    // If the previous filter is encoding headers only, so are we unless we start adding data during
+    // this filter. We propagate the encoding_headers_only_ flag forward to further filters,
+    // allowing filters to override thie value for itself and subsequent filters.
+    const auto encoding_headers_only =
+        entry == encoder_filters_.begin() ? false : (*std::prev(entry))->encoding_headers_only_;
     (*entry)->encoding_headers_only_ = encoding_headers_only;
-    (*entry)->end_stream_ = encoding_headers_only ||
-                            (end_stream && continue_data_entry == encoder_filters_.end());
+    (*entry)->end_stream_ =
+        encoding_headers_only || (end_stream && continue_data_entry == encoder_filters_.end());
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, (*entry)->end_stream_);
 
     ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && (*entry)->end_stream_),
@@ -994,12 +997,14 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
 
     // Here we handle the case where we have a header only response, but a filter adds a body
     // to it. We need to not raise end_stream = true to further filters during inline iteration.
-    if ((end_stream || (*entry)->encoding_headers_only_) && buffered_response_data_ && continue_data_entry == encoder_filters_.end()) {
+    if ((end_stream || (*entry)->encoding_headers_only_) && buffered_response_data_ &&
+        continue_data_entry == encoder_filters_.end()) {
       continue_data_entry = entry;
     }
   }
 
-  const bool encoding_headers_only = encoder_filters_.empty() ? false : encoder_filters_.back()->encoding_headers_only_;
+  const bool encoding_headers_only =
+      encoder_filters_.empty() ? false : encoder_filters_.back()->encoding_headers_only_;
   const bool modified_end_stream =
       encoding_headers_only || (end_stream && continue_data_entry == encoder_filters_.end());
   state_.non_100_response_headers_encoded_ = true;
