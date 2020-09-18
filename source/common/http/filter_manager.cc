@@ -519,8 +519,8 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       // This ensures that when we continue the data we set end_stream = true.
       maybeEndDecode(true);
 
-      // We do this check here in addition to below since we've cleared the entries that would mark this filter
-      // as the last filter.
+      // We do this check here in addition to below since we've cleared the entries that would mark
+      // this filter as the last filter.
       if (continue_data_entry == decoder_filters_.end()) {
         continue_data_entry = entry;
       }
