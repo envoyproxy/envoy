@@ -131,6 +131,25 @@ private:
   const std::string default_value_;
 };
 
+
+/**
+ * Action for filter metadata rate limiting.
+ */
+class FilterMetaDataAction : public RateLimitAction {
+public:
+  FilterMetaDataAction(const envoy::config::route::v3::RateLimit::Action::FilterMetaData& action);
+  // Router::RateLimitAction
+  bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
+                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          const Network::Address::Instance& remote_address,
+                          const envoy::config::core::v3::Metadata* dynamic_metadata) const override;
+
+private:
+  const Envoy::Config::MetadataKey metadata_key_;
+  const std::string descriptor_key_;
+  const std::string default_value_;
+};
+
 /**
  * Action for header value match rate limiting.
  */

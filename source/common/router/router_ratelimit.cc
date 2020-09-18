@@ -124,6 +124,29 @@ bool DynamicMetaDataAction::populateDescriptor(
   return false;
 }
 
+FilterMetaDataAction::FilterMetaDataAction(
+    const envoy::config::route::v3::RateLimit::Action::FilterMetaData& action)
+    : metadata_key_(action.metadata_key()), descriptor_key_(action.descriptor_key()),
+      default_value_(action.default_value()) {}
+
+bool FilterMetaDataAction::populateDescriptor(
+    const Router::RouteEntry& route, RateLimit::Descriptor& descriptor, const std::string&,
+    const Http::HeaderMap&, const Network::Address::Instance&,
+    const envoy::config::core::v3::Metadata*) const {
+  const ProtobufWkt::Value& metadata_value =
+      Envoy::Config::Metadata::metadataValue(&route.metadata(), metadata_key_);
+
+  if (!metadata_value.string_value().empty()) {
+    descriptor.entries_.push_back({descriptor_key_, metadata_value.string_value()});
+    return true;
+  } else if (metadata_value.string_value().empty() && !default_value_.empty()) {
+    descriptor.entries_.push_back({descriptor_key_, default_value_});
+    return true;
+  }
+
+  return false;
+}
+
 HeaderValueMatchAction::HeaderValueMatchAction(
     const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action)
     : descriptor_value_(action.descriptor_value()),
@@ -166,6 +189,9 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kDynamicMetadata:
       actions_.emplace_back(new DynamicMetaDataAction(action.dynamic_metadata()));
+      break;
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kFilterMetadata:
+      actions_.emplace_back(new FilterMetaDataAction(action.filter_metadata()));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kHeaderValueMatch:
       actions_.emplace_back(new HeaderValueMatchAction(action.header_value_match()));

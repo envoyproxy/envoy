@@ -1476,7 +1476,7 @@ message VirtualCluster {
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.RateLimit";
 
-  // [#next-free-field: 8]
+  // [#next-free-field: 9]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.route.v3.RateLimit.Action";
@@ -1598,7 +1598,7 @@ message RateLimit {
     //
     // .. code-block:: cpp
     //
-    //   ("<descriptor_key>", "<value_queried_from_metadata>")
+    //   ("<descriptor_key>", "<value_queried_from_dynamic_metadata>")
     message DynamicMetaData {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.route.v3.RateLimit.Action.DynamicMetaData";
@@ -1608,6 +1608,27 @@ message RateLimit {
 
       // Metadata struct that defines the key and path to retrieve the string value. A match will
       // only happen if the value in the dynamic metadata is of type string.
+      type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
+
+      // An optional value to use if *metadata_key* is empty. If not set and
+      // no value is present under the metadata_key then no descriptor is generated.
+      string default_value = 3;
+    }
+
+    // The following descriptor entry is appended when the filter metadata contains a key value:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("<descriptor_key>", "<value_queried_from_filter_metadata>")
+    message FilterMetaData {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.config.route.v3.RateLimit.Action.FilterMetaData";
+
+      // The key to use in the descriptor entry.
+      string descriptor_key = 1 [(validate.rules).string = {min_bytes: 1}];
+
+      // Metadata struct that defines the key and path to retrieve the string value. A match will
+      // only happen if the value in the filter metadata is of type string.
       type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
 
       // An optional value to use if *metadata_key* is empty. If not set and
@@ -1638,6 +1659,9 @@ message RateLimit {
 
       // Rate limit on dynamic metadata.
       DynamicMetaData dynamic_metadata = 7;
+
+      // Rate limit on filter metadata.
+      FilterMetaData filter_metadata = 8;
     }
   }
 
