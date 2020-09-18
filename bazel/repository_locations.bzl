@@ -522,8 +522,8 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_github_curl = dict(
         project_name = "curl",
         project_url = "https://curl.haxx.se",
-        version = "7.69.1",
-        sha256 = "01ae0c123dee45b01bbaef94c0bc00ed2aec89cb2ee0fd598e0d302a6b5e0a98",
+        version = "7.72.0",
+        sha256 = "d4d5899a3868fbb6ae1856c3e55a32ce35913de3956d1973caccd37bd0174fa2",
         strip_prefix = "curl-{version}",
         urls = ["https://github.com/curl/curl/releases/download/curl-{underscore_version}/curl-{version}.tar.gz"],
         use_category = ["dataplane"],
@@ -543,9 +543,9 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_googlesource_quiche = dict(
         project_name = "QUICHE",
         project_url = "https://quiche.googlesource.com/quiche",
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/96bd860bec207d4b722ab7f319fa47be129a85cd.tar.gz
-        version = "96bd860bec207d4b722ab7f319fa47be129a85cd",
-        sha256 = "d7129a2f41f2bd00a8a38b33f9b7b955d3e7de3dec20f69b70d7000d3a856360",
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/f555d99a084cdd086a349548c70fb558ac5847cf.tar.gz
+        version = "f555d99a084cdd086a349548c70fb558ac5847cf",
+        sha256 = "1833f08e7b0f18b49d7498b029b7f3e6559a82113ec82a98a9e945553756e351",
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",

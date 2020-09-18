@@ -34,7 +34,7 @@ static_resources:
           - name: envoy.filters.http.router
   clusters:
   - name: service_google
-    connect_timeout: 0.25s
+    connect_timeout: 30s
     type: LOGICAL_DNS
     # Comment out the following line to test on v6 networks
     dns_lookup_family: V4_ONLY
