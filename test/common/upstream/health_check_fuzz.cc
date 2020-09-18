@@ -33,7 +33,6 @@ void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   health_checker_->start();
   ON_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillByDefault(testing::Return(45000));
-
   // If has an initial jitter, this calls onIntervalBase and finishes startup
   if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
     test_sessions_[0]->interval_timer_->invokeCallback();

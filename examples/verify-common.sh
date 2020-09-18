@@ -55,7 +55,6 @@ cleanup_stack () {
     path="$1"
     run_log "Cleanup ($path)"
     docker-compose down
-    docker system prune -f
 }
 
 cleanup () {

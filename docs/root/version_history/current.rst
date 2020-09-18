@@ -6,11 +6,13 @@ Incompatible Behavior Changes
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
 * build: added visibility rules for upstream. If these cause visibility related breakage, see notes in //BUILD.
+* watchdog: added two guarddogs, breaking the aggregated stats for the single guarddog system. The aggregated stats for the guarddogs will have the following prefixes: `main_thread` and `workers`. Concretely, anything monitoring `server.watchdog_miss` and `server.watchdog_mega_miss` will need to be updated.
 
 Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* adaptive concurrency: added a response body / grpc-message header for rejected requests.
 * build: an :ref:`Ubuntu based debug image <install_binaries>` is built and published in DockerHub.
 * build: the debug information will be generated separately to reduce target size and reduce compilation time when build in compilation mode `dbg` and `opt`. Users will need to build dwp file to debug with gdb.
 * compressor: always insert `Vary` headers for compressible resources even if it's decided not to compress a response due to incompatible `Accept-Encoding` value. The `Vary` header needs to be inserted to let a caching proxy in front of Envoy know that the requested resource still can be served with compression applied.
@@ -36,6 +38,7 @@ Minor Behavior Changes
 * router: added transport failure reason to response body when upstream reset happens. After this change, the response body will be of the form `upstream connect error or disconnect/reset before headers. reset reason:{}, transport failure reason:{}`.This behavior may be reverted by setting runtime feature `envoy.reloadable_features.http_transport_failure_reason_in_body` to false.
 * router: now consumes all retry related headers to prevent them from being propagated to the upstream. This behavior may be reverted by setting runtime feature `envoy.reloadable_features.consume_all_retry_headers` to false.
 * thrift_proxy: special characters {'\0', '\r', '\n'} will be stripped from thrift headers.
+* watchdog: replaced single watchdog with separate watchdog configuration for worker threads and for the main thread :ref:`Watchdogs<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdogs>`. It works with :ref:`watchdog<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdog>` by having the worker thread and main thread watchdogs have same config.
 
 Bug Fixes
 ---------
@@ -79,6 +82,7 @@ New Features
 * grpc-json: support specifying `response_body` field in for `google.api.HttpBody` message.
 * hds: added :ref:`cluster_endpoints_health <envoy_v3_api_field_service.health.v3.EndpointHealthResponse.cluster_endpoints_health>` to HDS responses, keeping endpoints in the same groupings as they were configured in the HDS specifier by cluster and locality instead of as a flat list.
 * hds: added :ref:`transport_socket_matches <envoy_v3_api_field_service.health.v3.ClusterHealthCheck.transport_socket_matches>` to HDS cluster health check specifier, so the existing match filter :ref:`transport_socket_match_criteria <envoy_v3_api_field_config.core.v3.HealthCheck.transport_socket_match_criteria>` in the repeated field :ref:`health_checks <envoy_v3_api_field_service.health.v3.ClusterHealthCheck.health_checks>` has context to match against. This unblocks support for health checks over HTTPS and HTTP/2.
+* hot restart: added :option:`--socket-path` and :option:`--socket-mode` to configure UDS path in the filesystem and set permission to it.
 * http: added support for :ref:`%DOWNSTREAM_PEER_FINGERPRINT_1% <config_http_conn_man_headers_custom_request_headers>` as custom header.
 * http: added :ref:`allow_chunked_length <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.allow_chunked_length>` configuration option for HTTP/1 codec to allow processing requests/responses with both Content-Length and Transfer-Encoding: chunked headers. If such message is served and option is enabled - per RFC Content-Length is ignored and removed.
 * http: introduced new HTTP/1 and HTTP/2 codec implementations that will remove the use of exceptions for control flow due to high risk factors and instead use error statuses. The old behavior is used by default, but the new codecs can be enabled for testing by setting the runtime feature `envoy.reloadable_features.new_codec_behavior` to true. The new codecs will be in development for one month, and then enabled by default while the old codecs are deprecated.
@@ -110,6 +114,8 @@ New Features
   that track headers and body sizes of requests and responses.
 * stats: allow configuring histogram buckets for stats sinks and admin endpoints that support it.
 * tap: added :ref:`generic body matcher<envoy_v3_api_msg_config.tap.v3.HttpGenericBodyMatch>` to scan http requests and responses for text or hex patterns.
+* tcp: switched the TCP connection pool to the new "shared" connection pool, sharing a common code base with HTTP and HTTP/2. Any unexpected behavioral changes can be temporarily reverted by setting `envoy.reloadable_features.new_tcp_connection_pool` to false.
+* tcp_proxy: added :ref:`max_downstream_connection_duration<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_downstream_connection_duration>` for downstream connection. When max duration is reached the connection will be closed.
 * tcp_proxy: allow earlier network filters to set metadataMatchCriteria on the connection StreamInfo to influence load balancing.
 * tls: introduce new :ref:`extension point<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_handshaker>` for overriding :ref:`TLS handshaker <arch_overview_ssl>` behavior.
 * tls: switched from using socket BIOs to using custom BIOs that know how to interact with IoHandles. The feature can be disabled by setting runtime feature `envoy.reloadable_features.tls_use_io_handle_bio` to false.
@@ -138,3 +144,4 @@ Deprecated
 * ext_authz: the :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.OkHttpResponse.dynamic_metadata>` field in :ref:`OkHttpResponse <envoy_v3_api_msg_service.auth.v3.OkHttpResponse>`
   has been deprecated in favor of :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` field in :ref:`CheckResponse <envoy_v3_api_msg_service.auth.v3.CheckResponse>`.
 * router_check_tool: `request_header_fields`, `response_header_fields` config deprecated in favor of `request_header_matches`, `response_header_matches`.
+* watchdog: :ref:`watchdog <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdog>` deprecated in favor of :ref:`watchdogs <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdogs>`.
