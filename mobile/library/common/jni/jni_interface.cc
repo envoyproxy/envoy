@@ -40,9 +40,9 @@ static void jvm_on_engine_running(void* context) {
       jcls_JvmonEngineRunningContext, "invokeOnEngineRunning", "()Ljava/lang/Object;");
   env->CallObjectMethod(j_context, jmid_onEngineRunning);
 
-  // Delete the local ref since the engine does not use it directly.
-  // If this changes in the future, deletion will need to be moved.
   env->DeleteLocalRef(jcls_JvmonEngineRunningContext);
+  // TODO(goaway): This isn't re-used by other engine callbacks, so it's safe to delete here.
+  // This will need to be updated for https://github.com/lyft/envoy-mobile/issues/332
   env->DeleteGlobalRef(j_context);
 }
 
