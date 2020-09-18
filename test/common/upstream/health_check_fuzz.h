@@ -1,10 +1,7 @@
 #pragma once
-<<<<<<< HEAD
 
 #include <memory>
 
-=======
->>>>>>> origin/master
 #include "test/common/upstream/health_check_fuzz.pb.validate.h"
 #include "test/common/upstream/health_checker_impl_test_utils.h"
 #include "test/fuzz/common.pb.h"
