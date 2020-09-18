@@ -1113,7 +1113,7 @@ TEST_P(HdsIntegrationTest, UpdateEndpoints) {
   EXPECT_EQ(locality_resp1.locality().sub_zone(), "paris");
   ASSERT_EQ(locality_resp1.endpoints_health_size(), 1);
 
-  // check endpoints.
+  // Check endpoints.
   EXPECT_TRUE(checkEndpointHealthResponse(locality_resp0.endpoints_health(0),
                                           envoy::config::core::v3::UNHEALTHY,
                                           host_upstream_->localAddress()));
@@ -1122,6 +1122,7 @@ TEST_P(HdsIntegrationTest, UpdateEndpoints) {
   EXPECT_EQ(1, test_server_->counter("cluster.cat.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cat.health_check.failure")->value());
 
+  // Create new specifier that removes the second cluster, and adds an endpoint to the first.
   server_health_check_specifier_ =
       makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
   Network::Utility::addressToProtobufAddress(
