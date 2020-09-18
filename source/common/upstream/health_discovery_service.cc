@@ -407,18 +407,18 @@ void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluste
 
     // Check to see if our list of socket matches have changed. If they have, create a new matcher
     // in info_.
-    bool update_socket_matches = false;
+    bool update_cluster_info = false;
     const uint64_t socket_match_hash = RepeatedPtrUtil::hash(cluster_.transport_socket_matches());
     if (socket_match_hash_ != socket_match_hash) {
       socket_match_hash_ = socket_match_hash;
-      update_socket_matches = true;
+      update_cluster_info = true;
       info_ = info_factory.createClusterInfo(
           {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_,
            cm, local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
     }
 
     // Check to see if anything in the endpoints list has changed.
-    updateHosts(cluster_.load_assignment().endpoints(), update_socket_matches);
+    updateHosts(cluster_.load_assignment().endpoints(), update_cluster_info);
 
     // Check to see if any of the health checkers have changed.
     updateHealthchecks(cluster_.health_checks(), access_log_manager, runtime, random, dispatcher,
@@ -457,10 +457,11 @@ void HdsCluster::updateHealthchecks(
   health_checkers_ = std::move(health_checkers);
   health_checkers_map_ = std::move(health_checkers_map);
 }
+
 void HdsCluster::updateHosts(
     const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
         locality_endpoints,
-    bool update_socket_matches) {
+    bool update_cluster_info) {
   // Create the data structures needed for PrioritySet::update.
   HostVectorSharedPtr hosts = std::make_shared<std::vector<HostSharedPtr>>();
   std::vector<HostSharedPtr> hosts_added;
@@ -476,22 +477,12 @@ void HdsCluster::updateHosts(
       LocalityEndpointTuple endpoint_key = {endpoints.locality(), endpoint};
 
       // Check to see if this exact Locality+Endpoint has been seen before.
+      // Also, if we made changes to our info, re-create all endpoints.
       auto host_pair = hosts_map_.find(endpoint_key);
       HostSharedPtr host;
-      if (host_pair != hosts_map_.end()) {
+      if (!update_cluster_info && host_pair != hosts_map_.end()) {
         // If we have this exact pair, save the shared pointer.
         host = host_pair->second;
-
-        // If our socket_matcher changed, update this host with the new info.
-        if (update_socket_matches) {
-
-          // ClusterInfo only exists in hosts_impls (from parent class HostDescriptionImpl). So if
-          // it is a HostImpl, update it.
-          HostImpl* host_impl_ptr = dynamic_cast<HostImpl*>(host.get());
-          if (host_impl_ptr != nullptr) {
-            host_impl_ptr->updateClusterInfo(info_);
-          }
-        }
       } else {
         // We do not have this endpoint saved, so create a new one.
         host = std::make_shared<HostImpl>(
