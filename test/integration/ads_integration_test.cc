@@ -1242,6 +1242,7 @@ TEST_P(AdsClusterV3Test, LdsUdpaUrl) {
     const auto lds_resource_locator = Config::UdpaResourceIdentifier::decodeUrl(udpa_url_str);
     bootstrap.mutable_dynamic_resources()->mutable_lds_resources_locator()->MergeFrom(
         lds_resource_locator);
+    bootstrap.mutable_dynamic_resources()->clear_lds_config();
     bootstrap.mutable_dynamic_resources()->clear_cds_config();
 
     auto static_resources = bootstrap.mutable_static_resources();
