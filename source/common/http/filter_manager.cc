@@ -1,6 +1,7 @@
 #include "common/http/filter_manager.h"
 
 #include "common/common/enum_to_int.h"
+#include "common/common/logger.h"
 #include "common/common/scope_tracker.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -113,7 +114,7 @@ bool ActiveStreamFilterBase::commonHandleAfterHeadersCallback(FilterHeadersStatu
                                                               bool& end_stream,
                                                               bool& headers_only) {
   ASSERT(!headers_continued_);
-  ASSERT(canIterate());
+  ASSERT(canIterate(), "after headers callback called when iteration state already stopped.");
 
   switch (status) {
   case FilterHeadersStatus::StopIteration:
@@ -129,6 +130,7 @@ bool ActiveStreamFilterBase::commonHandleAfterHeadersCallback(FilterHeadersStatu
     // Set headers_only to true so we know to end early if necessary,
     // but continue filter iteration so we actually write the headers/run the cleanup code.
     headers_only = true;
+    headers_continued_ = true;
     ENVOY_STREAM_LOG(debug, "converting to headers only", parent_);
     break;
   case FilterHeadersStatus::ContinueAndDontEndStream:
@@ -475,6 +477,21 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(
         status, end_stream, (*entry)->decoding_headers_only_);
 
+    // Once a filter turns the stream into header only, throw away all the data that might be
+    // included by marking all previous filters as decoding headers only as well.
+    if ((*entry)->decoding_headers_only_) {
+      state_.ignore_downstream_data_ = true;
+      state_.ignore_downstream_trailers_ = true;
+      auto back_itr = entry;
+      for (back_itr--; back_itr != std::prev(decoder_filters_.begin()); back_itr--) {
+        (*back_itr)->decoding_headers_only_ = true;
+      }
+    }
+
+    for (const auto& e : decoder_filters_) {
+      ENVOY_LOG_MISC(info, "HEADER ONLY {}", e->decoding_headers_only_);
+    }
+
     // If this filter ended the stream, decodeComplete() should be called for it.
     if ((*entry)->end_stream_ || (*entry)->decoding_headers_only_) {
       (*entry)->handle_->decodeComplete();
@@ -484,10 +501,12 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
     // in headers by inserting an empty data frame with end_stream set. The empty data frame is sent
     // after the new metadata.
-    if ((*entry)->end_stream_ && new_metadata_added && !buffered_request_data_) {
+    if (((*entry)->end_stream_ || (*entry)->decoding_headers_only_) && new_metadata_added &&
+        !buffered_request_data_) {
       Buffer::OwnedImpl empty_data("");
       ENVOY_STREAM_LOG(
-          trace, "inserting an empty data frame for end_stream due metadata being added.", *this);
+          trace, "inserting an empty data frame for end_stream due metadata being added. filter {}",
+          *this, std::distance(decoder_filters_.begin(), entry));
       // Metadata frame doesn't carry end of stream bit. We need an empty data frame to end the
       // stream.
       addDecodedData(*((*entry).get()), empty_data, true);
@@ -497,6 +516,13 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       (*entry)->decoding_headers_only_ = false;
       // Unmark end_stream_ for this filter so that it can receive the data when continue is called.
       (*entry)->end_stream_ = false;
+      maybeEndDecode(true);
+
+      if (continue_data_entry == decoder_filters_.end()) {
+        continue_data_entry = entry;
+      }
+
+      (*entry)->iteration_state_ = ActiveStreamDecoderFilter::IterationState::Continue;
     }
 
     if (!continue_iteration && std::next(entry) != decoder_filters_.end()) {
@@ -541,6 +567,9 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       commonDecodePrefix(filter, filter_iteration_start_state);
 
   for (; entry != decoder_filters_.end(); entry++) {
+    if ((*entry)->end_stream_) {
+      return;
+    }
     // If we previously decided to decode only the headers, do nothing here.
     if ((*entry)->decoding_headers_only_) {
       continue;
@@ -604,8 +633,9 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     if (end_stream) {
       state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
     }
-    ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
-                     static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
+    ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={} end_stream={}", *this,
+                     static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status),
+                     end_stream);
 
     processNewlyAddedMetadata();
 
@@ -728,12 +758,12 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
 }
 
 void FilterManager::maybeEndDecode(bool end_stream) {
-  ASSERT(!state_.remote_complete_);
-  state_.remote_complete_ = end_stream;
-  if (end_stream) {
+  // ASSERT(!state_.remote_complete_);
+  if (end_stream && !state_.remote_complete_) {
     stream_info_.onLastDownstreamRxByteReceived();
     ENVOY_STREAM_LOG(debug, "request end stream", *this);
   }
+  state_.remote_complete_ = end_stream;
 }
 
 void FilterManager::disarmRequestTimeout() { filter_manager_callbacks_.disarmRequestTimeout(); }
@@ -976,6 +1006,15 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     // encoding_headers_only_ is set if the filter returns ContinueAndEndStream.
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(
         status, end_stream, (*entry)->encoding_headers_only_);
+
+    // Once a filter turns the stream into header only, throw away all the data that might be
+    // included by marking all previous filters as encoding headers only as well.
+    if ((*entry)->encoding_headers_only_) {
+      auto back_itr = entry;
+      for (back_itr--; back_itr != std::prev(encoder_filters_.begin()); back_itr--) {
+        (*back_itr)->encoding_headers_only_ = true;
+      }
+    }
 
     // If this filter ended the stream, encodeComplete() should be called for it.
     if ((*entry)->end_stream_ || (*entry)->encoding_headers_only_) {
