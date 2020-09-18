@@ -59,7 +59,7 @@ struct Response {
   // (using "addCopy") to the request to the upstream server.
   Http::HeaderVector headers_to_add;
   // A set of HTTP headers consumed by the authorization server, will be removed
-  // (using "remove") from the request to the upstream server.
+  // from the request to the upstream server.
   std::vector<Envoy::Http::LowerCaseString> headers_to_remove;
   // Optional http body used only on denied response.
   std::string body;
