@@ -138,7 +138,7 @@ void TcpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase 
   // The Receive proto message has a validation that if there is a receive field, the text field, a
   // string representing the hex encoded payload has a least one byte.
   if (input.health_check_config().tcp_health_check().receive_size() != 0) {
-    ENVOY_LOG_MISC(trace, "Health checker has a non empty response");
+    ENVOY_LOG_MISC(trace, "Health Checker is only testing to connect");
     empty_response_ = false;
   }
   if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
@@ -195,7 +195,7 @@ void TcpHealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
 void TcpHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) {
   // On a close event, the health checker will call handleFailure if expect_close_ is false. This is
   // set by multiple code paths. handleFailure() turns on interval and turns off timeout. However,
-  // other action of the fuzzer account for this by explicility invoking a client after
+  // other action of the fuzzer account for this by explicitly invoking a client after
   // expect_close_ gets set to true, turning expect_close_ back to false.
   connection_->raiseEvent(event_type);
   if (!last_action && event_type != Network::ConnectionEvent::Connected) {
@@ -222,18 +222,15 @@ HealthCheckFuzz::getEventTypeFromProto(const test::common::upstream::RaiseEvent&
   switch (event) {
   case test::common::upstream::RaiseEvent::CONNECTED: {
     return Network::ConnectionEvent::Connected;
-    break;
   }
   case test::common::upstream::RaiseEvent::REMOTE_CLOSE: {
     return Network::ConnectionEvent::RemoteClose;
-    break;
   }
   case test::common::upstream::RaiseEvent::LOCAL_CLOSE: {
     return Network::ConnectionEvent::LocalClose;
-    break;
   }
   default: // shouldn't hit
-    return Network::ConnectionEvent::Connected;
+    NOT_REACHED_GCOVR_EXCL_LINE;
     break;
   }
 }
