@@ -15,5 +15,5 @@ cp -r $@ fuzz_corpus/seed_corpus
 LLVM_PROFILE_FILE= ${TEST_BINARY} fuzz_corpus -seed=${FUZZ_CORPUS_SEED:-1} -max_total_time=${FUZZ_CORPUS_TIME:-60} -max_len=2048 -rss_limit_mb=8192 -timeout=30 || true
 
 # Passing files instead of a directory will run fuzzing as a regression test.
-# TODO(asraa): Add a manual `|| true`, but this shouldn't be necessary. 
-${TEST_BINARY} $(find fuzz_corpus -type f) -rss_limit_mb=8192
+# TODO(asraa): Remove manual `|| true`, but this shouldn't be necessary. 
+${TEST_BINARY} $(find fuzz_corpus -type f) -rss_limit_mb=8192 || true
