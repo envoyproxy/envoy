@@ -45,17 +45,18 @@ TEST_F(ProtobufUtilityTest, ConvertPercentNaNDouble) {
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   common_config_.mutable_healthy_panic_threshold()->set_value(
       std::numeric_limits<double>::quiet_NaN());
-  EXPECT_THROW(PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(common_config_, healthy_panic_threshold, 0.5),
-               EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(
+      PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(common_config_, healthy_panic_threshold, 0.5),
+      EnvoyException, "Value not in the range of 0..100 range.");
 }
 
 TEST_F(ProtobufUtilityTest, ConvertPercentNaN) {
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   common_config_.mutable_healthy_panic_threshold()->set_value(
       std::numeric_limits<double>::quiet_NaN());
-  EXPECT_THROW(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config_,
-                                                              healthy_panic_threshold, 100, 50),
-               EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+                                common_config_, healthy_panic_threshold, 100, 50),
+                            EnvoyException, "Value not in the range of 0..100 range.");
 }
 
 namespace ProtobufPercentHelper {
