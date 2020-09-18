@@ -25,44 +25,46 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/host.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-using testing::_;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
-using testing::NiceMock;
-using testing::Return;
-using testing::ReturnPointee;
-using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace TcpProxy {
 namespace {
 
 using ::Envoy::Network::UpstreamServerName;
+using ::testing::_;
+using ::testing::DoAll;
+using ::testing::Invoke;
+using ::testing::InvokeWithoutArgs;
+using ::testing::NiceMock;
+using ::testing::Return;
+using ::testing::ReturnPointee;
+using ::testing::ReturnRef;
+using ::testing::SaveArg;
 
 namespace {
 Config constructConfigFromYaml(const std::string& yaml,
-                               Server::Configuration::FactoryContext& context) {
+                               Server::Configuration::FactoryContext& context,
+                               bool avoid_boosting = true) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy, false, avoid_boosting);
   return Config(tcp_proxy, context);
 }
 
-Config constructConfigFromV2Yaml(const std::string& yaml,
-                                 Server::Configuration::FactoryContext& context) {
+Config constructConfigFromV3Yaml(const std::string& yaml,
+                                 Server::Configuration::FactoryContext& context,
+                                 bool avoid_boosting = true) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy, false, avoid_boosting);
   return Config(tcp_proxy, context);
 }
 
@@ -75,7 +77,7 @@ cluster: foo
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
   EXPECT_EQ(std::chrono::hours(1), config_obj.sharedConfig()->idleTimeout().value());
 }
 
@@ -87,7 +89,7 @@ idle_timeout: 0s
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
   EXPECT_FALSE(config_obj.sharedConfig()->idleTimeout().has_value());
 }
 
@@ -99,7 +101,7 @@ idle_timeout: 1s
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
   EXPECT_EQ(std::chrono::seconds(1), config_obj.sharedConfig()->idleTimeout().value());
 }
 
@@ -122,7 +124,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(BadConfig)) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(constructConfigFromYaml(yaml_string, factory_context), EnvoyException);
+  EXPECT_THROW(constructConfigFromYaml(yaml_string, factory_context, false), EnvoyException);
 }
 
 TEST(ConfigTest, DEPRECATED_FEATURE_TEST(EmptyRouteConfig)) {
@@ -134,7 +136,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(EmptyRouteConfig)) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  EXPECT_THROW(constructConfigFromYaml(yaml, factory_context_), EnvoyException);
+  EXPECT_THROW(constructConfigFromYaml(yaml, factory_context_, false), EnvoyException);
 }
 
 TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
@@ -185,7 +187,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  Config config_obj(constructConfigFromYaml(yaml, factory_context_));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context_, false));
 
   {
     // hit route with destination_ip (10.10.10.10/32)
@@ -364,7 +366,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(RouteWithTopLevelMetadataMatchConfig)) 
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  Config config_obj(constructConfigFromYaml(yaml, factory_context_));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context_, false));
 
   ProtobufWkt::Value v1, v2;
   v1.set_string_value("v1");
@@ -402,7 +404,7 @@ TEST(ConfigTest, WeightedClusterWithZeroWeightConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(constructConfigFromV2Yaml(yaml, factory_context), EnvoyException);
+  EXPECT_THROW(constructConfigFromV3Yaml(yaml, factory_context), EnvoyException);
 }
 
 // Tests that it is possible to define a list of weighted clusters.
@@ -418,7 +420,7 @@ TEST(ConfigTest, WeightedClustersConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
 
   NiceMock<Network::MockConnection> connection;
   EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(0));
@@ -452,7 +454,7 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
 
   {
     ProtobufWkt::Value v1, v2;
@@ -539,7 +541,7 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchAndTopLevelMetadataMatchConfig
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
 
   ProtobufWkt::Value v00, v01, v04;
   v00.set_string_value("v00");
@@ -630,7 +632,7 @@ TEST(ConfigTest, WeightedClustersWithTopLevelMetadataMatchConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
 
   ProtobufWkt::Value v1, v2;
   v1.set_string_value("v1");
@@ -669,7 +671,7 @@ TEST(ConfigTest, TopLevelMetadataMatchConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
 
   ProtobufWkt::Value v1, v2;
   v1.set_string_value("v1");
@@ -702,7 +704,7 @@ TEST(ConfigTest, ClusterWithTopLevelMetadataMatchConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
 
   ProtobufWkt::Value v1, v2;
   v1.set_string_value("v1");
@@ -741,7 +743,7 @@ TEST(ConfigTest, PerConnectionClusterWithTopLevelMetadataMatchConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
 
   ProtobufWkt::Value v1, v2;
   v1.set_string_value("v1");
@@ -780,7 +782,7 @@ TEST(ConfigTest, HashWithSourceIpConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
   EXPECT_NE(nullptr, config_obj.hashPolicy());
 }
 
@@ -791,7 +793,7 @@ TEST(ConfigTest, HashWithSourceIpDefaultConfig) {
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  Config config_obj(constructConfigFromV3Yaml(yaml, factory_context));
   EXPECT_EQ(nullptr, config_obj.hashPolicy());
 }
 
@@ -877,7 +879,7 @@ public:
           .WillByDefault(ReturnRef(*upstream_connections_.back()));
       upstream_hosts_.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
       conn_pool_handles_.push_back(
-          std::make_unique<NiceMock<Tcp::ConnectionPool::MockCancellable>>());
+          std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>());
 
       ON_CALL(*upstream_hosts_.at(i), cluster())
           .WillByDefault(ReturnPointee(
@@ -969,7 +971,7 @@ public:
   std::vector<std::unique_ptr<NiceMock<Tcp::ConnectionPool::MockConnectionData>>>
       upstream_connection_data_{};
   std::vector<Tcp::ConnectionPool::Callbacks*> conn_pool_callbacks_;
-  std::vector<std::unique_ptr<NiceMock<Tcp::ConnectionPool::MockCancellable>>> conn_pool_handles_;
+  std::vector<std::unique_ptr<NiceMock<Envoy::ConnectionPool::MockCancellable>>> conn_pool_handles_;
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_;
   Tcp::ConnectionPool::UpstreamCallbacks* upstream_callbacks_;
   StringViewSaver access_log_data_;
@@ -1142,6 +1144,15 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsLimit)) {
 
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UF,URX");
+}
+
+TEST_F(TcpProxyTest, ConnectedNoOp) {
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::Connected);
+
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 // Test that the tcp proxy sends the correct notifications to the outlier detector
@@ -1356,6 +1367,100 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
     EXPECT_EQ("k2", effective_criterions[1]->name());
     EXPECT_EQ(hv2, effective_criterions[1]->value());
   }
+}
+
+// Test that metadata match criteria provided on the StreamInfo is used.
+TEST_F(TcpProxyTest, StreamInfoDynamicMetadata) {
+  configure(defaultConfig());
+
+  ProtobufWkt::Value val;
+  val.set_string_value("val");
+
+  envoy::config::core::v3::Metadata metadata;
+  ProtobufWkt::Struct& map =
+      (*metadata.mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB];
+  (*map.mutable_fields())["test"] = val;
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, dynamicMetadata())
+      .WillOnce(ReturnRef(metadata));
+
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+  filter_->initializeReadFilterCallbacks(filter_callbacks_);
+
+  Upstream::LoadBalancerContext* context;
+
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  EXPECT_NE(nullptr, context);
+
+  const auto effective_criteria = context->metadataMatchCriteria();
+  EXPECT_NE(nullptr, effective_criteria);
+
+  const auto& effective_criterions = effective_criteria->metadataMatchCriteria();
+  EXPECT_EQ(1, effective_criterions.size());
+
+  EXPECT_EQ("test", effective_criterions[0]->name());
+  EXPECT_EQ(HashedValue(val), effective_criterions[0]->value());
+}
+
+// Test that if both streamInfo and configuration add metadata match criteria, they
+// are merged.
+TEST_F(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  weighted_clusters:
+    clusters:
+    - name: cluster1
+      weight: 1
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k0: v0
+            k1: from_config
+)EOF";
+
+  config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
+
+  ProtobufWkt::Value v0, v1, v2;
+  v0.set_string_value("v0");
+  v1.set_string_value("from_streaminfo"); // 'v1' is overridden with this value by streamInfo.
+  v2.set_string_value("v2");
+  HashedValue hv0(v0), hv1(v1), hv2(v2);
+
+  envoy::config::core::v3::Metadata metadata;
+  ProtobufWkt::Struct& map =
+      (*metadata.mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB];
+  (*map.mutable_fields())["k1"] = v1;
+  (*map.mutable_fields())["k2"] = v2;
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, dynamicMetadata())
+      .WillOnce(ReturnRef(metadata));
+
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
+  filter_->initializeReadFilterCallbacks(filter_callbacks_);
+
+  Upstream::LoadBalancerContext* context;
+
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  EXPECT_NE(nullptr, context);
+
+  const auto effective_criteria = context->metadataMatchCriteria();
+  EXPECT_NE(nullptr, effective_criteria);
+
+  const auto& effective_criterions = effective_criteria->metadataMatchCriteria();
+  EXPECT_EQ(3, effective_criterions.size());
+
+  EXPECT_EQ("k0", effective_criterions[0]->name());
+  EXPECT_EQ(hv0, effective_criterions[0]->value());
+
+  EXPECT_EQ("k1", effective_criterions[1]->name());
+  EXPECT_EQ(hv1, effective_criterions[1]->value());
+
+  EXPECT_EQ("k2", effective_criterions[2]->name());
+  EXPECT_EQ(hv2, effective_criterions[2]->value());
 }
 
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(DisconnectBeforeData)) {
@@ -1742,7 +1847,7 @@ class TcpProxyRoutingTest : public testing::Test {
 public:
   TcpProxyRoutingTest() = default;
 
-  void setup() {
+  void setup(bool avoid_boosting = true) {
     const std::string yaml = R"EOF(
     stat_prefix: name
     cluster: fallback_cluster
@@ -1752,7 +1857,8 @@ public:
         cluster: fake_cluster
     )EOF";
 
-    config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
+    config_ =
+        std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_, avoid_boosting));
   }
 
   void initializeFilter() {
@@ -1772,7 +1878,7 @@ public:
 };
 
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(NonRoutableConnection)) {
-  setup();
+  setup(false);
 
   const uint32_t total_cx = config_->stats().downstream_cx_total_.value();
   const uint32_t non_routable_cx = config_->stats().downstream_cx_no_route_.value();
@@ -1793,7 +1899,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(NonRoutableConnection)) {
 }
 
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(RoutableConnection)) {
-  setup();
+  setup(false);
 
   const uint32_t total_cx = config_->stats().downstream_cx_total_.value();
   const uint32_t non_routable_cx = config_->stats().downstream_cx_no_route_.value();
@@ -1815,7 +1921,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(RoutableConnection)) {
 
 // Test that the tcp proxy uses the cluster from FilterState if set
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionCluster)) {
-  setup();
+  setup(false);
   initializeFilter();
 
   connection_.streamInfo().filterState()->setData(
@@ -1832,7 +1938,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionC
 
 // Test that the tcp proxy forwards the requested server name from FilterState if set
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
-  setup();
+  setup(false);
   initializeFilter();
 
   connection_.streamInfo().filterState()->setData(
@@ -1862,7 +1968,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
 
 // Test that the tcp proxy override ALPN from FilterState if set
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
-  setup();
+  setup(false);
   initializeFilter();
 
   connection_.streamInfo().filterState()->setData(

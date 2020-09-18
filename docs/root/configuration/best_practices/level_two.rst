@@ -5,14 +5,14 @@ Configuring Envoy as a level two proxy
 
 Envoy is a production-ready proxy, however, the default settings that are tailored for the
 edge use case may need to be adjusted when using Envoy in a multi-level deployment as a
-"level two" HTTP/2 proxy.
+"level two" proxy.
 
 .. image:: /_static/multilevel_deployment.svg
 
 **In summary, if you run level two Envoy version 1.11.1 or greater which terminates 
-HTTP/2, we strongly advise you to change the HTTP/2 configuration of your level 
+HTTP/2, we strongly advise you to change the HttpConnectionManager configuration of your level
 two Envoy, by setting its downstream**
-:ref:`validation of HTTP/2 messaging option <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
+:ref:`validation of HTTP messaging option <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`
 **to true.**
 
 If there is an invalid HTTP/2 request and this option is not set, the Envoy in 
@@ -29,9 +29,7 @@ user has insight into what traffic will bypass level one checks, they could spra
 “bad” traffic across the level one fleet, causing serious disruption to other users’ 
 traffic.
 
-Please note that the
-:ref:`validation of HTTP/2 messaging option <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
-is planned to be deprecated and replaced with mandatory configuration in the HttpConnectionManager, to ensure
-that what is now an easily overlooked option would need to be configured, ideally
-appropriately for the given Envoy deployment. Please refer to the
-https://github.com/envoyproxy/envoy/issues/9285 for more information.
+This configuration option also has implications for invalid HTTP/1.1 though slightly less
+severe ones. For Envoy L1s, invalid HTTP/1 requests will also result in connection
+reset. If the option is set to true, and the request is completely read, the connection
+will persist and can be reused for a subsequent request.

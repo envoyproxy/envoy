@@ -1,12 +1,10 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
+load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 
 licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_package")
-
 envoy_package()
-
-load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 
 exports_files([
     "gen_sh_test_runner.sh",
@@ -127,11 +125,6 @@ config_setting(
 )
 
 config_setting(
-    name = "compdb_build",
-    values = {"define": "ENVOY_CONFIG_COMPILATION_DATABASE=1"},
-)
-
-config_setting(
     name = "clang_build",
     flag_values = {
         "@bazel_tools//tools/cpp:compiler": "clang",
@@ -201,6 +194,11 @@ config_setting(
     values = {"define": "path_normalization_by_default=true"},
 )
 
+config_setting(
+    name = "enable_new_codecs_in_integration_tests",
+    values = {"define": "use_new_codecs_in_integration_tests=true"},
+)
+
 cc_proto_library(
     name = "grpc_health_proto",
     deps = ["@com_github_grpc_grpc//src/proto/grpc/health/v1:_health_proto_only"],
@@ -243,6 +241,14 @@ config_setting(
 config_setting(
     name = "boringssl_disabled",
     values = {"define": "boringssl=disabled"},
+)
+
+config_setting(
+    name = "zlib_ng",
+    constraint_values = [
+        "@bazel_tools//platforms:linux",
+    ],
+    values = {"define": "zlib=ng"},
 )
 
 config_setting(
@@ -341,6 +347,19 @@ config_setting(
 config_setting(
     name = "android_logger",
     values = {"define": "logger=android"},
+)
+
+config_setting(
+    name = "libfuzzer_coverage",
+    define_values = {
+        "FUZZING_ENGINE": "libfuzzer",
+        "ENVOY_CONFIG_COVERAGE": "1",
+    },
+)
+
+config_setting(
+    name = "libfuzzer",
+    values = {"define": "FUZZING_ENGINE=libfuzzer"},
 )
 
 alias(

@@ -28,18 +28,7 @@ public:
       )EOF");
   }
 
-  /**
-   * Initializer for an individual test.
-   */
   void SetUp() override { BaseIntegrationTest::initialize(); }
-
-  /**
-   *  Destructor for an individual test.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, EchoIntegrationTest,
@@ -78,7 +67,7 @@ filter_chains:
       [&listener_added_by_worker]() -> void { listener_added_by_worker.setReady(); });
   test_server_->server().dispatcher().post([this, json, &listener_added_by_manager]() -> void {
     EXPECT_TRUE(test_server_->server().listenerManager().addOrUpdateListener(
-        Server::parseListenerFromV2Yaml(json), "", true));
+        Server::parseListenerFromV3Yaml(json), "", true));
     listener_added_by_manager.setReady();
   });
   listener_added_by_worker.waitReady();

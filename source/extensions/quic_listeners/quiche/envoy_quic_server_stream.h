@@ -36,9 +36,13 @@ public:
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
     return absl::nullopt;
   }
+  bool streamErrorOnInvalidHttpMessage() const override { return false; }
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
+  void setFlushTimeout(std::chrono::milliseconds) override {
+    // TODO(mattklein123): Actually implement this for HTTP/3 similar to HTTP/2.
+  }
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;

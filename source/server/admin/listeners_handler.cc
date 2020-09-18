@@ -16,10 +16,24 @@ ListenersHandler::ListenersHandler(Server::Instance& server) : HandlerContextBas
 Http::Code ListenersHandler::handlerDrainListeners(absl::string_view url, Http::ResponseHeaderMap&,
                                                    Buffer::Instance& response, AdminStream&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+
   ListenerManager::StopListenersType stop_listeners_type =
       params.find("inboundonly") != params.end() ? ListenerManager::StopListenersType::InboundOnly
                                                  : ListenerManager::StopListenersType::All;
-  server_.listenerManager().stopListeners(stop_listeners_type);
+
+  const bool graceful = params.find("graceful") != params.end();
+  if (graceful) {
+    // Ignore calls to /drain_listeners?graceful if the drain sequence has
+    // already started.
+    if (!server_.drainManager().draining()) {
+      server_.drainManager().startDrainSequence([this, stop_listeners_type]() {
+        server_.listenerManager().stopListeners(stop_listeners_type);
+      });
+    }
+  } else {
+    server_.listenerManager().stopListeners(stop_listeners_type);
+  }
+
   response.add("OK\n");
   return Http::Code::OK;
 }

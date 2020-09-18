@@ -1,8 +1,6 @@
 #pragma once
 
 #include <chrono>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "envoy/api/api.h"
@@ -17,6 +15,9 @@
 
 #include "common/common/logger.h"
 
+#include "absl/container/node_hash_map.h"
+#include "absl/container/node_hash_set.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -29,8 +30,8 @@ public:
   // has changed state.
   bool updateResourcePressure(const std::string& name, double pressure);
 
-  // Returns whether the action is currently active or not.
-  bool isActive() const;
+  // Returns the current action state, which is the max state across all registered triggers.
+  OverloadActionState getState() const;
 
   class Trigger {
   public:
@@ -39,15 +40,16 @@ public:
     // Updates the current value of the metric and returns whether the trigger has changed state.
     virtual bool updateValue(double value) PURE;
 
-    // Returns whether the trigger is currently fired or not.
-    virtual bool isFired() const PURE;
+    // Returns the action state for the trigger.
+    virtual OverloadActionState actionState() const PURE;
   };
   using TriggerPtr = std::unique_ptr<Trigger>;
 
 private:
-  std::unordered_map<std::string, TriggerPtr> triggers_;
-  std::unordered_set<std::string> fired_triggers_;
+  absl::node_hash_map<std::string, TriggerPtr> triggers_;
+  OverloadActionState state_;
   Stats::Gauge& active_gauge_;
+  Stats::Gauge& scale_percent_gauge_;
 };
 
 class OverloadManagerImpl : Logger::Loggable<Logger::Id::main>, public OverloadManager {
@@ -69,6 +71,7 @@ public:
   void stop();
 
 private:
+  using FlushEpochId = uint64_t;
   class Resource : public ResourceMonitor::Callbacks {
   public:
     Resource(const std::string& name, ResourceMonitorPtr monitor, OverloadManagerImpl& manager,
@@ -78,13 +81,14 @@ private:
     void onSuccess(const ResourceUsage& usage) override;
     void onFailure(const EnvoyException& error) override;
 
-    void update();
+    void update(FlushEpochId flush_epoch);
 
   private:
     const std::string name_;
     ResourceMonitorPtr monitor_;
     OverloadManagerImpl& manager_;
     bool pending_update_;
+    FlushEpochId flush_epoch_;
     Stats::Gauge& pressure_gauge_;
     Stats::Counter& failed_updates_counter_;
     Stats::Counter& skipped_updates_counter_;
@@ -97,15 +101,23 @@ private:
     OverloadActionCb callback_;
   };
 
-  void updateResourcePressure(const std::string& resource, double pressure);
+  void updateResourcePressure(const std::string& resource, double pressure,
+                              FlushEpochId flush_epoch);
+  // Flushes any enqueued action state updates to all worker threads.
+  void flushResourceUpdates();
 
   bool started_;
   Event::Dispatcher& dispatcher_;
   ThreadLocal::SlotPtr tls_;
   const std::chrono::milliseconds refresh_interval_;
   Event::TimerPtr timer_;
-  std::unordered_map<std::string, Resource> resources_;
-  std::unordered_map<std::string, OverloadAction> actions_;
+  absl::node_hash_map<std::string, Resource> resources_;
+  absl::node_hash_map<std::string, OverloadAction> actions_;
+
+  absl::flat_hash_map<std::string, OverloadActionState> state_updates_to_flush_;
+  absl::flat_hash_map<ActionCallback*, OverloadActionState> callbacks_to_flush_;
+  FlushEpochId flush_epoch_ = 0;
+  uint64_t flush_awaiting_updates_ = 0;
 
   using ResourceToActionMap = std::unordered_multimap<std::string, std::string>;
   ResourceToActionMap resource_to_actions_;

@@ -5,6 +5,8 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/io_handle.h"
+#include "envoy/network/post_io_action.h"
+#include "envoy/network/proxy_protocol.h"
 #include "envoy/ssl/connection.h"
 
 #include "absl/types/optional.h"
@@ -14,16 +16,6 @@ namespace Network {
 
 class Connection;
 enum class ConnectionEvent;
-
-/**
- * Action that should occur on a connection after I/O.
- */
-enum class PostIoAction {
-  // Close the connection.
-  Close,
-  // Keep the connection open.
-  KeepOpen
-};
 
 /**
  * Result of each I/O event.
@@ -180,9 +172,30 @@ public:
   virtual const std::vector<std::string>& verifySubjectAltNameListOverride() const PURE;
 
   /**
+   * The application protocols to use when negotiating an upstream connection. When an application
+   * protocol override is provided, it will *always* be used.
    * @return the optional overridden application protocols.
    */
   virtual const std::vector<std::string>& applicationProtocolListOverride() const PURE;
+
+  /**
+   * The application protocol to use when negotiating an upstream connection and no other
+   * application protocol has been configured. Both
+   * TransportSocketOptions::applicationProtocolListOverride and application protocols configured
+   * in the CommonTlsContext on the Cluster will take precedence.
+   *
+   * Note that this option is intended for intermediate code (e.g. the HTTP connection pools) to
+   * specify a default ALPN when no specific values are specified elsewhere. As such, providing a
+   * value here might not make sense prior to load balancing.
+   * @return the optional fallback for application protocols, for when they are not specified in the
+   *         TLS configuration.
+   */
+  virtual const absl::optional<std::string>& applicationProtocolFallback() const PURE;
+
+  /**
+   * @return optional PROXY protocol address information.
+   */
+  virtual absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const PURE;
 
   /**
    * @param vector of bytes to which the option should append hash key data that will be used

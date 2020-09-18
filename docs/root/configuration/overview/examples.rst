@@ -9,7 +9,8 @@ Static
 
 A minimal fully static bootstrap config is provided below:
 
-.. code-block:: yaml
+.. validated-code-block:: yaml
+  :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
     access_log_path: /tmp/admin_access.log
@@ -61,7 +62,8 @@ discovery <arch_overview_dynamic_config_eds>` via an
 :ref:`EDS<envoy_v3_api_file_envoy/service/endpoint/v3/eds.proto>` gRPC management server listening
 on 127.0.0.1:5678 is provided below:
 
-.. code-block:: yaml
+.. validated-code-block:: yaml
+  :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
     access_log_path: /tmp/admin_access.log
@@ -100,8 +102,8 @@ on 127.0.0.1:5678 is provided below:
           api_config_source:
             api_type: GRPC
             grpc_services:
-              envoy_grpc:
-                cluster_name: xds_cluster
+              - envoy_grpc:
+                  cluster_name: xds_cluster
     - name: xds_cluster
       connect_timeout: 0.25s
       type: STATIC
@@ -159,7 +161,8 @@ A fully dynamic bootstrap configuration, in which all resources other than
 those belonging to the management server are discovered via xDS is provided
 below:
 
-.. code-block:: yaml
+.. validated-code-block:: yaml
+  :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
     access_log_path: /tmp/admin_access.log
@@ -171,14 +174,14 @@ below:
       api_config_source:
         api_type: GRPC
         grpc_services:
-          envoy_grpc:
-            cluster_name: xds_cluster
+          - envoy_grpc:
+              cluster_name: xds_cluster
     cds_config:
       api_config_source:
         api_type: GRPC
         grpc_services:
-          envoy_grpc:
-            cluster_name: xds_cluster
+          - envoy_grpc:
+              cluster_name: xds_cluster
 
   static_resources:
     clusters:
@@ -226,8 +229,8 @@ The management server could respond to LDS requests with:
               api_config_source:
                 api_type: GRPC
                 grpc_services:
-                  envoy_grpc:
-                    cluster_name: xds_cluster
+                  - envoy_grpc:
+                      cluster_name: xds_cluster
           http_filters:
           - name: envoy.filters.http.router
 
@@ -262,8 +265,8 @@ The management server could respond to CDS requests with:
         api_config_source:
           api_type: GRPC
           grpc_services:
-            envoy_grpc:
-              cluster_name: xds_cluster
+            - envoy_grpc:
+                cluster_name: xds_cluster
 
 The management server could respond to EDS requests with:
 

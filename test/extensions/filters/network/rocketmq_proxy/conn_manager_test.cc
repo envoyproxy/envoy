@@ -9,7 +9,8 @@
 #include "test/extensions/filters/network/rocketmq_proxy/utility.h"
 #include "test/mocks/network/connection.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/instance.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -643,6 +644,20 @@ TEST_F(RocketmqConnectionManagerTest, OnDataWithUnsupportedCode) {
   initializeFilter();
 
   BufferUtility::fillRequestBuffer(buffer_, RequestCode::Unsupported);
+  EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+
+  buffer_.drain(buffer_.length());
+}
+
+TEST_F(RocketmqConnectionManagerTest, OnDataInvalidFrameLength) {
+  // Test against the invalid input where frame_length <= header_length.
+  const std::string yaml = R"EOF(
+  stat_prefix: test
+  )EOF";
+  initializeFilter(yaml);
+  buffer_.add(
+      std::string({'\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00'}));
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
 

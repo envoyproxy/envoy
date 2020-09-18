@@ -63,6 +63,21 @@ public:
   virtual bool supportsMmsg() const PURE;
 
   /**
+   * return true if the OS supports UDP GRO.
+   */
+  virtual bool supportsUdpGro() const PURE;
+
+  /**
+   * return true if the OS supports UDP GSO
+   */
+  virtual bool supportsUdpGso() const PURE;
+
+  /**
+   * return true if the OS support both IP_TRANSPARENT and IPV6_TRANSPARENT options
+   */
+  virtual bool supportsIpTransparent() const PURE;
+
+  /**
    * Release all resources allocated for fd.
    * @return zero on success, -1 returned otherwise.
    */
@@ -150,6 +165,11 @@ public:
    * @see man 2 write
    */
   virtual SysCallSizeResult write(os_fd_t socket, const void* buffer, size_t length) PURE;
+
+  /**
+   * @see man 2 accept. The fds returned are configured to be non-blocking.
+   */
+  virtual SysCallSocketResult accept(os_fd_t socket, sockaddr* addr, socklen_t* addrlen) PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

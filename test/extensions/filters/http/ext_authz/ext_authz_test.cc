@@ -27,7 +27,7 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -238,7 +238,7 @@ TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
       1U,
       filter_callbacks_.clusterInfo()->statsScope().counterFromString("ext_authz.error").value());
   EXPECT_EQ(1U, config_->stats().error_.value());
-  EXPECT_EQ("ext_authz_error", filter_callbacks_.details_);
+  EXPECT_EQ("ext_authz_error", filter_callbacks_.details());
 }
 
 // Test when failure_mode_allow is set and the response from the authorization service is Error that
@@ -597,7 +597,7 @@ TEST_F(HttpFilterTest, ClearCache) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
-  response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"bar"}, "foo"}};
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"bar"}, "foo"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromString("ext_authz.ok").value());
@@ -677,7 +677,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromString("ext_authz.ok").value());
@@ -752,7 +752,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
-  response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"bar"}, "foo"}};
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"bar"}, "foo"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromString("ext_authz.ok").value());
@@ -775,7 +775,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Unauthorized;
-  response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
@@ -793,7 +793,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
   EXPECT_EQ(
       1U,
       filter_callbacks_.clusterInfo()->statsScope().counterFromString("ext_authz.denied").value());
-  EXPECT_EQ("ext_authz_denied", filter_callbacks_.details_);
+  EXPECT_EQ("ext_authz_denied", filter_callbacks_.details());
 }
 
 // Verifies that specified metadata is passed along in the check request
@@ -907,6 +907,69 @@ TEST_F(HttpFilterTest, FilterEnabled) {
   // Engage the filter.
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
+}
+
+// Test that filter can deny for protected path when filter is disabled via filter_enabled field.
+TEST_F(HttpFilterTest, FilterDenyAtDisable) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_enabled:
+    runtime_key: "http.ext_authz.enabled"
+    default_value:
+      numerator: 0
+      denominator: HUNDRED
+  deny_at_disable:
+    runtime_key: "http.ext_authz.deny_at_disable"
+    default_value:
+      value: true
+  )EOF");
+
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("http.ext_authz.enabled",
+                         testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
+      .WillByDefault(Return(false));
+
+  ON_CALL(runtime_.snapshot_, featureEnabled("http.ext_authz.enabled", false))
+      .WillByDefault(Return(true));
+
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+}
+
+// Test that filter allows for protected path when filter is disabled via filter_enabled field.
+TEST_F(HttpFilterTest, FilterAllowAtDisable) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_enabled:
+    runtime_key: "http.ext_authz.enabled"
+    default_value:
+      numerator: 0
+      denominator: HUNDRED
+  deny_at_disable:
+    runtime_key: "http.ext_authz.deny_at_disable"
+    default_value:
+      value: false
+  )EOF");
+
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("http.ext_authz.enabled",
+                         testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
+      .WillByDefault(Return(false));
+
+  ON_CALL(runtime_.snapshot_, featureEnabled("http.ext_authz.enabled", false))
+      .WillByDefault(Return(false));
+
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
 // -------------------
@@ -1063,6 +1126,8 @@ TEST_P(HttpFilterTestParam, OkResponse) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  // Send an OK response Without setting the dynamic metadata field.
+  EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromString("ext_authz.ok").value());
@@ -1106,7 +1171,7 @@ TEST_P(HttpFilterTestParam, ImmediateDeniedResponseWithHttpAttributes) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Unauthorized;
-  response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   response.body = std::string{"baz"};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
@@ -1148,7 +1213,7 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_append = Http::HeaderVector{{request_header_key, "bar"}};
-  response.headers_to_add = Http::HeaderVector{{key_to_add, "foo"}, {key_to_override, "bar"}};
+  response.headers_to_set = Http::HeaderVector{{key_to_add, "foo"}, {key_to_override, "bar"}};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -1267,7 +1332,7 @@ TEST_P(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Forbidden;
   response.body = std::string{"foo"};
-  response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"},
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"},
                                                {Http::LowerCaseString{"bar"}, "foo"}};
   Filters::Common::ExtAuthz::ResponsePtr response_ptr =
       std::make_unique<Filters::Common::ExtAuthz::Response>(response);
@@ -1292,7 +1357,7 @@ TEST_P(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
   EXPECT_CALL(filter_callbacks_, encodeData(_, true))
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
         response_ptr.reset();
-        Http::TestHeaderMapImpl test_headers{*saved_headers};
+        Http::TestRequestHeaderMapImpl test_headers{*saved_headers};
         EXPECT_EQ(test_headers.get_("foo"), "bar");
         EXPECT_EQ(test_headers.get_("bar"), "foo");
         EXPECT_EQ(data.toString(), "foo");
@@ -1321,7 +1386,7 @@ TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Forbidden;
   response.body = std::string{"foo"};
-  response.headers_to_add =
+  response.headers_to_set =
       Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"},
                          {Http::LowerCaseString{"bar"}, "foo"},
                          {Http::LowerCaseString{"set-cookie"}, "cookie1=value"},
@@ -1357,7 +1422,7 @@ TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
   EXPECT_CALL(filter_callbacks_, encodeData(_, true))
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
         response_ptr.reset();
-        Http::TestHeaderMapImpl test_headers{*saved_headers};
+        Http::TestRequestHeaderMapImpl test_headers{*saved_headers};
         EXPECT_EQ(test_headers.get_("foo"), "bar");
         EXPECT_EQ(test_headers.get_("bar"), "foo");
         EXPECT_EQ(test_headers.get_("foobar"), "DO_NOT_OVERRIDE");
@@ -1380,6 +1445,55 @@ TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
   EXPECT_EQ(
       1U,
       filter_callbacks_.clusterInfo()->statsScope().counterFromString("upstream_rq_403").value());
+}
+
+// Verify that when returning an OK response with dynamic_metadata field set, the filter emits
+// dynamic metadata.
+TEST_F(HttpFilterTest, EmitDynamicMetadata) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+
+  auto* fields = response.dynamic_metadata.mutable_fields();
+  (*fields)["foo"] = ValueUtil::stringValue("ok");
+  (*fields)["bar"] = ValueUtil::numberValue(1);
+
+  EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([&response](const std::string& ns,
+                                   const ProtobufWkt::Struct& returned_dynamic_metadata) {
+        EXPECT_EQ(ns, HttpFilterNames::get().ExtAuthorization);
+        EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
+      }));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+      .Times(0);
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  EXPECT_EQ(
+      1U, filter_callbacks_.clusterInfo()->statsScope().counterFromString("ext_authz.ok").value());
+  EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
 // Test that when a connection awaiting a authorization response is canceled then the

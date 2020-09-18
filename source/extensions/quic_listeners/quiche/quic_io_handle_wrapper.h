@@ -14,7 +14,7 @@ public:
   QuicIoHandleWrapper(Network::IoHandle& io_handle) : io_handle_(io_handle) {}
 
   // Network::IoHandle
-  os_fd_t fd() const override { return io_handle_.fd(); }
+  os_fd_t fdDoNotUse() const override { return io_handle_.fdDoNotUse(); }
   Api::IoCallUint64Result close() override {
     closed_ = true;
     return Api::ioCallUint64ResultNoError();
@@ -62,7 +62,49 @@ public:
     }
     return io_handle_.recvmmsg(slices, self_port, output);
   }
+  Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override {
+    if (closed_) {
+      ASSERT(false, "recv called after close.");
+      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
+                                                        Network::IoSocketError::deleteIoError));
+    }
+    return io_handle_.recv(buffer, length, flags);
+  }
   bool supportsMmsg() const override { return io_handle_.supportsMmsg(); }
+  bool supportsUdpGro() const override { return io_handle_.supportsUdpGro(); }
+  Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override {
+    return io_handle_.bind(address);
+  }
+  Api::SysCallIntResult listen(int backlog) override { return io_handle_.listen(backlog); }
+  Network::IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override {
+    return io_handle_.accept(addr, addrlen);
+  }
+  Api::SysCallIntResult connect(Network::Address::InstanceConstSharedPtr address) override {
+    return io_handle_.connect(address);
+  }
+  Api::SysCallIntResult setOption(int level, int optname, const void* optval,
+                                  socklen_t optlen) override {
+    return io_handle_.setOption(level, optname, optval, optlen);
+  }
+  Api::SysCallIntResult getOption(int level, int optname, void* optval,
+                                  socklen_t* optlen) override {
+    return io_handle_.getOption(level, optname, optval, optlen);
+  }
+  Api::SysCallIntResult setBlocking(bool blocking) override {
+    return io_handle_.setBlocking(blocking);
+  }
+  absl::optional<int> domain() override { return io_handle_.domain(); }
+  Network::Address::InstanceConstSharedPtr localAddress() override {
+    return io_handle_.localAddress();
+  }
+  Network::Address::InstanceConstSharedPtr peerAddress() override {
+    return io_handle_.peerAddress();
+  }
+  Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                      Event::FileTriggerType trigger, uint32_t events) override {
+    return io_handle_.createFileEvent(dispatcher, cb, trigger, events);
+  }
+  Api::SysCallIntResult shutdown(int how) override { return io_handle_.shutdown(how); }
 
 private:
   Network::IoHandle& io_handle_;

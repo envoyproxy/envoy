@@ -28,6 +28,7 @@ public:
 
   // Server::DrainManager
   void startDrainSequence(std::function<void()> drain_complete_cb) override;
+  bool draining() const override { return draining_; }
   void startParentShutdownSequence() override;
 
 private:

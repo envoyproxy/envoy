@@ -4,7 +4,8 @@
 #include "server/hot_restarting_parent.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/listener_manager.h"
 
 #include "gtest/gtest.h"
 
@@ -35,7 +36,8 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildNotFound) {
   MockListenerManager listener_manager;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
   EXPECT_CALL(server_, listenerManager()).WillOnce(ReturnRef(listener_manager));
-  EXPECT_CALL(listener_manager, listeners()).WillOnce(Return(listeners));
+  EXPECT_CALL(listener_manager, listeners(ListenerManager::ListenerState::ACTIVE))
+      .WillOnce(Return(listeners));
 
   HotRestartMessage::Request request;
   request.mutable_pass_listen_socket()->set_address("tcp://127.0.0.1:80");
@@ -50,7 +52,8 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildNotBindPort) {
   InSequence s;
   listeners.push_back(std::ref(*static_cast<Network::ListenerConfig*>(&listener_config)));
   EXPECT_CALL(server_, listenerManager()).WillOnce(ReturnRef(listener_manager));
-  EXPECT_CALL(listener_manager, listeners()).WillOnce(Return(listeners));
+  EXPECT_CALL(listener_manager, listeners(ListenerManager::ListenerState::ACTIVE))
+      .WillOnce(Return(listeners));
   EXPECT_CALL(listener_config, listenSocketFactory());
   EXPECT_CALL(listener_config.socket_factory_, localAddress());
   EXPECT_CALL(listener_config, bindToPort()).WillOnce(Return(false));
@@ -140,7 +143,7 @@ TEST_F(HotRestartingParentTest, RetainDynamicStats) {
     Stats::Gauge& g2 =
         child_store.gaugeFromStatName(dynamic.add("g2"), Stats::Gauge::ImportMode::Accumulate);
 
-    HotRestartingChild hot_restarting_child(0, 0);
+    HotRestartingChild hot_restarting_child(0, 0, "@envoy_domain_socket", 0);
     hot_restarting_child.mergeParentStats(child_store, stats_proto);
     EXPECT_EQ(1, c1.value());
     EXPECT_EQ(1, c2.value());

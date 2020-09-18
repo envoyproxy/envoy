@@ -268,8 +268,8 @@ DetectorImpl::DetectorImpl(const Cluster& cluster,
 DetectorImpl::~DetectorImpl() {
   for (const auto& host : host_monitors_) {
     if (host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-      ASSERT(stats_.ejections_active_.value() > 0);
-      stats_.ejections_active_.dec();
+      ASSERT(ejections_active_helper_.value() > 0);
+      ejections_active_helper_.dec();
     }
   }
 }
@@ -301,8 +301,8 @@ void DetectorImpl::initialize(const Cluster& cluster) {
         for (const HostSharedPtr& host : hosts_removed) {
           ASSERT(host_monitors_.count(host) == 1);
           if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-            ASSERT(stats_.ejections_active_.value() > 0);
-            stats_.ejections_active_.dec();
+            ASSERT(ejections_active_helper_.value() > 0);
+            ejections_active_helper_.dec();
           }
 
           host_monitors_.erase(host);
@@ -335,7 +335,7 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
           "outlier_detection.base_ejection_time_ms", config_.baseEjectionTimeMs()));
   ASSERT(monitor->numEjections() > 0);
   if ((base_eject_time * monitor->numEjections()) <= (now - monitor->lastEjectionTime().value())) {
-    stats_.ejections_active_.dec();
+    ejections_active_helper_.dec();
     host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     // Reset the consecutive failure counters to avoid re-ejection on very few new errors due
     // to the non-triggering counter being close to its trigger value.
@@ -451,7 +451,7 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
   uint64_t max_ejection_percent = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger("outlier_detection.max_ejection_percent",
                                           config_.maxEjectionPercent()));
-  double ejected_percent = 100.0 * stats_.ejections_active_.value() / host_monitors_.size();
+  double ejected_percent = 100.0 * ejections_active_helper_.value() / host_monitors_.size();
   // Note this is not currently checked per-priority level, so it is possible
   // for outlier detection to eject all hosts at any given priority level.
   if (ejected_percent < max_ejection_percent) {
@@ -461,7 +461,7 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
       stats_.ejections_total_.inc();
     }
     if (enforceEjection(type)) {
-      stats_.ejections_active_.inc();
+      ejections_active_helper_.inc();
       updateEnforcedEjectionStats(type);
       host_monitors_[host]->eject(time_source_.monotonicTime());
       runCallbacks(host);

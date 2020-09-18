@@ -1,12 +1,12 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
-envoy_package()
+licenses(["notice"])  # Apache 2
+
+envoy_extension_package()
 
 # Build targets in this package are part of the QUICHE platform implementation.
 # These implementations are the infrastructure building block for QUIC. They are
@@ -104,6 +104,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:stl_helpers",
+        "//source/common/common:utility_lib",
     ],
 )
 
@@ -187,7 +188,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
-        "//source/common/http:utility_lib",
+        "//source/common/http:url_utility_lib",
     ],
 )
 
@@ -229,6 +230,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_platform_udp_socket_impl_lib",
+    hdrs = select({
+        "//bazel:linux": ["quic_udp_socket_platform_impl.h"],
+        "//conditions:default": [],
+    }),
+    repository = "@envoy",
+    tags = ["nofips"],
+)
+
+envoy_cc_library(
     name = "envoy_quic_clock_lib",
     srcs = ["envoy_quic_clock.cc"],
     hdrs = ["envoy_quic_clock.h"],
@@ -241,16 +252,26 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quiche_common_platform_optional_impl_lib",
+    hdrs = ["quiche_optional_impl.h"],
+    external_deps = [
+        "abseil_node_hash_map",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+envoy_cc_library(
     name = "quiche_common_platform_impl_lib",
+    srcs = ["quiche_time_utils_impl.cc"],
     hdrs = [
         "quiche_arraysize_impl.h",
         "quiche_logging_impl.h",
         "quiche_map_util_impl.h",
-        "quiche_optional_impl.h",
         "quiche_ptr_util_impl.h",
         "quiche_str_cat_impl.h",
         "quiche_string_piece_impl.h",
         "quiche_text_utils_impl.h",
+        "quiche_time_utils_impl.h",
         "quiche_unordered_containers_impl.h",
     ],
     external_deps = [
@@ -261,6 +282,7 @@ envoy_cc_library(
     deps = [
         ":quic_platform_logging_impl_lib",
         ":string_utils_lib",
+        "@com_googlesource_quiche//:quiche_common_platform_optional",
     ],
 )
 

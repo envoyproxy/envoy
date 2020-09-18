@@ -1,7 +1,9 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/grpc/async_client.h"
 
@@ -13,6 +15,8 @@
 namespace Envoy {
 namespace Config {
 
+template <class ResponseProto> using ResponseProtoPtr = std::unique_ptr<ResponseProto>;
+
 // Oversees communication for gRPC xDS implementations (parent to both regular xDS and delta
 // xDS variants). Reestablishes the gRPC channel when necessary, and provides rate limiting of
 // requests.
@@ -21,26 +25,31 @@ class GrpcStream : public Grpc::AsyncStreamCallbacks<ResponseProto>,
                    public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks, Grpc::RawAsyncClientPtr async_client,
-             const Protobuf::MethodDescriptor& service_method, Runtime::RandomGenerator& random,
+             const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
              Event::Dispatcher& dispatcher, Stats::Scope& scope,
              const RateLimitSettings& rate_limit_settings)
       : callbacks_(callbacks), async_client_(std::move(async_client)),
-        service_method_(service_method), control_plane_stats_(generateControlPlaneStats(scope)),
-        random_(random), time_source_(dispatcher.timeSource()),
+        service_method_(service_method),
+        control_plane_stats_(Utility::generateControlPlaneStats(scope)), random_(random),
+        time_source_(dispatcher.timeSource()),
         rate_limiting_enabled_(rate_limit_settings.enabled_) {
     retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
     if (rate_limiting_enabled_) {
       // Default Bucket contains 100 tokens maximum and refills at 10 tokens/sec.
       limit_request_ = std::make_unique<TokenBucketImpl>(
           rate_limit_settings.max_tokens_, time_source_, rate_limit_settings.fill_rate_);
-      drain_request_timer_ = dispatcher.createTimer([this]() { callbacks_->onWriteable(); });
+      drain_request_timer_ = dispatcher.createTimer([this]() {
+        if (stream_ != nullptr) {
+          callbacks_->onWriteable();
+        }
+      });
     }
 
     // TODO(htuch): Make this configurable.
     static constexpr uint32_t RetryInitialDelayMs = 500;
     static constexpr uint32_t RetryMaxDelayMs = 30000; // Do not cross more than 30s
-    backoff_strategy_ =
-        std::make_unique<JitteredBackOffStrategy>(RetryInitialDelayMs, RetryMaxDelayMs, random_);
+    backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
+        RetryInitialDelayMs, RetryMaxDelayMs, random_);
   }
 
   void establishNewStream() {
@@ -73,14 +82,14 @@ public:
     UNREFERENCED_PARAMETER(metadata);
   }
 
-  void onReceiveMessage(std::unique_ptr<ResponseProto>&& message) override {
+  void onReceiveMessage(ResponseProtoPtr<ResponseProto>&& message) override {
     // Reset here so that it starts with fresh backoff interval on next disconnect.
     backoff_strategy_->reset();
     // Sometimes during hot restarts this stat's value becomes inconsistent and will continue to
     // have 0 until it is reconnected. Setting here ensures that it is consistent with the state of
     // management server connection.
     control_plane_stats_.connected_state_.set(1);
-    callbacks_->onDiscoveryResponse(std::move(message));
+    callbacks_->onDiscoveryResponse(std::move(message), control_plane_stats_);
   }
 
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override {
@@ -116,19 +125,15 @@ public:
     ASSERT(drain_request_timer_ != nullptr);
     control_plane_stats_.rate_limit_enforced_.inc();
     // Enable the drain request timer.
-    drain_request_timer_->enableTimer(limit_request_->nextTokenAvailable());
+    if (!drain_request_timer_->enabled()) {
+      drain_request_timer_->enableTimer(limit_request_->nextTokenAvailable());
+    }
     return false;
   }
 
 private:
   void setRetryTimer() {
     retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
-  }
-
-  ControlPlaneStats generateControlPlaneStats(Stats::Scope& scope) {
-    const std::string control_plane_prefix = "control_plane.";
-    return {ALL_CONTROL_PLANE_STATS(POOL_COUNTER_PREFIX(scope, control_plane_prefix),
-                                    POOL_GAUGE_PREFIX(scope, control_plane_prefix))};
   }
 
   GrpcStreamCallbacks<ResponseProto>* const callbacks_;
@@ -140,7 +145,7 @@ private:
 
   // Reestablishes the gRPC channel when necessary, with some backoff politeness.
   Event::TimerPtr retry_timer_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   TimeSource& time_source_;
   BackOffStrategyPtr backoff_strategy_;
 

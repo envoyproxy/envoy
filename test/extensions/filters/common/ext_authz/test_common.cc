@@ -6,7 +6,7 @@
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
 
-#include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -65,7 +65,7 @@ Response TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_cod
         authz_response.headers_to_append.emplace_back(Http::LowerCaseString(header.header().key()),
                                                       header.header().value());
       } else {
-        authz_response.headers_to_add.emplace_back(Http::LowerCaseString(header.header().key()),
+        authz_response.headers_to_set.emplace_back(Http::LowerCaseString(header.header().key()),
                                                    header.header().value());
       }
     }
@@ -98,7 +98,7 @@ Http::ResponseMessagePtr TestCommon::makeMessageResponse(const HeaderValueOption
   return response;
 };
 
-bool TestCommon::CompareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs) {
+bool TestCommon::compareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs) {
   return std::set<std::pair<Http::LowerCaseString, std::string>>(lhs.begin(), lhs.end()) ==
          std::set<std::pair<Http::LowerCaseString, std::string>>(rhs.begin(), rhs.end());
 }

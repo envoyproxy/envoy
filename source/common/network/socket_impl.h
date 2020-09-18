@@ -7,53 +7,9 @@
 namespace Envoy {
 namespace Network {
 
-namespace SocketInterface {
-
-/**
- * Low level api to create a socket in the underlying host stack. Does not create an
- * Envoy socket.
- * @param type type of socket requested
- * @param addr_type type of address used with the socket
- * @param version IP version if address type is IP
- * @return Socket file descriptor
- */
-IoHandlePtr socket(Address::SocketType type, Address::Type addr_type, Address::IpVersion version);
-
-/**
- * Low level api to create a socket in the underlying host stack. Does not create an
- * Envoy socket.
- * @param socket_type type of socket requested
- * @param addr address that is gleaned for address type and version if needed (@see createSocket)
- */
-IoHandlePtr socket(Address::SocketType socket_type, const Address::InstanceConstSharedPtr addr);
-
-/**
- * Returns true if the given family is supported on this machine.
- * @param domain the IP family.
- */
-bool ipFamilySupported(int domain);
-
-/**
- * Obtain an address from a bound file descriptor. Raises an EnvoyException on failure.
- * @param fd socket file descriptor
- * @return InstanceConstSharedPtr for bound address.
- */
-Address::InstanceConstSharedPtr addressFromFd(os_fd_t fd);
-
-/**
- * Obtain the address of the peer of the socket with the specified file descriptor.
- * Raises an EnvoyException on failure.
- * @param fd socket file descriptor
- * @return InstanceConstSharedPtr for peer address.
- */
-Address::InstanceConstSharedPtr peerAddressFromFd(os_fd_t fd);
-
-} // namespace SocketInterface
-
 class SocketImpl : public virtual Socket {
 public:
-  SocketImpl(Address::SocketType type, Address::Type addr_type, Address::IpVersion version);
-  SocketImpl(Address::SocketType socket_type, const Address::InstanceConstSharedPtr addr);
+  SocketImpl(Socket::Type socket_type, const Address::InstanceConstSharedPtr addr);
 
   // Network::Socket
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
@@ -89,12 +45,13 @@ public:
   Api::SysCallIntResult setSocketOption(int level, int optname, const void* optval,
                                         socklen_t optlen) override;
   Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
-                                        socklen_t* optlen) override;
+                                        socklen_t* optlen) const override;
   Api::SysCallIntResult setBlockingForTest(bool blocking) override;
 
   const OptionsSharedPtr& options() const override { return options_; }
-  Address::SocketType socketType() const override { return sock_type_; }
+  Socket::Type socketType() const override { return sock_type_; }
   Address::Type addressType() const override { return addr_type_; }
+  absl::optional<Address::IpVersion> ipVersion() const override;
 
 protected:
   SocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address);
@@ -102,7 +59,7 @@ protected:
   const IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   OptionsSharedPtr options_;
-  Address::SocketType sock_type_;
+  Socket::Type sock_type_;
   Address::Type addr_type_;
 };
 

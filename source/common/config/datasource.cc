@@ -40,7 +40,7 @@ absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& s
 RemoteAsyncDataProvider::RemoteAsyncDataProvider(
     Upstream::ClusterManager& cm, Init::Manager& manager,
     const envoy::config::core::v3::RemoteDataSource& source, Event::Dispatcher& dispatcher,
-    Runtime::RandomGenerator& random, bool allow_empty, AsyncDataSourceCb&& callback)
+    Random::RandomGenerator& random, bool allow_empty, AsyncDataSourceCb&& callback)
     : allow_empty_(allow_empty), callback_(std::move(callback)),
       fetcher_(std::make_unique<Config::DataFetcher::RemoteDataFetcher>(cm, source.http_uri(),
                                                                         source.sha256(), *this)),
@@ -64,8 +64,8 @@ RemoteAsyncDataProvider::RemoteAsyncDataProvider(
     }
   }
 
-  backoff_strategy_ =
-      std::make_unique<JitteredBackOffStrategy>(base_interval_ms, max_interval_ms, random);
+  backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(base_interval_ms,
+                                                                           max_interval_ms, random);
   retry_timer_ = dispatcher.createTimer([this]() -> void { start(); });
 
   manager.add(init_target_);

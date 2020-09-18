@@ -33,7 +33,7 @@ public:
   Cluster(const envoy::config::cluster::v3::Cluster& cluster,
           const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
           Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
-          Runtime::RandomGenerator& random,
+          Random::RandomGenerator& random,
           Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
           Stats::ScopePtr&& stats_scope, ThreadLocal::SlotAllocator& tls, bool added_via_api);
 
@@ -53,7 +53,7 @@ public:
   Upstream::ClusterUpdateCallbacksHandlePtr handle_;
   Upstream::ClusterManager& cluster_manager_;
   Runtime::Loader& runtime_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   ThreadLocal::SlotPtr tls_;
   const std::vector<std::string> clusters_;
 
@@ -71,12 +71,16 @@ private:
 class AggregateClusterLoadBalancer : public Upstream::LoadBalancer {
 public:
   AggregateClusterLoadBalancer(
-      Upstream::ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      Upstream::ClusterStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : stats_(stats), runtime_(runtime), random_(random), common_config_(common_config) {}
 
   // Upstream::LoadBalancer
   Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
+  // Prefetching not yet implemented for extensions.
+  Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
+    return nullptr;
+  }
 
 private:
   // Use inner class to extend LoadBalancerBase. When initializing AggregateClusterLoadBalancer, the
@@ -84,7 +88,7 @@ private:
   class LoadBalancerImpl : public Upstream::LoadBalancerBase {
   public:
     LoadBalancerImpl(const PriorityContext& priority_context, Upstream::ClusterStats& stats,
-                     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                     Runtime::Loader& runtime, Random::RandomGenerator& random,
                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
         : Upstream::LoadBalancerBase(priority_context.priority_set_, stats, runtime, random,
                                      common_config),
@@ -92,6 +96,10 @@ private:
 
     // Upstream::LoadBalancer
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
+    // Prefetching not yet implemented for extensions.
+    Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
+      return nullptr;
+    }
 
     // Upstream::LoadBalancerBase
     Upstream::HostConstSharedPtr chooseHostOnce(Upstream::LoadBalancerContext*) override {
@@ -109,7 +117,7 @@ private:
   LoadBalancerImplPtr load_balancer_;
   Upstream::ClusterStats& stats_;
   Runtime::Loader& runtime_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config_;
   PriorityContextPtr priority_context_;
 

@@ -50,6 +50,7 @@ Envoy maintainers on the Envoy GitHub.
 We will address the following CVE(s):
 
 * CVE-YEAR-ABCDEF (CVSS score $CVSS, $SEVERITY): $CVESUMMARY
+  - Link to the appropriate section of the CVE writeup document with gh-cve-template.md content.
 ...
 
 We intend to make candidates release patches available under embargo on the
@@ -161,6 +162,45 @@ This issue is filed as $CVE. We have rated it as [$CVSSSTRING]($CVSSURL)
 
 Thank you to $REPORTER, $DEVELOPERS, and the $RELEASEMANAGERS for the
 coordination in making this release.
+
+Thanks,
+
+$PERSON (on behalf of the Envoy security team and maintainers)
+```
+
+## Security Fix of Main Branch Announcement
+
+```
+Subject: Security fix of Envoy main branch (that includes $GITSHORTCOMMITHASH) is now available
+To: envoy-security-announce@googlegroups.com
+Cc: envoy-announce@googlegroups.com, envoy-security@googlegroups.com, envoy-maintainers@googlegroups.com
+
+Hello Envoy Community,
+
+The Envoy security team would like to announce the availability of the fix for security defect(s)
+introduced in the main branch by [$GITSHORTCOMMITHASH]($GITHUBCOMMITURL) commit. The defect(s)
+caused by the [$GITSHORTCOMMITHASH]($GITHUBCOMMITURL) were not part of any Envoy stable releases.
+
+$DEFECTSSUMMARY
+
+<!-- Provide details on features, extensions, configuration that make it likely that a system is
+vulnerable in practice. -->
+
+The CVSS score for this is [$CVSSSTRING]($CVSSURL).
+
+Including the [$FIXGITSHORTCOMMITHASH]($FIXGITHUBCOMMITURL) commit is encouraged to fix this issue.
+
+**Security fix timeline**
+
+1. The defect(s) introduced in [$GITSHORTCOMMITHASH]($GITHUBCOMMITURL) were landed in the main
+   branch on $ORDINALDAY of $MONTH $YEAR at $PDTHOUR PDT ($GMTHOUR GMT).
+2. The fix [$FIXGITSHORTCOMMITHASH]($FIXGITHUBCOMMITURL) was merged into the main branch on
+   $ORDINALDAY of $MONTH $YEAR at $PDTHOUR PDT ($GMTHOUR GMT).
+
+**Thank you**
+
+Thank you to $REPORTER, $DEVELOPERS, and the $RELEASEMANAGERS for the coordination in making this
+release.
 
 Thanks,
 

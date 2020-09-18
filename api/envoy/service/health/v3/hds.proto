@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.service.health.v3;
 
+import "envoy/config/cluster/v3/cluster.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/health_check.proto";
 import "envoy/config/endpoint/v3/endpoint_components.proto";
@@ -9,6 +10,7 @@ import "envoy/config/endpoint/v3/endpoint_components.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -108,11 +110,30 @@ message EndpointHealth {
   config.core.v3.HealthStatus health_status = 2;
 }
 
+// Group endpoint health by locality under each cluster.
+message LocalityEndpointsHealth {
+  config.core.v3.Locality locality = 1;
+
+  repeated EndpointHealth endpoints_health = 2;
+}
+
+// The health status of endpoints in a cluster. The cluster name and locality
+// should match the corresponding fields in ClusterHealthCheck message.
+message ClusterEndpointsHealth {
+  string cluster_name = 1;
+
+  repeated LocalityEndpointsHealth locality_endpoints_health = 2;
+}
+
 message EndpointHealthResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v2.EndpointHealthResponse";
 
-  repeated EndpointHealth endpoints_health = 1;
+  // Deprecated - Flat list of endpoint health information.
+  repeated EndpointHealth endpoints_health = 1 [deprecated = true];
+
+  // Organize Endpoint health information by cluster.
+  repeated ClusterEndpointsHealth cluster_endpoints_health = 2;
 }
 
 message HealthCheckRequestOrEndpointHealthResponse {
@@ -148,6 +169,11 @@ message ClusterHealthCheck {
   repeated config.core.v3.HealthCheck health_checks = 2;
 
   repeated LocalityEndpoints locality_endpoints = 3;
+
+  // Optional map that gets filtered by :ref:`health_checks.transport_socket_match_criteria <envoy_api_field_config.core.v3.HealthCheck.transport_socket_match_criteria>`
+  // on connection when health checking. For more details, see
+  // :ref:`config.cluster.v3.Cluster.transport_socket_matches <envoy_api_field_config.cluster.v3.Cluster.transport_socket_matches>`.
+  repeated config.cluster.v3.Cluster.TransportSocketMatch transport_socket_matches = 4;
 }
 
 message HealthCheckSpecifier {

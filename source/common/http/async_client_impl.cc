@@ -39,7 +39,7 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Stats::Store& stats_store, Event::Dispatcher& dispatcher,
                                  const LocalInfo::LocalInfo& local_info,
                                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-                                 Runtime::RandomGenerator& random,
+                                 Random::RandomGenerator& random,
                                  Router::ShadowWriterPtr&& shadow_writer,
                                  Http::Context& http_context)
     : cluster_(cluster), config_("http.async-client.", local_info, stats_store, cm, runtime, random,
@@ -63,7 +63,7 @@ AsyncClient::Request* AsyncClientImpl::send(RequestMessagePtr&& request,
 
   // The request may get immediately failed. If so, we will return nullptr.
   if (!new_request->remote_closed_) {
-    new_request->moveIntoList(std::move(new_request), active_streams_);
+    LinkedList::moveIntoList(std::move(new_request), active_streams_);
     return async_request;
   } else {
     new_request->cleanup();
@@ -74,7 +74,7 @@ AsyncClient::Request* AsyncClientImpl::send(RequestMessagePtr&& request,
 AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callbacks,
                                             const AsyncClient::StreamOptions& options) {
   std::unique_ptr<AsyncStreamImpl> new_stream{new AsyncStreamImpl(*this, callbacks, options)};
-  new_stream->moveIntoList(std::move(new_stream), active_streams_);
+  LinkedList::moveIntoList(std::move(new_stream), active_streams_);
   return active_streams_.front().get();
 }
 
@@ -94,10 +94,12 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   // TODO(mattklein123): Correctly set protocol in stream info when we support access logging.
 }
 
-void AsyncStreamImpl::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
+void AsyncStreamImpl::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
+                                    absl::string_view) {
   ENVOY_LOG(debug, "async http request response headers (end_stream={}):\n{}", end_stream,
             *headers);
   ASSERT(!remote_closed_);
+  encoded_response_headers_ = true;
   stream_callbacks_.onHeaders(std::move(headers), end_stream);
   closeRemote(end_stream);
   // At present, the router cleans up stream state as soon as the remote is closed, making a
@@ -240,7 +242,6 @@ AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl&
                                    AsyncClient::Callbacks& callbacks,
                                    const AsyncClient::RequestOptions& options)
     : AsyncStreamImpl(parent, *this, options), request_(std::move(request)), callbacks_(callbacks) {
-
   if (nullptr != options.parent_span_) {
     const std::string child_span_name =
         options.child_span_name_.empty()
@@ -266,6 +267,8 @@ void AsyncRequestImpl::initialize() {
 }
 
 void AsyncRequestImpl::onComplete() {
+  callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_, &response_->headers());
+
   Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &response_->headers(),
                                                    response_->trailers(), streamInfo(),
                                                    Tracing::EgressConfig::get());
@@ -293,12 +296,15 @@ void AsyncRequestImpl::onTrailers(ResponseTrailerMapPtr&& trailers) {
 
 void AsyncRequestImpl::onReset() {
   if (!cancelled_) {
-    // Add tags about reset.
-    child_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    // Set "error reason" tag related to reset. The tagging for "error true" is done inside the
+    // Tracing::HttpTracerUtility::finalizeUpstreamSpan.
     child_span_->setTag(Tracing::Tags::get().ErrorReason, "Reset");
   }
 
-  // Finalize the span based on whether we received a response or not
+  callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_,
+                                          remoteClosed() ? &response_->headers() : nullptr);
+
+  // Finalize the span based on whether we received a response or not.
   Tracing::HttpTracerUtility::finalizeUpstreamSpan(
       *child_span_, remoteClosed() ? &response_->headers() : nullptr,
       remoteClosed() ? response_->trailers() : nullptr, streamInfo(), Tracing::EgressConfig::get());
@@ -312,7 +318,7 @@ void AsyncRequestImpl::onReset() {
 void AsyncRequestImpl::cancel() {
   cancelled_ = true;
 
-  // Add tags about the cancellation
+  // Add tags about the cancellation.
   child_span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
 
   reset();

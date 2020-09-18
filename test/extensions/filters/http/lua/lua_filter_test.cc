@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <memory>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -8,11 +9,13 @@
 
 #include "extensions/filters/http/lua/lua_filter.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -54,6 +57,7 @@ public:
           decoder_callbacks_.buffer_->move(data);
         }));
 
+    EXPECT_CALL(decoder_callbacks_, activeSpan()).Times(AtLeast(0));
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).Times(AtLeast(0));
     EXPECT_CALL(decoder_callbacks_, route()).Times(AtLeast(0));
 
@@ -65,14 +69,30 @@ public:
           }
           encoder_callbacks_.buffer_->move(data);
         }));
+    EXPECT_CALL(encoder_callbacks_, activeSpan()).Times(AtLeast(0));
     EXPECT_CALL(encoder_callbacks_, encodingBuffer()).Times(AtLeast(0));
+    EXPECT_CALL(decoder_callbacks_, streamInfo()).Times(testing::AnyNumber());
   }
 
   ~LuaHttpFilterTest() override { filter_->onDestroy(); }
 
+  // Quickly set up a global configuration. In order to avoid extensive modification of existing
+  // test cases, the existing configuration methods must be compatible.
   void setup(const std::string& lua_code) {
-    config_ = std::make_shared<FilterConfig>(lua_code, tls_, cluster_manager_);
+    envoy::extensions::filters::http::lua::v3::Lua proto_config;
+    proto_config.set_inline_code(lua_code);
+    envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+    setupConfig(proto_config, per_route_proto_config);
     setupFilter();
+  }
+
+  void setupConfig(envoy::extensions::filters::http::lua::v3::Lua& proto_config,
+                   envoy::extensions::filters::http::lua::v3::LuaPerRoute& per_route_proto_config) {
+    // Setup filter config for Lua filter.
+    config_ = std::make_shared<FilterConfig>(proto_config, tls_, cluster_manager_, api_);
+    // Setup per route config for Lua filter.
+    per_route_config_ =
+        std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
   }
 
   void setupFilter() {
@@ -93,9 +113,12 @@ public:
         .WillOnce(testing::ReturnRef(metadata_));
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Api::MockApi> api_;
   Upstream::MockClusterManager cluster_manager_;
   std::shared_ptr<FilterConfig> config_;
+  std::shared_ptr<FilterConfigPerRoute> per_route_config_;
   std::unique_ptr<TestFilter> filter_;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
@@ -103,6 +126,7 @@ public:
   std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
+  Tracing::MockSpan child_span_;
 
   const std::string HEADER_ONLY_SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -180,6 +204,12 @@ public:
       end
     end
   )EOF"};
+
+  const std::string ADD_HEADERS_SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("hello", "world")
+    end
+  )EOF"};
 };
 
 // Bad code in initial config.
@@ -190,7 +220,12 @@ TEST(LuaHttpFilterConfigTest, BadCode) {
 
   NiceMock<ThreadLocal::MockInstance> tls;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
-  EXPECT_THROW_WITH_MESSAGE(FilterConfig(SCRIPT, tls, cluster_manager),
+  NiceMock<Api::MockApi> api;
+
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.set_inline_code(SCRIPT);
+
+  EXPECT_THROW_WITH_MESSAGE(FilterConfig(proto_config, tls, cluster_manager, api),
                             Filters::Common::Lua::LuaException,
                             "script load error: [string \"...\"]:3: '=' expected near '<eof>'");
 }
@@ -771,12 +806,12 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ((Http::TestHeaderMapImpl{{":path", "/"},
-                                               {":method", "POST"},
-                                               {":authority", "foo"},
-                                               {"set-cookie", "flavor=chocolate; Path=/"},
-                                               {"set-cookie", "variant=chewy; Path=/"},
-                                               {"content-length", "11"}}),
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{{":path", "/"},
+                                                      {":method", "POST"},
+                                                      {":authority", "foo"},
+                                                      {"set-cookie", "flavor=chocolate; Path=/"},
+                                                      {"set-cookie", "variant=chewy; Path=/"},
+                                                      {"content-length", "11"}}),
                       message->headers());
             callbacks = &cb;
             return &request;
@@ -797,6 +832,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers());
   callbacks->onSuccess(request, std::move(response_message));
 }
 
@@ -834,12 +870,12 @@ TEST_F(LuaHttpFilterTest, HttpCallAsyncFalse) {
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ((Http::TestHeaderMapImpl{{":path", "/"},
-                                               {":method", "POST"},
-                                               {":authority", "foo"},
-                                               {"set-cookie", "flavor=chocolate; Path=/"},
-                                               {"set-cookie", "variant=chewy; Path=/"},
-                                               {"content-length", "11"}}),
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{{":path", "/"},
+                                                      {":method", "POST"},
+                                                      {":authority", "foo"},
+                                                      {"set-cookie", "flavor=chocolate; Path=/"},
+                                                      {"set-cookie", "variant=chewy; Path=/"},
+                                                      {"content-length", "11"}}),
                       message->headers());
             callbacks = &cb;
             return &request;
@@ -893,12 +929,12 @@ TEST_F(LuaHttpFilterTest, HttpCallAsynchronous) {
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ((Http::TestHeaderMapImpl{{":path", "/"},
-                                               {":method", "POST"},
-                                               {":authority", "foo"},
-                                               {"set-cookie", "flavor=chocolate; Path=/"},
-                                               {"set-cookie", "variant=chewy; Path=/"},
-                                               {"content-length", "11"}}),
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{{":path", "/"},
+                                                      {":method", "POST"},
+                                                      {":authority", "foo"},
+                                                      {"set-cookie", "flavor=chocolate; Path=/"},
+                                                      {"set-cookie", "variant=chewy; Path=/"},
+                                                      {"content-length", "11"}}),
                       message->headers());
             callbacks = &cb;
             return &request;
@@ -961,10 +997,10 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ((Http::TestHeaderMapImpl{{":path", "/"},
-                                               {":method", "POST"},
-                                               {":authority", "foo"},
-                                               {"content-length", "11"}}),
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{{":path", "/"},
+                                                      {":method", "POST"},
+                                                      {":authority", "foo"},
+                                                      {"content-length", "11"}}),
                       message->headers());
             callbacks = &cb;
             return &request;
@@ -984,7 +1020,7 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ((Http::TestHeaderMapImpl{
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{
                           {":path", "/bar"}, {":method", "GET"}, {":authority", "foo"}}),
                       message->headers());
             callbacks = &cb;
@@ -997,6 +1033,7 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 403")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no body")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers());
   callbacks->onSuccess(request, std::move(response_message));
 
   Buffer::OwnedImpl data("hello");
@@ -1040,7 +1077,7 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ((Http::TestHeaderMapImpl{
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{
                           {":path", "/"}, {":method", "GET"}, {":authority", "foo"}}),
                       message->headers());
             callbacks = &cb;
@@ -1098,7 +1135,7 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ((Http::TestHeaderMapImpl{
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{
                           {":path", "/"}, {":method", "GET"}, {":authority", "foo"}}),
                       message->headers());
             callbacks = &cb;
@@ -1110,9 +1147,9 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
 
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  Http::TestHeaderMapImpl expected_headers{{":status", "403"},
-                                           {"set-cookie", "flavor=chocolate; Path=/"},
-                                           {"set-cookie", "variant=chewy; Path=/"}};
+  Http::TestResponseHeaderMapImpl expected_headers{{":status", "403"},
+                                                   {"set-cookie", "flavor=chocolate; Path=/"},
+                                                   {"set-cookie", "variant=chewy; Path=/"}};
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
   callbacks->onSuccess(request, std::move(response_message));
 }
@@ -1410,8 +1447,9 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   setup(SCRIPT);
 
   // Perform a GC and snap bytes currently used by the runtime.
-  config_->runtimeGC();
-  const uint64_t mem_use_at_start = config_->runtimeBytesUsed();
+  auto script_config = config_->perLuaCodeSetup(GLOBAL_SCRIPT_NAME);
+  script_config->runtimeGC();
+  const uint64_t mem_use_at_start = script_config->runtimeBytesUsed();
 
   uint64_t num_loops = 2000;
 #if defined(__has_feature) && (__has_feature(thread_sanitizer))
@@ -1422,7 +1460,7 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
 
   for (uint64_t i = 0; i < num_loops; i++) {
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-    Http::TestHeaderMapImpl expected_headers{{":status", "503"}, {"content-length", "4"}};
+    Http::TestResponseHeaderMapImpl expected_headers{{":status", "503"}, {"content-length", "4"}};
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
     EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -1439,8 +1477,8 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   //       to do a soft comparison here. In my own testing, without a fix for #3570, the memory
   //       usage after is at least 20x higher after 2000 iterations so we just check to see if it's
   //       within 2x.
-  config_->runtimeGC();
-  EXPECT_TRUE(config_->runtimeBytesUsed() < mem_use_at_start * 2);
+  script_config->runtimeGC();
+  EXPECT_TRUE(script_config->runtimeBytesUsed() < mem_use_at_start * 2);
 }
 
 // Respond with bad status.
@@ -1793,6 +1831,157 @@ TEST_F(LuaHttpFilterTest, CheckConnection) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
+// Inspect stream info downstream SSL connection.
+TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      if request_handle:streamInfo():downstreamSslConnection() == nil then
+      else
+        if request_handle:streamInfo():downstreamSslConnection():peerCertificatePresented() then
+          request_handle:logTrace("peerCertificatePresented")
+        end
+
+        if request_handle:streamInfo():downstreamSslConnection():peerCertificateValidated() then
+          request_handle:logTrace("peerCertificateValidated")
+        end
+
+        request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():uriSanPeerCertificate(), ","))
+        request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():uriSanLocalCertificate(), ","))
+        request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():dnsSansPeerCertificate(), ","))
+        request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():dnsSansLocalCertificate(), ","))
+
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():ciphersuiteId())
+
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():validFromPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():expirationPeerCertificate())
+
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():subjectLocalCertificate())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():sha256PeerCertificateDigest())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():serialNumberPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():issuerPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():subjectPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():ciphersuiteString())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():tlsVersion())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():urlEncodedPemEncodedPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():urlEncodedPemEncodedPeerCertificateChain())
+
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():sessionId())
+      end
+    end
+  )EOF"};
+
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+
+  auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+
+  EXPECT_CALL(*connection_info, peerCertificatePresented()).WillOnce(Return(true));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("peerCertificatePresented")));
+
+  EXPECT_CALL(*connection_info, peerCertificateValidated()).WillOnce(Return(true));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("peerCertificateValidated")));
+
+  const std::vector<std::string> peer_uri_sans{"peer-uri-sans-1", "peer-uri-sans-2"};
+  EXPECT_CALL(*connection_info, uriSanPeerCertificate()).WillOnce(Return(peer_uri_sans));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("peer-uri-sans-1,peer-uri-sans-2")));
+
+  const std::vector<std::string> local_uri_sans{"local-uri-sans-1", "local-uri-sans-2"};
+  EXPECT_CALL(*connection_info, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::trace, StrEq("local-uri-sans-1,local-uri-sans-2")));
+
+  const std::vector<std::string> peer_dns_sans{"peer-dns-sans-1", "peer-dns-sans-2"};
+  EXPECT_CALL(*connection_info, dnsSansPeerCertificate()).WillOnce(Return(peer_dns_sans));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("peer-dns-sans-1,peer-dns-sans-2")));
+
+  const std::vector<std::string> local_dns_sans{"local-dns-sans-1", "local-dns-sans-2"};
+  EXPECT_CALL(*connection_info, dnsSansLocalCertificate()).WillOnce(Return(local_dns_sans));
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::trace, StrEq("local-dns-sans-1,local-dns-sans-2")));
+
+  const std::string subject_local = "subject-local";
+  EXPECT_CALL(*connection_info, subjectLocalCertificate()).WillOnce(ReturnRef(subject_local));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(subject_local)));
+
+  const uint64_t cipher_suite_id = 0x0707;
+  EXPECT_CALL(*connection_info, ciphersuiteId()).WillRepeatedly(Return(cipher_suite_id));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("0x0707")));
+
+  const SystemTime validity(std::chrono::seconds(1522796777));
+  EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(validity));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1522796777")));
+
+  const SystemTime expiry(std::chrono::seconds(1522796776));
+  EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(expiry));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1522796776")));
+
+  const std::string peer_cert_digest = "peer-cert-digest";
+  EXPECT_CALL(*connection_info, sha256PeerCertificateDigest())
+      .WillOnce(ReturnRef(peer_cert_digest));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(peer_cert_digest)));
+
+  const std::string peer_cert_serial_number = "peer-cert-serial-number";
+  EXPECT_CALL(*connection_info, serialNumberPeerCertificate())
+      .WillOnce(ReturnRef(peer_cert_serial_number));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(peer_cert_serial_number)));
+
+  const std::string peer_cert_issuer = "peer-cert-issuer";
+  EXPECT_CALL(*connection_info, issuerPeerCertificate()).WillOnce(ReturnRef(peer_cert_issuer));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(peer_cert_issuer)));
+
+  const std::string peer_cert_subject = "peer-cert-subject";
+  EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillOnce(ReturnRef(peer_cert_subject));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(peer_cert_subject)));
+
+  const std::string cipher_suite = "cipher-suite";
+  EXPECT_CALL(*connection_info, ciphersuiteString()).WillOnce(Return(cipher_suite));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(cipher_suite)));
+
+  const std::string tls_version = "tls-version";
+  EXPECT_CALL(*connection_info, tlsVersion()).WillOnce(ReturnRef(tls_version));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(tls_version)));
+
+  const std::string peer_cert = "peer-cert";
+  EXPECT_CALL(*connection_info, urlEncodedPemEncodedPeerCertificate())
+      .WillOnce(ReturnRef(peer_cert));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(peer_cert)));
+
+  const std::string peer_cert_chain = "peer-cert-chain";
+  EXPECT_CALL(*connection_info, urlEncodedPemEncodedPeerCertificateChain())
+      .WillOnce(ReturnRef(peer_cert_chain));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(peer_cert_chain)));
+
+  const std::string id = "12345";
+  EXPECT_CALL(*connection_info, sessionId()).WillRepeatedly(ReturnRef(id));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(id)));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Inspect stream info downstream SSL connection in a plain connection.
+TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnectionOnPlainConnection) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      if request_handle:streamInfo():downstreamSslConnection() == nil then
+        request_handle:logTrace("downstreamSslConnection is nil")
+      end
+    end
+  )EOF"};
+
+  setup(SCRIPT);
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
+
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("downstreamSslConnection is nil")));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
 TEST_F(LuaHttpFilterTest, ImportPublicKey) {
   const std::string SCRIPT{R"EOF(
     function string.fromhex(str)
@@ -1916,6 +2105,139 @@ TEST_F(LuaHttpFilterTest, SignatureVerify) {
   EXPECT_CALL(*filter_,
               scriptLog(spdlog::level::trace, StrEq("Failed to verify digest. Error code: 0")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Test whether the route configuration can properly disable the Lua filter.
+TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.set_inline_code(ADD_HEADERS_SCRIPT);
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+  per_route_proto_config.set_disabled(true);
+
+  setupConfig(proto_config, per_route_proto_config);
+  setupFilter();
+
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
+  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Lua))
+      .WillByDefault(Return(nullptr));
+
+  Http::TestRequestHeaderMapImpl request_headers_1{{":path", "/"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_1, true));
+  EXPECT_EQ("world", request_headers_1.get_("hello"));
+
+  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Lua))
+      .WillByDefault(Return(per_route_config_.get()));
+
+  Http::TestRequestHeaderMapImpl request_headers_2{{":path", "/"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_2, true));
+  EXPECT_EQ(nullptr, request_headers_2.get(Http::LowerCaseString("hello")));
+}
+
+// Test whether the route can directly reuse the Lua code in the global configuration.
+TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodes) {
+  const std::string SCRIPT_FOR_ROUTE_ONE{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("route_info", "This request is routed by ROUTE_ONE");
+    end
+  )EOF"};
+  const std::string SCRIPT_FOR_ROUTE_TWO{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("route_info", "This request is routed by ROUTE_TWO");
+    end
+  )EOF"};
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.set_inline_code(ADD_HEADERS_SCRIPT);
+  envoy::config::core::v3::DataSource source1, source2;
+  source1.set_inline_string(SCRIPT_FOR_ROUTE_ONE);
+  source2.set_inline_string(SCRIPT_FOR_ROUTE_TWO);
+  proto_config.mutable_source_codes()->insert({"route_one.lua", source1});
+  proto_config.mutable_source_codes()->insert({"route_two.lua", source2});
+
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+  per_route_proto_config.set_name("route_two.lua");
+
+  setupConfig(proto_config, per_route_proto_config);
+  setupFilter();
+
+  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Lua))
+      .WillByDefault(Return(per_route_config_.get()));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ("This request is routed by ROUTE_TWO", request_headers.get_("route_info"));
+}
+
+// Lua filter do nothing when the referenced name does not exist.
+TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodeNotExist) {
+  const std::string SCRIPT_FOR_ROUTE_ONE{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("route_info", "This request is routed by ROUTE_ONE");
+    end
+  )EOF"};
+
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.set_inline_code(ADD_HEADERS_SCRIPT);
+  envoy::config::core::v3::DataSource source1;
+  source1.set_inline_string(SCRIPT_FOR_ROUTE_ONE);
+  proto_config.mutable_source_codes()->insert({"route_one.lua", source1});
+
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+  // The global source codes do not contain a script named 'route_two.lua'.
+  per_route_proto_config.set_name("route_two.lua");
+
+  setupConfig(proto_config, per_route_proto_config);
+  setupFilter();
+
+  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Lua))
+      .WillByDefault(Return(per_route_config_.get()));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(nullptr, request_headers.get(Http::LowerCaseString("hello")));
+}
+
+TEST_F(LuaHttpFilterTest, LuaFilterBase64Escape) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local base64Encoded = request_handle:base64Escape("foobar")
+      request_handle:logTrace(base64Encoded)
+    end
+
+    function envoy_on_response(response_handle)
+      local base64Encoded = response_handle:base64Escape("barfoo")
+      response_handle:logTrace(base64Encoded)
+
+      local resp_body_buf = response_handle:body()
+      local resp_body = resp_body_buf:getBytes(0, resp_body_buf:length())
+      local b64_resp_body = response_handle:base64Escape(resp_body)
+      response_handle:logTrace(b64_resp_body)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Zm9vYmFy")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("YmFyZm9v")));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers, false));
+
+  // Base64 encoding should also work for binary data.
+  uint8_t buffer[34] = {31, 139, 8,  0, 0, 0, 0, 0,   0,   255, 202, 72,  205, 201, 201, 47, 207,
+                        47, 202, 73, 1, 4, 0, 0, 255, 255, 173, 32,  235, 249, 10,  0,   0,  0};
+  Buffer::OwnedImpl response_body(buffer, 34);
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace,
+                                  StrEq("H4sIAAAAAAAA/8pIzcnJL88vykkBBAAA//+tIOv5CgAAAA==")));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
 }
 
 } // namespace

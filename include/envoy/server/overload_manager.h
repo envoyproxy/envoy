@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 
 #include "envoy/common/pure.h"
 #include "envoy/thread_local/thread_local.h"
@@ -12,15 +11,27 @@
 namespace Envoy {
 namespace Server {
 
-enum class OverloadActionState {
-  /**
-   * Indicates that an overload action is active because at least one of its triggers has fired.
-   */
-  Active,
-  /**
-   * Indicates that an overload action is inactive because none of its triggers have fired.
-   */
-  Inactive
+/**
+ * Tracks the state of an overload action. The state is a number between 0 and 1 that represents the
+ * level of saturation. The values are categorized in two groups:
+ * - Saturated (value = 1): indicates that an overload action is active because at least one of its
+ *   triggers has reached saturation.
+ * - Scaling (0 <= value < 1): indicates that an overload action is not saturated.
+ */
+class OverloadActionState {
+public:
+  static constexpr OverloadActionState inactive() { return OverloadActionState(0); }
+
+  static constexpr OverloadActionState saturated() { return OverloadActionState(1.0); }
+
+  explicit constexpr OverloadActionState(float value)
+      : action_value_(std::min(1.0f, std::max(0.0f, value))) {}
+
+  float value() const { return action_value_; }
+  bool isSaturated() const { return action_value_ == 1; }
+
+private:
+  float action_value_;
 };
 
 /**
@@ -33,25 +44,8 @@ using OverloadActionCb = std::function<void(OverloadActionState)>;
  */
 class ThreadLocalOverloadState : public ThreadLocal::ThreadLocalObject {
 public:
-  const OverloadActionState& getState(const std::string& action) {
-    auto it = actions_.find(action);
-    if (it == actions_.end()) {
-      it = actions_.insert(std::make_pair(action, OverloadActionState::Inactive)).first;
-    }
-    return it->second;
-  }
-
-  void setState(const std::string& action, OverloadActionState state) {
-    auto it = actions_.find(action);
-    if (it == actions_.end()) {
-      actions_[action] = state;
-    } else {
-      it->second = state;
-    }
-  }
-
-private:
-  std::unordered_map<std::string, OverloadActionState> actions_;
+  // Get a thread-local reference to the value for the given action key.
+  virtual const OverloadActionState& getState(const std::string& action) PURE;
 };
 
 /**
@@ -106,17 +100,6 @@ public:
    * an alternative to registering a callback for overload action state changes.
    */
   virtual ThreadLocalOverloadState& getThreadLocalOverloadState() PURE;
-
-  /**
-   * Convenience method to get a statically allocated reference to the inactive overload
-   * action state. Useful for code that needs to initialize a reference either to an
-   * entry in the ThreadLocalOverloadState map (if overload behavior is enabled) or to
-   * some other static memory location set to the inactive state (if overload behavior
-   * is disabled).
-   */
-  static const OverloadActionState& getInactiveState() {
-    CONSTRUCT_ON_FIRST_USE(OverloadActionState, OverloadActionState::Inactive);
-  }
 };
 
 } // namespace Server

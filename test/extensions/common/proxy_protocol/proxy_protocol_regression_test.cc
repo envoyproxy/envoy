@@ -1,6 +1,7 @@
 #include "envoy/network/address.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/basic_resource_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/listen_socket_impl.h"
@@ -12,7 +13,6 @@
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -46,9 +46,9 @@ public:
         socket_(std::make_shared<Network::TcpListenSocket>(
             Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_)), name_("proxy"),
-        filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
-    EXPECT_CALL(socket_factory_, socketType())
-        .WillOnce(Return(Network::Address::SocketType::Stream));
+        filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
+        init_manager_(nullptr) {
+    EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
     EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
     connection_handler_->addListener(absl::nullopt, *this);
@@ -71,6 +71,8 @@ public:
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
   Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override { return absl::nullopt; }
+  ResourceLimit& openConnections() override { return open_connections_; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }
@@ -78,6 +80,8 @@ public:
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return empty_access_logs_;
   }
+  uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+  Init::Manager& initManager() override { return *init_manager_; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -98,7 +102,9 @@ public:
           filter_manager.addAcceptFilter(
               nullptr,
               std::make_unique<ListenerFilters::ProxyProtocol::Filter>(
-                  std::make_shared<ListenerFilters::ProxyProtocol::Config>(listenerScope())));
+                  std::make_shared<ListenerFilters::ProxyProtocol::Config>(
+                      listenerScope(),
+                      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol())));
           maybeExitDispatcher();
           return true;
         }));
@@ -162,12 +168,14 @@ public:
   Network::MockFilterChainFactory factory_;
   Network::ClientConnectionPtr conn_;
   NiceMock<Network::MockConnectionCallbacks> connection_callbacks_;
+  BasicResourceLimitImpl open_connections_;
   Network::Connection* server_connection_;
   Network::MockConnectionCallbacks server_callbacks_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+  std::unique_ptr<Init::Manager> init_manager_;
 };
 
 // Parameterize the listener socket address version.

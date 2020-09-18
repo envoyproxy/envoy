@@ -66,6 +66,8 @@ public:
   const std::string Tap = "envoy.filters.http.tap";
   // Adaptive concurrency limit filter
   const std::string AdaptiveConcurrency = "envoy.filters.http.adaptive_concurrency";
+  // Admission control filter
+  const std::string AdmissionControl = "envoy.filters.http.admission_control";
   // Original Src Filter
   const std::string OriginalSrc = "envoy.filters.http.original_src";
   // Dynamic forward proxy filter
@@ -74,6 +76,8 @@ public:
   const std::string AwsRequestSigning = "envoy.filters.http.aws_request_signing";
   // AWS Lambda filter
   const std::string AwsLambda = "envoy.filters.http.aws_lambda";
+  // OAuth filter
+  const std::string OAuth = "envoy.filters.http.oauth";
 };
 
 using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;

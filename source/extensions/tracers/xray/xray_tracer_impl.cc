@@ -53,8 +53,10 @@ Driver::Driver(const XRayConfiguration& config,
   tls_slot_ptr_->set([this, daemon_endpoint,
                       &context](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     DaemonBrokerPtr broker = std::make_unique<DaemonBrokerImpl>(daemon_endpoint);
-    TracerPtr tracer = std::make_unique<Tracer>(xray_config_.segment_name_, std::move(broker),
-                                                context.serverFactoryContext().timeSource());
+    TracerPtr tracer = std::make_unique<Tracer>(xray_config_.segment_name_, xray_config_.origin_,
+                                                xray_config_.aws_metadata_, std::move(broker),
+                                                context.serverFactoryContext().timeSource(),
+                                                context.serverFactoryContext().random());
     return std::make_shared<XRay::Driver::TlsTracer>(std::move(tracer), *this);
   });
 }

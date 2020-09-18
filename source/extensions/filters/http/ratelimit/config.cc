@@ -31,8 +31,16 @@ Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
           filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(
         filter_config, Filters::Common::RateLimit::rateLimitClient(
-                           context, proto_config.rate_limit_service().grpc_service(), timeout)));
+                           context, proto_config.rate_limit_service().grpc_service(), timeout,
+                           proto_config.rate_limit_service().transport_api_version())));
   };
+}
+
+Router::RouteSpecificFilterConfigConstSharedPtr
+RateLimitFilterConfig::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute& proto_config,
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<FilterConfigPerRoute>(proto_config);
 }
 
 /**

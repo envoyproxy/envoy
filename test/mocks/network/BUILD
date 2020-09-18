@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -25,8 +25,19 @@ envoy_cc_mock(
     srcs = ["io_handle.cc"],
     hdrs = ["io_handle.h"],
     deps = [
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:io_handle_interface",
         "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_cc_mock(
+    name = "socket_mocks",
+    srcs = ["socket.cc"],
+    hdrs = ["socket.h"],
+    deps = [
+        ":io_handle_mocks",
+        "//include/envoy/network:socket_interface",
     ],
 )
 

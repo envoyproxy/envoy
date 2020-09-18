@@ -1,5 +1,11 @@
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+#include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
+#include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 
+#include "common/tracing/http_tracer_impl.h"
+
+#include "extensions/filters/http/common/utility.h"
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
@@ -70,11 +76,57 @@ void UberFilterFuzzer::guideAnyProtoType(test::fuzz::HttpData* mutable_data, uin
   mutable_any->set_type_url(type_url);
 }
 
+void cleanAttachmentTemplate(Protobuf::Message* message) {
+  envoy::extensions::filters::http::squash::v3::Squash& config =
+      dynamic_cast<envoy::extensions::filters::http::squash::v3::Squash&>(*message);
+  std::string json;
+  Protobuf::util::JsonPrintOptions json_options;
+  if (!Protobuf::util::MessageToJsonString(config.attachment_template(), &json, json_options)
+           .ok()) {
+    config.clear_attachment_template();
+  }
+}
+
+void cleanTapConfig(Protobuf::Message* message) {
+  envoy::extensions::filters::http::tap::v3::Tap& config =
+      dynamic_cast<envoy::extensions::filters::http::tap::v3::Tap&>(*message);
+  if (config.common_config().config_type_case() ==
+      envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::kTapdsConfig) {
+    config.mutable_common_config()->mutable_static_config()->mutable_match_config()->set_any_match(
+        true);
+  }
+  // TODO(samflattery): remove once StreamingGrpcSink is implemented
+  // a static config filter is required to have one sink, but since validation isn't performed on
+  // the filter until after this function runs, we have to manually check that there are sinks
+  // before checking that they are not StreamingGrpc
+  else if (config.common_config().config_type_case() ==
+               envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::
+                   kStaticConfig &&
+           !config.common_config().static_config().output_config().sinks().empty() &&
+           config.common_config()
+                   .static_config()
+                   .output_config()
+                   .sinks(0)
+                   .output_sink_type_case() ==
+               envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc) {
+    // will be caught in UberFilterFuzzer::fuzz
+    throw EnvoyException("received input with not implemented output_sink_type StreamingGrpcSink");
+  }
+}
+
 void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
                                          Protobuf::Message* message) {
+  const std::string name = Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(
+      std::string(filter_name));
   // Map filter name to clean-up function.
   if (filter_name == HttpFilterNames::get().GrpcJsonTranscoder) {
+    // Add a valid service proto descriptor.
     addBookstoreProtoDescriptor(message);
+  } else if (name == HttpFilterNames::get().Squash) {
+    cleanAttachmentTemplate(message);
+  } else if (name == HttpFilterNames::get().Tap) {
+    // TapDS oneof field and OutputSinkType StreamingGrpc not implemented
+    cleanTapConfig(message);
   }
 }
 
@@ -83,6 +135,8 @@ void UberFilterFuzzer::perFilterSetup() {
   addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
   ON_CALL(connection_, remoteAddress()).WillByDefault(testing::ReturnRef(addr_));
   ON_CALL(connection_, localAddress()).WillByDefault(testing::ReturnRef(addr_));
+  ON_CALL(factory_context_, clusterManager()).WillByDefault(testing::ReturnRef(cluster_manager_));
+  ON_CALL(cluster_manager_.async_client_, send_(_, _, _)).WillByDefault(Return(&async_request_));
 
   ON_CALL(decoder_callbacks_, connection()).WillByDefault(testing::Return(&connection_));
   ON_CALL(decoder_callbacks_, activeSpan())

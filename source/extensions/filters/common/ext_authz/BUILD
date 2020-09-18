@@ -1,12 +1,12 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
-envoy_package()
+licenses(["notice"])  # Apache 2
+
+envoy_extension_package()
 
 envoy_cc_library(
     name = "ext_authz_interface",
@@ -44,6 +44,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/tracing:http_tracer_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v2alpha:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )

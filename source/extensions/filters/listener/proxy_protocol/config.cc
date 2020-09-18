@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -18,10 +20,16 @@ class ProxyProtocolConfigFactory : public Server::Configuration::NamedListenerFi
 public:
   // NamedListenerFilterConfigFactory
   Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
-      const Protobuf::Message&,
+      const Protobuf::Message& message,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
       Server::Configuration::ListenerFactoryContext& context) override {
-    ConfigSharedPtr config(new Config(context.scope()));
+
+    // downcast it to the proxy protocol config
+    const auto& proto_config = MessageUtil::downcastAndValidate<
+        const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol&>(
+        message, context.messageValidationVisitor());
+
+    ConfigSharedPtr config = std::make_shared<Config>(context.scope(), proto_config);
     return
         [listener_filter_matcher, config](Network::ListenerFilterManager& filter_manager) -> void {
           filter_manager.addAcceptFilter(listener_filter_matcher, std::make_unique<Filter>(config));

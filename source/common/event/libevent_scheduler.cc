@@ -1,6 +1,7 @@
 #include "common/event/libevent_scheduler.h"
 
 #include "common/common/assert.h"
+#include "common/event/schedulable_cb_impl.h"
 #include "common/event/timer_impl.h"
 
 #include "event2/util.h"
@@ -14,7 +15,22 @@ void recordTimeval(Stats::Histogram& histogram, const timeval& tv) {
 }
 } // namespace
 
-LibeventScheduler::LibeventScheduler() : libevent_(event_base_new()) {
+LibeventScheduler::LibeventScheduler() {
+#ifdef WIN32
+  event_config* event_config = event_config_new();
+  RELEASE_ASSERT(event_config != nullptr,
+                 "Failed to initialize libevent event_base: event_config_new");
+  // Request wepoll backend by avoiding win32 backend.
+  int error = event_config_avoid_method(event_config, "win32");
+  RELEASE_ASSERT(error == 0, "Failed to initialize libevent event_base: event_config_avoid_method");
+  event_base* event_base = event_base_new_with_config(event_config);
+  event_config_free(event_config);
+#else
+  event_base* event_base = event_base_new();
+#endif
+  RELEASE_ASSERT(event_base != nullptr, "Failed to initialize libevent event_base");
+  libevent_ = Libevent::BasePtr(event_base);
+
   // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
   RELEASE_ASSERT(Libevent::Global::initialized(), "");
 }
@@ -23,19 +39,16 @@ TimerPtr LibeventScheduler::createTimer(const TimerCb& cb, Dispatcher& dispatche
   return std::make_unique<TimerImpl>(libevent_, cb, dispatcher);
 };
 
+SchedulableCallbackPtr
+LibeventScheduler::createSchedulableCallback(const std::function<void()>& cb) {
+  return std::make_unique<SchedulableCallbackImpl>(libevent_, cb);
+};
+
 void LibeventScheduler::run(Dispatcher::RunType mode) {
   int flag = 0;
   switch (mode) {
   case Dispatcher::RunType::NonBlock:
-    flag = EVLOOP_NONBLOCK;
-#ifdef WIN32
-    // On Windows, EVLOOP_NONBLOCK will cause the libevent event_base_loop to run forever.
-    // This is because libevent only supports level triggering on Windows, and so the write
-    // event callbacks will trigger every time through the loop. Adding EVLOOP_ONCE ensures the
-    // loop will run at most once
-    flag |= EVLOOP_NONBLOCK | EVLOOP_ONCE;
-#endif
-    break;
+    flag = LibeventScheduler::flagsBasedOnEventType();
   case Dispatcher::RunType::Block:
     // The default flags have 'block' behavior. See
     // http://www.wangafu.net/~nickm/libevent-book/Ref3_eventloop.html

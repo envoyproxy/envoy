@@ -19,7 +19,7 @@ MISSPELL_ARGS="-error -o stderr"
 
 if [[ "$#" -lt 1 ]]; then
   echo "Usage: $0 check|fix"
-  exit -1
+  exit 1
 fi
 
 if [[ "$1" == "fix" ]]; then
@@ -39,13 +39,13 @@ SCRIPTPATH=$( cd "$(dirname "$0")" ; pwd -P )
 ROOTDIR="${SCRIPTPATH}/../.."
 cd "$ROOTDIR"
 
-BIN_FILENAME="misspell_"${VERSION}"_"${OS}"_64bit.tar.gz"
+BIN_FILENAME="misspell_${VERSION}_${OS}_64bit.tar.gz"
 # Install tools we need
 if [[ ! -e "${TMP_DIR}/misspell" ]]; then
   if ! wget https://github.com/client9/misspell/releases/download/v"${VERSION}"/"${BIN_FILENAME}" \
   -O "${TMP_DIR}/${BIN_FILENAME}" --no-verbose --tries=3 -o "${TMP_DIR}/wget.log"; then
     cat "${TMP_DIR}/wget.log"
-    exit -1
+    exit 1
   fi
   tar -xvf "${TMP_DIR}/${BIN_FILENAME}" -C "${TMP_DIR}" &> /dev/null
 fi
@@ -61,22 +61,21 @@ else
   EXPECT_SHA="${MAC_MISSPELL_SHA}"
 fi
 
-if [[ ! ${ACTUAL_SHA} == ${EXPECT_SHA} ]]; then
+if [[ ! ${ACTUAL_SHA} == "${EXPECT_SHA}" ]]; then
    echo "Expect shasum is ${ACTUAL_SHA}, but actual is shasum ${EXPECT_SHA}"
    exit 1
 fi
 
 chmod +x "${TMP_DIR}/misspell"
- 
+
 # Spell checking
 # All the skipping files are defined in tools/spelling/spelling_skip_files.txt
-SPELLING_SKIP_FILES="${ROOTDIR}/tools/spelling/spelling_skip_files.txt"
+read -ra SKIP_FILES < "${ROOTDIR}/tools/spelling/spelling_skip_files.txt"
+read -ra SKIP_FILES <<< "${SKIP_FILES[@]/#/-e }"
 
-# All the ignore words are defined in tools/spelling/spelling_whitelist_words.txt
-SPELLING_WHITELIST_WORDS_FILE="${ROOTDIR}/tools/spelling/spelling_whitelist_words.txt"
+# All the ignore words are defined in tools/spelling/spelling_allowlist_words.txt
+SPELLING_ALLOWLIST_WORDS_FILE="${ROOTDIR}/tools/spelling/spelling_allowlist_words.txt"
+ALLOWLIST_WORDS=$(grep -vE '^#|^$' "${SPELLING_ALLOWLIST_WORDS_FILE}" | xargs | tr ' ' ',')
 
-WHITELIST_WORDS=$(echo -n $(cat "${SPELLING_WHITELIST_WORDS_FILE}" | \
-                  grep -v "^#"|grep -v "^$") | tr ' ' ',')
-SKIP_FILES=$(echo $(cat "${SPELLING_SKIP_FILES}") | sed "s| | -e |g")
-git ls-files | grep -v -e ${SKIP_FILES} | xargs "${TMP_DIR}/misspell" -i \
-  "${WHITELIST_WORDS}" ${MISSPELL_ARGS}
+git ls-files | grep -v "${SKIP_FILES[@]}" | xargs "${TMP_DIR}/misspell" -i \
+  "${ALLOWLIST_WORDS}" ${MISSPELL_ARGS}

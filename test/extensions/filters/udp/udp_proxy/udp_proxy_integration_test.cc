@@ -46,14 +46,6 @@ public:
     BaseIntegrationTest::initialize();
   }
 
-  /**
-   *  Destructor for an individual test.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
   void requestResponseWithListenerAddress(const Network::Address::Instance& listener_address) {
     // Send datagram to be proxied.
     Network::Test::UdpSyncPeer client(version_);
@@ -92,6 +84,16 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// Make sure that we gracefully fail if the user does not configure reuse port and concurrency is
+// > 1.
+TEST_P(UdpProxyIntegrationTest, NoReusePort) {
+  concurrency_ = 2;
+  // Do not wait for listeners to start as the listener will fail.
+  defer_listener_finalization_ = true;
+  setup(1);
+  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+}
+
 // Basic loopback test.
 TEST_P(UdpProxyIntegrationTest, HelloWorldOnLoopback) {
   setup(1);
@@ -110,10 +112,10 @@ TEST_P(UdpProxyIntegrationTest, HelloWorldOnNonLocalAddress) {
   if (version_ == Network::Address::IpVersion::v4) {
     // Kernel regards any 127.x.x.x as local address.
     listener_address = std::make_shared<Network::Address::Ipv4Instance>(
-#ifndef __APPLE__
-        "127.0.0.3",
-#else
+#if defined(__APPLE__) || defined(WIN32)
         "127.0.0.1",
+#else
+        "127.0.0.3",
 #endif
         port);
   } else {

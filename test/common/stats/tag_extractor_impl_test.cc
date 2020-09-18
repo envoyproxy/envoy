@@ -306,8 +306,8 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   client_ssl.name_ = tag_names.CLIENTSSL_PREFIX;
   client_ssl.value_ = "clientssl_prefix";
 
-  regex_tester.testRegex("auth.clientssl.clientssl_prefix.auth_ip_white_list",
-                         "auth.clientssl.auth_ip_white_list", {client_ssl});
+  regex_tester.testRegex("auth.clientssl.clientssl_prefix.auth_ip_allowlist",
+                         "auth.clientssl.auth_ip_allowlist", {client_ssl});
 
   // TCP Prefix
   Tag tcp_prefix;
@@ -316,6 +316,14 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
 
   regex_tester.testRegex("tcp.tcp_prefix.downstream_flow_control_resumed_reading_total",
                          "tcp.downstream_flow_control_resumed_reading_total", {tcp_prefix});
+
+  // UDP Prefix
+  Tag udp_prefix;
+  udp_prefix.name_ = tag_names.UDP_PREFIX;
+  udp_prefix.value_ = "udp_prefix";
+
+  regex_tester.testRegex("udp.udp_prefix.downstream_flow_control_resumed_reading_total",
+                         "udp.downstream_flow_control_resumed_reading_total", {udp_prefix});
 
   // Fault Downstream Cluster
   Tag fault_connection_manager;

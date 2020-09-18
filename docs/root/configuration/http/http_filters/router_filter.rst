@@ -42,7 +42,7 @@ A few notes on how Envoy does retries:
   retries. Thus if the request timeout is set to 3s, and the first request attempt takes 2.7s, the
   retry (including back-off) has .3s to complete. This is by design to avoid an exponential
   retry/timeout explosion.
-* Envoy uses a fully jittered exponential back-off algorithm for retries with a default base
+* By default, Envoy uses a fully jittered exponential back-off algorithm for retries with a default base
   interval of 25ms. Given a base interval B and retry number N, the back-off for the retry is in
   the range :math:`\big[0, (2^N-1)B\big)`. For example, given the default interval, the first retry
   will be delayed randomly by 0-24ms, the 2nd by 0-74ms, the 3rd by 0-174ms, and so on. The
@@ -51,8 +51,13 @@ A few notes on how Envoy does retries:
   upstream.base_retry_backoff_ms runtime parameter. The back-off intervals can also be modified
   by configuring the retry policy's
   :ref:`retry back-off <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_back_off>`.
-* If max retries is set both by header as well as in the route configuration, the maximum value is
-  taken when determining the max retries to use for the request.
+* Envoy can also be configured to use feedback from the upstream server to decide the interval between
+  retries. Response headers like ``Retry-After`` or ``X-RateLimit-Reset`` instruct the client how long
+  to wait before re-trying. The retry policy's
+  :ref:`rate limited retry back off <envoy_v3_api_field_config.route.v3.RetryPolicy.rate_limited_retry_back_off>`
+  strategy can be configured to expect a particular header, and if that header is present in the response Envoy
+  will use its value to decide the back-off. If the header is not present, or if it cannot be parsed
+  successfully, Envoy will use the default exponential back-off algorithm instead.
 
 .. _config_http_filters_router_x-envoy-retry-on:
 
@@ -93,6 +98,12 @@ connect-failure
     :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms` or via :ref:`route
     configuration <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>` or via
     :ref:`virtual host retry policy <envoy_v3_api_field_config.route.v3.VirtualHost.retry_policy>`.
+
+.. _config_http_filters_router_retry_policy-envoy-ratelimited:
+
+envoy-ratelimited
+  Envoy will retry if the header :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>`
+  is present.
 
 retriable-4xx
   Envoy will attempt a retry if the upstream server responds with a retriable 4xx response code.
@@ -294,9 +305,11 @@ information.
 x-envoy-ratelimited
 ^^^^^^^^^^^^^^^^^^^
 
-If this header is set by upstream, Envoy will not retry. Currently the value of the header is not
-looked at, only its presence. This header is set by :ref:`rate limit filter<config_http_filters_rate_limit>`
-when the request is rate limited.
+If this header is set by upstream, Envoy will not retry unless the retry policy
+:ref:`envoy-ratelimited<config_http_filters_router_retry_policy-envoy-ratelimited>`
+is enabled. Currently, the value of the header is not looked at, only its
+presence. This header is set by :ref:`rate limit
+filter<config_http_filters_rate_limit>` when the request is rate limited.
 
 .. _config_http_filters_router_headers_set:
 
@@ -354,9 +367,9 @@ HTTP response headers set on downstream responses
 x-envoy-upstream-service-time
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Contains the time in milliseconds spent by the upstream host processing the request. This is useful
-if the client wants to determine service time compared to network latency. This header is set on
-responses.
+Contains the time in milliseconds spent by the upstream host processing the request and the network
+latency between Envoy and upstream host. This is useful if the client wants to determine service time
+compared to network latency between client and Envoy. This header is set on responses.
 
 .. _config_http_filters_router_x-envoy-overloaded_set:
 

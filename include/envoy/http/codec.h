@@ -6,6 +6,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
+#include "envoy/grpc/status.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/protocol.h"
@@ -35,6 +36,14 @@ const char MaxResponseHeadersCountOverrideKey[] =
     "envoy.reloadable_features.max_response_headers_count";
 
 class Stream;
+
+/**
+ * Error codes used to convey the reason for a GOAWAY.
+ */
+enum class GoAwayErrorCode {
+  NoError,
+  Other,
+};
 
 /**
  * Stream encoder options specific to HTTP/1.
@@ -133,6 +142,12 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(const ResponseTrailerMap& trailers) PURE;
+
+  /**
+   * Indicates whether invalid HTTP messaging should be handled with a stream error or a connection
+   * error.
+   */
+  virtual bool streamErrorOnInvalidHttpMessage() const PURE;
 };
 
 /**
@@ -177,6 +192,20 @@ public:
    * @param trailers supplies the decoded trailers.
    */
   virtual void decodeTrailers(RequestTrailerMapPtr&& trailers) PURE;
+
+  /**
+   * Called if the codec needs to send a protocol error.
+   * @param is_grpc_request indicates if the request is a gRPC request
+   * @param code supplies the HTTP error code to send.
+   * @param body supplies an optional body to send with the local reply.
+   * @param modify_headers supplies a way to edit headers before they are sent downstream.
+   * @param grpc_status an optional gRPC status for gRPC requests
+   * @param details details about the source of the error, for debug purposes
+   */
+  virtual void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
+                              const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              absl::string_view details) PURE;
 };
 
 /**
@@ -312,6 +341,13 @@ public:
    * with the stream.
    */
   virtual const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() PURE;
+
+  /**
+   * Set the flush timeout for the stream. At the codec level this is used to bound the amount of
+   * time the codec will wait to flush body data pending open stream window. It does *not* count
+   * small window updates as satisfying the idle timeout as this is a potential DoS vector.
+   */
+  virtual void setFlushTimeout(std::chrono::milliseconds timeout) PURE;
 };
 
 /**
@@ -324,7 +360,7 @@ public:
   /**
    * Fires when the remote indicates "go away." No new streams should be created.
    */
-  virtual void onGoAway() PURE;
+  virtual void onGoAway(GoAwayErrorCode error_code) PURE;
 };
 
 /**
@@ -344,6 +380,10 @@ struct Http1Settings {
   //  - Is neither a HEAD only request nor a HTTP Upgrade
   //  - Not a HEAD request
   bool enable_trailers_{false};
+  // Allows Envoy to process requests/responses with both `Content-Length` and `Transfer-Encoding`
+  // headers set. By default such messages are rejected, but if option is enabled - Envoy will
+  // remove Content-Length header and process message.
+  bool allow_chunked_length_{false};
 
   enum class HeaderKeyFormat {
     // By default no formatting is performed, presenting all headers in lowercase (as Envoy
@@ -356,6 +396,11 @@ struct Http1Settings {
 
   // How header keys should be formatted when serializing HTTP/1.1 headers.
   HeaderKeyFormat header_key_format_{HeaderKeyFormat::Default};
+
+  // Behaviour on invalid HTTP messaging:
+  // - if true, the HTTP/1.1 connection is left open (where possible)
+  // - if false, the HTTP/1.1 connection is terminated
+  bool stream_error_on_invalid_http_message_{false};
 };
 
 /**

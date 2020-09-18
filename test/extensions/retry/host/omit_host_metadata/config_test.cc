@@ -3,9 +3,9 @@
 #include "envoy/upstream/retry.h"
 
 #include "extensions/retry/host/omit_host_metadata/omit_host_metadata.h"
-#include "extensions/retry/host/well_known_names.h"
 
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/host.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -20,7 +20,7 @@ namespace {
 
 TEST(OmitHostsRetryPredicateTest, PredicateTest) {
   auto factory = Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
-      RetryHostPredicateValues::get().OmitHostMetadataPredicate);
+      "envoy.retry_host_predicates.omit_host_metadata");
 
   ASSERT_NE(nullptr, factory);
 
@@ -82,6 +82,8 @@ TEST(OmitHostsRetryPredicateTest, PredicateTest) {
         )EOF"))));
 
   ASSERT_FALSE(predicate->shouldSelectAnotherHost(*host));
+
+  predicate->onHostAttempted(host);
 }
 } // namespace
 } // namespace Host

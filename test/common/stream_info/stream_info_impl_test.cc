@@ -10,9 +10,13 @@
 #include "common/stream_info/stream_info_impl.h"
 
 #include "test/common/stream_info/test_int_accessor.h"
+#include "test/test_common/utility.h"
+
+//#include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/host.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -232,7 +236,7 @@ TEST_F(StreamInfoImplTest, RequestHeadersTest) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
   EXPECT_FALSE(stream_info.getRequestHeaders());
 
-  Http::RequestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   stream_info.setRequestHeaders(headers);
   EXPECT_EQ(&headers, stream_info.getRequestHeaders());
 }
@@ -243,8 +247,8 @@ TEST_F(StreamInfoImplTest, DefaultRequestIDExtensionTest) {
 
   auto rid_extension = stream_info.getRequestIDExtension();
 
-  Http::RequestHeaderMapImpl request_headers;
-  Http::ResponseHeaderMapImpl response_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   rid_extension->set(request_headers, false);
   rid_extension->set(request_headers, true);
   rid_extension->setInResponse(response_headers, request_headers);

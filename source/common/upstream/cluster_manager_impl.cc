@@ -32,7 +32,9 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
+#include "common/runtime/runtime_features.h"
 #include "common/tcp/conn_pool.h"
+#include "common/tcp/original_conn_pool.h"
 #include "common/upstream/cds_api_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/maglev_lb.h"
@@ -149,19 +151,17 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
             secondary_init_clusters_.empty());
   if (!secondary_init_clusters_.empty()) {
     if (!started_secondary_initialize_) {
-      const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-          envoy::config::core::v3::ApiVersion::V2);
       ENVOY_LOG(info, "cm init: initializing secondary clusters");
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      if (cm_.adsMux() == nullptr || cm_.adsMux()->paused(type_url)) {
-        initializeSecondaryClusters();
-      } else {
-        cm_.adsMux()->pause(type_url);
-        Cleanup eds_resume([this, type_url] { cm_.adsMux()->resume(type_url); });
-        initializeSecondaryClusters();
+      Config::ScopedResume maybe_resume_eds;
+      if (cm_.adsMux()) {
+        const auto type_urls =
+            Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+        maybe_resume_eds = cm_.adsMux()->pause(type_urls);
       }
+      initializeSecondaryClusters();
     }
     return;
   }
@@ -234,7 +234,7 @@ void ClusterManagerInitHelper::setPrimaryClustersInitializedCb(
 ClusterManagerImpl::ClusterManagerImpl(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-    Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+    Random::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
     Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
     Http::Context& http_context, Grpc::Context& grpc_context)
@@ -776,7 +776,7 @@ void ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& 
       cluster_entry_it->second->thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
           cluster_reference.prioritySet(), cluster_reference.info()->stats(),
           cluster_reference.info()->statsScope(), runtime_, random_,
-          cluster_reference.info()->lbConfig());
+          cluster_reference.info()->lbMaglevConfig(), cluster_reference.info()->lbConfig());
     }
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided) {
     cluster_entry_it->second->thread_aware_lb_ = std::move(new_cluster_pair.second);
@@ -798,13 +798,13 @@ void ClusterManagerImpl::updateClusterCounts() {
   // signal to ADS to proceed with RDS updates.
   // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
   if (ads_mux_) {
-    const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
-        envoy::config::core::v3::ApiVersion::V2);
+    const auto type_urls = Config::getAllVersionTypeUrls<envoy::config::cluster::v3::Cluster>();
     const uint64_t previous_warming = cm_stats_.warming_clusters_.value();
     if (previous_warming == 0 && !warming_clusters_.empty()) {
-      ads_mux_->pause(type_url);
+      resume_cds_ = ads_mux_->pause(type_urls);
     } else if (previous_warming > 0 && warming_clusters_.empty()) {
-      ads_mux_->resume(type_url);
+      ASSERT(resume_cds_ != nullptr);
+      resume_cds_.reset();
     }
   }
   cm_stats_.active_clusters_.set(active_clusters_.size());
@@ -822,9 +822,35 @@ ThreadLocalCluster* ClusterManagerImpl::get(absl::string_view cluster) {
   }
 }
 
+void ClusterManagerImpl::maybePrefetch(
+    ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry,
+    std::function<ConnectionPool::Instance*()> pick_prefetch_pool) {
+  // TODO(alyssawilk) As currently implemented, this will always just prefetch
+  // one connection ahead of actually needed connections.
+  //
+  // Instead we want to track the following metrics across the entire connection
+  // pool and use the same algorithm we do for per-upstream prefetch:
+  // ((pending_streams_ + num_active_streams_) * global_prefetch_ratio >
+  //  (connecting_stream_capacity_ + num_active_streams_)))
+  //  and allow multiple prefetches per pick.
+  //  Also cap prefetches such that
+  //  num_unused_prefetch < num hosts
+  //  since if we have more prefetches than hosts, we should consider kicking into
+  //  per-upstream prefetch.
+  //
+  //  Once we do this, this should loop capped number of times while shouldPrefetch is true.
+  if (cluster_entry->cluster_info_->peekaheadRatio() > 1.0) {
+    ConnectionPool::Instance* prefetch_pool = pick_prefetch_pool();
+    if (prefetch_pool) {
+      prefetch_pool->maybePrefetch(cluster_entry->cluster_info_->peekaheadRatio());
+    }
+  }
+}
+
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                                           Http::Protocol protocol, LoadBalancerContext* context) {
+                                           absl::optional<Http::Protocol> protocol,
+                                           LoadBalancerContext* context) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
@@ -833,7 +859,19 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
   }
 
   // Select a host and create a connection pool for it if it does not already exist.
-  return entry->second->connPool(priority, protocol, context);
+  auto ret = entry->second->connPool(priority, protocol, context, false);
+
+  // Now see if another host should be prefetched.
+  // httpConnPoolForCluster is called immediately before a call for newStream. newStream doesn't
+  // have the load balancer context needed to make selection decisions so prefetching must be
+  // performed here in anticipation of the new stream.
+  // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
+  // code-enforced.
+  maybePrefetch(entry->second, [&entry, &priority, &protocol, &context]() {
+    return entry->second->connPool(priority, protocol, context, true);
+  });
+
+  return ret;
 }
 
 Tcp::ConnectionPool::Instance*
@@ -847,7 +885,19 @@ ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePr
   }
 
   // Select a host and create a connection pool for it if it does not already exist.
-  return entry->second->tcpConnPool(priority, context);
+  auto ret = entry->second->tcpConnPool(priority, context, false);
+
+  // tcpConnPoolForCluster is called immediately before a call for newConnection. newConnection
+  // doesn't have the load balancer context needed to make selection decisions so prefetching must
+  // be performed here in anticipation of the new connection.
+  // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
+  // code-enforced.
+  // Now see if another host should be prefetched.
+  maybePrefetch(entry->second, [&entry, &priority, &context]() {
+    return entry->second->tcpConnPool(priority, context, true);
+  });
+
+  return ret;
 }
 
 void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
@@ -1163,18 +1213,31 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     }
   }
   {
+    // Drain or close any TCP connection pool for the host. Draining a TCP pool doesn't lead to
+    // connections being closed, it only prevents new connections through the pool. The
+    // CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE can be used to make the pool close any
+    // active connections.
     const auto& container = config.host_tcp_conn_pool_map_.find(host);
     if (container != config.host_tcp_conn_pool_map_.end()) {
       for (const auto& pair : container->second.pools_) {
         const Tcp::ConnectionPool::InstancePtr& pool = pair.second;
-        pool->drainConnections();
+        if (host->cluster().features() &
+            ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
+          pool->closeConnections();
+        } else {
+          pool->drainConnections();
+        }
       }
     }
   }
 
   if (host->cluster().features() &
       ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
-
+    // Close non connection pool TCP connections obtained from tcpConnForCluster()
+    //
+    // TODO(jono): The only remaining user of the non-pooled connections seems to be the statsd
+    // TCP client. Perhaps it could be rewritten to use a connection pool, and this code deleted.
+    //
     // Each connection will remove itself from the TcpConnectionsMap when it closes, via its
     // Network::ConnectionCallbacks. The last removed tcp conn will remove the TcpConnectionsMap
     // from host_tcp_conn_map_, so do not cache it between iterations.
@@ -1226,8 +1289,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     lb_ = std::make_unique<SubsetLoadBalancer>(
         cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
         cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
-        cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbLeastRequestConfig(),
-        cluster->lbConfig());
+        cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbMaglevConfig(),
+        cluster->lbLeastRequestConfig(), cluster->lbConfig());
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
@@ -1277,15 +1340,17 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
 
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
-    ResourcePriority priority, Http::Protocol protocol, LoadBalancerContext* context) {
-  HostConstSharedPtr host = lb_->chooseHost(context);
+    ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
+    LoadBalancerContext* context, bool peek) {
+  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
     ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
     cluster_info_->stats().upstream_cx_none_healthy_.inc();
     return nullptr;
   }
 
-  std::vector<uint8_t> hash_key = {uint8_t(protocol)};
+  auto upstream_protocol = host->cluster().upstreamHttpProtocol(downstream_protocol);
+  std::vector<uint8_t> hash_key = {uint8_t(upstream_protocol)};
 
   Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
   if (context) {
@@ -1309,6 +1374,12 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     have_transport_socket_options = true;
   }
 
+  // If configured, use the downstream connection id in pool hash key
+  if (cluster_info_->connectionPoolPerDownstreamConnection() && context &&
+      context->downstreamConnection()) {
+    context->downstreamConnection()->hashKey(hash_key);
+  }
+
   ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
 
   // Note: to simplify this, we assume that the factory is only called in the scope of this
@@ -1316,7 +1387,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   ConnPoolsContainer::ConnPools::PoolOptRef pool =
       container.pools_->getPool(priority, hash_key, [&]() {
         return parent_.parent_.factory_.allocateConnPool(
-            parent_.thread_local_dispatcher_, host, priority, protocol,
+            parent_.thread_local_dispatcher_, host, priority, upstream_protocol,
             !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr);
       });
@@ -1330,8 +1401,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
-    ResourcePriority priority, LoadBalancerContext* context) {
-  HostConstSharedPtr host = lb_->chooseHost(context);
+    ResourcePriority priority, LoadBalancerContext* context, bool peek) {
+  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
     ENVOY_LOG(debug, "no healthy host for TCP connection pool");
     cluster_info_->stats().upstream_cx_none_healthy_.inc();
@@ -1401,8 +1472,13 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) {
-  return Tcp::ConnectionPool::InstancePtr{
-      new Tcp::ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options)};
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_tcp_connection_pool")) {
+    return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
+                                               transport_socket_options);
+  } else {
+    return Tcp::ConnectionPool::InstancePtr{new Tcp::OriginalConnPoolImpl(
+        dispatcher, host, priority, options, transport_socket_options)};
+  }
 }
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(

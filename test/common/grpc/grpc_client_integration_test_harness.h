@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
@@ -8,6 +10,8 @@
 #include "common/api/api_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/grpc/async_client_impl.h"
+#include "common/grpc/context_impl.h"
+#include "common/http/context_impl.h"
 
 #ifdef ENVOY_GOOGLE_GRPC
 #include "common/grpc/google_async_client_impl.h"
@@ -28,9 +32,12 @@
 #include "test/integration/fake_upstream.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/host.h"
+#include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/global.h"
@@ -112,7 +119,7 @@ public:
   void expectInitialMetadata(const TestMetadata& metadata) {
     EXPECT_CALL(*this, onReceiveInitialMetadata_(_))
         .WillOnce(Invoke([this, &metadata](const Http::HeaderMap& received_headers) {
-          Http::TestHeaderMapImpl stream_headers(received_headers);
+          Http::TestResponseHeaderMapImpl stream_headers(received_headers);
           for (const auto& value : metadata) {
             EXPECT_EQ(value.second, stream_headers.get_(value.first));
           }
@@ -124,7 +131,7 @@ public:
   void expectTrailingMetadata(const TestMetadata& metadata) {
     EXPECT_CALL(*this, onReceiveTrailingMetadata_(_))
         .WillOnce(Invoke([this, &metadata](const Http::HeaderMap& received_headers) {
-          Http::TestHeaderMapImpl stream_headers(received_headers);
+          Http::TestResponseTrailerMapImpl stream_headers(received_headers);
           for (auto& value : metadata) {
             EXPECT_EQ(value.second, stream_headers.get_(value.first));
           }
@@ -139,7 +146,7 @@ public:
       reply_headers->addReference(value.first, value.second);
     }
     expectInitialMetadata(metadata);
-    fake_stream_->encodeHeaders(Http::TestHeaderMapImpl(*reply_headers), false);
+    fake_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl(*reply_headers), false);
   }
 
   void sendReply() {
@@ -164,7 +171,8 @@ public:
 
   void sendServerTrailers(Status::GrpcStatus grpc_status, const std::string& grpc_message,
                           const TestMetadata& metadata, bool trailers_only = false) {
-    Http::TestHeaderMapImpl reply_trailers{{"grpc-status", std::to_string(enumToInt(grpc_status))}};
+    Http::TestResponseTrailerMapImpl reply_trailers{
+        {"grpc-status", std::to_string(enumToInt(grpc_status))}};
     if (!grpc_message.empty()) {
       reply_trailers.addCopy("grpc-message", grpc_message);
     }
@@ -198,6 +206,8 @@ public:
   const TestMetadata empty_metadata_;
 };
 
+using HelloworldStreamPtr = std::unique_ptr<HelloworldStream>;
+
 // Request related test utilities.
 class HelloworldRequest : public MockAsyncRequestCallbacks<helloworld::HelloReply> {
 public:
@@ -220,6 +230,8 @@ public:
   AsyncRequest* grpc_request_{};
   Tracing::MockSpan* child_span_{new Tracing::MockSpan()};
 };
+
+using HelloworldRequestPtr = std::unique_ptr<HelloworldRequest>;
 
 class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
@@ -330,7 +342,7 @@ public:
   void expectInitialHeaders(FakeStream& fake_stream, const TestMetadata& initial_metadata) {
     AssertionResult result = fake_stream.waitForHeadersComplete();
     RELEASE_ASSERT(result, result.message());
-    stream_headers_ = std::make_unique<Http::TestHeaderMapImpl>(fake_stream.headers());
+    stream_headers_ = std::make_unique<Http::TestRequestHeaderMapImpl>(fake_stream.headers());
     EXPECT_EQ("POST", stream_headers_->get_(":method"));
     EXPECT_EQ("/helloworld.Greeter/SayHello", stream_headers_->get_(":path"));
     EXPECT_EQ("application/grpc", stream_headers_->get_("content-type"));
@@ -345,7 +357,7 @@ public:
 
   virtual void expectExtraHeaders(FakeStream&) {}
 
-  std::unique_ptr<HelloworldRequest> createRequest(const TestMetadata& initial_metadata) {
+  HelloworldRequestPtr createRequest(const TestMetadata& initial_metadata) {
     auto request = std::make_unique<HelloworldRequest>(dispatcher_helper_);
     EXPECT_CALL(*request, onCreateInitialMetadata(_))
         .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
@@ -391,7 +403,7 @@ public:
     return request;
   }
 
-  std::unique_ptr<HelloworldStream> createStream(const TestMetadata& initial_metadata) {
+  HelloworldStreamPtr createStream(const TestMetadata& initial_metadata) {
     auto stream = std::make_unique<HelloworldStream>(dispatcher_helper_);
     EXPECT_CALL(*stream, onCreateInitialMetadata(_))
         .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
@@ -434,10 +446,10 @@ public:
   Stats::ScopeSharedPtr stats_scope_{stats_store_};
   Grpc::StatNames google_grpc_stat_names_{stats_store_->symbolTable()};
   TestMetadata service_wide_initial_metadata_;
-  std::unique_ptr<Http::TestHeaderMapImpl> stream_headers_;
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> stream_headers_;
   std::vector<std::pair<std::string, std::string>> channel_args_;
 #ifdef ENVOY_GOOGLE_GRPC
-  std::unique_ptr<GoogleAsyncClientThreadLocal> google_tls_;
+  GoogleAsyncClientThreadLocalPtr google_tls_;
 #endif
   AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
   Event::TimerPtr timeout_timer_;
@@ -453,7 +465,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Runtime::MockLoader runtime_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{test_time_.timeSystem()};
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
   Http::ContextImpl http_context_;
@@ -520,7 +532,7 @@ public:
   Network::TransportSocketFactoryPtr createUpstreamSslContext() {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
-    common_tls_context->add_alpn_protocols("h2");
+    common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
     auto* tls_cert = common_tls_context->add_tls_certificates();
     tls_cert->mutable_certificate_chain()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));

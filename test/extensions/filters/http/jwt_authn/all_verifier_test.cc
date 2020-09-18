@@ -5,7 +5,7 @@
 
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
@@ -125,6 +125,14 @@ TEST_F(AllowFailedInSingleRequirementTest, NoJwt) {
 TEST_F(AllowFailedInSingleRequirementTest, BadJwt) {
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+}
+
+TEST_F(AllowFailedInSingleRequirementTest, MissingIssToken) {
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ES256WithoutIssToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));

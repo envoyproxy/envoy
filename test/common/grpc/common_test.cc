@@ -5,7 +5,7 @@
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/global.h"
 #include "test/test_common/utility.h"
@@ -104,20 +104,20 @@ TEST(GrpcContextTest, GetGrpcTimeout) {
 }
 
 TEST(GrpcCommonTest, GrpcStatusDetailsBin) {
-  Http::TestHeaderMapImpl empty_trailers;
+  Http::TestResponseTrailerMapImpl empty_trailers;
   EXPECT_FALSE(Common::getGrpcStatusDetailsBin(empty_trailers));
 
-  Http::TestHeaderMapImpl invalid_value{{"grpc-status-details-bin", "invalid"}};
+  Http::TestResponseTrailerMapImpl invalid_value{{"grpc-status-details-bin", "invalid"}};
   EXPECT_FALSE(Common::getGrpcStatusDetailsBin(invalid_value));
 
-  Http::TestHeaderMapImpl unpadded_value{
+  Http::TestResponseTrailerMapImpl unpadded_value{
       {"grpc-status-details-bin", "CAUSElJlc291cmNlIG5vdCBmb3VuZA"}};
   auto status = Common::getGrpcStatusDetailsBin(unpadded_value);
   ASSERT_TRUE(status);
   EXPECT_EQ(Status::WellKnownGrpcStatus::NotFound, status->code());
   EXPECT_EQ("Resource not found", status->message());
 
-  Http::TestHeaderMapImpl padded_value{
+  Http::TestResponseTrailerMapImpl padded_value{
       {"grpc-status-details-bin", "CAUSElJlc291cmNlIG5vdCBmb3VuZA=="}};
   status = Common::getGrpcStatusDetailsBin(padded_value);
   ASSERT_TRUE(status);

@@ -27,12 +27,13 @@ public:
 
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
-  void onDestroy() override {}
+  void onDestroy() override;
 
 private:
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_callback_;
   Envoy::Http::FilterHeadersStatus filter_iteration_state_{Http::FilterHeadersStatus::Continue};
+  bool decode_headers_active_{false};
 };
 
 } // namespace OnDemand

@@ -8,6 +8,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/network/exception.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
@@ -30,9 +31,9 @@ namespace Network {
 UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
                                  UdpListenerCallbacks& cb, TimeSource& time_source)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source) {
-  file_event_ = dispatcher_.createFileEvent(
-      socket_->ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); },
-      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
+  file_event_ = socket_->ioHandle().createFileEvent(
+      dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   ASSERT(file_event_);
 
@@ -44,15 +45,17 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
 }
 
 UdpListenerImpl::~UdpListenerImpl() {
-  disable();
+  disableEvent();
   file_event_.reset();
 }
 
-void UdpListenerImpl::disable() { file_event_->setEnabled(0); }
+void UdpListenerImpl::disable() { disableEvent(); }
 
 void UdpListenerImpl::enable() {
   file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
 }
+
+void UdpListenerImpl::disableEvent() { file_event_->setEnabled(0); }
 
 void UdpListenerImpl::onSocketEvent(short flags) {
   ASSERT((flags & (Event::FileReadyType::Read | Event::FileReadyType::Write)));
@@ -107,13 +110,19 @@ const Address::InstanceConstSharedPtr& UdpListenerImpl::localAddress() const {
 Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
   ENVOY_UDP_LOG(trace, "send");
   Buffer::Instance& buffer = send_data.buffer_;
-  Api::IoCallUint64Result send_result = Utility::writeToSocket(
-      socket_->ioHandle(), buffer, send_data.local_ip_, send_data.peer_address_);
+
+  Api::IoCallUint64Result send_result =
+      cb_.udpPacketWriter().writePacket(buffer, send_data.local_ip_, send_data.peer_address_);
 
   // The send_result normalizes the rc_ value to 0 in error conditions.
   // The drain call is hence 'safe' in success and failure cases.
   buffer.drain(send_result.rc_);
   return send_result;
+}
+
+Api::IoCallUint64Result UdpListenerImpl::flush() {
+  ENVOY_UDP_LOG(trace, "flush");
+  return cb_.udpPacketWriter().flush();
 }
 
 } // namespace Network

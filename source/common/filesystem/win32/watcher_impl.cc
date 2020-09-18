@@ -31,7 +31,10 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api)
   thread_exit_event_ = ::CreateEvent(nullptr, false, false, nullptr);
   ASSERT(thread_exit_event_ != NULL);
   keep_watching_ = true;
-  watch_thread_ = thread_factory_.createThread([this]() -> void { watchLoop(); });
+
+  // See comments in WorkerImpl::start for the naming convention.
+  Thread::Options options{absl::StrCat("wat:", dispatcher.name())};
+  watch_thread_ = thread_factory_.createThread([this]() -> void { watchLoop(); }, options);
 }
 
 WatcherImpl::~WatcherImpl() {
@@ -50,6 +53,10 @@ WatcherImpl::~WatcherImpl() {
 }
 
 void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) {
+  if (path == Platform::null_device_path) {
+    return;
+  }
+
   const PathSplitResult result = api_.fileSystem().splitPathFromFilename(path);
   // ReadDirectoryChangesW only has a Unicode version, so we need
   // to use wide strings here

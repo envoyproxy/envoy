@@ -112,10 +112,145 @@ private:
  */
 class SslConnectionWrapper : public BaseLuaObject<SslConnectionWrapper> {
 public:
-  SslConnectionWrapper(const Ssl::ConnectionInfoConstSharedPtr) {}
-  static ExportedFunctions exportedFunctions() { return {}; }
+  explicit SslConnectionWrapper(const Ssl::ConnectionInfo& info) : connection_info_{info} {}
+  static ExportedFunctions exportedFunctions() {
+    return {{"peerCertificatePresented", static_luaPeerCertificatePresented},
+            {"peerCertificateValidated", static_luaPeerCertificateValidated},
+            {"uriSanLocalCertificate", static_luaUriSanLocalCertificate},
+            {"sha256PeerCertificateDigest", static_luaSha256PeerCertificateDigest},
+            {"serialNumberPeerCertificate", static_luaSerialNumberPeerCertificate},
+            {"issuerPeerCertificate", static_luaIssuerPeerCertificate},
+            {"subjectPeerCertificate", static_luaSubjectPeerCertificate},
+            {"uriSanPeerCertificate", static_luaUriSanPeerCertificate},
+            {"subjectLocalCertificate", static_luaSubjectLocalCertificate},
+            {"dnsSansPeerCertificate", static_luaDnsSansPeerCertificate},
+            {"dnsSansLocalCertificate", static_luaDnsSansLocalCertificate},
+            {"validFromPeerCertificate", static_luaValidFromPeerCertificate},
+            {"expirationPeerCertificate", static_luaExpirationPeerCertificate},
+            {"sessionId", static_luaSessionId},
+            {"ciphersuiteId", static_luaCiphersuiteId},
+            {"ciphersuiteString", static_luaCiphersuiteString},
+            {"urlEncodedPemEncodedPeerCertificate", static_luaUrlEncodedPemEncodedPeerCertificate},
+            {"urlEncodedPemEncodedPeerCertificateChain",
+             static_luaUrlEncodedPemEncodedPeerCertificateChain},
+            {"tlsVersion", static_luaTlsVersion}};
+  }
 
-  // TODO(dio): Add more Lua APIs around Ssl::Connection.
+private:
+  /**
+   * Returns bool whether the peer certificate is presented.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaPeerCertificatePresented);
+
+  /**
+   * Returns bool whether the peer certificate is validated.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaPeerCertificateValidated);
+
+  /**
+   * Returns the URIs in the SAN field of the local certificate. Returns empty table if there is no
+   * local certificate, or no SAN field, or no URI in SAN.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaUriSanLocalCertificate);
+
+  /**
+   * Returns the subject field of the local certificate in RFC 2253 format. Returns empty string if
+   * there is no local certificate, or no subject.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaSubjectLocalCertificate);
+
+  /**
+   * Returns the SHA256 digest of the peer certificate. Returns empty string if there is no peer
+   * certificate which can happen in TLS (non mTLS) connections.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaSha256PeerCertificateDigest);
+
+  /**
+   * Returns the serial number field of the peer certificate. Returns empty string if there is no
+   * peer certificate, or no serial number.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaSerialNumberPeerCertificate);
+
+  /**
+   * Returns the issuer field of the peer certificate in RFC 2253 format. Returns empty string if
+   * there is no peer certificate, or no issuer.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaIssuerPeerCertificate);
+
+  /**
+   * Returns the subject field of the peer certificate in RFC 2253 format. Returns empty string if
+   * there is no peer certificate, or no subject.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaSubjectPeerCertificate);
+
+  /**
+   * Returns the URIs in the SAN field of the peer certificate. Returns empty table if there is no
+   * peer certificate, or no SAN field, or no URI.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaUriSanPeerCertificate);
+
+  /**
+   * Return string the URL-encoded PEM-encoded representation of the peer certificate. Returns empty
+   * string if there is no peer certificate or encoding fails.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaUrlEncodedPemEncodedPeerCertificate);
+
+  /**
+   * Returns the URL-encoded PEM-encoded representation of the full peer certificate chain including
+   * the leaf certificate. Returns empty string if there is no peer certificate or encoding fails.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaUrlEncodedPemEncodedPeerCertificateChain);
+
+  /**
+   * Returns the DNS entries in the SAN field of the peer certificate. Returns an empty table if
+   * there is no peer certificate, or no SAN field, or no DNS entries in SAN.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaDnsSansPeerCertificate);
+
+  /**
+   * Returns the DNS entries in the SAN field of the local certificate. Returns an empty table if
+   * there is no local certificate, or no SAN field, or no DNS entries in SAN.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaDnsSansLocalCertificate);
+
+  /**
+   * Returns the timestamp-since-epoch (in seconds) that the peer certificate was issued and should
+   * be considered valid from. Returns empty string if there is no peer certificate.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaValidFromPeerCertificate);
+
+  /**
+   * Returns the timestamp-since-epoch (in seconds) that the peer certificate expires and should not
+   * be considered valid after. Returns empty string if there is no peer certificate.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaExpirationPeerCertificate);
+
+  /**
+   * Returns the hex-encoded TLS session ID as defined in RFC 5246.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaSessionId);
+
+  /**
+   * Returns the standard ID for the ciphers used in the established TLS connection. Returns 0xffff
+   * if there is no current negotiated ciphersuite.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaCiphersuiteId);
+
+  /**
+   * Returns the OpenSSL name for the set of ciphers used in the established TLS connection. Returns
+   * empty string if there is no current negotiated ciphersuite.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaCiphersuiteString);
+
+  /**
+   * Returns the TLS version (e.g. TLSv1.2, TLSv1.3) used in the established TLS connection. Returns
+   * string if secured and nil if not.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaTlsVersion);
+
+  // TODO(dio): Add luaX509Extension if required, since currently it is used out of tree.
+
+  const Ssl::ConnectionInfo& connection_info_;
 };
 
 /**
@@ -124,6 +259,9 @@ public:
 class ConnectionWrapper : public BaseLuaObject<ConnectionWrapper> {
 public:
   ConnectionWrapper(const Network::Connection* connection) : connection_{connection} {}
+
+  // TODO(dio): Remove this in favor of StreamInfo::downstreamSslConnection wrapper since ssl() in
+  // envoy/network/connection.h is subject to removal.
   static ExportedFunctions exportedFunctions() { return {{"ssl", static_luaSsl}}; }
 
 private:

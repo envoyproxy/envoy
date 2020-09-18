@@ -10,11 +10,6 @@ public:
   LocalRateLimitIntegrationTest()
       : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {}
 
-  ~LocalRateLimitIntegrationTest() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
   void setup(const std::string& filter_yaml) {
     config_helper_.addNetworkFilter(filter_yaml);
     BaseIntegrationTest::initialize();
@@ -40,12 +35,12 @@ typed_config:
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello"));
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
   ASSERT_TRUE(fake_upstream_connection->write("world"));
   tcp_client->waitForData("world");
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   EXPECT_EQ(0,
             test_server_->counter("local_rate_limit.local_rate_limit_stats.rate_limited")->value());

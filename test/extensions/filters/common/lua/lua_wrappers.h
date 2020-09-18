@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "extensions/filters/common/lua/lua.h"
 
 #include "test/mocks/thread_local/mocks.h"
@@ -14,16 +16,24 @@ namespace Filters {
 namespace Common {
 namespace Lua {
 
+// A helper to be called inside the registered closure.
+class Printer {
+public:
+  MOCK_CONST_METHOD1(testPrint, void(const std::string&));
+};
+
+const Printer& getPrinter() { CONSTRUCT_ON_FIRST_USE(Printer); }
+
 template <class T> class LuaWrappersTestBase : public testing::Test {
 public:
   virtual void setup(const std::string& code) {
     coroutine_.reset();
-    state_.reset(new ThreadLocalState(code, tls_));
+    state_ = std::make_unique<ThreadLocalState>(code, tls_);
     state_->registerType<T>();
     coroutine_ = state_->createCoroutine();
-    lua_pushlightuserdata(coroutine_->luaState(), this);
     lua_pushcclosure(coroutine_->luaState(), luaTestPrint, 1);
     lua_setglobal(coroutine_->luaState(), "testPrint");
+    testing::Mock::AllowLeak(&printer_);
   }
 
   void start(const std::string& method) {
@@ -31,19 +41,16 @@ public:
   }
 
   static int luaTestPrint(lua_State* state) {
-    LuaWrappersTestBase* test =
-        static_cast<LuaWrappersTestBase*>(lua_touserdata(state, lua_upvalueindex(1)));
     const char* message = luaL_checkstring(state, 1);
-    test->testPrint(message);
+    getPrinter().testPrint(message);
     return 0;
   }
 
-  MOCK_METHOD(void, testPrint, (const std::string&));
-
   NiceMock<ThreadLocal::MockInstance> tls_;
-  std::unique_ptr<ThreadLocalState> state_;
+  ThreadLocalStatePtr state_;
   std::function<void()> yield_callback_;
   CoroutinePtr coroutine_;
+  const Printer& printer_{getPrinter()};
 };
 
 } // namespace Lua

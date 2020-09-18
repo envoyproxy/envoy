@@ -3,17 +3,22 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
+#include "envoy/network/exception.h"
+#include "envoy/network/udp_packet_writer_config.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 
 #include "common/access_log/access_log_impl.h"
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/config/utility.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/socket_option_factory.h"
+#include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_features.h"
@@ -53,7 +58,7 @@ bool needTlsInspector(const envoy::config::listener::v3::Listener& config) {
 
 ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& factory,
                                                  Network::Address::InstanceConstSharedPtr address,
-                                                 Network::Address::SocketType socket_type,
+                                                 Network::Socket::Type socket_type,
                                                  const Network::Socket::OptionsSharedPtr& options,
                                                  bool bind_to_port,
                                                  const std::string& listener_name, bool reuse_port)
@@ -62,7 +67,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& facto
 
   bool create_socket = false;
   if (local_address_->type() == Network::Address::Type::Ip) {
-    if (socket_type_ == Network::Address::SocketType::Datagram) {
+    if (socket_type_ == Network::Socket::Type::Datagram) {
       ASSERT(reuse_port_ == true);
     }
 
@@ -106,7 +111,7 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
         fmt::format("{}: Setting socket options {}", listener_name_, ok ? "succeeded" : "failed");
     if (!ok) {
       ENVOY_LOG(warn, "{}", message);
-      throw EnvoyException(message);
+      throw Network::CreateListenerException(message);
     } else {
       ENVOY_LOG(debug, "{}", message);
     }
@@ -166,7 +171,7 @@ Http::Context& ListenerFactoryContextBaseImpl::httpContext() { return server_.ht
 const LocalInfo::LocalInfo& ListenerFactoryContextBaseImpl::localInfo() const {
   return server_.localInfo();
 }
-Envoy::Runtime::RandomGenerator& ListenerFactoryContextBaseImpl::random() {
+Envoy::Random::RandomGenerator& ListenerFactoryContextBaseImpl::random() {
   return server_.random();
 }
 Envoy::Runtime::Loader& ListenerFactoryContextBaseImpl::runtime() { return server_.runtime(); }
@@ -228,6 +233,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), added_via_api_(added_via_api),
       workers_started_(workers_started), hash_(hash),
+      tcp_backlog_size_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
@@ -244,6 +251,11 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           parent.factory_.createDrainManager(config.drain_type()))),
       filter_chain_manager_(address_, listener_factory_context_->parentFactoryContext(),
                             initManager()),
+      cx_limit_runtime_key_("envoy.resource_limits.listener." + config_.name() +
+                            ".connection_limit"),
+      open_connections_(std::make_shared<BasicResourceLimitImpl>(
+          std::numeric_limits<uint64_t>::max(), listener_factory_context_->runtime(),
+          cx_limit_runtime_key_)),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name), [this] {
         if (workers_started_) {
           parent_.onListenerWarmed(*this);
@@ -253,14 +265,25 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           listener_init_target_.ready();
         }
       }) {
+
+  const absl::optional<std::string> runtime_val =
+      listener_factory_context_->runtime().snapshot().get(cx_limit_runtime_key_);
+  if (runtime_val && runtime_val->empty()) {
+    ENVOY_LOG(warn,
+              "Listener connection limit runtime key {} is empty. There are currently no "
+              "limitations on the number of accepted connections for listener {}.",
+              cx_limit_runtime_key_, config_.name());
+  }
+
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);
   buildUdpListenerFactory(socket_type, concurrency);
+  buildUdpWriterFactory(socket_type);
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
   buildFilterChains();
-  if (socket_type == Network::Address::SocketType::Datagram) {
+  if (socket_type == Network::Socket::Type::Datagram) {
     return;
   }
   buildSocketOptions();
@@ -276,7 +299,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   }
 }
 
-ListenerImpl::ListenerImpl(const ListenerImpl& origin,
+ListenerImpl::ListenerImpl(ListenerImpl& origin,
                            const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
@@ -289,6 +312,8 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(origin.listener_tag_), name_(name), added_via_api_(added_via_api),
       workers_started_(workers_started), hash_(hash),
+      tcp_backlog_size_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
@@ -300,6 +325,7 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
+      connection_balancer_(origin.connection_balancer_),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           origin.listener_factory_context_->listener_factory_context_base_, this, *this)),
       filter_chain_manager_(address_, origin.listener_factory_context_->parentFactoryContext(),
@@ -312,6 +338,7 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);
   buildUdpListenerFactory(socket_type, concurrency);
+  buildUdpWriterFactory(socket_type);
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
   buildFilterChains();
@@ -320,6 +347,7 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
   buildOriginalDstListenerFilter();
   buildProxyProtocolListenerFilter();
   buildTlsInspectorListenerFilter();
+  open_connections_ = origin.open_connections_;
 }
 
 void ListenerImpl::buildAccessLog() {
@@ -330,9 +358,15 @@ void ListenerImpl::buildAccessLog() {
   }
 }
 
-void ListenerImpl::buildUdpListenerFactory(Network::Address::SocketType socket_type,
+void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
                                            uint32_t concurrency) {
-  if (socket_type == Network::Address::SocketType::Datagram) {
+  if (socket_type == Network::Socket::Type::Datagram) {
+    if (!config_.reuse_port() && concurrency > 1) {
+      throw EnvoyException("Listening on UDP when concurrency is > 1 without the SO_REUSEPORT "
+                           "socket option results in "
+                           "unstable packet proxying. Configure the reuse_port listener option or "
+                           "set concurrency = 1.");
+    }
     auto udp_config = config_.udp_listener_config();
     if (udp_config.udp_listener_name().empty()) {
       udp_config.set_udp_listener_name(UdpListenerNames::get().RawUdp);
@@ -343,14 +377,33 @@ void ListenerImpl::buildUdpListenerFactory(Network::Address::SocketType socket_t
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
     udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message, concurrency);
-    if (!config_.reuse_port() && concurrency > 1) {
-      ENVOY_LOG(warn, "Listening on UDP without SO_REUSEPORT socket option may result to unstable "
-                      "packet proxying. Consider configuring the reuse_port listener option.");
-    }
   }
 }
 
-void ListenerImpl::buildListenSocketOptions(Network::Address::SocketType socket_type) {
+void ListenerImpl::buildUdpWriterFactory(Network::Socket::Type socket_type) {
+  if (socket_type == Network::Socket::Type::Datagram) {
+    auto udp_writer_config = config_.udp_writer_config();
+    if (!Api::OsSysCallsSingleton::get().supportsUdpGso() ||
+        udp_writer_config.typed_config().type_url().empty()) {
+      const std::string default_type_url =
+          "type.googleapis.com/envoy.config.listener.v3.UdpDefaultWriterOptions";
+      udp_writer_config.mutable_typed_config()->set_type_url(default_type_url);
+    }
+    auto& config_factory =
+        Config::Utility::getAndCheckFactory<Network::UdpPacketWriterConfigFactory>(
+            udp_writer_config);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        udp_writer_config.typed_config(), validation_visitor_, config_factory);
+    udp_writer_factory_ = config_factory.createUdpPacketWriterFactory(*message);
+  }
+}
+
+void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
+  // The process-wide `signal()` handling may fail to handle SIGPIPE if overridden
+  // in the process (i.e., on a mobile client). Some OSes support handling it at the socket layer:
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    addListenSocketOptions(Network::SocketOptionFactory::buildSocketNoSigpipeOptions());
+  }
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, transparent, false)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }
@@ -364,18 +417,23 @@ void ListenerImpl::buildListenSocketOptions(Network::Address::SocketType socket_
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config_.socket_options()));
   }
-  if (socket_type == Network::Address::SocketType::Datagram) {
+  if (socket_type == Network::Socket::Type::Datagram) {
     // Needed for recvmsg to return destination address in IP header.
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
     addListenSocketOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+    // TODO(yugant) : Add a config option for UDP_GRO
+    if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+      // Needed to receive gso_size option
+      addListenSocketOptions(Network::SocketOptionFactory::buildUdpGroOptions());
+    }
   }
 }
 
-void ListenerImpl::createListenerFilterFactories(Network::Address::SocketType socket_type) {
+void ListenerImpl::createListenerFilterFactories(Network::Socket::Type socket_type) {
   if (!config_.listener_filters().empty()) {
     switch (socket_type) {
-    case Network::Address::SocketType::Datagram:
+    case Network::Socket::Type::Datagram:
       if (config_.listener_filters().size() > 1) {
         // Currently supports only 1 UDP listener filter.
         throw EnvoyException(fmt::format(
@@ -385,7 +443,7 @@ void ListenerImpl::createListenerFilterFactories(Network::Address::SocketType so
       udp_listener_filter_factories_ = parent_.factory_.createUdpListenerFilterFactoryList(
           config_.listener_filters(), *listener_factory_context_);
       break;
-    case Network::Address::SocketType::Stream:
+    case Network::Socket::Type::Stream:
       listener_filter_factories_ = parent_.factory_.createListenerFilterFactoryList(
           config_.listener_filters(), *listener_factory_context_);
       break;
@@ -395,8 +453,8 @@ void ListenerImpl::createListenerFilterFactories(Network::Address::SocketType so
   }
 }
 
-void ListenerImpl::validateFilterChains(Network::Address::SocketType socket_type) {
-  if (config_.filter_chains().empty() && (socket_type == Network::Address::SocketType::Stream ||
+void ListenerImpl::validateFilterChains(Network::Socket::Type socket_type) {
+  if (config_.filter_chains().empty() && (socket_type == Network::Socket::Type::Stream ||
                                           !udp_listener_factory_->isTransportConnectionless())) {
     // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
     // is a filter chain specified
@@ -431,12 +489,15 @@ void ListenerImpl::buildFilterChains() {
 
 void ListenerImpl::buildSocketOptions() {
   // TCP specific setup.
-  if (config_.has_connection_balance_config()) {
-    // Currently exact balance is the only supported type and there are no options.
-    ASSERT(config_.connection_balance_config().has_exact_balance());
-    connection_balancer_ = std::make_unique<Network::ExactConnectionBalancerImpl>();
-  } else {
-    connection_balancer_ = std::make_unique<Network::NopConnectionBalancerImpl>();
+  if (connection_balancer_ == nullptr) {
+    // Not in place listener update.
+    if (config_.has_connection_balance_config()) {
+      // Currently exact balance is the only supported type and there are no options.
+      ASSERT(config_.connection_balance_config().has_exact_balance());
+      connection_balancer_ = std::make_shared<Network::ExactConnectionBalancerImpl>();
+    } else {
+      connection_balancer_ = std::make_shared<Network::NopConnectionBalancerImpl>();
+    }
   }
 
   if (config_.has_tcp_fast_open_queue_length()) {
@@ -468,7 +529,7 @@ void ListenerImpl::buildProxyProtocolListenerFilter() {
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
     listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
-        Envoy::ProtobufWkt::Empty(),
+        envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol(),
         /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
   }
 }
@@ -518,7 +579,7 @@ Http::Context& PerListenerFactoryContextImpl::httpContext() {
 const LocalInfo::LocalInfo& PerListenerFactoryContextImpl::localInfo() const {
   return listener_factory_context_base_->localInfo();
 }
-Envoy::Runtime::RandomGenerator& PerListenerFactoryContextImpl::random() {
+Envoy::Random::RandomGenerator& PerListenerFactoryContextImpl::random() {
   return listener_factory_context_base_->random();
 }
 Envoy::Runtime::Loader& PerListenerFactoryContextImpl::runtime() {
@@ -637,9 +698,9 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
 
   // Currently we only support TCP filter chain update.
   if (Network::Utility::protobufAddressSocketType(config_.address()) !=
-          Network::Address::SocketType::Stream ||
+          Network::Socket::Type::Stream ||
       Network::Utility::protobufAddressSocketType(config.address()) !=
-          Network::Address::SocketType::Stream) {
+          Network::Socket::Type::Stream) {
     return false;
   }
 

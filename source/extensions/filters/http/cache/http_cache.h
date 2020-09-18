@@ -11,8 +11,11 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/assert.h"
+#include "common/common/logger.h"
 
 #include "source/extensions/filters/http/cache/key.pb.h"
+
+#include "extensions/filters/http/cache/cache_headers_utils.h"
 
 #include "absl/strings/string_view.h"
 
@@ -32,11 +35,11 @@ enum class CacheEntryStatus {
   // This entry is fresh, and an appropriate basis for a 304 Not Modified
   // response.
   FoundNotModified,
-  // This entry is fresh, but can't satisfy the requested range(s).
-  UnsatisfiableRange,
+  // This entry is fresh, but cannot satisfy the requested range(s).
+  NotSatisfiableRange,
+  // This entry is fresh, and can satisfy the requested range(s).
+  SatisfiableRange,
 };
-
-std::ostream& operator<<(std::ostream& os, CacheEntryStatus status);
 
 // Byte range from an HTTP request.
 class RawByteRange {
@@ -69,6 +72,16 @@ private:
   const uint64_t last_byte_pos_;
 };
 
+class RangeRequests : Logger::Loggable<Logger::Id::cache_filter> {
+public:
+  // Parses the ranges from the request headers into a vector<RawByteRange>.
+  // max_byte_range_specs defines how many byte ranges can be parsed from the header value.
+  // If there is no range header, multiple range headers, the header value is malformed, or there
+  // are more ranges than max_byte_range_specs, returns an empty vector.
+  static std::vector<RawByteRange> parseRanges(const Http::RequestHeaderMap& request_headers,
+                                               uint64_t max_byte_range_specs);
+};
+
 // Byte range from an HTTP request, adjusted for a known response body size, and converted from an
 // HTTP-style closed interval to a C++ style half-open interval.
 class AdjustedByteRange {
@@ -96,8 +109,6 @@ private:
 inline bool operator==(const AdjustedByteRange& lhs, const AdjustedByteRange& rhs) {
   return lhs.begin() == rhs.begin() && lhs.end() == rhs.end();
 }
-
-std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range);
 
 // Adjusts request_range_spec to fit a cached response of size content_length, putting the results
 // in response_ranges. Returns true if response_ranges is satisfiable (empty is considered
@@ -135,7 +146,14 @@ struct LookupResult {
   // TODO(toddmgreer): Implement trailer support.
   // True if the cached response has trailers.
   bool has_trailers_ = false;
+
+  // Update the content length of the object and its response headers.
+  void setContentLength(uint64_t new_length) {
+    content_length_ = new_length;
+    headers_->setContentLength(new_length);
+  }
 };
+using LookupResultPtr = std::unique_ptr<LookupResult>;
 
 // Produces a hash of key that is consistent across restarts, architectures,
 // builds, and configurations. Caches that store persistent entries based on a
@@ -152,15 +170,27 @@ struct LookupResult {
 // TODO(toddmgreer): Ensure that stability guarantees above are accurate.
 size_t stableHashKey(const Key& key);
 
+// The metadata associated with a cached response.
+// TODO(yosrym93): This could be changed to a proto if a need arises.
+// If a cache was created with the current interface, then it was changed to a proto, all the cache
+// entries will need to be invalidated.
+struct ResponseMetadata {
+  // The time at which a response was was most recently inserted, updated, or validated in this
+  // cache. This represents "response_time" in the age header calculations at:
+  // https://httpwg.org/specs/rfc7234.html#age.calculations
+  SystemTime response_time_;
+};
+
 // LookupRequest holds everything about a request that's needed to look for a
 // response in a cache, to evaluate whether an entry from a cache is usable, and
 // to determine what ranges are needed.
 class LookupRequest {
 public:
-  using HeaderVector = std::vector<Http::HeaderEntry>;
-
   // Prereq: request_headers's Path(), Scheme(), and Host() are non-null.
-  LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp);
+  LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
+                const VaryHeader& vary_allow_list);
+
+  const RequestCacheControl& requestCacheControl() const { return request_cache_control_; }
 
   // Caches may modify the key according to local needs, though care must be
   // taken to ensure that meaningfully distinct responses have distinct keys.
@@ -171,27 +201,33 @@ public:
   // LookupHeadersCallback. Specifically,
   // - LookupResult::cache_entry_status_ is set according to HTTP cache
   // validation logic.
-  // - LookupResult::headers takes ownership of response_headers.
-  // - LookupResult::content_length == content_length.
-  // - LookupResult::response_ranges entries are satisfiable (as documented
+  // - LookupResult::headers_ takes ownership of response_headers.
+  // - LookupResult::content_length_ == content_length.
+  // - LookupResult::response_ranges_ entries are satisfiable (as documented
   // there).
   LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
-                                uint64_t content_length) const;
+                                ResponseMetadata&& metadata, uint64_t content_length) const;
+
+  // Warning: this should not be accessed out-of-thread!
+  const Http::RequestHeaderMap& getVaryHeaders() const { return *vary_headers_; }
 
 private:
-  bool isFresh(const Http::ResponseHeaderMap& response_headers) const;
+  void initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers);
+  bool requiresValidation(const Http::ResponseHeaderMap& response_headers,
+                          SystemTime::duration age) const;
 
   Key key_;
   std::vector<RawByteRange> request_range_spec_;
   // Time when this LookupRequest was created (in response to an HTTP request).
   SystemTime timestamp_;
-  // The subset of this request's headers that are listed in
+  // The subset of this request's headers that match one of the rules in
   // envoy::extensions::filters::http::cache::v3alpha::CacheConfig::allowed_vary_headers. If a cache
   // storage implementation forwards lookup requests to a remote cache server that supports *vary*
   // headers, that server may need to see these headers. For local implementations, it may be
   // simpler to instead call makeLookupResult with each potential response.
-  HeaderVector vary_headers_;
-  const std::string request_cache_control_;
+  Http::RequestHeaderMapPtr vary_headers_;
+
+  RequestCacheControl request_cache_control_;
 };
 
 // Statically known information about a cache.
@@ -209,12 +245,13 @@ using InsertCallback = std::function<void(bool success_ready_for_more)>;
 class InsertContext {
 public:
   // Accepts response_headers for caching. Only called once.
-  virtual void insertHeaders(const Http::ResponseHeaderMap& response_headers, bool end_stream) PURE;
+  virtual void insertHeaders(const Http::ResponseHeaderMap& response_headers,
+                             const ResponseMetadata& metadata, bool end_stream) PURE;
 
   // The insertion is streamed into the cache in chunks whose size is determined
   // by the client, but with a pace determined by the cache. To avoid streaming
   // data into cache too fast for the cache to handle, clients should wait for
-  // the cache to call ready_for_next_chunk() before streaming the next chunk.
+  // the cache to call readyForNextChunk() before streaming the next chunk.
   //
   // The client can abort the streaming insertion by dropping the
   // InsertContextPtr. A cache can abort the insertion by passing 'false' into
@@ -224,6 +261,23 @@ public:
 
   // Inserts trailers into the cache.
   virtual void insertTrailers(const Http::ResponseTrailerMap& trailers) PURE;
+
+  // This routine is called prior to an InsertContext being destroyed. InsertContext is responsible
+  // for making sure that any async activities are cleaned up before returning from onDestroy().
+  // This includes timers, network calls, etc. The reason there is an onDestroy() method vs. doing
+  // this type of cleanup in the destructor is to avoid potential data races between an async
+  // callback and the destructor in case the connection terminates abruptly.
+  // Example scenario with a hypothetical cache that uses RPC:
+  // 1. [Filter's thread] CacheFilter calls InsertContext::insertBody.
+  // 2. [Filter's thread] RPCInsertContext sends RPC and returns.
+  // 3. [Filter's thread] Client disconnects; Destroying stream; CacheFilter destructor begins.
+  // 4. [Filter's thread] RPCInsertContext destructor begins.
+  // 5. [Other thread] RPC completes and calls RPCInsertContext::onRPCDone.
+  // --> RPCInsertContext's destructor and onRpcDone cause a data race in RpcInsertContext.
+  // onDestroy() should cancel any outstanding async operations and, if necessary,
+  // it should block on that cancellation to avoid data races. InsertContext must not invoke any
+  // callbacks to the CacheFilter after having onDestroy() invoked.
+  virtual void onDestroy() PURE;
 
   virtual ~InsertContext() = default;
 };
@@ -261,6 +315,23 @@ public:
   // Http::ResponseTrailerMapPtr passed to cb must not be null.
   virtual void getTrailers(LookupTrailersCallback&& cb) PURE;
 
+  // This routine is called prior to a LookupContext being destroyed. LookupContext is responsible
+  // for making sure that any async activities are cleaned up before returning from onDestroy().
+  // This includes timers, network calls, etc. The reason there is an onDestroy() method vs. doing
+  // this type of cleanup in the destructor is to avoid potential data races between an async
+  // callback and the destructor in case the connection terminates abruptly.
+  // Example scenario with a hypothetical cache that uses RPC:
+  // 1. [Filter's thread] CacheFilter calls LookupContext::getHeaders.
+  // 2. [Filter's thread] RPCLookupContext sends RPC and returns.
+  // 3. [Filter's thread] Client disconnects; Destroying stream; CacheFilter destructor begins.
+  // 4. [Filter's thread] RPCLookupContext destructor begins.
+  // 5. [Other thread] RPC completes and calls RPCLookupContext::onRPCDone.
+  // --> RPCLookupContext's destructor and onRpcDone cause a data race in RPCLookupContext.
+  // onDestroy() should cancel any outstanding async operations and, if necessary,
+  // it should block on that cancellation to avoid data races. InsertContext must not invoke any
+  // callbacks to the CacheFilter after having onDestroy() invoked.
+  virtual void onDestroy() PURE;
+
   virtual ~LookupContext() = default;
 };
 using LookupContextPtr = std::unique_ptr<LookupContext>;
@@ -286,8 +357,9 @@ public:
   //
   // This is called when an expired cache entry is successfully validated, to
   // update the cache entry.
-  virtual void updateHeaders(LookupContextPtr&& lookup_context,
-                             Http::ResponseHeaderMapPtr&& response_headers) PURE;
+  virtual void updateHeaders(const LookupContext& lookup_context,
+                             const Http::ResponseHeaderMap& response_headers,
+                             const ResponseMetadata& metadata) PURE;
 
   // Returns statically known information about a cache.
   virtual CacheInfo cacheInfo() const PURE;
@@ -299,7 +371,7 @@ public:
 class HttpCacheFactory : public Config::TypedFactory {
 public:
   // From UntypedFactory
-  std::string category() const override { return "http_cache_factory"; }
+  std::string category() const override { return "envoy.http.cache"; }
 
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).

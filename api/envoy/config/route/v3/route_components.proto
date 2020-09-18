@@ -7,6 +7,7 @@ import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
+import "envoy/type/metadata/v3/metadata.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
 import "envoy/type/v3/range.proto";
@@ -17,6 +18,7 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -125,7 +127,9 @@ message VirtualHost {
 
   // Specifies a list of HTTP headers that should be removed from each response
   // handled by this virtual host.
-  repeated string response_headers_to_remove = 11;
+  repeated string response_headers_to_remove = 11 [(validate.rules).repeated = {
+    items {string {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+  }];
 
   // Indicates that the virtual host has a CORS policy.
   CorsPolicy cors = 8;
@@ -225,6 +229,8 @@ message Route {
     // [#not-implemented-hide:]
     // If true, a filter will define the action (e.g., it could dynamically generate the
     // RouteAction).
+    // [#comment: TODO(samflattery): Remove cleanup in route_fuzz_test.cc when
+    // implemented]
     FilterAction filter_action = 17;
   }
 
@@ -271,7 +277,9 @@ message Route {
 
   // Specifies a list of HTTP headers that should be removed from each response
   // to requests matching this route.
-  repeated string response_headers_to_remove = 11;
+  repeated string response_headers_to_remove = 11 [(validate.rules).repeated = {
+    items {string {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+  }];
 
   // Presence of the object defines whether the connection manager's tracing configuration
   // is overridden by this route specific instance.
@@ -330,7 +338,9 @@ message WeightedCluster {
 
     // Specifies a list of HTTP headers that should be removed from each request when
     // this cluster is selected through the enclosing :ref:`envoy_api_msg_config.route.v3.RouteAction`.
-    repeated string request_headers_to_remove = 9;
+    repeated string request_headers_to_remove = 9 [(validate.rules).repeated = {
+      items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
+    }];
 
     // Specifies a list of headers to be added to responses when this cluster is selected
     // through the enclosing :ref:`envoy_api_msg_config.route.v3.RouteAction`.
@@ -344,7 +354,9 @@ message WeightedCluster {
 
     // Specifies a list of headers to be removed from responses when this cluster is selected
     // through the enclosing :ref:`envoy_api_msg_config.route.v3.RouteAction`.
-    repeated string response_headers_to_remove = 6;
+    repeated string response_headers_to_remove = 6 [(validate.rules).repeated = {
+      items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
+    }];
 
     // The per_filter_config field can be used to provide weighted cluster-specific
     // configurations for filters. The key should match the filter name, such as
@@ -432,14 +444,14 @@ message RouteMatch {
     // (WebSocket and the like) as they are normalized in Envoy as HTTP/1.1 style
     // upgrades.
     // This is the only way to match CONNECT requests for HTTP/1.1. For HTTP/2,
-    // where CONNECT requests may have a path, the path matchers will work if
+    // where Extended CONNECT requests may have a path, the path matchers will work if
     // there is a path present.
     // Note that CONNECT support is currently considered alpha in Envoy.
     // [#comment:TODO(htuch): Replace the above comment with an alpha tag.
     ConnectMatcher connect_matcher = 12;
   }
 
-  // Indicates that prefix/path matching should be case insensitive. The default
+  // Indicates that prefix/path matching should be case sensitive. The default
   // is true.
   google.protobuf.BoolValue case_sensitive = 4;
 
@@ -537,7 +549,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 35]
+// [#next-free-field: 37]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -611,6 +623,10 @@ message RouteAction {
       string header_name = 1 [
         (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
       ];
+
+      // If specified, the request header value will be rewritten and used
+      // to produce the hash key.
+      type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 2;
     }
 
     // Envoy supports two types of cookie affinity:
@@ -748,6 +764,31 @@ message RouteAction {
     ConnectConfig connect_config = 3;
   }
 
+  // [#not-implemented-hide:]
+  message MaxStreamDuration {
+    // Specifies the maximum duration allowed for streams on the route. If not specified, the value
+    // from the :ref:`max_stream_duration
+    // <envoy_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>` field in
+    // :ref:`HttpConnectionManager.common_http_protocol_options
+    // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options>`
+    // is used.
+    google.protobuf.Duration max_stream_duration = 1;
+
+    // If present, and the request contains a `grpc-timeout header
+    // <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_, use that value as the
+    // *max_stream_duration*, but limit the applied timeout to the maximum value specified here.
+    // If set to 0, the `grpc-timeout` header is used without modification.
+    google.protobuf.Duration grpc_max_timeout = 2;
+
+    // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by
+    // subtracting the provided duration from the header. This is useful for allowing Envoy to set
+    // its global timeout to be less than that of the deadline imposed by the calling client, which
+    // makes it more likely that Envoy will handle the timeout instead of having the call canceled
+    // by the client. If, after applying the offset, the resulting timeout is zero or negative,
+    // the stream will timeout immediately.
+    google.protobuf.Duration grpc_timeout_offset = 3;
+  }
+
   reserved 12, 18, 19, 16, 22, 21, 10;
 
   reserved "request_mirror_policy";
@@ -878,6 +919,23 @@ message RouteAction {
     //   must come from trusted source.
     string host_rewrite_header = 29
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+    // Indicates that during forwarding, the host header will be swapped with
+    // the result of the regex substitution executed on path value with query and fragment removed.
+    // This is useful for transitioning variable content between path segment and subdomain.
+    //
+    // For example with the following config:
+    //
+    //   .. code-block:: yaml
+    //
+    //     host_rewrite_path_regex:
+    //       pattern:
+    //         google_re2: {}
+    //         regex: "^/(.+)/.+$"
+    //       substitution: \1
+    //
+    // Would rewrite the host header to `envoyproxy.io` given the path `/envoyproxy.io/some/path`.
+    type.matcher.v3.RegexMatchAndSubstitute host_rewrite_path_regex = 35;
   }
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
@@ -939,7 +997,9 @@ message RouteAction {
   // limits. By default, if the route configured rate limits, the virtual host
   // :ref:`rate_limits <envoy_api_field_config.route.v3.VirtualHost.rate_limits>` are not applied to the
   // request.
-  google.protobuf.BoolValue include_vh_rate_limits = 14;
+  //
+  // This field is deprecated. Please use :ref:`vh_rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits>`
+  google.protobuf.BoolValue include_vh_rate_limits = 14 [deprecated = true];
 
   // Specifies a list of hash policies to use for ring hash load balancing. Each
   // hash policy is evaluated individually and the combined result is used to
@@ -1018,12 +1078,21 @@ message RouteAction {
   // it'll take precedence over the virtual host level hedge policy entirely
   // (e.g.: policies are not merged, most internal one becomes the enforced policy).
   HedgePolicy hedge_policy = 27;
+
+  // Specifies the maximum stream duration for this route.
+  // [#not-implemented-hide:]
+  MaxStreamDuration max_stream_duration = 36;
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message RetryPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RetryPolicy";
+
+  enum ResetHeaderFormat {
+    SECONDS = 0;
+    UNIX_TIMESTAMP = 1;
+  }
 
   message RetryPriority {
     option (udpa.annotations.versioning).previous_message_type =
@@ -1075,6 +1144,69 @@ message RetryPolicy {
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {}}];
   }
 
+  message ResetHeader {
+    string name = 1
+        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+    ResetHeaderFormat format = 2 [(validate.rules).enum = {defined_only: true}];
+  }
+
+  // A retry back-off strategy that applies when the upstream server rate limits
+  // the request.
+  //
+  // Given this configuration:
+  //
+  // .. code-block:: yaml
+  //
+  //   rate_limited_retry_back_off:
+  //     reset_headers:
+  //     - name: Retry-After
+  //       format: SECONDS
+  //     - name: X-RateLimit-Reset
+  //       format: UNIX_TIMESTAMP
+  //     max_interval: "300s"
+  //
+  // The following algorithm will apply:
+  //
+  //  1. If the response contains the header ``Retry-After`` its value must be on
+  //     the form ``120`` (an integer that represents the number of seconds to
+  //     wait before retrying). If so, this value is used as the back-off interval.
+  //  2. Otherwise, if the response contains the header ``X-RateLimit-Reset`` its
+  //     value must be on the form ``1595320702`` (an integer that represents the
+  //     point in time at which to retry, as a Unix timestamp in seconds). If so,
+  //     the current time is subtracted from this value and the result is used as
+  //     the back-off interval.
+  //  3. Otherwise, Envoy will use the default
+  //     :ref:`exponential back-off <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_back_off>`
+  //     strategy.
+  //
+  // No matter which format is used, if the resulting back-off interval exceeds
+  // ``max_interval`` it is discarded and the next header in ``reset_headers``
+  // is tried. If a request timeout is configured for the route it will further
+  // limit how long the request will be allowed to run.
+  //
+  // To prevent many clients retrying at the same point in time jitter is added
+  // to the back-off interval, so the resulting interval is decided by taking:
+  // ``random(interval, interval * 1.5)``.
+  //
+  // .. attention::
+  //
+  //   Configuring ``rate_limited_retry_back_off`` will not by itself cause a request
+  //   to be retried. You will still need to configure the right retry policy to match
+  //   the responses from the upstream server.
+  message RateLimitedRetryBackOff {
+    // Specifies the reset headers (like ``Retry-After`` or ``X-RateLimit-Reset``)
+    // to match against the response. Headers are tried in order, and matched case
+    // insensitive. The first header to be parsed successfully is used. If no headers
+    // match the default exponential back-off is used instead.
+    repeated ResetHeader reset_headers = 1 [(validate.rules).repeated = {min_items: 1}];
+
+    // Specifies the maximum back off interval that Envoy will allow. If a reset
+    // header contains an interval longer than this then it will be discarded and
+    // the next header will be tried. Defaults to 300 seconds.
+    google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {}}];
+  }
+
   // Specifies the conditions under which retry takes place. These are the same
   // conditions documented for :ref:`config_http_filters_router_x-envoy-retry-on` and
   // :ref:`config_http_filters_router_x-envoy-retry-grpc-on`.
@@ -1083,7 +1215,8 @@ message RetryPolicy {
   // Specifies the allowed number of retries. This parameter is optional and
   // defaults to 1. These are the same conditions documented for
   // :ref:`config_http_filters_router_x-envoy-max-retries`.
-  google.protobuf.UInt32Value num_retries = 2;
+  google.protobuf.UInt32Value num_retries = 2
+      [(udpa.annotations.field_migrate).rename = "max_retries"];
 
   // Specifies a non-zero upstream timeout per retry attempt. This parameter is optional. The
   // same conditions documented for
@@ -1117,12 +1250,21 @@ message RetryPolicy {
   // HTTP status codes that should trigger a retry in addition to those specified by retry_on.
   repeated uint32 retriable_status_codes = 7;
 
-  // Specifies parameters that control retry back off. This parameter is optional, in which case the
+  // Specifies parameters that control exponential retry back off. This parameter is optional, in which case the
   // default base interval is 25 milliseconds or, if set, the current value of the
   // `upstream.base_retry_backoff_ms` runtime parameter. The default maximum interval is 10 times
   // the base interval. The documentation for :ref:`config_http_filters_router_x-envoy-max-retries`
   // describes Envoy's back-off algorithm.
   RetryBackOff retry_back_off = 8;
+
+  // Specifies parameters that control a retry back-off strategy that is used
+  // when the request is rate limited by the upstream server. The server may
+  // return a response header like ``Retry-After`` or ``X-RateLimit-Reset`` to
+  // provide feedback to the client on how long to wait before retrying. If
+  // configured, this back-off strategy will be used instead of the
+  // default exponential back off strategy (configured using `retry_back_off`)
+  // whenever a response includes the matching headers.
+  RateLimitedRetryBackOff rate_limited_retry_back_off = 11;
 
   // HTTP response headers that trigger a retry if present in the response. A retry will be
   // triggered if any of the header matches match the upstream response headers.
@@ -1203,6 +1345,21 @@ message RedirectAction {
 
   oneof path_rewrite_specifier {
     // The path portion of the URL will be swapped with this value.
+    // Please note that query string in path_redirect will override the
+    // request's query string and will not be stripped.
+    //
+    // For example, let's say we have the following routes:
+    //
+    // - match: { path: "/old-path-1" }
+    //   redirect: { path_redirect: "/new-path-1" }
+    // - match: { path: "/old-path-2" }
+    //   redirect: { path_redirect: "/new-path-2", strip-query: "true" }
+    // - match: { path: "/old-path-3" }
+    //   redirect: { path_redirect: "/new-path-3?foo=1", strip_query: "true" }
+    //
+    // 1. if request uri is "/old-path-1?bar=1", users will be redirected to "/new-path-1?bar=1"
+    // 2. if request uri is "/old-path-2?bar=1", users will be redirected to "/new-path-2"
+    // 3. if request uri is "/old-path-3?bar=1", users will be redirected to "/new-path-3?foo=1"
     string path_redirect = 2
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
@@ -1338,7 +1495,7 @@ message VirtualCluster {
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RateLimit.Action";
@@ -1424,6 +1581,10 @@ message RateLimit {
 
       // The value to use in the descriptor entry.
       string descriptor_value = 1 [(validate.rules).string = {min_bytes: 1}];
+
+      // An optional key to use in the descriptor entry. If not set it defaults
+      // to 'generic_key' as the descriptor key.
+      string descriptor_key = 2;
     }
 
     // The following descriptor entry is appended to the descriptor:
@@ -1452,6 +1613,24 @@ message RateLimit {
       repeated HeaderMatcher headers = 3 [(validate.rules).repeated = {min_items: 1}];
     }
 
+    // The following descriptor entry is appended when the dynamic metadata contains a key value:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("<descriptor_key>", "<value_queried_from_metadata>")
+    message DynamicMetaData {
+      // The key to use in the descriptor entry.
+      string descriptor_key = 1 [(validate.rules).string = {min_bytes: 1}];
+
+      // Metadata struct that defines the key and path to retrieve the string value. A match will
+      // only happen if the value in the dynamic metadata is of type string.
+      type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
+
+      // An optional value to use if *metadata_key* is empty. If not set and
+      // no value is present under the metadata_key then no descriptor is generated.
+      string default_value = 3;
+    }
+
     oneof action_specifier {
       option (validate.required) = true;
 
@@ -1472,6 +1651,27 @@ message RateLimit {
 
       // Rate limit on the existence of request headers.
       HeaderValueMatch header_value_match = 6;
+
+      // Rate limit on dynamic metadata.
+      DynamicMetaData dynamic_metadata = 7;
+    }
+  }
+
+  message Override {
+    // Fetches the override from the dynamic metadata.
+    message DynamicMetadata {
+      // Metadata struct that defines the key and path to retrieve the struct value.
+      // The value must be a struct containing an integer "requests_per_unit" property
+      // and a "unit" property with a value parseable to :ref:`RateLimitUnit
+      // enum <envoy_api_enum_type.v3.RateLimitUnit>`
+      type.metadata.v3.MetadataKey metadata_key = 1 [(validate.rules).message = {required: true}];
+    }
+
+    oneof override_specifier {
+      option (validate.required) = true;
+
+      // Limit override from dynamic metadata.
+      DynamicMetadata dynamic_metadata = 1;
     }
   }
 
@@ -1494,6 +1694,12 @@ message RateLimit {
   // configuration. See :ref:`composing actions
   // <config_http_filters_rate_limit_composing_actions>` for additional documentation.
   repeated Action actions = 3 [(validate.rules).repeated = {min_items: 1}];
+
+  // An optional limit override to be appended to the descriptor produced by this
+  // rate limit configuration. If the override value is invalid or cannot be resolved
+  // from metadata, no override is provided. See :ref:`rate limit override
+  // <config_http_filters_rate_limit_rate_limit_override>` for more information.
+  Override limit = 4;
 }
 
 // .. attention::
@@ -1520,7 +1726,7 @@ message RateLimit {
 //   value.
 //
 //  [#next-major-version: HeaderMatcher should be refactored to use StringMatcher.]
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message HeaderMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.HeaderMatcher";
 
@@ -1574,6 +1780,15 @@ message HeaderMatcher {
     //
     // * The suffix *abcd* matches the value *xyzabcd*, but not for *xyzbcd*.
     string suffix_match = 10 [(validate.rules).string = {min_bytes: 1}];
+
+    // If specified, header match will be performed based on whether the header value contains
+    // the given value or not.
+    // Note: empty contains match is not allowed, please use present_match instead.
+    //
+    // Examples:
+    //
+    // * The value *abcd* matches the value *xyzabcdpqr*, but not for *xyzbcdpqr*.
+    string contains_match = 12 [(validate.rules).string = {min_bytes: 1}];
   }
 
   // If specified, the match result will be inverted before checking. Defaults to false.

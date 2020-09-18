@@ -12,7 +12,8 @@ namespace Server {
  */
 class HotRestartingChild : HotRestartingBase, Logger::Loggable<Logger::Id::main> {
 public:
-  HotRestartingChild(int base_id, int restart_epoch);
+  HotRestartingChild(int base_id, int restart_epoch, const std::string& socket_path,
+                     mode_t socket_mode);
 
   int duplicateParentListenSocket(const std::string& address);
   std::unique_ptr<envoy::HotRestartMessage> getParentStats();
@@ -27,6 +28,7 @@ private:
   bool parent_terminated_{};
   sockaddr_un parent_address_;
   std::unique_ptr<Stats::StatMerger> stat_merger_{};
+  Stats::StatName hot_restart_generation_stat_name_;
 };
 
 } // namespace Server

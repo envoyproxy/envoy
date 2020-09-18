@@ -61,10 +61,13 @@ message ClientStatusRequest {
   // Management server can use these match criteria to identify clients.
   // The match follows OR semantics.
   repeated type.matcher.v3.NodeMatcher node_matchers = 1;
+
+  // The node making the csds request.
+  config.core.v3.Node node = 2;
 }
 
 // Detailed config (per xDS) with status.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message PerXdsConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.status.v2.PerXdsConfig";
@@ -79,6 +82,8 @@ message PerXdsConfig {
     admin.v3.RoutesConfigDump route_config = 4;
 
     admin.v3.ScopedRoutesConfigDump scoped_route_config = 5;
+
+    admin.v3.EndpointsConfigDump endpoint_config = 6;
   }
 }
 

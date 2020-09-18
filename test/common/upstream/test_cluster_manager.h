@@ -35,10 +35,10 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -126,7 +126,7 @@ public:
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{
       dispatcher_.timeSource()};
@@ -160,7 +160,7 @@ public:
   TestClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                          ClusterManagerFactory& factory, Stats::Store& stats,
                          ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                         Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                         Random::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                          AccessLog::AccessLogManager& log_manager,
                          Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
                          ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
@@ -185,7 +185,7 @@ public:
   MockedUpdatedClusterManagerImpl(
       const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
       Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+      Random::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
       AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
       Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
       MockLocalClusterUpdate& local_cluster_update, MockLocalHostsRemoved& local_hosts_removed,

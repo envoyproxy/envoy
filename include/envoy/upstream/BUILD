@@ -1,22 +1,26 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_package()
 
 envoy_cc_library(
     name = "cluster_manager_interface",
     hdrs = ["cluster_manager.h"],
+    external_deps = [
+        "abseil_node_hash_map",
+    ],
     deps = [
         ":health_checker_interface",
         ":load_balancer_interface",
         ":thread_local_cluster_interface",
         ":upstream_interface",
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/common:random_generator_interface",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_factory_interface",
         "//include/envoy/grpc:async_client_manager_interface",

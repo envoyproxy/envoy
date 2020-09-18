@@ -38,7 +38,7 @@ public:
   // destructed.
   MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
                  ListenerHooks& listener_hooks, Server::ComponentFactory& component_factory,
-                 std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
+                 std::unique_ptr<Random::RandomGenerator>&& random_generator,
                  Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
                  std::unique_ptr<ProcessContext> process_context);
 
@@ -78,21 +78,25 @@ protected:
   Stats::SymbolTablePtr symbol_table_;
   Stats::AllocatorImpl stats_allocator_;
 
-  std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
+  ThreadLocal::InstanceImplPtr tls_;
   std::unique_ptr<Server::HotRestart> restarter_;
-  std::unique_ptr<Stats::ThreadLocalStoreImpl> stats_store_;
+  Stats::ThreadLocalStoreImplPtr stats_store_;
   std::unique_ptr<Logger::Context> logging_context_;
   std::unique_ptr<Init::Manager> init_manager_{std::make_unique<Init::ManagerImpl>("Server")};
   std::unique_ptr<Server::InstanceImpl> server_;
 
 private:
   void configureComponentLogLevels();
+  void configureHotRestarter(Random::RandomGenerator& random_generator);
 };
 
 // TODO(jmarantz): consider removing this class; I think it'd be more useful to
 // go through MainCommonBase directly.
 class MainCommon {
 public:
+  // Hook to run after a server is created.
+  using PostServerHook = std::function<void(Server::Instance& server)>;
+
   MainCommon(int argc, const char* const* argv);
   bool run() { return base_.run(); }
   // Only tests have a legitimate need for this today.
@@ -119,6 +123,20 @@ public:
    *         validation mode.
    */
   Server::Instance* server() { return base_.server(); }
+
+  /**
+   * Instantiates a MainCommon using default factory implements, parses args,
+   * and runs an event loop depending on the mode.
+   *
+   * Note that MainCommonBase can also be directly instantiated, providing the
+   * opportunity to override subsystem implementations for custom
+   * implementations.
+   *
+   * @param argc number of command-line args
+   * @param argv command-line argument array
+   * @param hook optional hook to run after a server is created
+   */
+  static int main(int argc, char** argv, PostServerHook hook = nullptr);
 
 private:
 #ifdef ENVOY_HANDLE_SIGNALS

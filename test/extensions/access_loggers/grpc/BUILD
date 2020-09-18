@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -8,6 +6,8 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -68,7 +68,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.access_loggers.http_grpc",
     deps = [
         "//source/extensions/access_loggers/grpc:http_config",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
     ],
@@ -78,7 +78,6 @@ envoy_extension_cc_test(
     name = "http_grpc_access_log_integration_test",
     srcs = ["http_grpc_access_log_integration_test.cc"],
     extension_name = "envoy.access_loggers.http_grpc",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",
@@ -98,7 +97,6 @@ envoy_extension_cc_test(
     name = "tcp_grpc_access_log_integration_test",
     srcs = ["tcp_grpc_access_log_integration_test.cc"],
     extension_name = "envoy.access_loggers.http_grpc",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",

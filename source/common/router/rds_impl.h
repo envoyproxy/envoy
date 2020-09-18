@@ -2,14 +2,14 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <queue>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/route/v3/route.pb.validate.h"
 #include "envoy/config/subscription.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/codes.h"
@@ -33,6 +33,9 @@
 #include "common/protobuf/utility.h"
 #include "common/router/route_config_update_receiver_impl.h"
 #include "common/router/vhds.h"
+
+#include "absl/container/node_hash_map.h"
+#include "absl/container/node_hash_set.h"
 
 namespace Envoy {
 namespace Router {
@@ -116,7 +119,7 @@ class RdsRouteConfigSubscription
 public:
   ~RdsRouteConfigSubscription() override;
 
-  std::unordered_set<RouteConfigProvider*>& routeConfigProviders() {
+  absl::node_hash_set<RouteConfigProvider*>& routeConfigProviders() {
     ASSERT(route_config_providers_.size() == 1 || route_config_providers_.empty());
     return route_config_providers_;
   }
@@ -128,17 +131,13 @@ public:
 
 private:
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+  void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
                       const std::string& version_info) override;
-  void onConfigUpdate(
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string&) override;
+  void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string& system_version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
-  std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::config::route::v3::RouteConfiguration>(resource).name();
-  }
 
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) {
     return update_callback_manager_.add(callback);
@@ -152,10 +151,11 @@ private:
 
   bool validateUpdateSize(int num_resources);
 
-  std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const std::string route_config_name_;
+  // This scope must outlive the subscription_ below as the subscription has derived stats.
+  Stats::ScopePtr scope_;
+  Envoy::Config::SubscriptionPtr subscription_;
   Server::Configuration::ServerFactoryContext& factory_context_;
-  ProtobufMessage::ValidationVisitor& validator_;
 
   // Init target used to notify the parent init manager that the subscription [and its sub resource]
   // is ready.
@@ -165,13 +165,12 @@ private:
   // Target which starts the RDS subscription.
   Init::TargetImpl local_init_target_;
   Init::ManagerImpl local_init_manager_;
-  Stats::ScopePtr scope_;
   std::string stat_prefix_;
   RdsStats stats_;
   RouteConfigProviderManagerImpl& route_config_provider_manager_;
   const uint64_t manager_identifier_;
   // TODO(lambdai): Prove that a subscription has exactly one provider and remove the container.
-  std::unordered_set<RouteConfigProvider*> route_config_providers_;
+  absl::node_hash_set<RouteConfigProvider*> route_config_providers_;
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
   Common::CallbackManager<> update_callback_manager_;
@@ -227,9 +226,14 @@ private:
   ProtobufMessage::ValidationVisitor& validator_;
   ThreadLocal::SlotPtr tls_;
   std::list<UpdateOnDemandCallback> config_update_callbacks_;
+  // A flag used to determine if this instance of RdsRouteConfigProviderImpl hasn't been
+  // deallocated. Please also see a comment in requestVirtualHostsUpdate() method implementation.
+  std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
 
   friend class RouteConfigProviderManagerImpl;
 };
+
+using RdsRouteConfigProviderImplSharedPtr = std::shared_ptr<RdsRouteConfigProviderImpl>;
 
 class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
                                        public Singleton::Instance {
@@ -253,14 +257,16 @@ private:
   // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map
   // as in ConfigTracker. I.e. the ProviderImpls would have an EntryOwner for these lists
   // Then the lifetime management stuff is centralized and opaque.
-  std::unordered_map<uint64_t, std::weak_ptr<RdsRouteConfigProviderImpl>>
+  absl::node_hash_map<uint64_t, std::weak_ptr<RdsRouteConfigProviderImpl>>
       dynamic_route_config_providers_;
-  std::unordered_set<RouteConfigProvider*> static_route_config_providers_;
+  absl::node_hash_set<RouteConfigProvider*> static_route_config_providers_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
 
   friend class RdsRouteConfigSubscription;
   friend class StaticRouteConfigProviderImpl;
 };
+
+using RouteConfigProviderManagerImplPtr = std::unique_ptr<RouteConfigProviderManagerImpl>;
 
 } // namespace Router
 } // namespace Envoy

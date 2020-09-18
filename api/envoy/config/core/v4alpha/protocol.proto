@@ -100,7 +100,7 @@ message HttpProtocolOptions {
   HeadersWithUnderscoresAction headers_with_underscores_action = 5;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message Http1ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.Http1ProtocolOptions";
@@ -157,9 +157,27 @@ message Http1ProtocolOptions {
   //   - Not a response to a HEAD request.
   //   - The content length header is not present.
   bool enable_trailers = 5;
+
+  // Allows Envoy to process requests/responses with both `Content-Length` and `Transfer-Encoding`
+  // headers set. By default such messages are rejected, but if option is enabled - Envoy will
+  // remove Content-Length header and process message.
+  // See `RFC7230, sec. 3.3.3 <https://tools.ietf.org/html/rfc7230#section-3.3.3>` for details.
+  //
+  // .. attention::
+  //   Enabling this option might lead to request smuggling vulnerability, especially if traffic
+  //   is proxied via multiple layers of proxies.
+  bool allow_chunked_length = 6;
+
+  // Allows invalid HTTP messaging. When this option is false, then Envoy will terminate
+  // HTTP/1.1 connections upon receiving an invalid HTTP message. However,
+  // when this option is true, then Envoy will leave the HTTP/1.1 connection
+  // open where possible.
+  // If set, this overrides any HCM :ref:`stream_error_on_invalid_http_messaging
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`.
+  google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 7;
 }
 
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.Http2ProtocolOptions";
@@ -172,13 +190,17 @@ message Http2ProtocolOptions {
 
     // The 16 bit parameter identifier.
     google.protobuf.UInt32Value identifier = 1 [
-      (validate.rules).uint32 = {lte: 65536 gte: 1},
+      (validate.rules).uint32 = {lte: 65535 gte: 0},
       (validate.rules).message = {required: true}
     ];
 
     // The 32 bit parameter value.
     google.protobuf.UInt32Value value = 2 [(validate.rules).message = {required: true}];
   }
+
+  reserved 12;
+
+  reserved "stream_error_on_invalid_http_messaging";
 
   // `Maximum table size <https://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
   // (in octets) that the encoder is permitted to use for the dynamic HPACK table. Valid values
@@ -280,8 +302,11 @@ message Http2ProtocolOptions {
   // the whole HTTP/2 connection is terminated upon receiving invalid HEADERS frame. However,
   // when this option is enabled, only the offending stream is terminated.
   //
+  // This overrides any HCM :ref:`stream_error_on_invalid_http_messaging
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`
+  //
   // See `RFC7540, sec. 8.1 <https://tools.ietf.org/html/rfc7540#section-8.1>`_ for details.
-  bool stream_error_on_invalid_http_messaging = 12;
+  google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 14;
 
   // [#not-implemented-hide:]
   // Specifies SETTINGS frame parameters to be sent to the peer, with two exceptions:

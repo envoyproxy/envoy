@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -75,9 +75,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "guarddog_config_interface",
+    hdrs = ["guarddog_config.h"],
+    deps = [
+        ":guarddog_interface",
+        "//include/envoy/api:api_interface",
+        "//include/envoy/protobuf:message_validator_interface",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "health_checker_config_interface",
     hdrs = ["health_checker_config.h"],
     deps = [
+        "//include/envoy/common:random_generator_interface",
         "//include/envoy/config:typed_config_interface",
         "//include/envoy/upstream:health_checker_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -154,8 +166,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "filter_config_interface",
-    hdrs = ["filter_config.h"],
+    name = "factory_context_interface",
+    hdrs = ["factory_context.h"],
     deps = [
         ":admin_interface",
         ":drain_manager_interface",
@@ -173,7 +185,6 @@ envoy_cc_library(
         "//include/envoy/network:drain_decision_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server:overload_manager_interface",
-        "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/tracing:http_tracer_interface",
@@ -182,6 +193,30 @@ envoy_cc_library(
         "//source/common/common:macros",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_config_interface",
+    hdrs = ["filter_config.h"],
+    deps = [
+        ":drain_manager_interface",
+        ":factory_context_interface",
+        ":lifecycle_notifier_interface",
+        ":process_context_interface",
+        "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/server:overload_manager_interface",
+        "//include/envoy/server:transport_socket_config_interface",
+        "//include/envoy/singleton:manager_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "//include/envoy/tracing:http_tracer_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
+        "//source/common/protobuf",
     ],
 )
 
@@ -220,6 +255,7 @@ envoy_cc_library(
     name = "transport_socket_config_interface",
     hdrs = ["transport_socket_config.h"],
     deps = [
+        ":factory_context_interface",
         "//include/envoy/config:typed_config_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/init:manager_interface",
@@ -233,6 +269,7 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/protobuf",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -291,5 +328,14 @@ envoy_cc_library(
     deps = [
         "//include/envoy/config:typed_config_interface",
         "//include/envoy/network:connection_handler_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "bootstrap_extension_config_interface",
+    hdrs = ["bootstrap_extension_config.h"],
+    deps = [
+        ":factory_context_interface",
+        "//include/envoy/config:typed_config_interface",
     ],
 )

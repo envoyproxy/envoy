@@ -1,3 +1,10 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_cc_library",
+    "envoy_extension_package",
+)
+
 licenses(["notice"])  # Apache 2
 
 #package(default_visibility = ["//visibility:public"])
@@ -5,14 +12,7 @@ licenses(["notice"])  # Apache 2
 # PostgresSQL proxy L7 network filter.
 # Public docs: docs/root/configuration/network_filters/postgres_proxy_filter.rst
 
-load(
-    "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
-    "envoy_cc_library",
-    "envoy_package",
-)
-
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "filter",
@@ -33,6 +33,8 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/network:filter_lib",
+        "//source/extensions/common/sqlutils:sqlutils_lib",
+        "//source/extensions/filters/network:well_known_names",
     ],
 )
 

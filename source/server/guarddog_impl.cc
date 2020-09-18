@@ -1,13 +1,25 @@
 #include "server/guarddog_impl.h"
 
+#include <sys/types.h>
+
 #include <chrono>
 #include <memory>
+#include <utility>
+#include <vector>
 
+#include "envoy/common/time.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/server/configuration.h"
+#include "envoy/server/guarddog.h"
+#include "envoy/server/guarddog_config.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
+#include "common/common/logger.h"
+#include "common/config/utility.h"
+#include "common/protobuf/utility.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "server/watchdog_impl.h"
@@ -17,12 +29,13 @@
 namespace Envoy {
 namespace Server {
 
-GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
+GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config,
                            Api::Api& api, std::unique_ptr<TestInterlockHook>&& test_interlock)
     : test_interlock_hook_(std::move(test_interlock)), stats_scope_(stats_scope),
-      time_source_(api.timeSource()), miss_timeout_(config.wdMissTimeout()),
-      megamiss_timeout_(config.wdMegaMissTimeout()), kill_timeout_(config.wdKillTimeout()),
-      multi_kill_timeout_(config.wdMultiKillTimeout()),
+      time_source_(api.timeSource()), miss_timeout_(config.missTimeout()),
+      megamiss_timeout_(config.megaMissTimeout()), kill_timeout_(config.killTimeout()),
+      multi_kill_timeout_(config.multiKillTimeout()),
+      multi_kill_fraction_(config.multiKillThreshold() / 100.0),
       loop_interval_([&]() -> std::chrono::milliseconds {
         // The loop interval is simply the minimum of all specified intervals,
         // but we must account for the 0=disabled case. This lambda takes care
@@ -39,11 +52,29 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
           Stats::StatNameManagedStorage("server.watchdog_mega_miss", stats_scope.symbolTable())
               .statName())),
       dispatcher_(api.allocateDispatcher("guarddog_thread")),
-      loop_timer_(dispatcher_->createTimer([this]() { step(); })), run_thread_(true) {
+      loop_timer_(dispatcher_->createTimer([this]() { step(); })),
+      events_to_actions_([&](const Server::Configuration::Watchdog& config) -> EventToActionsMap {
+        EventToActionsMap map;
+
+        // We should be able to share the dispatcher since guard dog's lifetime
+        // should eclipse those of actions.
+        Configuration::GuardDogActionFactoryContext context = {api, *dispatcher_};
+
+        const auto& actions = config.actions();
+        for (const auto& action : actions) {
+          // Get factory and add the created cb
+          auto& factory = Config::Utility::getAndCheckFactory<Configuration::GuardDogActionFactory>(
+              action.config());
+          map[action.event()].push_back(factory.createGuardDogActionFromProto(action, context));
+        }
+
+        return map;
+      }(config)),
+      run_thread_(true) {
   start(api);
 }
 
-GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
+GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config,
                            Api::Api& api)
     : GuardDogImpl(stats_scope, config, api, std::make_unique<TestInterlockHook>()) {}
 
@@ -58,14 +89,23 @@ void GuardDogImpl::step() {
   }
 
   const auto now = time_source_.monotonicTime();
+  std::vector<std::pair<Thread::ThreadId, MonotonicTime>> miss_threads;
+  std::vector<std::pair<Thread::ThreadId, MonotonicTime>> mega_miss_threads;
 
   {
-    bool seen_one_multi_timeout(false);
+    std::vector<std::pair<Thread::ThreadId, MonotonicTime>> multi_kill_threads;
     Thread::LockGuard guard(wd_lock_);
+
+    // Compute the multikill threshold
+    const size_t required_for_multi_kill =
+        std::max(static_cast<size_t>(2),
+                 static_cast<size_t>(ceil(multi_kill_fraction_ * watched_dogs_.size())));
+
     for (auto& watched_dog : watched_dogs_) {
-      const auto ltt = watched_dog->dog_->lastTouchTime();
-      const auto delta = now - ltt;
-      if (watched_dog->last_alert_time_ && watched_dog->last_alert_time_.value() < ltt) {
+      const auto last_checkin = watched_dog->dog_->lastTouchTime();
+      const auto tid = watched_dog->dog_->threadId();
+      const auto delta = now - last_checkin;
+      if (watched_dog->last_alert_time_ && watched_dog->last_alert_time_.value() < last_checkin) {
         watched_dog->miss_alerted_ = false;
         watched_dog->megamiss_alerted_ = false;
       }
@@ -73,33 +113,47 @@ void GuardDogImpl::step() {
         if (!watched_dog->miss_alerted_) {
           watchdog_miss_counter_.inc();
           watched_dog->miss_counter_.inc();
-          watched_dog->last_alert_time_ = ltt;
+          watched_dog->last_alert_time_ = last_checkin;
           watched_dog->miss_alerted_ = true;
+          miss_threads.emplace_back(tid, last_checkin);
         }
       }
       if (delta > megamiss_timeout_) {
         if (!watched_dog->megamiss_alerted_) {
           watchdog_megamiss_counter_.inc();
           watched_dog->megamiss_counter_.inc();
-          watched_dog->last_alert_time_ = ltt;
+          watched_dog->last_alert_time_ = last_checkin;
           watched_dog->megamiss_alerted_ = true;
+          mega_miss_threads.emplace_back(tid, last_checkin);
         }
       }
       if (killEnabled() && delta > kill_timeout_) {
+        invokeGuardDogActions(WatchDogAction::KILL, {{tid, last_checkin}}, now);
+
         PANIC(fmt::format("GuardDog: one thread ({}) stuck for more than watchdog_kill_timeout",
                           watched_dog->dog_->threadId().debugString()));
       }
       if (multikillEnabled() && delta > multi_kill_timeout_) {
-        if (seen_one_multi_timeout) {
+        multi_kill_threads.emplace_back(tid, last_checkin);
 
-          PANIC(fmt::format(
-              "GuardDog: multiple threads ({},...) stuck for more than watchdog_multikill_timeout",
-              watched_dog->dog_->threadId().debugString()));
-        } else {
-          seen_one_multi_timeout = true;
+        if (multi_kill_threads.size() >= required_for_multi_kill) {
+          invokeGuardDogActions(WatchDogAction::MULTIKILL, multi_kill_threads, now);
+
+          PANIC(fmt::format("GuardDog: At least {} threads ({},...) stuck for more than "
+                            "watchdog_multikill_timeout",
+                            multi_kill_threads.size(), tid.debugString()));
         }
       }
     }
+  }
+
+  // Run megamiss and miss handlers
+  if (!mega_miss_threads.empty()) {
+    invokeGuardDogActions(WatchDogAction::MEGAMISS, mega_miss_threads, now);
+  }
+
+  if (!miss_threads.empty()) {
+    invokeGuardDogActions(WatchDogAction::MISS, miss_threads, now);
   }
 
   {
@@ -142,8 +196,10 @@ void GuardDogImpl::stopWatching(WatchDogSharedPtr wd) {
 
 void GuardDogImpl::start(Api::Api& api) {
   Thread::LockGuard guard(mutex_);
+  // See comments in WorkerImpl::start for the naming convention.
+  Thread::Options options{absl::StrCat("dog:", dispatcher_->name())};
   thread_ = api.threadFactory().createThread(
-      [this]() -> void { dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); });
+      [this]() -> void { dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); }, options);
   loop_timer_->enableTimer(std::chrono::milliseconds(0));
 }
 
@@ -156,6 +212,18 @@ void GuardDogImpl::stop() {
   if (thread_) {
     thread_->join();
     thread_.reset();
+  }
+}
+
+void GuardDogImpl::invokeGuardDogActions(
+    WatchDogAction::WatchdogEvent event,
+    std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_last_checkin_pairs,
+    MonotonicTime now) {
+  const auto& registered_actions = events_to_actions_.find(event);
+  if (registered_actions != events_to_actions_.end()) {
+    for (auto& action : registered_actions->second) {
+      action->run(event, thread_last_checkin_pairs, now);
+    }
   }
 }
 

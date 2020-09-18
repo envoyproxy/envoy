@@ -119,6 +119,10 @@ public:
 
   absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
   absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
+  std::chrono::milliseconds resetMaxInterval() const override { return reset_max_interval_; }
+  const std::vector<ResetHeaderParserSharedPtr>& resetHeaders() const override {
+    return reset_headers_;
+  }
 
   std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
@@ -129,6 +133,8 @@ public:
   std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
   absl::optional<std::chrono::milliseconds> base_interval_{};
   absl::optional<std::chrono::milliseconds> max_interval_{};
+  std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
+  std::chrono::milliseconds reset_max_interval_{300000};
 };
 
 class MockInternalRedirectPolicy : public InternalRedirectPolicy {
@@ -157,6 +163,8 @@ public:
   void expectResetRetry();
 
   MOCK_METHOD(bool, enabled, ());
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, parseResetInterval,
+              (const Http::ResponseHeaderMap& response_headers), (const));
   MOCK_METHOD(RetryStatus, shouldRetryHeaders,
               (const Http::ResponseHeaderMap& response_headers, DoRetryCallback callback));
   MOCK_METHOD(bool, wouldRetryFromHeaders, (const Http::ResponseHeaderMap& response_headers));
@@ -184,7 +192,8 @@ public:
   MOCK_METHOD(void, populateDescriptors,
               (const RouteEntry& route, std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                const std::string& local_service_cluster, const Http::HeaderMap& headers,
-               const Network::Address::Instance& remote_address),
+               const Network::Address::Instance& remote_address,
+               const envoy::config::core::v3::Metadata* dynamic_metadata),
               (const));
 
   uint64_t stage_{};
@@ -517,6 +526,50 @@ public:
   MOCK_METHOD(ApiType, apiType, (), (const));
 
   std::shared_ptr<MockScopedConfig> config_;
+};
+
+class MockGenericConnPool : public GenericConnPool {
+  MOCK_METHOD(void, newStream, (GenericConnectionPoolCallbacks * request));
+  MOCK_METHOD(bool, cancelAnyPendingStream, ());
+  MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
+  MOCK_METHOD(bool, initialize,
+              (Upstream::ClusterManager&, const RouteEntry&, Http::Protocol,
+               Upstream::LoadBalancerContext*));
+  MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
+};
+
+class MockUpstreamToDownstream : public UpstreamToDownstream {
+public:
+  MOCK_METHOD(const RouteEntry&, routeEntry, (), (const));
+  MOCK_METHOD(const Network::Connection&, connection, (), (const));
+
+  MOCK_METHOD(void, decodeData, (Buffer::Instance&, bool));
+  MOCK_METHOD(void, decodeMetadata, (Http::MetadataMapPtr &&));
+  MOCK_METHOD(void, decode100ContinueHeaders, (Http::ResponseHeaderMapPtr &&));
+  MOCK_METHOD(void, decodeHeaders, (Http::ResponseHeaderMapPtr&&, bool));
+  MOCK_METHOD(void, decodeTrailers, (Http::ResponseTrailerMapPtr &&));
+
+  MOCK_METHOD(void, onResetStream, (Http::StreamResetReason, absl::string_view));
+  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
+  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
+};
+
+class MockGenericConnectionPoolCallbacks : public GenericConnectionPoolCallbacks {
+public:
+  MockGenericConnectionPoolCallbacks();
+
+  MOCK_METHOD(void, onPoolFailure,
+              (Http::ConnectionPool::PoolFailureReason reason,
+               absl::string_view transport_failure_reason,
+               Upstream::HostDescriptionConstSharedPtr host));
+  MOCK_METHOD(void, onPoolReady,
+              (std::unique_ptr<GenericUpstream> && upstream,
+               Upstream::HostDescriptionConstSharedPtr host,
+               const Network::Address::InstanceConstSharedPtr& upstream_local_address,
+               const StreamInfo::StreamInfo& info));
+  MOCK_METHOD(UpstreamToDownstream&, upstreamToDownstream, ());
+
+  NiceMock<MockUpstreamToDownstream> upstream_to_downstream_;
 };
 
 } // namespace Router

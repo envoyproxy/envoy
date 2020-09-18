@@ -68,6 +68,12 @@ void releaseFragmentAllocation(const void* p, size_t, const Buffer::BufferFragme
 // walk off the edge; the caller should be guaranteeing this.
 class StringBuffer : public Buffer::Instance {
 public:
+  void addDrainTracker(std::function<void()> drain_tracker) override {
+    // Not implemented well.
+    ASSERT(false);
+    drain_tracker();
+  }
+
   void add(const void* data, uint64_t size) override {
     FUZZ_ASSERT(start_ + size_ + size <= data_.size());
     ::memcpy(mutableEnd(), data, size);
@@ -127,6 +133,8 @@ public:
     return mutableStart();
   }
 
+  Buffer::SliceDataPtr extractMutableFrontSlice() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
   void move(Buffer::Instance& rhs) override { move(rhs, rhs.length()); }
 
   void move(Buffer::Instance& rhs, uint64_t length) override {
@@ -153,7 +161,8 @@ public:
     return 1;
   }
 
-  ssize_t search(const void* data, uint64_t size, size_t start) const override {
+  ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override {
+    UNREFERENCED_PARAMETER(length);
     return asStringView().find({static_cast<const char*>(data), size}, start);
   }
 

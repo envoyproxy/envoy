@@ -3,10 +3,6 @@
 Dynamic forward proxy
 =====================
 
-.. attention::
-
-  HTTP dynamic forward proxy support should be considered alpha and not production ready.
-
 * HTTP dynamic forward proxy :ref:`architecture overview <arch_overview_http_dynamic_forward_proxy>`
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig>`
 * This filter should be configured with the name *envoy.filters.http.dynamic_forward_proxy*
@@ -31,6 +27,13 @@ host when forwarding. See the example below within the configured routes.
   *trusted_ca* certificates instructs Envoy to use TLS when connecting to upstream hosts and verify
   the certificate chain. Additionally, Envoy will automatically perform SAN verification for the
   resolved host name as well as specify the host name via SNI.
+
+.. _dns_cache_circuit_breakers:
+
+  Dynamic forward proxy uses circuit breakers built in to the DNS cache with the configuration
+  of :ref:`DNS cache circuit breakers <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_cache_circuit_breaker>`. By default, this behavior is enabled by the runtime feature `envoy.reloadable_features.enable_dns_cache_circuit_breakers`.
+  If this runtime feature is disabled, cluster circuit breakers will be used even when setting the configuration
+  of :ref:`DNS cache circuit breakers <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_cache_circuit_breaker>`.
 
 .. code-block:: yaml
 
@@ -119,3 +122,14 @@ namespace.
   host_added, Counter, Number of hosts that have been added to the cache.
   host_removed, Counter, Number of hosts that have been removed from the cache.
   num_hosts, Gauge, Number of hosts that are currently in the cache.
+  dns_rq_pending_overflow, Counter, Number of dns pending request overflow.
+
+The dynamic forward proxy DNS cache circuit breakers outputs statistics in the dns_cache.<dns_cache_name>.circuit_breakers*
+namespace.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  rq_pending_open, Gauge, Whether the requests circuit breaker is closed (0) or open (1)
+  rq_pending_remaining, Gauge, Number of remaining requests until the circuit breaker opens

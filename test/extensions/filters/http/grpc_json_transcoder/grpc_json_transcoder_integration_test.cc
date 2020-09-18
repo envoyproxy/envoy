@@ -28,9 +28,7 @@ class GrpcJsonTranscoderIntegrationTest
 public:
   GrpcJsonTranscoderIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
-  /**
-   * Global initializer for all integration tests.
-   */
+
   void SetUp() override {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     const std::string filter =
@@ -43,15 +41,6 @@ public:
             )EOF";
     config_helper_.addFilter(
         fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
-  }
-
-  /**
-   * Global destructor for all integration tests.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstream_connection_.reset();
-    fake_upstreams_.clear();
   }
 
 protected:
@@ -141,8 +130,7 @@ protected:
     }
 
     response_headers.iterate(
-        [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
-          auto* response = static_cast<IntegrationStreamDecoder*>(context);
+        [response = response.get()](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
           Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
           if (entry.value() == UnexpectedHeaderValue) {
             EXPECT_FALSE(response->headers().get(lower_key));
@@ -151,8 +139,7 @@ protected:
                       response->headers().get(lower_key)->value().getStringView());
           }
           return Http::HeaderMap::Iterate::Continue;
-        },
-        response.get());
+        });
     if (!response_body.empty()) {
       if (full_response) {
         EXPECT_EQ(response_body, response->body());
@@ -330,6 +317,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetHttpBody) {
 TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBody) {
   HttpIntegrationTest::initialize();
 
+  // 1. Normal streaming get
   testTranscoding<Empty, google::api::HttpBody>(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"}, {":path", "/indexStream"}, {":authority", "host"}},
@@ -339,6 +327,14 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBody) {
       Status(), Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "text/html"}},
       R"(<h1>Hello!</h1>)"
       R"(Hello!)");
+
+  // 2. Empty response (trailers only) from streaming backend, with a gRPC error.
+  testTranscoding<Empty, google::api::HttpBody>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/indexStream"}, {":authority", "host"}},
+      "", {""}, {}, Status(Code::NOT_FOUND, "Not Found"),
+      Http::TestResponseHeaderMapImpl{{":status", "404"}, {"content-type", "application/json"}},
+      "");
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBodyMultipleFramesInData) {
@@ -642,7 +638,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGet) {
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"}, {":path", "/shelves/37/books"}, {":authority", "host"}},
       "", {"shelf: 37"}, {}, Status(Code::NOT_FOUND, "Shelf 37 not found"),
-      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      Http::TestResponseHeaderMapImpl{{":status", "404"}, {"content-type", "application/json"}},
       "[]");
 }
 
@@ -748,6 +744,14 @@ std::string jsonStrToPbStrucStr(std::string json) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
+  // Lower the timeout for the 408 response.
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        virtual_host->mutable_routes(0)->mutable_route()->mutable_idle_timeout()->set_seconds(5);
+      });
+
   HttpIntegrationTest::initialize();
   // Due to the limit of protobuf util, we can only compare to level 32.
   std::string deepJson = createDeepJson(32, true);
@@ -761,14 +765,13 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
       R"({"content":)" + deepJson + R"(})");
 
   // The valid deep struct is parsed successfully.
-  // Since we didn't set the response, it return 503.
-  // Response body is empty (not a valid JSON), so content type should be application/grpc.
+  // Since we didn't set a response, it will time out.
+  // Response body is empty (not a valid JSON), so the error response is plaintext.
   testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(
       Http::TestRequestHeaderMapImpl{
           {":method", "POST"}, {":path", "/echoStruct"}, {":authority", "host"}},
       createDeepJson(100, true), {}, {}, Status(),
-      Http::TestResponseHeaderMapImpl{{":status", "503"}, {"content-type", "application/grpc"}},
-      "");
+      Http::TestResponseHeaderMapImpl{{":status", "408"}, {"content-type", "text/plain"}}, "");
 
   // The invalid deep struct is detected.
   testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(
@@ -809,7 +812,9 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, LargeStruct) {
       R"({"content":)" + largeJson + R"(})");
 }
 
-TEST_P(GrpcJsonTranscoderIntegrationTest, UnknownField) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnknownFieldInRequest) {
+  // Request JSON has many fields that are unknown to the request proto message.
+  // They are discarded.
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -823,6 +828,33 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnknownField) {
                                       {"content-length", "30"},
                                       {"grpc-status", "0"}},
       R"({"id":"20","theme":"Children"})");
+}
+
+// Test proto to json transcoding with an unknown field in the response message.
+// gRPC server may use a updated proto with a new field, but Envoy transcoding
+// filter could use an old proto descriptor without that field. That fields is unknown
+// to the Envoy transcoder filter. Expected result: the unknown field is discarded,
+// other fields should be transcoded properly.
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnknownResponse) {
+  // The mocked upstream proto response message is bookstore::BigBook which has
+  // all 3 fields. But the proto descriptor used by the Envoy transcoder filter is using
+  // bookstore::OldBigBook which is missing the `field1` field.
+  HttpIntegrationTest::initialize();
+  // The bug is ZeroCopyInputStreamImpl::Skip() which is not implemented.
+  // In order to trigger a call to that function, the response message has to be big enough
+  // so it is stored in multiple slices.
+  const std::string field1_value = std::string(32 * 1024, 'O');
+  const std::string response_body =
+      fmt::format(R"(field1: "{}" field2: "field2_value" field3: "field3_value" )", field1_value);
+  testTranscoding<Empty, bookstore::BigBook>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/bigbook"}, {":authority", "host"}},
+      "", {""}, {response_body}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "application/json"},
+                                      {"content-length", "49"},
+                                      {"grpc-status", "0"}},
+      R"({"field2":"field2_value","field3":"field3_value"})");
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UTF8) {

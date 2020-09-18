@@ -31,8 +31,9 @@ public:
     EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
       return Grpc::RawAsyncClientPtr{async_client_};
     }));
-    streamer_ = std::make_unique<GrpcMetricsStreamerImpl>(Grpc::AsyncClientFactoryPtr{factory_},
-                                                          local_info_);
+    streamer_ = std::make_unique<GrpcMetricsStreamerImpl>(
+        Grpc::AsyncClientFactoryPtr{factory_}, local_info_,
+        envoy::config::core::v3::ApiVersion::AUTO);
   }
 
   void expectStreamStart(MockMetricsStream& stream, MetricsServiceCallbacks** callbacks_to_set) {
@@ -48,7 +49,7 @@ public:
   LocalInfo::MockLocalInfo local_info_;
   Grpc::MockAsyncClient* async_client_{new NiceMock<Grpc::MockAsyncClient>};
   Grpc::MockAsyncClientFactory* factory_{new Grpc::MockAsyncClientFactory};
-  std::unique_ptr<GrpcMetricsStreamerImpl> streamer_;
+  GrpcMetricsStreamerImplPtr streamer_;
 };
 
 // Test basic metrics streaming flow.

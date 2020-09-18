@@ -30,7 +30,8 @@
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/test_host_predicate_config.h"
 #include "test/integration/utility.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/retry_priority.h"
+#include "test/mocks/upstream/retry_priority_factory.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
@@ -97,7 +98,6 @@ TEST_P(ProtocolIntegrationTest, TrailerSupportHttp1) {
 TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
   auto response = makeHeaderOnlyRequest(nullptr, 0);
   // Shut down the server with active connection pool connections.
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   test_server_.reset();
   checkSimpleRequestSuccess(0U, 0U, response.get());
 }
@@ -155,6 +155,18 @@ TEST_P(ProtocolIntegrationTest, RouterRedirect) {
   EXPECT_EQ("301", response->headers().getStatusValue());
   EXPECT_EQ("https://www.redirect.com/foo",
             response->headers().get(Http::Headers::get().Location)->value().getStringView());
+}
+
+TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "600"}};
+  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("600", response->headers().getStatusValue());
 }
 
 // Add a health check filter and verify correct computation of health based on upstream status.
@@ -246,6 +258,34 @@ TEST_P(ProtocolIntegrationTest, AddBodyToResponseAndWaitForIt) {
   EXPECT_EQ("body", response->body());
 }
 
+TEST_P(ProtocolIntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
+  config_helper_.addFilter(R"EOF(
+  name: continue-headers-only-inject-body-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send a headers only request.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Make sure that the body was injected to the request.
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(upstream_request_->receivedData());
+  EXPECT_EQ(upstream_request_->body().toString(), "body");
+
+  // Send a headers only response.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+
+  // Make sure that the body was injected to the response.
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->body(), "body");
+}
+
 TEST_P(ProtocolIntegrationTest, AddEncodedTrailers) {
   config_helper_.addFilter(R"EOF(
 name: add-trailers-filter
@@ -271,32 +311,6 @@ typed_config:
   EXPECT_EQ("503", response->headers().getStatusValue());
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
     EXPECT_EQ("encode", response->trailers()->getGrpcMessageValue());
-  }
-}
-
-// Add a health check filter and verify correct behavior when draining.
-TEST_P(ProtocolIntegrationTest, DrainClose) {
-  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
-  initialize();
-
-  absl::Notification drain_sequence_started;
-  test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
-    test_server_->drainManager().startDrainSequence([] {});
-    drain_sequence_started.Notify();
-  });
-  drain_sequence_started.WaitForNotification();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  response->waitForEndStream();
-  codec_client_->waitForDisconnect();
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
-    EXPECT_TRUE(codec_client_->sawGoAway());
-  } else {
-    EXPECT_EQ("close", response->headers().getConnectionValue());
   }
 }
 
@@ -478,9 +492,12 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingReset) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   // Send back an upstream failure and end stream. Make sure an immediate reset
-  // doesn't cause problems.
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-  upstream_request_->encodeResetStream();
+  // doesn't cause problems. Schedule via the upstream_request_ dispatcher to ensure that the stream
+  // still exists when encoding the reset stream.
+  upstream_request_->postToConnectionThread([this]() {
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
+    upstream_request_->encodeResetStream();
+  });
 
   // Make sure the fake stream is reset.
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
@@ -812,9 +829,6 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // Envoy will likely connect and proxy some unspecified amount of data before
-  // hitting the buffer limit and disconnecting. Ignore this if it happens.
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   auto response = codec_client_->makeRequestWithBody(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/dynamo/url"},
@@ -860,7 +874,6 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
 
   // Now send an overly large response body. At some point, too much data will
   // be buffered, the stream will be reset, and the connection will disconnect.
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   upstream_request_->encodeData(1024 * 65, false);
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
@@ -886,12 +899,20 @@ TEST_P(ProtocolIntegrationTest, EnvoyHandlingDuplicate100Continue) {
   testEnvoyHandling100Continue(true);
 }
 
-TEST_P(ProtocolIntegrationTest, EnvoyProxyingEarly100Continue) {
-  testEnvoyProxying100Continue(true);
+// 100-continue before the request completes.
+TEST_P(ProtocolIntegrationTest, EnvoyProxyingEarly100Continue) { testEnvoyProxying1xx(true); }
+
+// Multiple 1xx before the request completes.
+TEST_P(ProtocolIntegrationTest, EnvoyProxyingEarlyMultiple1xx) {
+  testEnvoyProxying1xx(true, false, true);
 }
 
-TEST_P(ProtocolIntegrationTest, EnvoyProxyingLate100Continue) {
-  testEnvoyProxying100Continue(false);
+// 100-continue after the request completes.
+TEST_P(ProtocolIntegrationTest, EnvoyProxyingLate100Continue) { testEnvoyProxying1xx(false); }
+
+// Multiple 1xx after the request completes.
+TEST_P(ProtocolIntegrationTest, EnvoyProxyingLateMultiple1xx) {
+  testEnvoyProxying1xx(false, false, true);
 }
 
 TEST_P(ProtocolIntegrationTest, TwoRequests) { testTwoRequests(); }
@@ -965,6 +986,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresRemainByDefault) {
 
 // Verify that request with headers containing underscores is rejected when configured.
 TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefault) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -981,15 +1003,16 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefa
                                      {"foo_bar", "baz"}});
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
     response->waitForReset();
     codec_client_->close();
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
   }
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ValidZeroLengthContent) {
@@ -1116,23 +1139,28 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
                                                                  {"content-length", "-1"}});
   auto response = std::move(encoder_decoder.second);
 
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
+    test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->reset_reason());
+    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
   }
 }
 
-// TODO(PiotrSikora): move this HTTP/2 only variant to http2_integration_test.cc.
 TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
-        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+        hcm.mutable_http2_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
+        hcm.mutable_http_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
       });
 
   initialize();
@@ -1147,7 +1175,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
   auto response = std::move(encoder_decoder.second);
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     response->waitForReset();
     codec_client_->close();
@@ -1158,7 +1186,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
   }
 }
 
@@ -1172,14 +1200,14 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
                                                                  {"content-length", "3,2"}});
   auto response = std::move(encoder_decoder.second);
 
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->reset_reason());
+    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
   }
 }
 
@@ -1188,7 +1216,9 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
-        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+        hcm.mutable_http2_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
       });
 
   initialize();
@@ -1201,7 +1231,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
   auto response = std::move(encoder_decoder.second);
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     response->waitForReset();
     codec_client_->close();
@@ -1212,7 +1242,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
   }
 }
 
@@ -1370,6 +1400,16 @@ name: decode-headers-only
   EXPECT_EQ(0, upstream_request_->body().length());
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlRejected) {
+  // Send one 95 kB URL with limit 60 kB headers.
+  testLargeRequestUrl(95, 60);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlAccepted) {
+  // Send one 95 kB URL with limit 96 kB headers.
+  testLargeRequestUrl(95, 96);
+}
+
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
   // Send one 95 kB header with limit 60 kB and 100 headers.
   testLargeRequestHeaders(95, 1, 60, 100);
@@ -1401,7 +1441,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
@@ -1409,7 +1448,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("431", response->headers().getStatusValue());
   } else {
@@ -1480,9 +1519,9 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
             max_request_headers_count_);
       });
 
-  Http::RequestTrailerMapImpl request_trailers;
+  auto request_trailers = Http::RequestTrailerMapImpl::create();
   for (int i = 0; i < 20000; i++) {
-    request_trailers.addCopy(Http::LowerCaseString(std::to_string(i)), "");
+    request_trailers->addCopy(Http::LowerCaseString(std::to_string(i)), "");
   }
 
   initialize();
@@ -1494,7 +1533,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
                                                                  {":authority", "host"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  codec_client_->sendTrailers(*request_encoder_, *request_trailers);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
@@ -1532,7 +1571,7 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
@@ -1834,7 +1873,7 @@ TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 // Test connection is closed after single request processed.
@@ -1903,10 +1942,51 @@ TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
   test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, TestPrefetch) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster->mutable_prefetch_policy()->mutable_per_upstream_prefetch_ratio()->set_value(1.5);
+  });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  FakeHttpConnectionPtr fake_upstream_connection_two;
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    // For HTTP/1.1 there should be a prefetched connection.
+    ASSERT_TRUE(
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_two));
+  } else {
+    // For HTTP/2, the original connection can accommodate two requests.
+    ASSERT_FALSE(fake_upstreams_[0]->waitForHttpConnection(
+        *dispatcher_, fake_upstream_connection_two, std::chrono::milliseconds(5)));
+  }
+}
+
 TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeout) {
   config_helper_.setDownstreamMaxStreamDuration(std::chrono::milliseconds(500));
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
+  response->waitForReset();
+  EXPECT_TRUE(response->complete());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeoutLegacy) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_response_for_timeout",
+                                    "false");
+  config_helper_.setDownstreamMaxStreamDuration(std::chrono::milliseconds(500));
+  initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
@@ -1920,12 +2000,12 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeout) {
   test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
   response->waitForReset();
   EXPECT_FALSE(response->complete());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("max_duration_timeout"));
 }
 
 // Make sure that invalid authority headers get blocked at or before the HCM.
 TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -1943,7 +2023,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
   } else {
     // For HTTP/2 this is handled by nghttp2 which resets the connection without
     // sending an HTTP response.
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     ASSERT_FALSE(response->complete());
   }
 }
@@ -1962,11 +2042,11 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
     EXPECT_TRUE(response->complete());
   } else {
     response->waitForReset();
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
 }
 
-// Make sure that with stream_error_on_invalid_http_messaging true, CONNECT
+// Make sure that with override_stream_error_on_invalid_http_message true, CONNECT
 // results in stream teardown not connection teardown.
 TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
@@ -1975,7 +2055,9 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
-        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+        hcm.mutable_http2_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
       });
 
   initialize();
@@ -1985,6 +2067,40 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
 
   response->waitForReset();
   EXPECT_FALSE(codec_client_->disconnected());
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/12131
+TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnect) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encode100ContinueHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  ASSERT_TRUE(fake_upstream_connection_->close());
+
+  // Make sure that a disconnect results in valid 5xx response headers even when preceded by a 100.
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnectLegacy) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_500_after_100", "false");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encode100ContinueHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  ASSERT_TRUE(fake_upstream_connection_->close());
+
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    EXPECT_FALSE(response->complete());
+  } else {
+    response->waitForReset();
+    EXPECT_FALSE(response->complete());
+  }
 }
 
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be

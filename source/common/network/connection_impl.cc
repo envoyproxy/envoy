@@ -57,25 +57,18 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       write_buffer_above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false) {
-  // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
-  // condition and just crash.
-  RELEASE_ASSERT(SOCKET_VALID(ConnectionImpl::ioHandle().fd()), "");
 
   if (!connected) {
     connecting_ = true;
   }
 
-  // Libevent only supports Level trigger on Windows.
-#ifdef WIN32
-  Event::FileTriggerType trigger = Event::FileTriggerType::Level;
-#else
-  Event::FileTriggerType trigger = Event::FileTriggerType::Edge;
-#endif
+  Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+
   // We never ask for both early close and read at the same time. If we are reading, we want to
   // consume all available data.
-  file_event_ = dispatcher_.createFileEvent(
-      ConnectionImpl::ioHandle().fd(), [this](uint32_t events) -> void { onFileEvent(events); },
-      trigger, Event::FileReadyType::Read | Event::FileReadyType::Write);
+  file_event_ = socket_->ioHandle().createFileEvent(
+      dispatcher_, [this](uint32_t events) -> void { onFileEvent(events); }, trigger,
+      Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   transport_socket_->setTransportSocketCallbacks(*this);
 }
@@ -250,14 +243,14 @@ void ConnectionImpl::noDelay(bool enable) {
   Api::SysCallIntResult result =
       socket_->setSocketOption(IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
 #if defined(__APPLE__)
-  if (SOCKET_FAILURE(result.rc_) && result.errno_ == EINVAL) {
+  if (SOCKET_FAILURE(result.rc_) && result.errno_ == SOCKET_ERROR_INVAL) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
     // enabled despite this result.
     return;
   }
 #elif defined(WIN32)
   if (SOCKET_FAILURE(result.rc_) &&
-      (result.errno_ == WSAEWOULDBLOCK || result.errno_ == WSAEINVAL)) {
+      (result.errno_ == SOCKET_ERROR_AGAIN || result.errno_ == SOCKET_ERROR_INVAL)) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
     // enabled despite this result.
     return;
@@ -595,7 +588,7 @@ ConnectionImpl::unixSocketPeerCredentials() const {
   struct ucred ucred;
   socklen_t ucred_size = sizeof(ucred);
   int rc = socket_->getSocketOption(SOL_SOCKET, SO_PEERCRED, &ucred, &ucred_size).rc_;
-  if (rc == -1) {
+  if (SOCKET_FAILURE(rc)) {
     return absl::nullopt;
   }
 
@@ -645,15 +638,18 @@ void ConnectionImpl::onWriteReady() {
   } else if ((inDelayedClose() && new_buffer_size == 0) || bothSidesHalfClosed()) {
     ENVOY_CONN_LOG(debug, "write flush complete", *this);
     if (delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
-      ASSERT(delayed_close_timer_ != nullptr);
-      delayed_close_timer_->enableTimer(delayed_close_timeout_);
+      ASSERT(delayed_close_timer_ != nullptr && delayed_close_timer_->enabled());
+      if (result.bytes_processed_ > 0) {
+        delayed_close_timer_->enableTimer(delayed_close_timeout_);
+      }
     } else {
       ASSERT(bothSidesHalfClosed() || delayed_close_state_ == DelayedCloseState::CloseAfterFlush);
       closeConnectionImmediately();
     }
   } else {
     ASSERT(result.action_ == PostIoAction::KeepOpen);
-    if (delayed_close_timer_ != nullptr) {
+    ASSERT(!delayed_close_timer_ || delayed_close_timer_->enabled());
+    if (delayed_close_timer_ != nullptr && result.bytes_processed_ > 0) {
       delayed_close_timer_->enableTimer(delayed_close_timeout_);
     }
     if (result.bytes_processed_ > 0) {
@@ -736,7 +732,7 @@ ClientConnectionImpl::ClientConnectionImpl(
       if (result.rc_ < 0) {
         // TODO(lizan): consider add this error into transportFailureReason.
         ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source->get()->asString(),
-                       strerror(result.errno_));
+                       errorDetails(result.errno_));
         bind_error_ = true;
         // Set a special error state to ensure asynchronous close to give the owner of the
         // ConnectionImpl a chance to add callbacks and detect the "disconnect".
@@ -756,8 +752,15 @@ void ClientConnectionImpl::connect() {
     // write will become ready.
     ASSERT(connecting_);
   } else {
-    ASSERT(result.rc_ == -1);
-    if (result.errno_ == EINPROGRESS) {
+    ASSERT(SOCKET_FAILURE(result.rc_));
+#ifdef WIN32
+    // winsock2 connect returns EWOULDBLOCK if the socket is non-blocking and the connection
+    // cannot be completed immediately. We do not check for EINPROGRESS as that error is for
+    // blocking operations.
+    if (result.errno_ == SOCKET_ERROR_AGAIN) {
+#else
+    if (result.errno_ == SOCKET_ERROR_IN_PROGRESS) {
+#endif
       ASSERT(connecting_);
       ENVOY_CONN_LOG(debug, "connection in progress", *this);
     } else {
@@ -768,13 +771,6 @@ void ClientConnectionImpl::connect() {
       // Trigger a write event. This is needed on macOS and seems harmless on Linux.
       file_event_->activate(Event::FileReadyType::Write);
     }
-  }
-
-  // The local address can only be retrieved for IP connections. Other
-  // types, such as UDS, don't have a notion of a local address.
-  // TODO(fcoras) move to SocketImpl?
-  if (socket_->remoteAddress()->type() == Address::Type::Ip) {
-    socket_->setLocalAddress(SocketInterface::addressFromFd(ioHandle().fd()));
   }
 }
 } // namespace Network

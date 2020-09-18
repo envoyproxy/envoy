@@ -7,7 +7,7 @@
 #include "common/http/utility.h"
 #include "common/stats/fake_symbol_table_impl.h"
 
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/global.h"
 #include "test/test_common/utility.h"
 
@@ -65,7 +65,7 @@ TEST(GrpcContextTest, ChargeStats) {
 TEST(GrpcContextTest, ResolveServiceAndMethod) {
   std::string service;
   std::string method;
-  Http::RequestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   headers.setPath("/service_name/method_name?a=b");
   const Http::HeaderEntry* path = headers.Path();
   Stats::TestSymbolTable symbol_table;

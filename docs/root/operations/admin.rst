@@ -137,6 +137,13 @@ modify different aspects of the server:
   The underlying proto is marked v2alpha and hence its contents, including the JSON representation,
   are not guaranteed to be stable.
 
+.. _operations_admin_interface_config_dump_include_eds:
+
+.. http:get:: /config_dump?include_eds
+
+  Dump currently loaded configuration including EDS. See the :ref:`response definition <envoy_v3_api_msg_admin.v3.EndpointsConfigDump>` for more
+  information.
+
 .. _operations_admin_interface_config_dump_by_mask:
 
 .. http:get:: /config_dump?mask={}
@@ -205,6 +212,24 @@ modify different aspects of the server:
 
   See :option:`--hot-restart-version`.
 
+.. _operations_admin_interface_init_dump:
+
+.. http:get:: /init_dump
+
+  Dump currently information of unready targets of various Envoy components as JSON-serialized proto
+  messages. See the :ref:`response definition <envoy_v3_api_msg_admin.v3.UnreadyTargetsDumps>` for more
+  information.
+
+.. _operations_admin_interface_init_dump_by_mask:
+
+.. http:get:: /init_dump?mask={}
+
+  When mask query parameters is specified, the mask value is the desired component to dump unready targets.
+  The mask is parsed as a ``ProtobufWkt::FieldMask``.
+
+  For example, get the unready targets of all listeners with
+  ``/init_dump?mask=listener``
+
 .. _operations_admin_interface_listeners:
 
 .. http:get:: /listeners
@@ -230,7 +255,9 @@ modify different aspects of the server:
 
   .. note::
 
-    Generally only used during development.
+    Generally only used during development. With `--enable-fine-grain-logging` being set, the logger is represented
+    by the path of the file it belongs to (to be specific, the path determined by `__FILE__`), so the logger list
+    will show a list of file paths, and the specific path should be used as <logger_name> to change the log level. 
 
 .. http:get:: /memory
 
@@ -257,6 +284,12 @@ modify different aspects of the server:
    :ref:`Drains <arch_overview_draining>` all inbound listeners. `traffic_direction` field in 
    :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` is used to determine whether a listener 
    is inbound or outbound.
+
+   .. http:post:: /drain_listeners?graceful
+
+   When draining listeners, enter a graceful drain period prior to closing listeners. 
+   This behaviour and duration is configurable via server options or CLI 
+   (:option:`--drain-time-s` and :option:`--drain-strategy`).
 
 .. attention::
 

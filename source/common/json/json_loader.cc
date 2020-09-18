@@ -3,10 +3,10 @@
 #include <cstdint>
 #include <fstream>
 #include <limits>
+#include <map>
 #include <sstream>
 #include <stack>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "common/common/assert.h"
@@ -127,7 +127,7 @@ private:
     bool boolean_value_;
     double double_value_;
     int64_t integer_value_;
-    std::unordered_map<std::string, FieldSharedPtr> object_value_;
+    std::map<std::string, FieldSharedPtr> object_value_;
     std::string string_value_;
   };
 

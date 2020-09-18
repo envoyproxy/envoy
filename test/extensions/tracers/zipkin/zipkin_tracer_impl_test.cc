@@ -2,7 +2,6 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
@@ -21,7 +20,8 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -146,7 +146,7 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
 
   NiceMock<Tracing::MockConfig> config_;
   Event::SimulatedTimeSystem test_time_;
@@ -620,7 +620,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   // Test effective setTag()
   // ====
 
-  request_headers_.removeOtSpanContext();
+  request_headers_.remove(Http::CustomHeaders::get().OtSpanContext);
 
   // New span will have a CS annotation
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
@@ -643,7 +643,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   const std::string parent_id = Hex::uint64ToHex(generateRandom64());
   const std::string context = trace_id + ";" + span_id + ";" + parent_id + ";" + CLIENT_SEND;
 
-  request_headers_.setOtSpanContext(context);
+  request_headers_.setCopy(Http::CustomHeaders::get().OtSpanContext, context);
 
   // New span will have an SR annotation
   Tracing::SpanPtr span2 = driver_->startSpan(config_, request_headers_, operation_name_,
@@ -690,6 +690,14 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   EXPECT_FALSE(zipkin_zipkin_span4.annotations().empty());
   EXPECT_EQ(timestamp_count, zipkin_zipkin_span4.annotations().back().timestamp());
   EXPECT_EQ("abc", zipkin_zipkin_span4.annotations().back().value());
+
+  // ====
+  // Test baggage noop
+  // ====
+  Tracing::SpanPtr span5 = driver_->startSpan(config_, request_headers_, operation_name_,
+                                              start_time_, {Tracing::Reason::Sampling, true});
+  span5->setBaggage("baggage_key", "baggage_value");
+  EXPECT_EQ("", span5->getBaggage("baggage_key"));
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
@@ -865,11 +873,10 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   span->setSampled(true);
   span->injectContext(request_headers_);
   request_headers_.iterate(
-      [](const Http::HeaderEntry& header, void* cb) -> Http::HeaderMap::Iterate {
-        EXPECT_FALSE(static_cast<DupCallback*>(cb)->operator()(header.key().getStringView()));
+      [&dup_callback](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+        dup_callback(header.key().getStringView());
         return Http::HeaderMap::Iterate::Continue;
-      },
-      &dup_callback);
+      });
 }
 
 } // namespace

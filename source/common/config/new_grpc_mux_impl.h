@@ -1,6 +1,9 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/v2/discovery.pb.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
@@ -30,18 +33,24 @@ public:
   NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
                  const Protobuf::MethodDescriptor& service_method,
                  envoy::config::core::v3::ApiVersion transport_api_version,
-                 Runtime::RandomGenerator& random, Stats::Scope& scope,
+                 Random::RandomGenerator& random, Stats::Scope& scope,
                  const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                           SubscriptionCallbacks& callbacks) override;
+                           SubscriptionCallbacks& callbacks,
+                           OpaqueResourceDecoder& resource_decoder,
+                           const bool use_namespace_matching = false) override;
 
-  void pause(const std::string& type_url) override;
-  void resume(const std::string& type_url) override;
-  bool paused(const std::string& type_url) const override;
+  void requestOnDemandUpdate(const std::string& type_url,
+                             const std::set<std::string>& for_update) override;
+
+  ScopedResume pause(const std::string& type_url) override;
+  ScopedResume pause(const std::vector<std::string> type_urls) override;
+
   void onDiscoveryResponse(
-      std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message) override;
+      std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
+      ControlPlaneStats& control_plane_stats) override;
 
   void onStreamEstablished() override;
 
@@ -56,8 +65,8 @@ public:
 
   struct SubscriptionStuff {
     SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
-                      Event::Dispatcher& dispatcher)
-        : sub_state_(type_url, watch_map_, local_info, dispatcher) {}
+                      const bool use_namespace_matching, Event::Dispatcher& dispatcher)
+        : watch_map_(use_namespace_matching), sub_state_(type_url, watch_map_, local_info, dispatcher) {}
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
@@ -66,8 +75,10 @@ public:
     SubscriptionStuff& operator=(const SubscriptionStuff&) = delete;
   };
 
+  using SubscriptionStuffPtr = std::unique_ptr<SubscriptionStuff>;
+
   // for use in tests only
-  const absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionStuff>>& subscriptions() {
+  const absl::flat_hash_map<std::string, SubscriptionStuffPtr>& subscriptions() {
     return subscriptions_;
   }
 
@@ -102,9 +113,10 @@ private:
   // the whole subscription, or if a removed name has no other watch interested in it, then the
   // subscription will enqueue and attempt to send an appropriate discovery request.
   void updateWatch(const std::string& type_url, Watch* watch,
-                   const std::set<std::string>& resources);
+                   const std::set<std::string>& resources,
+                   const bool creating_namespace_watch = false);
 
-  void addSubscription(const std::string& type_url);
+  void addSubscription(const std::string& type_url, const bool use_namespace_matching);
 
   void trySendDiscoveryRequests();
 
@@ -126,7 +138,7 @@ private:
   PausableAckQueue pausable_ack_queue_;
 
   // Map key is type_url.
-  absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionStuff>> subscriptions_;
+  absl::flat_hash_map<std::string, SubscriptionStuffPtr> subscriptions_;
 
   // Determines the order of initial discovery requests. (Assumes that subscriptions are added in
   // the order of Envoy's dependency ordering).
@@ -142,6 +154,7 @@ private:
   Event::Dispatcher& dispatcher_;
 };
 
+using NewGrpcMuxImplPtr = std::unique_ptr<NewGrpcMuxImpl>;
 using NewGrpcMuxImplSharedPtr = std::shared_ptr<NewGrpcMuxImpl>;
 
 } // namespace Config

@@ -16,10 +16,10 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
-#include "envoy/stream_info/stream_info.h"
 
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"
+#include "common/stream_info/stream_info_impl.h"
 
 #include "spdlog/spdlog.h"
 
@@ -28,7 +28,9 @@ namespace Server {
 
 #define ALL_LISTENER_STATS(COUNTER, GAUGE, HISTOGRAM)                                              \
   COUNTER(downstream_cx_destroy)                                                                   \
+  COUNTER(downstream_cx_overflow)                                                                  \
   COUNTER(downstream_cx_total)                                                                     \
+  COUNTER(downstream_global_cx_overflow)                                                           \
   COUNTER(downstream_pre_cx_timeout)                                                               \
   COUNTER(no_filter_chain_match)                                                                   \
   GAUGE(downstream_cx_active, Accumulate)                                                          \
@@ -105,7 +107,7 @@ private:
   /**
    * Wrapper for an active tcp listener owned by this handler.
    */
-  class ActiveTcpListener : public Network::ListenerCallbacks,
+  class ActiveTcpListener : public Network::TcpListenerCallbacks,
                             public ActiveListenerImplBase,
                             public Network::BalancedConnectionHandler {
   public:
@@ -113,15 +115,22 @@ private:
     ActiveTcpListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
                       Network::ListenerConfig& config);
     ~ActiveTcpListener() override;
+    bool listenerConnectionLimitReached() const {
+      // TODO(tonya11en): Delegate enforcement of per-listener connection limits to overload
+      // manager.
+      return !config_->openConnections().canCreate();
+    }
     void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
                         bool hand_off_restored_destination_connections, bool rebalanced);
     void decNumConnections() {
       ASSERT(num_listener_connections_ > 0);
       --num_listener_connections_;
+      config_->openConnections().dec();
     }
 
-    // Network::ListenerCallbacks
+    // Network::TcpListenerCallbacks
     void onAccept(Network::ConnectionSocketPtr&& socket) override;
+    void onReject() override { stats_.downstream_global_cx_overflow_.inc(); }
 
     // ActiveListenerImplBase
     Network::Listener* listener() override { return listener_.get(); }
@@ -131,7 +140,10 @@ private:
 
     // Network::BalancedConnectionHandler
     uint64_t numConnections() const override { return num_listener_connections_; }
-    void incNumConnections() override { ++num_listener_connections_; }
+    void incNumConnections() override {
+      ++num_listener_connections_;
+      config_->openConnections().inc();
+    }
     void post(Network::ConnectionSocketPtr&& socket) override;
 
     /**
@@ -143,7 +155,8 @@ private:
     /**
      * Create a new connection from a socket accepted by the listener.
      */
-    void newConnection(Network::ConnectionSocketPtr&& socket);
+    void newConnection(Network::ConnectionSocketPtr&& socket,
+                       std::unique_ptr<StreamInfo::StreamInfo> stream_info);
 
     /**
      * Return the active connections container attached with the given filter chain.
@@ -168,7 +181,7 @@ private:
     const std::chrono::milliseconds listener_filters_timeout_;
     const bool continue_on_listener_filters_timeout_;
     std::list<ActiveTcpSocketPtr> sockets_;
-    std::unordered_map<const Network::FilterChain*, ActiveConnectionsPtr> connections_by_context_;
+    absl::node_hash_map<const Network::FilterChain*, ActiveConnectionsPtr> connections_by_context_;
 
     // The number of connections currently active on this listener. This is typically used for
     // connection balancing across per-handler listeners.
@@ -230,8 +243,13 @@ private:
                     bool hand_off_restored_destination_connections)
         : listener_(listener), socket_(std::move(socket)),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
-          iter_(accept_filters_.end()) {
+          iter_(accept_filters_.end()), stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
+                                            listener_.parent_.dispatcher_.timeSource(),
+                                            StreamInfo::FilterState::LifeSpan::Connection)) {
       listener_.stats_.downstream_pre_cx_active_.inc();
+      stream_info_->setDownstreamLocalAddress(socket_->localAddress());
+      stream_info_->setDownstreamRemoteAddress(socket_->remoteAddress());
+      stream_info_->setDownstreamDirectRemoteAddress(socket_->directRemoteAddress());
     }
     ~ActiveTcpSocket() override {
       accept_filters_.clear();
@@ -294,6 +312,13 @@ private:
     Network::ConnectionSocket& socket() override { return *socket_.get(); }
     Event::Dispatcher& dispatcher() override { return listener_.parent_.dispatcher_; }
     void continueFilterChain(bool success) override;
+    void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override;
+    envoy::config::core::v3::Metadata& dynamicMetadata() override {
+      return stream_info_->dynamicMetadata();
+    };
+    const envoy::config::core::v3::Metadata& dynamicMetadata() const override {
+      return stream_info_->dynamicMetadata();
+    };
 
     ActiveTcpListener& listener_;
     Network::ConnectionSocketPtr socket_;
@@ -301,6 +326,8 @@ private:
     std::list<ListenerFilterWrapperPtr> accept_filters_;
     std::list<ListenerFilterWrapperPtr>::iterator iter_;
     Event::TimerPtr timer_;
+    std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
+    bool connected_{false};
   };
 
   using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
@@ -331,20 +358,34 @@ class ActiveRawUdpListener : public Network::UdpListenerCallbacks,
 public:
   ActiveRawUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
                        Network::ListenerConfig& config);
-  ActiveRawUdpListener(Network::ConnectionHandler& parent, Network::UdpListenerPtr&& listener,
+  ActiveRawUdpListener(Network::ConnectionHandler& parent,
+                       Network::SocketSharedPtr listen_socket_ptr, Event::Dispatcher& dispatcher,
                        Network::ListenerConfig& config);
+  ActiveRawUdpListener(Network::ConnectionHandler& parent, Network::Socket& listen_socket,
+                       Network::SocketSharedPtr listen_socket_ptr, Event::Dispatcher& dispatcher,
+                       Network::ListenerConfig& config);
+  ActiveRawUdpListener(Network::ConnectionHandler& parent, Network::Socket& listen_socket,
+                       Network::UdpListenerPtr&& listener, Network::ListenerConfig& config);
 
   // Network::UdpListenerCallbacks
   void onData(Network::UdpRecvData& data) override;
   void onReadReady() override;
   void onWriteReady(const Network::Socket& socket) override;
   void onReceiveError(Api::IoError::IoErrorCode error_code) override;
+  Network::UdpPacketWriter& udpPacketWriter() override { return *udp_packet_writer_; }
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return udp_listener_.get(); }
   void pauseListening() override { udp_listener_->disable(); }
   void resumeListening() override { udp_listener_->enable(); }
-  void shutdownListener() override { udp_listener_.reset(); }
+  void shutdownListener() override {
+    // The read filter should be deleted before the UDP listener is deleted.
+    // The read filter refers to the UDP listener to send packets to downstream.
+    // If the UDP listener is deleted before the read filter, the read filter may try to use it
+    // after deletion.
+    read_filter_.reset();
+    udp_listener_.reset();
+  }
 
   // Network::UdpListenerFilterManager
   void addReadFilter(Network::UdpListenerReadFilterPtr&& filter) override;
@@ -355,6 +396,8 @@ public:
 private:
   Network::UdpListenerPtr udp_listener_;
   Network::UdpListenerReadFilterPtr read_filter_;
+  Network::UdpPacketWriterPtr udp_packet_writer_;
+  Network::Socket& listen_socket_;
 };
 
 } // namespace Server

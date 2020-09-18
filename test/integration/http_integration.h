@@ -38,7 +38,8 @@ public:
   void sendMetadata(Http::RequestEncoder& encoder, Http::MetadataMap metadata_map);
   std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
   startRequest(const Http::RequestHeaderMap& headers);
-  bool waitForDisconnect(std::chrono::milliseconds time_to_wait = std::chrono::milliseconds(0));
+  ABSL_MUST_USE_RESULT AssertionResult
+  waitForDisconnect(std::chrono::milliseconds time_to_wait = TestUtility::DefaultTimeout);
   Network::ClientConnection* connection() const { return connection_.get(); }
   Network::ConnectionEvent lastConnectionEvent() const { return last_connection_event_; }
   Network::Connection& rawConnection() { return *connection_; }
@@ -60,7 +61,7 @@ private:
     CodecCallbacks(IntegrationCodecClient& parent) : parent_(parent) {}
 
     // Http::ConnectionCallbacks
-    void onGoAway() override { parent_.saw_goaway_ = true; }
+    void onGoAway(Http::GoAwayErrorCode) override { parent_.saw_goaway_ = true; }
 
     IntegrationCodecClient& parent_;
   };
@@ -103,9 +104,12 @@ public:
 protected:
   void useAccessLog(absl::string_view format = "");
 
+  Network::TransportSocketFactoryPtr createUpstreamTlsContext();
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   // Makes a http connection object without checking its connected state.
-  virtual IntegrationCodecClientPtr makeRawHttpConnection(Network::ClientConnectionPtr&& conn);
+  virtual IntegrationCodecClientPtr makeRawHttpConnection(
+      Network::ClientConnectionPtr&& conn,
+      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options);
   // Makes a http connection object with asserting a connected state.
   IntegrationCodecClientPtr makeHttpConnection(Network::ClientConnectionPtr&& conn);
 
@@ -195,6 +199,7 @@ protected:
   void testLargeHeaders(Http::TestRequestHeaderMapImpl request_headers,
                         Http::TestRequestTrailerMapImpl request_trailers, uint32_t size,
                         uint32_t max_size);
+  void testLargeRequestUrl(uint32_t url_size, uint32_t max_headers_size);
   void testLargeRequestHeaders(uint32_t size, uint32_t count, uint32_t max_size = 60,
                                uint32_t max_count = 100);
   void testLargeRequestTrailers(uint32_t size, uint32_t max_size = 60);
@@ -208,8 +213,9 @@ protected:
 
   void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
                                     const std::string& via = "");
-  void testEnvoyProxying100Continue(bool continue_before_upstream_complete = false,
-                                    bool with_encoder_filter = false);
+  void testEnvoyProxying1xx(bool continue_before_upstream_complete = false,
+                            bool with_encoder_filter = false,
+                            bool with_multiple_1xx_headers = false);
 
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();

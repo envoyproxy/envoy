@@ -1,6 +1,6 @@
 FROM envoyproxy/envoy-alpine-dev:latest
 
-RUN apk update && apk add python3 bash
+RUN apk update && apk add py3-pip bash
 RUN pip3 install -q Flask==0.11.1
 RUN mkdir /code
 ADD ./crosssite/service.py ./index.html /code/

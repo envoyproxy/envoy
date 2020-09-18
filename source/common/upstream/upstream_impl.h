@@ -41,8 +41,8 @@
 #include "common/common/thread.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
+#include "common/http/http1/codec_stats.h"
+#include "common/http/http2/codec_stats.h"
 #include "common/init/manager_impl.h"
 #include "common/network/utility.h"
 #include "common/shared_pool/shared_pool.h"
@@ -54,6 +54,7 @@
 
 #include "server/transport_socket_config_impl.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
@@ -149,7 +150,7 @@ protected:
   mutable absl::Mutex metadata_mutex_;
   MetadataConstSharedPtr metadata_ ABSL_GUARDED_BY(metadata_mutex_);
   const envoy::config::core::v3::Locality locality_;
-  Stats::StatNameManagedStorage locality_zone_stat_name_;
+  Stats::StatNameDynamicStorage locality_zone_stat_name_;
   mutable HostStats stats_;
   Outlier::DetectorHostMonitorPtr outlier_detector_;
   HealthCheckHostMonitorPtr health_checker_;
@@ -195,7 +196,7 @@ public:
   }
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
-  void healthFlagSet(HealthFlag flag) override { health_flags_ |= enumToInt(flag); }
+  void healthFlagSet(HealthFlag flag) final { health_flags_ |= enumToInt(flag); }
 
   ActiveHealthFailureType getActiveHealthFailureType() const override {
     return active_health_failure_type_;
@@ -498,12 +499,12 @@ private:
                      const HostVector& hosts_removed,
                      absl::optional<uint32_t> overprovisioning_factor) override;
 
-    std::unordered_set<HostSharedPtr> all_hosts_added_;
-    std::unordered_set<HostSharedPtr> all_hosts_removed_;
+    absl::node_hash_set<HostSharedPtr> all_hosts_added_;
+    absl::node_hash_set<HostSharedPtr> all_hosts_removed_;
 
   private:
     PrioritySetImpl& parent_;
-    std::unordered_set<uint32_t> priorities_;
+    absl::node_hash_set<uint32_t> priorities_;
   };
 };
 
@@ -515,14 +516,14 @@ public:
   ClusterInfoImpl(const envoy::config::cluster::v3::Cluster& config,
                   const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
                   TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope,
-                  bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor,
-                  Server::Configuration::TransportSocketFactoryContext&);
+                  bool added_via_api, Server::Configuration::TransportSocketFactoryContext&);
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
   static ClusterCircuitBreakersStats generateCircuitBreakersStats(Stats::Scope& scope,
                                                                   const std::string& stat_prefix,
                                                                   bool track_remaining);
+  static ClusterRequestResponseSizeStats generateRequestResponseSizeStats(Stats::Scope&);
   static ClusterTimeoutBudgetStats generateTimeoutBudgetStats(Stats::Scope&);
 
   // Upstream::ClusterInfo
@@ -534,6 +535,8 @@ public:
   const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
     return idle_timeout_;
   }
+  float perUpstreamPrefetchRatio() const override { return per_upstream_prefetch_ratio_; }
+  float peekaheadRatio() const override { return peekahead_ratio_; }
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
   }
@@ -561,9 +564,17 @@ public:
   lbRingHashConfig() const override {
     return lb_ring_hash_config_;
   }
+  const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>&
+  lbMaglevConfig() const override {
+    return lb_maglev_config_;
+  }
   const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&
   lbOriginalDstConfig() const override {
     return lb_original_dst_config_;
+  }
+  const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
+  upstreamConfig() const override {
+    return upstream_config_;
   }
   bool maintenanceMode() const override;
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
@@ -573,10 +584,27 @@ public:
   TransportSocketMatcher& transportSocketMatcher() const override { return *socket_matcher_; }
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
-  ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
-  const absl::optional<ClusterTimeoutBudgetStats>& timeoutBudgetStats() const override {
-    return timeout_budget_stats_;
+
+  ClusterRequestResponseSizeStatsOptRef requestResponseSizeStats() const override {
+    if (optional_cluster_stats_ == nullptr ||
+        optional_cluster_stats_->request_response_size_stats_ == nullptr) {
+      return absl::nullopt;
+    }
+
+    return std::ref(*(optional_cluster_stats_->request_response_size_stats_));
   }
+
+  ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
+
+  ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const override {
+    if (optional_cluster_stats_ == nullptr ||
+        optional_cluster_stats_->timeout_budget_stats_ == nullptr) {
+      return absl::nullopt;
+    }
+
+    return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
+  }
+
   const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
     return source_address_;
   };
@@ -589,13 +617,16 @@ public:
   };
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
+  bool connectionPoolPerDownstreamConnection() const override {
+    return connection_pool_per_downstream_connection_;
+  }
   bool warmHosts() const override { return warm_hosts_; }
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
   upstreamHttpProtocolOptions() const override {
     return upstream_http_protocol_options_;
   }
 
-  absl::optional<std::string> eds_service_name() const override { return eds_service_name_; }
+  absl::optional<std::string> edsServiceName() const override { return eds_service_name_; }
 
   void createNetworkFilterChain(Network::Connection&) const override;
   Http::Protocol
@@ -618,6 +649,13 @@ private:
     Managers managers_;
   };
 
+  struct OptionalClusterStats {
+    OptionalClusterStats(const envoy::config::cluster::v3::Cluster& config,
+                         Stats::Scope& stats_scope);
+    const ClusterTimeoutBudgetStatsPtr timeout_budget_stats_;
+    const ClusterRequestResponseSizeStatsPtr request_response_size_stats_;
+  };
+
   Runtime::Loader& runtime_;
   const std::string name_;
   const envoy::config::cluster::v3::Cluster::DiscoveryType type_;
@@ -625,13 +663,15 @@ private:
   const uint32_t max_response_headers_count_;
   const std::chrono::milliseconds connect_timeout_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
+  const float per_upstream_prefetch_ratio_;
+  const float peekahead_ratio_;
   const uint32_t per_connection_buffer_limit_bytes_;
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopePtr stats_scope_;
   mutable ClusterStats stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;
   mutable ClusterLoadReportStats load_report_stats_;
-  const absl::optional<ClusterTimeoutBudgetStats> timeout_budget_stats_;
+  const std::unique_ptr<OptionalClusterStats> optional_cluster_stats_;
   const uint64_t features_;
   const Http::Http1Settings http1_settings_;
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
@@ -644,7 +684,9 @@ private:
   absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
       lb_least_request_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
+  absl::optional<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;
   const envoy::config::core::v3::Metadata metadata_;
@@ -652,6 +694,7 @@ private:
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
+  const bool connection_pool_per_downstream_connection_;
   const bool warm_hosts_;
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;
@@ -782,7 +825,6 @@ private:
   std::function<void()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
   const bool local_cluster_;
-  Stats::SymbolTable& symbol_table_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
 };
 

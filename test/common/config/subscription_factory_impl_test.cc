@@ -9,6 +9,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/config/subscription_factory_impl.h"
+#include "common/config/udpa_resource.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -17,7 +18,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
@@ -41,16 +42,25 @@ public:
         subscription_factory_(local_info_, dispatcher_, cm_, random_, validation_visitor_, *api_,
                               runtime_) {}
 
-  std::unique_ptr<Subscription>
+  SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
     return subscription_factory_.subscriptionFromConfigSource(
-        config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_);
+        config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_,
+        resource_decoder_);
+  }
+
+  SubscriptionPtr collectionSubscriptionFromUrl(const std::string& udpa_url) {
+    const auto resource_locator = UdpaResourceIdentifier::decodeUrl(udpa_url);
+    return subscription_factory_.collectionSubscriptionFromUrl(
+        resource_locator, {}, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
+        callbacks_, resource_decoder_);
   }
 
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
-  Runtime::MockRandomGenerator random_;
+  Random::MockRandomGenerator random_;
   MockSubscriptionCallbacks callbacks_;
+  MockOpaqueResourceDecoder resource_decoder_;
   Http::MockAsyncClientRequest http_request_;
   Stats::MockIsolatedStatsStore stats_store_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -68,7 +78,7 @@ TEST_F(SubscriptionFactoryTest, NoConfigSpecifier) {
   envoy::config::core::v3::ConfigSource config;
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config), EnvoyException,
-      "Missing config source specifier in envoy::api::v2::core::ConfigSource");
+      "Missing config source specifier in envoy::config::core::v3::ConfigSource");
 }
 
 TEST_F(SubscriptionFactoryTest, RestClusterEmpty) {
@@ -195,6 +205,23 @@ TEST_F(SubscriptionFactoryTest, FilesystemSubscriptionNonExistentFile) {
                             "'/blahblah' does not exist")
 }
 
+TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscription) {
+  std::string test_path = TestEnvironment::temporaryDirectory();
+  auto* watcher = new Filesystem::MockWatcher();
+  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
+  EXPECT_CALL(*watcher, addWatch(test_path, _, _));
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
+  // Unix paths start with /, Windows with c:/.
+  const std::string file_path = test_path[0] == '/' ? test_path.substr(1) : test_path;
+  collectionSubscriptionFromUrl(fmt::format("file:///{}", file_path))->start({});
+}
+
+TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscriptionNonExistentFile){
+    EXPECT_THROW_WITH_MESSAGE(collectionSubscriptionFromUrl("file:///blahblah")->start({}),
+                              EnvoyException,
+                              "envoy::api::v2::Path must refer to an existing path in the system: "
+                              "'/blahblah' does not exist")}
+
 TEST_F(SubscriptionFactoryTest, LegacySubscription) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
@@ -308,7 +335,8 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedApi) {
   EXPECT_LOG_CONTAINS(
       "warn", "xDS of version v2 has been deprecated", try {
         subscription_factory_.subscriptionFromConfigSource(
-            config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_);
+            config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_,
+            resource_decoder_);
       } catch (EnvoyException&){/* expected, we pass an empty configuration  */});
 }
 

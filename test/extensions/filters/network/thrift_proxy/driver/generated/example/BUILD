@@ -1,6 +1,8 @@
-licenses(["notice"])  # Apache 2
-
+load("@rules_python//python:defs.bzl", "py_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("@thrift_pip3//:requirements.bzl", "requirement")
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -13,6 +15,6 @@ py_library(
         "ttypes.py",
     ],
     deps = [
-        "@com_github_apache_thrift//:apache_thrift",
+        requirement("thrift"),
     ],
 )

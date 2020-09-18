@@ -76,6 +76,31 @@ TEST_P(XdsIntegrationTestTypedStruct, RouterRequestAndResponseWithBodyNoBuffer) 
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
+class UdpaXdsIntegrationTestListCollection : public XdsIntegrationTest {
+public:
+  UdpaXdsIntegrationTestListCollection() = default;
+
+  void createEnvoy() override {
+    // TODO(htuch): Convert CDS/EDS/RDS to UDPA list collections when support is implemented in
+    // Envoy.
+    createEnvoyServer({
+        "test/config/integration/server_xds.bootstrap.udpa.yaml",
+        "test/config/integration/server_xds.cds.yaml",
+        "test/config/integration/server_xds.eds.yaml",
+        "test/config/integration/server_xds.lds.udpa.list_collection.yaml",
+        "test/config/integration/server_xds.rds.yaml",
+    });
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, UdpaXdsIntegrationTestListCollection,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(UdpaXdsIntegrationTestListCollection, RouterRequestAndResponseWithBodyNoBuffer) {
+  testRouterRequestAndResponseWithBody(1024, 512, false);
+}
+
 class LdsInplaceUpdateTcpProxyIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public BaseIntegrationTest {
@@ -196,6 +221,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigDeletingFilterChain)
 TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
   setUpstreamCount(2);
   initialize();
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
 
   std::string response_0;
   auto client_conn_0 = createConnectionAndWrite("alpn0", "hello", response_0);
@@ -264,7 +290,13 @@ public:
     std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
     config_helper_.addListenerFilter(tls_inspector_config);
     config_helper_.addSslConfig();
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      if (!use_default_balancer_) {
+        bootstrap.mutable_static_resources()
+            ->mutable_listeners(0)
+            ->mutable_connection_balance_config()
+            ->mutable_exact_balance();
+      }
       auto* filter_chain_0 =
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
       *filter_chain_0->mutable_filter_chain_match()->mutable_application_protocols()->Add() =
@@ -330,10 +362,17 @@ public:
     }
   }
 
+  void expectConnenctionServed(std::string alpn = "alpn0") {
+    auto codec_client_after_config_update = createHttpCodec(alpn);
+    expectResponseHeaderConnectionClose(*codec_client_after_config_update, false);
+    codec_client_after_config_update->close();
+  }
+
   std::unique_ptr<Ssl::ContextManager> context_manager_;
   Network::TransportSocketFactoryPtr context_;
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
   Network::Address::InstanceConstSharedPtr address_;
+  bool use_default_balancer_{false};
 };
 
 // Verify that http response on filter chain 0 has "Connection: close" header when filter chain 0
@@ -362,12 +401,14 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
   expectResponseHeaderConnectionClose(*codec_client_1, true);
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 0);
   expectResponseHeaderConnectionClose(*codec_client_0, false);
+  expectConnenctionServed();
 }
 
 // Verify that http clients of filter chain 0 survives if new listener config adds new filter
 // chain 2.
 TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
   initialize();
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
 
   auto codec_client_0 = createHttpCodec("alpn0");
   Cleanup cleanup0([c0 = codec_client_0.get()]() { c0->close(); });
@@ -389,6 +430,29 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
   Cleanup cleanup2([c2 = codec_client_2.get()]() { c2->close(); });
   expectResponseHeaderConnectionClose(*codec_client_2, false);
   expectResponseHeaderConnectionClose(*codec_client_0, false);
+  expectConnenctionServed();
+}
+
+// Verify that balancer is inherited. Test only default balancer because ExactConnectionBalancer
+// is verified in filter chain add and delete test case.
+TEST_P(LdsInplaceUpdateHttpIntegrationTest, OverlappingFilterChainServesNewConnection) {
+  use_default_balancer_ = true;
+  initialize();
+
+  auto codec_client_0 = createHttpCodec("alpn0");
+  Cleanup cleanup([c0 = codec_client_0.get()]() { c0->close(); });
+  ConfigHelper new_config_helper(version_, *api_,
+                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+  new_config_helper.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        listener->mutable_filter_chains()->RemoveLast();
+      });
+
+  new_config_helper.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
+  expectResponseHeaderConnectionClose(*codec_client_0, false);
+  expectConnenctionServed();
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, LdsInplaceUpdateHttpIntegrationTest,
@@ -413,8 +477,6 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
   // Given we're using LDS in this test, initialize() will not complete until
   // the initial LDS file has loaded.
   EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
-
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // HTTP 1.0 is disabled by default.
   std::string response;
@@ -450,8 +512,7 @@ TEST_P(LdsIntegrationTest, FailConfigLoad) {
     filter_chain->mutable_filters(0)->clear_typed_config();
     filter_chain->mutable_filters(0)->set_name("grewgragra");
   });
-  EXPECT_DEATH_LOG_TO_STDERR(initialize(),
-                             "Didn't find a registered implementation for name: 'grewgragra'");
+  EXPECT_DEATH(initialize(), "Didn't find a registered implementation for name: 'grewgragra'");
 }
 } // namespace
 } // namespace Envoy

@@ -50,6 +50,11 @@ public:
   virtual ~Socket() = default;
 
   /**
+   * Type of sockets supported. See man 2 socket for more details
+   */
+  enum class Type { Stream, Datagram };
+
+  /**
    * @return the local address of the socket.
    */
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
@@ -76,12 +81,17 @@ public:
   /**
    * @return the type (stream or datagram) of the socket.
    */
-  virtual Address::SocketType socketType() const PURE;
+  virtual Socket::Type socketType() const PURE;
 
   /**
    * @return the type (IP or pipe) of addresses used by the socket (subset of socket domain)
    */
   virtual Address::Type addressType() const PURE;
+
+  /**
+   * @return the IP version used by the socket if address type is IP, absl::nullopt otherwise
+   */
+  virtual absl::optional<Address::IpVersion> ipVersion() const PURE;
 
   /**
    * Close the underlying socket.
@@ -128,7 +138,7 @@ public:
    * Retrieves option from underlying socket (@see man 2 getsockopt)
    */
   virtual Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
-                                                socklen_t* optlen) PURE;
+                                                socklen_t* optlen) const PURE;
 
   /**
    * Toggle socket blocking state

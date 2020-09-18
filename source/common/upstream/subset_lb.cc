@@ -1,7 +1,6 @@
 #include "common/upstream/subset_lb.h"
 
 #include <memory>
-#include <unordered_set>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -15,21 +14,25 @@
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/ring_hash_lb.h"
 
+#include "absl/container/node_hash_set.h"
+
 namespace Envoy {
 namespace Upstream {
 
 SubsetLoadBalancer::SubsetLoadBalancer(
     LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
     ClusterStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
-    Runtime::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
+    Random::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
     const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
         lb_ring_hash_config,
+    const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>& lb_maglev_config,
     const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
         least_request_config,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config),
-      least_request_config_(least_request_config), common_config_(common_config), stats_(stats),
-      scope_(scope), runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
+      lb_maglev_config_(lb_maglev_config), least_request_config_(least_request_config),
+      common_config_(common_config), stats_(stats), scope_(scope), runtime_(runtime),
+      random_(random), fallback_policy_(subsets.fallbackPolicy()),
       default_subset_metadata_(subsets.defaultSubset().fields().begin(),
                                subsets.defaultSubset().fields().end()),
       subset_selectors_(subsets.subsetSelectors()), original_priority_set_(priority_set),
@@ -61,14 +64,24 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     panic_mode_subset_ = subset_any_;
   }
 
+  initSubsetSelectorMap();
+
   // Create filtered default subset (if necessary) and other subsets based on current hosts.
   refreshSubsets();
 
-  initSubsetSelectorMap();
+  // This must happen after `initSubsetSelectorMap()` because that initializes `single_`.
+  rebuildSingle();
 
   // Configure future updates.
   original_priority_set_callback_handle_ = priority_set.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
+        // TODO(ggreenway) PERF: This is currently an O(n^2) operation in the edge case of
+        // many priorities and only one host per priority. This could be improved by either
+        // updating in a single pass across all priorities, or by having the callback give a
+        // list of modified hosts so that an incremental update of the data structure can be
+        // performed.
+        rebuildSingle();
+
         if (hosts_added.empty() && hosts_removed.empty()) {
           // It's possible that metadata changed, without hosts being added nor removed.
           // If so we need to add any new subsets, remove unused ones, and regroup hosts into
@@ -100,6 +113,74 @@ SubsetLoadBalancer::~SubsetLoadBalancer() {
   });
 }
 
+void SubsetLoadBalancer::rebuildSingle() {
+  if (single_key_.empty()) {
+    return;
+  }
+
+  // Because PriorityUpdateCb doesn't give a modified list (only added and removed), it is
+  // faster to just rebuild this map than try to figure out if any hosts had their metadata
+  // changed, and then figure out the old and new value (to remove from the old key in this map
+  // and insert in the new key).
+  single_host_per_subset_map_.clear();
+
+  uint32_t collision_count = 0;
+  for (const auto& host_set : original_priority_set_.hostSetsPerPriority()) {
+    for (const auto& host : host_set->hosts()) {
+      MetadataConstSharedPtr metadata = host->metadata();
+      const auto& filter_metadata = metadata->filter_metadata();
+      auto filter_it = filter_metadata.find(Config::MetadataFilters::get().ENVOY_LB);
+      if (filter_it != filter_metadata.end()) {
+        const auto& fields = filter_it->second.fields();
+        auto fields_it = fields.find(single_key_);
+        if (fields_it != fields.end()) {
+          auto [iterator, did_insert] =
+              single_host_per_subset_map_.try_emplace(fields_it->second, host);
+          if (!did_insert) {
+            // Two hosts with the same metadata value were found. Ignore all but one of them, and
+            // set a metric for how many times this happened.
+            collision_count++;
+          }
+        }
+      }
+    }
+  }
+
+  // This stat isn't added to `ClusterStats` because it wouldn't be used
+  // for nearly all clusters, and is only set during configuration updates,
+  // not in the data path, so performance of looking up the stat isn't critical.
+  if (single_duplicate_stat_ == nullptr) {
+    Stats::StatNameManagedStorage name_storage("lb_subsets_single_host_per_subset_duplicate",
+                                               scope_.symbolTable());
+
+    single_duplicate_stat_ = &Stats::Utility::gaugeFromElements(
+        scope_, {name_storage.statName()}, Stats::Gauge::ImportMode::Accumulate);
+  }
+  single_duplicate_stat_->set(collision_count);
+}
+
+// When in `single_host_per_subset` mode, select a host based on the provided match_criteria.
+// Set `host_chosen` to false if there is not a match.
+HostConstSharedPtr SubsetLoadBalancer::tryChooseHostFromMetadataMatchCriteriaSingle(
+    const Router::MetadataMatchCriteria& match_criteria, bool& host_chosen) {
+  ASSERT(!single_key_.empty());
+
+  for (const auto& entry : match_criteria.metadataMatchCriteria()) {
+    if (entry->name() == single_key_) {
+      auto it = single_host_per_subset_map_.find(entry->value());
+      if (it != single_host_per_subset_map_.end()) {
+        if (it->second->health() != Host::Health::Unhealthy) {
+          host_chosen = true;
+          stats_.lb_subsets_selected_.inc();
+          return it->second;
+        }
+      }
+      break;
+    }
+  }
+  return nullptr;
+}
+
 void SubsetLoadBalancer::refreshSubsets() {
   for (auto& host_set : original_priority_set_.hostSetsPerPriority()) {
     update(host_set->priority(), host_set->hosts(), {});
@@ -128,6 +209,22 @@ void SubsetLoadBalancer::initSubsetSelectorMap() {
     const auto& selector_keys = subset_selector->selectorKeys();
     const auto& selector_fallback_policy = subset_selector->fallbackPolicy();
     const auto& selector_fallback_keys_subset = subset_selector->fallbackKeysSubset();
+
+    if (subset_selector->singleHostPerSubset()) {
+      if (subset_selectors_.size() > 1) {
+        throw EnvoyException("subset_lb selector: single_host_per_subset cannot be set when there "
+                             "are multiple subset selectors.");
+      }
+      if (selector_keys.size() != 1 || selector_keys.begin()->empty()) {
+        throw EnvoyException("subset_lb selector: single_host_per_subset cannot bet set when there "
+                             "isn't exactly 1 key or if that key is empty.");
+      }
+      single_key_ = *selector_keys.begin();
+
+      subset_selectors_.clear();
+      return;
+    }
+
     if (selector_fallback_policy ==
         envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED) {
       continue;
@@ -280,6 +377,10 @@ HostConstSharedPtr SubsetLoadBalancer::tryChooseHostFromContext(LoadBalancerCont
     return nullptr;
   }
 
+  if (!single_key_.empty()) {
+    return tryChooseHostFromMetadataMatchCriteriaSingle(*match_criteria, host_chosen);
+  }
+
   // Route has metadata match criteria defined, see if we have a matching subset.
   LbSubsetEntryPtr entry = findSubset(match_criteria->metadataMatchCriteria());
   if (entry == nullptr || !entry->active()) {
@@ -366,7 +467,7 @@ void SubsetLoadBalancer::processSubsets(
     const HostVector& hosts_added, const HostVector& hosts_removed,
     std::function<void(LbSubsetEntryPtr)> update_cb,
     std::function<void(LbSubsetEntryPtr, HostPredicate, const SubsetMetadata&)> new_cb) {
-  std::unordered_set<LbSubsetEntryPtr> subsets_modified;
+  absl::node_hash_set<LbSubsetEntryPtr> subsets_modified;
 
   std::pair<const HostVector&, bool> steps[] = {{hosts_added, true}, {hosts_removed, false}};
   for (const auto& step : steps) {
@@ -602,11 +703,15 @@ void SubsetLoadBalancer::purgeEmptySubsets(LbSubsetMap& subsets) {
         stats_.lb_subsets_removed_.inc();
       }
 
-      it = subset_it->second.erase(it);
+      auto next_it = std::next(it);
+      subset_it->second.erase(it);
+      it = next_it;
     }
 
     if (subset_it->second.empty()) {
-      subset_it = subsets.erase(subset_it);
+      auto next_subset_it = std::next(subset_it);
+      subsets.erase(subset_it);
+      subset_it = next_subset_it;
     } else {
       subset_it++;
     }
@@ -666,7 +771,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
     thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
         *this, subset_lb.stats_, subset_lb.scope_, subset_lb.runtime_, subset_lb.random_,
-        subset_lb.common_config_);
+        subset_lb.lb_maglev_config_, subset_lb.common_config_);
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
     break;
@@ -691,8 +796,8 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
   // that we maintain a consistent view of the metadata and saves on computation
   // since metadata lookups can be expensive.
   //
-  // We use an unordered_set because this can potentially be in the tens of thousands.
-  std::unordered_set<const Host*> matching_hosts;
+  // We use an unordered container because this can potentially be in the tens of thousands.
+  absl::node_hash_set<const Host*> matching_hosts;
 
   auto cached_predicate = [&matching_hosts](const auto& host) {
     return matching_hosts.count(&host) == 1;

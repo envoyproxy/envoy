@@ -106,6 +106,9 @@ message AggregatedConfigSource {
 // set in :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` can be used to
 // specify that other data can be obtained from the same server.
 message SelfConfigSource {
+  // API version for xDS transport protocol. This describes the xDS gRPC/REST
+  // endpoint and version of [Delta]DiscoveryRequest/Response used on the wire.
+  ApiVersion transport_api_version = 1 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Rate Limit settings to be applied for discovery requests made by Envoy.

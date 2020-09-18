@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.common.ratelimit.v3;
 
+import "envoy/type/v3/ratelimit_unit.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -54,6 +56,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // The idea behind the API is that (1)/(2)/(3) and (4)/(5) can be sent in 1 request if desired.
 // This enables building complex application scenarios with a generic backend.
+//
+// Optionally the descriptor can contain a limit override under a "limit" key, that specifies
+// the number of requests per unit to use instead of the number configured in the
+// rate limiting service.
 message RateLimitDescriptor {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.ratelimit.RateLimitDescriptor";
@@ -69,6 +75,20 @@ message RateLimitDescriptor {
     string value = 2 [(validate.rules).string = {min_bytes: 1}];
   }
 
+  // Override rate limit to apply to this descriptor instead of the limit
+  // configured in the rate limit service. See :ref:`rate limit override
+  // <config_http_filters_rate_limit_rate_limit_override>` for more information.
+  message RateLimitOverride {
+    // The number of requests per unit of time.
+    uint32 requests_per_unit = 1;
+
+    // The unit of time.
+    type.v3.RateLimitUnit unit = 2 [(validate.rules).enum = {defined_only: true}];
+  }
+
   // Descriptor entries.
   repeated Entry entries = 1 [(validate.rules).repeated = {min_items: 1}];
+
+  // Optional rate limit override to supply to the ratelimit service.
+  RateLimitOverride limit = 2;
 }

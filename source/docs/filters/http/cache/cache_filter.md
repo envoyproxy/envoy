@@ -31,7 +31,7 @@ which request methods and response codes are cacheable, subject to the
 cache-related headers they also define: *cache-control*, *range*, *if-match*,
 *if-none-match*, *if-modified-since*, *if-unmodified-since*, *if-range*, *authorization*,
 *date*, *age*, *expires*, and *vary*. Responses with a *vary* header will only be cached
-if the named headers are listed in *allowed_vary_headers*.
+if the named headers are accepted by one of the matching rules in *allowed_vary_headers*.
 
 ## Status
  * ready for developers to write cache storage plugins; please contribute them

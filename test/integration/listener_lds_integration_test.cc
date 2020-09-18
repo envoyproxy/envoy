@@ -32,10 +32,7 @@ protected:
   ListenerIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
 
-  ~ListenerIntegrationTest() override {
-    resetConnections();
-    cleanupUpstreamAndDownstream();
-  }
+  ~ListenerIntegrationTest() override { resetConnections(); }
 
   void initialize() override {
     // We want to use the GRPC based LDS.
@@ -98,9 +95,6 @@ protected:
     // Create the RDS upstream (fake_upstreams_[2]).
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
                                                   timeSystem(), enable_half_close_));
-    for (auto& upstream : fake_upstreams_) {
-      upstream->set_allow_unexpected_disconnects(true);
-    }
   }
 
   void resetFakeUpstreamInfo(FakeUpstreamInfo* upstream_info) {
@@ -249,16 +243,15 @@ TEST_P(ListenerIntegrationTest, BasicSuccess) {
   codec_client_ = makeHttpConnection(lookupPort(listener_name_));
   int response_size = 800;
   int request_size = 10;
-  Http::TestHeaderMapImpl response_headers{{":status", "200"},
-                                           {"server_id", "cluster_0, backend_0"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"server_id", "cluster_0, backend_0"}};
   auto response = sendRequestAndWaitForResponse(
-      Http::TestHeaderMapImpl{
+      Http::TestResponseHeaderMapImpl{
           {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
       request_size, response_headers, response_size, /*cluster_0*/ 0);
   verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
-  cleanupUpstreamAndDownstream();
 }
 
 } // namespace

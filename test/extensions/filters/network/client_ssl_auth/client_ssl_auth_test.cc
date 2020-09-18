@@ -13,7 +13,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -113,7 +113,7 @@ ip_white_list:
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_;
   Stats::TestUtil::TestStore stats_store_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
   std::shared_ptr<Ssl::MockConnectionInfo> ssl_;
 };
@@ -215,7 +215,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(1U, stats_store_.counter("auth.clientssl.vpn.update_success").value());
-  EXPECT_EQ(2U, stats_store_.counter("auth.clientssl.vpn.auth_ip_white_list").value());
+  EXPECT_EQ(2U, stats_store_.counter("auth.clientssl.vpn.auth_ip_allowlist").value());
   EXPECT_EQ(1U, stats_store_.counter("auth.clientssl.vpn.auth_digest_match").value());
   EXPECT_EQ(1U, stats_store_.counter("auth.clientssl.vpn.auth_digest_no_match").value());
 

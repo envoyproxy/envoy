@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -34,6 +34,7 @@ envoy_cc_library(
     ],
     deps = [
         "//include/envoy/runtime:runtime_interface",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
@@ -47,7 +48,6 @@ envoy_cc_library(
     hdrs = [
         "runtime_impl.h",
     ],
-    external_deps = ["ssl"],
     deps = [
         ":runtime_features_lib",
         ":runtime_protos_lib",

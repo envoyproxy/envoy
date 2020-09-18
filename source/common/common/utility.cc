@@ -15,6 +15,7 @@
 #include "common/common/hash.h"
 #include "common/singleton/const_singleton.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
@@ -38,6 +39,31 @@ using UnsignedMilliseconds = std::chrono::duration<uint64_t, std::milli>;
 
 } // namespace
 
+const std::string errorDetails(int error_code) {
+#ifndef WIN32
+  // clang-format off
+  return strerror(error_code);
+  // clang-format on
+#else
+  // Windows error codes do not correspond to POSIX errno values
+  // Use FormatMessage, strip trailing newline, and return "Unknown error" on failure (as on POSIX).
+  // Failures will usually be due to the error message not being found.
+  char* buffer = NULL;
+  DWORD msg_size = FormatMessage(
+      FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+      NULL, error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&buffer, 0, NULL);
+  if (msg_size == 0) {
+    return "Unknown error";
+  }
+  if (msg_size > 1 && buffer[msg_size - 2] == '\r' && buffer[msg_size - 1] == '\n') {
+    msg_size -= 2;
+  }
+  std::string error_details(buffer, msg_size);
+  ASSERT(LocalFree(buffer) == NULL);
+  return error_details;
+#endif
+}
+
 std::string DateFormatter::fromTime(const SystemTime& time) const {
   struct CachedTime {
     // The string length of a number of seconds since the Epoch. E.g. for "1528270093", the length
@@ -60,7 +86,7 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
       SpecifierOffsets specifier_offsets;
     };
     // A map is used to keep different formatted format strings at a given second.
-    std::unordered_map<std::string, const Formatted> formatted;
+    absl::node_hash_map<std::string, const Formatted> formatted;
   };
   static thread_local CachedTime cached_time;
 
@@ -76,9 +102,11 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
     // Remove all the expired cached items.
     for (auto it = cached_time.formatted.cbegin(); it != cached_time.formatted.cend();) {
       if (it->second.epoch_time_seconds != epoch_time_seconds) {
-        it = cached_time.formatted.erase(it);
+        auto next_it = std::next(it);
+        cached_time.formatted.erase(it);
+        it = next_it;
       } else {
-        it++;
+        ++it;
       }
     }
 
@@ -127,10 +155,13 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
 }
 
 void DateFormatter::parse(const std::string& format_string) {
-  std::string new_format_string = format_string;
+  std::string suffix = format_string;
   std::smatch matched;
+  // "step" is the last specifier's position + the last specifier's width. It's not the current
+  // position in "format_string" because the length has changed. It is actually the index which
+  // points to the end of the last specifier in formatted string (generated in the future).
   size_t step = 0;
-  while (regex_search(new_format_string, matched, SpecifierConstants::get().PATTERN)) {
+  while (regex_search(suffix, matched, SpecifierConstants::get().PATTERN)) {
     // The std::smatch matched for (%([1-9])?f)|(%s): [all, subsecond-specifier, subsecond-specifier
     // width, second-specifier].
     const std::string& width_specifier = matched[2];
@@ -139,27 +170,22 @@ void DateFormatter::parse(const std::string& format_string) {
     // In the template string to be used in runtime substitution, the width is the number of
     // characters to be replaced.
     const size_t width = width_specifier.empty() ? 9 : width_specifier.at(0) - '0';
-    new_format_string.replace(matched.position(), matched.length(),
-                              std::string(second_specifier.empty() ? width : 2, '?'));
 
-    ASSERT(step < new_format_string.size());
-
+    ASSERT(!suffix.empty());
     // This records matched position, the width of current subsecond pattern, and also the string
     // segment before the matched position. These values will be used later at data path.
     specifiers_.emplace_back(
         second_specifier.empty()
-            ? Specifier(matched.position(), width,
-                        new_format_string.substr(step, matched.position() - step))
-            : Specifier(matched.position(),
-                        new_format_string.substr(step, matched.position() - step)));
-
+            ? Specifier(step + matched.position(), width, suffix.substr(0, matched.position()))
+            : Specifier(step + matched.position(), suffix.substr(0, matched.position())));
     step = specifiers_.back().position_ + specifiers_.back().width_;
+    suffix = matched.suffix();
   }
 
   // To capture the segment after the last specifier pattern of a format string by creating a zero
   // width specifier. E.g. %3f-this-is-the-last-%s-segment-%Y-until-this.
-  if (step < new_format_string.size()) {
-    Specifier specifier(step, 0, new_format_string.substr(step));
+  if (!suffix.empty()) {
+    Specifier specifier(step, 0, suffix);
     specifiers_.emplace_back(specifier);
   }
 }
@@ -481,12 +507,12 @@ std::string StringUtil::removeCharacters(const absl::string_view& str,
   const auto intervals = remove_characters.toVector();
   std::vector<absl::string_view> pieces;
   pieces.reserve(intervals.size());
-  for (const auto& interval : intervals) {
-    if (interval.first != pos) {
-      ASSERT(interval.second <= str.size());
-      pieces.push_back(str.substr(pos, interval.first - pos));
+  for (const auto& [left_bound, right_bound] : intervals) {
+    if (left_bound != pos) {
+      ASSERT(right_bound <= str.size());
+      pieces.push_back(str.substr(pos, left_bound - pos));
     }
-    pos = interval.second;
+    pos = right_bound;
   }
   if (pos != str.size()) {
     pieces.push_back(str.substr(pos));
@@ -544,6 +570,10 @@ double WelfordStandardDeviation::computeStandardDeviation() const {
 InlineString::InlineString(const char* str, size_t size) : size_(size) {
   RELEASE_ASSERT(size <= 0xffffffff, "size must fit in 32 bits");
   memcpy(data_, str, size);
+}
+
+void ExceptionUtil::throwEnvoyException(const std::string& message) {
+  throw EnvoyException(message);
 }
 
 } // namespace Envoy

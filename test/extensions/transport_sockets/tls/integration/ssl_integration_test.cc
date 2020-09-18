@@ -286,7 +286,8 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnly) {
   server_rsa_cert_ = false;
   server_ecdsa_cert_ = true;
   initialize();
-  auto codec_client = makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()));
+  auto codec_client =
+      makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()), absl::nullopt);
   EXPECT_FALSE(codec_client->connected());
   const std::string counter_name = listenerStatPrefix("ssl.connection_error");
   Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
@@ -313,7 +314,8 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaClientEcdsaOnly) {
   client_ecdsa_cert_ = true;
   initialize();
   EXPECT_FALSE(
-      makeRawHttpConnection(makeSslClientConnection(ecdsaOnlyClientOptions()))->connected());
+      makeRawHttpConnection(makeSslClientConnection(ecdsaOnlyClientOptions()), absl::nullopt)
+          ->connected());
   const std::string counter_name = listenerStatPrefix("ssl.connection_error");
   Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
   test_server_->waitForCounterGe(counter_name, 1);
@@ -394,10 +396,8 @@ public:
   envoy::extensions::transport_sockets::tap::v3::Tap
   createTapConfig(const envoy::config::core::v3::TransportSocket& inner_transport) {
     envoy::extensions::transport_sockets::tap::v3::Tap tap_config;
-    tap_config.mutable_common_config()
-        ->mutable_static_config()
-        ->mutable_match_config()
-        ->set_any_match(true);
+    tap_config.mutable_common_config()->mutable_static_config()->mutable_match()->set_any_match(
+        true);
     auto* output_config =
         tap_config.mutable_common_config()->mutable_static_config()->mutable_output_config();
     if (max_rx_bytes_.has_value()) {
@@ -436,7 +436,7 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   // First request (ID will be +1 since the client will also bump).
   const uint64_t first_id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
   codec_client_ = makeHttpConnection(creator());
-  Http::TestHeaderMapImpl post_request_headers{
+  Http::TestRequestHeaderMapImpl post_request_headers{
       {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
       {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
   auto response =
@@ -474,7 +474,7 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   // Verify a second request hits a different file.
   const uint64_t second_id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
   codec_client_ = makeHttpConnection(creator());
-  Http::TestHeaderMapImpl get_request_headers{
+  Http::TestRequestHeaderMapImpl get_request_headers{
       {":method", "GET"},     {":path", "/test/long/url"}, {":scheme", "http"},
       {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
   response =

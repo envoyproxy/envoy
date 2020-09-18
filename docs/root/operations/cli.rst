@@ -66,10 +66,24 @@ following are the command line options that Envoy supports.
   set this option. However, if Envoy needs to be run multiple times on the same machine, each
   running Envoy will need a unique base ID so that the shared memory regions do not conflict.
 
+.. option:: --use-dynamic-base-id
+
+  *(optional)* Selects an unused base ID to use when allocating shared memory regions. Using
+  preselected values with :option:`--base-id` is preferred, however. If this option is enabled,
+  it supersedes the :option:`--base-id` value. This flag may not be used when the value of
+  :option:`--restart-epoch` is non-zero. Instead, for subsequent hot restarts, set
+  :option:`--base-id` option with the selected base ID. See :option:`--base-id-path`.
+
+.. option:: --base-id-path <path_string>
+
+  *(optional)* Writes the base ID to the given path. While this option is compatible with
+  :option:`--base-id`, its intended use is to provide access to the dynamic base ID selected by
+  :option:`--use-dynamic-base-id`.
+
 .. option:: --concurrency <integer>
 
   *(optional)* The number of :ref:`worker threads <arch_overview_threading>` to run. If not
-  specified defaults to the number of hardware threads on the machine. If set to zero, Envoy will 
+  specified defaults to the number of hardware threads on the machine. If set to zero, Envoy will
   still run one worker thread.
 
 .. option:: -l <string>, --log-level <string>
@@ -79,9 +93,9 @@ following are the command line options that Envoy supports.
 
 .. option:: --component-log-level <string>
 
-  *(optional)* The comma separated list of logging level per component. Non developers should generally 
-  never set this option. For example, if you want `upstream` component to run at `debug` level and 
-  `connection` component to run at `trace` level, you should pass ``upstream:debug,connection:trace`` to 
+  *(optional)* The comma separated list of logging level per component. Non developers should generally
+  never set this option. For example, if you want `upstream` component to run at `debug` level and
+  `connection` component to run at `trace` level, you should pass ``upstream:debug,connection:trace`` to
   this flag. See ``ALL_LOGGER_IDS`` in :repo:`/source/common/common/logger.h` for a list of components.
 
 .. option:: --cpuset-threads
@@ -100,13 +114,10 @@ following are the command line options that Envoy supports.
 .. option:: --log-format <format string>
 
    *(optional)* The format string to use for laying out the log message metadata. If this is not
-   set, a default format string ``"[%Y-%m-%d %T.%e][%t][%l][%n] %v"`` is used.
+   set, a default format string ``"[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v"`` is used.
 
-   When used in conjunction with :option:`--log-format-prefix-with-location` set to 0, the logger can be
-   configured to not prefix ``%v`` by a file path and a line number.
-
-   **NOTE**: The default log format will be changed to ``"[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v"``
-   together with the default value of :option:`--log-format-prefix-with-location` to 0 at 1.16.0 release.
+   When used in conjunction with :option:`--log-format-prefix-with-location` set to 1, the logger can be
+   configured to prefix ``%v`` by a file path and a line number.
 
    When used in conjunction with :option:`--log-format-escaped`, the logger can be configured
    to log in a format that is parsable by log viewers. Known integrations are documented
@@ -153,10 +164,9 @@ following are the command line options that Envoy supports.
 
    *(optional)* This temporary flag allows replacing all entries of ``"%v"`` in the log format by
    ``"[%g:%#] %v"``. This flag is provided for migration purposes only. If this is not set, a
-   default value 1 is used.
+   default value 0 is used.
 
-   **NOTE**: The default value will be changed to 0 at 1.16.0 release and the flag will be
-   removed at 1.17.0 release.
+   **NOTE**: The flag will be removed at 1.17.0 release.
 
 .. option:: --log-format-escaped
 
@@ -173,6 +183,29 @@ following are the command line options that Envoy supports.
   or whether to open an existing one. It should be incremented every time a hot restart takes place.
   The :ref:`hot restart wrapper <operations_hot_restarter>` sets the *RESTART_EPOCH* environment
   variable which should be passed to this option in most cases.
+
+.. option:: --enable-fine-grain-logging
+
+  *(optional)* Enables fine-grain logger with file level log control and runtime update at administration
+  interface. If enabled, main log macros including `ENVOY_LOG`, `ENVOY_CONN_LOG`, `ENVOY_STREAM_LOG` and
+  `ENVOY_FLUSH_LOG` will use a per-file logger, and the usage doesn't need `Envoy::Logger::Loggable` any 
+  more. The administration interface usage is similar. Please see `Administration interface 
+  <https://www.envoyproxy.io/docs/envoy/latest/operations/admin>`_ for more detail.
+
+.. option:: --socket-path <path string>
+
+  *(optional)* The output file path to the socket address for :ref:`hot restart <arch_overview_hot_restart>`.
+  Default to "@envoy_domain_socket" which will be created in the abstract namespace. Suffix _{role}_{id}
+  is appended to provide name. All envoy processes wanting to participate in hot-restart together must
+  use the same value for this option.
+
+  **NOTE**: The path started with "@" will be created in the abstract namespace.
+
+.. option:: --socket-mode <string>
+
+  *(optional)* The socket file permission for :ref:`hot restart <arch_overview_hot_restart>`.
+  This must be a valid octal file permission, such as 644. The default value is 600.
+  This flag may not be used when :option:`--socket-path` is start with "@" or not set.
 
 .. option:: --hot-restart-version
 
@@ -239,14 +272,22 @@ following are the command line options that Envoy supports.
 
 .. option:: --drain-time-s <integer>
 
-  *(optional)* The time in seconds that Envoy will drain connections during 
+  *(optional)* The time in seconds that Envoy will drain connections during
   a :ref:`hot restart <arch_overview_hot_restart>` or when individual listeners are being
-  modified or removed via :ref:`LDS <arch_overview_dynamic_config_lds>`. 
-  Defaults to 600 seconds (10 minutes). Generally the drain time should be less than 
-  the parent shutdown time set via the :option:`--parent-shutdown-time-s` option. How the two 
+  modified or removed via :ref:`LDS <arch_overview_dynamic_config_lds>`.
+  Defaults to 600 seconds (10 minutes). Generally the drain time should be less than
+  the parent shutdown time set via the :option:`--parent-shutdown-time-s` option. How the two
   settings are configured depends on the specific deployment. In edge scenarios, it might be
   desirable to have a very long drain time. In service to service scenarios, it might be possible
   to make the drain and shutdown time much shorter (e.g., 60s/90s).
+
+.. option:: --drain-strategy <string>
+
+  *(optional)* Determine behaviour of Envoy during the hot restart drain sequence. During the drain sequence, the drain manager encourages draining through terminating connections on request completion, sending "Connection: CLOSE" on HTTP1, and sending GOAWAY on HTTP2.
+
+  * ``gradual``: *(default)* The percentage of requests encouraged to drain increases to 100% as the drain time elapses.
+
+  * ``immediate``: All requests are encouraged to drain as soon as the drain sequence begins.
 
 .. option:: --parent-shutdown-time-s <integer>
 
@@ -291,9 +332,9 @@ following are the command line options that Envoy supports.
 .. option:: --ignore-unknown-dynamic-fields
 
   *(optional)* This flag disables validation of protobuf configuration for unknown fields in dynamic
-   configuration. Unlike setting --reject-unknown-dynamic-fields to false, it does not log warnings or
-   count occurrences of unknown fields, in the interest of configuration processing speed. If
-   --reject-unknown-dynamic-fields is set to true, this flag has no effect.
+  configuration. Unlike setting :option:`--reject-unknown-dynamic-fields` to false, it does not log warnings
+  or count occurrences of unknown fields, in the interest of configuration processing speed. If
+  :option:`--reject-unknown-dynamic-fields` is set to true, this flag has no effect.
 
 .. option:: --disable-extensions <extension list>
 
