@@ -33,6 +33,10 @@ public:
 
   // Determines whether the client gets reused or not after respondHeaders()
   bool reuse_connection_ = true;
+
+  // Empty response induces a specific codepath in raiseEvent in case of connected, ignores the
+  // binary field and only uses text.
+  bool empty_response_ = true;
 };
 
 class HealthCheckFuzz { // TODO: once added tcp/grpc, switch this to an
@@ -49,7 +53,7 @@ public:
   };
 
 private:
-  void raiseEvent(const test::common::upstream::RaiseEvent& event, bool last_action);
+  Network::ConnectionEvent getEventTypeFromProto(const test::common::upstream::RaiseEvent& event);
 
   void replay(const test::common::upstream::HealthCheckTestCase& input);
 

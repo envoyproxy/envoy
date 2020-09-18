@@ -136,7 +136,12 @@ void TcpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase 
   if (input.health_check_config().has_reuse_connection()) {
     reuse_connection_ = input.health_check_config().reuse_connection().value();
   }
-
+  // The Receive proto message has a validation that if there is a receive field, the text field, a
+  // string representing the hex encoded payload has a least one byte.
+  if (input.health_check_config().tcp_health_check().receive_size() != 0) {
+    ENVOY_LOG_MISC(trace, "Health checker has a non empty response");
+    empty_response_ = false;
+  }
   if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
     interval_timer_->invokeCallback();
   }
@@ -155,9 +160,9 @@ void TcpHealthCheckFuzz::respond(std::string data, bool last_action) {
   read_filter_->onData(response, true);
 
   // The interval timer may not be on. If it's not on, return. An http response will automatically
-  // turn on interval and turn off timer, but for tcp it doesn't if the data doesn't match. If it
-  // doesn't match, it only sets the host to unhealthy. If it doesn't hit, it will turn timeout on
-  // and interval off.
+  // turn on interval and turn off timeout, but for tcp it doesn't if the data doesn't match. If the
+  // response doesn't match, it only sets the host to unhealthy. If it does match, it will turn
+  // timeout off and interval on.
   if (!reuse_connection_ && !last_action && interval_timer_->enabled_) {
     expectClientCreate();
     interval_timer_->invokeCallback();
@@ -189,52 +194,47 @@ void TcpHealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
 }
 
 void TcpHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) {
+  // On a close event, the health checker will call handleFailure if expect_close_ is false. This is
+  // set by multiple code paths. handleFailure() turns on interval and turns off timeout. However,
+  // other action of the fuzzer account for this by explicility invoking a client after
+  // expect_close_ gets set to true, turning expect_close_ back to false.
   connection_->raiseEvent(event_type);
   if (!last_action && event_type != Network::ConnectionEvent::Connected) {
-    if (!interval_timer_
-             ->enabled_) { // Note: related to the TODO below. This will mean that both timers are
-                           // disabled, meaning any action after hitting this will be voided.
+    if (!interval_timer_->enabled_) {
       return;
     }
     ENVOY_LOG_MISC(trace, "Creating client from close event");
     expectClientCreate();
-    // It calls it with a number if expect close is false (like 4 different code paths). TODO:
-    // Figure out what to do in this scenario.
+    interval_timer_->invokeCallback();
+  }
+
+  // In the specific case of:
+  // https://github.com/envoyproxy/envoy/blob/master/source/common/upstream/health_checker_impl.cc#L489
+  // This blows away client, should create a new one
+  if (event_type == Network::ConnectionEvent::Connected && empty_response_) {
+    ENVOY_LOG_MISC(trace, "Creating client from connected event and empty response.");
+    expectClientCreate();
     interval_timer_->invokeCallback();
   }
 }
 
-void HealthCheckFuzz::raiseEvent(const test::common::upstream::RaiseEvent& event,
-                                 bool last_action) {
-  Network::ConnectionEvent eventType;
+Network::ConnectionEvent
+HealthCheckFuzz::getEventTypeFromProto(const test::common::upstream::RaiseEvent& event) {
   switch (event) {
   case test::common::upstream::RaiseEvent::CONNECTED: {
-    eventType = Network::ConnectionEvent::Connected;
+    return Network::ConnectionEvent::Connected;
     break;
   }
   case test::common::upstream::RaiseEvent::REMOTE_CLOSE: {
-    eventType = Network::ConnectionEvent::RemoteClose;
+    return Network::ConnectionEvent::RemoteClose;
     break;
   }
   case test::common::upstream::RaiseEvent::LOCAL_CLOSE: {
-    eventType = Network::ConnectionEvent::LocalClose;
+    return Network::ConnectionEvent::LocalClose;
     break;
   }
   default: // shouldn't hit
-    eventType = Network::ConnectionEvent::Connected;
-    break;
-  }
-
-  switch (type_) {
-  case HealthCheckFuzz::Type::HTTP: {
-    http_fuzz_test_->raiseEvent(eventType, last_action);
-    break;
-  }
-  case HealthCheckFuzz::Type::TCP: {
-    tcp_fuzz_test_->raiseEvent(eventType, last_action);
-    break;
-  }
-  default:
+    return Network::ConnectionEvent::Connected;
     break;
   }
 }
@@ -251,7 +251,6 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
       return;
     }
     replay(input);
-    ENVOY_LOG_MISC(trace, "Deleted http fuzz test base");
     break;
   }
   case envoy::config::core::v3::HealthCheck::kTcpHealthCheck: {
@@ -264,7 +263,6 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
       return;
     }
     replay(input);
-    ENVOY_LOG_MISC(trace, "Deleted tcp fuzz test base");
     break;
   }
   default:
@@ -325,9 +323,19 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
       }
       break;
     }
-    // Shared method across all three
     case test::common::upstream::Action::kRaiseEvent: {
-      raiseEvent(event.raise_event(), last_action);
+      switch (type_) {
+      case HealthCheckFuzz::Type::HTTP: {
+        http_fuzz_test_->raiseEvent(getEventTypeFromProto(event.raise_event()), last_action);
+        break;
+      }
+      case HealthCheckFuzz::Type::TCP: {
+        tcp_fuzz_test_->raiseEvent(getEventTypeFromProto(event.raise_event()), last_action);
+        break;
+      }
+      default:
+        break;
+      }
       break;
     }
     default:
