@@ -601,8 +601,6 @@ setBytes()
 
 Set the content of wrapped buffer with the input string.
 
-
-
 .. _config_http_filters_lua_metadata_wrapper:
 
 Metadata object API
