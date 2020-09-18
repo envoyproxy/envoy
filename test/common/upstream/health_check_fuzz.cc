@@ -240,7 +240,7 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
   case envoy::config::core::v3::HealthCheck::kHttpHealthCheck: {
     type_ = HealthCheckFuzz::Type::HTTP;
     http_fuzz_test_ = std::make_unique<HttpHealthCheckFuzz>();
-    try { // Catches exceptions realted to initializing health checker
+    try { // Catches exceptions related to initializing health checker
       http_fuzz_test_->initialize(input);
     } catch (EnvoyException& e) {
       ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
@@ -252,7 +252,7 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
   case envoy::config::core::v3::HealthCheck::kTcpHealthCheck: {
     type_ = HealthCheckFuzz::Type::TCP;
     tcp_fuzz_test_ = std::make_unique<TcpHealthCheckFuzz>();
-    try { // Catches exceptions realted to initializing health checker
+    try { // Catches exceptions related to initializing health checker
       tcp_fuzz_test_->initialize(input);
     } catch (EnvoyException& e) {
       ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
