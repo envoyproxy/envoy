@@ -16,7 +16,7 @@ namespace Event {
  */
 class ScaledRangeTimerManager {
 public:
-  ScaledRangeTimerManager(Dispatcher& dispatcher, double scale_factor);
+  explicit ScaledRangeTimerManager(Dispatcher& dispatcher);
 
   /**
    * Creates a new range timer backed by the manager. The returned timer will be subject to the
@@ -26,17 +26,20 @@ public:
   RangeTimerPtr createTimer(TimerCb callback);
 
   /**
-   * Sets the scale factor for all timers created through this manager.
+   * Sets the scale factor for all timers created through this manager. The value should be between
+   * 0 and 1, inclusive.
    */
   void setScaleFactor(double scale_factor);
 
-protected:
+private:
   class RangeTimerImpl;
   struct Queue {
     struct Item {
       Item(RangeTimerImpl& timer, MonotonicTime active_time);
-      RangeTimerImpl& timer;
-      MonotonicTime active_time;
+      // The timer owned by the caller being kept in the queue.
+      RangeTimerImpl& timer_;
+      // The time at which the timer became active (when its min duration expired).
+      MonotonicTime active_time_;
     };
 
     using Iterator = std::list<Item>::iterator;
@@ -44,25 +47,27 @@ protected:
     Queue(std::chrono::milliseconds duration, ScaledRangeTimerManager& manager,
           Dispatcher& dispatcher);
 
-    const std::chrono::milliseconds duration;
-    std::list<Item> range_timers;
-    const TimerPtr timer;
+    const std::chrono::milliseconds duration_;
+    // The list of active timers in this queue. This is implemented as a
+    // std::list so that the iterators held in ScalingTimerHandle instances are
+    // not invalidated by removal or insertion of other timers. Insertion only
+    // happens at the end, though, since the times used are monotonic, which
+    // keeps the list in sorted order.
+    std::list<Item> range_timers_;
+    const TimerPtr timer_;
   };
 
   struct ScalingTimerHandle {
     ScalingTimerHandle(Queue& queue, Queue::Iterator iterator);
-    Queue& queue;
-    Queue::Iterator iterator;
+    Queue& queue_;
+    Queue::Iterator iterator_;
   };
 
-  ScalingTimerHandle activateTimer(std::chrono::milliseconds duration, RangeTimerImpl& timer);
-  void removeTimer(ScalingTimerHandle handle);
-
-private:
+  // A simple wrapper around a float that ensures value() is sane (in the range [0, 1]).
   class DurationScaleFactor {
   public:
     DurationScaleFactor(double value);
-    double value() const;
+    double value() const { return value_; }
 
   private:
     double value_;
@@ -73,11 +78,11 @@ private:
     using is_transparent = void;
 
     size_t operator()(const std::chrono::milliseconds duration) const {
-      return hash(duration.count());
+      return hash_(duration.count());
     }
-    size_t operator()(const Queue& queue) const { return (*this)(queue.duration); }
+    size_t operator()(const Queue& queue) const { return (*this)(queue.duration_); }
     size_t operator()(const std::unique_ptr<Queue>& queue) const { return (*this)(*queue); }
-    std::hash<std::chrono::milliseconds::rep> hash;
+    std::hash<std::chrono::milliseconds::rep> hash_;
   };
 
   struct Eq {
@@ -85,15 +90,19 @@ private:
     using is_transparent = void;
 
     bool operator()(const std::unique_ptr<Queue>& lhs, std::chrono::milliseconds rhs) const {
-      return lhs->duration == rhs;
+      return lhs->duration_ == rhs;
     }
     bool operator()(const std::unique_ptr<Queue>& lhs, const Queue& rhs) const {
-      return (*this)(lhs, rhs.duration);
+      return (*this)(lhs, rhs.duration_);
     }
     bool operator()(const std::unique_ptr<Queue>& lhs, const std::unique_ptr<Queue>& rhs) const {
       return (*this)(lhs, *rhs);
     }
   };
+
+  ScalingTimerHandle activateTimer(std::chrono::milliseconds duration, RangeTimerImpl& timer);
+
+  void removeTimer(ScalingTimerHandle handle);
 
   void resetQueueTimer(Queue& queue, MonotonicTime now);
 

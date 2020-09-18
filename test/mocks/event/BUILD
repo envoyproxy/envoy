@@ -31,7 +31,6 @@ envoy_cc_mock(
 
 envoy_cc_test_library(
     name = "wrapped_dispatcher",
-    srcs = ["wrapped_dispatcher.cc"],
     hdrs = ["wrapped_dispatcher.h"],
     deps = [
         "//include/envoy/event:dispatcher_interface",

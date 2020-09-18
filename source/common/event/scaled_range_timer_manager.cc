@@ -25,20 +25,22 @@ class ScaledRangeTimerManager::RangeTimerImpl final : public RangeTimer {
 public:
   RangeTimerImpl(TimerCb callback, ScaledRangeTimerManager& manager)
       : manager_(manager), callback_(std::move(callback)),
-        pending_timer_(manager.dispatcher_.createTimer([this] { onPendingTimerComplete(); })) {}
+        min_duration_timer_(manager.dispatcher_.createTimer([this] { onPendingTimerComplete(); })) {
+  }
 
   ~RangeTimerImpl() override { disableTimer(); }
 
   void disableTimer() override {
     struct Dispatch {
-      Dispatch(RangeTimerImpl& timer) : timer(timer) {}
-      RangeTimerImpl& timer;
+      Dispatch(RangeTimerImpl& timer) : timer_(timer) {}
+      RangeTimerImpl& timer_;
       void operator()(const Inactive&) {}
-      void operator()(const WaitingForMin&) { timer.pending_timer_->disableTimer(); }
-      void operator()(ScalingMax& active) { timer.manager_.removeTimer(active.handle); }
+      void operator()(const WaitingForMin&) { timer_.min_duration_timer_->disableTimer(); }
+      void operator()(ScalingMax& active) { timer_.manager_.removeTimer(active.handle_); }
     };
     absl::visit(Dispatch(*this), state_);
     state_.emplace<Inactive>();
+    scope_ = nullptr;
   }
 
   void enableTimer(const std::chrono::milliseconds& min_ms, const std::chrono::milliseconds& max_ms,
@@ -52,7 +54,7 @@ public:
       state_.emplace<ScalingMax>(handle);
     } else {
       state_.emplace<WaitingForMin>(max_ms - min_ms);
-      pending_timer_->enableTimer(min_ms);
+      min_duration_timer_->enableTimer(min_ms);
     }
   }
 
@@ -75,17 +77,19 @@ private:
   struct Inactive {};
 
   struct WaitingForMin {
-    WaitingForMin(std::chrono::milliseconds duration) : duration(duration) {}
+    WaitingForMin(std::chrono::milliseconds scalable_duration)
+        : scalable_duration_(scalable_duration) {}
 
-    // The number for the bucket this timer will be placed in.
-    const std::chrono::milliseconds duration;
+    // The amount of time between this enabled timer's max and min, which should
+    // be scaled by the current scale factor.
+    const std::chrono::milliseconds scalable_duration_;
   };
 
   struct ScalingMax {
-    ScalingMax(ScaledRangeTimerManager::ScalingTimerHandle handle) : handle(handle) {}
+    ScalingMax(ScaledRangeTimerManager::ScalingTimerHandle handle) : handle_(handle) {}
 
     // A handle that can be used to disable the timer.
-    ScaledRangeTimerManager::ScalingTimerHandle handle;
+    ScaledRangeTimerManager::ScalingTimerHandle handle_;
   };
 
   void onPendingTimerComplete() {
@@ -93,30 +97,30 @@ private:
     ASSERT(absl::holds_alternative<WaitingForMin>(state_));
     WaitingForMin& waiting = absl::get<WaitingForMin>(state_);
 
-    if (waiting.duration < std::chrono::milliseconds::zero()) {
+    if (waiting.scalable_duration_ < std::chrono::milliseconds::zero()) {
       trigger();
     } else {
-      state_.emplace<ScalingMax>(manager_.activateTimer(waiting.duration, *this));
+      state_.emplace<ScalingMax>(manager_.activateTimer(waiting.scalable_duration_, *this));
     }
   }
 
   ScaledRangeTimerManager& manager_;
   const TimerCb callback_;
-  const TimerPtr pending_timer_;
+  const TimerPtr min_duration_timer_;
 
   absl::variant<Inactive, WaitingForMin, ScalingMax> state_;
   const ScopeTrackedObject* scope_;
 };
 
-ScaledRangeTimerManager::ScaledRangeTimerManager(Dispatcher& dispatcher, double scale_factor)
-    : dispatcher_(dispatcher), scale_factor_(scale_factor) {}
+ScaledRangeTimerManager::ScaledRangeTimerManager(Dispatcher& dispatcher)
+    : dispatcher_(dispatcher), scale_factor_(1.0) {}
 
 RangeTimerPtr ScaledRangeTimerManager::createTimer(TimerCb callback) {
   return std::make_unique<RangeTimerImpl>(callback, *this);
 }
 
 void ScaledRangeTimerManager::setScaleFactor(double scale_factor) {
-  const MonotonicTime now = dispatcher_.timeSource().monotonicTime();
+  const MonotonicTime now = dispatcher_.approximateMonotonicTime();
   scale_factor_ = DurationScaleFactor(scale_factor);
   for (auto& queue : queues_) {
     resetQueueTimer(*queue, now);
@@ -124,74 +128,75 @@ void ScaledRangeTimerManager::setScaleFactor(double scale_factor) {
 }
 
 ScaledRangeTimerManager::Queue::Item::Item(RangeTimerImpl& timer, MonotonicTime active_time)
-    : timer(timer), active_time(active_time) {}
+    : timer_(timer), active_time_(active_time) {}
 
 ScaledRangeTimerManager::Queue::Queue(std::chrono::milliseconds duration,
                                       ScaledRangeTimerManager& manager, Dispatcher& dispatcher)
-    : duration(duration),
-      timer(dispatcher.createTimer([this, &manager] { manager.onQueueTimerFired(*this); })) {}
+    : duration_(duration),
+      timer_(dispatcher.createTimer([this, &manager] { manager.onQueueTimerFired(*this); })) {}
 
 ScaledRangeTimerManager::ScalingTimerHandle::ScalingTimerHandle(Queue& queue,
                                                                 Queue::Iterator iterator)
-    : queue(queue), iterator(iterator) {}
+    : queue_(queue), iterator_(iterator) {}
+
+ScaledRangeTimerManager::DurationScaleFactor::DurationScaleFactor(double value)
+    : value_(std::max(0.0, std::min(value, 1.0))) {}
 
 ScaledRangeTimerManager::ScalingTimerHandle
 ScaledRangeTimerManager::activateTimer(std::chrono::milliseconds duration,
                                        RangeTimerImpl& range_timer) {
+  ASSERT(dispatcher_.isThreadSafe());
   auto it = queues_.find(duration);
   if (it == queues_.end()) {
     auto queue = std::make_unique<Queue>(duration, *this, dispatcher_);
     it = queues_.emplace(std::move(queue)).first;
   }
+  Queue& queue = **it;
 
-  (*it)->range_timers.emplace_back(range_timer, dispatcher_.timeSource().monotonicTime());
-  if ((*it)->range_timers.size() == 1) {
-    resetQueueTimer(**it, dispatcher_.timeSource().monotonicTime());
+  queue.range_timers_.emplace_back(range_timer, dispatcher_.approximateMonotonicTime());
+  if (queue.range_timers_.size() == 1) {
+    resetQueueTimer(queue, dispatcher_.approximateMonotonicTime());
   }
 
-  return ScalingTimerHandle(**it, --(*it)->range_timers.end());
+  return ScalingTimerHandle(queue, --queue.range_timers_.end());
 }
 
 void ScaledRangeTimerManager::removeTimer(ScalingTimerHandle handle) {
-  const bool was_front = handle.queue.range_timers.begin() == handle.iterator;
-  handle.queue.range_timers.erase(handle.iterator);
-  if (handle.queue.range_timers.empty()) {
-    queues_.erase(handle.queue);
+  ASSERT(dispatcher_.isThreadSafe());
+  const bool was_front = handle.queue_.range_timers_.begin() == handle.iterator_;
+  handle.queue_.range_timers_.erase(handle.iterator_);
+  if (handle.queue_.range_timers_.empty()) {
+    queues_.erase(handle.queue_);
   } else {
     if (was_front) {
-      resetQueueTimer(handle.queue, dispatcher_.timeSource().monotonicTime());
+      resetQueueTimer(handle.queue_, dispatcher_.approximateMonotonicTime());
     }
   }
 }
 
-ScaledRangeTimerManager::DurationScaleFactor::DurationScaleFactor(double value)
-    : value_(std::max(0.0, std::min(value, 1.0))) {}
-
-double ScaledRangeTimerManager::DurationScaleFactor::value() const { return value_; }
-
 void ScaledRangeTimerManager::resetQueueTimer(Queue& queue, MonotonicTime now) {
-  ASSERT(!queue.range_timers.empty());
+  ASSERT(!queue.range_timers_.empty());
   const MonotonicTime trigger_time =
-      queue.range_timers.front().active_time +
-      std::chrono::duration_cast<MonotonicTime::duration>(queue.duration * scale_factor_.value());
+      queue.range_timers_.front().active_time_ +
+      std::chrono::duration_cast<MonotonicTime::duration>(queue.duration_ * scale_factor_.value());
   if (trigger_time < now) {
-    queue.timer->enableTimer(std::chrono::milliseconds::zero());
+    queue.timer_->enableTimer(std::chrono::milliseconds::zero());
   } else {
-    queue.timer->enableTimer(
+    queue.timer_->enableTimer(
         std::chrono::duration_cast<std::chrono::milliseconds>(trigger_time - now));
   }
 }
 
 void ScaledRangeTimerManager::onQueueTimerFired(Queue& queue) {
-  ASSERT(!queue.range_timers.empty());
-  auto item = std::move(queue.range_timers.front());
-  queue.range_timers.pop_front();
-  item.timer.trigger();
+  ASSERT(!queue.range_timers_.empty());
+  auto item = std::move(queue.range_timers_.front());
+  queue.range_timers_.pop_front();
+  item.timer_.trigger();
 
-  if (queue.range_timers.empty()) {
+  if (queue.range_timers_.empty()) {
     queues_.erase(queue);
   } else {
-    resetQueueTimer(queue, dispatcher_.timeSource().monotonicTime());
+    resetQueueTimer(queue, dispatcher_.approximateMonotonicTime());
   }
 }
 

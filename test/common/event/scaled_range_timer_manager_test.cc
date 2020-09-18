@@ -59,11 +59,11 @@ struct TrackedTimer {
 };
 
 TEST_F(ScaledRangeTimerManagerTest, CreateAndDestroy) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
 }
 
 TEST_F(ScaledRangeTimerManagerTest, CreateAndDestroyTimer) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
 
   {
     StrictMock<MockFunction<TimerCb>> callback;
@@ -72,7 +72,7 @@ TEST_F(ScaledRangeTimerManagerTest, CreateAndDestroyTimer) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, CreateSingleScaledTimer) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
 
   StrictMock<MockFunction<TimerCb>> callback;
   auto timer = manager.createTimer(callback.AsStdFunction());
@@ -91,7 +91,7 @@ TEST_F(ScaledRangeTimerManagerTest, CreateSingleScaledTimer) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, EnableAndDisableTimer) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
 
   StrictMock<MockFunction<TimerCb>> callback;
   auto timer = manager.createTimer(callback.AsStdFunction());
@@ -110,7 +110,7 @@ TEST_F(ScaledRangeTimerManagerTest, EnableAndDisableTimer) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, DisableWhileDisabled) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
 
   StrictMock<MockFunction<TimerCb>> callback;
   auto timer = manager.createTimer(callback.AsStdFunction());
@@ -122,7 +122,7 @@ TEST_F(ScaledRangeTimerManagerTest, DisableWhileDisabled) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, DisableWhilePending) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
 
   StrictMock<MockFunction<TimerCb>> callback;
   auto timer = manager.createTimer(callback.AsStdFunction());
@@ -134,7 +134,7 @@ TEST_F(ScaledRangeTimerManagerTest, DisableWhilePending) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, DisableWhileActive) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
 
   StrictMock<MockFunction<TimerCb>> callback;
   auto timer = manager.createTimer(callback.AsStdFunction());
@@ -155,7 +155,7 @@ TEST_F(ScaledRangeTimerManagerTest, DisableWhileActive) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, DisableFrontActiveTimer) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
 
   StrictMock<MockFunction<TimerCb>> callback1, callback2;
   EXPECT_CALL(callback2, Call);
@@ -181,7 +181,7 @@ TEST_F(ScaledRangeTimerManagerTest, DisableFrontActiveTimer) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, DisableLaterActiveTimer) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
 
   StrictMock<MockFunction<TimerCb>> callback1, callback2;
   EXPECT_CALL(callback1, Call);
@@ -214,7 +214,7 @@ public:
 };
 
 TEST_P(ScaledRangeTimerManagerTestWithScope, ReRegisterOnCallback) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
 
   StrictMock<MockFunction<TimerCb>> callback;
   auto timer = manager.createTimer(callback.AsStdFunction());
@@ -249,7 +249,7 @@ TEST_P(ScaledRangeTimerManagerTestWithScope, ReRegisterOnCallback) {
 };
 
 TEST_P(ScaledRangeTimerManagerTestWithScope, ScheduleWithScalingFactorZero) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
 
   StrictMock<MockFunction<TimerCb>> callback;
   auto timer = manager.createTimer(callback.AsStdFunction());
@@ -266,7 +266,7 @@ INSTANTIATE_TEST_SUITE_P(WithAndWithoutScope, ScaledRangeTimerManagerTestWithSco
                          testing::Bool());
 
 TEST_F(ScaledRangeTimerManagerTest, SingleTimerTriggeredNoScaling) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
   bool triggered = false;
 
   StrictMock<MockFunction<TimerCb>> callback;
@@ -289,7 +289,7 @@ TEST_F(ScaledRangeTimerManagerTest, SingleTimerTriggeredNoScaling) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, SingleTimerSameMinMax) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
 
   StrictMock<MockFunction<TimerCb>> callback;
   auto timer = manager.createTimer(callback.AsStdFunction());
@@ -302,7 +302,7 @@ TEST_F(ScaledRangeTimerManagerTest, SingleTimerSameMinMax) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, MultipleTimersNoScaling) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
   std::vector<TrackedTimer> timers;
 
   const MonotonicTime T = simTime().monotonicTime();
@@ -325,7 +325,7 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersNoScaling) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, MultipleTimersWithScaling) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
   std::vector<TrackedTimer> timers;
 
   for (int i = 0; i < 3; ++i) {
@@ -369,7 +369,7 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersWithScaling) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, MultipleTimersSameTimes) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
   std::vector<TrackedTimer> timers;
 
   const MonotonicTime T = simTime().monotonicTime();
@@ -391,7 +391,7 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersSameTimes) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, MultipleTimersSameTimesFastClock) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
   std::vector<TrackedTimer> timers;
 
   const MonotonicTime T = simTime().monotonicTime();
@@ -413,7 +413,8 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersSameTimesFastClock) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, ScheduledWithScalingFactorZero) {
-  ScaledRangeTimerManager manager(dispatcher_, 0.0);
+  ScaledRangeTimerManager manager(dispatcher_);
+  manager.setScaleFactor(0);
 
   TrackedTimer timer(manager, simTime());
 
@@ -430,7 +431,7 @@ TEST_F(ScaledRangeTimerManagerTest, ScheduledWithScalingFactorZero) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, ScheduledWithMaxBeforeMin) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  ScaledRangeTimerManager manager(dispatcher_);
 
   TrackedTimer timer(manager, simTime());
 
