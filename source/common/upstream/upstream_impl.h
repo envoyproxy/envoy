@@ -80,7 +80,7 @@ public:
       Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
       const envoy::config::core::v3::Locality& locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority);
+      uint32_t priority, uint64_t creation_time_ms);
 
   Network::TransportSocketFactory& transportSocketFactory() const override {
     return socket_factory_;
@@ -139,6 +139,9 @@ public:
   Network::TransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
                                 const envoy::config::core::v3::Metadata* metadata) const;
+  const uint64_t creationTimeMs() const override {
+    return 0;
+}                              
 
 protected:
   ClusterInfoConstSharedPtr cluster_;
@@ -156,6 +159,7 @@ protected:
   HealthCheckHostMonitorPtr health_checker_;
   std::atomic<uint32_t> priority_;
   Network::TransportSocketFactory& socket_factory_;
+  const uint64_t creation_time_ms_;
 };
 
 /**
@@ -169,9 +173,10 @@ public:
            Network::Address::InstanceConstSharedPtr address, MetadataConstSharedPtr metadata,
            uint32_t initial_weight, const envoy::config::core::v3::Locality& locality,
            const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-           uint32_t priority, const envoy::config::core::v3::HealthStatus health_status)
+           uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
+           uint64_t creation_time_ms)
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
-                            priority),
+                            priority, creation_time_ms),
         used_(true) {
     setEdsHealthFlag(health_status);
     HostImpl::weight(initial_weight);

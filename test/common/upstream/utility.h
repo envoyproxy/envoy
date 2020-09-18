@@ -83,7 +83,7 @@ inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::
       new HostImpl(cluster, hostname, Network::Utility::resolveUrl(url), nullptr, weight,
                    envoy::config::core::v3::Locality(),
                    envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-                   envoy::config::core::v3::UNKNOWN)};
+                   envoy::config::core::v3::UNKNOWN, 0 /*creation time*/)};
 }
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
@@ -92,7 +92,7 @@ inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::
       new HostImpl(cluster, "", Network::Utility::resolveUrl(url), nullptr, weight,
                    envoy::config::core::v3::Locality(),
                    envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(),
-                   priority, envoy::config::core::v3::UNKNOWN)};
+                   priority, envoy::config::core::v3::UNKNOWN, 0 /*creation time*/)};
 }
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
@@ -112,7 +112,7 @@ makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
              uint32_t weight = 1) {
   return HostSharedPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url), nullptr, weight,
                                     envoy::config::core::v3::Locality(), health_check_config, 0,
-                                    envoy::config::core::v3::UNKNOWN)};
+                                    envoy::config::core::v3::UNKNOWN, 0 /*creation time*/)};
 }
 
 inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSharedPtr cluster,

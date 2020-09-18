@@ -254,7 +254,7 @@ HostDescriptionImpl::HostDescriptionImpl(
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
     const envoy::config::core::v3::Locality& locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-    uint32_t priority)
+    uint32_t priority, uint64_t creation_time_ms)
     : cluster_(cluster), hostname_(hostname),
       health_checks_hostname_(health_check_config.hostname()), address_(dest_address),
       canary_(Config::Metadata::metadataValue(metadata.get(),
@@ -264,7 +264,8 @@ HostDescriptionImpl::HostDescriptionImpl(
       metadata_(metadata), locality_(locality),
       locality_zone_stat_name_(locality.zone(), cluster->statsScope().symbolTable()),
       priority_(priority),
-      socket_factory_(resolveTransportSocketFactory(dest_address, metadata_.get())) {
+      socket_factory_(resolveTransportSocketFactory(dest_address, metadata_.get())),
+      creation_time_ms_(creation_time_ms) {
   if (health_check_config.port_value() != 0 && dest_address->type() != Network::Address::Type::Ip) {
     // Setting the health check port to non-0 only works for IP-type addresses. Setting the port
     // for a pipe address is a misconfiguration. Throw an exception.
@@ -1241,7 +1242,7 @@ void PriorityStateManager::registerHostForPriority(
   const HostSharedPtr host(new HostImpl(
       parent_.info(), hostname, address, metadata, lb_endpoint.load_balancing_weight().value(),
       locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
-      locality_lb_endpoint.priority(), lb_endpoint.health_status()));
+      locality_lb_endpoint.priority(), lb_endpoint.health_status(), 0 /*creation time*/));
   registerHostForPriority(host, locality_lb_endpoint);
 }
 

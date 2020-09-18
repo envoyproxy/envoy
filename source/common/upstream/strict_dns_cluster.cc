@@ -134,7 +134,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
                 std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
                 lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoint_.locality(),
                 lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoint_.priority(),
-                lb_endpoint_.health_status()));
+                lb_endpoint_.health_status(), 0 /*creation time*/));
 
             ttl_refresh_rate = min(ttl_refresh_rate, resp.ttl_);
           }
