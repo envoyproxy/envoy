@@ -281,6 +281,8 @@ void HdsDelegate::processMessage(
   // Overwrite our map data structures.
   hds_clusters_name_map_ = std::move(new_hds_clusters_name_map);
   hds_clusters_ = std::move(hds_clusters);
+
+  // TODO: add stats reporting for number of clusters added, removed, and reused.
 }
 
 void HdsDelegate::onReceiveMessage(
@@ -456,6 +458,8 @@ void HdsCluster::updateHealthchecks(
   // replace our member data structures with our newly created ones.
   health_checkers_ = std::move(health_checkers);
   health_checkers_map_ = std::move(health_checkers_map);
+
+  // TODO: add stats reporting for number of health checkers added, removed, and reused.
 }
 
 void HdsCluster::updateHosts(
@@ -516,6 +520,7 @@ void HdsCluster::updateHosts(
   hosts_ = std::move(hosts);
   hosts_map_ = std::move(hosts_map);
 
+  // TODO: add stats reporting for number of endpoints added, removed, and reused.
   ENVOY_LOG(debug, "Hosts Added: {}, Removed: {}, Reused: {}", hosts_added.size(),
             hosts_removed.size(), hosts_->size() - hosts_added.size());
 
