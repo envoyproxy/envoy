@@ -20,6 +20,10 @@ void AdaptiveConcurrencyIntegrationTest::sendRequests(uint32_t request_count,
   // doesn't respond between the client sending headers and data, invalidating the client's encoder
   // stream. We should change this integration test to allow for the ability to test this scenario.
 
+  if (use_grpc_) {
+    default_request_headers_.setContentType(Http::Headers::get().ContentTypeValues.Grpc);
+  }
+
   // We expect these requests to reach the upstream.
   for (uint32_t idx = 0; idx < num_forwarded; ++idx) {
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -103,9 +107,7 @@ void AdaptiveConcurrencyIntegrationTest::respondToRequest(bool expect_forwarded)
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdaptiveConcurrencyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-/**
- * Test a single request returns successfully.
- */
+// Test a single request returns successfully.
 TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrency1) {
   customInit();
 
@@ -115,10 +117,19 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrency1) {
   test_server_->waitForCounterEq(REQUEST_BLOCK_COUNTER_NAME, 1);
 }
 
-/**
- * Test many requests, where only a single request returns 200 during the minRTT window.
- */
+// Test many requests, where only a single request returns 200 during the minRTT window.
 TEST_P(AdaptiveConcurrencyIntegrationTest, TestManyConcurrency1) {
+  customInit();
+
+  EXPECT_EQ(0, test_server_->counter(REQUEST_BLOCK_COUNTER_NAME)->value());
+  sendRequests(10, 1);
+  respondToAllRequests(1, std::chrono::milliseconds(5));
+  test_server_->waitForCounterEq(REQUEST_BLOCK_COUNTER_NAME, 9);
+}
+
+// Test many grpc requests, where only a single request returns 200 during the minRTT window.
+TEST_P(AdaptiveConcurrencyIntegrationTest, TestManyConcurrencyGrpc) {
+  use_grpc_ = true;
   customInit();
 
   EXPECT_EQ(0, test_server_->counter(REQUEST_BLOCK_COUNTER_NAME)->value());

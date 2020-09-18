@@ -544,9 +544,9 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_googlesource_quiche = dict(
         project_name = "QUICHE",
         project_url = "https://quiche.googlesource.com/quiche",
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/96bd860bec207d4b722ab7f319fa47be129a85cd.tar.gz
-        version = "96bd860bec207d4b722ab7f319fa47be129a85cd",
-        sha256 = "d7129a2f41f2bd00a8a38b33f9b7b955d3e7de3dec20f69b70d7000d3a856360",
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/f555d99a084cdd086a349548c70fb558ac5847cf.tar.gz
+        version = "f555d99a084cdd086a349548c70fb558ac5847cf",
+        sha256 = "1833f08e7b0f18b49d7498b029b7f3e6559a82113ec82a98a9e945553756e351",
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/{version}.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
