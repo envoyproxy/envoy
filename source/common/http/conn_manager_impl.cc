@@ -280,7 +280,6 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
 
     const Status status = codec_->dispatch(data);
 
-    ASSERT(!isPrematureResponseError(status));
     if (isBufferFloodError(status) || isInboundFramesWithEmptyPayloadError(status)) {
       handleCodecError(status.message());
       return Network::FilterStatus::StopIteration;
@@ -289,6 +288,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       handleCodecError(status.message());
       return Network::FilterStatus::StopIteration;
     }
+    ASSERT(status.ok());
 
     // Processing incoming data may release outbound data so check for closure here as well.
     checkForDeferredClose();
