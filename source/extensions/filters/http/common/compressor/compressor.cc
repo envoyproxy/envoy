@@ -224,7 +224,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   }
 
   // Find all encodings accepted by the user agent and adjust the list of allowed compressors.
-  for (const auto token : StringUtil::splitToken(*accept_encoding_, ",", false /* keep_empty */)) {
+  for (const auto& token : StringUtil::splitToken(*accept_encoding_, ",", false /* keep_empty */)) {
     EncPair pair =
         std::make_pair(StringUtil::trim(StringUtil::cropRight(token, ";")), static_cast<float>(1));
     const auto params = StringUtil::cropLeft(token, ";");
