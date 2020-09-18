@@ -366,30 +366,30 @@ private:
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override {
-    stream_info_.setResponseCodeDetails(details);
     if (encoded_response_headers_) {
       resetStream();
       return;
     }
     Utility::sendLocalReply(
         remote_closed_,
-        Utility::EncodeFunctions{
-            nullptr, nullptr,
-            [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-              if (modify_headers != nullptr) {
-                modify_headers(*headers);
-              }
-              encodeHeaders(std::move(headers), end_stream);
-            },
-            [this](Buffer::Instance& data, bool end_stream) -> void {
-              encodeData(data, end_stream);
-            }},
+        Utility::EncodeFunctions{nullptr, nullptr,
+                                 [this, modify_headers, &details](ResponseHeaderMapPtr&& headers,
+                                                                  bool end_stream) -> void {
+                                   if (modify_headers != nullptr) {
+                                     modify_headers(*headers);
+                                   }
+                                   encodeHeaders(std::move(headers), end_stream, details);
+                                 },
+                                 [this](Buffer::Instance& data, bool end_stream) -> void {
+                                   encodeData(data, end_stream);
+                                 }},
         Utility::LocalReplyData{is_grpc_request_, code, body, grpc_status, is_head_request_});
   }
   // The async client won't pause if sending an Expect: 100-Continue so simply
   // swallows any incoming encode100Continue.
   void encode100ContinueHeaders(ResponseHeaderMapPtr&&) override {}
-  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
+  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
+                     absl::string_view details) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
   void encodeMetadata(MetadataMapPtr&&) override {}

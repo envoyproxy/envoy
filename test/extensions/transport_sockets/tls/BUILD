@@ -49,6 +49,7 @@ envoy_cc_test(
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
@@ -158,5 +159,28 @@ envoy_cc_test_library(
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "handshaker_test",
+    srcs = ["handshaker_test.cc"],
+    data = [
+        "gen_unittest_certs.sh",
+        "//test/config/integration/certs",
+        "//test/extensions/transport_sockets/tls/test_data:certs",
+    ],
+    external_deps = ["ssl"],
+    deps = [
+        ":ssl_socket_test",
+        ":ssl_test_utils",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/transport_sockets/tls:ssl_handshaker_lib",
+        "//test/mocks/buffer:buffer_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stats:stats_mocks",
     ],
 )
