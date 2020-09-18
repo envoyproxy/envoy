@@ -16,4 +16,4 @@ LLVM_PROFILE_FILE= ${TEST_BINARY} fuzz_corpus -seed=${FUZZ_CORPUS_SEED:-1} -max_
 
 # Passing files instead of a directory will run fuzzing as a regression test.
 # TODO(asraa): Add a manual `|| true`, but this shouldn't be necessary. 
-${TEST_BINARY} $(find fuzz_corpus -type f)
+${TEST_BINARY} $(find fuzz_corpus -type f) -rss_limit_mb=8192
