@@ -61,7 +61,7 @@ MATCHER_P(AuthzErrorResponse, status, "") {
 }
 
 MATCHER(AuthzTimedoutResponse, "") {
-  // These fields should be always empty when the status is an timedout error.
+  // These fields should be always empty when the status is a timeout error.
   if (!arg->headers_to_add.empty() || !arg->headers_to_append.empty() || !arg->body.empty()) {
     return false;
   }

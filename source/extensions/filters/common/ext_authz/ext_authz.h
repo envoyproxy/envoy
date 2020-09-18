@@ -63,7 +63,7 @@ struct Response {
   // Call status.
   CheckStatus status;
 
-  // In case status is Error, this will contain the kind of error that occured.
+  // In case status is Error, this will contain the kind of error that occurred.
   ErrorKind error_kind{ErrorKind::Other};
 
   // A set of HTTP headers returned by the authorization server, that will be optionally appended
