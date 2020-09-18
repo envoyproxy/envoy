@@ -84,7 +84,7 @@ protected:
   }
 
   void initGuardDog(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config) {
-    guard_dog_ = std::make_unique<GuardDogImpl>(stats_scope, config, *api_,
+    guard_dog_ = std::make_unique<GuardDogImpl>(stats_scope, config, *api_, "server",
                                                 std::make_unique<DebugTestInterlock>());
   }
 
@@ -445,15 +445,15 @@ public:
   RecordGuardDogAction(std::vector<std::string>& events) : events_(events) {}
 
   void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
-           const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs,
+           const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_last_checkin_pairs,
            MonotonicTime /*now*/) override {
     std::string event_string =
         envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent_Name(event);
     absl::StrAppend(&event_string, " : ");
     std::vector<std::string> output_string_parts;
-    output_string_parts.reserve(thread_ltt_pairs.size());
+    output_string_parts.reserve(thread_last_checkin_pairs.size());
 
-    for (const auto& thread_ltt_pair : thread_ltt_pairs) {
+    for (const auto& thread_ltt_pair : thread_last_checkin_pairs) {
       output_string_parts.push_back(thread_ltt_pair.first.debugString());
     }
 
@@ -470,9 +470,10 @@ class AssertGuardDogAction : public Configuration::GuardDogAction {
 public:
   AssertGuardDogAction() = default;
 
-  void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent /*event*/,
-           const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& /*thread_ltt_pairs*/,
-           MonotonicTime /*now*/) override {
+  void
+  run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent /*event*/,
+      const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& /*thread_last_checkin_pairs*/,
+      MonotonicTime /*now*/) override {
     RELEASE_ASSERT(false, "ASSERT_GUARDDOG_ACTION");
   }
 };

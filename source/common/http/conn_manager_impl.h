@@ -231,19 +231,20 @@ private:
 
     // TODO(snowp): Create shared OptRef/OptConstRef helpers
     Http::RequestHeaderMapOptRef requestHeaders() override {
-      return request_headers_ ? std::make_optional(std::ref(*request_headers_)) : absl::nullopt;
+      return request_headers_ ? absl::make_optional(std::ref(*request_headers_)) : absl::nullopt;
     }
     Http::RequestTrailerMapOptRef requestTrailers() override {
-      return request_trailers_ ? std::make_optional(std::ref(*request_trailers_)) : absl::nullopt;
+      return request_trailers_ ? absl::make_optional(std::ref(*request_trailers_)) : absl::nullopt;
     }
     Http::ResponseHeaderMapOptRef continueHeaders() override {
-      return continue_headers_ ? std::make_optional(std::ref(*continue_headers_)) : absl::nullopt;
+      return continue_headers_ ? absl::make_optional(std::ref(*continue_headers_)) : absl::nullopt;
     }
     Http::ResponseHeaderMapOptRef responseHeaders() override {
-      return response_headers_ ? std::make_optional(std::ref(*response_headers_)) : absl::nullopt;
+      return response_headers_ ? absl::make_optional(std::ref(*response_headers_)) : absl::nullopt;
     }
     Http::ResponseTrailerMapOptRef responseTrailers() override {
-      return response_trailers_ ? std::make_optional(std::ref(*response_trailers_)) : absl::nullopt;
+      return response_trailers_ ? absl::make_optional(std::ref(*response_trailers_))
+                                : absl::nullopt;
     }
 
     void endStream() override {
