@@ -98,8 +98,12 @@ envoy_status_t set_preferred_network(envoy_network_t network);
 
 /**
  * Increment a counter with the given elements and by the given count.
+ * @param engine, the engine that owns the counter.
+ * @param elements, the string that identifies the counter to increment.
+ * @param count, the count to increment by.
+ * @param envoy_status_t, the resulting status of the operation.
  */
-void record_counter(const char* elements, uint64_t count);
+envoy_status_t record_counter(envoy_engine_t engine, const char* elements, uint64_t count);
 
 /**
  * Statically register APIs leveraging platform libraries.

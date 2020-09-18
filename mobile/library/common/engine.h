@@ -39,8 +39,9 @@ public:
    * Increment a counter with a given string of elements and by the given count.
    * @param elements, joined elements of the timeseries.
    * @param count, amount to add to the counter.
+   * @param envoy_status_t, the resulting status of the operation.
    */
-  void recordCounter(const std::string& elements, uint64_t count);
+  envoy_status_t recordCounter(const std::string& elements, uint64_t count);
 
 private:
   envoy_status_t run(std::string config, std::string log_level);

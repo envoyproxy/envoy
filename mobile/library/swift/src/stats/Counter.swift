@@ -9,7 +9,7 @@ public protocol Counter: AnyObject {
 
 extension Counter {
   /// Increment the counter by 1.
-  public func increment() {
+  public func increment(){
     self.increment(count: 1)
   }
 }

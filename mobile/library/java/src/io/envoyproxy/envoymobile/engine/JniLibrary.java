@@ -154,9 +154,14 @@ class JniLibrary {
   public static native String templateString();
 
   /**
-   * Increment a counter.
+   * Increment a counter with the given count.
+   *
+   * @param engine,  handle to the engine that owns the counter.
+   * @param elements Elements of the counter stat.
+   * @param count Amount to add to the counter.
+   * @return A status indicating if the action was successful.
    */
-  protected static native void recordCounter(String elements, int count);
+  protected static native int recordCounter(long engine, String elements, int count);
 
   /**
    * Provides a configuration template that may be used for building platform

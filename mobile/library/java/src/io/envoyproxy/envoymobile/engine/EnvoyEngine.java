@@ -40,6 +40,7 @@ public interface EnvoyEngine {
    *
    * @param elements Elements of the counter stat.
    * @param count    Amount to add to the counter.
+   * @param A status indicating if the action was successful.
    */
-  void recordCounter(String elements, int count);
+  int recordCounter(String elements, int count);
 }

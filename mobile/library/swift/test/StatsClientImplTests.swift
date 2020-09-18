@@ -1,5 +1,5 @@
 @testable import Envoy
-import EnvoyEngine
+@testable import EnvoyEngine
 import Foundation
 import XCTest
 

@@ -247,8 +247,9 @@ extern const int kEnvoyFailure;
 
  @param elements Elements of the counter stat.
  @param count Amount to add to the counter.
+ @return A status indicating if the action was successful.
  */
-- (void)recordCounter:(NSString *)elements count:(NSUInteger)count;
+- (int)recordCounter:(NSString *)elements count:(NSUInteger)count;
 
 @end
 

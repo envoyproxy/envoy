@@ -79,9 +79,10 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    *
    * @param elements Elements of the counter stat.
    * @param count Amount to add to the counter.
+   * @return A status indicating if the action was successful.
    */
   @Override
-  public void recordCounter(String elements, int count) {
-    JniLibrary.recordCounter(elements, count);
+  public int recordCounter(String elements, int count) {
+    return JniLibrary.recordCounter(engineHandle, elements, count);
   }
 }
