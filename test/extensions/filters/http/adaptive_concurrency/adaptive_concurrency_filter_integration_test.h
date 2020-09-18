@@ -71,12 +71,19 @@ protected:
   }
 
   void verifyResponseBlocked(IntegrationStreamDecoderPtr response) {
-    EXPECT_EQ("503", response->headers().getStatusValue());
+    if (use_grpc_) {
+      EXPECT_EQ("200", response->headers().getStatusValue());
+      EXPECT_EQ("reached concurrency limit", response->headers().getGrpcMessageValue());
+    } else {
+      EXPECT_EQ("503", response->headers().getStatusValue());
+      EXPECT_EQ("reached concurrency limit", response->body());
+    }
   }
 
   std::deque<IntegrationStreamDecoderPtr> responses_;
   std::deque<FakeStreamPtr> upstream_requests_;
   std::deque<FakeHttpConnectionPtr> upstream_connections_;
+  bool use_grpc_{};
 };
 
 } // namespace Envoy
