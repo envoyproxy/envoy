@@ -61,7 +61,8 @@ public:
     span_store->setAsEntrySpan(true);
     span_store->setAsError(false);
     span_store->setOperation(seed + "#OPERATION");
-    span_store->setPeer(seed + "#PEER");
+    span_store->setPeerAddress("0.0.0.0");
+    span_store->setUpstreamAddress("0.0.0.0");
     span_store->setStartTime(22222222);
     span_store->setEndTime(33333333);
 

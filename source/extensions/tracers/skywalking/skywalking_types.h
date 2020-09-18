@@ -175,7 +175,14 @@ public:
   }
 
   /*
-   * Get peer address.
+   * Get upstream address.
+   */
+  const std::string& upstreamAddress() const { return upstream_address_; }
+
+  /*
+   * Get peer address. The peer in SkyWalking is different with the tag value of 'peer.address'. The
+   * tag value of 'peer.address' in Envoy is downstream address and the peer in SkyWalking is
+   * request host.
    */
   const std::string& peerAddress() const { return peer_address_; }
 
@@ -244,16 +251,17 @@ public:
   void setOperation(const std::string& operation) { operation_ = operation; }
 
   /*
-   * Set peer address. It should be downstream remote address currently.
-   */
-  void setPeerAddress(const std::string& peer_address) { peer_address_ = peer_address; }
-
-  /*
    * Set upstream address.
    */
   void setUpstreamAddress(const std::string& upstream_address) {
     upstream_address_ = upstream_address;
   }
+
+  /*
+   * Set peer address. In SkyWalking, the peer address is only set in ExitSpan. And it should the
+   * request host.
+   */
+  void setPeerAddress(const std::string& peer_address) { peer_address_ = peer_address; }
 
   /*
    * Set if the current span has an error.
@@ -319,8 +327,8 @@ private:
   uint64_t end_time_{0};
 
   std::string operation_;
-  std::string peer_address_;
   std::string upstream_address_;
+  std::string peer_address_;
 
   bool is_error_{false};
   bool is_entry_span_{true};

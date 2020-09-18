@@ -79,9 +79,9 @@ TraceSegmentReporter::TraceSegmentReporter(
       client_(factory->create()),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "TraceSegmentReportService.collect")) {
-  max_delayed_segments_cache_size_ = client_config.max_cache_size() == 0
-                                         ? DEFAULT_DELAYED_SEGMENTS_CACHE_SIZE
-                                         : client_config.max_cache_size();
+  max_delayed_segments_cache_size_ = client_config.has_max_cache_size()
+                                         ? client_config.max_cache_size().value()
+                                         : DEFAULT_DELAYED_SEGMENTS_CACHE_SIZE;
 
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   establishNewStream();

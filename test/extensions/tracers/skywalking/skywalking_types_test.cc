@@ -272,6 +272,14 @@ TEST(SpanStoreTest, SpanStoreCommonTest) {
   // instead.
   EXPECT_EQ("CURR#ENDPOINT", root_store->operation());
 
+  EXPECT_EQ("0.0.0.0", root_store->peerAddress());
+  root_store->setPeerAddress(TEST_ADDRESS);
+  EXPECT_EQ(TEST_ADDRESS, root_store->peerAddress());
+
+  EXPECT_EQ("0.0.0.0", root_store->upstreamAddress());
+  root_store->setUpstreamAddress(TEST_ADDRESS);
+  EXPECT_EQ(TEST_ADDRESS, root_store->upstreamAddress());
+
   EXPECT_EQ(22222222, root_store->startTime());
   root_store->setStartTime(23333);
   EXPECT_EQ(23333, root_store->startTime());
@@ -289,32 +297,12 @@ TEST(SpanStoreTest, SpanStoreCommonTest) {
   EXPECT_EQ(std::chrono::time_point_cast<std::chrono::milliseconds>(now).time_since_epoch().count(),
             root_store->endTime());
 
-  EXPECT_EQ("ROOT#PEER", root_store->peer());
-  root_store->setPeer("");
-
   // Test whether SpanStore can correctly inject propagation headers to request headers.
 
-  // When the peer is empty, use the host in the request as the target address.
-  Http::TestRequestHeaderMapImpl request_headers_no_peer{{":authority", "test.com"}};
-  root_store->injectContext(request_headers_no_peer);
+  Http::TestRequestHeaderMapImpl request_headers_with_upstream{{":authority", "test.com"}};
+  root_store->injectContext(request_headers_with_upstream);
+
   std::string expected_header_value = fmt::format(
-      "{}-{}-{}-{}-{}-{}-{}-{}", 1,
-      SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator)),
-      SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator)),
-      0, SkyWalkingTestHelper::base64Encode("CURR#SERVICE"),
-      SkyWalkingTestHelper::base64Encode("CURR#INSTANCE"),
-      SkyWalkingTestHelper::base64Encode("CURR#ENDPOINT"),
-      SkyWalkingTestHelper::base64Encode("test.com"));
-
-  EXPECT_EQ(request_headers_no_peer.get_("sw8"), expected_header_value);
-
-  root_store->setPeer(TEST_ADDRESS);
-  EXPECT_EQ(TEST_ADDRESS, root_store->peer());
-
-  Http::TestRequestHeaderMapImpl request_headers_with_peer{{":authority", "test.com"}};
-  root_store->injectContext(request_headers_with_peer);
-
-  expected_header_value = fmt::format(
       "{}-{}-{}-{}-{}-{}-{}-{}", 1,
       SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator)),
       SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator)),
@@ -323,7 +311,24 @@ TEST(SpanStoreTest, SpanStoreCommonTest) {
       SkyWalkingTestHelper::base64Encode("CURR#ENDPOINT"),
       SkyWalkingTestHelper::base64Encode(TEST_ADDRESS));
 
-  EXPECT_EQ(request_headers_with_peer.get_("sw8"), expected_header_value);
+  EXPECT_EQ(request_headers_with_upstream.get_("sw8"), expected_header_value);
+
+  // Reset upstream address to empty.
+  root_store->setUpstreamAddress("");
+
+  // When the upstream address is empty, use the host in the request as the target address.
+  Http::TestRequestHeaderMapImpl request_headers_no_upstream{{":authority", "test.com"}};
+  root_store->injectContext(request_headers_no_upstream);
+  expected_header_value = fmt::format(
+      "{}-{}-{}-{}-{}-{}-{}-{}", 1,
+      SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator)),
+      SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator)),
+      0, SkyWalkingTestHelper::base64Encode("CURR#SERVICE"),
+      SkyWalkingTestHelper::base64Encode("CURR#INSTANCE"),
+      SkyWalkingTestHelper::base64Encode("CURR#ENDPOINT"),
+      SkyWalkingTestHelper::base64Encode("test.com"));
+
+  EXPECT_EQ(request_headers_no_upstream.get_("sw8"), expected_header_value);
 }
 
 } // namespace SkyWalking

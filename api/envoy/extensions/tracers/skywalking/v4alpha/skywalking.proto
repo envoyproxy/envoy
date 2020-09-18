@@ -4,6 +4,8 @@ package envoy.extensions.tracers.skywalking.v4alpha;
 
 import "envoy/config/core/v4alpha/grpc_service.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -52,6 +54,6 @@ message ClientConfig {
 
   // Envoy caches the segment in memory when the backend service is temporarily
   // unavailable. This field specifies the maximum number of segments that can
-  // be cached.
-  uint32 max_cache_size = 5;
+  // be cached. If not specified, the default is 1024.
+  google.protobuf.UInt32Value max_cache_size = 5;
 }

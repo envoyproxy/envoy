@@ -2,6 +2,8 @@
 
 #include <chrono>
 
+#include "common/http/url_utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -16,19 +18,34 @@ uint64_t getTimestamp(SystemTime time) {
   return std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch()).count();
 }
 
+// A simple tool function. Used to extract the HTTP Host from the URL, and set the Host value as the
+// peer address to the SpanStore object.
+void setSkyWalkingPeerAddress(SpanStore* span_store, absl::string_view http_request_url) {
+  if (span_store->isEntrySpan()) {
+    return;
+  }
+  if (size_t host_start_pos = http_request_url.find("://"); host_start_pos != std::string::npos) {
+    absl::string_view host_with_path = http_request_url.substr(host_start_pos + 3);
+    size_t path_start_pos = host_with_path.find("/");
+    if (path_start_pos == std::string::npos) {
+      return;
+    }
+    host_with_path.remove_suffix(host_with_path.size() - path_start_pos);
+    span_store->setPeerAddress(std::string(host_with_path));
+  }
+}
+
 } // namespace
 
 Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, SystemTime start_time,
-                                   const std::string& operation_name,
-                                   SegmentContextSharedPtr segment_context, Span* parent_span) {
-  SpanStore* span_store = segment_context->createSpanStore(
-      time_source_, parent_span ? parent_span->spanStore() : nullptr);
+                                   const std::string& operation,
+                                   SegmentContextSharedPtr segment_context, Span* parent) {
+  SpanStore* span_store =
+      segment_context->createSpanStore(time_source_, parent ? parent->spanStore() : nullptr);
   span_store->setAsEntrySpan(config.operationName() == Tracing::OperationName::Ingress);
   span_store->setStartTime(getTimestamp(start_time));
 
-  // TODO(wbpcode): I am not sure if the operation name and endpoint need to be consistent. So here
-  // may need to be improved.
-  span_store->setOperation(operation_name);
+  span_store->setOperation(operation);
 
   return std::make_unique<Span>(std::move(segment_context), span_store, *this);
 }
@@ -38,22 +55,25 @@ void Span::setOperation(absl::string_view operation) {
 }
 
 void Span::setTag(absl::string_view name, absl::string_view value) {
+  // Use request host as peer address and set it in ExitSpan. The request host can be parsed from
+  // the URL.
   if (name == Tracing::Tags::get().HttpUrl) {
     span_store_->addTag(UrlTag, value);
+    setSkyWalkingPeerAddress(span_store_, value);
+    return;
   }
 
   if (name == Tracing::Tags::get().HttpStatusCode) {
     span_store_->addTag(StatusCodeTag, value);
+    return;
   }
 
   if (name == Tracing::Tags::get().Error) {
     span_store_->setAsError(value == Tracing::Tags::get().True);
   }
 
-  if (name == Tracing::Tags::get().PeerAddress) {
-    span_store_->setPeerAddress(std::string(value));
-  }
-
+  // When we need to create a new propagation header and send it to upstream, use upstream address
+  // as the target address.
   if (name == Tracing::Tags::get().UpstreamAddress) {
     span_store_->setUpstreamAddress(std::string(value));
   }

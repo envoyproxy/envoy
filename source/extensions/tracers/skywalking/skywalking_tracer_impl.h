@@ -34,6 +34,7 @@ private:
 
   envoy::config::trace::v3::ClientConfig client_config_;
 
+  // This random_generator_ will be used to create SkyWalking trace id and segment id.
   Random::RandomGenerator& random_generator_;
   ThreadLocal::SlotPtr tls_slot_ptr_;
 };

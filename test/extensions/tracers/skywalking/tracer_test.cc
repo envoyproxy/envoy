@@ -74,33 +74,65 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
       SkyWalkingTestHelper::createSegmentContext(true, "CURR", "", mock_random_generator_);
 
   EXPECT_CALL(mock_tracing_config_, operationName())
-      .WillOnce(Return(Envoy::Tracing::OperationName::Ingress));
+      .WillOnce(Return(Envoy::Tracing::OperationName::Egress));
   Envoy::Tracing::SpanPtr org_span = tracer_->startSpan(
-      mock_tracing_config_, mock_time_source_.systemTime(), "", segment_context, nullptr);
+      mock_tracing_config_, mock_time_source_.systemTime(), "TEST_OP", segment_context, nullptr);
   Span* span = dynamic_cast<Span*>(org_span.get());
 
-  // Since the operation name in config is Ingress, the new span is entry span.
-  EXPECT_EQ(true, span->spanStore()->isEntrySpan());
+  // Since the operation name in config is Egress, the new span is ExitSpan.
+  EXPECT_EQ(false, span->spanStore()->isEntrySpan());
 
   // Test whether the basic functions of Span are normal.
+
   span->setSampled(false);
   EXPECT_EQ(false, span->spanStore()->sampled());
 
+  // The initial operation name is consistent with the 'operation' parameter in the 'startSpan'
+  // method call.
+  EXPECT_EQ("TEST_OP", span->spanStore()->operation());
+  // Reset operation to empty. Then endpoint will be used as a replacement.
+  span->setOperation("");
   EXPECT_EQ("CURR#ENDPOINT", span->spanStore()->operation());
   span->setOperation("op");
   EXPECT_EQ("op", span->spanStore()->operation());
 
+  // Test whether the tag can be set correctly.
   span->setTag("TestTagKeyA", "TestTagValueA");
   span->setTag("TestTagKeyB", "TestTagValueB");
   EXPECT_EQ("TestTagValueA", span->spanStore()->tags().at(0).value());
   EXPECT_EQ("TestTagValueB", span->spanStore()->tags().at(1).value());
 
-  // Entry span does not set the peer address.
-  span->setTag(Tracing::Tags::get().PeerAddress, "0.0.0.0");
-  EXPECT_EQ("", span->spanStore()->peer());
+  // When setting the status code tag, the corresponding tag name will be rewritten as
+  // 'status_code'.
+  span->setTag(Tracing::Tags::get().HttpStatusCode, "200");
+  EXPECT_EQ("status_code", span->spanStore()->tags().at(2).key());
+  EXPECT_EQ("200", span->spanStore()->tags().at(2).value());
+
+  // When setting the error tag, the SpanStore object will also mark itself as an error.
+  span->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+  EXPECT_EQ(Tracing::Tags::get().Error, span->spanStore()->tags().at(3).key());
+  EXPECT_EQ(Tracing::Tags::get().True, span->spanStore()->tags().at(3).value());
+  EXPECT_EQ(true, span->spanStore()->isError());
+
+  // When setting http url tag, the corresponding tag name will be rewritten as 'url'. At the same
+  // time, we will extract the http request host from the url value as the peer address of
+  // SkyWalking.
+  span->setTag(Tracing::Tags::get().HttpUrl, "http://test.com/test/path");
+  EXPECT_EQ("url", span->spanStore()->tags().at(4).key());
+  EXPECT_EQ("http://test.com/test/path", span->spanStore()->tags().at(4).value());
+  EXPECT_EQ("test.com", span->spanStore()->peerAddress());
+
+  // If the url format is wrong, the peer address remains empty.
+  span->spanStore()->setPeerAddress("");
+  span->setTag(Tracing::Tags::get().HttpUrl, "http:/test.com/test/path");
+  EXPECT_EQ("", span->spanStore()->peerAddress());
+
+  span->setTag(Tracing::Tags::get().HttpUrl, "http://test.com");
+  EXPECT_EQ("", span->spanStore()->peerAddress());
 
   // Test the inject context function and verify the result.
   Http::TestRequestHeaderMapImpl headers{{":authority", "test.com"}};
+  // No upstream address set and host in request headers will be used as target address.
   std::string expected_header_value = fmt::format(
       "{}-{}-{}-{}-{}-{}-{}-{}", 0,
       SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator_)),
@@ -113,21 +145,18 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   EXPECT_EQ(expected_header_value, headers.get_("sw8"));
 
   EXPECT_CALL(mock_tracing_config_, operationName())
-      .WillOnce(Return(Envoy::Tracing::OperationName::Egress));
+      .WillOnce(Return(Envoy::Tracing::OperationName::Ingress));
   Envoy::Tracing::SpanPtr org_first_child_span =
       span->spawnChild(mock_tracing_config_, "TestChild", mock_time_source_.systemTime());
   Span* first_child_span = dynamic_cast<Span*>(org_first_child_span.get());
 
-  // Since the operation name in config is Egress, the new span is exit span.
-  EXPECT_EQ(false, first_child_span->spanStore()->isEntrySpan());
+  // Since the operation name in config is Ingress, the new span is EntrySpan.
+  EXPECT_EQ(true, first_child_span->spanStore()->isEntrySpan());
 
   EXPECT_EQ(0, first_child_span->spanStore()->sampled());
   EXPECT_EQ(1, first_child_span->spanStore()->spanId());
   EXPECT_EQ(0, first_child_span->spanStore()->parentSpanId());
 
-  // Exit span will set the peer address.
-  first_child_span->setTag(Tracing::Tags::get().PeerAddress, "1.1.1.1");
-  EXPECT_EQ("1.1.1.1", first_child_span->spanStore()->peer());
   EXPECT_EQ("TestChild", first_child_span->spanStore()->operation());
 
   Http::TestRequestHeaderMapImpl first_child_headers{{":authority", "test.com"}};
@@ -138,7 +167,9 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
       1, SkyWalkingTestHelper::base64Encode("CURR#SERVICE"),
       SkyWalkingTestHelper::base64Encode("CURR#INSTANCE"),
       SkyWalkingTestHelper::base64Encode("CURR#ENDPOINT"),
-      SkyWalkingTestHelper::base64Encode("1.1.1.1"));
+      SkyWalkingTestHelper::base64Encode("0.0.0.0"));
+
+  first_child_span->setTag(Tracing::Tags::get().UpstreamAddress, "0.0.0.0");
   first_child_span->injectContext(first_child_headers);
   EXPECT_EQ(expected_header_value, first_child_headers.get_("sw8"));
 

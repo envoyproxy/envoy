@@ -42,9 +42,8 @@ Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
-                                   Http::RequestHeaderMap& request_headers,
-                                   const std::string& operation_name, Envoy::SystemTime start_time,
-                                   const Tracing::Decision decision) {
+                                   Http::RequestHeaderMap& request_headers, const std::string&,
+                                   Envoy::SystemTime start_time, const Tracing::Decision decision) {
   auto& tracer = *tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_;
 
   try {
@@ -56,16 +55,22 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     segment_context->setService(client_config_.service_name());
     segment_context->setServiceInstance(client_config_.instance_name());
 
+    // In order to be consistent with the existing SkyWalking agent, we use request Method and
+    // request Path to create an operation name.
+    // TODO(wbpcode): A temporary decision. This strategy still needs further consideration.
+    std::string operation_name =
+        absl::StrCat("/", request_headers.getMethodValue(),
+                     Http::PathUtil::removeQueryAndFragment(request_headers.getPathValue()));
+
     if (!client_config_.pass_endpoint() || !segment_context->previousSpanContext()) {
-      segment_context->setEndpoint(
-          absl::StrCat("/", request_headers.getMethodValue(),
-                       Http::PathUtil::removeQueryAndFragment(request_headers.getPathValue())));
+      segment_context->setEndpoint(operation_name);
     } else {
       segment_context->setEndpoint(segment_context->previousSpanContext()->endpoint_);
     }
 
     return tracer.startSpan(config, start_time, operation_name, std::move(segment_context),
                             nullptr);
+
   } catch (const EnvoyException&) {
     return std::make_unique<Tracing::NullSpan>();
   }
