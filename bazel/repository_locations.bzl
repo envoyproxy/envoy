@@ -433,6 +433,8 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     com_google_googletest = dict(
         project_name = "Google Test",
         project_url = "https://github.com/google/googletest",
+        # Pick up fix for MOCK_METHOD compilation with clang-cl for Windows (resolved after 1.10.0)
+        # see https://github.com/google/googletest/issues/2490
         # 2020-09-10
         version = "a4ab0abb93620ce26efad9de9296b73b16e88588",
         sha256 = "7897bfaa5ad39a479177cfb5c3ce010184dbaee22a7c3727b212282871918751",
