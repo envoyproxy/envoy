@@ -59,9 +59,10 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
   RELEASE_ASSERT(fd != -1, "error in DNSServiceRefSockFD");
   ENVOY_LOG(warn, "DNS resolver has fd={}", fd);
 
-  sd_ref_event_ = dispatcher_.createFileEvent(
-      fd, [this](uint32_t events) { onEventCallback(events); }, Event::FileTriggerType::Level,
-      Event::FileReadyType::Read);
+  sd_ref_event_ = dispatcher_.createFileEvent(fd,
+    // note: Event::FileTriggerType::Level is used here to closely resemble the c-ares implementation in dns_impl.cc.
+    [this](uint32_t events) { onEventCallback(events); }, Event::FileTriggerType::Level,
+    Event::FileReadyType::Read);
   sd_ref_event_->setEnabled(Event::FileReadyType::Read);
 }
 
@@ -96,6 +97,11 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
 void AppleDnsResolverImpl::addPendingQuery(PendingResolution* query) {
   ASSERT(queries_with_pending_cb_.count(query) == 0);
   queries_with_pending_cb_.insert(query);
+}
+
+void AppleDnsResolverImpl::removePendingQuery(PendingResolution* query) {
+  auto erased = queries_with_pending_cb_.erase(query);
+  ASSERT(erased == 1);
 }
 
 void AppleDnsResolverImpl::flushPendingQueries() {
@@ -154,10 +160,13 @@ void AppleDnsResolverImpl::PendingResolution::cancel() {
      * might have been referring to events coming for the operation you canceled,
      * which will now not be coming because the operation has been canceled.
      */
+    // First, get rid of the current query, because it is cancel, its callback should not be executed during the subsequent flush.
+    parent_.removePendingQuery(this);
+    // Then, flush all other queries.
     parent_.flushPendingQueries();
-  } else {
-    delete this;
   }
+  // Because the query is self-owned, delete now.
+  delete this;
 }
 
 void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
@@ -170,8 +179,10 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
             flags & kDNSServiceFlagsAdd ? "yes" : "no", interface_index, error_code, hostname);
   ASSERT(interface_index == 0);
 
-  if (error_code == kDNSServiceErr_DefunctConnection || error_code == kDNSServiceErr_Timeout ||
-      error_code == kDNSServiceErr_Refused) {
+  // Generic error handling.
+  if (error_code != kDNSServiceErr_NoError) {
+    // FIXME: charge stats for known errors.
+
     // Current query gets a failure status
     if (!pending_cb_) {
       ENVOY_LOG(warn, "[Error path] Adding to queries pending callback");
@@ -196,13 +207,6 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
 
     return;
   }
-
-  // At this point all known non-success cases have been dealt with. Assert that the error code is
-  // no error.
-  // POINT FOR DISCUSSION: Crash otherwise to alert consumers that there are unadressed edge cases?
-  // stat?
-  RELEASE_ASSERT(error_code == kDNSServiceErr_NoError,
-                 "An unknown error has been returned by DNSServiceGetAddrInfoReply");
 
   // Only add this address to the list if kDNSServiceFlagsAdd is set. Callback targets are purely
   // additive.

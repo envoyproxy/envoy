@@ -89,6 +89,7 @@ private:
   void deallocateMainSdRef();
   void onEventCallback(uint32_t events);
   void addPendingQuery(PendingResolution* query);
+  void removePendingQuery(PendingResolution* query);
   void flushPendingQueries();
 
   Event::Dispatcher& dispatcher_;
