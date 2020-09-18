@@ -55,8 +55,9 @@ public:
   void start() override;
 
   struct SubscriptionStuff {
-    SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info)
-        : sub_state_(type_url, watch_map_, local_info) {}
+    SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
+                      Event::Dispatcher& dispatcher)
+        : sub_state_(type_url, watch_map_, local_info, dispatcher) {}
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
@@ -138,6 +139,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
 
   const envoy::config::core::v3::ApiVersion transport_api_version_;
+  Event::Dispatcher& dispatcher_;
 };
 
 using NewGrpcMuxImplSharedPtr = std::shared_ptr<NewGrpcMuxImpl>;

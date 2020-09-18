@@ -24,7 +24,7 @@ const char TypeUrl[] = "type.googleapis.com/envoy.api.v2.Cluster";
 
 class DeltaSubscriptionStateTest : public testing::Test {
 protected:
-  DeltaSubscriptionStateTest() : state_(TypeUrl, callbacks_, local_info_) {
+  DeltaSubscriptionStateTest() : state_(TypeUrl, callbacks_, local_info_, dispatcher_) {
     state_.updateSubscriptionInterest({"name1", "name2", "name3"}, {});
     envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
         state_.getNextRequestAckless();
@@ -386,6 +386,32 @@ TEST_F(DeltaSubscriptionStateTest, AddedAndRemoved) {
       deliverDiscoveryResponse(additions, removals, "debugversion1", absl::nullopt, false);
   EXPECT_EQ("duplicate name name1 found in the union of added+removed resources",
             ack.error_detail_.message());
+}
+
+TEST_F(DeltaSubscriptionStateTest, ResourceTTL) {
+  Event::MockTimer* timer = new Event::MockTimer();
+  Event::TimerCb timer_cb;
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
+    timer_cb = cb;
+    return timer;
+  }));
+  EXPECT_CALL(*timer, enableTimer(_, _));
+
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
+  auto* resource = added_resources.Add();
+  resource->set_name("name1");
+  resource->set_version("version1A");
+
+  ProtobufWkt::Duration ttl;
+  ttl.set_seconds(10);
+  resource->mutable_ttl()->CopyFrom(ttl);
+
+  deliverDiscoveryResponse(added_resources, {}, "debug1", "nonce1");
+
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _)).Times(1);
+
+  // simulate timer fire
+  timer_cb();
 }
 
 } // namespace

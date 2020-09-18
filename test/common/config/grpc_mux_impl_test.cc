@@ -684,6 +684,65 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
 }
+
+TEST_F(GrpcMuxImplTest, TestUnwrapResource) {
+  setup();
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+
+  grpc_mux_->start();
+  // subscribe and unsubscribe (by not keeping the return watch) so that the type is known to envoy
+  expectSendMessage(type_url, {"x", "y"}, "", true);
+  expectSendMessage(type_url, {}, "");
+  grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_);
+
+  /*
+
+
+
+
+  {
+      /*
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+    response->set_type_url(type_url);
+
+    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+    load_assignment.set_cluster_name("x");
+
+    envoy::service::discovery::v3::Resource resource;
+    resource.mutable_resource()->PackFrom(load_assignment);
+
+    //ProtobufWkt::Any a;
+    //a.PackFrom(load_assignment);
+    response->add_resources()->PackFrom(resource);
+
+    grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
+    */
+}
+
+{
+  /*
+invalid_response->set_type_url(type_url);
+invalid_response->mutable_resources()->Add()->set_type_url("bar");
+EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _))
+    .WillOnce(Invoke([](Envoy::Config::ConfigUpdateFailureReason, const EnvoyException* e) {
+      EXPECT_TRUE(IsSubstring(
+          "", "", "bar does not match the message-wide type URL foo in DiscoveryResponse",
+          e->what()));
+    }));
+
+expectSendMessage(
+    expected_type_url, {"x", "y"}, "", false, "", Grpc::Status::WellKnownGrpcStatus::Internal,
+    fmt::format("bar does not match the message-wide type URL foo in DiscoveryResponse {}",
+                invalid_response->DebugString()));
+grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(invalid_response));
+*/
+}
+// expectSendMessage("foo", {}, "");
 } // namespace
+
 } // namespace Config
+} // namespace Envoy
 } // namespace Envoy

@@ -1,5 +1,6 @@
 #include "common/config/delta_subscription_state.h"
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
@@ -11,8 +12,10 @@ namespace Config {
 
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                SubscriptionCallbacks& callbacks,
-                                               const LocalInfo::LocalInfo& local_info)
-    : type_url_(std::move(type_url)), callbacks_(callbacks), local_info_(local_info) {}
+                                               const LocalInfo::LocalInfo& local_info,
+                                               Event::Dispatcher& dispatcher)
+    : type_url_(std::move(type_url)), callbacks_(callbacks), local_info_(local_info),
+      dispatcher_(dispatcher) {}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
                                                         const std::set<std::string>& cur_removed) {
@@ -25,7 +28,7 @@ void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::stri
     names_added_.insert(a);
   }
   for (const auto& r : cur_removed) {
-    setLostInterestInResource(r);
+    removeResourceState(r);
     // Ideally, when interest in a resource is added-then-removed in between requests,
     // we would avoid putting a superfluous "unsubscribe [resource that was never subscribed]"
     // in the request. However, the removed-then-added case *does* need to go in the request,
@@ -84,8 +87,9 @@ void DeltaSubscriptionState::handleGoodResponse(
   callbacks_.onConfigUpdate(message.resources(), message.removed_resources(),
                             message.system_version_info());
   for (const auto& resource : message.resources()) {
-    setResourceVersion(resource.name(), resource.version());
+    addResourceState(resource);
   }
+
   // If a resource is gone, there is no longer a meaningful version for it that makes sense to
   // provide to the server upon stream reconnect: either it will continue to not exist, in which
   // case saying nothing is fine, or the server will bring back something new, which we should
@@ -124,7 +128,7 @@ DeltaSubscriptionState::getNextRequestAckless() {
     // initial_resource_versions "must be populated for first request in a stream".
     // Also, since this might be a new server, we must explicitly state *all* of our subscription
     // interest.
-    for (auto const& resource : resource_versions_) {
+    for (auto const& resource : resource_state_) {
       // Populate initial_resource_versions with the resource versions we currently have.
       // Resources we are interested in, but are still waiting to get any version of from the
       // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
@@ -160,19 +164,32 @@ DeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
   return request;
 }
 
-void DeltaSubscriptionState::setResourceVersion(const std::string& resource_name,
-                                                const std::string& resource_version) {
-  resource_versions_[resource_name] = ResourceVersion(resource_version);
-  resource_names_.insert(resource_name);
+void DeltaSubscriptionState::addResourceState(
+    const envoy::service::discovery::v3::Resource& resource) {
+  Event::TimerPtr ttl_timer;
+  if (resource.has_ttl()) {
+    ttl_timer = dispatcher_.createTimer([this, resource]() -> void {
+      Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> empty_resources;
+      Protobuf::RepeatedPtrField<std::string> remove_resources;
+      *remove_resources.Add() = resource.name();
+      callbacks_.onConfigUpdate(empty_resources, remove_resources, resource.version());
+      setResourceWaitingForServer(resource.name());
+    });
+    ttl_timer->enableTimer(
+        std::chrono::milliseconds(DurationUtil::durationToMilliseconds(resource.ttl())));
+  }
+
+  resource_state_[resource.name()] = ResourceState(resource, std::move(ttl_timer));
+  resource_names_.insert(resource.name());
 }
 
 void DeltaSubscriptionState::setResourceWaitingForServer(const std::string& resource_name) {
-  resource_versions_[resource_name] = ResourceVersion();
+  resource_state_[resource_name] = ResourceState();
   resource_names_.insert(resource_name);
 }
 
-void DeltaSubscriptionState::setLostInterestInResource(const std::string& resource_name) {
-  resource_versions_.erase(resource_name);
+void DeltaSubscriptionState::removeResourceState(const std::string& resource_name) {
+  resource_state_.erase(resource_name);
   resource_names_.erase(resource_name);
 }
 

@@ -114,6 +114,9 @@ private:
     bool pending_{};
     // Has this API been tracked in subscriptions_?
     bool subscribed_{};
+    // If the resource has a TTL associated with it, contains a mapping from resource name ->
+    // Event::TimerPtr
+    std::set<std::string, Event::TimerPtr> resource_timers_;
   };
 
   // Request queue management logic.

@@ -123,6 +123,16 @@ bool GrpcMuxImpl::paused(const std::string& type_url) const {
   return entry->second.paused_;
 }
 
+// TODO(bgallagher) move to class?
+const ProtobufWkt::Any& updateTTL(const std::string& resource_name,
+                                  const ProtobufWkt::Any& resource) {
+  if (resource.Is<envoy::service::discovery::v3::Resource>()) {
+    std::cerr << "updateTTL: " << resource_name << " : " << resource.type_url() << std::endl;
+    return resource;
+  }
+  return resource;
+}
+
 void GrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message) {
   const std::string& type_url = message->type_url();
@@ -152,6 +162,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     }
     return;
   }
+
   try {
     // To avoid O(n^2) explosion (e.g. when we have 1000s of EDS watches), we
     // build a map here from resource name to resource and then walk watches_.
@@ -159,7 +170,14 @@ void GrpcMuxImpl::onDiscoveryResponse(
     // ensure we deliver empty config updates when a resource is dropped.
     std::unordered_map<std::string, ProtobufWkt::Any> resources;
     SubscriptionCallbacks& callbacks = api_state_[type_url].watches_.front()->callbacks_;
-    for (const auto& resource : message->resources()) {
+    for (ProtobufWkt::Any resource : message->resources()) {
+
+      if (resource.Is<envoy::service::discovery::v3::Resource>()) {
+        envoy::service::discovery::v3::Resource unpacked_resource;
+        MessageUtil::unpackTo(resource, unpacked_resource);
+        resource = unpacked_resource.resource();
+      }
+
       if (type_url != resource.type_url()) {
         throw EnvoyException(
             fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
@@ -168,6 +186,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
       const std::string resource_name = callbacks.resourceName(resource);
       resources.emplace(resource_name, resource);
     }
+
     for (auto watch : api_state_[type_url].watches_) {
       // onConfigUpdate should be called in all cases for single watch xDS (Cluster and
       // Listener) even if the message does not have resources so that update_empty stat
@@ -177,10 +196,12 @@ void GrpcMuxImpl::onDiscoveryResponse(
         continue;
       }
       Protobuf::RepeatedPtrField<ProtobufWkt::Any> found_resources;
-      for (const auto& watched_resource_name : watch->resources_) {
-        auto it = resources.find(watched_resource_name);
+      for (const auto& resource_name : watch->resources_) {
+        auto it = resources.find(resource_name);
         if (it != resources.end()) {
           found_resources.Add()->MergeFrom(it->second);
+          // TODO: update the TTL
+          updateTTL(resource_name, it->second);
         }
       }
       // onConfigUpdate should be called only on watches(clusters/routes) that have
