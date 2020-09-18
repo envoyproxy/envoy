@@ -66,7 +66,8 @@ public:
   struct SubscriptionStuff {
     SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
                       const bool use_namespace_matching, Event::Dispatcher& dispatcher)
-        : watch_map_(use_namespace_matching), sub_state_(type_url, watch_map_, local_info, dispatcher) {}
+        : watch_map_(use_namespace_matching),
+          sub_state_(type_url, watch_map_, local_info, dispatcher) {}
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;

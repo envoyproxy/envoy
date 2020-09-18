@@ -28,11 +28,6 @@ public:
   SchedulerPtr createScheduler(Scheduler& base_scheduler, CallbackScheduler& cb_scheduler) override;
 
   // TestTimeSystem
-  void advanceTimeWait(const Duration& duration) override;
-  void advanceTimeAsync(const Duration& duration) override;
-  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-                                      const Duration& duration) noexcept
-      EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
   void advanceTimeWaitImpl(const Duration& duration) override;
   void advanceTimeAsyncImpl(const Duration& duration) override;
 
@@ -99,7 +94,7 @@ private:
     absl::MutexLock lock(&mutex_);
     --pending_updates_;
   }
-  void waitForNoPendingLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  // void waitForNoPendingLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
   MonotonicTime monotonic_time_ ABSL_GUARDED_BY(mutex_);

@@ -164,8 +164,8 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
 
 void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
                                      const bool use_namespace_matching) {
-  subscriptions_.emplace(
-      type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_, use_namespace_matching));
+  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(
+                                       type_url, local_info_, use_namespace_matching, dispatcher_));
   subscription_ordering_.emplace_back(type_url);
 }
 

@@ -114,14 +114,7 @@ ScopedResume GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
 }
 
 // TODO(bgallagher) move to class?
-const ProtobufWkt::Any& updateTTL(const std::string& resource_name,
-                                  const ProtobufWkt::Any& resource) {
-  if (resource.Is<envoy::service::discovery::v3::Resource>()) {
-    std::cerr << "updateTTL: " << resource_name << " : " << resource.type_url() << std::endl;
-    return resource;
-  }
-  return resource;
-}
+void updateTTL(const std::string&, DecodedResourceRef) {}
 
 void GrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
@@ -198,7 +191,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
         auto it = resource_ref_map.find(watched_resource_name);
         if (it != resource_ref_map.end()) {
           found_resources.emplace_back(it->second);
-          updateTTL(resource_name, it->second);
+          updateTTL(it->first, it->second);
         }
       }
       // onConfigUpdate should be called only on watches(clusters/routes) that have

@@ -734,7 +734,7 @@ TEST_F(GrpcMuxImplTest, TestUnwrapResource) {
   // subscribe and unsubscribe (by not keeping the return watch) so that the type is known to envoy
   expectSendMessage(type_url, {"x", "y"}, "", true);
   expectSendMessage(type_url, {}, "");
-  grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_);
+  grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, resource_decoder_);
 
   /*
 
@@ -742,7 +742,6 @@ TEST_F(GrpcMuxImplTest, TestUnwrapResource) {
 
 
   {
-      /*
     auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(type_url);
 
@@ -760,27 +759,24 @@ TEST_F(GrpcMuxImplTest, TestUnwrapResource) {
     */
 }
 
-{
-  /*
+/*
 invalid_response->set_type_url(type_url);
 invalid_response->mutable_resources()->Add()->set_type_url("bar");
 EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _))
-    .WillOnce(Invoke([](Envoy::Config::ConfigUpdateFailureReason, const EnvoyException* e) {
-      EXPECT_TRUE(IsSubstring(
-          "", "", "bar does not match the message-wide type URL foo in DiscoveryResponse",
-          e->what()));
-    }));
+  .WillOnce(Invoke([](Envoy::Config::ConfigUpdateFailureReason, const EnvoyException* e) {
+    EXPECT_TRUE(IsSubstring(
+        "", "", "bar does not match the message-wide type URL foo in DiscoveryResponse",
+        e->what()));
+  }));
 
 expectSendMessage(
-    expected_type_url, {"x", "y"}, "", false, "", Grpc::Status::WellKnownGrpcStatus::Internal,
-    fmt::format("bar does not match the message-wide type URL foo in DiscoveryResponse {}",
-                invalid_response->DebugString()));
+  expected_type_url, {"x", "y"}, "", false, "", Grpc::Status::WellKnownGrpcStatus::Internal,
+  fmt::format("bar does not match the message-wide type URL foo in DiscoveryResponse {}",
+              invalid_response->DebugString()));
 grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(invalid_response));
 */
-}
 // expectSendMessage("foo", {}, "");
 } // namespace
 
 } // namespace Config
-} // namespace Envoy
 } // namespace Envoy

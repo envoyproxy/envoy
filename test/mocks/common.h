@@ -59,11 +59,6 @@ public:
   void advanceTimeWaitImpl(const Duration& duration) override {
     real_time_.advanceTimeWaitImpl(duration);
   }
-  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-                                      const Duration& duration) noexcept
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
-    return real_time_.waitFor(mutex, condvar, duration); // NO_CHECK_FORMAT(real_time)
-      }
   void advanceTimeAsyncImpl(const Duration& duration) override {
     real_time_.advanceTimeAsyncImpl(duration);
   }

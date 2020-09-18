@@ -12,8 +12,10 @@ namespace Config {
 
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
-                                               const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher)
-    : type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info), dispatcher_(dispatcher) {}
+                                               const LocalInfo::LocalInfo& local_info,
+                                               Event::Dispatcher& dispatcher)
+    : type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),
+      dispatcher_(dispatcher) {}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
                                                         const std::set<std::string>& cur_removed) {
@@ -130,8 +132,8 @@ DeltaSubscriptionState::getNextRequestAckless() {
       // Populate initial_resource_versions with the resource versions we currently have.
       // Resources we are interested in, but are still waiting to get any version of from the
       // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
-      if (!resource_version.waitingForServer()) {
-        (*request.mutable_initial_resource_versions())[resource_name] = resource_version.version();
+      if (!resource_state.waitingForServer()) {
+        (*request.mutable_initial_resource_versions())[resource_name] = resource_state.version();
       }
       // As mentioned above, fill resource_names_subscribe with everything, including names we
       // have yet to receive any resource for.
@@ -170,7 +172,7 @@ void DeltaSubscriptionState::addResourceState(
       Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> empty_resources;
       Protobuf::RepeatedPtrField<std::string> remove_resources;
       *remove_resources.Add() = resource.name();
-      callbacks_.onConfigUpdate(empty_resources, remove_resources, resource.version());
+      watch_map_.onConfigUpdate(empty_resources, remove_resources, resource.version());
       setResourceWaitingForServer(resource.name());
     });
     ttl_timer->enableTimer(
