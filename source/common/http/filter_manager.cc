@@ -450,7 +450,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
 
     // If the previous filter is decoding headers only, so are we unless we start adding data during
     // this filter. We propagate the decoding_headers_only_ flag forward to further filters,
-    // allowing filters to override thie value for itself and subsequent filters.
+    // allowing filters to override this value for itself and subsequent filters.
     const auto decoding_headers_only =
         entry == decoder_filters_.begin() ? false : (*std::prev(entry))->decoding_headers_only_;
     (*entry)->decoding_headers_only_ = decoding_headers_only;
@@ -952,7 +952,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
 
     // If the previous filter is encoding headers only, so are we unless we start adding data during
     // this filter. We propagate the encoding_headers_only_ flag forward to further filters,
-    // allowing filters to override thie value for itself and subsequent filters.
+    // allowing filters to override this value for itself and subsequent filters.
     const auto encoding_headers_only =
         entry == encoder_filters_.begin() ? false : (*std::prev(entry))->encoding_headers_only_;
     (*entry)->encoding_headers_only_ = encoding_headers_only;
