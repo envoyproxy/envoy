@@ -22,6 +22,7 @@
 #include "common/http/http2/codec_stats.h"
 #include "common/http/http2/metadata_decoder.h"
 #include "common/http/http2/metadata_encoder.h"
+#include "common/http/http2/protocol_constraints.h"
 #include "common/http/status.h"
 #include "common/http/utility.h"
 
@@ -443,57 +444,7 @@ protected:
   // Set if the type of frame that is about to be sent is PING or SETTINGS with the ACK flag set, or
   // RST_STREAM.
   bool is_outbound_flood_monitored_control_frame_ = 0;
-  // This counter keeps track of the number of outbound frames of all types (these that were
-  // buffered in the underlying connection but not yet written into the socket). If this counter
-  // exceeds the `max_outbound_frames_' value the connection is terminated.
-  uint32_t outbound_frames_ = 0;
-  // Maximum number of outbound frames. Initialized from corresponding http2_protocol_options.
-  // Default value is 10000.
-  const uint32_t max_outbound_frames_;
-  const std::function<void()> frame_buffer_releasor_;
-  // This counter keeps track of the number of outbound frames of types PING, SETTINGS and
-  // RST_STREAM (these that were buffered in the underlying connection but not yet written into the
-  // socket). If this counter exceeds the `max_outbound_control_frames_' value the connection is
-  // terminated.
-  uint32_t outbound_control_frames_ = 0;
-  // Maximum number of outbound frames of types PING, SETTINGS and RST_STREAM. Initialized from
-  // corresponding http2_protocol_options. Default value is 1000.
-  const uint32_t max_outbound_control_frames_;
-  const std::function<void()> control_frame_buffer_releasor_;
-  // This counter keeps track of the number of consecutive inbound frames of types HEADERS,
-  // CONTINUATION and DATA with an empty payload and no end stream flag. If this counter exceeds
-  // the `max_consecutive_inbound_frames_with_empty_payload_` value the connection is terminated.
-  uint32_t consecutive_inbound_frames_with_empty_payload_ = 0;
-  // Maximum number of consecutive inbound frames of types HEADERS, CONTINUATION and DATA without
-  // a payload. Initialized from corresponding http2_protocol_options. Default value is 1.
-  const uint32_t max_consecutive_inbound_frames_with_empty_payload_;
-
-  // This counter keeps track of the number of inbound streams.
-  uint32_t inbound_streams_ = 0;
-  // This counter keeps track of the number of inbound PRIORITY frames. If this counter exceeds
-  // the value calculated using this formula:
-  //
-  //     max_inbound_priority_frames_per_stream_ * (1 + inbound_streams_)
-  //
-  // the connection is terminated.
-  uint64_t inbound_priority_frames_ = 0;
-  // Maximum number of inbound PRIORITY frames per stream. Initialized from corresponding
-  // http2_protocol_options. Default value is 100.
-  const uint32_t max_inbound_priority_frames_per_stream_;
-
-  // This counter keeps track of the number of inbound WINDOW_UPDATE frames. If this counter exceeds
-  // the value calculated using this formula:
-  //
-  //     1 + 2 * (inbound_streams_ +
-  //              max_inbound_window_update_frames_per_data_frame_sent_ * outbound_data_frames_)
-  //
-  // the connection is terminated.
-  uint64_t inbound_window_update_frames_ = 0;
-  // This counter keeps track of the number of outbound DATA frames.
-  uint64_t outbound_data_frames_ = 0;
-  // Maximum number of inbound WINDOW_UPDATE frames per outbound DATA frame sent. Initialized
-  // from corresponding http2_protocol_options. Default value is 10.
-  const uint32_t max_inbound_window_update_frames_per_data_frame_sent_;
+  ::Envoy::Http::Http2::ProtocolConstraints protocol_constraints_;
 
   // For the flood mitigation to work the onSend callback must be called once for each outbound
   // frame. This is what the nghttp2 library is doing, however this is not documented. The
@@ -527,12 +478,8 @@ private:
   // Adds buffer fragment for a new outbound frame to the supplied Buffer::OwnedImpl.
   // Returns true on success or false if outbound queue limits were exceeded.
   bool addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
-  virtual void checkOutboundQueueLimits() PURE;
-  void incrementOutboundFrameCount(bool is_outbound_flood_monitored_control_frame);
+  virtual void checkOutboundFrameLimits() PURE;
   virtual bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
-  virtual bool checkInboundFrameLimits(int32_t stream_id) PURE;
-  void releaseOutboundFrame();
-  void releaseOutboundControlFrame();
 
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
@@ -568,9 +515,8 @@ private:
   // mitigation on the downstream connections, which causes an exception to be thrown in the middle
   // of the clean-up loop, leaving resources in a half cleaned up state.
   // TODO(yanavlasov): add flood mitigation for upstream connections as well.
-  void checkOutboundQueueLimits() override {}
+  void checkOutboundFrameLimits() override {}
   bool trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return true; }
-  bool checkInboundFrameLimits(int32_t) override { return true; }
 
   Http::ConnectionCallbacks& callbacks_;
 };
@@ -593,16 +539,15 @@ private:
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   int onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
-  void checkOutboundQueueLimits() override;
+  void checkOutboundFrameLimits() override;
   bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
-  bool checkInboundFrameLimits(int32_t stream_id) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
 
   // Http::Connection
   // The reason for overriding the dispatch method is to do flood mitigation only when
   // processing data from downstream client. Doing flood mitigation when processing upstream
   // responses makes clean-up tricky, which needs to be improved (see comments for the
-  // ClientConnectionImpl::checkOutboundQueueLimits method). The dispatch method on the
+  // ClientConnectionImpl::checkProtocolConstraintsStatus method). The dispatch method on the
   // ServerConnectionImpl objects is called only when processing data from the downstream client in
   // the ConnectionManagerImpl::onData method.
   Http::Status dispatch(Buffer::Instance& data) override;
