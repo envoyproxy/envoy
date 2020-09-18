@@ -37,6 +37,8 @@ public:
 
   const Pipe* pipe() const { return nullptr; }
 
+  const EnvoyInternalAddress* envoyInternalAddress() const { return nullptr; }
+
   const sockaddr* sockAddr() const { return nullptr; }
 
   socklen_t sockAddrLen() const { return 0; }

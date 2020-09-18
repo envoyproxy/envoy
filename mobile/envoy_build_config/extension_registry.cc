@@ -9,6 +9,7 @@ void ExtensionRegistry::registerFactories() {
   Envoy::Extensions::Compression::Gzip::Decompressor::forceRegisterGzipDecompressorLibraryFactory();
   Envoy::Extensions::HttpFilters::Assertion::forceRegisterAssertionFilterFactory();
   Envoy::Extensions::HttpFilters::Decompressor::forceRegisterDecompressorFilterFactory();
+  Envoy::Extensions::HttpFilters::BufferFilter::forceRegisterBufferFilterFactory();
   Envoy::Extensions::HttpFilters::DynamicForwardProxy::
       forceRegisterDynamicForwardProxyFilterFactory();
   Envoy::Extensions::HttpFilters::PlatformBridge::forceRegisterPlatformBridgeFilterFactory();

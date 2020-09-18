@@ -4,6 +4,7 @@
 
 #include "extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "extensions/compression/gzip/decompressor/config.h"
+#include "extensions/filters/http/buffer/config.h"
 #include "extensions/filters/http/decompressor/config.h"
 #include "extensions/filters/http/dynamic_forward_proxy/config.h"
 #include "extensions/filters/http/router/config.h"

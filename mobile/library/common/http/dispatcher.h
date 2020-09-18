@@ -100,6 +100,10 @@ public:
   envoy_status_t cancelStream(envoy_stream_t stream);
 
   const DispatcherStats& stats() const;
+  // Used to fill response code details for streams that are cancelled via cancelStream.
+  const std::string& getCancelDetails() {
+    CONSTRUCT_ON_FIRST_USE(std::string, "client cancelled stream");
+  }
 
   // Used for testing.
   Thread::ThreadSynchronizer& synchronizer() { return synchronizer_; }
@@ -168,11 +172,16 @@ private:
     const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
       return parent_.address_;
     }
+    absl::string_view responseDetails() override { return response_details_; }
     // TODO: https://github.com/lyft/envoy-mobile/issues/825
     void readDisable(bool /*disable*/) override {}
     uint32_t bufferLimit() override { return 65000; }
     // Not applicable
     void setFlushTimeout(std::chrono::milliseconds) override {}
+
+    void setResponseDetails(absl::string_view response_details) {
+      response_details_ = response_details;
+    }
 
     const envoy_stream_t stream_handle_;
 
@@ -181,6 +190,8 @@ private:
     // Used to receive incoming HTTP stream operations.
     DirectStreamCallbacksPtr callbacks_;
     Dispatcher& parent_;
+    // Response details used by the connection manager.
+    absl::string_view response_details_;
   };
 
   using DirectStreamSharedPtr = std::shared_ptr<DirectStream>;
