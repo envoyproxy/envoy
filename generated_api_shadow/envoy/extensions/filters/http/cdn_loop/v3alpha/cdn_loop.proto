@@ -31,5 +31,5 @@ message CdnLoopConfig {
   //
   // The default of 0 means a request can transit the CdnLoopFilter
   // once.
-  uint32 max_allowed_occurences = 2;
+  uint32 max_allowed_occurrences = 2;
 }

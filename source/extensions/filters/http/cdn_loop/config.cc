@@ -19,7 +19,7 @@ Http::FilterFactoryCb CdnLoopFilterFactory::createFilterFactoryFromProtoTyped(
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   return [config, stats_prefix, &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
-        std::make_shared<CdnLoopFilter>(config.cdn_id(), config.max_allowed_occurences()));
+        std::make_shared<CdnLoopFilter>(config.cdn_id(), config.max_allowed_occurrences()));
   };
 }
 

@@ -14,14 +14,14 @@ namespace CdnLoop {
 
 class CdnLoopFilter : public Http::PassThroughDecoderFilter {
 public:
-  CdnLoopFilter(std::string cdn_id, int max_allowed_occurences)
-      : cdn_id_(std::move(cdn_id)), max_allowed_occurences_(max_allowed_occurences) {}
+  CdnLoopFilter(std::string cdn_id, int max_allowed_occurrences)
+      : cdn_id_(std::move(cdn_id)), max_allowed_occurrences_(max_allowed_occurrences) {}
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
 
 private:
   const std::string cdn_id_;
-  const int max_allowed_occurences_;
+  const int max_allowed_occurrences_;
 };
 
 } // namespace CdnLoop

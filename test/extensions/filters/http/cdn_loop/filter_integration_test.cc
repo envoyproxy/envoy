@@ -25,7 +25,7 @@ name: envoy.filters.http.cdn_loop
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.cdn_loop.v3alpha.CdnLoopConfig
   cdn_id: cdn
-  max_allowed_occurences: 2
+  max_allowed_occurrences: 2
 )EOF";
 
 class CdnLoopFilterIntegrationTest : public HttpProtocolIntegrationTest {};

@@ -31,7 +31,7 @@ Http::FilterHeadersStatus CdnLoopFilter::decodeHeaders(Http::RequestHeaderMap& h
       decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, ParseErrorMessage, nullptr,
                                          absl::nullopt, ParseErrorDetails);
       return Http::FilterHeadersStatus::StopIteration;
-    } else if (*count > max_allowed_occurences_) {
+    } else if (*count > max_allowed_occurrences_) {
       decoder_callbacks_->sendLocalReply(Http::Code::BadGateway, LoopDetectedMessage, nullptr,
                                          absl::nullopt, LoopDetectedDetails);
       return Http::FilterHeadersStatus::StopIteration;
