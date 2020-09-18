@@ -357,6 +357,10 @@ envoy_status_t Dispatcher::cancelStream(envoy_stream_t stream) {
       synchronizer_.syncPoint("dispatch_on_cancel");
       direct_stream->callbacks_->onCancel();
 
+      // Since https://github.com/envoyproxy/envoy/pull/13052, the connection manager expects that
+      // response code details are set on all possible paths for streams.
+      direct_stream->setResponseDetails(getCancelDetails());
+
       // The runResetCallbacks call synchronously causes Envoy to defer delete the HCM's
       // ActiveStream. We have some concern that this could potentially race a terminal callback
       // scheduled on the same iteration of the event loop. If we see violations in the callback
