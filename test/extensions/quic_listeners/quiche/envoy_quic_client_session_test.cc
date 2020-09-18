@@ -97,7 +97,6 @@ public:
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
           SetQuicReloadableFlag(quic_disable_version_draft_27, !GetParam());
-          SetQuicReloadableFlag(quic_disable_version_draft_25, !GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -215,9 +214,13 @@ TEST_P(EnvoyQuicClientSessionTest, OnGoAwayFrame) {
   Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;
 
-  quic::QuicGoAwayFrame goaway;
   EXPECT_CALL(http_connection_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
-  quic_connection_->OnGoAwayFrame(goaway);
+  if (quic::VersionUsesHttp3(quic_version_[0].transport_version)) {
+    envoy_quic_session_.OnHttp3GoAway(4u);
+  } else {
+    quic::QuicGoAwayFrame goaway;
+    quic_connection_->OnGoAwayFrame(goaway);
+  }
 }
 
 TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {
