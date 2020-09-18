@@ -168,7 +168,7 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   ASSERT(isThreadSafe());
   current_to_delete_->emplace_back(std::move(to_delete));
   ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
-  if (1 == current_to_delete_->size()) {
+  if (current_to_delete_->size() == 1) {
     deferred_delete_cb_->scheduleCallbackCurrentIteration();
   }
 }
