@@ -2240,6 +2240,58 @@ TEST_F(LuaHttpFilterTest, LuaFilterBase64Escape) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
 }
 
+TEST_F(LuaHttpFilterTest, LuaFilterSetResponseBuffer) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local content_length = response_handle:body():setBytes("1234")
+      response_handle:logTrace(content_length)
+
+      -- It is possible to replace an entry in headers after overridding encoding buffer.
+      response_handle:headers():replace("content-length", content_length)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl response_body("1234567890");
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("4")));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
+  EXPECT_EQ(4, encoder_callbacks_.buffer_->length());
+}
+
+TEST_F(LuaHttpFilterTest, LuaFilterSetResponseBufferChunked) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local last
+      for chunk in response_handle:bodyChunks() do
+        chunk:setBytes("")
+        last = chunk
+      end
+      response_handle:logTrace(last:setBytes("1234"))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+
+  Buffer::OwnedImpl response_body("1234567890");
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("4")));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
+}
+
 } // namespace
 } // namespace Lua
 } // namespace HttpFilters

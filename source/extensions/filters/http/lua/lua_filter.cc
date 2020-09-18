@@ -427,8 +427,9 @@ int StreamHandleWrapper::luaBody(lua_State* state) {
       if (body_wrapper_.get() != nullptr) {
         body_wrapper_.pushStack();
       } else {
-        body_wrapper_.reset(
-            Filters::Common::Lua::BufferWrapper::create(state, *callbacks_.bufferedBody()), true);
+        body_wrapper_.reset(Filters::Common::Lua::BufferWrapper::create(
+                                state, const_cast<Buffer::Instance&>(*callbacks_.bufferedBody())),
+                            true);
       }
       return 1;
     }
