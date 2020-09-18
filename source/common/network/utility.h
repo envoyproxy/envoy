@@ -102,7 +102,6 @@ public:
    * @return std::string the parsed host
    */
   static std::string hostFromTcpUrl(const std::string& url);
-  static std::string hostFromTcpUrlTest(const std::string& url);
 
   /**
    * Parses the port from a TCP URL

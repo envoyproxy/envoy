@@ -121,10 +121,6 @@ Api::IoCallUint64Result receiveMessage(uint64_t max_packet_size, Buffer::Instanc
 
 } // namespace
 
-std::string Utility::hostFromTcpUrlTest(const std::string& url) {
-  return hostFromUrl(url, TCP_SCHEME, "TCP");
-}
-
 std::string Utility::hostFromTcpUrl(const std::string& url) {
   return hostFromUrl(url, TCP_SCHEME, "TCP");
 }
