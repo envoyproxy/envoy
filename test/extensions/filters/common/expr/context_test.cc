@@ -205,7 +205,7 @@ TEST(Context, RequestFallbackAttributes) {
   Http::TestRequestHeaderMapImpl header_map{
       {":method", "POST"},
       {":scheme", "http"},
-      {":path", "/meow?yes=1"},
+      {":path", "/meow"},
   };
   RequestWrapper request(&header_map, info);
 
@@ -353,6 +353,31 @@ TEST(Context, ResponseAttributes) {
     Http::TestResponseTrailerMapImpl trailer_map{{trailer_name, "b"}};
     ResponseWrapper response_no_status(&header_map, &trailer_map, info_without_code);
     auto value = response_no_status[CelValue::CreateStringView(GrpcStatus)];
+    EXPECT_FALSE(value.has_value());
+  }
+}
+
+TEST(Context, ConnectionFallbackAttributes) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  ConnectionWrapper connection(info);
+  UpstreamWrapper upstream(info);
+  {
+    auto value = connection[CelValue::CreateStringView(Undefined)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = connection[CelValue::CreateStringView(ID)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateStringView(Undefined)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateInt64(1)];
     EXPECT_FALSE(value.has_value());
   }
 }
