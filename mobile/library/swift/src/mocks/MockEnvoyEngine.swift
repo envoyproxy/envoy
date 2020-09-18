@@ -30,7 +30,8 @@ extension MockEnvoyEngine: EnvoyEngine {
     return MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
   }
 
-  func recordCounter(_ elements: String, count: UInt) {
+  func recordCounter(_ elements: String, count: UInt) -> Int32 {
     MockEnvoyEngine.onRecordCounter?(elements, count)
+    return kEnvoySuccess
   }
 }

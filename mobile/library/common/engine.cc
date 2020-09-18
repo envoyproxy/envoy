@@ -104,13 +104,15 @@ Engine::~Engine() {
   main_thread_.join();
 }
 
-void Engine::recordCounter(const std::string& elements, uint64_t count) {
+envoy_status_t Engine::recordCounter(const std::string& elements, uint64_t count) {
   if (server_ && client_scope_) {
     server_->dispatcher().post([this, elements, count]() -> void {
       Stats::Utility::counterFromElements(*client_scope_, {Stats::DynamicName(elements)})
           .add(count);
     });
+    return ENVOY_SUCCESS;
   }
+  return ENVOY_FAILURE;
 }
 
 Http::Dispatcher& Engine::httpDispatcher() { return *http_dispatcher_; }

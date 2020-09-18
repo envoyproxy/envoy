@@ -16,5 +16,5 @@ internal class MockEnvoyEngine : EnvoyEngine {
 
   override fun startStream(callbacks: EnvoyHTTPCallbacks?): EnvoyHTTPStream = MockEnvoyHTTPStream(callbacks!!)
 
-  override fun recordCounter(elements: String, count: Int) {}
+  override fun recordCounter(elements: String, count: Int): Int = 0
 }

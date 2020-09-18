@@ -14,6 +14,7 @@ class CounterImpl: NSObject, Counter {
   }
 
   /// Increment the counter by the given count.
+  /// TODO: potentially raise error to platform if the operation is not successful.
   func increment(count: Int) {
     guard let engine = self.engine else {
       return
