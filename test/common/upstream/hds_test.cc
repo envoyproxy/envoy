@@ -100,7 +100,7 @@ protected:
   }
 
   void expectCreateClientConnection() {
-    // create a new mock connection for each call to creatClientConnection
+    // Create a new mock connection for each call to createClientConnection.
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .WillRepeatedly(Invoke(
             [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
