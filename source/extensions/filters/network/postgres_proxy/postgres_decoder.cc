@@ -219,8 +219,8 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
 
   data.drain(startup_ ? 4 : 5); // Length plus optional 1st byte.
 
-  auto bytesToRead = message_len_ - 4;
-  message.assign(std::string(static_cast<char*>(data.linearize(bytesToRead)), bytesToRead));
+  uint32_t bytes_to_read = message_len_ - 4;
+  message.assign(std::string(static_cast<char*>(data.linearize(bytes_to_read)), bytes_to_read));
   setMessage(message);
 
   ENVOY_LOG(trace, "postgres_proxy: msg parsed");
@@ -271,6 +271,9 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
     std::string message = "Unrecognized";
     if (f != nullptr) {
       auto msgParser = f();
+      // message_len_ specifies total message length including 4 bytes long
+      // "length" field. The length of message body is total length minus size
+      // of "length" field (4 bytes).
       msgParser->read(data, message_len_ - 4);
       message = msgParser->toString();
     }

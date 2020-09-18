@@ -30,6 +30,18 @@ namespace PostgresProxy {
 // Size of integer types is fixed and depends on the type of integer.
 template <typename T> class Int {
 public:
+  /**
+   * Read integer value from data buffer.
+   * @param data reference to a buffer containing data to read.
+   * @param pos offset in the buffer where data to read is located. Successful read will advance
+   * this parameter.
+   * @param left number of bytes to be read to reach the end of Postgres message.
+   * Successful read will adjust this parameter.
+   * @return boolean value indicating whether read was successful. If read returns
+   * false "pos" and "left" params are not updated. When read is not successful,
+   * the caller should not continue reading next values from the data buffer
+   * for the current message.
+   */
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
     if ((data.length() - pos) < sizeof(T)) {
       return false;
@@ -59,16 +71,19 @@ using Byte1 = Int<char>;
 // String type requires byte with zero value to indicate end of string.
 class String {
 public:
+  /**
+   * See above for parameter and return value description.
+   */
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
     // First find the terminating zero.
     char zero = 0;
-    auto index = data.search(&zero, 1, pos);
+    ssize_t index = data.search(&zero, 1, pos);
     if (index == -1) {
       return false;
     }
 
     // Reserve that many bytes in the string.
-    auto size = index - pos;
+    uint64_t size = index - pos;
     value_.resize(size);
     // Now copy from buffer to string.
     data.copyOut(pos, index - pos, value_.data());
@@ -88,6 +103,9 @@ private:
 // sequence of bytes. The length must be deduced from message length.
 class ByteN {
 public:
+  /**
+   * See above for parameter and return value description.
+   */
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
     if (left > (data.length() - pos)) {
       return false;
@@ -103,14 +121,14 @@ public:
     std::string out = "[";
     bool first = true;
     for (const auto& i : value_) {
-      std::string buf;
       if (first) {
-        buf = fmt::format("{}", i);
+        absl::StrAppend(&out, i);
         first = false;
       } else {
+        std::string buf;
         buf = fmt::format(" {}", i);
+        absl::StrAppend(&out, buf);
       }
-      absl::StrAppend(&out, buf);
     }
     absl::StrAppend(&out, "]");
     return out;
@@ -133,6 +151,9 @@ private:
 // value.
 class VarByteN {
 public:
+  /**
+   * See above for parameter and return value description.
+   */
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
     if ((left < sizeof(int32_t)) || ((data.length() - pos) < sizeof(int32_t))) {
       return false;
@@ -162,14 +183,14 @@ public:
 
     bool first = true;
     for (const auto& i : value_) {
-      std::string buf;
       if (first) {
-        buf = fmt::format("{}", i);
+        absl::StrAppend(&out, i);
         first = false;
       } else {
+        std::string buf;
         buf = fmt::format(" {}", i);
+        absl::StrAppend(&out, buf);
       }
-      absl::StrAppend(&out, buf);
     }
     absl::StrAppend(&out, "]");
     return out;
@@ -183,6 +204,9 @@ private:
 // Array contains one or more values of the same type.
 template <typename T> class Array {
 public:
+  /**
+   * See above for parameter and return value description.
+   */
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
     // First read the 16 bits value which indicates how many
     // elements there are in the array.
@@ -224,6 +248,9 @@ private:
 // of the Postgres message.
 template <typename T> class Repeated {
 public:
+  /**
+   * See above for parameter and return value description.
+   */
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
     if ((data.length() - pos) < left) {
       return false;
@@ -289,8 +316,14 @@ public:
     return read(data, pos, left);
   }
 
+  /**
+   * Implementation of "read" method for variadic template.
+   * It reads data for the current type and invokes read operation
+   * for remaining types.
+   * See above for parameter and return value description for individual types.
+   */
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
-    auto result = first_.read(data, pos, left);
+    bool result = first_.read(data, pos, left);
     if (!result) {
       return false;
     }
