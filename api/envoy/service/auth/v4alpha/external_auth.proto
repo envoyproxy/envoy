@@ -83,6 +83,11 @@ message OkHttpResponse {
   // authorized) or not receive it (if it's not), but will not see headers
   // containing authorization credentials.
   //
+  // Pseudo headers (such as `:authority`, `:method`, `:path` etc), as well as
+  // the header `Host`, may not be removed as that would make the request
+  // malformed. If mentioned in `headers_to_remove` these special headers will
+  // be ignored.
+  //
   // When using the HTTP service this must instead be set by the HTTP
   // authorization service as a comma separated list like so:
   // ``x-envoy-auth-headers-to-remove: one-auth-header, another-auth-header``.

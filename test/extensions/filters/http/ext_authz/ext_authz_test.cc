@@ -689,6 +689,62 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
   EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
+TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
+  InSequence s;
+
+  // Set up all the typical headers plus an additional user defined header
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/users");
+  request_headers_.addCopy(Http::Headers::get().Protocol, "websocket");
+  request_headers_.addCopy(Http::Headers::get().Scheme, "https");
+  request_headers_.addCopy("remove-me", "upstream-should-not-see-me");
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  clear_route_cache: true
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
+      .Times(0);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  // Let's try to remove all the headers in the request
+  response.headers_to_remove = std::vector<Http::LowerCaseString>{
+      Http::Headers::get().Host,          Http::Headers::get().HostLegacy,
+      Http::Headers::get().Method,        Http::Headers::get().Path,
+      Http::Headers::get().Protocol,      Http::Headers::get().Scheme,
+      Http::LowerCaseString{"remove-me"},
+  };
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  // All :-prefixed headers (and Host) should still be there - only the user
+  // defined header should have been removed
+  EXPECT_EQ("example.com", request_headers_.get_(Http::Headers::get().Host));
+  EXPECT_EQ("example.com", request_headers_.get_(Http::Headers::get().HostLegacy));
+  EXPECT_EQ("GET", request_headers_.get_(Http::Headers::get().Method));
+  EXPECT_EQ("/users", request_headers_.get_(Http::Headers::get().Path));
+  EXPECT_EQ("websocket", request_headers_.get_(Http::Headers::get().Protocol));
+  EXPECT_EQ("https", request_headers_.get_(Http::Headers::get().Scheme));
+  EXPECT_EQ(nullptr, request_headers_.get(Http::LowerCaseString{"remove-me"}));
+}
+
 // Verifies that the filter clears the route cache when an authorization response:
 // 1. is an OK response.
 // 2. has NO headers to append.
