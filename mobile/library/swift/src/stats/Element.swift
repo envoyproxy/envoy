@@ -14,4 +14,8 @@ public final class Element: NSObject, ExpressibleByStringLiteral {
     }
     self.value = value
   }
+
+  public override func isEqual(_ object: Any?) -> Bool {
+    return (object as? Element)?.value == self.value
+  }
 }
