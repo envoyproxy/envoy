@@ -523,7 +523,7 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
   }
   std::set<std::string> require_type_urls;
   for (const auto& type_url : config_discovery.type_urls()) {
-    auto factory_type_url = Config::ApiTypeOracle::typeUrlToDescriptorFullName(type_url);
+    auto factory_type_url = Config::TypeUtil::typeUrlToDescriptorFullName(type_url);
     require_type_urls.emplace(factory_type_url);
     auto* factory = Registry::FactoryRegistry<
         Server::Configuration::NamedHttpFilterConfigFactory>::getFactoryByType(factory_type_url);

@@ -19,7 +19,7 @@ Http::FilterFactoryCb CompressorFilterFactory::createFilterFactoryFromProtoTyped
   if (!proto_config.has_compressor_library()) {
     throw EnvoyException("Compressor filter doesn't have compressor_library defined");
   }
-  const std::string type{Config::ApiTypeOracle::typeUrlToDescriptorFullName(
+  const std::string type{Config::TypeUtil::typeUrlToDescriptorFullName(
       proto_config.compressor_library().typed_config().type_url())};
   Compression::Compressor::NamedCompressorLibraryConfigFactory* const config_factory =
       Registry::FactoryRegistry<

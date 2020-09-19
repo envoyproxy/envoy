@@ -28,7 +28,7 @@ TEST(ApiTypeOracleTest, All) {
             ApiTypeOracle::getEarlierVersionMessageTypeName(v3_config.GetDescriptor()->full_name())
                 .value());
   EXPECT_EQ("envoy.config.filter.http.ip_tagging.v2.IPTagging",
-            ApiTypeOracle::typeUrlToDescriptorFullName(
+            TypeUtil::typeUrlToDescriptorFullName(
                 "type.googleapis.com/envoy.config.filter.http.ip_tagging.v2.IPTagging"));
 }
 

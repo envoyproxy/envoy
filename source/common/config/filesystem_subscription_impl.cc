@@ -98,7 +98,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
   MessageUtil::loadFromFile(path_, resource_message, validation_visitor_, api_);
   // Dynamically load the collection message.
   const std::string collection_type = std::string(
-      Config::ApiTypeOracle::typeUrlToDescriptorFullName(resource_message.resource().type_url()));
+      Config::TypeUtil::typeUrlToDescriptorFullName(resource_message.resource().type_url()));
   const Protobuf::Descriptor* collection_descriptor =
       Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(collection_type);
   if (collection_descriptor == nullptr) {

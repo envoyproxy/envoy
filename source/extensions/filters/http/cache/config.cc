@@ -11,7 +11,7 @@ Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   const std::string type{
-      Config::ApiTypeOracle::typeUrlToDescriptorFullName(config.typed_config().type_url())};
+      Config::TypeUtil::typeUrlToDescriptorFullName(config.typed_config().type_url())};
   HttpCacheFactory* const http_cache_factory =
       Registry::FactoryRegistry<HttpCacheFactory>::getFactoryByType(type);
   if (http_cache_factory == nullptr) {

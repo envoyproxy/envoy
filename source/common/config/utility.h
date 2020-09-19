@@ -255,14 +255,12 @@ public:
         udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
-    auto type =
-        std::string(Config::ApiTypeOracle::typeUrlToDescriptorFullName(typed_config.type_url()));
+    auto type = std::string(Config::TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
     if (type == typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
       MessageUtil::unpackTo(typed_config, typed_struct);
       // Not handling nested structs or typed structs in typed structs
-      return std::string(
-          Config::ApiTypeOracle::typeUrlToDescriptorFullName(typed_struct.type_url()));
+      return std::string(Config::TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
     }
     return type;
   }

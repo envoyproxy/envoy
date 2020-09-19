@@ -26,7 +26,7 @@ RequestIDExtensionSharedPtr RequestIDExtensionFactory::fromProto(
         config,
     Server::Configuration::FactoryContext& context) {
   const std::string type{
-      Config::ApiTypeOracle::typeUrlToDescriptorFullName(config.typed_config().type_url())};
+      Config::TypeUtil::typeUrlToDescriptorFullName(config.typed_config().type_url())};
   auto* factory =
       Registry::FactoryRegistry<Server::Configuration::RequestIDExtensionFactory>::getFactoryByType(
           type);

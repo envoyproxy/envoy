@@ -32,23 +32,11 @@ ApiTypeOracle::getEarlierVersionMessageTypeName(const std::string& message_type)
   return absl::nullopt;
 }
 
-const absl::string_view ApiTypeOracle::typeUrlToDescriptorFullName(absl::string_view type_url) {
-  const size_t pos = type_url.rfind('/');
-  if (pos != absl::string_view::npos) {
-    type_url = type_url.substr(pos + 1);
-  }
-  return type_url;
-}
-
-const std::string ApiTypeOracle::descriptorFullNameToTypeUrl(std::string& type) {
-  return "type.googleapis.com/" + type;
-}
-
 const absl::optional<std::string> ApiTypeOracle::getEarlierTypeUrl(const std::string& type_url) {
-  const std::string type{typeUrlToDescriptorFullName(type_url)};
+  const std::string type{Config::TypeUtil::typeUrlToDescriptorFullName(type_url)};
   absl::optional<std::string> old_type = ApiTypeOracle::getEarlierVersionMessageTypeName(type);
   if (old_type.has_value()) {
-    return descriptorFullNameToTypeUrl(old_type.value());
+    return TypeUtil::descriptorFullNameToTypeUrl(old_type.value());
   }
   return {};
 }

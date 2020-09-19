@@ -14,7 +14,7 @@ namespace Decompressor {
 Http::FilterFactoryCb DecompressorFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  const std::string decompressor_library_type{Config::ApiTypeOracle::typeUrlToDescriptorFullName(
+  const std::string decompressor_library_type{Config::TypeUtil::typeUrlToDescriptorFullName(
       proto_config.decompressor_library().typed_config().type_url())};
   Compression::Decompressor::NamedDecompressorLibraryConfigFactory* const
       decompressor_library_factory = Registry::FactoryRegistry<

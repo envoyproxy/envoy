@@ -79,7 +79,7 @@ void trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
       any_message.MergeFrom(reflection->GetMessage(message, any_field));
       Protobuf::DynamicMessageFactory dmf;
       const absl::string_view inner_type_name =
-          Config::ApiTypeOracle::typeUrlToDescriptorFullName(any_message.type_url());
+          Config::TypeUtil::typeUrlToDescriptorFullName(any_message.type_url());
       const Protobuf::Descriptor* inner_descriptor =
           Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(
               static_cast<std::string>(inner_type_name));
