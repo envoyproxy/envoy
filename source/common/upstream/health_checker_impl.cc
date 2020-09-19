@@ -469,6 +469,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
     data.drain(data.length());
     handleSuccess(false);
     if (!parent_.reuse_connection_) {
+      ENVOY_LOG_MISC(trace, "Parent isnt closed, so reuse connection gets set to false.");
       expect_close_ = true;
       client_->close(Network::ConnectionCloseType::NoFlush);
     }
@@ -481,6 +482,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::Connect
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     if (!expect_close_) {
+      ENVOY_LOG_MISC(trace, "Expect close is false, so it called handle failure");
       handleFailure(envoy::data::core::v3::NETWORK);
     }
     parent_.dispatcher_.deferredDelete(std::move(client_));

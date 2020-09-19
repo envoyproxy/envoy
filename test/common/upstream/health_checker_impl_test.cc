@@ -3424,20 +3424,6 @@ public:
 
 class GrpcHealthCheckerImplTestBase : public HealthCheckerTestBase {
 public:
-  struct TestSession {
-    TestSession() = default;
-
-    Event::MockTimer* interval_timer_{};
-    Event::MockTimer* timeout_timer_{};
-    Http::MockClientConnection* codec_{};
-    Stats::IsolatedStoreImpl stats_store_;
-    Network::MockClientConnection* client_connection_{};
-    NiceMock<Http::MockRequestEncoder> request_encoder_;
-    Http::ResponseDecoder* stream_response_callbacks_{};
-    CodecClientForTest* codec_client_{};
-  };
-
-  using TestSessionPtr = std::unique_ptr<TestSession>;
 
   struct ResponseSpec {
     struct ChunkSpec {
@@ -3492,11 +3478,6 @@ public:
     std::vector<ChunkSpec> body_chunks;
     std::vector<std::pair<std::string, std::string>> trailers;
   };
-
-  GrpcHealthCheckerImplTestBase() {
-    EXPECT_CALL(*cluster_->info_, features())
-        .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP2));
-  }
 
   void allocHealthChecker(const envoy::config::core::v3::HealthCheck& config) {
     health_checker_ = std::make_shared<TestGrpcHealthCheckerImpl>(
@@ -3553,56 +3534,6 @@ public:
     config.mutable_healthy_threshold()->set_value(3);
     allocHealthChecker(config);
     addCompletionCallback();
-  }
-
-  void expectSessionCreate() {
-    // Expectations are in LIFO order.
-    TestSessionPtr new_test_session(new TestSession());
-    test_sessions_.emplace_back(std::move(new_test_session));
-    TestSession& test_session = *test_sessions_.back();
-    test_session.timeout_timer_ = new Event::MockTimer(&dispatcher_);
-    test_session.interval_timer_ = new Event::MockTimer(&dispatcher_);
-    expectClientCreate(test_sessions_.size() - 1);
-  }
-
-  void expectClientCreate(size_t index) {
-    TestSession& test_session = *test_sessions_[index];
-    test_session.codec_ = new NiceMock<Http::MockClientConnection>();
-    test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
-    connection_index_.push_back(index);
-    codec_index_.push_back(index);
-
-    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-        .Times(testing::AnyNumber())
-        .WillRepeatedly(InvokeWithoutArgs([&]() -> Network::ClientConnection* {
-          uint32_t index = connection_index_.front();
-          connection_index_.pop_front();
-          return test_sessions_[index]->client_connection_;
-        }));
-
-    EXPECT_CALL(*health_checker_, createCodecClient_(_))
-        .WillRepeatedly(
-            Invoke([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
-              uint32_t index = codec_index_.front();
-              codec_index_.pop_front();
-              TestSession& test_session = *test_sessions_[index];
-              std::shared_ptr<Upstream::MockClusterInfo> cluster{
-                  new NiceMock<Upstream::MockClusterInfo>()};
-              Event::MockDispatcher dispatcher_;
-
-              test_session.codec_client_ = new CodecClientForTest(
-                  Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
-                  test_session.codec_, nullptr,
-                  Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
-              return test_session.codec_client_;
-            }));
-  }
-
-  void expectStreamCreate(size_t index) {
-    test_sessions_[index]->request_encoder_.stream_.callbacks_.clear();
-    EXPECT_CALL(*test_sessions_[index]->codec_, newStream(_))
-        .WillOnce(DoAll(SaveArgAddress(&test_sessions_[index]->stream_response_callbacks_),
-                        ReturnRef(test_sessions_[index]->request_encoder_)));
   }
 
   // Starts healthchecker and sets up timer expectations, leaving up future specification of
@@ -3755,11 +3686,6 @@ public:
   }
 
   MOCK_METHOD(void, onHostStatus, (HostSharedPtr host, HealthTransition changed_state));
-
-  std::vector<TestSessionPtr> test_sessions_;
-  std::shared_ptr<TestGrpcHealthCheckerImpl> health_checker_;
-  std::list<uint32_t> connection_index_{};
-  std::list<uint32_t> codec_index_{};
 };
 
 class GrpcHealthCheckerImplTest : public testing::Test, public GrpcHealthCheckerImplTestBase {};

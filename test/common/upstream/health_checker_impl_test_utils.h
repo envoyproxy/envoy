@@ -87,5 +87,37 @@ public:
   Network::ReadFilterSharedPtr read_filter_;
 };
 
+class GrpcHealthCheckerImplTestBase : public HealthCheckerTestBase {
+public:
+  struct TestSession {
+    TestSession() = default;
+
+    Event::MockTimer* interval_timer_{};
+    Event::MockTimer* timeout_timer_{};
+    Http::MockClientConnection* codec_{};
+    Stats::IsolatedStoreImpl stats_store_;
+    Network::MockClientConnection* client_connection_{};
+    NiceMock<Http::MockRequestEncoder> request_encoder_;
+    Http::ResponseDecoder* stream_response_callbacks_{};
+    CodecClientForTest* codec_client_{};
+  };
+
+  GrpcHealthCheckerImplTestBase() {
+    EXPECT_CALL(*cluster_->info_, features())
+        .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP2));
+  }
+
+  using TestSessionPtr = std::unique_ptr<TestSession>;
+
+  void expectSessionCreate();
+  void expectClientCreate(size_t index);
+  void expectStreamCreate(size_t index);
+
+  std::vector<TestSessionPtr> test_sessions_;
+  std::shared_ptr<TestGrpcHealthCheckerImpl> health_checker_;
+  std::list<uint32_t> connection_index_{};
+  std::list<uint32_t> codec_index_{};
+}
+
 } // namespace Upstream
 } // namespace Envoy

@@ -17,9 +17,17 @@ message TcpRespond {
   bytes data = 1;
 }
 
+message GrpcRespond {
+  oneof grpc_respond_selector {
+
+    bytes data = 2;
+  }
+}
+
 message Respond {
   HttpRespond http_respond = 1 [(validate.rules).message.required = true];
   TcpRespond tcp_respond = 2 [(validate.rules).message.required = true];
+  GrpcRespond grpc_respond = 3 [(validate.rules).message.required = true];
 }
 
 enum RaiseEvent {

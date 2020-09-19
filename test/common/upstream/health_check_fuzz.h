@@ -14,7 +14,7 @@ public:
   void allocHttpHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input);
   void respond(const test::fuzz::Headers& headers, absl::string_view status);
-  void triggerIntervalTimer(bool last_action);
+  void triggerIntervalTimer(bool expect_client_create);
   void triggerTimeoutTimer(bool last_action);
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action);
 
@@ -39,6 +39,18 @@ public:
   bool empty_response_ = true;
 };
 
+class GrpcHealthCheckFuzz : GrpcHealthCheckerImplTestBase { //TODO: What methods will I use here
+  void allocGrpcHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
+  void initialize(test::common::upstream::HealthCheckTestCase input);
+  void respond(); //This has two options, headers or raw bytes
+  void triggerIntervalTimer(bool expect_client_create);
+  void triggerTimeoutTimer();
+  void raiseEvent();
+
+  // Determines whether the client gets reused or not after respondHeaders()
+  bool reuse_connection_ = true;
+};
+
 class HealthCheckFuzz { // TODO: once added tcp/grpc, switch this to an
                         // abstract health checker test class that can handle
                         // one of the three types
@@ -60,6 +72,7 @@ private:
   Type type_;
   std::unique_ptr<HttpHealthCheckFuzz> http_fuzz_test_;
   std::unique_ptr<TcpHealthCheckFuzz> tcp_fuzz_test_;
+  std::unique_ptr<GrpcHealthCheckFuzz> grpc_fuzz_test_;
 };
 
 } // namespace Upstream

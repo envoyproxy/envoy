@@ -235,6 +235,70 @@ HealthCheckFuzz::getEventTypeFromProto(const test::common::upstream::RaiseEvent&
   }
 }
 
+void GrpcHealthCheckFuzz::allocGrpcHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config) {
+  health_checker_ = std::make_shared<TestGrpcHealthCheckerImpl>(
+      *cluster_, config, dispatcher_, runtime_, random_,
+      HealthCheckEventLoggerPtr(event_logger_storage_.release()));
+  ENVOY_LOG_MISC(trace, "Created Test Grpc Health Checker");
+}
+
+void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase input) {
+  allocGrpcHealthCheckerFromProto(input);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectStreamCreate(0);
+  health_checker_->start();
+  ON_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _)) //TODO: Is this the same thing?
+      .WillByDefault(testing::Return(45000));
+
+  //What to do here?
+  if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
+    test_sessions_[0]->interval_timer_->invokeCallback();
+  }
+  if (input.health_check_config().has_reuse_connection()) {
+    reuse_connection_ = input.health_check_config().reuse_connection().value();
+  }
+}
+
+void GrpcHealthCheckFuzz::respond(); //This has two options, headers or raw bytes
+void GrpcHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
+  if (!test_sessions_[0]->interval_timer_.enabled_) {
+    ENVOY_LOG_MISC(trace, "Interval timer is disabled. Skipping trigger interval timer.");
+    return;
+  }
+  if (expect_client_create) {
+    expectClientCreate();
+  }
+  expectStreamCreate();
+  test_sessions_[0]->interval_timer_->invokeCallback();
+}
+
+void GrpcHealthCheckFuzz::triggerTimeoutTimer() {
+  // Timeout timer needs to be explicitly enabled, usually by a call to onIntervalBase().
+  if (!test_sessions_[0]->timeout_timer_->enabled_) {
+    ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping trigger timeout timer.");
+    return;
+  }
+  ENVOY_LOG_MISC(trace, "Triggered timeout timer");
+  test_sessions_[0]->timeout_timer_->invokeCallback(); // This closes the client, turns off timeout
+                                                       // and enables interval
+  if (!last_action) {
+    ENVOY_LOG_MISC(trace, "Creating client and stream from network timeout");
+    triggerIntervalTimer(true);
+  }
+}
+
+void GrpcHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) {
+  test_sessions_[0]->raiseEvent(event_type);
+  if (!last_action && event_type != Network::ConnectionEvent::Connected) {
+    ENVOY_LOG_MISC(trace, "Creating client and stream from close event");
+    triggerIntervalTimer(
+        true); // Interval timer is guaranteed to be enabled from a close event - calls
+               // onResetStream which handles failure, turning interval timer on and timeout off
+  }
+}
+
 void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTestCase input) {
   switch (input.health_check_config().health_checker_case()) {
   case envoy::config::core::v3::HealthCheck::kHttpHealthCheck: {
@@ -254,6 +318,18 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
     tcp_fuzz_test_ = std::make_unique<TcpHealthCheckFuzz>();
     try { // Catches exceptions related to initializing health checker
       tcp_fuzz_test_->initialize(input);
+    } catch (EnvoyException& e) {
+      ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
+      return;
+    }
+    replay(input);
+    break;
+  }
+  case envoy::config::core::v3::HealthCheck::kGrpcHealthCheck: {
+    type_ = HealthCheckFuzz::Type::GRPC;
+    grpc_fuzz_test_ = std::make_unique<GrpcHealthCheckFuzz>();
+    try { // Catches exceptions related to initializing health checker
+      grpc_fuzz_test_->initialize(input);
     } catch (EnvoyException& e) {
       ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
       return;
@@ -314,6 +390,10 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
         tcp_fuzz_test_->triggerTimeoutTimer(last_action);
         break;
       }
+      case HealthCheckFuzz::Type::GRPC: {
+        grpc_fuzz_test_->triggerTimeoutTimer(last_action);
+        break;
+      }
       default:
         break;
       }
@@ -327,6 +407,10 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
       }
       case HealthCheckFuzz::Type::TCP: {
         tcp_fuzz_test_->raiseEvent(getEventTypeFromProto(event.raise_event()), last_action);
+        break;
+      }
+      case HealthCheckFuzz::Type::GRPC: {
+        grpc_fuzz_test_->raiseEvent(getEventTypeFromProto(event.raise_event()), last_action);
         break;
       }
       default:
