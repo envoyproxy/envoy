@@ -56,7 +56,7 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
               decompressor_library:
-                name: basic
+                name: gzip
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip
                   # Maximum window bits to allow for any stream to be decompressed. Optimally this
