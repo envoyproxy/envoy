@@ -77,3 +77,10 @@ envoy_mobile_swift_test(
         "CounterTests.swift",
     ],
 )
+
+envoy_mobile_swift_test(
+    name = "element_tests",
+    srcs = [
+        "ElementTests.swift",
+    ],
+)
