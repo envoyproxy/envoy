@@ -23,9 +23,11 @@ build --define disable_known_issue_asserts=true
 build --define cxxopts=-std=c++17
 # https://github.com/bazelbuild/bazel/issues/10674#issuecomment-658208918
 build --incompatible_objc_compile_info_migration
+# Unset per_object_debug_info. Causes failures on Android Linux release builds.
+build --features=-per_object_debug_info
 
 # Default flags for builds targeting iOS
-# Manual Stamping is necessary in order to get versioning information in the ios
+# Manual stamping is necessary in order to get versioning information in the iOS
 # static framework.
 # More information on stamping can be found here:
 # https://github.com/envoyproxy/envoy/tree/master/bazel#enabling-optional-features
