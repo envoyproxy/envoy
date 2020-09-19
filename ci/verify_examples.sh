@@ -64,7 +64,7 @@ case "$TESTCOMMAND" in
 	echo "Running sandbox test"
 	run_examples
 	;;
-    "")
+    ""|all)
 	echo "Running all tests"
 	verify_build_configs
 	run_examples
