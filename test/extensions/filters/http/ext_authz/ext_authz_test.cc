@@ -692,7 +692,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
 TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
   InSequence s;
 
-  // Set up all the typical headers plus an additional user defined header
+  // Set up all the typical headers plus an additional user defined header.
   request_headers_.addCopy(Http::Headers::get().Host, "example.com");
   request_headers_.addCopy(Http::Headers::get().Method, "GET");
   request_headers_.addCopy(Http::Headers::get().Path, "/users");
@@ -725,7 +725,7 @@ TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  // Let's try to remove all the headers in the request
+  // Let's try to remove all the headers in the request.
   response.headers_to_remove = std::vector<Http::LowerCaseString>{
       Http::Headers::get().Host,          Http::Headers::get().HostLegacy,
       Http::Headers::get().Method,        Http::Headers::get().Path,
@@ -735,7 +735,7 @@ TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
   // All :-prefixed headers (and Host) should still be there - only the user
-  // defined header should have been removed
+  // defined header should have been removed.
   EXPECT_EQ("example.com", request_headers_.get_(Http::Headers::get().Host));
   EXPECT_EQ("example.com", request_headers_.get_(Http::Headers::get().HostLegacy));
   EXPECT_EQ("GET", request_headers_.get_(Http::Headers::get().Method));
