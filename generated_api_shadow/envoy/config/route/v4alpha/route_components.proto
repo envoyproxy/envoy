@@ -551,7 +551,40 @@ message CorsPolicy {
   core.v4alpha.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 37]
+message HeaderRewriteLiteral {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.route.v3.HeaderRewriteLiteral";
+
+  // String match can use prefix match and present match. In case of prefix match, the matched prefix part of
+  // the header's value is substituted. In case of present match the whole value of the header is overwritten.
+  type.matcher.v4alpha.StringMatcher string_match = 1 [(validate.rules).message = {required: true}];
+
+  // The matched part will be replaced by the value provided in substitution.
+  string substitution = 2 [(validate.rules).string = {min_bytes: 1}];
+}
+
+message HeaderMatchAndRewrite {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.route.v3.HeaderMatchAndRewrite";
+
+  oneof header_rewriter_type {
+    // Describes the pattern to look for in the Header's value and what to substitute in its place
+    HeaderRewriteLiteral value_rewrite_literal = 1;
+  }
+}
+
+// Consists of the name of the header to rewrite along with the criteria
+// by which to match the upstream response header and instructions on how to rewrite it
+message UpstreamHeaderRewriter {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.route.v3.UpstreamHeaderRewriter";
+
+  string header_name = 1;
+
+  HeaderMatchAndRewrite match_and_rewrite = 2;
+}
+
+// [#next-free-field: 38]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.RouteAction";
 
@@ -800,6 +833,55 @@ message RouteAction {
   reserved 12, 18, 19, 16, 22, 21, 10;
 
   reserved "request_mirror_policy";
+
+  // Indicates that some headers received from upstream cluster need to be rewritten. When upstream
+  // returns a header, the header will be overwritten with the given value before being sent back as
+  // response to the client.
+  //
+  // In the below example we rewrite the location header received from the upstream cluster. In the
+  // case of the location header, two things need to match before a value substitution happens for
+  // the location header - Location header's value, and a few other headers present in upstream
+  // response.
+  //
+  // If a header is specified in response_headers_to_rewrite section but is not returned from the
+  // upstream it it simply ignored.
+  //
+  //   .. code-block:: yaml
+  //
+  //     - match:
+  //         prefix: "/itm/"
+  //       route:
+  //         response_headers_to_rewrite:
+  //         - header_name: location
+  //           match_and_rewrite:
+  //             value_rewrite_literal:
+  //               string_match:
+  //                 prefix: /itm/not-found/
+  //               substitution: /n/error
+  //             response_match_criteria:
+  //               and_match:
+  //                 rules:
+  //                 - and_match:
+  //                   rules:
+  //                   - http_response_headers_match:
+  //                     headers:
+  //                     - name: "cookie"
+  //                       exact_match: "pagetype=123"
+  //                   - http_response_headers_match:
+  //                     headers:
+  //                     - name: "content-type"
+  //                       exact_match: "text/html"
+  //                 - or_match:
+  //                   rules:
+  //                   - http_response_headers_match:
+  //                     headers:
+  //                     - name: "status"
+  //                       exact_match: "301"
+  //                   - http_response_headers_match:
+  //                     headers:
+  //                     - name: "status"
+  //                       exact_match: "302"
+  repeated UpstreamHeaderRewriter response_headers_to_rewrite = 37;
 
   oneof cluster_specifier {
     option (validate.required) = true;

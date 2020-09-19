@@ -469,7 +469,53 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               "not be stripped: {}",
               path_redirect_);
   }
+
+  for (const auto& element : route.route().response_headers_to_rewrite()) {
+    UpstreamHeaderRewriterSharedPtr rewriterPtr =
+        std::make_shared<UpstreamHeaderRewriter>(element.match_and_rewrite());
+    const bool success =
+        response_headers_to_rewrite_
+            .emplace(std::make_pair(std::string(element.header_name()), rewriterPtr))
+            .second;
+    if (!success) {
+      throw EnvoyException(
+          absl::StrCat("An upstream header can be added for rewrite only once. Duplicate header: ", element.header_name()));
+    }
+  }
 }
+
+RouteEntryImplBase::HeaderRewriteLiteral::HeaderRewriteLiteral(
+    const envoy::config::route::v3::HeaderRewriteLiteral& config)
+    : matcher_(config.string_match()), substitution_(config.substitution()) {
+  std::string msg = "Only prefix and exact match are allowed for header value literal";
+  switch (matcher_->matcher().match_pattern_case()) {
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact:
+    matched_prefix_ = matcher_->matcher().exact();
+    break;
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix:
+    matched_prefix_ = matcher_->matcher().prefix();
+    break;
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSuffix:
+    throw EnvoyException(msg);
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kContains:
+    throw EnvoyException(msg);
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
+    throw EnvoyException(msg);
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:
+    throw EnvoyException(msg);
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
+bool RouteEntryImplBase::HeaderRewriteLiteral::matches(const absl::string_view header_value) const {
+  return matcher_->match(header_value);
+}
+
+RouteEntryImplBase::UpstreamHeaderRewriter::UpstreamHeaderRewriter(
+    const envoy::config::route::v3::HeaderMatchAndRewrite& config)
+    : value_rewrite_literal_(
+          std::make_shared<HeaderRewriteLiteral>(config.value_rewrite_literal())) {}
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
   return !runtime_ ? true
@@ -572,16 +618,65 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   }
 }
 
+bool RouteEntryImplBase::shouldRewriteHeader(absl::string_view key, absl::string_view value,
+                                             std::string& matched_prefix,
+                                             std::string& substitution) const {
+  auto it = this->response_headers_to_rewrite_.find(std::string(key));
+  if (it != this->response_headers_to_rewrite_.end()) {
+    // Check for match predicate and header value conditions before substituting
+    if (it->second->getValueRewriteLiteral()->matches(value)) {
+      matched_prefix = it->second->getValueRewriteLiteral()->getMatchedPrefix();
+      substitution = it->second->getValueRewriteLiteral()->getSubstitution();
+      return true;
+    }
+  }
+  return false;
+}
+
+void RouteEntryImplBase::rewriteUpstreamResponseHeaders(Http::ResponseHeaderMap& headers) const {
+  std::vector<std::pair<Http::LowerCaseString, std::string>> headers_to_rewrite;
+  headers.iterate(
+      [this, &headers_to_rewrite](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+        absl::string_view key_to_use = header.key().getStringView();
+        absl::string_view value_to_use = header.value().getStringView();
+        std::string matched_prefix;
+        std::string substitution;
+        if (this->shouldRewriteHeader(key_to_use, value_to_use, matched_prefix, substitution)) {
+          std::string final_substitution(substitution);
+          if (matched_prefix.size()) {
+            // rewrite the matched prefix part with substitution value.
+            // If matched_prefix size is 0, the whole value is replaced.
+            final_substitution += std::string(value_to_use).substr(matched_prefix.size());
+          }
+          // Cannot directly change headers here as iterate() stops if headers change
+          headers_to_rewrite.push_back(
+              std::make_pair(Http::LowerCaseString(std::string(key_to_use)), final_substitution));
+        }
+        return Http::HeaderMap::Iterate::Continue;
+      });
+
+  // Iterate over the list and rewrite headers
+  for (auto vit = headers_to_rewrite.begin(); vit != headers_to_rewrite.end(); vit++) {
+    headers.setReferenceKey(vit->first, vit->second);
+  }
+}
+
 void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info) const {
   if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
     // Append user-specified request headers from most to least specific: route-level headers,
     // virtual host level headers and finally global connection manager level headers.
+    // The header rewriter should run before adding removing headers as the intention
+    // is to rewrite upstream headers not user-specified headers.
+    this->rewriteUpstreamResponseHeaders(headers);
     response_headers_parser_->evaluateHeaders(headers, stream_info);
     vhost_.responseHeaderParser().evaluateHeaders(headers, stream_info);
     vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, stream_info);
   } else {
     // Most specific mutations take precedence.
+    // However the rewrites to upstream headers should
+    // happen before any user specified header is added
+    this->rewriteUpstreamResponseHeaders(headers);
     vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, stream_info);
     vhost_.responseHeaderParser().evaluateHeaders(headers, stream_info);
     response_headers_parser_->evaluateHeaders(headers, stream_info);

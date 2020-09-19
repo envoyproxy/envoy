@@ -530,6 +530,9 @@ public:
   }
   const absl::optional<ConnectConfig>& connectConfig() const override { return connect_config_; }
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
+  void rewriteUpstreamResponseHeaders(Http::ResponseHeaderMap& headers) const;
+  bool shouldRewriteHeader(absl::string_view key, absl::string_view value,
+                           std::string& matched_prefix, std::string& substitution) const;
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::RequestHeaderMap& headers) const override;
@@ -568,6 +571,44 @@ protected:
   void finalizePathHeader(Http::RequestHeaderMap& headers, absl::string_view matched_path,
                           bool insert_envoy_original_path) const;
 
+  class HeaderRewriteLiteral {
+  public:
+    HeaderRewriteLiteral(const envoy::config::route::v3::HeaderRewriteLiteral& config);
+
+    /**
+     * Check if the upstream header value for a request contain
+     * a match for this HeaderRewriteLiteral.
+     * @param header_value supplies the header value from a request.
+     * @return bool true if a match for this HeaderRewriteLiteral exists in header_value.
+     */
+    bool matches(const absl::string_view header_value) const;
+    std::string& getSubstitution() { return substitution_; }
+    std::string& getMatchedPrefix() { return matched_prefix_; }
+
+  private:
+    const absl::optional<Matchers::StringMatcherImpl> matcher_;
+    std::string substitution_;
+    std::string matched_prefix_;
+  };
+  using HeaderRewriteLiteralSharedPtr = std::shared_ptr<HeaderRewriteLiteral>;
+
+  class UpstreamHeaderRewriter {
+  public:
+    UpstreamHeaderRewriter(const envoy::config::route::v3::HeaderMatchAndRewrite& config);
+    // UpstreamHeaderMatchPredicate& getHeaderMatchPredicate();
+    HeaderRewriteLiteralSharedPtr getValueRewriteLiteral() const { return value_rewrite_literal_; }
+
+  private:
+    // UpstreamHeaderMatchPredicate header_match_predicate_;
+    HeaderRewriteLiteralSharedPtr value_rewrite_literal_;
+  };
+  using UpstreamHeaderRewriterSharedPtr = std::shared_ptr<UpstreamHeaderRewriter>;
+
+  // class UpstreamHeaderMatchPredicate {
+  //   public:
+  //     UpstreamHeaderMatchPredicate(const  envoy::config::route::v3::MatchPredicate& config);
+  // };
+
 private:
   struct RuntimeData {
     std::string fractional_runtime_key_{};
@@ -590,6 +631,9 @@ private:
                                 const StreamInfo::StreamInfo& stream_info,
                                 bool insert_envoy_original_path) const override {
       return parent_->finalizeRequestHeaders(headers, stream_info, insert_envoy_original_path);
+    }
+    void rewriteUpstreamResponseHeaders(Http::ResponseHeaderMap& headers) const {
+      return parent_->rewriteUpstreamResponseHeaders(headers);
     }
     void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                  const StreamInfo::StreamInfo& stream_info) const override {
@@ -714,8 +758,12 @@ private:
       request_headers_parser_->evaluateHeaders(headers, stream_info);
       DynamicRouteEntry::finalizeRequestHeaders(headers, stream_info, insert_envoy_original_path);
     }
+    void rewriteUpstreamResponseHeaders(Http::ResponseHeaderMap& headers) const {
+      DynamicRouteEntry::rewriteUpstreamResponseHeaders(headers);
+    }
     void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                  const StreamInfo::StreamInfo& stream_info) const override {
+      rewriteUpstreamResponseHeaders(headers);
       response_headers_parser_->evaluateHeaders(headers, stream_info);
       DynamicRouteEntry::finalizeResponseHeaders(headers, stream_info);
     }
@@ -803,6 +851,7 @@ private:
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
 
   UpgradeMap upgrade_map_;
+  std::map<std::string, UpstreamHeaderRewriterSharedPtr> response_headers_to_rewrite_;
   const uint64_t total_cluster_weight_;
   std::unique_ptr<const Http::HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaConstPtr metadata_match_criteria_;
