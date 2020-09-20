@@ -261,7 +261,19 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   }
 }
 
-void GrpcHealthCheckFuzz::respond() { //This has two options, headers or raw bytes
+void GrpcHealthCheckFuzz::respondHeaders(test::common::upstream::GrpcRespondHeaders grpc_respond_headers) {
+
+}
+
+void GrpcHealthCheckFuzz::respondBytes(test::common::upstream::GrpcRespondBytes grpc_respond_bytes) {
+
+}
+
+void GrpcHealthCheckFuzz::respondTrailers(test::common::upstream::GrpcRespondTrailers grpc_respond_headers) {
+
+}
+
+void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respond) { //This has two options, headers or raw bytes
 
 }
 
@@ -363,6 +375,10 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
         tcp_fuzz_test_->respond(event.respond().tcp_respond().data(), last_action);
         break;
       }
+      case HealthCheckFuzz::Type::GRPC: {
+        grpc_fuzz_test_->respond(event.respond());
+        break;
+      }
       default:
         break;
       }
@@ -376,6 +392,10 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
       }
       case HealthCheckFuzz::Type::TCP: {
         tcp_fuzz_test_->triggerIntervalTimer();
+        break;
+      }
+      case HealthCheckFuzz::Type::GRPC: {
+        grpc_fuzz_test_->triggerIntervalTimer(false);
         break;
       }
       default:

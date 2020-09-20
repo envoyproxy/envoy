@@ -3409,7 +3409,7 @@ TEST_F(TcpHealthCheckerImplTest, ConnectionLocalFailure) {
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.passive_failure").value());
 }
 
-class GrpcHealthCheckerImplTestBase : public HealthCheckerTestBase {
+class GrpcHealthCheckerImplTest : public testing::Test, public GrpcHealthCheckerImplTestBase {
 public:
   struct ResponseSpec {
     struct ChunkSpec {
@@ -3673,8 +3673,6 @@ public:
 
   MOCK_METHOD(void, onHostStatus, (HostSharedPtr host, HealthTransition changed_state));
 };
-
-class GrpcHealthCheckerImplTest : public testing::Test, public GrpcHealthCheckerImplTestBase {};
 
 // Test single host check success.
 TEST_F(GrpcHealthCheckerImplTest, Success) { testSingleHostSuccess(absl::nullopt); }

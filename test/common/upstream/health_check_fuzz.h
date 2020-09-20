@@ -18,7 +18,7 @@ public:
   void triggerTimeoutTimer(bool last_action);
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action);
 
-  // Determines whether the client gets reused or not after respondHeaders()
+  // Determines whether the client gets reused or not after response
   bool reuse_connection_ = true;
 };
 
@@ -31,7 +31,7 @@ public:
   void triggerTimeoutTimer(bool last_action);
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action);
 
-  // Determines whether the client gets reused or not after respondHeaders()
+  // Determines whether the client gets reused or not after response
   bool reuse_connection_ = true;
 
   // Empty response induces a specific codepath in raiseEvent in case of connected, ignores the
@@ -43,12 +43,15 @@ class GrpcHealthCheckFuzz : GrpcHealthCheckerImplTestBase { //TODO: What methods
 public:
   void allocGrpcHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input);
-  void respond(); //This has two options, headers or raw bytes
+  void respondHeaders(test::common::upstream::GrpcRespondHeaders grpc_respond_headers);
+  void respondBytes(test::common::upstream::GrpcRespondBytes grpc_respond_bytes);
+  void respondTrailers(test::common::upstream::GrpcRespondTrailers grpc_respond_headers);
+  void respond(test::common::upstream::GrpcRespond grpc_respond); //This has three options, headers, raw bytes, or trailers
   void triggerIntervalTimer(bool expect_client_create);
   void triggerTimeoutTimer(bool last_action);
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action);
 
-  // Determines whether the client gets reused or not after respondHeaders()
+  // Determines whether the client gets reused or not after response
   bool reuse_connection_ = true;
 };
 

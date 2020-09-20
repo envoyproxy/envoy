@@ -17,17 +17,26 @@ message TcpRespond {
   bytes data = 1;
 }
 
-message GrpcRespondBytes {
+message GrpcRespondHeaders {
+  test.fuzz.Headers headers = 1;
+  //https://github.com/nodejs/http-parser/blob/master/http_parser.c#L852
+  string status = 2 [(validate.rules).string = {pattern: "[0-9]+$*", min_len: 1}];
+}
 
+message GrpcRespondBytes {
+  //TODO: Structured response, which will get converted to raw bytes
   bytes data = 2; //Raw bytes
+}
+
+message GrpcRespondTrailers {
+
 }
 
 message GrpcRespond {
   oneof grpc_respond_selector {
-    test.fuzz.Headers headers = 1;
-    //https://github.com/nodejs/http-parser/blob/master/http_parser.c#L852
-    string status = 2 [(validate.rules).string = {pattern: "[0-9]+$*", min_len: 1}];
-    GrpcRespondBytes grpc_respond_bytes = 3;
+    GrpcRespondHeaders grpc_respond_headers = 1;
+    GrpcRespondBytes grpc_respond_bytes = 2;
+    GrpcRespondTrailers grpc_respond_trailers = 3;
   }
 }
 
