@@ -17,7 +17,6 @@ envoy_extension_cc_test(
     name = "proxy_protocol_test",
     srcs = ["proxy_protocol_test.cc"],
     extension_name = "envoy.filters.listener.proxy_protocol",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",

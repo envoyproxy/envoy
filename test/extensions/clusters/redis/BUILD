@@ -92,7 +92,6 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["redis_cluster_integration_test.cc"],
     extension_name = "envoy.clusters.redis",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/clusters/redis:redis_cluster",
         "//source/extensions/clusters/redis:redis_cluster_lb",

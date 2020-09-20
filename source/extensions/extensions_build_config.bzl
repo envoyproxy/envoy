@@ -164,7 +164,7 @@ EXTENSIONS = {
     "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_config",
     "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
-    "envoy.transport_sockets.quic":                     "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
+    "envoy.transport_sockets.quic":                     "//source/extensions/quic_listeners/quiche:quic_factory_lib",
 
     #
     # Retry host predicates
@@ -203,6 +203,7 @@ EXTENSIONS = {
     # Watchdog actions
     #
     "envoy.watchdog.profile_action":                    "//source/extensions/watchdog/profile_action:config",
+    "envoy.watchdog.abort_action":                      "//source/extensions/watchdog/abort_action:config",
 
 }
 

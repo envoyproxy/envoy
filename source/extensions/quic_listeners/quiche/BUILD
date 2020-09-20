@@ -181,7 +181,7 @@ envoy_cc_library(
     ],
     tags = ["nofips"],
     deps = [
-        ":envoy_quic_crypto_server_stream_lib",
+        ":envoy_quic_proof_source_lib",
         ":envoy_quic_stream_lib",
         ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",
@@ -302,7 +302,6 @@ envoy_cc_library(
         ":envoy_quic_packet_writer_lib",
         ":envoy_quic_proof_source_lib",
         ":envoy_quic_utils_lib",
-        ":udp_gso_batch_writer_lib",
         "//include/envoy/network:listener_interface",
         "//source/common/network:listener_lib",
         "//source/common/protobuf:utility_lib",
@@ -350,11 +349,10 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "quic_transport_socket_factory_lib",
     srcs = ["quic_transport_socket_factory.cc"],
     hdrs = ["quic_transport_socket_factory.h"],
-    security_posture = "unknown",
     tags = ["nofips"],
     deps = [
         "//include/envoy/network:transport_socket_interface",
@@ -365,6 +363,32 @@ envoy_cc_extension(
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
     ],
+)
+
+# Create a single target that contains all the libraries that register factories.
+# All of these are needed for this extension to function.
+envoy_cc_extension(
+    name = "quic_factory_lib",
+    security_posture = "unknown",
+    tags = ["nofips"],
+
+    # QUICHE can't build against FIPS BoringSSL until the FIPS build
+    # is on a new enough version to have QUIC support. Remove it from
+    # the build until then. Re-enable as part of #7433.
+    #
+    # QUICHE doesn't compile on Windows right now. Disable until it
+    # is fixed.
+    deps = select({
+        "//bazel:boringssl_fips": [],
+        "//bazel:boringssl_disabled": [],
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            ":active_quic_listener_config_lib",
+            ":codec_lib",
+            ":quic_transport_socket_factory_lib",
+            ":udp_gso_batch_writer_config_lib",
+        ],
+    }),
 )
 
 envoy_cc_library(
@@ -381,8 +405,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "udp_gso_batch_writer_lib",
-    srcs = ["udp_gso_batch_writer.cc"],
-    hdrs = ["udp_gso_batch_writer.h"],
+    srcs = select({
+        "//bazel:linux": ["udp_gso_batch_writer.cc"],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        "//bazel:linux": ["udp_gso_batch_writer.h"],
+        "//conditions:default": [],
+    }),
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     visibility = [
@@ -413,16 +443,5 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/common/api:os_sys_calls_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "envoy_quic_crypto_server_stream_lib",
-    srcs = ["envoy_quic_crypto_server_stream.cc"],
-    hdrs = ["envoy_quic_crypto_server_stream.h"],
-    tags = ["nofips"],
-    deps = [
-        ":envoy_quic_proof_source_lib",
-        "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
     ],
 )

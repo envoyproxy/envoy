@@ -11,8 +11,8 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/listen_socket_impl.h"
-#include "common/network/listener_impl.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/network/tcp_listener_impl.h"
 #include "common/network/utility.h"
 
 #include "server/connection_handler_impl.h"
@@ -61,7 +61,8 @@ public:
         socket_(std::make_shared<Network::TcpListenSocket>(
             Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_)), name_("proxy"),
-        filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
+        filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
+        init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
     EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
@@ -95,6 +96,7 @@ public:
     return empty_access_logs_;
   }
   uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+  Init::Manager& initManager() override { return *init_manager_; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -200,6 +202,7 @@ public:
   Api::OsSysCallsImpl os_sys_calls_actual_;
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+  std::unique_ptr<Init::Manager> init_manager_;
 };
 
 // Parameterize the listener socket address version.
@@ -303,6 +306,8 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  // TODO(davinci26): Mocking should not be used to provide real system calls.
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -345,6 +350,12 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
   EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
     return os_sys_calls_actual_.close(fd);
   }));
+  EXPECT_CALL(os_sys_calls, accept(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
+            return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
+          }));
   connect(false);
   write(buffer, sizeof(buffer));
 
@@ -360,6 +371,8 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  // TODO(davinci26): Mocking should not be used to provide real system calls.
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Return(Api::SysCallSizeResult{-1, 0}));
@@ -397,6 +410,12 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
   EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
     return os_sys_calls_actual_.close(fd);
   }));
+  EXPECT_CALL(os_sys_calls, accept(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
+            return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
+          }));
   connect(false);
   write(buffer, sizeof(buffer));
 
@@ -577,6 +596,7 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
+  // TODO(davinci26): Mocking should not be used to provide real system calls.
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t n, int flags) {
@@ -621,6 +641,12 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
   EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
     return os_sys_calls_actual_.close(fd);
   }));
+  EXPECT_CALL(os_sys_calls, accept(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
+            return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
+          }));
   connect(false);
   write(buffer, sizeof(buffer));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -721,6 +747,7 @@ TEST_P(ProxyProtocolTest, V2Fragmented3Error) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
+  // TODO(davinci26): Mocking should not be used to provide real system calls.
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
@@ -768,6 +795,12 @@ TEST_P(ProxyProtocolTest, V2Fragmented3Error) {
   EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
     return os_sys_calls_actual_.close(fd);
   }));
+  EXPECT_CALL(os_sys_calls, accept(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
+            return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
+          }));
   connect(false);
   write(buffer, 17);
 
@@ -785,6 +818,7 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
+  // TODO(davinci26): Mocking should not be used to provide real system calls.
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
@@ -832,6 +866,12 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
   EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
     return os_sys_calls_actual_.close(fd);
   }));
+  EXPECT_CALL(os_sys_calls, accept(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
+            return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
+          }));
   connect(false);
   write(buffer, 10);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -1246,7 +1286,8 @@ public:
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
             socket_->localAddress()->ip()->port())),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_)), name_("proxy"),
-        filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
+        filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
+        init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
     EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
@@ -1290,6 +1331,7 @@ public:
     return empty_access_logs_;
   }
   uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+  Init::Manager& initManager() override { return *init_manager_; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -1357,6 +1399,7 @@ public:
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+  std::unique_ptr<Init::Manager> init_manager_;
 };
 
 // Parameterize the listener socket address version.

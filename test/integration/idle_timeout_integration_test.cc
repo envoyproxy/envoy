@@ -40,7 +40,6 @@ public:
 
   IntegrationStreamDecoderPtr setupPerStreamIdleTimeoutTest(const char* method = "GET") {
     initialize();
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
     auto encoder_decoder =
         codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", method},
@@ -192,7 +191,6 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutWithLargeBuffer) {
   enable_per_stream_idle_timeout_ = true;
   initialize();
 
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   response->waitForEndStream();
@@ -356,7 +354,6 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestW
   enable_request_timeout_ = true;
 
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   std::string raw_response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1", &raw_response, true);
@@ -370,7 +367,6 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDoesNotTriggerOnRawCompleteRequ
   enable_request_timeout_ = true;
 
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   std::string raw_response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &raw_response, true);
