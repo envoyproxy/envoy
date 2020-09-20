@@ -1,6 +1,5 @@
 #include "test/common/upstream/health_checker_impl_test_utils.h"
 
-#include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
 
 #include "gmock/gmock.h"
@@ -87,6 +86,11 @@ void TcpHealthCheckerImplTestBase::expectClientCreate() {
   EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(testing::SaveArg<0>(&read_filter_));
 }
 
+GrpcHealthCheckerImplTestBase::GrpcHealthCheckerImplTestBase() {
+    EXPECT_CALL(*cluster_->info_, features())
+        .WillRepeatedly(testing::Return(Upstream::ClusterInfo::Features::HTTP2));
+  }
+
 void GrpcHealthCheckerImplTestBase::expectSessionCreate() {
   // Expectations are in LIFO order.
     TestSessionPtr new_test_session(new TestSession());
@@ -106,7 +110,7 @@ void GrpcHealthCheckerImplTestBase::expectClientCreate(size_t index) {
 
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .Times(testing::AnyNumber())
-        .WillRepeatedly(InvokeWithoutArgs([&]() -> Network::ClientConnection* {
+        .WillRepeatedly(testing::InvokeWithoutArgs([&]() -> Network::ClientConnection* {
           uint32_t index = connection_index_.front();
           connection_index_.pop_front();
           return test_sessions_[index]->client_connection_;

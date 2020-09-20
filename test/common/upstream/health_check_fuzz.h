@@ -40,12 +40,13 @@ public:
 };
 
 class GrpcHealthCheckFuzz : GrpcHealthCheckerImplTestBase { //TODO: What methods will I use here
+public:
   void allocGrpcHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input);
   void respond(); //This has two options, headers or raw bytes
   void triggerIntervalTimer(bool expect_client_create);
-  void triggerTimeoutTimer();
-  void raiseEvent();
+  void triggerTimeoutTimer(bool last_action);
+  void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action);
 
   // Determines whether the client gets reused or not after respondHeaders()
   bool reuse_connection_ = true;

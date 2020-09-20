@@ -7,6 +7,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/health_check_event_logger.h"
+#include "test/common/http/common.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -87,6 +88,20 @@ public:
   Network::ReadFilterSharedPtr read_filter_;
 };
 
+class TestGrpcHealthCheckerImpl : public GrpcHealthCheckerImpl {
+public:
+  using GrpcHealthCheckerImpl::GrpcHealthCheckerImpl;
+
+  Http::CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& conn_data) override {
+    auto codec_client = createCodecClient_(conn_data);
+    return Http::CodecClientPtr(codec_client);
+  };
+
+  // GrpcHealthCheckerImpl
+  MOCK_METHOD(Http::CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData&));
+};
+
+
 class GrpcHealthCheckerImplTestBase : public HealthCheckerTestBase {
 public:
   struct TestSession {
@@ -102,12 +117,9 @@ public:
     CodecClientForTest* codec_client_{};
   };
 
-  GrpcHealthCheckerImplTestBase() {
-    EXPECT_CALL(*cluster_->info_, features())
-        .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP2));
-  }
-
   using TestSessionPtr = std::unique_ptr<TestSession>;
+
+  GrpcHealthCheckerImplTestBase();
 
   void expectSessionCreate();
   void expectClientCreate(size_t index);
@@ -117,7 +129,7 @@ public:
   std::shared_ptr<TestGrpcHealthCheckerImpl> health_checker_;
   std::list<uint32_t> connection_index_{};
   std::list<uint32_t> codec_index_{};
-}
+};
 
 } // namespace Upstream
 } // namespace Envoy

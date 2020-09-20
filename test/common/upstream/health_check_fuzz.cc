@@ -243,7 +243,7 @@ void GrpcHealthCheckFuzz::allocGrpcHealthCheckerFromProto(const envoy::config::c
 }
 
 void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase input) {
-  allocGrpcHealthCheckerFromProto(input);
+  allocGrpcHealthCheckerFromProto(input.health_check_config());
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   expectSessionCreate();
@@ -261,20 +261,23 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   }
 }
 
-void GrpcHealthCheckFuzz::respond(); //This has two options, headers or raw bytes
+void GrpcHealthCheckFuzz::respond() { //This has two options, headers or raw bytes
+
+}
+
 void GrpcHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
-  if (!test_sessions_[0]->interval_timer_.enabled_) {
+  if (!test_sessions_[0]->interval_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Interval timer is disabled. Skipping trigger interval timer.");
     return;
   }
   if (expect_client_create) {
-    expectClientCreate();
+    expectClientCreate(0);
   }
-  expectStreamCreate();
+  expectStreamCreate(0);
   test_sessions_[0]->interval_timer_->invokeCallback();
 }
 
-void GrpcHealthCheckFuzz::triggerTimeoutTimer() {
+void GrpcHealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
   // Timeout timer needs to be explicitly enabled, usually by a call to onIntervalBase().
   if (!test_sessions_[0]->timeout_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping trigger timeout timer.");
@@ -290,7 +293,7 @@ void GrpcHealthCheckFuzz::triggerTimeoutTimer() {
 }
 
 void GrpcHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) {
-  test_sessions_[0]->raiseEvent(event_type);
+  test_sessions_[0]->client_connection_->raiseEvent(event_type);
   if (!last_action && event_type != Network::ConnectionEvent::Connected) {
     ENVOY_LOG_MISC(trace, "Creating client and stream from close event");
     triggerIntervalTimer(

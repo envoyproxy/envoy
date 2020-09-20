@@ -3409,22 +3409,8 @@ TEST_F(TcpHealthCheckerImplTest, ConnectionLocalFailure) {
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.passive_failure").value());
 }
 
-class TestGrpcHealthCheckerImpl : public GrpcHealthCheckerImpl {
-public:
-  using GrpcHealthCheckerImpl::GrpcHealthCheckerImpl;
-
-  Http::CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& conn_data) override {
-    auto codec_client = createCodecClient_(conn_data);
-    return Http::CodecClientPtr(codec_client);
-  };
-
-  // GrpcHealthCheckerImpl
-  MOCK_METHOD(Http::CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData&));
-};
-
 class GrpcHealthCheckerImplTestBase : public HealthCheckerTestBase {
 public:
-
   struct ResponseSpec {
     struct ChunkSpec {
       bool valid;

@@ -17,10 +17,17 @@ message TcpRespond {
   bytes data = 1;
 }
 
+message GrpcRespondBytes {
+
+  bytes data = 2; //Raw bytes
+}
+
 message GrpcRespond {
   oneof grpc_respond_selector {
-
-    bytes data = 2;
+    test.fuzz.Headers headers = 1;
+    //https://github.com/nodejs/http-parser/blob/master/http_parser.c#L852
+    string status = 2 [(validate.rules).string = {pattern: "[0-9]+$*", min_len: 1}];
+    GrpcRespondBytes grpc_respond_bytes = 3;
   }
 }
 
