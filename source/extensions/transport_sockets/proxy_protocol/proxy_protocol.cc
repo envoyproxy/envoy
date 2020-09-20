@@ -107,8 +107,12 @@ UpstreamProxyProtocolSocketFactory::UpstreamProxyProtocolSocketFactory(
 
 Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsSharedPtr options) const {
-  return std::make_unique<UpstreamProxyProtocolSocket>(
-      transport_socket_factory_->createTransportSocket(options), options, config_.version());
+  auto inner_socket = transport_socket_factory_->createTransportSocket(options);
+  if (inner_socket == nullptr) {
+    return nullptr;
+  }
+  return std::make_unique<UpstreamProxyProtocolSocket>(std::move(inner_socket), options,
+                                                       config_.version());
 }
 
 bool UpstreamProxyProtocolSocketFactory::implementsSecureTransport() const {

@@ -1,3 +1,4 @@
+#include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/network/proxy_protocol.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -22,6 +23,7 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
+using envoy::config::core::v3::ProxyProtocolConfig;
 using envoy::config::core::v3::ProxyProtocolConfig_Version;
 
 namespace Envoy {
@@ -389,6 +391,34 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddresses) {
   EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
 
   proxy_protocol_socket_->doWrite(msg, false);
+}
+
+class FakeTransportSocketFactory : public Network::TransportSocketFactory {
+public:
+  FakeTransportSocketFactory() {}
+
+  Network::TransportSocketPtr
+  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override {
+    (void)options;
+    return nullptr;
+  }
+
+  bool implementsSecureTransport() const override { return false; }
+};
+
+class ProxyProtocolSocketFactoryTest : public testing::Test {
+public:
+  ProxyProtocolSocketFactoryTest()
+      : testing::Test(),
+        factory_(std::make_unique<FakeTransportSocketFactory>(), ProxyProtocolConfig()) {}
+
+  UpstreamProxyProtocolSocketFactory factory_;
+};
+
+// Test injects PROXY protocol header only once
+TEST_F(ProxyProtocolSocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
+  auto socket = factory_.createTransportSocket(nullptr);
+  ASSERT_EQ(nullptr, socket);
 }
 
 } // namespace

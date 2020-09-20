@@ -66,6 +66,8 @@ Here is an example config for setting up the socket:
           name: envoy.transport_sockets.raw_buffer
       ...
 
+Note: If you are wrapping a TLS socket, the header will be sent before the TLS handshake occurs.
+
 Some drawbacks to Proxy Protocol:
 
 * It only supports TCP protocols.
