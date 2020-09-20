@@ -89,7 +89,6 @@ envoy_cc_library(
     ],
 )
 
-
 envoy_cc_library(
     name = "visitor_lib",
     srcs = ["visitor.cc"],
