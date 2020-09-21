@@ -38,6 +38,7 @@ namespace ExtAuthz {
   COUNTER(ok)                                                                                      \
   COUNTER(denied)                                                                                  \
   COUNTER(error)                                                                                   \
+  COUNTER(timeout)                                                                                 \
   COUNTER(failure_mode_allowed)
 
 /**
@@ -76,6 +77,7 @@ public:
         stats_(generateStats(stats_prefix, scope)), ext_authz_ok_(pool_.add("ext_authz.ok")),
         ext_authz_denied_(pool_.add("ext_authz.denied")),
         ext_authz_error_(pool_.add("ext_authz.error")),
+        ext_authz_timeout_(pool_.add("ext_authz.timeout")),
         ext_authz_failure_mode_allowed_(pool_.add("ext_authz.failure_mode_allowed")) {}
 
   bool allowPartialMessage() const { return allow_partial_message_; }
@@ -154,6 +156,7 @@ public:
   const Stats::StatName ext_authz_ok_;
   const Stats::StatName ext_authz_denied_;
   const Stats::StatName ext_authz_error_;
+  const Stats::StatName ext_authz_timeout_;
   const Stats::StatName ext_authz_failure_mode_allowed_;
 };
 

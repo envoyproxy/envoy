@@ -172,6 +172,9 @@ public:
   bool enabled_{};
 
   Event::TimerCb callback_;
+
+  // If not nullptr, will be set on dtor. This can help to verify that the timer was destroyed.
+  bool* timer_destroyed_{};
 };
 
 class MockSchedulableCallback : public SchedulableCallback {

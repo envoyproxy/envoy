@@ -83,7 +83,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
     case envoy::extensions::filters::network::ext_authz::Action::kOnData: {
       // Optional input field to set default authorization check result for the following "onData()"
       if (action.on_data().has_result()) {
-        ON_CALL(*client, check(_, _, _, _))
+        ON_CALL(*client, check(_, _, _, _, _))
             .WillByDefault(WithArgs<0>(
                 Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
                   callbacks.onComplete(makeAuthzResponse(

@@ -49,7 +49,11 @@ MockTimer::MockTimer(MockDispatcher* dispatcher) : MockTimer() {
       .RetiresOnSaturation();
 }
 
-MockTimer::~MockTimer() = default;
+MockTimer::~MockTimer() {
+  if (timer_destroyed_) {
+    *timer_destroyed_ = true;
+  }
+}
 
 MockSchedulableCallback::~MockSchedulableCallback() = default;
 

@@ -9,6 +9,7 @@
 #include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
