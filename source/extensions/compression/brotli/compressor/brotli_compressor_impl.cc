@@ -53,7 +53,8 @@ void BrotliCompressorImpl::compress(Buffer::Instance& buffer,
     buffer.drain(input_slice.len_);
   }
 
-  buffer.add(accumulation_buffer);
+  ASSERT(buffer.length() == 0);
+  buffer.move(accumulation_buffer);
 
   do {
     process(ctx, buffer,
