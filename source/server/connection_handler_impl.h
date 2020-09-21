@@ -372,9 +372,9 @@ public:
   ~ActiveUdpListenerBase() override;
 
   // Network::UdpListenerCallbacks
-  void onData(Network::UdpRecvData&& data) override final;
-  uint32_t workerIndex() const override final { return worker_index_; }
-  void post(Network::UdpRecvData&& data) override final;
+  void onData(Network::UdpRecvData&& data) final;
+  uint32_t workerIndex() const final { return worker_index_; }
+  void post(Network::UdpRecvData&& data) final;
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return udp_listener_.get(); }
