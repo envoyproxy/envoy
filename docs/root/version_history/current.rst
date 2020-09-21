@@ -64,6 +64,7 @@ Removed Config or Runtime
 
 New Features
 ------------
+* xds: added support for mixed v2/v3 discovery response, which enable type url downgrade and upgrade. This feature is disabled by default and is controlled by runtime guard 'envoy.reloadable_features.enable_type_url_downgrade_and_upgrade'.
 * access log: added a :ref:`dynamic metadata filter<envoy_v3_api_msg_config.accesslog.v3.MetadataFilter>` for access logs, which filters whether to log based on matching dynamic metadata.
 * access log: added support for :ref:`%DOWNSTREAM_PEER_FINGERPRINT_1% <config_access_log_format_response_flags>` as a response flag.
 * access log: added support for nested objects in :ref:`JSON logging mode <config_access_log_format_dictionaries>`.
