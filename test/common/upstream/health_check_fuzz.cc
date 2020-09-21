@@ -278,7 +278,25 @@ void GrpcHealthCheckFuzz::respondBytes(
   switch (grpc_respond_bytes.grpc_respond_bytes_selector_case()) {
   case test::common::upstream::GrpcRespondBytes::kStatus: {
     //Structured Response
-    std::vector<uint8_t> data = serializeResponse(grpc_respond_bytes.status());
+    std::vector<uint8_t> data;
+    switch (grpc_respond_bytes.status()) {
+      case test::common::upstream::ServingStatus::UNKNOWN: {
+        data = serializeResponse(grpc::health::v1::HealthCheckResponse::UNKNOWN);
+        break;
+      }
+      case test::common::upstream::ServingStatus::SERVING: {
+        data = serializeResponse(grpc::health::v1::HealthCheckResponse::SERVING);
+        break;
+      }
+      case test::common::upstream::ServingStatus::NOT_SERVING: {
+        data = serializeResponse(grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+        break;
+      }
+      default: { // shouldn't hit
+        NOT_REACHED_GCOVR_EXCL_LINE;
+        break;
+      }
+    }
     Buffer::OwnedImpl response;
     response.add(data.data(), data.size());
     //const auto response = std::make_unique<Buffer::OwnedImpl>(data, data.size());

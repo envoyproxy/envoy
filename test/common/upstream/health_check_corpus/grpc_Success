@@ -41,6 +41,8 @@ actions {
             }
         }
     }
+}
+actions {
     respond {
         http_respond {
             headers {
@@ -55,11 +57,13 @@ actions {
             
         }
         grpc_respond {
-            grpc_respond_data {
+            grpc_respond_bytes {
                 status: SERVING
             }
         }
     }
+}
+actions {
     respond {
         http_respond {
             headers {
@@ -74,7 +78,7 @@ actions {
             
         }
         grpc_respond {
-            grpc_respond_headers {
+            grpc_respond_trailers {
             trailers {
                 headers {
                     key: "grpc-status"
