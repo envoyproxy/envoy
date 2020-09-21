@@ -45,7 +45,7 @@ public:
   /**
    * @return false more data is acceptable.
    */
-  virtual bool isOverHighWatermark() const PURE;
+  virtual bool isWritable() const PURE;
 
   //   virtual bool triggeredHighToLowWatermark() const PURE;
   //   virtual void clearTriggeredHighToLowWatermark() PURE;

@@ -94,6 +94,9 @@ public:
     writable_peer_ = nullptr;
     peer_closed_ = true;
   }
+  bool isWritable() const override {
+    return !isOverHighWatermark();
+  }
   Buffer::Instance* getWriteBuffer() override { return &owned_buffer_; }
   // ReadableSource
   bool isPeerShutDownWrite() const override { return read_end_stream_; }
