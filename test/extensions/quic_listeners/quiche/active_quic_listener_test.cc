@@ -88,7 +88,6 @@ protected:
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
           SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
           SetQuicReloadableFlag(quic_disable_version_draft_27, !use_http3);
-          SetQuicReloadableFlag(quic_disable_version_draft_25, !use_http3);
           return quic::CurrentSupportedVersions();
         }()[0]) {}
 
@@ -136,8 +135,8 @@ protected:
     auto proof_source = std::make_unique<TestProofSource>();
     filter_chain_ = &proof_source->filterChain();
     crypto_config_peer.ResetProofSource(std::move(proof_source));
-    simulated_time_system_.advanceTimeAsync(std::chrono::milliseconds(100));
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    simulated_time_system_.advanceTimeAndRun(std::chrono::milliseconds(100), *dispatcher_,
+                                             Event::Dispatcher::RunType::NonBlock);
   }
 
   Network::ActiveUdpListenerFactoryPtr createQuicListenerFactory(const std::string& yaml) {

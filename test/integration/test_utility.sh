@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Helper script for bash integration tests, intended to be source'd from the
 # _test.sh.
 #
@@ -8,20 +10,22 @@
 
 CURRENT_TEST="NONE"
 function start_test() {
-  CURRENT_TEST="$@"
+  CURRENT_TEST="$1"
   echo "TEST: $CURRENT_TEST"
 }
 
 check() {
   echo "     check" "$@" ...
+  # see https://github.com/koalaman/shellcheck/issues/1679
+  # shellcheck disable=SC2119
   "$@" || handle_failure
 }
 
-BACKGROUND_PID="?"
+export BACKGROUND_PID="?"
 run_in_background_saving_pid() {
   echo "     backgrounding:" "$@" ...
   "$@" &
-  BACKGROUND_PID="$!"
+  export BACKGROUND_PID="$!"
 }
 
 # By default, print a message like:
@@ -35,6 +39,7 @@ run_in_background_saving_pid() {
 # Assumes it's being called from a failure-reporting function and that the
 # actual failure the user is interested in is our caller's caller.  If it
 # weren't for this, fail and handle_failure could be the same.
+# shellcheck disable=SC2120
 handle_failure() {
   if [ $# -eq 1 ]; then
     echo FAILed Input: "$1"
@@ -44,7 +49,7 @@ handle_failure() {
   # to avoid printing 'handle_failure' we start with 1 to skip get_stack caller
   local i
   local stack_size=${#FUNCNAME[@]}
-  for (( i=1; i<$stack_size ; i++ )); do
+  for (( i=1; i<stack_size ; i++ )); do
     local func="${FUNCNAME[$i]}"
     [ -z "$func" ] && func=MAIN
     local line_number="${BASH_LINENO[(( i - 1 ))]}"
@@ -83,24 +88,26 @@ scrape_stat() {
 }
 
 milliseconds() {
-  local nanos=$(date +%N | sed 's/^0*//')
-  local seconds=$(date +%s)
+  local nanos seconds
+  nanos=$(date +%N | sed 's/^0*//')
+  seconds=$(date +%s)
   echo $((1000*seconds + nanos/1000000))
 }
 
 wait_for_stat() {
-  local ADMIN_ADDRESS="$1"
-  local STAT_NAME="$2"
-  local OP="$3"
-  local VALUE="$4"
-  local TIMEOUT_SEC="$5"
-  local start_time_ms=$(milliseconds)
-  local end_time=$((SECONDS + TIMEOUT_SEC))
-  local ret=""
+  local ADMIN_ADDRESS="$1" \
+	STAT_NAME="$2" \
+	OP="$3" \
+	VALUE="$4" \
+	TIMEOUT_SEC="$5" \
+	ret="" \
+	end_time end_time_ms start_time_ms stat
+  start_time_ms=$(milliseconds)
+  end_time=$((SECONDS + TIMEOUT_SEC))
   while [ "$ret" = "" ]; do
-    local stat=$(scrape_stat "$ADMIN_ADDRESS" "$STAT_NAME")
-    if [ $stat $OP $VALUE ]; then
-      local end_time_ms=$(milliseconds)
+    stat=$(scrape_stat "$ADMIN_ADDRESS" "$STAT_NAME")
+    if test "$stat" "$OP" "$VALUE"; then
+      end_time_ms=$(milliseconds)
       ret="success: $STAT_NAME reached $stat after $((end_time_ms - start_time_ms)) ms"
     elif [ "$SECONDS" -gt "$end_time" ]; then
       ret="timeout: waiting $TIMEOUT_SEC seconds for $STAT_NAME=$stat to reach $VALUE"
