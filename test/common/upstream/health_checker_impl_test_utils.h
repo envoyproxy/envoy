@@ -101,7 +101,7 @@ public:
   MOCK_METHOD(Http::CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData&));
 };
 
-class GrpcHealthCheckerImplTestBase : public HealthCheckerTestBase {
+class GrpcHealthCheckerImplTestBaseUtils : public HealthCheckerTestBase {
 public:
   struct TestSession {
     TestSession() = default;
@@ -118,7 +118,7 @@ public:
 
   using TestSessionPtr = std::unique_ptr<TestSession>;
 
-  GrpcHealthCheckerImplTestBase();
+  GrpcHealthCheckerImplTestBaseUtils();
 
   void expectSessionCreate();
   void expectClientCreate(size_t index);

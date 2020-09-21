@@ -86,12 +86,12 @@ void TcpHealthCheckerImplTestBase::expectClientCreate() {
   EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(testing::SaveArg<0>(&read_filter_));
 }
 
-GrpcHealthCheckerImplTestBase::GrpcHealthCheckerImplTestBase() {
+GrpcHealthCheckerImplTestBaseUtils::GrpcHealthCheckerImplTestBaseUtils() {
   EXPECT_CALL(*cluster_->info_, features())
       .WillRepeatedly(testing::Return(Upstream::ClusterInfo::Features::HTTP2));
 }
 
-void GrpcHealthCheckerImplTestBase::expectSessionCreate() {
+void GrpcHealthCheckerImplTestBaseUtils::expectSessionCreate() {
   // Expectations are in LIFO order.
   TestSessionPtr new_test_session(new TestSession());
   test_sessions_.emplace_back(std::move(new_test_session));
@@ -101,7 +101,7 @@ void GrpcHealthCheckerImplTestBase::expectSessionCreate() {
   expectClientCreate(test_sessions_.size() - 1);
 }
 
-void GrpcHealthCheckerImplTestBase::expectClientCreate(size_t index) {
+void GrpcHealthCheckerImplTestBaseUtils::expectClientCreate(size_t index) {
   TestSession& test_session = *test_sessions_[index];
   test_session.codec_ = new NiceMock<Http::MockClientConnection>();
   test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
@@ -134,7 +134,7 @@ void GrpcHealthCheckerImplTestBase::expectClientCreate(size_t index) {
           }));
 }
 
-void GrpcHealthCheckerImplTestBase::expectStreamCreate(size_t index) {
+void GrpcHealthCheckerImplTestBaseUtils::expectStreamCreate(size_t index) {
   test_sessions_[index]->request_encoder_.stream_.callbacks_.clear();
   EXPECT_CALL(*test_sessions_[index]->codec_, newStream(_))
       .WillOnce(DoAll(SaveArgAddress(&test_sessions_[index]->stream_response_callbacks_),

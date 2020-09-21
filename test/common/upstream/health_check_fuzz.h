@@ -39,7 +39,7 @@ public:
   bool empty_response_ = true;
 };
 
-class GrpcHealthCheckFuzz : GrpcHealthCheckerImplTestBase {
+class GrpcHealthCheckFuzz : GrpcHealthCheckerImplTestBaseUtils {
 public:
   void allocGrpcHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input);
