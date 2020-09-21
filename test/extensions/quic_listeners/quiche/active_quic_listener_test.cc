@@ -361,18 +361,23 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
 }
 
 TEST_P(ActiveQuicListenerTest, QuicProcessingDisabledAndEnabled) {
+  maybeConfigureMocks(/* connection_count = */ 2);
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
-  Runtime::LoaderSingleton::getExisting()->mergeValues({{"quic.enabled", " false"}});
   sendCHLO(quic::test::TestConnectionId(1));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(quic_dispatcher_->session_map().size(), 1);
+
+  Runtime::LoaderSingleton::getExisting()->mergeValues({{"quic.enabled", " false"}});
+  sendCHLO(quic::test::TestConnectionId(2));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   // If listener was enabled, there should have been session created for active connection.
-  EXPECT_TRUE(quic_dispatcher_->session_map().empty());
+  EXPECT_EQ(quic_dispatcher_->session_map().size(), 1);
   EXPECT_FALSE(ActiveQuicListenerPeer::enabled(*quic_listener_));
+
   Runtime::LoaderSingleton::getExisting()->mergeValues({{"quic.enabled", " true"}});
-  maybeConfigureMocks(/* connection_count = */ 1);
-  sendCHLO(quic::test::TestConnectionId(1));
+  sendCHLO(quic::test::TestConnectionId(2));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  EXPECT_FALSE(quic_dispatcher_->session_map().empty());
+  EXPECT_EQ(quic_dispatcher_->session_map().size(), 2);
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
 }
 
