@@ -164,7 +164,6 @@ public:
   void advanceTimeAsyncImpl(const Duration& duration) override {
     timeSystem().advanceTimeAsyncImpl(duration);
   }
-
   void advanceTimeWaitImpl(const Duration& duration) override {
     timeSystem().advanceTimeWaitImpl(duration);
   }

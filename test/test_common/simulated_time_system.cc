@@ -397,6 +397,14 @@ void SimulatedTimeSystemHelper::advanceTimeWaitImpl(const Duration& duration) {
   MonotonicTime monotonic_time =
       monotonic_time_ + std::chrono::duration_cast<MonotonicTime::duration>(duration);
   setMonotonicTimeLockHeld(monotonic_time);
+  waitForNoPendingLockHeld();
+}
+
+void SimulatedTimeSystemHelper::waitForNoPendingLockHeld() const
+    ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+  mutex_.Await(absl::Condition(
+      +[](const uint32_t* pending_updates) -> bool { return *pending_updates == 0; },
+      &pending_updates_));
 }
 
 SchedulerPtr SimulatedTimeSystemHelper::createScheduler(Scheduler& /*base_scheduler*/,

@@ -94,7 +94,7 @@ private:
     absl::MutexLock lock(&mutex_);
     --pending_updates_;
   }
-  // void waitForNoPendingLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void waitForNoPendingLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
   MonotonicTime monotonic_time_ ABSL_GUARDED_BY(mutex_);
