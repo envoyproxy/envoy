@@ -10,6 +10,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
+#include "envoy/extensions/watchdog/abort_action/v3alpha/abort_action.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/instance.h"
@@ -171,7 +172,30 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
   multikill_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, multikill_timeout, 0));
   multikill_threshold_ = PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(watchdog, multikill_threshold, 0.0);
-  actions_ = watchdog.actions();
+  auto actions = watchdog.actions();
+
+// Add abort_action if it's available on the given platform and killing is
+// enabled since it's more helpful than the default kill action.
+#ifndef WIN32
+  envoy::extensions::watchdog::abort_action::v3alpha::AbortActionConfig abort_config;
+  // Wait one second for the aborted thread to abort.
+  abort_config.mutable_wait_duration()->set_seconds(1);
+
+  if (kill_timeout > 0) {
+    auto abort_action_config = actions.Add();
+    abort_action_config->set_event(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::KILL);
+    abort_action_config->mutable_config()->mutable_typed_config()->PackFrom(abort_config);
+  }
+
+  if (multikill_timeout_.count() > 0) {
+    auto abort_action_config = actions.Add();
+    abort_action_config->set_event(
+        envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MULTIKILL);
+    abort_action_config->mutable_config()->mutable_typed_config()->PackFrom(abort_config);
+  }
+#endif
+
+  actions_ = actions;
 }
 
 InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
