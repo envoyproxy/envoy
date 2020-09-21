@@ -45,9 +45,6 @@
 #include "extensions/quic_listeners/quiche/platform/envoy_quic_clock.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
-#ifndef WIN32
-#include "extensions/quic_listeners/quiche/udp_gso_batch_writer.h"
-#endif
 
 using testing::Return;
 using testing::ReturnRef;
@@ -115,21 +112,18 @@ protected:
     ON_CALL(listener_config_, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
     ON_CALL(socket_factory_, getListenSocket()).WillByDefault(Return(listen_socket_));
 
+    // UdpGsoBatchWriter cannot be supported on Windows, use UdpDefaultWriter instead
+    // TODO(ggreenway,wrowe): Permit batched UdpGsoBatchWriter when available in a platform
+    // agnostic manner leveraging PR #13086
+    // See discussion: https://github.com/envoyproxy/envoy/pull/12898#discussion_r492085735
     ON_CALL(listener_config_, udpPacketWriterFactory())
         .WillByDefault(Return(
             std::reference_wrapper<Network::UdpPacketWriterFactory>(udp_packet_writer_factory_)));
     ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _))
         .WillByDefault(Invoke(
             [&](Network::IoHandle& io_handle, Stats::Scope& scope) -> Network::UdpPacketWriterPtr {
-#ifndef WIN32
-              // Use UdpGsoBatchWriter to perform non-batched writes for the purpose of this test
-              Network::UdpPacketWriterPtr udp_packet_writer =
-                  std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
-#else
-              // UdpGsoBatchWriter cannot be supported on Windows, use UdpDefaultWriter instead
               Network::UdpPacketWriterPtr udp_packet_writer =
                   std::make_unique<Network::UdpDefaultWriter>(io_handle);
-#endif
               return udp_packet_writer;
             }));
 
