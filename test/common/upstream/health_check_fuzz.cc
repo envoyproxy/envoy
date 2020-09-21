@@ -274,7 +274,12 @@ void GrpcHealthCheckFuzz::respondHeaders(test::common::upstream::GrpcRespondHead
   //Knowing if the client closed will be the hardest part - do here
   bool client_will_close = false;
 
+  //This will always call handleSuccess or handleFailure, turning off timeout and enabling interval
   test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), true);
+  //It does all this through calling on rpc complete
+
+  //When does this turn off client? This turns off client if reuse connection, or received no error go away
+  //Standard if for reuse connection
 }
 
 void GrpcHealthCheckFuzz::respondBytes(test::common::upstream::GrpcRespondBytes grpc_respond_bytes) {
@@ -290,12 +295,21 @@ void GrpcHealthCheckFuzz::respondBytes(test::common::upstream::GrpcRespondBytes 
 
 
   //How to determine client create? Tcp actually used interval timer
+
+  //Same thing here - calls on rpc complete, so an if for reuse connection, and recieved no error thing
 }
 
 void GrpcHealthCheckFuzz::respondTrailers(test::common::upstream::GrpcRespondTrailers grpc_respond_headers) {
   //TODO: Respond trailers arguments, and what it does logically
   //decodeTrailers(Http::ResponseTrailerMapPtr&& trailers)
   //Probably the same as respond headers, expect a different type, if its test.fuzz.Headers() its the same thing
+  std::unique_ptr<Http::TestResponseTrailerMapImpl> response_headers =
+      std::make_unique<Http::TestResponseTrailerMapImpl>(
+          Fuzz::fromHeaders<Http::TestResponseTrailerMapImpl>(grpc_respond_headers.headers(), {}, {}));
+
+  test_sessions_[0]->stream_response_callbacks_->decodeTrailers(std::move(trailers));
+
+  //client is determined the same way - on rpc complete
 }
 
 void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respond) {
@@ -345,11 +359,13 @@ void GrpcHealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
     ENVOY_LOG_MISC(trace, "Creating client and stream from network timeout");
     triggerIntervalTimer(true);
   }
+
+  //Same thing here - dependent on received no error go away and reuse connection
 }
 
 void GrpcHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) {
   test_sessions_[0]->client_connection_->raiseEvent(event_type);
-  if (!last_action && event_type != Network::ConnectionEvent::Connected) {
+  if (!last_action && event_type != Network::ConnectionEvent::Connected) { //Close events will always blow away the client
     ENVOY_LOG_MISC(trace, "Creating client and stream from close event");
     triggerIntervalTimer(
         true); // Interval timer is guaranteed to be enabled from a close event - calls
