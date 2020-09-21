@@ -177,7 +177,27 @@ message Http1ProtocolOptions {
   google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 7;
 }
 
-// [#next-free-field: 17]
+message KeepaliveSettings {
+  // Send HTTP/2 PING frames at this period, in order to test that the connection is still alive.
+  google.protobuf.Duration interval = 1 [(validate.rules).duration = {
+    required: true
+    gt {nanos: 1000000}
+  }];
+
+  // How long to wait for a response to a keepalive PING. If a response is not received within this
+  // time period, the connection will be aborted.
+  google.protobuf.Duration timeout = 2 [(validate.rules).duration = {
+    required: true
+    gt {nanos: 1000000}
+  }];
+
+  // An optional jitter amount as a percentage of interval_ms. If specified,
+  // during every interval Envoy will add interval_ms *
+  // interval_jitter_percent / 100 to the wait time.
+  uint32 interval_jitter_percent = 3;
+}
+
+// [#next-free-field: 16]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http2ProtocolOptions";
@@ -346,21 +366,8 @@ message Http2ProtocolOptions {
   // standardized identifiers.
   repeated SettingsParameter custom_settings_parameters = 13;
 
-  // Send HTTP/2 PING frames at this period, in order to test that the connection is still alive.
-  // If not specified, no keepalive PING frames will be sent.
-  google.protobuf.Duration connection_keepalive_interval = 15
-      [(validate.rules).duration = {gt {nanos: 1000000}}];
-
-  // How long to wait for a response to a keepalive PING. If a response is not received within this
-  // time period, the connection will be aborted.
-  //
-  // If configured, this value must be less than :ref:`connection_keepalive_interval
-  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.connection_keepalive_interval>`.
-  //
-  // This setting is required if :ref:`connection_keepalive_interval
-  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.connection_keepalive_interval>` is set.
-  google.protobuf.Duration connection_keepalive_timeout = 16
-      [(validate.rules).duration = {gt {nanos: 1000000}}];
+  // Send HTTP/2 PING frames to verify that the connection is still healthy.
+  KeepaliveSettings connection_keepalive = 15;
 }
 
 // [#not-implemented-hide:]

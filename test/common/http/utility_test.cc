@@ -421,27 +421,6 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
   }
 }
 
-TEST(HttpUtility, ValidateHttp2KeepaliveSettings) {
-  {
-    envoy::config::core::v3::Http2ProtocolOptions options;
-    options.mutable_connection_keepalive_interval()->set_seconds(1);
-    options.mutable_connection_keepalive_timeout()->set_seconds(2);
-
-    EXPECT_THROW_WITH_MESSAGE(
-        Envoy::Http2::Utility::initializeAndValidateOptions(options), EnvoyException,
-        "HTTP/2 'connection_keepalive_timeout' is greater than 'connection_keepalive_interval'");
-  }
-
-  {
-    envoy::config::core::v3::Http2ProtocolOptions options;
-    options.mutable_connection_keepalive_interval()->set_seconds(1);
-
-    EXPECT_THROW_WITH_MESSAGE(
-        Envoy::Http2::Utility::initializeAndValidateOptions(options), EnvoyException,
-        "HTTP/2 'connection_keepalive_period' is set but 'connection_keepalive_timeout' is not");
-  }
-}
-
 TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
   Protobuf::BoolValue hcm_value;

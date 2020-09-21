@@ -18,6 +18,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/mocks/common.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/network_utility.h"
@@ -65,6 +66,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                    const std::string& host, const std::string& content_type) {
 
   NiceMock<Stats::MockIsolatedStatsStore> mock_stats_store;
+  NiceMock<Random::MockRandomGenerator> random;
   Event::GlobalTimeSystem time_system;
   Api::Impl api(Thread::threadFactoryForTest(), mock_stats_store, time_system,
                 Filesystem::fileSystemForTest());
@@ -76,7 +78,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       type,
       dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
                                          Network::Test::createRawBufferSocket(), nullptr),
-      host_description, *dispatcher);
+      host_description, *dispatcher, random);
   BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void {
     client.close();
     dispatcher->exit();

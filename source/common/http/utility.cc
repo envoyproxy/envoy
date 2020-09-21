@@ -216,20 +216,6 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
         OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT);
   }
 
-  if (options_clone.has_connection_keepalive_interval()) {
-    if (!options_clone.has_connection_keepalive_timeout()) {
-      throw EnvoyException(
-          "HTTP/2 'connection_keepalive_period' is set but 'connection_keepalive_timeout' is not");
-    }
-
-    auto interval_ms = PROTOBUF_GET_MS_REQUIRED(options_clone, connection_keepalive_interval);
-    auto timeout_ms = PROTOBUF_GET_MS_REQUIRED(options_clone, connection_keepalive_timeout);
-    if (timeout_ms > interval_ms) {
-      throw EnvoyException(
-          "HTTP/2 'connection_keepalive_timeout' is greater than 'connection_keepalive_interval'");
-    }
-  }
-
   return options_clone;
 }
 

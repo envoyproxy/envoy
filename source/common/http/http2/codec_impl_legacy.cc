@@ -526,6 +526,7 @@ void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
+                               Random::RandomGenerator& random,
                                const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                                const uint32_t max_headers_kb, const uint32_t max_headers_count)
     : stats_(stats), connection_(connection), max_headers_kb_(max_headers_kb),
@@ -545,21 +546,21 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           http2_options.max_inbound_window_update_frames_per_data_frame_sent().value()),
       skip_encoding_empty_trailers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_skip_encoding_empty_trailers")),
-      dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {
-  if (http2_options.has_connection_keepalive_interval()) {
-    ASSERT(http2_options.has_connection_keepalive_timeout(),
-           "Validated in `initializeAndValidateOptions()`");
-
+      dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false), random_(random) {
+  if (http2_options.has_connection_keepalive()) {
     keepalive_interval_ = std::chrono::milliseconds(
-        PROTOBUF_GET_MS_REQUIRED(http2_options, connection_keepalive_interval));
+        PROTOBUF_GET_MS_REQUIRED(http2_options.connection_keepalive(), interval));
     keepalive_timeout_ = std::chrono::milliseconds(
-        PROTOBUF_GET_MS_REQUIRED(http2_options, connection_keepalive_timeout));
+        PROTOBUF_GET_MS_REQUIRED(http2_options.connection_keepalive(), timeout));
+    keepalive_interval_jitter_percent_ =
+        http2_options.connection_keepalive().interval_jitter_percent();
 
     keepalive_send_timer_ = connection.dispatcher().createTimer([this]() { sendKeepalive(); });
     keepalive_timeout_timer_ =
         connection.dispatcher().createTimer([this]() { onKeepaliveResponseTimeout(); });
 
-    keepalive_send_timer_->enableTimer(keepalive_interval_);
+    // This call schedules the initial interval, with jitter.
+    onKeepaliveResponse();
   }
 }
 
@@ -582,7 +583,20 @@ void ConnectionImpl::sendKeepalive() {
   sendPendingFrames();
 
   keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
-  keepalive_send_timer_->enableTimer(keepalive_interval_);
+}
+
+void ConnectionImpl::onKeepaliveResponse() {
+  if (keepalive_timeout_timer_ != nullptr) {
+    keepalive_timeout_timer_->disableTimer();
+  }
+  if (keepalive_send_timer_ != nullptr) {
+    uint64_t interval_ms = keepalive_interval_.count();
+    const uint64_t jitter_percent_mod = keepalive_interval_jitter_percent_ * interval_ms / 100;
+    if (jitter_percent_mod > 0) {
+      interval_ms += random_.random() % jitter_percent_mod;
+    }
+    keepalive_send_timer_->enableTimer(std::chrono::milliseconds(interval_ms));
+  }
 }
 
 void ConnectionImpl::onKeepaliveResponseTimeout() {
@@ -696,6 +710,16 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   // and CONTINUATION frames, but we track them separately: HEADERS frames in onBeginHeaders()
   // and CONTINUATION frames in onBeforeFrameReceived().
   ASSERT(frame->hd.type != NGHTTP2_CONTINUATION);
+
+  if ((frame->hd.type == NGHTTP2_PING) && (frame->ping.hd.flags & NGHTTP2_FLAG_ACK)) {
+    uint64_t data;
+    static_assert(sizeof(data) == sizeof(frame->ping.opaque_data), "Sizes are equal");
+    memcpy(&data, frame->ping.opaque_data, sizeof(data));
+    ENVOY_CONN_LOG(trace, "recv PING ACK {}", connection_, data);
+
+    onKeepaliveResponse();
+    return 0;
+  }
 
   if (frame->hd.type == NGHTTP2_DATA) {
     if (!trackInboundFrames(&frame->hd, frame->data.padlen)) {
@@ -1306,10 +1330,11 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
 
 ClientConnectionImpl::ClientConnectionImpl(
     Network::Connection& connection, Http::ConnectionCallbacks& callbacks, CodecStats& stats,
+    Random::RandomGenerator& random,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const uint32_t max_response_headers_kb, const uint32_t max_response_headers_count,
     Nghttp2SessionFactory& http2_session_factory)
-    : ConnectionImpl(connection, stats, http2_options, max_response_headers_kb,
+    : ConnectionImpl(connection, stats, random, http2_options, max_response_headers_kb,
                      max_response_headers_count),
       callbacks_(callbacks) {
   ClientHttp2Options client_http2_options(http2_options);
@@ -1356,11 +1381,12 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
 
 ServerConnectionImpl::ServerConnectionImpl(
     Network::Connection& connection, Http::ServerConnectionCallbacks& callbacks, CodecStats& stats,
+    Random::RandomGenerator& random,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
-    : ConnectionImpl(connection, stats, http2_options, max_request_headers_kb,
+    : ConnectionImpl(connection, stats, random, http2_options, max_request_headers_kb,
                      max_request_headers_count),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action) {
   Http2Options h2_options(http2_options);
