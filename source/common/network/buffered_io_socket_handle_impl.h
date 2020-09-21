@@ -87,11 +87,8 @@ public:
   // WritablePeer
   void setWriteEnd() override { read_end_stream_ = true; }
   void maybeSetNewData() override {
-    if (last_read_to_empty_) {
-      last_read_to_empty_ = false;
-      scheduleWriteEvent();
-      scheduleNextEvent();
-    }
+    scheduleWriteEvent();
+    scheduleNextEvent();
   }
   void onPeerDestroy() override {
     writable_peer_ = nullptr;
@@ -107,8 +104,6 @@ private:
   // Support isOpen() and close(). IoHandle owner must invoke close() to avoid potential resource
   // leak.
   bool closed_;
-  // Drained to empty. The following write should switch the state to false.
-  bool last_read_to_empty_{true};
   // True if owned_buffer_ is not addable. Note that owned_buffer_ may have pending data to drain.
   bool read_end_stream_{false};
   Buffer::WatermarkBuffer owned_buffer_;

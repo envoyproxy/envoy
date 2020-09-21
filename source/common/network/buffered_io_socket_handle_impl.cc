@@ -58,24 +58,21 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::recvmmsg(RawSliceArrays&, ui
 }
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::recv(void* buffer, size_t length, int flags) {
-  if (flags | MSG_PEEK) {
-    // No data and the writer closed.
-    if (owned_buffer_.length() == 0) {
-
-      if (read_end_stream_) {
-        return sysCallResultToIoCallResult(Api::SysCallSizeResult{-1, SOCKET_ERROR_INTR});
-      } else {
-        return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                                   IoSocketError::deleteIoError)};
-      }
+  // No data and the writer closed.
+  if (owned_buffer_.length() == 0) {
+    if (read_end_stream_) {
+      return sysCallResultToIoCallResult(Api::SysCallSizeResult{-1, SOCKET_ERROR_INTR});
     } else {
-      auto min_len = std::min(owned_buffer_.length(), length);
-      owned_buffer_.copyOut(0, min_len, buffer);
-      return {min_len, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
+      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                                 IoSocketError::deleteIoError)};
     }
   } else {
-    // TODO(lambdai): implement non-PEEK for proxy_protocol listener filter.
-    return IoSocketError::ioResultSocketInvalidAddress();
+    auto min_len = std::min(owned_buffer_.length(), length);
+    owned_buffer_.copyOut(0, min_len, buffer);
+    if (!(flags & MSG_PEEK)) {
+      owned_buffer_.drain(min_len);
+    }
+    return {min_len, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
   }
 }
 
