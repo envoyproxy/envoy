@@ -100,6 +100,10 @@ private:
     }
   };
 
+  static MonotonicTime computeTriggerTime(const Queue::Item& item,
+                                          std::chrono::milliseconds duration,
+                                          DurationScaleFactor scale_factor);
+
   ScalingTimerHandle activateTimer(std::chrono::milliseconds duration, RangeTimerImpl& timer);
 
   void removeTimer(ScalingTimerHandle handle);

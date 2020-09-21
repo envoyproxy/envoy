@@ -142,6 +142,13 @@ ScaledRangeTimerManager::ScalingTimerHandle::ScalingTimerHandle(Queue& queue,
 ScaledRangeTimerManager::DurationScaleFactor::DurationScaleFactor(double value)
     : value_(std::max(0.0, std::min(value, 1.0))) {}
 
+MonotonicTime ScaledRangeTimerManager::computeTriggerTime(const Queue::Item& item,
+                                                          std::chrono::milliseconds duration,
+                                                          DurationScaleFactor scale_factor) {
+  return item.active_time_ +
+         std::chrono::duration_cast<MonotonicTime::duration>(duration * scale_factor.value());
+}
+
 ScaledRangeTimerManager::ScalingTimerHandle
 ScaledRangeTimerManager::activateTimer(std::chrono::milliseconds duration,
                                        RangeTimerImpl& range_timer) {
@@ -177,8 +184,7 @@ void ScaledRangeTimerManager::removeTimer(ScalingTimerHandle handle) {
 void ScaledRangeTimerManager::resetQueueTimer(Queue& queue, MonotonicTime now) {
   ASSERT(!queue.range_timers_.empty());
   const MonotonicTime trigger_time =
-      queue.range_timers_.front().active_time_ +
-      std::chrono::duration_cast<MonotonicTime::duration>(queue.duration_ * scale_factor_.value());
+      computeTriggerTime(queue.range_timers_.front(), queue.duration_, scale_factor_);
   if (trigger_time < now) {
     queue.timer_->enableTimer(std::chrono::milliseconds::zero());
   } else {
@@ -188,15 +194,21 @@ void ScaledRangeTimerManager::resetQueueTimer(Queue& queue, MonotonicTime now) {
 }
 
 void ScaledRangeTimerManager::onQueueTimerFired(Queue& queue) {
-  ASSERT(!queue.range_timers_.empty());
-  auto item = std::move(queue.range_timers_.front());
-  queue.range_timers_.pop_front();
-  item.timer_.trigger();
+  auto& timers = queue.range_timers_;
+  ASSERT(!timers.empty());
+  const MonotonicTime now = dispatcher_.approximateMonotonicTime();
+
+  while (!timers.empty() &&
+         computeTriggerTime(timers.front(), queue.duration_, scale_factor_) <= now) {
+    auto item = std::move(queue.range_timers_.front());
+    queue.range_timers_.pop_front();
+    item.timer_.trigger();
+  }
 
   if (queue.range_timers_.empty()) {
     queues_.erase(queue);
   } else {
-    resetQueueTimer(queue, dispatcher_.approximateMonotonicTime());
+    resetQueueTimer(queue, now);
   }
 }
 
