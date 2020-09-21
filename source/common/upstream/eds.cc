@@ -173,6 +173,7 @@ void EdsClusterImpl::onAssignmentTimeout() {
   // TODO(vishalpowar) This is not going to work for incremental updates, and we
   // need to instead change the health status to indicate the assignments are
   // stale.
+  // TODO(snowp): This should probably just use xDS TTLs?
   envoy::config::endpoint::v3::ClusterLoadAssignment resource;
   resource.set_cluster_name(cluster_name_);
   ProtobufWkt::Any any_resource;

@@ -127,9 +127,8 @@ private:
     bool pending_{};
     // Has this API been tracked in subscriptions_?
     bool subscribed_{};
-    // If the resource has a TTL associated with it, contains a mapping from resource name ->
-    // Event::TimerPtr
-    absl::flat_hash_map<std::string, Event::TimerPtr> resource_timers_;
+    // If set, this will fire the removal of this set of resources after the TTL expires.
+    Event::TimerPtr ttl_timer_;
   };
 
   // Request queue management logic.
@@ -150,6 +149,8 @@ private:
   // This string is a type URL.
   std::unique_ptr<std::queue<std::string>> request_queue_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
+
+  Event::Dispatcher& dispatcher_;
 };
 
 using GrpcMuxImplPtr = std::unique_ptr<GrpcMuxImpl>;

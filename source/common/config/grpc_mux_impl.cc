@@ -23,7 +23,8 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
-      first_stream_request_(true), transport_api_version_(transport_api_version) {
+      first_stream_request_(true), transport_api_version_(transport_api_version),
+      dispatcher_(dispatcher) {
   Config::Utility::checkLocalInfo("ads", local_info);
 }
 
@@ -113,9 +114,6 @@ ScopedResume GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
   });
 }
 
-// TODO(bgallagher) move to class?
-void updateTTL(const std::string&, DecodedResourceRef) {}
-
 void GrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
     ControlPlaneStats& control_plane_stats) {
@@ -131,6 +129,22 @@ void GrpcMuxImpl::onDiscoveryResponse(
     // protocol violation
     return;
   }
+
+  if (!api_state_[type_url].ttl_timer_ && message->has_ttl()) {
+    api_state_[type_url].ttl_timer_ = dispatcher_.createTimer([this, type_url] {
+      for (const auto& w : api_state_[type_url].watches_) {
+        w->callbacks_.onConfigUpdate({}, "");
+      }
+    });
+  }
+
+  if (message->has_ttl()) {
+    api_state_[type_url].ttl_timer_->enableTimer(
+        std::chrono::milliseconds(DurationUtil::durationToMilliseconds(message->ttl())));
+  } else if (api_state_[type_url].ttl_timer_) {
+    api_state_[type_url].ttl_timer_->disableTimer();
+  }
+
   if (api_state_[type_url].watches_.empty()) {
     // update the nonce as we are processing this response.
     api_state_[type_url].request_.set_response_nonce(message->nonce());
@@ -191,7 +205,6 @@ void GrpcMuxImpl::onDiscoveryResponse(
         auto it = resource_ref_map.find(watched_resource_name);
         if (it != resource_ref_map.end()) {
           found_resources.emplace_back(it->second);
-          updateTTL(it->first, it->second);
         }
       }
       // onConfigUpdate should be called only on watches(clusters/routes) that have

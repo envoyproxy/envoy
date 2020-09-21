@@ -25,20 +25,24 @@ public:
   DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder, const ProtobufWkt::Any& resource,
                       const std::string& version)
       : DecodedResourceImpl(resource_decoder, {}, Protobuf::RepeatedPtrField<std::string>(),
-                            resource, true, version) {}
+                            resource, true, version, absl::nullopt) {}
   DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder,
                       const envoy::service::discovery::v3::Resource& resource)
       : DecodedResourceImpl(resource_decoder, resource.name(), resource.aliases(),
-                            resource.resource(), resource.has_resource(), resource.version()) {}
+                            resource.resource(), resource.has_resource(), resource.version(),
+                            resource.has_ttl()
+                                ? absl::make_optional(std::chrono::milliseconds(
+                                      DurationUtil::durationToMilliseconds(resource.ttl())))
+                                : absl::nullopt) {}
   DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder,
                       const udpa::core::v1::CollectionEntry::InlineEntry& inline_entry)
       : DecodedResourceImpl(resource_decoder, inline_entry.name(),
                             Protobuf::RepeatedPtrField<std::string>(), inline_entry.resource(),
-                            true, inline_entry.version()) {}
+                            true, inline_entry.version(), absl::nullopt) {}
   DecodedResourceImpl(ProtobufTypes::MessagePtr resource, const std::string& name,
                       const std::vector<std::string>& aliases, const std::string& version)
       : resource_(std::move(resource)), has_resource_(true), name_(name), aliases_(aliases),
-        version_(version) {}
+        version_(version), ttl_(absl::nullopt) {}
 
   // Config::DecodedResource
   const std::string& name() const override { return name_; }
@@ -46,21 +50,24 @@ public:
   const std::string& version() const override { return version_; };
   const Protobuf::Message& resource() const override { return *resource_; };
   bool hasResource() const override { return has_resource_; }
+  absl::optional<std::chrono::milliseconds> ttl() const override { return ttl_; }
 
 private:
   DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder, absl::optional<std::string> name,
                       const Protobuf::RepeatedPtrField<std::string>& aliases,
                       const ProtobufWkt::Any& resource, bool has_resource,
-                      const std::string& version)
+                      const std::string& version, absl::optional<std::chrono::milliseconds> ttl)
       : resource_(resource_decoder.decodeResource(resource)), has_resource_(has_resource),
         name_(name ? *name : resource_decoder.resourceName(*resource_)),
-        aliases_(repeatedPtrFieldToVector(aliases)), version_(version) {}
+        aliases_(repeatedPtrFieldToVector(aliases)), version_(version), ttl_(ttl) {}
 
   const ProtobufTypes::MessagePtr resource_;
   const bool has_resource_;
   const std::string name_;
   const std::vector<std::string> aliases_;
   const std::string version_;
+  // Per resource TTL.
+  const absl::optional<std::chrono::milliseconds> ttl_;
 };
 
 using DecodedResourceImplPtr = std::unique_ptr<DecodedResourceImpl>;

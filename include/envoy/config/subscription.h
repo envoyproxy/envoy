@@ -53,6 +53,8 @@ public:
    */
   virtual const Protobuf::Message& resource() const PURE;
 
+  virtual absl::optional<std::chrono::milliseconds> ttl() const PURE;
+
   /**
    * @return bool does the xDS discovery response have a set resource payload?
    */
