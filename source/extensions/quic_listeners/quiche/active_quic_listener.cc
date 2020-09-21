@@ -119,10 +119,9 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
                                   /*owns_header_buffer*/ false);
   quic_dispatcher_->ProcessPacket(self_address, peer_address, packet);
 
-  // On event loop runs where this listener reads or has packets posted to it, process buffered
-  // packets on the next loop. This ensures that the limit of processed client hellos per loop is
-  // honored, and that buffered client hellos are processed in a timely fashion.
   if (quic_dispatcher_->HasChlosBuffered()) {
+    // If there are any buffered CHLOs, activate a read event for the next event loop to process
+    // them.
     udp_listener_->activateRead();
   }
 }
