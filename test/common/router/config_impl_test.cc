@@ -4825,7 +4825,9 @@ virtual_hosts:
     EXPECT_EQ(nullptr, route_entry->hashPolicy());
     EXPECT_TRUE(route_entry->opaqueConfig().empty());
     EXPECT_FALSE(route_entry->autoHostRewrite());
-    EXPECT_TRUE(route_entry->includeVirtualHostRateLimits());
+    // Default behavior when include_vh_rate_limits is not set, similar to
+    // VhRateLimitOptions::Override
+    EXPECT_FALSE(route_entry->includeVirtualHostRateLimits());
     EXPECT_EQ(Http::Code::ServiceUnavailable, route_entry->clusterNotFoundResponseCode());
     EXPECT_EQ(nullptr, route_entry->corsPolicy());
     EXPECT_EQ("test_value",
@@ -5416,7 +5418,7 @@ virtual_hosts:
 
 class RoutePropertyTest : public testing::Test, public ConfigImplTestBase {};
 
-TEST_F(RoutePropertyTest, ExcludeVHRateLimits) {
+TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(ExcludeVHRateLimits)) {
   std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -5434,7 +5436,9 @@ virtual_hosts:
 
   config_ptr = std::make_unique<TestConfigImpl>(parseRouteConfigurationFromYaml(yaml),
                                                 factory_context_, true);
-  EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
+  // Default behavior when include_vh_rate_limits is not set, similar to
+  // VhRateLimitOptions::Override
+  EXPECT_FALSE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 
   yaml = R"EOF(
 virtual_hosts:

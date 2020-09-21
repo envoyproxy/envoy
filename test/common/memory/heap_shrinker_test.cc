@@ -25,8 +25,8 @@ protected:
         dispatcher_("test_thread", *api_, time_system_) {}
 
   void step() {
-    time_system_.advanceTimeAsync(std::chrono::milliseconds(10000));
-    dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+    time_system_.advanceTimeAndRun(std::chrono::milliseconds(10000), dispatcher_,
+                                   Event::Dispatcher::RunType::NonBlock);
   }
 
   Envoy::Stats::TestUtil::TestStore stats_;
