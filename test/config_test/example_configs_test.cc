@@ -5,6 +5,10 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+// The total number of available configuration files under the examples directory.
+constexpr uint64_t NumberOfConfigurationFiles = 38UL;
+
 TEST(ExampleConfigsTest, All) {
   TestEnvironment::exec(
       {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});
@@ -21,9 +25,9 @@ TEST(ExampleConfigsTest, All) {
 
 #if defined(__APPLE__) || defined(WIN32)
   // freebind/freebind.yaml is not supported on macOS or Windows and is disabled via Bazel.
-  EXPECT_EQ(37UL, ConfigTest::run(directory));
+  EXPECT_EQ(NumberOfConfigurationFiles - 1, ConfigTest::run(directory));
 #else
-  EXPECT_EQ(38UL, ConfigTest::run(directory));
+  EXPECT_EQ(NumberOfConfigurationFiles, ConfigTest::run(directory));
 #endif
 
   ConfigTest::testMerge();
