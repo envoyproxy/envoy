@@ -71,6 +71,7 @@ private:
   Network::UdpPacketWriter* udp_packet_writer_;
 
   // The number of runs of the event loop in which at least one CHLO was buffered.
+  // TODO(ggreenway): Consider making this a published stat, or some variation of this information.
   uint64_t event_loops_with_buffered_chlo_for_test_{0};
 };
 
