@@ -86,7 +86,7 @@ protected:
 
   os_fd_t fd_;
   int socket_v6only_{false};
-  absl::optional<int> domain_;
+  const absl::optional<int> domain_;
 
   // The minimum cmsg buffer size to filled in destination address, packets dropped and gso
   // size when receiving a packet. It is possible for a received packet to contain both IPv4

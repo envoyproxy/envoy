@@ -214,7 +214,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg
     return getAddressFromSockAddrOrDie(ss, sizeof(sockaddr_in), fd);
   }
   return nullptr;
-} // namespace Network
+}
 
 absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader(
 #ifdef SO_RXQ_OVFL
@@ -226,7 +226,7 @@ absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader(
     const cmsghdr&) {
 #endif
   return absl::nullopt;
-} // namespace Envoy
+}
 
 Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     const uint64_t num_slice, uint32_t self_port,
