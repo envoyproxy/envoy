@@ -13,6 +13,7 @@ HTTP connection manager
   headers
   header_sanitizing
   local_reply
+  response_code_details
   stats
   runtime
   rds
