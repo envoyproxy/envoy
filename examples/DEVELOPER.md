@@ -182,7 +182,6 @@ bring_up_example
 If your sandbox has multiple compositions, and uses the `$PATHS` env var described above,
 `bring_up_example` will bring all of your compositions up.
 
-
 ### Additional arguments to `docker-compose up -d`
 
 If you need to pass additional arguments to compose you can set the `UPARGS`
@@ -209,32 +208,11 @@ If your example asks the user to run commands inside containers, you can
 mimick this using `docker-compose exec -T`. The `-T` flag is necessary as the
 tests do not have access to a `tty` in the CI pipeline.
 
+
 ## Add sandbox configs to configuration tests
 
 Example configuration files are tested to ensure they are valid and well-formed, and do
 not contain deprecated features.
-
-### Exclude configs from example configuration tests
-
-The CI script to find the configuration files will search for all files with a `yaml` or `lua`
-extension. If your sandbox example contains non-envoy configuration files that should not be
-checked you can exclude them by setting the `EXCLUDED_BUILD_CONFIGS` in `ci/verify_examples.sh`.
-
-Given a sandbox with the name `example-sandbox`, and a configuration file that should be excluded
-named `my-config.yaml`, add `^./example-sandbox/my-config.yaml` to `EXCLUDED_BUILD_CONFIGS`
-
-For example, change:
-```
-EXCLUDED_BUILD_CONFIGS=${EXCLUDED_BUILD_CONFIGS:-"^./cache/responses.yaml|^./jaeger-native-tracing|docker-compose"}
-```
-
-to:
-```
-EXCLUDED_BUILD_CONFIGS=${EXCLUDED_BUILD_CONFIGS:-"^./example-sandbox/my-config.yaml|^./cache/responses.yaml|^./jaeger-native-tracing|docker-compose"}
-```
-
-This variable is used as a regular expression, so you can exclude multiple or more targeted exclusions using an
-appropriate bash `regex`.
 
 ### List configs in `BUILD` file
 
@@ -259,8 +237,30 @@ Find the section shown in the following code block:
 If, for example, your sandbox includes 2 new configuration files - you should change `37 -> 39`
 and `38 -> 40` (current numbers may differ).
 
-## Verifying your sandbox
+### Exclude configs from example configuration tests
 
+The CI script to find the configuration files will search for all files with a `yaml` or `lua`
+extension. If your sandbox example contains non-envoy configuration files that should not be
+checked you can exclude them by setting the `EXCLUDED_BUILD_CONFIGS` in `ci/verify_examples.sh`.
+
+Given a sandbox with the name `example-sandbox`, and a configuration file that should be excluded
+named `my-config.yaml`, add `^./example-sandbox/my-config.yaml` to `EXCLUDED_BUILD_CONFIGS`
+
+For example, change:
+```
+EXCLUDED_BUILD_CONFIGS=${EXCLUDED_BUILD_CONFIGS:-"^./cache/responses.yaml|^./jaeger-native-tracing|docker-compose"}
+```
+
+to:
+```
+EXCLUDED_BUILD_CONFIGS=${EXCLUDED_BUILD_CONFIGS:-"^./example-sandbox/my-config.yaml|^./cache/responses.yaml|^./jaeger-native-tracing|docker-compose"}
+```
+
+This variable is used as a regular expression, so you can exclude multiple or more targeted exclusions using an
+appropriate bash `regex`.
+
+
+## Verifying your sandbox
 
 
 ## Verifying multiple/all sandboxes
