@@ -64,7 +64,6 @@ Removed Config or Runtime
 
 New Features
 ------------
-* xds: added support for mixed v2/v3 discovery response, which enable type url downgrade and upgrade. This feature is disabled by default and is controlled by runtime guard 'envoy.reloadable_features.enable_type_url_downgrade_and_upgrade'.
 * access log: added a :ref:`dynamic metadata filter<envoy_v3_api_msg_config.accesslog.v3.MetadataFilter>` for access logs, which filters whether to log based on matching dynamic metadata.
 * access log: added support for :ref:`%DOWNSTREAM_PEER_FINGERPRINT_1% <config_access_log_format_response_flags>` as a response flag.
 * access log: added support for nested objects in :ref:`JSON logging mode <config_access_log_format_dictionaries>`.
@@ -120,6 +119,7 @@ New Features
 * watchdog: supports an extension point where actions can be registered to fire on watchdog events such as miss, megamiss, kill and multikill. See ref:`watchdog actions<envoy_v3_api_field_config.bootstrap.v3.Watchdog.actions>`.
 * watchdog: watchdog action extension that does cpu profiling. See ref:`Profile Action <envoy_v3_api_file_envoy/extensions/watchdog/profile_action/v3alpha/profile_action.proto>`.
 * xds: added :ref:`extension config discovery<envoy_v3_api_msg_config.core.v3.ExtensionConfigSource>` support for HTTP filters.
+* xds: added support for mixed v2/v3 discovery response, which enable type url downgrade and upgrade. This feature is disabled by default and is controlled by runtime guard 'envoy.reloadable_features.enable_type_url_downgrade_and_upgrade'.
 * zlib: added option to use `zlib-ng <https://github.com/zlib-ng/zlib-ng>`_ as zlib library.
 
 Deprecated
