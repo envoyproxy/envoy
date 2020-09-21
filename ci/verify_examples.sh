@@ -70,7 +70,7 @@ case "$TESTCOMMAND" in
 	run_examples
 	;;
     *)
-	echo "Usage ./ci/verify_examples.sh [build_config|sandbox] [<test_filter>]"
+	echo "Usage: ./ci/verify_examples.sh [build_config|sandbox|all] [<test_filter>]"
 esac
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
