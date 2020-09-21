@@ -790,7 +790,10 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
       for key, value in pairs(headers) do
         request_handle:logTrace(key .. " " .. value)
       end
+      request_handle:logTrace(string.len(body))
       request_handle:logTrace(body)
+      request_handle:logTrace(string.byte(body, 5))
+      request_handle:logTrace(string.sub(body, 6, 8))
     end
   )EOF"};
 
@@ -828,9 +831,13 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
 
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  response_message->body() = std::make_unique<Buffer::OwnedImpl>("response");
+  const char response[8] = {'r', 'e', 's', 'p', '\0', 'n', 's', 'e'};
+  response_message->body() = std::make_unique<Buffer::OwnedImpl>(response, 8);
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("8")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("resp")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("0")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("nse")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers());
   callbacks->onSuccess(request, std::move(response_message));
