@@ -1474,6 +1474,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/config:api_version_lib",
+        "//source/common/config:udpa_resource_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",

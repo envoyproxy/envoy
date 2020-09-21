@@ -458,6 +458,31 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
   return AssertionSuccess();
 }
 
+AssertionResult BaseIntegrationTest::expectUdpaUrlInDiscoveryRequest(
+    const std::string& expected_type_url,
+    std::vector<udpa::core::v1::ResourceLocator> expected_resource_locators) {
+  envoy::service::discovery::v3::DeltaDiscoveryRequest discovery_request;
+  VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
+  if (expected_type_url != discovery_request.type_url()) {
+    return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
+                                             discovery_request.type_url(), expected_type_url);
+  }
+  const std::vector<udpa::core::v1::ResourceLocator> resource_locators(
+      discovery_request.udpa_resources_subscribe().begin(),
+      discovery_request.udpa_resources_subscribe().end());
+  if (resource_locators.size() != expected_resource_locators.size()) {
+    return AssertionFailure() << "Resource locator number mismatch.";
+  }
+  for (size_t i = 0; i < resource_locators.size(); i++) {
+    if (!Envoy::Protobuf::util::MessageDifferencer::Equals(resource_locators[i],
+                                                           expected_resource_locators[i])) {
+      return AssertionFailure() << "Resource locator element mismatch.";
+    }
+  }
+
+  return AssertionSuccess();
+}
+
 AssertionResult compareSets(const std::set<std::string>& set1, const std::set<std::string>& set2,
                             absl::string_view name) {
   if (set1 == set2) {

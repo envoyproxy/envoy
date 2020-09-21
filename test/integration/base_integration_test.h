@@ -185,6 +185,10 @@ public:
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
 
+  AssertionResult expectUdpaUrlInDiscoveryRequest(
+      const std::string& expected_type_url,
+      std::vector<udpa::core::v1::ResourceLocator> expected_resource_locators);
+
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
                                  const std::string& version, const bool api_downgrade = true) {

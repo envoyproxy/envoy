@@ -7,6 +7,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/config/api_version.h"
+#include "common/config/udpa_resource.h"
 #include "common/config/version_converter.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -84,6 +85,16 @@ protected:
       envoy::config::core::v3::GrpcService* grpc_service =
           lds_api_config_source->add_grpc_services();
       setGrpcService(*grpc_service, "lds_cluster", getLdsFakeUpstream().localAddress());
+    });
+  }
+
+  void setLdsUdpa() {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      const std::string udpa_url_str =
+          "udpa://some-authority/envoy.config.listeners.v3.Listener/my-listeners/*";
+      const auto lds_resource_locator = Config::UdpaResourceIdentifier::decodeUrl(udpa_url_str);
+      bootstrap.mutable_dynamic_resources()->mutable_lds_resources_locator()->MergeFrom(
+          lds_resource_locator);
     });
   }
 
@@ -252,6 +263,19 @@ TEST_P(ListenerIntegrationTest, BasicSuccess) {
   verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
+}
+
+// Tests that a LDS adding listener works as expected.
+TEST_P(ListenerIntegrationTest, LdsUdpa) {
+  setLdsUdpa();
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    const std::string udpa_url_str =
+        "udpa://some-authority/envoy.config.listeners.v3.Listener/my-listeners/*";
+    const auto lds_resource_locator = Config::UdpaResourceIdentifier::decodeUrl(udpa_url_str);
+    expectUdpaUrlInDiscoveryRequest(Config::TypeUrl::get().Listener, {lds_resource_locator});
+  };
+  initialize();
 }
 
 } // namespace
