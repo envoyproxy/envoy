@@ -59,15 +59,10 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
     }
   }
 
-  bool pack_as_bytes = config_->packAsBytes();
-  if (per_route_config_ != nullptr && per_route_config_->packAsBytes().has_value()) {
-    // When defined, per-route pack_as_bytes config overrides the global one.
-    pack_as_bytes = per_route_config_->packAsBytes().value();
-  }
-
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
       callbacks_, headers, std::move(context_extensions), std::move(metadata_context),
-      check_request_, config_->maxRequestBytes(), pack_as_bytes, config_->includePeerCertificate());
+      check_request_, config_->maxRequestBytes(), config_->packAsBytes(),
+      config_->includePeerCertificate());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *callbacks_);
   state_ = State::Calling;
@@ -75,7 +70,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
                                                // going to invoke check call.
   cluster_ = callbacks_->clusterInfo();
   initiating_call_ = true;
-  client_->check(*this, check_request_, callbacks_->activeSpan(), callbacks_->streamInfo());
+  client_->check(*this, callbacks_->dispatcher(), check_request_, callbacks_->activeSpan(),
+                 callbacks_->streamInfo());
   initiating_call_ = false;
 }
 
@@ -264,8 +260,14 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   case CheckStatus::Error: {
     if (cluster_) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_error_);
+      if (response->error_kind == Filters::Common::ExtAuthz::ErrorKind::Timedout) {
+        config_->incCounter(cluster_->statsScope(), config_->ext_authz_timeout_);
+      }
     }
     stats_.error_.inc();
+    if (response->error_kind == Filters::Common::ExtAuthz::ErrorKind::Timedout) {
+      stats_.timeout_.inc();
+    }
     if (config_->failureModeAllow()) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter allowed the request with error", *callbacks_);
       stats_.failure_mode_allowed_.inc();
@@ -311,10 +313,11 @@ bool Filter::skipCheckForRoute(const Router::RouteConstSharedPtr& route) const {
     return true;
   }
 
-  per_route_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
-      HttpFilterNames::get().ExtAuthorization, route);
-  if (per_route_config_ != nullptr) {
-    return per_route_config_->disabled();
+  const auto* specific_per_route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+          HttpFilterNames::get().ExtAuthorization, route);
+  if (specific_per_route_config != nullptr) {
+    return specific_per_route_config->disabled();
   }
 
   return false;

@@ -38,6 +38,7 @@ namespace ExtAuthz {
   COUNTER(ok)                                                                                      \
   COUNTER(denied)                                                                                  \
   COUNTER(error)                                                                                   \
+  COUNTER(timeout)                                                                                 \
   COUNTER(failure_mode_allowed)
 
 /**
@@ -77,6 +78,7 @@ public:
         stats_(generateStats(stats_prefix, scope)), ext_authz_ok_(pool_.add("ext_authz.ok")),
         ext_authz_denied_(pool_.add("ext_authz.denied")),
         ext_authz_error_(pool_.add("ext_authz.error")),
+        ext_authz_timeout_(pool_.add("ext_authz.timeout")),
         ext_authz_failure_mode_allowed_(pool_.add("ext_authz.failure_mode_allowed")) {}
 
   bool allowPartialMessage() const { return allow_partial_message_; }
@@ -158,6 +160,7 @@ public:
   const Stats::StatName ext_authz_ok_;
   const Stats::StatName ext_authz_denied_;
   const Stats::StatName ext_authz_error_;
+  const Stats::StatName ext_authz_timeout_;
   const Stats::StatName ext_authz_failure_mode_allowed_;
 };
 
@@ -176,11 +179,7 @@ public:
       : context_extensions_(config.has_check_settings()
                                 ? config.check_settings().context_extensions()
                                 : ContextExtensionsMap()),
-        disabled_(config.disabled()),
-        pack_as_bytes_(
-            config.has_check_settings()
-                ? PROTOBUF_GET_OPTIONAL_WRAPPED(config.check_settings(), pack_as_bytes, bool)
-                : absl::nullopt) {}
+        disabled_(config.disabled()) {}
 
   void merge(const FilterConfigPerRoute& other);
 
@@ -193,14 +192,11 @@ public:
 
   bool disabled() const { return disabled_; }
 
-  absl::optional<bool> packAsBytes() const { return pack_as_bytes_; }
-
 private:
   // We save the context extensions as a protobuf map instead of an std::map as this allows us to
   // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
   ContextExtensionsMap context_extensions_;
   bool disabled_;
-  absl::optional<bool> pack_as_bytes_;
 };
 
 /**
@@ -261,8 +257,6 @@ private:
   bool buffer_data_{};
   bool skip_check_{false};
   envoy::service::auth::v3::CheckRequest check_request_{};
-
-  mutable const FilterConfigPerRoute* per_route_config_{nullptr};
 };
 
 } // namespace ExtAuthz

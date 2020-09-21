@@ -26,7 +26,7 @@ For the v3 xDS APIs, a brief list of the key improvements that were made with a 
   - Extensions now reflect the Envoy source tree layout under `envoy.extensions`.
 * `std::regex` regular expressions were dropped from the API, in favor of RE2. The former have dangerous
   security implications.
-* `google.protobug.Struct` configuration of extensions was dropped from the API, in favor of
+* `google.protobuf.Struct` configuration of extensions was dropped from the API, in favor of
   typed configuration. This provides for better support for multiple instances of extensions, e.g.
   in filter chains, and more flexible naming of extension instances.
 * Over 60 deprecated fields were removed from the API.

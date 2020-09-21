@@ -9,8 +9,6 @@ import "envoy/config/core/v3/http_uri.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/http_status.proto";
 
-import "google/protobuf/wrappers.proto";
-
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -136,8 +134,11 @@ message BufferSettings {
   // filter.
   bool allow_partial_message = 2;
 
-  // If true, the body sent to the external authorization service is set with raw bytes, instead of
-  // UTF-8 string.
+  // If true, the body sent to the external authorization service is set with raw bytes, it sets
+  // the :ref:`raw_body<envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.raw_body>`
+  // field of HTTP request attribute context. Otherwise, :ref:`
+  // body<envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.body>` will be filled
+  // with UTF-8 string request body.
   bool pack_as_bytes = 3;
 }
 
@@ -248,12 +249,11 @@ message ExtAuthzPerRoute {
   }
 }
 
-// Extra settings for the check request.
-//
-// .. note::
-//
-//   These settings are only applied to a filter configured with a
-//   :ref:`grpc_service<envoy_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>`.
+// Extra settings for the check request. You can use this to provide extra context for the
+// external authorization server on specific virtual hosts \ routes. For example, adding a context
+// extension on the virtual host level can give the ext-authz server information on what virtual
+// host is used without needing to parse the host header. If CheckSettings is specified in multiple
+// per-filter-configs, they will be merged in order, and the result will be used.
 message CheckSettings {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.CheckSettings";
@@ -261,16 +261,11 @@ message CheckSettings {
   // Context extensions to set on the CheckRequest's
   // :ref:`AttributeContext.context_extensions<envoy_api_field_service.auth.v3.AttributeContext.context_extensions>`
   //
-  // You can use this to provide extra context for the external authorization server on specific
-  // virtual hosts/routes. For example, adding a context extension on the virtual host level can
-  // give the external authorization server information on what virtual host is used without needing
-  // to parse the host header. If CheckSettings is specified in multiple per-filter-configs, they
-  // will be merged in order, and the result will be used.
-  //
   // Merge semantics for this field are such that keys from more specific configs override.
+  //
+  // .. note::
+  //
+  //   These settings are only applied to a filter configured with a
+  //   :ref:`grpc_service<envoy_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>`.
   map<string, string> context_extensions = 1;
-
-  // Allow to override how request body is packed. If true, the body sent to the external
-  // authorization service is set with raw bytes, instead of UTF-8 string.
-  google.protobuf.BoolValue pack_as_bytes = 2;
 }
