@@ -30,6 +30,24 @@ constexpr socklen_t udsAddressLength() {
   return sizeof(sa_family_t);
 #endif
 }
+
+constexpr int messageTypeContainsIP() {
+#ifdef IP_RECVDSTADDR
+  return IP_RECVDSTADDR;
+#else
+  return IP_PKTINFO;
+#endif
+}
+
+in_addr addressFromMessage(const cmsghdr& cmsg) {
+#ifdef IP_RECVDSTADDR
+  return *reinterpret_cast<const in_addr*>(CMSG_DATA(&cmsg));
+#else
+  auto info = reinterpret_cast<const in_pktinfo*>(CMSG_DATA(&cmsg));
+  return info->ipi_addr;
+#endif
+}
+
 } // namespace
 
 namespace Network {
@@ -193,37 +211,25 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg
     ipv6_addr->sin6_port = htons(self_port);
     return getAddressFromSockAddrOrDie(ss, sizeof(sockaddr_in6), fd);
   }
-#ifndef IP_RECVDSTADDR
-  if (cmsg.cmsg_type == IP_PKTINFO) {
-    auto info = reinterpret_cast<const in_pktinfo*>(CMSG_DATA(&cmsg));
-#else
-  if (cmsg.cmsg_type == IP_RECVDSTADDR) {
-    auto addr = reinterpret_cast<const in_addr*>(CMSG_DATA(&cmsg));
-#endif
+
+  if (cmsg.cmsg_type == messageTypeContainsIP()) {
     sockaddr_storage ss;
     auto ipv4_addr = reinterpret_cast<sockaddr_in*>(&ss);
     memset(ipv4_addr, 0, sizeof(sockaddr_in));
     ipv4_addr->sin_family = AF_INET;
-    ipv4_addr->sin_addr =
-#ifndef IP_RECVDSTADDR
-        info->ipi_addr;
-#else
-        *addr;
-#endif
+    ipv4_addr->sin_addr = addressFromMessage(cmsg);
     ipv4_addr->sin_port = htons(self_port);
     return getAddressFromSockAddrOrDie(ss, sizeof(sockaddr_in), fd);
   }
+
   return nullptr;
 }
 
-absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader(
+absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader(const cmsghdr& cmsg) {
 #ifdef SO_RXQ_OVFL
-    const cmsghdr& cmsg) {
   if (cmsg.cmsg_type == SO_RXQ_OVFL) {
     return *reinterpret_cast<const uint32_t*>(CMSG_DATA(&cmsg));
   }
-#else
-    const cmsghdr&) {
 #endif
   return absl::nullopt;
 }
