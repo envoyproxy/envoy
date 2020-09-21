@@ -44,6 +44,7 @@ public:
     proxy_protocol_socket_ = std::make_unique<UpstreamProxyProtocolSocket>(std::move(inner_socket),
                                                                            socket_options, version);
     proxy_protocol_socket_->setTransportSocketCallbacks(transport_callbacks_);
+    proxy_protocol_socket_->onConnected();
   }
 
   NiceMock<Network::MockTransportSocket>* inner_socket_;
@@ -393,6 +394,27 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddresses) {
   proxy_protocol_socket_->doWrite(msg, false);
 }
 
+// Test onConnected generates header
+TEST_F(ProxyProtocolTest, OnConnectedGeneratesHeaderAndCallsInnerOnConnected) {
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
+  auto dst_addr = Network::Address::InstanceConstSharedPtr(
+      new Network::Address::Ipv6Instance("1:100:200:3::", 2));
+  Network::TransportSocketOptionsSharedPtr socket_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          "", std::vector<std::string>{}, std::vector<std::string>{}, absl::nullopt,
+          absl::optional<Network::ProxyProtocolData>(
+              Network::ProxyProtocolData{src_addr, dst_addr}));
+  transport_callbacks_.connection_.local_address_ =
+      Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000");
+  transport_callbacks_.connection_.remote_address_ =
+      Network::Utility::resolveUrl("tcp://[e:b:c:f::]:8080");
+  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, socket_options);
+
+  EXPECT_CALL(*inner_socket_, onConnected()).Times(1);
+  proxy_protocol_socket_->onConnected();
+}
+
 class FakeTransportSocketFactory : public Network::TransportSocketFactory {
 public:
   FakeTransportSocketFactory() {}
@@ -415,7 +437,7 @@ public:
   UpstreamProxyProtocolSocketFactory factory_;
 };
 
-// Test injects PROXY protocol header only once
+// Test returns createTransportSocket returns nullptr if inner call returns nullptr
 TEST_F(ProxyProtocolSocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
   auto socket = factory_.createTransportSocket(nullptr);
   ASSERT_EQ(nullptr, socket);

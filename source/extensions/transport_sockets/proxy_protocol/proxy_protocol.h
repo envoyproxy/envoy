@@ -26,6 +26,7 @@ public:
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
+  void onConnected() override;
 
 private:
   void generateHeader();

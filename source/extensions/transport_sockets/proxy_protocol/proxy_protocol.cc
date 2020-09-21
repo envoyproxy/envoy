@@ -27,7 +27,6 @@ void UpstreamProxyProtocolSocket::setTransportSocketCallbacks(
     Network::TransportSocketCallbacks& callbacks) {
   transport_socket_->setTransportSocketCallbacks(callbacks);
   callbacks_ = &callbacks;
-  generateHeader();
 }
 
 Network::IoResult UpstreamProxyProtocolSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
@@ -52,7 +51,7 @@ void UpstreamProxyProtocolSocket::generateHeader() {
 }
 
 void UpstreamProxyProtocolSocket::generateHeaderV1() {
-  // Default to local addresses
+  // Default to local addresses (used if no downstream connection exists e.g. health checks)
   auto src_addr = callbacks_->connection().localAddress();
   auto dst_addr = callbacks_->connection().remoteAddress();
 
@@ -99,6 +98,11 @@ Network::IoResult UpstreamProxyProtocolSocket::writeHeader() {
   } while (true);
 
   return {action, bytes_written, false};
+}
+
+void UpstreamProxyProtocolSocket::onConnected() {
+  generateHeader();
+  transport_socket_->onConnected();
 }
 
 UpstreamProxyProtocolSocketFactory::UpstreamProxyProtocolSocketFactory(

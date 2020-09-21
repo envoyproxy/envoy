@@ -1,4 +1,5 @@
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/transport_sockets/proxy_protocol/v3/upstream_proxy_protocol.pb.h"
 
@@ -38,6 +39,21 @@ public:
       transport_socket->mutable_typed_config()->PackFrom(proxy_proto_transport);
     });
     BaseIntegrationTest::initialize();
+  }
+
+  void initializeHealthCheck() {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto health_check =
+          bootstrap.mutable_static_resources()->mutable_clusters(0)->add_health_checks();
+      health_check->mutable_interval()->set_seconds(15);
+      health_check->mutable_timeout()->set_nanos(100000000); // 100 ms
+      health_check->mutable_no_traffic_interval()->set_seconds(15);
+      health_check->mutable_unhealthy_threshold()->set_value(3);
+      health_check->mutable_healthy_threshold()->set_value(3);
+      health_check->mutable_tcp_health_check()->mutable_send()->set_text("434c4f53450a");
+      auto recv_payload = health_check->mutable_tcp_health_check()->mutable_receive()->Add();
+      recv_payload->set_text("524554204d53470a");
+    });
   }
 
 private:
@@ -81,7 +97,19 @@ TEST_P(ProxyProtocolIntegrationTest, TestV1ProxyProtocol) {
   EXPECT_EQ(previous_data + " more data", observed_data);
 
   tcp_client->close();
-  auto _ = fake_upstream_connection->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+// Test sending proxy protocol health check
+TEST_P(ProxyProtocolIntegrationTest, TestProxyProtocolHealthCheck) {
+
+  setVersion(envoy::config::core::v3::ProxyProtocolConfig::V1);
+  initializeHealthCheck();
+  initialize();
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 // Test sending proxy protocol v2
@@ -131,7 +159,7 @@ TEST_P(ProxyProtocolIntegrationTest, TestV2ProxyProtocol) {
   EXPECT_EQ(previous_data + " more data", observed_data);
 
   tcp_client->close();
-  auto _ = fake_upstream_connection->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 } // namespace
