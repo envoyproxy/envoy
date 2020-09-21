@@ -44,7 +44,7 @@ TEST(AbortActionFactoryTest, CanCreateAction) {
   Stats::TestUtil::TestStore stats_;
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
-  Server::Configuration::GuardDogActionFactoryContext context{*api, dispatcher, stats_};
+  Server::Configuration::GuardDogActionFactoryContext context{*api, dispatcher, stats_, "test"};
 
   EXPECT_NE(factory->createGuardDogActionFromProto(config, context), nullptr);
 }

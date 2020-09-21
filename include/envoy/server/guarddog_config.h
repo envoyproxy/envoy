@@ -21,6 +21,7 @@ struct GuardDogActionFactoryContext {
   Api::Api& api_;
   Event::Dispatcher& dispatcher_; // not owned (this is the guard dog's dispatcher)
   Stats::Scope& stats_;           // not owned (this is the server's stats scope)
+  absl::string_view guarddog_name_;
 };
 
 class GuardDogAction {
