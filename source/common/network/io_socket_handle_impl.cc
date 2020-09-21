@@ -225,7 +225,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg
   return nullptr;
 }
 
-absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader(const cmsghdr& cmsg) {
+absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader([[maybe_unused]] const cmsghdr& cmsg) {
 #ifdef SO_RXQ_OVFL
   if (cmsg.cmsg_type == SO_RXQ_OVFL) {
     return *reinterpret_cast<const uint32_t*>(CMSG_DATA(&cmsg));
