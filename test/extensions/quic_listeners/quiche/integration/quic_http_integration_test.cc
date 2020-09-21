@@ -240,8 +240,8 @@ public:
     initialize();
     std::vector<IntegrationCodecClientPtr> codec_clients;
     for (size_t i = 1; i <= concurrency_; ++i) {
-      // The BPF filter looks at the 1st word of connection id in the packet
-      // header. And currently all QUIC versions support 8 bytes connection id. So
+      // The BPF filter and ActiveQuicListener::destination() look at the 1st word of connection id
+      // in the packet header. And currently all QUIC versions support 8 bytes connection id. So
       // create connections with the first 4 bytes of connection id different from each
       // other so they should be evenly distributed.
       designated_connection_ids_.push_back(quic::test::TestConnectionId(i << 32));
