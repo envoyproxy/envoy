@@ -127,7 +127,6 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
 }
 
 void ActiveQuicListener::onReadReady() {
-
   if (!enabled_.enabled()) {
     ENVOY_LOG(trace, "Quic listener {}: runtime disabled", config_->name());
     return;
