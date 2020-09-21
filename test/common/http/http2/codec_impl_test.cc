@@ -2175,12 +2175,15 @@ TEST_P(Http2CodecImplTest, EmptyDataFlood) {
   EXPECT_CALL(request_decoder_, decodeData(_, false));
   auto status = server_wrapper_.dispatch(data, *server_);
   EXPECT_FALSE(status.ok());
-  EXPECT_TRUE(isBufferFloodError(status));
-  // Legacy codec does not propagate error details and uses generic error message
-  EXPECT_EQ(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")
-                ? "Too many consecutive frames with an empty payload"
-                : "Flooding was detected in this HTTP/2 session, and it must be closed",
-            status.message());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+    EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(status));
+    EXPECT_EQ("Too many consecutive frames with an empty payload", status.message());
+  } else {
+    // Legacy codec does not propagate error details and uses generic error message
+    EXPECT_TRUE(isBufferFloodError(status));
+    EXPECT_EQ("Flooding was detected in this HTTP/2 session, and it must be closed",
+              status.message());
+  }
 }
 
 TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
