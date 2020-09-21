@@ -415,6 +415,7 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
           data.serializeAsProto().get());
   EXPECT_EQ(2U, filter_object.request_message_count());
   EXPECT_EQ(3U, filter_object.response_message_count());
+  EXPECT_EQ("2,3", data.serializeAsString().value());
 }
 
 TEST_F(GrpcStatsFilterConfigTest, UpstreamStats) {
