@@ -66,6 +66,14 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 
   span_ptr->setName(span_name);
 
+  // Set the span's kind (client or server)
+  if (config.operationName() == Tracing::OperationName::Egress) {
+    annotation.setValue(CLIENT_SEND);
+  } else {
+    annotation.setValue(SERVER_RECV);
+  }
+
+  // Set the span's id and parent id
   if (config.operationName() == Tracing::OperationName::Egress || !shared_span_context_) {
     // We need to create a new span that is a child of the previous span; no shared context
 
@@ -75,9 +83,6 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 
     // Set the parent id to the id of the previous span
     span_ptr->setParentId(previous_context.id());
-
-    // Set the CS annotation value
-    annotation.setValue(CLIENT_SEND);
 
     // Set the timestamp globally for the span
     span_ptr->setTimestamp(timestamp_micro);
@@ -89,9 +94,6 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
     if (previous_context.parentId()) {
       span_ptr->setParentId(previous_context.parentId());
     }
-
-    // Set the SR annotation value
-    annotation.setValue(SERVER_RECV);
   } else {
     return span_ptr; // return an empty span
   }
