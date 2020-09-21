@@ -614,9 +614,9 @@ TEST(Context, FilterStateAttributes) {
   ProtobufWkt::Arena arena;
   wrapper.Produce(&arena);
 
-  const auto key = "filter_state_key";
-  const auto serialized = "filter_state_value";
-  const auto missing = "missing_key";
+  const std::string key = "filter_state_key";
+  const std::string serialized = "filter_state_value";
+  const std::string missing = "missing_key";
 
   auto accessor = std::make_shared<Envoy::Router::StringAccessorImpl>(serialized);
   filter_state.setData(key, accessor, StreamInfo::FilterState::StateType::ReadOnly);
