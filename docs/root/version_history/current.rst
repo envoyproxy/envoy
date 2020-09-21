@@ -34,6 +34,7 @@ Minor Behavior Changes
 * http: fixed the 100-continue response path to properly handle upstream failure by sending 5xx responses. This behavior can be temporarily reverted by setting `envoy.reloadable_features.allow_500_after_100` to false.
 * http: the per-stream FilterState maintained by the HTTP connection manager will now provide read/write access to the downstream connection FilterState. As such, code that relies on interacting with this might
   see a change in behavior.
+* grpc reverse bridge: upstream headers will no longer be propagated when the response is missing or contains an unexpected content-type.
 * logging: added fine-grain logging for file level log control with logger management at administration interface. It can be enabled by option `--enable-fine-grain-logging`.
 * logging: changed default log format to `"[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v"` and default value of :option:`--log-format-prefix-with-location` to `0`.
 * logging: nghttp2 log messages no longer appear at trace level unless `ENVOY_NGHTTP2_TRACE` is set
