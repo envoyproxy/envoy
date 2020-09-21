@@ -1,4 +1,4 @@
-// Provides protos for testing source/common/config/config_provider_impl.{h,cc}.
+// Provides protos for testing.
 
 syntax = "proto3";
 
