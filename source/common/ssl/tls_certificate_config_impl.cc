@@ -4,7 +4,6 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/server/transport_socket_config.h"
 
-#include "common/common/base64.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/config/datasource.h"
