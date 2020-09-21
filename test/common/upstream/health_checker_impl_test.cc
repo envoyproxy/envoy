@@ -3460,7 +3460,8 @@ public:
       return ret;
     }
 
-    std::vector<std::pair<std::string, std::string>> response_headers;
+    std::vector<std::pair<std::string, std::string>>
+        response_headers; // Encapsulates all three types of responses
     std::vector<ChunkSpec> body_chunks;
     std::vector<std::pair<std::string, std::string>> trailers;
   };
@@ -4437,7 +4438,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgress) {
 
   // GOAWAY should cause a new connection to be created.
   expectClientCreate(0);
-  expectHealthcheckStart(0);
+  expectHealthcheckStart(0); // esentially a stream
   test_sessions_[0]->interval_timer_->invokeCallback();
 
   expectHealthcheckStop(0);

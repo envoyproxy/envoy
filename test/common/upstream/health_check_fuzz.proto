@@ -24,8 +24,9 @@ message GrpcRespondHeaders {
 }
 
 message GrpcRespondBytes {
-  //TODO: Structured response, which will get converted to raw bytes
-  bytes data = 2; //Raw bytes
+    //Structured response, which will get converted to raw bytes
+    grpc.health.v1.HealthCheckResponse.ServingStatus status = 1;
+    bytes data = 2; //Raw bytes
 }
 
 message GrpcRespondTrailers {

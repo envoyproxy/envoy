@@ -39,15 +39,17 @@ public:
   bool empty_response_ = true;
 };
 
-class GrpcHealthCheckFuzz : GrpcHealthCheckerImplTestBase { // TODO: What methods will I use here
+class GrpcHealthCheckFuzz : GrpcHealthCheckerImplTestBase {
 public:
   void allocGrpcHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input);
   void respondHeaders(test::common::upstream::GrpcRespondHeaders grpc_respond_headers);
+  //From unit tests
+  static std::vector<uint8_t> serializeResponse(grpc::health::v1::HealthCheckResponse::ServingStatus status);
   void respondBytes(test::common::upstream::GrpcRespondBytes grpc_respond_bytes);
   void respondTrailers(test::common::upstream::GrpcRespondTrailers grpc_respond_headers);
-  void respond(test::common::upstream::GrpcRespond
-                   grpc_respond); // This has three options, headers, raw bytes, or trailers
+  // This has three options, headers, raw bytes, or trailers
+  void respond(test::common::upstream::GrpcRespond grpc_respond);
   void triggerIntervalTimer(bool expect_client_create);
   void triggerTimeoutTimer(bool last_action);
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action);
