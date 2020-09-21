@@ -1,8 +1,8 @@
-#include "envoy/extensions/watchdog/abort_action/v3alpha/abort_action.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/guarddog_config.h"
+#include "envoy/watchdog/abort_action/v3alpha/abort_action.pb.h"
 
-#include "extensions/watchdog/abort_action/config.h"
+#include "common/watchdog/abort_action/config.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
@@ -11,7 +11,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Extensions {
 namespace Watchdog {
 namespace AbortAction {
 namespace {
@@ -31,7 +30,7 @@ TEST(AbortActionFactoryTest, CanCreateAction) {
             "name": "envoy.watchdog.abort_action",
             "typed_config": {
 	      "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-	      "type_url": "type.googleapis.com/envoy.extensions.watchdog.abort_action.v3alpha.AbortActionConfig",
+	      "type_url": "type.googleapis.com/envoy.watchdog.abort_action.v3alpha.AbortActionConfig",
 	      "value": {
 		"wait_duration": "2s",
 	      }
@@ -52,5 +51,4 @@ TEST(AbortActionFactoryTest, CanCreateAction) {
 } // namespace
 } // namespace AbortAction
 } // namespace Watchdog
-} // namespace Extensions
 } // namespace Envoy

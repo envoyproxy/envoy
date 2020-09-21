@@ -754,8 +754,8 @@ TEST_F(ConfigurationImplTest, KillTimeoutWithoutSkew) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(std::chrono::milliseconds(1000), config.workerWatchdogConfig().killTimeout());
-  EXPECT_EQ(std::chrono::milliseconds(1000), config.mainThreadWatchdogConfig().killTimeout());
+  EXPECT_EQ(config.workerWatchdogConfig().killTimeout(), std::chrono::milliseconds(1000));
+  EXPECT_EQ(config.mainThreadWatchdogConfig().killTimeout(), std::chrono::milliseconds(1000));
 }
 
 TEST_F(ConfigurationImplTest, CanSkewsKillTimeout) {
@@ -793,8 +793,40 @@ TEST_F(ConfigurationImplTest, DoesNotSkewIfKillTimeoutDisabled) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(std::chrono::milliseconds(0), config.mainThreadWatchdogConfig().killTimeout());
-  EXPECT_EQ(std::chrono::milliseconds(0), config.workerWatchdogConfig().killTimeout());
+  EXPECT_EQ(config.mainThreadWatchdogConfig().killTimeout(), std::chrono::milliseconds(0));
+  EXPECT_EQ(config.workerWatchdogConfig().killTimeout(), std::chrono::milliseconds(0));
+}
+
+TEST_F(ConfigurationImplTest, ShouldAddsAbortActionIfKillingIsEnabled) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  MainImpl config;
+  const std::string kill_json = R"EOF(
+  {
+    "watchdog": {
+      "kill_timeout": "1.0s",
+      "multikill_timeout" : "1.0s"
+    },
+  })EOF";
+
+  TestUtility::loadFromJson(kill_json, bootstrap);
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
+
+  // We should have the abort action added to both KILL and MULTIKILL events.
+  EXPECT_EQ(config.workerWatchdogConfig().actions().size(), 2);
+  EXPECT_EQ(config.mainThreadWatchdogConfig().actions().size(), 2);
+}
+
+TEST_F(ConfigurationImplTest, ShouldNotAddAbortActionIfKillingIsDisabled) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  MainImpl config;
+  const std::string killing_disabled_json = R"EOF( { "watchdog": { "miss_timeout": "1.0s" }})EOF";
+
+  TestUtility::loadFromJson(killing_disabled_json, bootstrap);
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
+
+  // We should have the abort action added
+  EXPECT_EQ(config.workerWatchdogConfig().actions().size(), 0);
+  EXPECT_EQ(config.mainThreadWatchdogConfig().actions().size(), 0);
 }
 
 TEST_F(ConfigurationImplTest, ShouldErrorIfBothWatchdogsAndWatchdogSet) {

@@ -4,12 +4,12 @@
 #include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/extensions/watchdog/abort_action/v3alpha/abort_action.pb.h"
 #include "envoy/server/guarddog_config.h"
 #include "envoy/thread/thread.h"
+#include "envoy/watchdog/abort_action/v3alpha/abort_action.pb.h"
 
-#include "extensions/watchdog/abort_action/abort_action.h"
-#include "extensions/watchdog/abort_action/config.h"
+#include "common/watchdog/abort_action/abort_action.h"
+#include "common/watchdog/abort_action/config.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/utility.h"
@@ -18,12 +18,11 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Extensions {
 namespace Watchdog {
 namespace AbortAction {
 namespace {
 
-using AbortActionConfig = envoy::extensions::watchdog::abort_action::v3alpha::AbortActionConfig;
+using AbortActionConfig = envoy::watchdog::abort_action::v3alpha::AbortActionConfig;
 
 class AbortActionTest : public testing::Test {
 protected:
@@ -126,5 +125,4 @@ TEST_F(AbortActionTest, PanicsIfThreadDoesNotDie) {
 } // namespace
 } // namespace AbortAction
 } // namespace Watchdog
-} // namespace Extensions
 } // namespace Envoy
