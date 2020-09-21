@@ -14,18 +14,17 @@ public:
   ~FileImplWin32();
 
 protected:
-  struct FlagsAndMode {
-    int flags_ = 0;
-    int pmode_ = 0;
-  };
-
-  // Filesystem::FileSharedImpl
-  FlagsAndMode translateFlag(FlagSet in);
-  void openFile(FlagSet in) override;
-  ssize_t writeFile(absl::string_view buffer) override;
-  bool closeFile() override;
+  Api::IoCallBoolResult open(FlagSet flag) override;
+  Api::IoCallSizeResult write(absl::string_view buffer) override;
+  Api::IoCallBoolResult close() override;
 
 private:
+  struct FlagsAndMode {
+    DWORD access_ = 0;
+    DWORD creation_ = 0;
+  };
+
+  FlagsAndMode translateFlag(FlagSet in);
   friend class FileSystemImplTest;
 };
 
