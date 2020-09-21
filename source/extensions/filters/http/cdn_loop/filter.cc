@@ -16,9 +16,9 @@ namespace CdnLoop {
 namespace {
 const Http::LowerCaseString CdnLoopHeaderName("CDN-Loop");
 constexpr absl::string_view ParseErrorMessage = "Invalid CDN-Loop header in request.";
-constexpr absl::string_view ParseErrorDetails = "The CDN-Loop header could not be parsed.";
-constexpr absl::string_view LoopDetectedMessage = "CDN-Loop detected.";
-constexpr absl::string_view LoopDetectedDetails = "The server has detected a loop between CDNs.";
+constexpr absl::string_view ParseErrorDetails = "invalid_cdn_loop_header";
+constexpr absl::string_view LoopDetectedMessage = "The server has detected a loop between CDNs.";
+constexpr absl::string_view LoopDetectedDetails = "cdn_loop_detected";
 } // namespace
 
 Http::FilterHeadersStatus CdnLoopFilter::decodeHeaders(Http::RequestHeaderMap& headers,
