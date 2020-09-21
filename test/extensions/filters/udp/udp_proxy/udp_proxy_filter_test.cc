@@ -21,6 +21,7 @@
 
 using testing::AtLeast;
 using testing::ByMove;
+using testing::DoAll;
 using testing::InSequence;
 using testing::InvokeWithoutArgs;
 using testing::Return;

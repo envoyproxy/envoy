@@ -98,7 +98,8 @@ private:
  */
 class HotRestartImpl : public HotRestart {
 public:
-  HotRestartImpl(uint32_t base_id, uint32_t restart_epoch);
+  HotRestartImpl(uint32_t base_id, uint32_t restart_epoch, const std::string& socket_path,
+                 mode_t socket_mode);
 
   // Server::HotRestart
   void drainParentListeners() override;
