@@ -55,14 +55,8 @@ actions {
             
         }
         grpc_respond {
-            grpc_respond_headers {
-            headers {
-                headers {
-                    key: ":status"
-                    value: "200"
-                }
-            }
-            status: "200"
+            grpc_respond_data {
+                status: SERVING
             }
         }
     }
