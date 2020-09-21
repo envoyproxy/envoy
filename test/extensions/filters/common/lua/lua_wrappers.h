@@ -19,7 +19,7 @@ namespace Lua {
 // A helper to be called inside the registered closure.
 class Printer {
 public:
-  MOCK_CONST_METHOD1(testPrint, void(const std::string&));
+  MOCK_METHOD(void, testPrint, (const std::string&), (const));
 };
 
 const Printer& getPrinter() { CONSTRUCT_ON_FIRST_USE(Printer); }
