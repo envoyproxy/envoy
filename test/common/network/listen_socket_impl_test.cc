@@ -145,48 +145,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ListenSocketImplTestUdp,
 
 TEST_P(ListenSocketImplTestTcp, BindSpecificPort) { testBindSpecificPort(); }
 
-#if defined(__linux__)
-
-TEST(ConnectionSocketImpl, LastRoundTripTimeReturnsEmptyOptionalIfGetSocketFails) {
-  std::unique_ptr<MockIoHandle> io_handle = std::make_unique<NiceMock<MockIoHandle>>();
-  EXPECT_CALL(*io_handle, getOption(_, _, _, _)).WillOnce(Return(Api::SysCallIntResult{-1, -1}));
-  ConnectionSocketImpl socket{std::move(io_handle),
-                              std::make_shared<NiceMock<MockResolvedAddress>>("", ""),
-                              std::make_shared<NiceMock<MockResolvedAddress>>("", "")};
-
-  EXPECT_THAT(socket.lastRoundTripTime(), Eq(absl::optional<std::chrono::milliseconds>{}));
-}
-
-TEST(ConnectionSocketImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
-  std::unique_ptr<MockIoHandle> io_handle = std::make_unique<NiceMock<MockIoHandle>>();
-  EXPECT_CALL(*io_handle, getOption(_, _, _, _))
-      .WillOnce(DoAll(WithArg<2>(Invoke([](void* optval) {
-                        static_cast<struct tcp_info*>(optval)->tcpi_rtt = 35;
-                      })),
-                      Return(Api::SysCallIntResult{0, 0})));
-  ConnectionSocketImpl socket{std::move(io_handle),
-                              std::make_shared<NiceMock<MockResolvedAddress>>("", ""),
-                              std::make_shared<NiceMock<MockResolvedAddress>>("", "")};
-
-  EXPECT_THAT(socket.lastRoundTripTime(), Eq(absl::optional<std::chrono::milliseconds>{35}));
-}
-
-#endif
-
-#if !defined(__linux__)
-
-TEST(ConnectionSocketImpl, LastRoundTripTimeAlwaysReturnsEmptyOptional) {
-  std::unique_ptr<MockIoHandle> io_handle = std::make_unique<NiceMock<MockIoHandle>>();
-  EXPECT_CALL(*io_handle, getOption(_, _, _, _)).WillOnce(Return(Api::SysCallIntResult{-1, -1}));
-  ConnectionSocketImpl socket{std::move(io_handle),
-                              std::make_shared<NiceMock<MockResolvedAddress>>("", ""),
-                              std::make_shared<NiceMock<MockResolvedAddress>>("", "")};
-
-  EXPECT_THAT(socket.lastRoundTripTime(), Eq(absl::optional<std::chrono::milliseconds>{}));
-}
-
-#endif
-
 /*
  * A simple implementation to test some of ListenSocketImpl's accessors without requiring
  * stack interaction.

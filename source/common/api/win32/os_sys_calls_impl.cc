@@ -207,6 +207,11 @@ SysCallIntResult OsSysCallsImpl::setsockopt(os_fd_t sockfd, int level, int optna
 
 SysCallIntResult OsSysCallsImpl::getsockopt(os_fd_t sockfd, int level, int optname, void* optval,
                                             socklen_t* optlen) {
+  // Skip socket call if not supported on this platform.
+  if (optname == ENVOY_TCP_INFO) {
+    return {-1, ENOTSUP / ENOSYS};
+  }
+
   const int rc = ::getsockopt(sockfd, level, optname, static_cast<char*>(optval), optlen);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }

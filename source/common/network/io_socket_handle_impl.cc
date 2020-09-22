@@ -492,5 +492,18 @@ Event::FileEventPtr IoSocketHandleImpl::createFileEvent(Event::Dispatcher& dispa
 Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {
   return Api::OsSysCallsSingleton::get().shutdown(fd_, how);
 }
+
+absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime() {
+  struct tcp_info ti;
+  socklen_t len = sizeof(ti);
+  if (!SOCKET_FAILURE(Api::OsSysCallsSingleton::get()
+                          .getsockopt(fd_, IPPROTO_TCP, ENVOY_TCP_INFO, &ti, &len)
+                          .rc_)) {
+    return std::chrono::milliseconds(ti.tcpi_rtt);
+  }
+
+  return {};
+}
+
 } // namespace Network
 } // namespace Envoy
