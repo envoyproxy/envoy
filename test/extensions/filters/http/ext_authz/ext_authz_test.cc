@@ -205,10 +205,12 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
   EXPECT_EQ(0U, config_->stats().timeout_.value());
 }
 
-// Test when when a timeout error occurs, the correct stat is incremented.
+// Test when when a timeout error occurs, the correct stat is incremented, with custom prefix for
+// statistics.
 TEST_F(HttpFilterTest, TimeoutError) {
   InSequence s;
   initialize(R"EOF(
+  stat_prefix: slow_service
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
@@ -235,12 +237,14 @@ TEST_F(HttpFilterTest, TimeoutError) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
   response.error_kind = Filters::Common::ExtAuthz::ErrorKind::Timedout;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-  EXPECT_EQ(
-      1U,
-      filter_callbacks_.clusterInfo()->statsScope().counterFromString("ext_authz.error").value());
-  EXPECT_EQ(
-      1U,
-      filter_callbacks_.clusterInfo()->statsScope().counterFromString("ext_authz.timeout").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.slow_service.error")
+                    .value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.slow_service.timeout")
+                    .value());
   EXPECT_EQ(1U, config_->stats().error_.value());
   EXPECT_EQ(1U, config_->stats().timeout_.value());
 }
