@@ -398,8 +398,8 @@ INSTANTIATE_TEST_SUITE_P(FramedTwitter, ThriftTwitterConnManagerIntegrationTest,
                                  Values(false, true)),
                          paramToString);
 
-// This test relies on an old apache thrift python package
-// that is only available in python2. Disabling the test on Windows.
+// This test relies on an old Apache Thrift Python package
+// that is only available in Python2. Disabling the test on Windows.
 #ifndef WIN32
 // Because of the protocol upgrade requests and the difficulty of separating them, we test this
 // protocol independently.

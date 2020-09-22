@@ -17,6 +17,7 @@ from twitter.common.rpc.finagle.protocol import TFinagleProtocol
 sys.stdin.reconfigure(encoding='utf-8')
 sys.stdout.reconfigure(encoding='utf-8')
 
+
 class TRecordingTransport(TTransport.TTransportBase):
 
   def __init__(self, underlying, writehandle, readhandle):
