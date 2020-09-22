@@ -1,8 +1,5 @@
 #include <cstdlib>
-
 #include <memory>
-
-#include "common/runtime/runtime_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
@@ -29,15 +26,15 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/udp_packet_writer_handler_impl.h"
+#include "common/runtime/runtime_impl.h"
 #include "extensions/quic_listeners/quiche/active_quic_listener.h"
 #include "test/extensions/quic_listeners/quiche/test_utils.h"
 #include "test/extensions/quic_listeners/quiche/test_proof_source.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/environment.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/instance.h"
-
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"
 #include "test/test_common/network_utility.h"
 #include "absl/time/time.h"
