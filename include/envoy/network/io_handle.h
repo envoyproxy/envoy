@@ -223,10 +223,7 @@ public:
   virtual Api::SysCallIntResult setBlocking(bool blocking) PURE;
 
   /**
-   * Get domain used by underlying socket (see man 2 socket)
-   * @param domain updated to the underlying socket's domain if call is successful
-   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
-   * is successful, errno_ shouldn't be used.
+   * @return the domain used by underlying socket (see man 2 socket)
    */
   virtual absl::optional<int> domain() PURE;
 

@@ -257,7 +257,8 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 #endif
 
-  RELEASE_ASSERT(result.rc_ == 0, "");
+  RELEASE_ASSERT(result.rc_ == 0, fmt::format("Failed to set TCP_NODELAY with error {}, {}",
+                                              result.errno_, errorDetails(result.errno_)));
 }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {

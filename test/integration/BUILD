@@ -1240,7 +1240,6 @@ envoy_cc_test(
         "uds_integration_test.cc",
         "uds_integration_test.h",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/event:dispatcher_includes",
