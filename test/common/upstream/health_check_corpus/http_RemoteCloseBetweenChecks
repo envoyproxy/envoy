@@ -38,6 +38,9 @@ actions {
         tcp_respond {
             
         }
+        grpc_respond {
+
+        }
     }
 }
 actions {
@@ -55,6 +58,9 @@ actions {
             status: "200"
         }
         tcp_respond {
+            
+        }
+        grpc_respond {
             
         }
     }

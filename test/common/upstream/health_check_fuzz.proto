@@ -21,15 +21,14 @@ message GrpcRespondHeaders {
   test.fuzz.Headers headers = 1;
   //https://github.com/nodejs/http-parser/blob/master/http_parser.c#L852
   string status = 2 [(validate.rules).string = {pattern: "[0-9]+$*", min_len: 1}];
-  bool end_stream = 3;
 }
 
 enum ServingStatus {
-    UNKNOWN = 0;
-    SERVING = 1;
-    NOT_SERVING = 2;
-    SERVICE_UNKNOWN = 3;  // Used only by the Watch method.
-  }
+  UNKNOWN = 0;
+  SERVING = 1;
+  NOT_SERVING = 2;
+  SERVICE_UNKNOWN = 3; // Used only by the Watch method.
+}
 
 message GrpcRespondBytes {
   oneof grpc_respond_bytes_selector {
@@ -44,11 +43,9 @@ message GrpcRespondTrailers {
 }
 
 message GrpcRespond {
-  oneof grpc_respond_selector {
-    GrpcRespondHeaders grpc_respond_headers = 1;
-    GrpcRespondBytes grpc_respond_bytes = 2;
-    GrpcRespondTrailers grpc_respond_trailers = 3;
-  }
+  GrpcRespondHeaders grpc_respond_headers = 1;
+  GrpcRespondBytes grpc_respond_bytes = 2;
+  GrpcRespondTrailers grpc_respond_trailers = 3;
 }
 
 message Respond {

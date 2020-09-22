@@ -43,45 +43,9 @@ actions {
             }
             status: "200"
             }
-        }
-    }
-}
-actions {
-    respond {
-        http_respond {
-            headers {
-                headers {
-                    key: ":status"
-                    value: "200"
-                }
-            }
-            status: "200"
-        }
-        tcp_respond {
-            
-        }
-        grpc_respond {
             grpc_respond_bytes {
                 status: SERVING
             }
-        }
-    }
-}
-actions {
-    respond {
-        http_respond {
-            headers {
-                headers {
-                    key: ":status"
-                    value: "200"
-                }
-            }
-            status: "200"
-        }
-        tcp_respond {
-            
-        }
-        grpc_respond {
             grpc_respond_trailers {
             trailers {
                 headers {

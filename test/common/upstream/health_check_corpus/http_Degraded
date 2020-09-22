@@ -42,6 +42,9 @@ actions {
         tcp_respond {
             
         }
+        grpc_respond {
+            
+        }
     }
 }
 actions {

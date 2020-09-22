@@ -31,5 +31,8 @@ actions {
         tcp_respond {
             data: "\x02"
         }
+        grpc_respond {
+            
+        }
     }
 }

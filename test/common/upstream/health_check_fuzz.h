@@ -43,12 +43,12 @@ class GrpcHealthCheckFuzz : GrpcHealthCheckerImplTestBaseUtils {
 public:
   void allocGrpcHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input);
-  void respondHeaders(test::common::upstream::GrpcRespondHeaders grpc_respond_headers);
-  //From unit tests
-  static std::vector<uint8_t> serializeResponse(grpc::health::v1::HealthCheckResponse::ServingStatus status);
-  void respondBytes(test::common::upstream::GrpcRespondBytes grpc_respond_bytes);
-  void respondTrailers(test::common::upstream::GrpcRespondTrailers grpc_respond_headers);
-  // This has three options, headers, raw bytes, or trailers
+  // From unit tests
+  static std::vector<uint8_t>
+  serializeResponse(grpc::health::v1::HealthCheckResponse::ServingStatus status);
+  Buffer::OwnedImpl
+  makeBufferToRespondWith(test::common::upstream::GrpcRespondBytes grpc_respond_bytes);
+  // This has three components, headers, raw bytes, or trailers
   void respond(test::common::upstream::GrpcRespond grpc_respond);
   void triggerIntervalTimer(bool expect_client_create);
   void triggerTimeoutTimer(bool last_action);
@@ -63,11 +63,10 @@ public:
   bool received_no_error_goaway_ = false;
 };
 
-class HealthCheckFuzz { // TODO: once added tcp/grpc, switch this to an
-                        // abstract health checker test class that can handle
-                        // one of the three types
+class HealthCheckFuzz {
 public:
   HealthCheckFuzz() = default;
+  // This will delegate to the specific classes
   void initializeAndReplay(test::common::upstream::HealthCheckTestCase
                                input); // This will delegate to the specific classes
   enum class Type {
