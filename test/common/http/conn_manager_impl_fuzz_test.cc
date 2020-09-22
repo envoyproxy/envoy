@@ -300,7 +300,7 @@ public:
         }));
     ON_CALL(*decoder_filter_, decodeHeaders(_, _))
         .WillByDefault(InvokeWithoutArgs(
-            [this, decode_header_status, end_stream]() -> Http::FilterHeadersStatus {
+            [this, decode_header_status]() -> Http::FilterHeadersStatus {
               header_status_ = fromHeaderStatus(decode_header_status);
               return *header_status_;
             }));
