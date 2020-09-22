@@ -1126,12 +1126,17 @@ message HedgePolicy {
   type.FractionalPercent additional_request_chance = 2;
 
   // Indicates that a hedged request should be sent when the per-try timeout is hit.
-  // This will only occur if the :ref:`RetryPolicy <envoy_api_msg_route.RetryPolicy>` also indicates that
-  // timed out requests should be retried (e.g. retry_on set to 'gateway-error' etc). (Other retry policies
-  // would also apply, but would only have effect if the response came back before the request was hedged against;
-  // otherwise such responses would simply be discarded as a retry is already in flight.)
-  // With hedging, the first request to complete successfully (be it the original or one of the hedged requests)
-  // wil be the one returned to the caller, where "successfully" is defined as not triggering the retry policy.
+  // This means that a retry will be issued without resetting the original request, leaving multiple upstream requests in flight.
+  // The first request to complete successfully will be the one returned to the caller.
+  //
+  // * At any time, a successful response (i.e. not triggering any of the retry-on conditions) would be returned to the client.
+  // * Before per-try timeout, an error response (per retry-on conditions) would be retried immediately or returned ot the client
+  //   if there are no more retries available.
+  // * After per-try timeout, an error response would be discard, as a retry in the form of a hedged request is already in progress.
+  //
+  // Note: For this to have effect, the :ref:`RetryPolicy <envoy_api_msg_route.RetryPolicy>` must be one that retries on timeout
+  // (e.g. `gateway-error`).
+  //
   // Defaults to false.
   bool hedge_on_per_try_timeout = 3;
 }
