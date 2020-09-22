@@ -89,10 +89,10 @@ on the virtual host, route, or weighted cluster.
 
 LuaPerRoute provides two ways of overriding the `GLOBAL` Lua script:
 
-* By providing a name reference to the defined :ref:`named Lua source codes map 
+* By providing a name reference to the defined :ref:`named Lua source codes map
   <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>`.
-* By providing inline :ref:`source code 
-  <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code>` (This allows the 
+* By providing inline :ref:`source code
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code>` (This allows the
   code to be sent through RDS).
 
 As a concrete example, given the following Lua filter configuration:
@@ -143,7 +143,7 @@ The ``GLOBAL`` Lua script will be overridden by the referenced script:
   <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`. Therefore, do not use
   ``GLOBAL`` as name for other Lua scripts.
 
-Or we can define a new Lua script in the LuaPerRoute configuration directly to override the `GLOBAL`  
+Or we can define a new Lua script in the LuaPerRoute configuration directly to override the `GLOBAL`
 Lua script as follows:
 
 .. code-block:: yaml
@@ -236,6 +236,40 @@ more details on the supported API.
     -- Log response status code
     response_handle:logInfo("Status: "..response_handle:headers():get(":status"))
   end
+
+A common use-case is to rewrite upstream response body, for example: an upstream sends non-2xx
+response with JSON data, but the application requires HTML page to be sent to browsers.
+
+There are two ways of doing this, the first one is via the `body()` API.
+
+.. code-block:: lua
+
+    function envoy_on_response(response_handle)
+      local content_length = response_handle:body():setBytes("<html><b>Not Found<b></html>")
+      response_handle:headers():replace("content-length", content_length)
+      response_handle:headers():replace("content-type", "text/html")
+    end
+
+
+Or, through `bodyChunks()` API, which let Envoy to skip buffering the upstream response data.
+
+.. code-block:: lua
+
+    function envoy_on_response(response_handle)
+
+      -- Sets the content-length.
+      response_handle:headers():replace("content-length", 28)
+      response_handle:headers():replace("content-type", "text/html")
+
+      local last
+      for chunk in response_handle:bodyChunks() do
+        -- Clears each received chunk.
+        chunk:setBytes("")
+        last = chunk
+      end
+
+      last:setBytes("<html><b>Not Found<b></html>")
+    end
 
 .. _config_http_filters_lua_stream_handle_api:
 
@@ -555,6 +589,17 @@ Get bytes from the buffer. By default Envoy will not copy all buffer bytes to Lu
 cause a buffer segment to be copied. *index* is an integer and supplies the buffer start index to
 copy. *length* is an integer and supplies the buffer length to copy. *index* + *length* must be
 less than the buffer length.
+
+.. _config_http_filters_lua_buffer_wrapper_api_set_bytes:
+
+setBytes()
+^^^^^^^^^^
+
+.. code-block:: lua
+
+  buffer:setBytes(string)
+
+Set the content of wrapped buffer with the input string.
 
 .. _config_http_filters_lua_metadata_wrapper:
 

@@ -129,6 +129,7 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
     if (code.has_value()) {
       return CelValue::CreateInt64(code.value());
     }
+    return {};
   } else if (value == Size) {
     return CelValue::CreateInt64(info_.bytesSent());
   } else if (value == Headers) {
@@ -150,6 +151,12 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
     return CelValue::CreateInt64(info_.bytesSent() +
                                  (headers_.value_ ? headers_.value_->byteSize() : 0) +
                                  (trailers_.value_ ? trailers_.value_->byteSize() : 0));
+  } else if (value == CodeDetails) {
+    const absl::optional<std::string>& details = info_.responseCodeDetails();
+    if (details.has_value()) {
+      return CelValue::CreateString(&details.value());
+    }
+    return {};
   }
   return {};
 }

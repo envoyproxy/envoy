@@ -275,6 +275,8 @@ build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
 # Fuzzing without ASAN. This is useful for profiling fuzzers without any ASAN artifacts.
 build:plain-fuzzer --define=FUZZING_ENGINE=libfuzzer
 build:plain-fuzzer --define ENVOY_CONFIG_ASAN=1
+build:plain-fuzzer --copt=-fsanitize=fuzzer-no-link
+build:plain-fuzzer --linkopt=-fsanitize=fuzzer-no-link
 
 # Compile database generation config
 build:compdb --build_tag_filters=-nocompdb

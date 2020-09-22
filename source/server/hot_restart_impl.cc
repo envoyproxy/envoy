@@ -95,10 +95,11 @@ void initializeMutex(pthread_mutex_t& mutex) {
 // performed the multiplication in OptionsImpl which produced incorrect server info output.
 // TODO(zuercher): ideally, the base_id would be separated from the restart_epoch in
 // the socket names to entirely prevent collisions between consecutive base ids.
-HotRestartImpl::HotRestartImpl(uint32_t base_id, uint32_t restart_epoch)
+HotRestartImpl::HotRestartImpl(uint32_t base_id, uint32_t restart_epoch,
+                               const std::string& socket_path, mode_t socket_mode)
     : base_id_(base_id), scaled_base_id_(base_id * 10),
-      as_child_(HotRestartingChild(scaled_base_id_, restart_epoch)),
-      as_parent_(HotRestartingParent(scaled_base_id_, restart_epoch)),
+      as_child_(HotRestartingChild(scaled_base_id_, restart_epoch, socket_path, socket_mode)),
+      as_parent_(HotRestartingParent(scaled_base_id_, restart_epoch, socket_path, socket_mode)),
       shmem_(attachSharedMemory(scaled_base_id_, restart_epoch)), log_lock_(shmem_->log_lock_),
       access_log_lock_(shmem_->access_log_lock_) {
   // If our parent ever goes away just terminate us so that we don't have to rely on ops/launching

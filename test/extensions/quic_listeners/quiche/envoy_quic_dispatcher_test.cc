@@ -67,7 +67,6 @@ public:
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
           SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
           SetQuicReloadableFlag(quic_disable_version_draft_27, !use_http3);
-          SetQuicReloadableFlag(quic_disable_version_draft_25, !use_http3);
           return quic::CurrentSupportedVersions();
         }()),
         quic_version_(version_manager_.GetSupportedVersions()[0]),
@@ -93,8 +92,8 @@ public:
 
   void SetUp() override {
     // Advance time a bit because QuicTime regards 0 as uninitialized timestamp.
-    time_system_.advanceTimeAsync(std::chrono::milliseconds(100));
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    time_system_.advanceTimeAndRun(std::chrono::milliseconds(100), *dispatcher_,
+                                   Event::Dispatcher::RunType::NonBlock);
     EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes())
         .WillRepeatedly(Return(1024 * 1024));
   }
