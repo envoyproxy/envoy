@@ -250,6 +250,7 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
 // All three types of responses end up calling onRpcComplete, so that codepath is taken care of
 void GrpcHealthCheckFuzz::respondHeaders(
     test::common::upstream::GrpcRespondHeaders grpc_respond_headers) {
+  //TODO: Add :status = 200, content-type = application/grpc to every response header map?
   std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers =
       std::make_unique<Http::TestResponseHeaderMapImpl>(
           Fuzz::fromHeaders<Http::TestResponseHeaderMapImpl>(grpc_respond_headers.headers(), {},
@@ -257,9 +258,11 @@ void GrpcHealthCheckFuzz::respondHeaders(
 
   response_headers->setStatus(grpc_respond_headers.status());
 
+  ENVOY_LOG_MISC(trace, "Responded headers {}", *response_headers.get());
   // This will always call handleSuccess or handleFailure, turning off timeout timer and enabling
   // interval timer
-  test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), true);
+  // TODO: Add end stream on headers boolean?
+  test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), grpc_respond_headers.end_stream());
 }
 
 //From unit tests
@@ -300,7 +303,7 @@ void GrpcHealthCheckFuzz::respondBytes(
     Buffer::OwnedImpl response;
     response.add(data.data(), data.size());
     //const auto response = std::make_unique<Buffer::OwnedImpl>(data, data.size());
-    test_sessions_[0]->stream_response_callbacks_->decodeData(response, true);
+    test_sessions_[0]->stream_response_callbacks_->decodeData(response, false); //End stream with bytes is a protocol error
     break;
   }
   case test::common::upstream::GrpcRespondBytes::kData: {
@@ -310,7 +313,7 @@ void GrpcHealthCheckFuzz::respondBytes(
 
     ENVOY_LOG_MISC(trace, "Responded with {}. Length (in bytes) = {}. This is the string passed in.",
                  grpc_respond_bytes.data(), grpc_respond_bytes.data().length());
-    test_sessions_[0]->stream_response_callbacks_->decodeData(response, true);
+    test_sessions_[0]->stream_response_callbacks_->decodeData(response, false); //End stream with bytes is a protocol error
     break;
   }
   default: { // shouldn't hit
@@ -320,6 +323,7 @@ void GrpcHealthCheckFuzz::respondBytes(
   }
 }
 
+//Trailers always imply end stream
 void GrpcHealthCheckFuzz::respondTrailers(
     test::common::upstream::GrpcRespondTrailers grpc_respond_headers) {
   std::unique_ptr<Http::TestResponseTrailerMapImpl> response_trailers =
@@ -357,12 +361,12 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respo
   if (!reuse_connection_ || received_no_error_goaway_) {
     ENVOY_LOG_MISC(trace, "Creating client and stream after response.");
     triggerIntervalTimer(true);
+  } else { //Still want to invoke interval timer after every response to not have the fuzzer have to wait for a triggerIntervalTimer event
+    ENVOY_LOG_MISC(trace, "Creating stream after response.");
+    triggerIntervalTimer(false);
   }
 
   received_no_error_goaway_ = false; // from resetState()
-
-  // Note: logic interesting in ongoaway, closes client if doesnt set
-  // go away code to true. No_error_goaway_ gets set to false on a call to reset state
 }
 
 void GrpcHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {

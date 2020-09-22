@@ -13,6 +13,7 @@ health_check_config {
     }
     grpc_health_check {
         service_name: "service"
+        authority: www.envoyproxy.io
     }
 }
 actions {
