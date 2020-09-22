@@ -94,6 +94,8 @@ public:
   }
 
 private:
+  // Holds a reference to the watchdog registered with this dispatcher and the timer used to ensure
+  // that the dog is touched periodically.
   class WatchdogRegistration {
   public:
     WatchdogRegistration(const Server::WatchDogSharedPtr& watchdog, Scheduler& scheduler,
