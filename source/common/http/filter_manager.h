@@ -541,6 +541,19 @@ public:
     }
   }
 
+  void preDestroyFilters() {
+    for (auto& filter : decoder_filters_) {
+      filter->handle_->onPreDestroy();
+    }
+
+    for (auto& filter : encoder_filters_) {
+      // Do not call onPreDestroy twice for dual registered filters.
+      if (!filter->dual_filter_) {
+        filter->handle_->onPreDestroy();
+      }
+    }
+  }
+
   void destroyFilters() {
     state_.destroyed_ = true;
 

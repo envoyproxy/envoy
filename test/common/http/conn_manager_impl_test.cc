@@ -284,13 +284,24 @@ public:
 
   void expectOnDestroy(bool deferred = true) {
     for (auto filter : decoder_filters_) {
-      EXPECT_CALL(*filter, onDestroy());
+      EXPECT_CALL(*filter, onPreDestroy());
+    }
+    {
+      auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
+        EXPECT_CALL(*filter, onPreDestroy());
+      };
+      std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
     }
 
-    auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
+    for (auto filter : decoder_filters_) {
       EXPECT_CALL(*filter, onDestroy());
-    };
-    std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
+    }
+    {
+      auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
+        EXPECT_CALL(*filter, onDestroy());
+      };
+      std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
+    }
 
     if (deferred) {
       EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
@@ -824,6 +835,7 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
         EXPECT_EQ("absolute_path_rejected",
                   filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
       }));
+  EXPECT_CALL(*filter, onPreDestroy());
   EXPECT_CALL(*filter, onDestroy());
 
   Buffer::OwnedImpl fake_input("1234");
@@ -864,6 +876,7 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
         EXPECT_EQ("path_normalization_failed",
                   filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
       }));
+  EXPECT_CALL(*filter, onPreDestroy());
   EXPECT_CALL(*filter, onDestroy());
 
   Buffer::OwnedImpl fake_input("1234");
@@ -906,6 +919,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
+  EXPECT_CALL(*filter, onPreDestroy());
   EXPECT_CALL(*filter, onDestroy());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
@@ -1187,6 +1201,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseNormalizedHost) {
   conn_manager_->onData(fake_input, false);
 
   // Clean up.
+  EXPECT_CALL(*filter, onPreDestroy());
   EXPECT_CALL(*filter, onDestroy());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
@@ -2035,6 +2050,55 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
   conn_manager_->onData(fake_input, false);
 }
 
+TEST_F(HttpConnectionManagerImplTest, TestFilterCanEnrichAccessLogs) {
+
+  setup(false, "");
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(filter);
+        callbacks.addAccessLogHandler(handler);
+      }));
+
+  EXPECT_CALL(*filter, onPreDestroy()).WillOnce(Invoke([&]() {
+    ProtobufWkt::Value metadata_value;
+    metadata_value.set_string_value("value");
+    ProtobufWkt::Struct metadata;
+    metadata.mutable_fields()->insert({"field", metadata_value});
+    filter->callbacks_->streamInfo().setDynamicMetadata("metadata_key", metadata);
+  }));
+
+  EXPECT_CALL(*handler, log(_, _, _, _))
+      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                          const StreamInfo::StreamInfo& stream_info) {
+        auto dynamic_meta = stream_info.dynamicMetadata().filter_metadata().at("metadata_key");
+        EXPECT_EQ("value", dynamic_meta.fields().at("field").string_value());
+      }));
+
+  NiceMock<MockResponseEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        RequestDecoder* decoder = &conn_manager_->newStream(encoder);
+
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":method", "GET"}, {":authority", "host"}, {":path", "/"}}};
+        decoder->decodeHeaders(std::move(headers), true);
+
+        filter->callbacks_->streamInfo().setResponseCodeDetails("");
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+
+        data.drain(4);
+        return Http::okStatus();
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
 TEST_F(HttpConnectionManagerImplTest, TestDownstreamDisconnectAccessLog) {
   setup(false, "");
 
@@ -2208,6 +2272,8 @@ public:
             EXPECT_EQ(nullptr, headers.Connection());
           }
         }));
+
+    EXPECT_CALL(*filter, onPreDestroy());
     EXPECT_CALL(*filter, onDestroy());
 
     Buffer::OwnedImpl fake_input;
@@ -2437,6 +2503,8 @@ TEST_F(HttpConnectionManagerImplTest, AccessEncoderRouteBeforeHeadersArriveOnIdl
       }));
   EXPECT_CALL(*filter, encodeData(_, _));
   EXPECT_CALL(*filter, encodeComplete());
+
+  EXPECT_CALL(*filter, onPreDestroy());
   EXPECT_CALL(*filter, onDestroy());
 
   EXPECT_CALL(response_encoder_, encodeHeaders(_, _));
@@ -3314,6 +3382,7 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
+  EXPECT_CALL(*filter, onPreDestroy());
   EXPECT_CALL(*filter, onDestroy());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
@@ -3577,6 +3646,7 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
         EXPECT_NE(nullptr, headers.Server());
         EXPECT_EQ("envoy-server-test", headers.getServerValue());
       }));
+  EXPECT_CALL(*decoder_filters_[0], onPreDestroy());
   EXPECT_CALL(*decoder_filters_[0], onDestroy());
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay));
@@ -3612,6 +3682,7 @@ TEST_F(HttpConnectionManagerImplTest, DisconnectOnProxyConnectionDisconnect) {
         EXPECT_EQ("close", headers.getConnectionValue());
         EXPECT_EQ(nullptr, headers.ProxyConnection());
       }));
+  EXPECT_CALL(*decoder_filters_[0], onPreDestroy());
   EXPECT_CALL(*decoder_filters_[0], onDestroy());
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay));
@@ -6780,6 +6851,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
   }
 
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[0], onPreDestroy());
   EXPECT_CALL(*decoder_filters_[0], onDestroy());
   EXPECT_CALL(*decoder_filters_[1], decodeComplete());
   EXPECT_CALL(*decoder_filters_[2], decodeComplete());
@@ -6792,7 +6864,9 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
   // The connection life time data should have been written to the connection filter state.
   EXPECT_TRUE(filter_callbacks_.connection_.stream_info_.filter_state_->hasData<SimpleType>(
       "per_downstream_connection"));
+  EXPECT_CALL(*decoder_filters_[1], onPreDestroy());
   EXPECT_CALL(*decoder_filters_[1], onDestroy());
+  EXPECT_CALL(*decoder_filters_[2], onPreDestroy());
   EXPECT_CALL(*decoder_filters_[2], onDestroy());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
