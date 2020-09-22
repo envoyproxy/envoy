@@ -59,6 +59,7 @@ private:
   const bool respect_dns_ttl_;
   Network::DnsLookupFamily dns_lookup_family_;
   uint32_t overprovisioning_factor_;
+  TimeSource& time_source_;
 };
 
 /**

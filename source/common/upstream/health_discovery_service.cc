@@ -274,7 +274,8 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : runtime_(runtime), cluster_(std::move(cluster)), bind_config_(bind_config), stats_(stats),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
-      initial_hosts_(new HostVector()), validation_visitor_(validation_visitor) {
+      initial_hosts_(new HostVector()), validation_visitor_(validation_visitor),
+      time_source_(dispatcher.timeSource()) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
 
@@ -299,7 +300,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
           info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()), nullptr, 1,
           locality_endpoints.locality(),
           envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
-          envoy::config::core::v3::UNKNOWN);
+          envoy::config::core::v3::UNKNOWN, time_source_);
       // Add this host/endpoint pointer to our flat list of endpoints for health checking.
       initial_hosts_->push_back(endpoint);
       // Add this host/endpoint pointer to our structured list by locality so results can be

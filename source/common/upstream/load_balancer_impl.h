@@ -388,6 +388,9 @@ private:
 
   // Scheduler for each valid HostsSource.
   absl::node_hash_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
+  const envoy::config::cluster::v3::Cluster::CommonLbConfig::EndpointWarmingPolicy
+      endpoint_warming_policy;
+  const uint32_t slow_start_window;
 };
 
 /**
@@ -461,16 +464,7 @@ public:
             least_request_config.has_value() && least_request_config->has_active_request_bias()
                 ? std::make_unique<Runtime::Double>(least_request_config->active_request_bias(),
                                                     runtime)
-                : nullptr),
-        // todo(nezdolik) move this to base class
-        endpoint_warming_policy(common_config.has_slow_start_config()
-                                    ? common_config.slow_start_config().endpoint_warming_policy()
-                                    : envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT),
-        // todo(nezdolik) move this to base class
-        slow_start_window(common_config.has_slow_start_config()
-                              ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.slow_start_config(),
-                                                                slow_start_window, 0)
-                              : 0) {
+                : nullptr) {
     initialize();
   }
 
@@ -530,16 +524,13 @@ private:
   double active_request_bias_{};
 
   const std::unique_ptr<Runtime::Double> active_request_bias_runtime_;
-  const envoy::config::cluster::v3::Cluster::CommonLbConfig::EndpointWarmingPolicy
-      endpoint_warming_policy;
-  const uint32_t slow_start_window;
 };
 
 /**
  * Random load balancer that picks a random host out of all hosts.
  */
 class RandomLoadBalancer : public ZoneAwareLoadBalancerBase,
-                                 Logger::Loggable<Logger::Id::upstream> {
+                           Logger::Loggable<Logger::Id::upstream> {
 public:
   RandomLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                      ClusterStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,

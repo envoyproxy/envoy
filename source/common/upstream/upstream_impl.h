@@ -80,7 +80,7 @@ public:
       Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr metadata,
       const envoy::config::core::v3::Locality& locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority, uint64_t creation_time_ms);
+      uint32_t priority, TimeSource& time_source);
 
   Network::TransportSocketFactory& transportSocketFactory() const override {
     return socket_factory_;
@@ -139,9 +139,7 @@ public:
   Network::TransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
                                 const envoy::config::core::v3::Metadata* metadata) const;
-  const uint64_t creationTimeMs() const override {
-    return 0;
-}                              
+  std::chrono::milliseconds creationTime() const override { return creation_time_; }
 
 protected:
   ClusterInfoConstSharedPtr cluster_;
@@ -159,7 +157,7 @@ protected:
   HealthCheckHostMonitorPtr health_checker_;
   std::atomic<uint32_t> priority_;
   Network::TransportSocketFactory& socket_factory_;
-  const uint64_t creation_time_ms_;
+  std::chrono::milliseconds creation_time_;
 };
 
 /**
@@ -174,9 +172,9 @@ public:
            uint32_t initial_weight, const envoy::config::core::v3::Locality& locality,
            const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
            uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
-           uint64_t creation_time_ms)
+           TimeSource& time_source)
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
-                            priority, creation_time_ms),
+                            priority, time_source),
         used_(true) {
     setEdsHealthFlag(health_status);
     HostImpl::weight(initial_weight);
@@ -239,9 +237,6 @@ public:
   void weight(uint32_t new_weight) override;
   bool used() const override { return used_; }
   void used(bool new_used) override { used_ = new_used; }
-  const uint64_t creationTimeMs() const override {
-      return 0;
-  }
 
 protected:
   static Network::ClientConnectionPtr
@@ -858,7 +853,7 @@ public:
   void registerHostForPriority(
       const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
       const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
-      const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint);
+      const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint, TimeSource& time_source);
 
   void registerHostForPriority(
       const HostSharedPtr& host,

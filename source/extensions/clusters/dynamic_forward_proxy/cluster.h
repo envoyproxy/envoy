@@ -113,6 +113,8 @@ private:
 
   friend class ClusterFactory;
   friend class ClusterTest;
+
+  TimeSource& time_source_;
 };
 
 class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<

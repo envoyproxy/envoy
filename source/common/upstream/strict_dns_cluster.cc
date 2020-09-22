@@ -18,7 +18,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
       local_info_(factory_context.localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
-      respect_dns_ttl_(cluster.respect_dns_ttl()) {
+      respect_dns_ttl_(cluster.respect_dns_ttl()),
+      time_source_(factory_context.dispatcher().timeSource()) {
   failure_backoff_strategy_ =
       Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
           cluster, dns_refresh_rate_ms_.count(), factory_context.random());
@@ -134,7 +135,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
                 std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
                 lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoint_.locality(),
                 lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoint_.priority(),
-                lb_endpoint_.health_status(), 0 /*creation time*/));
+                lb_endpoint_.health_status(), parent_.time_source_));
 
             ttl_refresh_rate = min(ttl_refresh_rate, resp.ttl_);
           }

@@ -76,6 +76,7 @@ private:
   Network::ActiveDnsQuery* active_dns_query_{};
   const LocalInfo::LocalInfo& local_info_;
   const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
+  TimeSource& time_source_;
 };
 
 class LogicalDnsClusterFactory : public ClusterFactoryImplBase {

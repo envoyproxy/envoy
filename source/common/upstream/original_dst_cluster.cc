@@ -57,7 +57,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
             info, info->name() + dst_addr.asString(), std::move(host_ip_port), nullptr, 1,
             envoy::config::core::v3::Locality().default_instance(),
             envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
-            envoy::config::core::v3::UNKNOWN));
+            envoy::config::core::v3::UNKNOWN, parent_->time_source_));
         ENVOY_LOG(debug, "Created host {}.", host->address()->asString());
 
         // Tell the cluster about the new host
@@ -113,7 +113,8 @@ OriginalDstCluster::OriginalDstCluster(
       use_http_header_(info_->lbOriginalDstConfig()
                            ? info_->lbOriginalDstConfig().value().use_http_header()
                            : false),
-      host_map_(std::make_shared<HostMap>()) {
+      host_map_(std::make_shared<HostMap>()),
+      time_source_(factory_context.dispatcher().timeSource()) {
   // TODO(dio): Remove hosts check once the hosts field is removed.
   if (config.has_load_assignment() || !config.hidden_envoy_deprecated_hosts().empty()) {
     throw EnvoyException("ORIGINAL_DST clusters must have no load assignment or hosts configured");

@@ -59,7 +59,8 @@ LogicalDnsCluster::LogicalDnsCluster(
       load_assignment_(
           cluster.has_load_assignment()
               ? convertPriority(cluster.load_assignment())
-              : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts())) {
+              : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts())),
+      time_source_(factory_context.dispatcher().timeSource()) {
   failure_backoff_strategy_ =
       Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
           cluster, dns_refresh_rate_ms_.count(), factory_context.random());
@@ -121,8 +122,9 @@ void LogicalDnsCluster::startResolve() {
                                                    Network::Utility::portFromTcpUrl(dns_url_));
 
           if (!logical_host_) {
-            logical_host_ = std::make_shared<LogicalHost>(
-                info_, hostname_, new_address, localityLbEndpoint(), lbEndpoint(), nullptr);
+            logical_host_ =
+                std::make_shared<LogicalHost>(info_, hostname_, new_address, localityLbEndpoint(),
+                                              lbEndpoint(), nullptr, time_source_);
 
             const auto& locality_lb_endpoint = localityLbEndpoint();
             PriorityStateManager priority_state_manager(*this, local_info_, nullptr);

@@ -89,6 +89,7 @@ private:
   ClusterInfoConstSharedPtr info_;
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  TimeSource& time_source_;
 };
 
 using HdsClusterPtr = std::shared_ptr<HdsCluster>;

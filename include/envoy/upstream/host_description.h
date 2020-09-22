@@ -152,7 +152,7 @@ public:
   /**
    * @return timestamp in milliseconds of when host was created.
    */
-  virtual const uint64_t creationTimeMs() const PURE;
+  virtual std::chrono::milliseconds creationTime() const PURE;
 };
 
 using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;
