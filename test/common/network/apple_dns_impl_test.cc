@@ -52,13 +52,11 @@ public:
 
   ActiveDnsQuery* resolveWithExpectations(const std::string& address,
                                           const DnsLookupFamily lookup_family,
-                                          const DnsResolver::ResolutionStatus expected_status,
-                                          const uint32_t expected_results) {
+                                          const DnsResolver::ResolutionStatus expected_status) {
     return resolver_->resolve(
         address, lookup_family,
-        [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
+        [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&&) -> void {
           EXPECT_EQ(expected_status, status);
-          EXPECT_EQ(results.size(), expected_results);
           dispatcher_->exit();
         });
   }
@@ -113,21 +111,21 @@ TEST_P(AppleDnsImplTest, DestructPending) {
 TEST_P(AppleDnsImplTest, LocalLookup) {
   if (GetParam() == Address::IpVersion::v4) {
     EXPECT_NE(nullptr, resolveWithExpectations("localhost", DnsLookupFamily::V4Only,
-                                               DnsResolver::ResolutionStatus::Success, 1));
+                                               DnsResolver::ResolutionStatus::Success));
   }
 }
 
 TEST_P(AppleDnsImplTest, DnsIpAddressVersion) {
   EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success, 2));
+                                             DnsResolver::ResolutionStatus::Success));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::V4Only,
-                                             DnsResolver::ResolutionStatus::Success, 1));
+                                             DnsResolver::ResolutionStatus::Success));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::V6Only,
-                                             DnsResolver::ResolutionStatus::Success, 1));
+                                             DnsResolver::ResolutionStatus::Success));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -211,7 +209,7 @@ TEST_P(AppleDnsImplTest, Cancel) {
       resolveWithUnreferencedParameters("google.com", DnsLookupFamily::Auto, false);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success, 2));
+                                             DnsResolver::ResolutionStatus::Success));
 
   ASSERT_NE(nullptr, query);
   query->cancel();
@@ -221,7 +219,7 @@ TEST_P(AppleDnsImplTest, Cancel) {
 
 TEST_P(AppleDnsImplTest, Timeout) {
   EXPECT_NE(nullptr, resolveWithExpectations("some.domain", DnsLookupFamily::V6Only,
-                                             DnsResolver::ResolutionStatus::Failure, 0));
+                                             DnsResolver::ResolutionStatus::Failure));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
