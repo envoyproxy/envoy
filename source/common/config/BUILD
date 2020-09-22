@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = ["api_type_oracle.h"],
     deps = [
         "//source/common/protobuf",
+        "//source/common/protobuf:type_util_lib",
         "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
     ],
 )

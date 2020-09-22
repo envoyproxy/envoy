@@ -1,7 +1,9 @@
 #pragma once
 
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/type_util.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -22,6 +24,8 @@ public:
 
   static const absl::optional<std::string>
   getEarlierVersionMessageTypeName(const std::string& message_type);
+
+  static const absl::optional<std::string> getEarlierTypeUrl(const std::string& type_url);
 };
 
 } // namespace Config
