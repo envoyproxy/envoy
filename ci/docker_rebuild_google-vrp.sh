@@ -23,7 +23,8 @@ set -e
 # this local dep which is fairly stable.
 BASE_DOCKER_IMAGE="envoyproxy/envoy-dev:latest"
 
-declare -r BUILD_DIR="$(mktemp -d)"
+BUILD_DIR="$(mktemp -d)"
+declare -r BUILD_DIR
 cp ci/Dockerfile-envoy-google-vrp "${BUILD_DIR}"
 declare -r DOCKER_BUILD_FILE="${BUILD_DIR}"/Dockerfile-envoy-google-vrp
 
