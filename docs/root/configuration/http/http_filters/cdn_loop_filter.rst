@@ -11,6 +11,7 @@ CDN-Loop header and passes the request to the next upstream filter. If the check
 stops processing on the request and returns an error response.
 
 RFC 8586 is particular in how the CDN-Loop header should be modified. As such:
+
 * other filters in the filter chain should not modify the CDN-Loop header and
 * the HTTP route configuration's :ref:`request_headers_to_add
   <envoy_v3_api_field_config.route.v3.RouteConfiguration.request_headers_to_add>` or
@@ -24,6 +25,7 @@ Configuration
 The filter is configured with the name *envoy.filters.http.cdn_loop*.
 
 The `filter config <config_http_filters_cdn_loop>`_ has two fields.
+
 * The *cdn_id* field sets the identifier that the filter will look for within and append to the
   CDN-Loop header. RFC 8586 calls this field the "cdn-id"; "cdn-id" can either be a pseudonym or a
   hostname the CDN provider has control of. The *cdn_id* field must not be empty.
