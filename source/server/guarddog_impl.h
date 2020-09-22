@@ -82,9 +82,8 @@ public:
   const std::chrono::milliseconds loopIntervalForTest() const { return loop_interval_; }
 
   /**
-   * Test hook to force a step() to catch up with the current simulated
-   * time. This is inlined so that it does not need to be present in the
-   * production binary.
+   * Test hook to force a step() to catch up with the current watchdog state and simulated time.
+   * This is inlined so that it does not need to be present in the production binary.
    */
   void forceCheckForTest() {
     Thread::LockGuard guard(mutex_);
