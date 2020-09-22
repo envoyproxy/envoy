@@ -133,6 +133,7 @@ New Features
 * watchdog: watchdog action extension that does cpu profiling. See ref:`Profile Action <envoy_v3_api_file_envoy/extensions/watchdog/profile_action/v3alpha/profile_action.proto>`.
 * watchdog: watchdog action extension that sends SIGABRT to the stuck thread to terminate the process. See ref:`Abort Action <envoy_v3_api_file_envoy/extensions/watchdog/abort_action/v3alpha/abort_action.proto>`.
 * xds: added :ref:`extension config discovery<envoy_v3_api_msg_config.core.v3.ExtensionConfigSource>` support for HTTP filters.
+* xds: added support for mixed v2/v3 discovery response, which enable type url downgrade and upgrade. This feature is disabled by default and is controlled by runtime guard `envoy.reloadable_features.enable_type_url_downgrade_and_upgrade`.
 * zlib: added option to use `zlib-ng <https://github.com/zlib-ng/zlib-ng>`_ as zlib library.
 
 Deprecated
