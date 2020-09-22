@@ -55,7 +55,7 @@ public:
                                           const DnsResolver::ResolutionStatus expected_status) {
     return resolver_->resolve(
         address, lookup_family,
-        [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&&) -> void {
+        [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse> &&) -> void {
           EXPECT_EQ(expected_status, status);
           dispatcher_->exit();
         });

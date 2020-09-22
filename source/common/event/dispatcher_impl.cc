@@ -18,8 +18,8 @@
 #include "common/event/signal_impl.h"
 #include "common/event/timer_impl.h"
 #include "common/filesystem/watcher_impl.h"
-#include "common/network/dns_impl.h"
 #include "common/network/connection_impl.h"
+#include "common/network/dns_impl.h"
 #include "common/network/tcp_listener_impl.h"
 #include "common/network/udp_listener_impl.h"
 
@@ -121,16 +121,17 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
                                                          std::move(transport_socket), options);
 }
 
-Network::DnsResolverSharedPtr
-DispatcherImpl::createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-                                  const bool use_tcp_for_dns_lookups) {
+Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
+    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+    const bool use_tcp_for_dns_lookups) {
   ASSERT(isThreadSafe());
 #ifdef __APPLE__
   UNREFERENCED_PARAMETER(resolvers);
   UNREFERENCED_PARAMETER(use_tcp_for_dns_lookups);
   return Network::DnsResolverSharedPtr{new Network::AppleDnsResolverImpl(*this)};
 #else
-  return Network::DnsResolverSharedPtr{new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
+  return Network::DnsResolverSharedPtr{
+      new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
 #endif
 }
 
