@@ -62,7 +62,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     Network::UdpListenerCallbacks* udp_listener =
         dynamic_cast<ActiveUdpListenerBase*>(details.listener_.get());
     ASSERT(udp_listener != nullptr);
-    details.typed_listener_ = *static_cast<Network::UdpListenerCallbacks*>(udp_listener);
+    details.typed_listener_ = *udp_listener;
   }
   if (disable_listeners_) {
     details.listener_->pauseListening();
