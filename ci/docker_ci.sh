@@ -12,7 +12,7 @@ config_env() {
   docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
   # Remove older build instance
-  docker buildx rm multi-builder | true
+  docker buildx rm multi-builder || :
   docker buildx create --use --name multi-builder --platform linux/arm64,linux/amd64
 }
 
@@ -31,10 +31,11 @@ build_args() {
   TYPE=$1
   FILE_SUFFIX="${TYPE/-debug/}"
 
-  echo "-f ci/Dockerfile-envoy${FILE_SUFFIX}"
-  [[ "${TYPE}" == *-debug ]] && echo "--build-arg ENVOY_BINARY_SUFFIX="
-  if [[ "${TYPE}" == "-google-vrp" ]]; then
-    echo "--build-arg ENVOY_VRP_BASE_IMAGE=${VRP_BASE_IMAGE}"
+  printf ' -f ci/Dockerfile-envoy%s' "${FILE_SUFFIX}"
+  if [[ "${TYPE}" == *-debug ]]; then
+      printf ' --build-arg ENVOY_BINARY_SUFFIX='
+  elif [[ "${TYPE}" == "-google-vrp" ]]; then
+      printf ' --build-arg ENVOY_VRP_BASE_IMAGE=%s' "${VRP_BASE_IMAGE}"
   fi
 }
 
@@ -50,16 +51,18 @@ use_builder() {
 IMAGES_TO_SAVE=()
 
 build_images() {
+  local _args args=()
   TYPE=$1
   BUILD_TAG=$2
 
   use_builder "${TYPE}"
-  ARGS="$(build_args ${TYPE})"
-  PLATFORM="$(build_platforms ${TYPE})"
+  _args=$(build_args "${TYPE}")
+  read -ra args <<< "$_args"
+  PLATFORM="$(build_platforms "${TYPE}")"
 
-  docker buildx build --platform "${PLATFORM}" ${ARGS} -t "${BUILD_TAG}" .
+  docker buildx build --platform "${PLATFORM}" "${args[@]}" -t "${BUILD_TAG}" .
 
-  PLATFORM="$(build_platforms ${TYPE} | tr ',' ' ')"
+  PLATFORM="$(build_platforms "${TYPE}" | tr ',' ' ')"
   # docker buildx load cannot have multiple platform, load individually
   for ARCH in ${PLATFORM}; do
     if [[ "${ARCH}" == "linux/amd64" ]]; then
@@ -67,20 +70,22 @@ build_images() {
     else
       IMAGE_TAG="${BUILD_TAG}-${ARCH/linux\//}"
     fi
-    docker buildx build --platform "${ARCH}" ${ARGS} -t "${IMAGE_TAG}" . --load
+    docker buildx build --platform "${ARCH}" "${args[@]}" -t "${IMAGE_TAG}" . --load
     IMAGES_TO_SAVE+=("${IMAGE_TAG}")
   done
 }
 
 push_images() {
+  local _args args=()
   TYPE=$1
   BUILD_TAG=$2
 
   use_builder "${TYPE}"
-  ARGS="$(build_args ${TYPE})"
-  PLATFORM="$(build_platforms ${TYPE})"
+  _args=$(build_args "${TYPE}")
+  read -ra args <<< "$_args"
+  PLATFORM="$(build_platforms "${TYPE}")"
   # docker buildx doesn't do push with default builder
-  docker buildx build --platform "${PLATFORM}" ${ARGS} -t ${BUILD_TAG} . --push || \
+  docker buildx build --platform "${PLATFORM}" "${args[@]}" -t "${BUILD_TAG}" . --push || \
     docker push "${BUILD_TAG}"
 }
 
@@ -90,7 +95,7 @@ RELEASE_TAG_REGEX="^refs/tags/v.*"
 
 # For master builds and release branch builds use the dev repo. Otherwise we assume it's a tag and
 # we push to the primary repo.
-if [[ "${AZP_BRANCH}" =~ "${RELEASE_TAG_REGEX}" ]]; then
+if [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then
   IMAGE_POSTFIX=""
   IMAGE_NAME="${AZP_BRANCH/refs\/tags\//}"
 else
