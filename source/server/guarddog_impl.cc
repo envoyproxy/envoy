@@ -103,9 +103,8 @@ void GuardDogImpl::step() {
                  static_cast<size_t>(ceil(multi_kill_fraction_ * watched_dogs_.size())));
 
     for (auto& watched_dog : watched_dogs_) {
-      if (watched_dog->dog_->touchCount() > 0) {
-        // Watchdog was touched since the guard dog last checked; update time and reset the count.
-        watched_dog->dog_->resetTouchCount();
+      if (watched_dog->dog_->getTouchedAndReset()) {
+        // Watchdog was touched since the guard dog last checked; update last check-in time.
         watched_dog->last_checkin_ = now;
         continue;
       }

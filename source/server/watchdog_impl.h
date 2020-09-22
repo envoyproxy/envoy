@@ -23,20 +23,21 @@ public:
       : thread_id_(thread_id), timer_interval_(interval) {}
 
   Thread::ThreadId threadId() const override { return thread_id_; }
-  // Accessors for use by GuardDogImpl to tell if the watchdog was touched recently and reset the
-  // count back to 0 when it has.
-  uint32_t touchCount() const { return touch_count_.load(); }
-  void resetTouchCount() { touch_count_.store(0); }
+  // Used by GuardDogImpl determine if the watchdog was touched recently and reset the touch status.
+  bool getTouchedAndReset() { return touched_.exchange(false, std::memory_order_acq_rel); }
 
   // Server::WatchDog
   void startWatchdog(Event::Dispatcher& dispatcher) override;
-  void touch() override { touch_count_.fetch_add(1); }
+  void touch() override {
+    // Set touched_ if not already set.
+    bool expected = false;
+    touched_.compare_exchange_strong(expected, true, std::memory_order_release,
+                                     std::memory_order_acquire);
+  }
 
 private:
   const Thread::ThreadId thread_id_;
-  // Use a 32-bit atomic counter since 64-bit atomics are not generally available in 32-bit ARM and
-  // 32-bit is large enough for our purposes.
-  std::atomic<uint32_t> touch_count_ = 0;
+  std::atomic<bool> touched_{false};
   Event::TimerPtr timer_;
   const std::chrono::milliseconds timer_interval_;
 };
