@@ -15,9 +15,9 @@ ActiveRawUdpListenerFactory::ActiveRawUdpListenerFactory(uint32_t concurrency)
     : concurrency_(concurrency) {}
 
 Network::ConnectionHandler::ActiveListenerPtr ActiveRawUdpListenerFactory::createActiveUdpListener(
-    uint32_t worker_id, Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
+    uint32_t worker_index, Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
     Network::ListenerConfig& config) {
-  return std::make_unique<ActiveRawUdpListener>(worker_id, concurrency_, parent, dispatcher,
+  return std::make_unique<ActiveRawUdpListener>(worker_index, concurrency_, parent, dispatcher,
                                                 config);
 }
 

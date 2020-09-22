@@ -66,9 +66,10 @@ class UdpListenerWorkerRouterImpl : public UdpListenerWorkerRouter {
 public:
   UdpListenerWorkerRouterImpl(uint32_t concurrency);
 
+  // UdpListenerWorkerRouter
   void registerWorkerForListener(UdpListenerCallbacks& listener) override;
   void unregisterWorkerForListener(UdpListenerCallbacks& listener) override;
-  void deliver(uint32_t dest_worker_id, UdpRecvData&& data) override;
+  void deliver(uint32_t dest_worker_index, UdpRecvData&& data) override;
 
 private:
   absl::Mutex mutex_;

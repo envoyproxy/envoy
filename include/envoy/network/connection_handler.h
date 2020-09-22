@@ -154,7 +154,7 @@ public:
    * @return the ActiveUdpListener created.
    */
   virtual ConnectionHandler::ActiveListenerPtr
-  createActiveUdpListener(uint32_t worker_id, ConnectionHandler& parent,
+  createActiveUdpListener(uint32_t worker_index, ConnectionHandler& parent,
                           Event::Dispatcher& dispatcher, Network::ListenerConfig& config) PURE;
 
   /**
