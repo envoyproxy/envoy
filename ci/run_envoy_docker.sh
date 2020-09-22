@@ -60,6 +60,7 @@ docker run --rm \
        -e HTTP_PROXY \
        -e HTTPS_PROXY \
        -e NO_PROXY \
+       -e BAZEL_STARTUP_OPTIONS \
        -e BAZEL_BUILD_EXTRA_OPTIONS \
        -e BAZEL_EXTRA_TEST_OPTIONS \
        -e BAZEL_REMOTE_CACHE \
