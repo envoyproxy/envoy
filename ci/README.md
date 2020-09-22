@@ -139,7 +139,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 An example basic invocation to build the Envoy static binary and run tests is:
 
 ```bash
-./ci/run_envoy_docker_windows.sh './ci/windows_ci_steps.sh'
+./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'
 ```
 
 You can modify `./ci/windows_ci_steps.sh` to modify `bazel` arguments, tests to run, etc.
@@ -147,7 +147,7 @@ You can modify `./ci/windows_ci_steps.sh` to modify `bazel` arguments, tests to 
 If you would like to run an interactive session to keep the build container running (to persist your local build environment), run:
 
 ```bash
-./ci/run_envoy_docker_windows.sh 'bash'
+./ci/run_envoy_docker.sh 'bash'
 ```
 
 From an interactive session, you can invoke `bazel` manually or use the `./ci/windows_ci_steps.sh` script to build and run tests.

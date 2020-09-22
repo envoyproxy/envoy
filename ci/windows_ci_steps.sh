@@ -28,7 +28,19 @@ if [ ! -e "/$drive/$drive" ]; then
   /c/windows/system32/cmd.exe /c "mklink /d $drive:\\$drive $drive:\\"
 fi
 
-BAZEL_STARTUP_OPTIONS="--output_base=c:/_eb"
+BUILD_DIR=${BUILD_DIR:-/c/build}
+if [[ ! -d "${BUILD_DIR}" ]]
+then
+  echo "${BUILD_DIR} mount missing - did you forget -v <something>:${BUILD_DIR}? Creating."
+  mkdir -p "${BUILD_DIR}"
+fi
+
+# Environment setup.
+export TEST_TMPDIR=${BUILD_DIR}/tmp
+
+[[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=" --nocache_test_results"
+
+BAZEL_STARTUP_OPTIONS+=" --output_base=c:/_eb"
 # Default to msvc-cl if not overridden
 BAZEL_BUILD_OPTIONS=(
     -c opt
@@ -38,11 +50,25 @@ BAZEL_BUILD_OPTIONS=(
     "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
     "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 
+# Also setup some space for building Envoy standalone.
+ENVOY_BUILD_DIR="${BUILD_DIR}"/envoy
+mkdir -p "${ENVOY_BUILD_DIR}"
+
+# This is where we copy build deliverables to.
+ENVOY_DELIVERY_DIR="${ENVOY_BUILD_DIR}"/source/exe
+mkdir -p "${ENVOY_DELIVERY_DIR}"
+
 # Test to validate updates of all dependency libraries in bazel/external and bazel/foreign_cc
 # bazel ${BAZEL_STARTUP_OPTIONS} build ${BAZEL_BUILD_OPTIONS} //bazel/... --build_tag_filters=-skip_on_windows
 
 # Complete envoy-static build (nothing needs to be skipped, build failure indicates broken dependencies)
 bazel "${BAZEL_STARTUP_OPTIONS}" build "${BAZEL_BUILD_OPTIONS[@]}" //source/exe:envoy-static
+
+# Copy binary to delivery directory
+cp -f bazel-bin/source/exe/envoy-static.exe "${ENVOY_DELIVERY_DIR}/envoy.exe"
+
+# Copy for azp, creating a tar archive
+tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C ${ENVOY_DELIVERY_DIR} envoy.exe
 
 # Test invocations of known-working tests on Windows
 bazel "${BAZEL_STARTUP_OPTIONS}" test "${BAZEL_BUILD_OPTIONS[@]}" //test/... --test_tag_filters=-skip_on_windows,-fails_on_windows,-flaky_on_windows --build_tests_only
