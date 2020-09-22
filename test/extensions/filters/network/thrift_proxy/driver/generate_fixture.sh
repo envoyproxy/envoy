@@ -7,19 +7,10 @@
 set -e
 
 function usage() {
-    echo "Usage: $0 <mode> <transport> <protocol> -s [multiplex-service] -H [headers] method [param...]"
+    echo "Usage: $0 <mode> <transport> <protocol> -s [multiplex-service] -H [headers] -T [TempPath] method [param...]"
     echo "where mode is success, exception, or idl-exception"
     exit 1
 }
-
-FIXTURE_DIR="${TEST_TMPDIR}"
-mkdir -p "${FIXTURE_DIR}"
-
-DRIVER_DIR="${TEST_SRCDIR}/envoy/test/extensions/filters/network/thrift_proxy/driver"
-
-if [[ -z "${TEST_UDSDIR}" ]]; then
-    TEST_UDSDIR=`mktemp -d /tmp/envoy_test_thrift.XXXXXX`
-fi
 
 MODE="$1"
 TRANSPORT="$2"
@@ -35,7 +26,8 @@ fi
 
 MULTIPLEX=
 HEADERS=
-while getopts ":s:H:" opt; do
+TEST_TMPDIR=
+while getopts ":s:H:T:" opt; do
     case ${opt} in
         s)
             MULTIPLEX=$OPTARG
@@ -43,7 +35,9 @@ while getopts ":s:H:" opt; do
         H)
             HEADERS=$OPTARG
             ;;
-
+        T)
+            TEST_TMPDIR=$OPTARG
+            ;;
         \?)
             echo "Invalid Option: -$OPTARG" >&2
             exit 1
@@ -61,12 +55,25 @@ if [[ "${METHOD}" == "" ]]; then
     usage
 fi
 shift
+echo "${TEST_TMPDIR}"
+FIXTURE_DIR="${TEST_TMPDIR}"
+mkdir -p "${FIXTURE_DIR}"
 
-SOCKET="${TEST_UDSDIR}/fixture.sock"
-rm -f "${SOCKET}"
+DRIVER_DIR="${TEST_SRCDIR}/envoy/test/extensions/filters/network/thrift_proxy/driver"
+
+
+while
+  port=$(shuf -n 1 -i 49152-65535)
+  netstat -atn | grep -q "$port" >> /dev/null
+do
+  continue
+done
+
+
+SOCKET="127.0.0.1:${port}"
+echo "Using address ${SOCKET}"
 
 SERVICE_FLAGS=("--addr" "${SOCKET}"
-               "--unix"
                "--response" "${MODE}"
                "--transport" "${TRANSPORT}"
                "--protocol" "${PROTOCOL}")
@@ -83,26 +90,20 @@ else
 fi
 
 # start server
-"${DRIVER_DIR}/server" "${SERVICE_FLAGS[@]}" &
+"${DRIVER_DIR}/server.py" "${SERVICE_FLAGS[@]}" &
 SERVER_PID="$!"
 
 trap "kill ${SERVER_PID}" EXIT;
 
-while [[ ! -a "${SOCKET}" ]]; do
-    sleep 0.1
-
-    if ! kill -0 "${SERVER_PID}"; then
-        echo "server failed to start"
-        exit 1
-    fi
-done
 
 if [[ -n "$HEADERS" ]]; then
     SERVICE_FLAGS+=("--headers")
     SERVICE_FLAGS+=("$HEADERS")
 fi
 
-"${DRIVER_DIR}/client" "${SERVICE_FLAGS[@]}" \
+echo  "${METHOD}" "$@"
+
+"${DRIVER_DIR}/client.py" "${SERVICE_FLAGS[@]}" \
                        --request "${REQUEST_FILE}" \
                        --response "${RESPONSE_FILE}" \
                        "${METHOD}" "$@"

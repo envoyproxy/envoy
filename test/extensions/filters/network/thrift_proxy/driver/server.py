@@ -15,6 +15,8 @@ from thrift.transport import TTransport
 from fbthrift import THeaderTransport
 from finagle import TFinagleServerProcessor, TFinagleServerProtocol
 
+sys.stdin.reconfigure(encoding='utf-8')
+sys.stdout.reconfigure(encoding='utf-8')
 
 class SuccessHandler:
 
