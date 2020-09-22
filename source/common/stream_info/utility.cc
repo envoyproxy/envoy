@@ -27,7 +27,6 @@ const std::string ResponseFlagUtils::INVALID_ENVOY_REQUEST_HEADERS = "IH";
 const std::string ResponseFlagUtils::DOWNSTREAM_PROTOCOL_ERROR = "DPE";
 const std::string ResponseFlagUtils::UPSTREAM_MAX_STREAM_DURATION_REACHED = "UMSDR";
 const std::string ResponseFlagUtils::RESPONSE_FROM_CACHE_FILTER = "RFCF";
-const std::string ResponseFlagUtils::UNAUTHORIZED_RBAC = "RBAC";
 const std::string ResponseFlagUtils::NO_FILTER_CONFIG_FOUND = "NFCF";
 const std::string ResponseFlagUtils::DURATION_TIMEOUT = "DT";
 
@@ -42,7 +41,7 @@ void ResponseFlagUtils::appendString(std::string& result, const std::string& app
 const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info) {
   std::string result;
 
-  static_assert(ResponseFlag::LastFlag == 0x800000, "A flag has been added. Fix this code.");
+  static_assert(ResponseFlag::LastFlag == 0x400000, "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
     appendString(result, FAILED_LOCAL_HEALTH_CHECK);
@@ -127,10 +126,6 @@ const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info
     appendString(result, RESPONSE_FROM_CACHE_FILTER);
   }
 
-  if (stream_info.hasResponseFlag(ResponseFlag::UnauthorizedRBAC)) {
-    appendString(result, UNAUTHORIZED_RBAC);
-  }
-
   if (stream_info.hasResponseFlag(ResponseFlag::NoFilterConfigFound)) {
     appendString(result, NO_FILTER_CONFIG_FOUND);
   }
@@ -168,7 +163,6 @@ absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(const std::string
       {ResponseFlagUtils::UPSTREAM_MAX_STREAM_DURATION_REACHED,
        ResponseFlag::UpstreamMaxStreamDurationReached},
       {ResponseFlagUtils::RESPONSE_FROM_CACHE_FILTER, ResponseFlag::ResponseFromCacheFilter},
-      {ResponseFlagUtils::UNAUTHORIZED_RBAC, ResponseFlag::UnauthorizedRBAC},
       {ResponseFlagUtils::NO_FILTER_CONFIG_FOUND, ResponseFlag::NoFilterConfigFound},
       {ResponseFlagUtils::DURATION_TIMEOUT, ResponseFlag::DurationTimeout},
   };

@@ -201,9 +201,6 @@ message ResponseFlags {
 
       // The request was denied by the external authorization service.
       EXTERNAL_SERVICE = 1;
-
-      // The request was denied by the RBAC filter.
-      RBAC = 2;
     }
 
     Reason reason = 1;

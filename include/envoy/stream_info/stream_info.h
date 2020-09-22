@@ -80,10 +80,8 @@ enum ResponseFlag {
   NoFilterConfigFound = 0x200000,
   // Request or connection exceeded the downstream connection duration.
   DurationTimeout = 0x400000,
-  // Request was unauthorized and rejected by RBAC filter.
-  UnauthorizedRBAC = 0x800000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = UnauthorizedRBAC
+  LastFlag = DurationTimeout
 };
 
 /**

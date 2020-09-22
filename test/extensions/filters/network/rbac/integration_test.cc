@@ -100,7 +100,7 @@ typed_config:
 }
 
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Denied) {
-  useListenerAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  useListenerAccessLog("%RESPONSE_CODE_DETAILS%");
   initializeFilter(R"EOF(
 name: rbac
 typed_config:
@@ -131,11 +131,11 @@ typed_config:
   EXPECT_EQ(1U, test_server_->counter("tcp.rbac.shadow_allowed")->value());
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.shadow_denied")->value());
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
-              testing::HasSubstr("RBAC rbac_access_denied_matched_policy[none]"));
+              testing::HasSubstr("rbac_access_denied_matched_policy[none]"));
 }
 
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DeniedWithDenyAction) {
-  useListenerAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  useListenerAccessLog("%RESPONSE_CODE_DETAILS%");
   initializeFilter(R"EOF(
 name: rbac
 typed_config:
@@ -158,7 +158,7 @@ typed_config:
   EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
   // Note the whitespace in the policy id is replaced by '_'.
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
-              testing::HasSubstr("RBAC rbac_access_denied_matched_policy[deny_all]"));
+              testing::HasSubstr("rbac_access_denied_matched_policy[deny_all]"));
 }
 
 } // namespace RBAC
