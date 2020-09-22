@@ -90,7 +90,7 @@ private:
   void onEventCallback(uint32_t events);
   void addPendingQuery(PendingResolution* query);
   void removePendingQuery(PendingResolution* query);
-  void flushPendingQueries();
+  void flushPendingQueries(const bool with_error);
 
   Event::Dispatcher& dispatcher_;
   DNSServiceRef main_sd_ref_;

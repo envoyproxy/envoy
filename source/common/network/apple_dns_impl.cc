@@ -109,7 +109,7 @@ void AppleDnsResolverImpl::removePendingQuery(PendingResolution* query) {
   ASSERT(erased == 1);
 }
 
-void AppleDnsResolverImpl::flushPendingQueries() {
+void AppleDnsResolverImpl::flushPendingQueries(const bool with_error) {
   ENVOY_LOG(error, "DNS Resolver flushing {} queries", queries_with_pending_cb_.size());
   for (std::set<PendingResolution*>::iterator it = queries_with_pending_cb_.begin();
        it != queries_with_pending_cb_.end(); ++it) {
@@ -139,6 +139,20 @@ void AppleDnsResolverImpl::flushPendingQueries() {
 
   // Purge the contents so no one tries to delete them again.
   queries_with_pending_cb_.clear();
+
+  if (with_error) {
+    // The main sd ref is destroyed here because a callback with an error is good indication that
+    // the connection to the DNS deamon is faulty and needs to be torn down.
+    //
+    // Deallocation of the MainSdRef __has__ to happen __after__ flushing queries. Flushing queries
+    // deallocates individual refs, so deallocating the main ref ahead would cause deallocation of
+    // invalid individual refs per dns_sd.h
+    ENVOY_LOG(error, "[Error path] deallocating main sd ref");
+    deallocateMainSdRef();
+    ENVOY_LOG(error, "[Error path] re-initializing main sd ref");
+    initializeMainSdRef();
+    ENVOY_LOG(error, "[Error path] done");
+  }
 }
 
 AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
@@ -165,11 +179,11 @@ void AppleDnsResolverImpl::PendingResolution::cancel() {
      * might have been referring to events coming for the operation you canceled,
      * which will now not be coming because the operation has been canceled.
      */
-    // First, get rid of the current query, because it is cancel, its callback should not be
+    // First, get rid of the current query, because if it is canceled, its callback should not be
     // executed during the subsequent flush.
     parent_.removePendingQuery(this);
     // Then, flush all other queries.
-    parent_.flushPendingQueries();
+    parent_.flushPendingQueries(false /* with_error */);
   }
   // Because the query is self-owned, delete now.
   delete this;
@@ -200,19 +214,9 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     }
 
     ENVOY_LOG(error, "[Error path] DNS Resolver flushing queries pending callback");
-    parent_.flushPendingQueries();
-
-    // The main sd ref if destroyed here because a callback with an error is good indication that
-    // the connection to the DNS deamon is faulty and needs to be torn down.
-    //
-    // Deallocation of the MainSdRef __has__ to happen __after__ flushing queries. Flushing queries
-    // deallocates individual refs, so deallocating the main ref aheadd would cause deallocation of
-    // invalid individual refs per dns_sd.h
-    ENVOY_LOG(error, "[Error path] deallocating main sd ref");
-    parent_.deallocateMainSdRef();
-    ENVOY_LOG(error, "[Error path] re-initializing main sd ref");
-    parent_.initializeMainSdRef();
-    ENVOY_LOG(error, "[Error path] done");
+    parent_.flushPendingQueries(true /* with_error */);
+    // Note: Nothing can follow this call to flushPendingQueries due to deletion of this
+    // object upon resolution.
     return;
   }
 
@@ -251,7 +255,10 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
      * callback that happened to be the last one to be invoked.
      */
     ENVOY_LOG(error, "DNS Resolver flushing queries pending callback");
-    parent_.flushPendingQueries();
+    parent_.flushPendingQueries(false /* with_error */);
+    // Note: Nothing can follow this call to flushPendingQueries due to deletion of this
+    // object upon resolution.
+    return;
   }
 }
 
