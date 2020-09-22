@@ -581,7 +581,7 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
 void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
   // If we don't have a type URL match, try an earlier version.
   const absl::string_view any_full_name =
-      Config::TypeUtil::typeUrlToDescriptorFullName(any_message.type_url());
+      TypeUtil::typeUrlToDescriptorFullName(any_message.type_url());
   if (any_full_name != message.GetDescriptor()->full_name()) {
     const Protobuf::Descriptor* earlier_version_desc =
         Config::ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
@@ -686,7 +686,7 @@ bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
   // Try to find a descriptor for `type_url` in the pool and instantiate a new message of the
   // correct concrete type.
   const std::string type_url(reflection->GetString(*message, type_url_field_descriptor));
-  const std::string concrete_type_name(Config::TypeUtil::typeUrlToDescriptorFullName(type_url));
+  const std::string concrete_type_name(TypeUtil::typeUrlToDescriptorFullName(type_url));
   const auto* concrete_descriptor =
       Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(concrete_type_name);
   if (concrete_descriptor == nullptr) {

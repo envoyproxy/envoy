@@ -33,7 +33,7 @@ ApiTypeOracle::getEarlierVersionMessageTypeName(const std::string& message_type)
 }
 
 const absl::optional<std::string> ApiTypeOracle::getEarlierTypeUrl(const std::string& type_url) {
-  const std::string type{Config::TypeUtil::typeUrlToDescriptorFullName(type_url)};
+  const std::string type{TypeUtil::typeUrlToDescriptorFullName(type_url)};
   absl::optional<std::string> old_type = ApiTypeOracle::getEarlierVersionMessageTypeName(type);
   if (old_type.has_value()) {
     return TypeUtil::descriptorFullNameToTypeUrl(old_type.value());

@@ -34,6 +34,9 @@ typical rollout sequence might look like:
    v3 resource type url. Client can also send discovery request with v3 resource type url and process 
    discovery response with v2 resource type url. The upgrade and downgrade of type url is disabled 
    by default and protected by a runtime guard *envoy.reloadable_features.enable_type_url_downgrade_and_upgrade*.
+   If your management server does not support both v2/v3 at the same time, you can perform a rollout by enabling
+   this feature, which allow you to rollout a v3-only management server in the presence of v2-only management servers 
+   and have the clients work with both.
 
 If you are operating a managed control plane as-a-service, you will likely need to support a wide
 range of client versions. In this scenario, you will require long term support for multiple major

@@ -6,12 +6,12 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
-namespace Config {
+
 class TypeUtil {
 public:
   static absl::string_view typeUrlToDescriptorFullName(absl::string_view type_url);
 
   static std::string descriptorFullNameToTypeUrl(absl::string_view type);
 };
-} // namespace Config
+
 } // namespace Envoy
