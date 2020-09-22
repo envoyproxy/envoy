@@ -21,13 +21,12 @@ protected:
     mode_t mode_ = 0;
   };
 
-  // Filesystem::FileSharedImpl
-  FlagsAndMode translateFlag(FlagSet in);
-  void openFile(FlagSet flags) override;
-  ssize_t writeFile(absl::string_view buffer) override;
-  bool closeFile() override;
+  Api::IoCallBoolResult open(FlagSet flag) override;
+  Api::IoCallSizeResult write(absl::string_view buffer) override;
+  Api::IoCallBoolResult close() override;
 
 private:
+  FlagsAndMode translateFlag(FlagSet in);
   friend class FileSystemImplTest;
 };
 
