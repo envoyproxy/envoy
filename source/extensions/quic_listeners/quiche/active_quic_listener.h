@@ -85,7 +85,7 @@ public:
                             uint32_t concurrency);
 
   // Network::ActiveUdpListenerFactory.
-  Network::ConnectionHandler::ActiveListenerPtr
+  Network::ConnectionHandler::ActiveUdpListenerPtr
   createActiveUdpListener(uint32_t worker_index, Network::ConnectionHandler& parent,
                           Event::Dispatcher& disptacher, Network::ListenerConfig& config) override;
   bool isTransportConnectionless() const override { return false; }

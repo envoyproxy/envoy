@@ -57,12 +57,11 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
   } else {
     ASSERT(config.udpListenerFactory() != nullptr, "UDP listener factory is not initialized.");
     ASSERT(worker_index_.has_value());
-    details.listener_ = config.udpListenerFactory()->createActiveUdpListener(*worker_index_, *this,
-                                                                             dispatcher_, config);
-    Network::UdpListenerCallbacks* udp_listener =
-        dynamic_cast<ActiveUdpListenerBase*>(details.listener_.get());
-    ASSERT(udp_listener != nullptr);
+    ConnectionHandler::ActiveUdpListenerPtr udp_listener =
+        config.udpListenerFactory()->createActiveUdpListener(*worker_index_, *this, dispatcher_,
+                                                             config);
     details.typed_listener_ = *udp_listener;
+    details.listener_ = std::move(udp_listener);
   }
   if (disable_listeners_) {
     details.listener_->pauseListening();

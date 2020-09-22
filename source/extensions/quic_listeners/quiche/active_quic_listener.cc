@@ -220,7 +220,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   quic_config_.SetMaxUnidirectionalStreamsToSend(max_streams);
 }
 
-Network::ConnectionHandler::ActiveListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
+Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
     uint32_t worker_index, Network::ConnectionHandler& parent, Event::Dispatcher& disptacher,
     Network::ListenerConfig& config) {
   bool kernel_worker_routing = false;

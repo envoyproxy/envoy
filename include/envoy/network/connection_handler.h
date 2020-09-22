@@ -133,6 +133,22 @@ public:
   };
 
   using ActiveListenerPtr = std::unique_ptr<ActiveListener>;
+
+  /**
+   * Used by ConnectionHandler to manage UDP listeners.
+   */
+  class ActiveUdpListener : public virtual ActiveListener, public Network::UdpListenerCallbacks {
+  public:
+    virtual ~ActiveUdpListener() = default;
+
+    /**
+     * Returns the worker index that ``data`` should be delivered to. The return value must be in
+     * the range [0, concurrency).
+     */
+    virtual uint32_t destination(const Network::UdpRecvData& data) const PURE;
+  };
+
+  using ActiveUdpListenerPtr = std::unique_ptr<ActiveUdpListener>;
 };
 
 using ConnectionHandlerPtr = std::unique_ptr<ConnectionHandler>;
@@ -154,7 +170,7 @@ public:
    * UdpListener objects.
    * @return the ActiveUdpListener created.
    */
-  virtual ConnectionHandler::ActiveListenerPtr
+  virtual ConnectionHandler::ActiveUdpListenerPtr
   createActiveUdpListener(uint32_t worker_index, ConnectionHandler& parent,
                           Event::Dispatcher& dispatcher, Network::ListenerConfig& config) PURE;
 

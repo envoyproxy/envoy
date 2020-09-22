@@ -11,7 +11,7 @@ class ActiveRawUdpListenerFactory : public Network::ActiveUdpListenerFactory {
 public:
   ActiveRawUdpListenerFactory(uint32_t concurrency);
 
-  Network::ConnectionHandler::ActiveListenerPtr
+  Network::ConnectionHandler::ActiveUdpListenerPtr
   createActiveUdpListener(uint32_t worker_index, Network::ConnectionHandler& parent,
                           Event::Dispatcher& disptacher, Network::ListenerConfig& config) override;
 

@@ -87,7 +87,7 @@ public:
   /**
    * Wrapper for an active listener owned by this handler.
    */
-  class ActiveListenerImplBase : public Network::ConnectionHandler::ActiveListener {
+  class ActiveListenerImplBase : public virtual Network::ConnectionHandler::ActiveListener {
   public:
     ActiveListenerImplBase(Network::ConnectionHandler& parent, Network::ListenerConfig* config);
 
@@ -364,7 +364,7 @@ private:
 };
 
 class ActiveUdpListenerBase : public ConnectionHandlerImpl::ActiveListenerImplBase,
-                              public Network::UdpListenerCallbacks {
+                              public Network::ConnectionHandler::ActiveUdpListener {
 public:
   ActiveUdpListenerBase(uint32_t worker_index, uint32_t concurrency,
                         Network::ConnectionHandler& parent, Network::Socket& listen_socket,
@@ -380,11 +380,7 @@ public:
   Network::Listener* listener() override { return udp_listener_.get(); }
 
 protected:
-  /**
-   * Returns the worker index that ``data`` should be delivered to. The return value must be in the
-   * range [0, concurrency).
-   */
-  virtual uint32_t destination(const Network::UdpRecvData& /*data*/) const {
+  uint32_t destination(const Network::UdpRecvData& /*data*/) const override {
     // By default, route to the current worker.
     return worker_index_;
   }
