@@ -120,7 +120,7 @@ protected:
             std::reference_wrapper<Network::UdpPacketWriterFactory>(udp_packet_writer_factory_)));
     ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _))
         .WillByDefault(Invoke(
-            [&](Network::IoHandle& io_handle, Stats::Scope& scope) -> Network::UdpPacketWriterPtr {
+            [&](Network::IoHandle& io_handle, Stats::Scope&) -> Network::UdpPacketWriterPtr {
               Network::UdpPacketWriterPtr udp_packet_writer =
                   std::make_unique<Network::UdpDefaultWriter>(io_handle);
               return udp_packet_writer;
