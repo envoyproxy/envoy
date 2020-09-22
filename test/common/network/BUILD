@@ -108,7 +108,6 @@ envoy_cc_test(
     name = "apple_dns_impl_test",
     srcs = ["apple_dns_impl_test.cc"],
     deps = [
-        ":dns_utility_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:address_interface",
         "//include/envoy/network:dns_interface",
@@ -133,7 +132,6 @@ envoy_cc_test(
     name = "dns_impl_test",
     srcs = ["dns_impl_test.cc"],
     deps = [
-        ":dns_utility_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:address_interface",
         "//include/envoy/network:dns_interface",
