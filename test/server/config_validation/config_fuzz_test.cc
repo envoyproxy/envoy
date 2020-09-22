@@ -20,7 +20,7 @@ namespace {
 // mode (quits upon validation of the given config)
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
   envoy::config::bootstrap::v3::Bootstrap sanitizedInput(input);
-  // QUIC is not enabled in production code yet, so remove references for HTTP3.
+  // TODO(asraa): QUIC is not enabled in production code yet, so remove references for HTTP3.
   // Tracked at https://github.com/envoyproxy/envoy/issues/9513.
   for (auto& cluster : *sanitizedInput.mutable_static_resources()->mutable_clusters()) {
     for (auto& health_check : *cluster.mutable_health_checks()) {

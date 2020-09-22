@@ -55,7 +55,7 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
   }
   for (auto& cluster : *output.mutable_static_resources()->mutable_clusters()) {
     for (auto& health_check : *cluster.mutable_health_checks()) {
-      // QUIC is not enabled in production code yet, so remove references for HTTP3.
+      // TODO(asraa): QUIC is not enabled in production code yet, so remove references for HTTP3.
       // Tracked at https://github.com/envoyproxy/envoy/issues/9513.
       if (health_check.http_health_check().codec_client_type() ==
           envoy::type::v3::CodecClientType::HTTP3)
