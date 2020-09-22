@@ -205,7 +205,7 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     // The main sd ref if destroyed here because a callback with an error is good indication that
     // the connection to the DNS deamon is faulty and needs to be torn down.
     //
-    // Deallocation of the MainSdRef __has__ to happend __after__ flushing queries. Flushing queries
+    // Deallocation of the MainSdRef __has__ to happen __after__ flushing queries. Flushing queries
     // deallocates individual refs, so deallocating the main ref aheadd would cause deallocation of
     // invalid individual refs per dns_sd.h
     ENVOY_LOG(error, "[Error path] deallocating main sd ref");
