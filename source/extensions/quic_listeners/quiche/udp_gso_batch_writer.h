@@ -1,11 +1,9 @@
 #pragma once
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
-// QUICHE allows ignored qualifiers
 #pragma GCC diagnostic ignored "-Wignored-qualifiers"
 
 // QUICHE doesn't mark override at QuicBatchWriterBase::SupportsReleaseTime()
@@ -15,6 +13,7 @@
 #elif defined(__GNUC__) && __GNUC__ >= 5
 #pragma GCC diagnostic ignored "-Wsuggest-override"
 #endif
+#endif
 
 #include "quiche/quic/core/batch_writer/quic_gso_batch_writer.h"
 
@@ -22,7 +21,9 @@
 #pragma clang diagnostic pop
 #endif
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "envoy/network/udp_packet_writer_handler.h"
 
