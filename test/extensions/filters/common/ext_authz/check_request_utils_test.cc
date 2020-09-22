@@ -56,9 +56,9 @@ public:
     auto metadata_val = MessageUtil::keyValueStruct("foo", "bar");
     (*metadata_context.mutable_filter_metadata())["meta.key"] = metadata_val;
 
-    CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),
-                                       std::move(metadata_context), request, false,
-                                       include_peer_certificate);
+    CheckRequestUtils::createHttpCheck(
+        &callbacks_, request_headers, std::move(context_extensions), std::move(metadata_context),
+        request, /*max_request_bytes=*/0, /*pack_as_bytes=*/false, include_peer_certificate);
 
     EXPECT_EQ("source", request.attributes().source().principal());
     EXPECT_EQ("destination", request.attributes().destination().principal());
@@ -154,7 +154,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   expectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, request_headers,
                                      Protobuf::Map<std::string, std::string>(),
-                                     envoy::config::core::v3::Metadata(), request_, size, false);
+                                     envoy::config::core::v3::Metadata(), request_, size,
+                                     /*pack_as_bytes=*/false, /*include_peer_certificate=*/false);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ(request_.attributes().request().http().headers().end(),
@@ -175,7 +176,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
   expectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
                                      Protobuf::Map<std::string, std::string>(),
-                                     envoy::config::core::v3::Metadata(), request_, size, false);
+                                     envoy::config::core::v3::Metadata(), request_, size,
+                                     /*pack_as_bytes=*/false, /*include_peer_certificate=*/false);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ("true", request_.attributes().request().http().headers().at(
@@ -193,10 +195,53 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
   expectBasicHttp();
   CheckRequestUtils::createHttpCheck(
       &callbacks_, headers_, Protobuf::Map<std::string, std::string>(),
-      envoy::config::core::v3::Metadata(), request_, buffer_->length(), false);
+      envoy::config::core::v3::Metadata(), request_, buffer_->length(), /*pack_as_bytes=*/false,
+      /*include_peer_certificate=*/false);
   ASSERT_EQ(buffer_->length(), request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
             request_.attributes().request().http().body());
+  EXPECT_EQ("false", request_.attributes().request().http().headers().at(
+                         Http::Headers::get().EnvoyAuthPartialBody.get()));
+}
+
+// Verify that check request object has all the request data and packed as bytes instead of UTF-8
+// string.
+TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBodyPackAsBytes) {
+  Http::TestRequestHeaderMapImpl headers_;
+  envoy::service::auth::v3::CheckRequest request_;
+
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+
+  // Fill the buffer with non UTF-8 data.
+  uint8_t raw[2] = {0xc0, 0xc0};
+  Buffer::OwnedImpl raw_buffer(raw, 2);
+  buffer_->drain(buffer_->length());
+  buffer_->add(raw_buffer);
+
+  expectBasicHttp();
+
+  // Setting pack_as_bytes as false and a string field with invalid UTF-8 data makes
+  // calling request_.SerializeToString() below to print an error message to stderr. Interestingly,
+  // request_.SerializeToString() still returns "true" when it is failed to serialize the data.
+  CheckRequestUtils::createHttpCheck(
+      &callbacks_, headers_, Protobuf::Map<std::string, std::string>(),
+      envoy::config::core::v3::Metadata(), request_, buffer_->length(), /*pack_as_bytes=*/true,
+      /*include_peer_certificate=*/false);
+
+  // TODO(dio): Find a way to test this without using function from testing::internal namespace.
+  testing::internal::CaptureStderr();
+  std::string out;
+  ASSERT_TRUE(request_.SerializeToString(&out));
+  ASSERT_EQ("", testing::internal::GetCapturedStderr());
+
+  // Non UTF-8 data sets raw_body field, instead of body field.
+  ASSERT_EQ(buffer_->length(), request_.attributes().request().http().raw_body().size());
+  ASSERT_EQ(0, request_.attributes().request().http().body().size());
+
+  EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
+            request_.attributes().request().http().raw_body());
   EXPECT_EQ("false", request_.attributes().request().http().headers().at(
                          Http::Headers::get().EnvoyAuthPartialBody.get()));
 }

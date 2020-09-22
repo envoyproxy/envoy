@@ -46,6 +46,7 @@ public:
    *        check request.
    * @param request is the reference to the check request that will be filled up.
    * @param with_request_body when true, will add the request body to the check request.
+   * @param pack_as_bytes when true, will set the check request body as bytes.
    * @param include_peer_certificate whether to include the peer certificate in the check request.
    */
   static void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
@@ -53,7 +54,8 @@ public:
                               Protobuf::Map<std::string, std::string>&& context_extensions,
                               envoy::config::core::v3::Metadata&& metadata_context,
                               envoy::service::auth::v3::CheckRequest& request,
-                              uint64_t max_request_bytes, bool include_peer_certificate);
+                              uint64_t max_request_bytes, bool pack_as_bytes,
+                              bool include_peer_certificate);
 
   /**
    * createTcpCheck is used to extract the attributes from the network layer and fill them up
@@ -76,13 +78,13 @@ private:
                              const uint64_t stream_id, const StreamInfo::StreamInfo& stream_info,
                              const Buffer::Instance* decoding_buffer,
                              const Envoy::Http::RequestHeaderMap& headers,
-                             uint64_t max_request_bytes);
+                             uint64_t max_request_bytes, bool pack_as_bytes);
   static void setAttrContextRequest(envoy::service::auth::v3::AttributeContext::Request& req,
                                     const uint64_t stream_id,
                                     const StreamInfo::StreamInfo& stream_info,
                                     const Buffer::Instance* decoding_buffer,
                                     const Envoy::Http::RequestHeaderMap& headers,
-                                    uint64_t max_request_bytes);
+                                    uint64_t max_request_bytes, bool pack_as_bytes);
   static std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);
   static Envoy::Http::HeaderMap::Iterate fillHttpHeaders(const Envoy::Http::HeaderEntry&, void*);
 };

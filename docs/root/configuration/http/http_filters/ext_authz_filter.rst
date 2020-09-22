@@ -22,7 +22,7 @@ configuration options at
 :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`.
 
 Configuration Examples
------------------------------
+----------------------
 
 A sample filter configuration for a gRPC authorization server:
 
@@ -59,6 +59,38 @@ A sample filter configuration for a gRPC authorization server:
       # This timeout controls the initial TCP handshake timeout - not the timeout for the
       # entire request.
       connect_timeout: 0.25s
+
+.. note::
+
+  One of the features of this filter is to send HTTP request body to the configured gRPC
+  authorization server as part of the :ref:`check request
+  <envoy_v3_api_msg_service.auth.v3.CheckRequest>`.
+
+  A sample configuration is as follows:
+
+  .. code:: yaml
+
+    http_filters:
+      - name: envoy.filters.http.ext_authz
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+          grpc_service:
+            envoy_grpc:
+              cluster_name: ext-authz
+          with_request_body:
+            max_request_bytes: 1024
+            allow_partial_message: true
+            pack_as_bytes: true
+
+  Please note that by default :ref:`check request<envoy_v3_api_msg_service.auth.v3.CheckRequest>`
+  carries the HTTP request body as UTF-8 string and it fills the :ref:`body
+  <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.body>` field. To pack the request
+  body as raw bytes, it is needed to set :ref:`pack_as_bytes
+  <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.BufferSettings.pack_as_bytes>` field to
+  true. In effect to that, the :ref:`raw_body
+  <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.raw_body>`
+  field will be set and :ref:`body
+  <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.body>` field will be empty.
 
 A sample filter configuration for a raw HTTP authorization server:
 
