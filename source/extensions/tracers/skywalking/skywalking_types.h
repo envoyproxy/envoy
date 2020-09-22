@@ -305,7 +305,7 @@ public:
    * Set sampling flag. In general, the sampling flag of span is consistent with the current span
    * context.
    */
-  void setSampled(int sampled) { sampled_ = sampled; }
+  void setSampled(int sampled) { sampled_ = sampled == 0 ? 0 : 1; }
 
   /*
    * Inject current span context information to request headers. This will update original

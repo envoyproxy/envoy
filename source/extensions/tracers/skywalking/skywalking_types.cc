@@ -44,7 +44,7 @@ std::string base64Decode(absl::string_view input) {
 SpanContextPtr SpanContext::spanContextFromRequest(Http::RequestHeaderMap& headers) {
   auto propagation_header = headers.get(propagationHeader());
   if (propagation_header == nullptr) {
-    // No propagation_header then Envoy is first hop.
+    // No propagation header then Envoy is first hop.
     return nullptr;
   }
 

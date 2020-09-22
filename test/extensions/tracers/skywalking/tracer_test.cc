@@ -82,6 +82,9 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   // Since the operation name in config is Egress, the new span is ExitSpan.
   EXPECT_EQ(false, span->spanStore()->isEntrySpan());
 
+  EXPECT_EQ("", span->getBaggage("FakeStringAndNothingToDo"));
+  span->setBaggage("FakeStringAndNothingToDo", "FakeStringAndNothingToDo");
+
   // Test whether the basic functions of Span are normal.
 
   span->setSampled(false);
@@ -170,6 +173,10 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
       SkyWalkingTestHelper::base64Encode("0.0.0.0"));
 
   first_child_span->setTag(Tracing::Tags::get().UpstreamAddress, "0.0.0.0");
+  first_child_span->setTag(Tracing::Tags::get().HttpUrl, "http://test.com/test/path");
+  // Peer address only set in ExitSpan.
+  EXPECT_EQ("", span->spanStore()->peerAddress());
+
   first_child_span->injectContext(first_child_headers);
   EXPECT_EQ(expected_header_value, first_child_headers.get_("sw8"));
 

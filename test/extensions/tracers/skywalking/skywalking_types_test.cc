@@ -28,11 +28,15 @@ constexpr char TEST_ENDPOINT[] = "/POST/path/for/test";
 // when errors occur.
 TEST(SpanContextTest, SpanContextCommonTest) {
   NiceMock<Random::MockRandomGenerator> mock_random_generator;
-
   ON_CALL(mock_random_generator, random()).WillByDefault(Return(uint64_t(23333)));
 
   std::string trace_id = SkyWalkingTestHelper::generateId(mock_random_generator);
   std::string segment_id = SkyWalkingTestHelper::generateId(mock_random_generator);
+
+  // No propagation header then previous span context will be null.
+  Http::TestRequestHeaderMapImpl headers_no_propagation;
+  auto null_span_context = SpanContext::spanContextFromRequest(headers_no_propagation);
+  EXPECT_EQ(nullptr, null_span_context.get());
 
   // Create properly formatted propagation headers and test whether the propagation headers can be
   // parsed correctly.
@@ -58,6 +62,20 @@ TEST(SpanContextTest, SpanContextCommonTest) {
   EXPECT_EQ(previous_span_context->service_instance_, TEST_INSTANCE);
   EXPECT_EQ(previous_span_context->endpoint_, TEST_ENDPOINT);
   EXPECT_EQ(previous_span_context->target_address_, TEST_ADDRESS);
+
+  std::string header_value_with_sampled =
+      fmt::format("{}-{}-{}-{}-{}-{}-{}-{}", 1, SkyWalkingTestHelper::base64Encode(trace_id),
+                  SkyWalkingTestHelper::base64Encode(segment_id), 233333,
+                  SkyWalkingTestHelper::base64Encode(TEST_SERVICE),
+                  SkyWalkingTestHelper::base64Encode(TEST_INSTANCE),
+                  SkyWalkingTestHelper::base64Encode(TEST_ENDPOINT),
+                  SkyWalkingTestHelper::base64Encode(TEST_ADDRESS));
+
+  Http::TestRequestHeaderMapImpl headers_with_sampled{{"sw8", header_value_with_sampled}};
+
+  auto previous_span_context_with_sampled =
+      SpanContext::spanContextFromRequest(headers_with_sampled);
+  EXPECT_EQ(previous_span_context_with_sampled->sampled_, 1);
 
   // Test whether an exception can be correctly thrown when some fields are missing.
   std::string header_value_lost_some_parts =
@@ -247,12 +265,23 @@ TEST(SpanStoreTest, SpanStoreCommonTest) {
   SpanStore* root_store = SkyWalkingTestHelper::createSpanStore(segment_context.get(), nullptr,
                                                                 "ROOT", mock_time_source);
   EXPECT_NE(nullptr, root_store);
+  EXPECT_EQ(3, root_store->tags().size());
+
+  root_store->addLog(now, "TestLogStringAndNeverBeStored");
+  EXPECT_EQ(0, root_store->logs().size());
 
   // The span id of the first SpanStore in each SegmentContext is 0. Its parent span id is -1.
   EXPECT_EQ(0, root_store->spanId());
   EXPECT_EQ(-1, root_store->parentSpanId());
 
+  root_store->setSpanId(123);
+  EXPECT_EQ(123, root_store->spanId());
+  root_store->setParentSpanId(234);
+  EXPECT_EQ(234, root_store->parentSpanId());
+
   EXPECT_EQ(1, root_store->sampled());
+  root_store->setSampled(0);
+  EXPECT_EQ(0, root_store->sampled());
 
   // Test whether the value of the fields can be set correctly and the value of the fields can be
   // obtained correctly.
@@ -288,10 +317,6 @@ TEST(SpanStoreTest, SpanStoreCommonTest) {
   root_store->setEndTime(25555);
   EXPECT_EQ(25555, root_store->endTime());
 
-  EXPECT_EQ(-1, root_store->parentSpanId());
-  root_store->setParentSpanId(234);
-  EXPECT_EQ(234, root_store->parentSpanId());
-
   // When SpanStore calls finish, the end time will be set.
   root_store->finish();
   EXPECT_EQ(std::chrono::time_point_cast<std::chrono::milliseconds>(now).time_since_epoch().count(),
@@ -303,10 +328,10 @@ TEST(SpanStoreTest, SpanStoreCommonTest) {
   root_store->injectContext(request_headers_with_upstream);
 
   std::string expected_header_value = fmt::format(
-      "{}-{}-{}-{}-{}-{}-{}-{}", 1,
+      "{}-{}-{}-{}-{}-{}-{}-{}", root_store->sampled(),
       SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator)),
       SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator)),
-      0, SkyWalkingTestHelper::base64Encode("CURR#SERVICE"),
+      root_store->spanId(), SkyWalkingTestHelper::base64Encode("CURR#SERVICE"),
       SkyWalkingTestHelper::base64Encode("CURR#INSTANCE"),
       SkyWalkingTestHelper::base64Encode("CURR#ENDPOINT"),
       SkyWalkingTestHelper::base64Encode(TEST_ADDRESS));
@@ -320,10 +345,10 @@ TEST(SpanStoreTest, SpanStoreCommonTest) {
   Http::TestRequestHeaderMapImpl request_headers_no_upstream{{":authority", "test.com"}};
   root_store->injectContext(request_headers_no_upstream);
   expected_header_value = fmt::format(
-      "{}-{}-{}-{}-{}-{}-{}-{}", 1,
+      "{}-{}-{}-{}-{}-{}-{}-{}", root_store->sampled(),
       SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator)),
       SkyWalkingTestHelper::base64Encode(SkyWalkingTestHelper::generateId(mock_random_generator)),
-      0, SkyWalkingTestHelper::base64Encode("CURR#SERVICE"),
+      root_store->spanId(), SkyWalkingTestHelper::base64Encode("CURR#SERVICE"),
       SkyWalkingTestHelper::base64Encode("CURR#INSTANCE"),
       SkyWalkingTestHelper::base64Encode("CURR#ENDPOINT"),
       SkyWalkingTestHelper::base64Encode("test.com"));
