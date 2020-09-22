@@ -299,11 +299,11 @@ public:
           return Http::okStatus();
         }));
     ON_CALL(*decoder_filter_, decodeHeaders(_, _))
-        .WillByDefault(InvokeWithoutArgs([this, decode_header_status,
-                                          end_stream]() -> Http::FilterHeadersStatus {
-          header_status_ = fromHeaderStatus(decode_header_status);
-          return *header_status_;
-        }));
+        .WillByDefault(InvokeWithoutArgs(
+            [this, decode_header_status, end_stream]() -> Http::FilterHeadersStatus {
+              header_status_ = fromHeaderStatus(decode_header_status);
+              return *header_status_;
+            }));
     fakeOnData();
     FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
   }

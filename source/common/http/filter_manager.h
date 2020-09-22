@@ -497,8 +497,7 @@ public:
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_continue_headers_)
-       << "\n";
+    os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_continue_headers_) << "\n";
 
     DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.requestHeaders());
     DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.requestTrailers());

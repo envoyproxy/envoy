@@ -452,8 +452,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
 
     (*entry)->decode_headers_called_ = true;
 
-    const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(
-        status, end_stream);
+    const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
 
     // If this filter ended the stream, decodeComplete() should be called for it.
     if ((*entry)->end_stream_) {
@@ -925,8 +924,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
 
     (*entry)->encode_headers_called_ = true;
 
-    const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(
-        status, end_stream);
+    const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
 
     // If this filter ended the stream, encodeComplete() should be called for it.
     if ((*entry)->end_stream_) {
