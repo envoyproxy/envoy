@@ -1,9 +1,9 @@
 #pragma once
 
 #if !defined(__linux__)
-#define UDP_GSO_BATCH_WRITER_PLATFORM_SUPPORT 0
+#define UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT 0
 #else
-#define UDP_GSO_BATCH_WRITER_PLATFORM_SUPPORT 1
+#define UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT 1
 
 #pragma GCC diagnostic push
 // QUICHE allows unused parameters.

@@ -120,7 +120,7 @@ protected:
     ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _))
         .WillByDefault(Invoke(
             [&](Network::IoHandle& io_handle, Stats::Scope& scope) -> Network::UdpPacketWriterPtr {
-#if UDP_GSO_BATCH_WRITER_PLATFORM_SUPPORT
+#if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
               return std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
 #else
               UNREFERENCED_PARAMETER(scope);
