@@ -649,12 +649,6 @@ TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   EXPECT_EQ(upstream_request_->duplicatedMetadataKeyCount().find("metadata")->second, 6);
 }
 
-static std::string decode_headers_only = R"EOF(
-name: decode-headers-only
-typed_config:
-  "@type": type.googleapis.com/google.protobuf.Empty
-)EOF";
-
 void Http2MetadataIntegrationTest::runHeaderOnlyTest(bool send_request_body, size_t body_size) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -696,28 +690,6 @@ void Http2MetadataIntegrationTest::verifyHeadersOnlyTest() {
   EXPECT_EQ(true, upstream_request_->receivedData());
   EXPECT_EQ(0, upstream_request_->bodyLength());
   EXPECT_EQ(true, upstream_request_->complete());
-}
-
-TEST_P(Http2MetadataIntegrationTest, DecodingHeadersOnlyRequestWithRequestMetadataEmptyData) {
-  addFilters({request_metadata_filter, decode_headers_only});
-
-  // Send a request with body, and body size is 0.
-  runHeaderOnlyTest(true, 0);
-  verifyHeadersOnlyTest();
-}
-
-TEST_P(Http2MetadataIntegrationTest, DecodingHeadersOnlyRequestWithRequestMetadataNoneEmptyData) {
-  addFilters({request_metadata_filter, decode_headers_only});
-  // Send a request with body, and body size is 128.
-  runHeaderOnlyTest(true, 128);
-  verifyHeadersOnlyTest();
-}
-
-TEST_P(Http2MetadataIntegrationTest, DecodingHeadersOnlyRequestWithRequestMetadataDiffFilterOrder) {
-  addFilters({decode_headers_only, request_metadata_filter});
-  // Send a request with body, and body size is 128.
-  runHeaderOnlyTest(true, 128);
-  verifyHeadersOnlyTest();
 }
 
 TEST_P(Http2MetadataIntegrationTest, HeadersOnlyRequestWithRequestMetadata) {

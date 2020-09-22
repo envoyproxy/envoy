@@ -302,11 +302,6 @@ public:
         .WillByDefault(InvokeWithoutArgs([this, decode_header_status,
                                           end_stream]() -> Http::FilterHeadersStatus {
           header_status_ = fromHeaderStatus(decode_header_status);
-          // When a filter should not return ContinueAndEndStream when send with end_stream set
-          // (see https://github.com/envoyproxy/envoy/pull/4885#discussion_r232176826)
-          if (end_stream && (*header_status_ == Http::FilterHeadersStatus::ContinueAndEndStream)) {
-            *header_status_ = Http::FilterHeadersStatus::Continue;
-          }
           return *header_status_;
         }));
     fakeOnData();
@@ -324,8 +319,6 @@ public:
       return Http::FilterHeadersStatus::Continue;
     case test::common::http::HeaderStatus::HEADER_STOP_ITERATION:
       return Http::FilterHeadersStatus::StopIteration;
-    case test::common::http::HeaderStatus::HEADER_CONTINUE_AND_END_STREAM:
-      return Http::FilterHeadersStatus::ContinueAndEndStream;
     case test::common::http::HeaderStatus::HEADER_STOP_ALL_ITERATION_AND_BUFFER:
       return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
     case test::common::http::HeaderStatus::HEADER_STOP_ALL_ITERATION_AND_WATERMARK:

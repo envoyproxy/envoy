@@ -506,7 +506,6 @@ envoy_cc_test_library(
         "//test/integration/filters:call_decodedata_once_filter_config_lib",
         "//test/integration/filters:decode_headers_return_stop_all_filter_config_lib",
         "//test/integration/filters:encode_headers_return_stop_all_filter_config_lib",
-        "//test/integration/filters:headers_only_filter_config_lib",
         "//test/integration/filters:modify_buffer_filter_config_lib",
         "//test/integration/filters:passthrough_filter_config_lib",
         "//test/integration/filters:pause_filter_lib",

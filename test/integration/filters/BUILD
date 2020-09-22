@@ -143,21 +143,6 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "headers_only_filter_config_lib",
-    srcs = [
-        "headers_only_filter.cc",
-    ],
-    deps = [
-        ":common_lib",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
-    ],
-)
-
-envoy_cc_test_library(
     name = "pause_filter_lib",
     srcs = [
         "pause_filter.cc",

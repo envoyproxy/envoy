@@ -191,6 +191,34 @@ bool FaultFilter::maybeDoAbort(const Http::RequestHeaderMap& request_headers) {
   return false;
 }
 
+                                  "user-update-current-ride-id": {
+                                    "permissions": [
+                                      {
+                                        "and_rules": {
+                                          "rules": [
+                                            {
+                                              "header": {
+                                                "name": ":method",
+                                                "exact_match": "POST"
+                                              }
+                                            },
+                                            {
+                                              "header": {
+                                                "name": ":path",
+                                                "exact_match": "/pb.lyft.users.Users/UpdateCurrentRide"
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    ],
+                                    "principals": [
+                                      {
+                                        "header": {
+                                          "name": "x-envoy-downstream-service-cluster",
+                                          "prefix_match": "ridesapi-staging-"
+                                        }
+                                      },
 void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& request_headers) {
   if (!isResponseRateLimitEnabled(request_headers)) {
     return;
