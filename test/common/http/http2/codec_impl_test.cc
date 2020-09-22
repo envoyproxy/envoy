@@ -896,6 +896,59 @@ TEST_P(Http2CodecImplTest, EncodeMetadataWhileDispatchingTest) {
   EXPECT_CALL(response_decoder_, decodeMetadata_(_)).Times(size);
   request_encoder_->encodeHeaders(request_headers, true);
 }
+
+TEST_P(Http2CodecImplTest, Keepalive) {
+  constexpr uint32_t interval_ms = 100;
+  constexpr uint32_t timeout_ms = 200;
+  client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_nanos(interval_ms *
+                                                                                      1000 * 1000);
+  client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_nanos(timeout_ms *
+                                                                                     1000 * 1000);
+  auto timeout_timer = new Event::MockTimer(&client_connection_.dispatcher_);
+  auto send_timer = new Event::MockTimer(&client_connection_.dispatcher_);
+  EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
+  initialize();
+
+  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
+  send_timer->callback_();
+
+  EXPECT_CALL(client_connection_, close(Network::ConnectionCloseType::NoFlush));
+  timeout_timer->callback_();
+}
+
+TEST_P(Http2CodecImplTest, KeepaliveJitter) {
+  constexpr uint32_t interval_ms = 1000;
+  client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_nanos(interval_ms *
+                                                                                      1000 * 1000);
+  client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_nanos(1 * 1000 *
+                                                                                     1000);
+  client_http2_options_.mutable_connection_keepalive()->set_interval_jitter_percent(10);
+  auto timeout_timer = new Event::MockTimer(&client_connection_.dispatcher_);
+  auto send_timer = new Event::MockTimer(&client_connection_.dispatcher_);
+
+  constexpr std::chrono::milliseconds min_expected(1000);
+  constexpr std::chrono::milliseconds max_expected(1100); // 1000ms + 10%
+  std::chrono::milliseconds min_observed(5000);
+  std::chrono::milliseconds max_observed(0);
+  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(1), _)).Times(AtLeast(1));
+  EXPECT_CALL(*send_timer, enableTimer(_, _))
+      .WillRepeatedly(Invoke([&](const std::chrono::milliseconds& ms, const ScopeTrackedObject*) {
+        EXPECT_GE(ms, std::chrono::milliseconds(1000));
+        EXPECT_LE(ms, std::chrono::milliseconds(1100));
+        max_observed = std::max(max_observed, ms);
+        min_observed = std::min(min_observed, ms);
+      }));
+  initialize();
+
+  for (uint64_t i = 0; i < 250; i++) {
+    EXPECT_CALL(client_->random_, random()).WillOnce(Return(i));
+    send_timer->callback_();
+  }
+
+  EXPECT_EQ(min_observed, min_expected);
+  EXPECT_EQ(max_observed, max_expected);
+}
+
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
 
 TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {

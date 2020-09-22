@@ -127,6 +127,8 @@ class TestClientConnection : public TestCodecStatsProvider,
                              public ClientCodecFacade {
 public:
   TestClientConnection(Stats::Scope& scope) : TestCodecStatsProvider(scope) {}
+
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
 template <typename CodecImplType>
@@ -160,8 +162,6 @@ public:
     UNREFERENCED_PARAMETER(stream_id);
     return false;
   }
-
-  testing::NiceMock<Random::MockRandomGenerator> random_;
 
 protected:
   // Overrides ClientConnectionImpl::onSettingsForTest().
