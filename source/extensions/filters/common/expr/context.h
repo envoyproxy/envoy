@@ -37,6 +37,7 @@ constexpr absl::string_view Protocol = "protocol";
 // Symbols for traversing the response properties
 constexpr absl::string_view Response = "response";
 constexpr absl::string_view Code = "code";
+constexpr absl::string_view CodeDetails = "code_details";
 constexpr absl::string_view Trailers = "trailers";
 constexpr absl::string_view Flags = "flags";
 constexpr absl::string_view GrpcStatus = "grpc_status";
@@ -100,6 +101,9 @@ private:
   const T* value_;
 };
 
+// Wrapper for accessing properties from internal data structures.
+// Note that CEL assumes no ownership of the underlying data, so temporary
+// data must be arena-allocated.
 class BaseWrapper : public google::api::expr::runtime::CelMap,
                     public google::api::expr::runtime::CelValueProducer {
 public:

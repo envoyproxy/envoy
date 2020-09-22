@@ -241,6 +241,9 @@ TEST(Context, ResponseAttributes) {
   EXPECT_CALL(info, bytesSent()).WillRepeatedly(Return(123));
   EXPECT_CALL(info, responseFlags()).WillRepeatedly(Return(0x1));
 
+  const absl::optional<std::string> code_details = "unauthorized";
+  EXPECT_CALL(info, responseCodeDetails()).WillRepeatedly(ReturnRef(code_details));
+
   {
     auto value = response[CelValue::CreateStringView(Undefined)];
     EXPECT_FALSE(value.has_value());
@@ -277,6 +280,13 @@ TEST(Context, ResponseAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
     EXPECT_EQ(404, value.value().Int64OrDie());
+  }
+
+  {
+    auto value = response[CelValue::CreateStringView(CodeDetails)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(code_details.value(), value.value().StringOrDie().value());
   }
 
   {
@@ -326,6 +336,16 @@ TEST(Context, ResponseAttributes) {
 
   {
     auto value = empty_response[CelValue::CreateStringView(GrpcStatus)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = empty_response[CelValue::CreateStringView(Code)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = empty_response[CelValue::CreateStringView(CodeDetails)];
     EXPECT_FALSE(value.has_value());
   }
 
