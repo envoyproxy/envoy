@@ -183,7 +183,6 @@ private:
   void tryInjectDelay();
 
   std::unique_ptr<Decoder> decoder_;
-  std::string stat_prefix_;
   MongoProxyStats stats_;
   Runtime::Loader& runtime_;
   const Network::DrainDecision& drain_decision_;

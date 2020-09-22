@@ -65,7 +65,6 @@ public:
   PostgresFilterConfig(const std::string& stat_prefix, bool enable_sql_parsing,
                        Stats::Scope& scope);
 
-  const std::string stat_prefix_;
   bool enable_sql_parsing_{true};
   Stats::Scope& scope_;
   PostgresProxyStats stats_;

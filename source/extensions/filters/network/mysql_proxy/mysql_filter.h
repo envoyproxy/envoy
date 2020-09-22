@@ -54,7 +54,6 @@ public:
   const MySQLProxyStats& stats() { return stats_; }
 
   Stats::Scope& scope_;
-  const std::string stat_prefix_;
   MySQLProxyStats stats_;
 
 private:
