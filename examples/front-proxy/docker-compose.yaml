@@ -45,8 +45,6 @@ services:
       - SERVICE_NAME=2
     expose:
       - "8000"
-  
-
 
 networks:
   envoymesh: {}
