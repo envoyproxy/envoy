@@ -48,7 +48,6 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
 }
 
 void HealthCheckFuzz::respondHttp(const test::fuzz::Headers& headers, absl::string_view status) {
-
   // Timeout timer needs to be explicitly enabled, usually by onIntervalBase() (Callback on interval
   // timer).
   if (!test_sessions_[0]->timeout_timer_->enabled_) {
@@ -61,6 +60,17 @@ void HealthCheckFuzz::respondHttp(const test::fuzz::Headers& headers, absl::stri
           Fuzz::fromHeaders<Http::TestResponseHeaderMapImpl>(headers, {}, {}));
 
   response_headers->setStatus(status);
+
+  // This utility gets called in codec impl which handles any exceptions thrown, so check here to
+  // constrain state space to what can pass through codec.
+  // TODO(zasweq): However, this utility function gets called in a lot of places around the codebase
+  // that may take in untrusted inputs.
+  try {
+    Http::Utility::getResponseStatus(*response_headers.get());
+  } catch (EnvoyException e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
+    return;
+  }
 
   // Responding with http can cause client to close, if so create a new one.
   bool client_will_close = false;
