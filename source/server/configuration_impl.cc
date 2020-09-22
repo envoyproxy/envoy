@@ -182,13 +182,13 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
   abort_config.mutable_wait_duration()->set_seconds(1);
 
   if (kill_timeout > 0) {
-    auto abort_action_config = actions.Add();
+    envoy::config::bootstrap::v3::Watchdog::WatchdogAction* abort_action_config = actions.Add();
     abort_action_config->set_event(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::KILL);
     abort_action_config->mutable_config()->mutable_typed_config()->PackFrom(abort_config);
   }
 
   if (multikill_timeout_.count() > 0) {
-    auto abort_action_config = actions.Add();
+    envoy::config::bootstrap::v3::Watchdog::WatchdogAction* abort_action_config = actions.Add();
     abort_action_config->set_event(
         envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MULTIKILL);
     abort_action_config->mutable_config()->mutable_typed_config()->PackFrom(abort_config);
