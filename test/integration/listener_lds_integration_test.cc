@@ -70,7 +70,6 @@ protected:
         });
 
     // Note this has to be the last modifier as it nuke static_resource listeners.
-    setUpGrpcLds();
     HttpIntegrationTest::initialize();
   }
   void setUpGrpcLds() {
@@ -82,6 +81,7 @@ protected:
       auto* lds_api_config_source =
           bootstrap.mutable_dynamic_resources()->mutable_lds_config()->mutable_api_config_source();
       lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+      lds_api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
       envoy::config::core::v3::GrpcService* grpc_service =
           lds_api_config_source->add_grpc_services();
       setGrpcService(*grpc_service, "lds_cluster", getLdsFakeUpstream().localAddress());
@@ -268,15 +268,125 @@ TEST_P(ListenerIntegrationTest, BasicSuccess) {
 // Tests that a LDS adding listener works as expected.
 TEST_P(ListenerIntegrationTest, LdsUdpa) {
   setLdsUdpa();
-  on_server_init_function_ = [&]() {
-    createLdsStream();
-    const std::string udpa_url_str =
-        "udpa://some-authority/envoy.config.listeners.v3.Listener/my-listeners/*";
-    const auto lds_resource_locator = Config::UdpaResourceIdentifier::decodeUrl(udpa_url_str);
-    expectUdpaUrlInDiscoveryRequest(Config::TypeUrl::get().Listener, {lds_resource_locator});
-  };
+  on_server_init_function_ = [&]() { createLdsStream(); };
   initialize();
+  const std::string udpa_url_str =
+      "udpa://some-authority/envoy.config.listeners.v3.Listener/my-listeners/*";
+  const auto lds_resource_locator = Config::UdpaResourceIdentifier::decodeUrl(udpa_url_str);
+  expectUdpaUrlInDiscoveryRequest(Config::TypeUrl::get().Listener, {lds_resource_locator});
 }
+
+class ScopedRdsIntegrationTest : public HttpIntegrationTest,
+                                 public Grpc::DeltaSotwIntegrationParamTest {
+protected:
+  struct FakeUpstreamInfo {
+    FakeHttpConnectionPtr connection_;
+    FakeUpstream* upstream_{};
+    absl::flat_hash_map<std::string, FakeStreamPtr> stream_by_resource_name_;
+  };
+
+  ScopedRdsIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
+
+  ~ScopedRdsIntegrationTest() override { resetConnections(); }
+
+  void initialize() override {
+    // Setup a upstream host the cluster.
+    setUpstreamCount(1);
+
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // Add the static cluster to serve SRDS.
+      auto* cluster_1 = bootstrap.mutable_static_resources()->add_clusters();
+      cluster_1->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      cluster_1->set_name("lds_cluster");
+
+      // Add the static cluster to serve SRDS.
+      auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      lds_cluster->set_name("srds_cluster");
+      lds_cluster->mutable_http2_protocol_options();
+    });
+
+    config_helper_.addConfigModifier(
+        [this](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                http_connection_manager) {
+          // Set resource api version for lds.
+          envoy::config::core::v3::ConfigSource* lds_config_source =
+              scoped_routes->mutable_lds_config_source();
+          lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+
+          // Add grpc service for rds.
+          lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+          envoy::config::core::v3::GrpcService* grpc_service =
+              rds_api_config_source->add_grpc_services();
+          setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
+
+          // Add grpc service for lds.
+          if (isDelta()) {
+            lds_api_config_source->set_api_type(
+                envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+          } else {
+            lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+          }
+          lds_api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+          grpc_service = lds_api_config_source->add_grpc_services();
+          setGrpcService(*grpc_service, "srds_cluster", getLdsFakeUpstream().localAddress());
+        });
+    HttpIntegrationTest::initialize();
+  }
+
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    // Create the LDS upstream.
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
+                                                  timeSystem(), enable_half_close_));
+  }
+
+  void resetFakeUpstreamInfo(FakeUpstreamInfo* upstream_info) {
+    ASSERT(upstream_info->upstream_ != nullptr);
+
+    AssertionResult result = upstream_info->connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = upstream_info->connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+    upstream_info->connection_.reset();
+  }
+
+  void resetConnections() { resetFakeUpstreamInfo(&lds_upstream_info_); }
+
+  FakeUpstream& getLdsFakeUpstream() const { return *fake_upstreams_[2]; }
+
+  void createStream(FakeUpstreamInfo* upstream_info, FakeUpstream& upstream,
+                    const std::string& resource_name) {
+    if (upstream_info->upstream_ == nullptr) {
+      // bind upstream if not yet.
+      upstream_info->upstream_ = &upstream;
+      AssertionResult result =
+          upstream_info->upstream_->waitForHttpConnection(*dispatcher_, upstream_info->connection_);
+      RELEASE_ASSERT(result, result.message());
+    }
+    if (!upstream_info->stream_by_resource_name_.try_emplace(resource_name, nullptr).second) {
+      RELEASE_ASSERT(false,
+                     fmt::format("stream with resource name '{}' already exists!", resource_name));
+    }
+    auto result = upstream_info->connection_->waitForNewStream(
+        *dispatcher_, upstream_info->stream_by_resource_name_[resource_name]);
+    RELEASE_ASSERT(result, result.message());
+    upstream_info->stream_by_resource_name_[resource_name]->startGrpcStream();
+  }
+
+  void createLdsStream(const std::string& resource_name) {
+    createStream(&lds_upstream_info_, getLdsFakeUpstream(), resource_name);
+  }
+
+  bool isDelta() { return sotwOrDelta() == Grpc::SotwOrDelta::Delta; }
+
+  FakeUpstreamInfo lds_upstream_info_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ScopedRdsIntegrationTest,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 } // namespace
 } // namespace Envoy

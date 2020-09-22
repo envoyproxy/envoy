@@ -461,6 +461,7 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
 AssertionResult BaseIntegrationTest::expectUdpaUrlInDiscoveryRequest(
     const std::string& expected_type_url,
     std::vector<udpa::core::v1::ResourceLocator> expected_resource_locators) {
+
   envoy::service::discovery::v3::DeltaDiscoveryRequest discovery_request;
   VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
   if (expected_type_url != discovery_request.type_url()) {
@@ -470,9 +471,11 @@ AssertionResult BaseIntegrationTest::expectUdpaUrlInDiscoveryRequest(
   const std::vector<udpa::core::v1::ResourceLocator> resource_locators(
       discovery_request.udpa_resources_subscribe().begin(),
       discovery_request.udpa_resources_subscribe().end());
+
   if (resource_locators.size() != expected_resource_locators.size()) {
     return AssertionFailure() << "Resource locator number mismatch.";
   }
+
   for (size_t i = 0; i < resource_locators.size(); i++) {
     if (!Envoy::Protobuf::util::MessageDifferencer::Equals(resource_locators[i],
                                                            expected_resource_locators[i])) {
