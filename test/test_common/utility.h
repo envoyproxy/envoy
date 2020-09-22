@@ -834,6 +834,13 @@ public:
     HeaderMapImpl::copyFrom(*header_map_, rhs);
     header_map_->verifyByteSizeInternalForTest();
   }
+  void copyFrom(const TestHeaderMapImplBase& rhs) {
+    copyFrom(*rhs.header_map_);
+  }
+  void copyFrom(const HeaderMap& rhs) {
+    HeaderMapImpl::copyFrom(*header_map_, rhs);
+    header_map_->verifyByteSizeInternalForTest();
+  }
   TestHeaderMapImplBase& operator=(const TestHeaderMapImplBase& rhs) {
     if (this == &rhs) {
       return *this;

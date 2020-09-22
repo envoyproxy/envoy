@@ -42,7 +42,8 @@ public:
    * response headers and request headers to be forwarded to the upstream are supplied.
    */
   virtual void complete(LimitStatus status, Http::ResponseHeaderMapPtr&& response_headers_to_add,
-                        Http::RequestHeaderMapPtr&& request_headers_to_add) PURE;
+                        Http::RequestHeaderMapPtr&& request_headers_to_add,
+                        const std::string& response_body) PURE;
 };
 
 /**

@@ -70,7 +70,8 @@ void Filter::onEvent(Network::ConnectionEvent event) {
 }
 
 void Filter::complete(Filters::Common::RateLimit::LimitStatus status, Http::ResponseHeaderMapPtr&&,
-                      Http::RequestHeaderMapPtr&&) {
+                      Http::RequestHeaderMapPtr&&,
+                      const std::string&) {
   status_ = Status::Complete;
   config_->stats().active_.dec();
 

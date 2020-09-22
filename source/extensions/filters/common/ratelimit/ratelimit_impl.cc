@@ -104,14 +104,14 @@ void GrpcClientImpl::onSuccess(
     }
   }
   callbacks_->complete(status, std::move(response_headers_to_add),
-                       std::move(request_headers_to_add));
+                       std::move(request_headers_to_add), response->body());
   callbacks_ = nullptr;
 }
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
-  callbacks_->complete(LimitStatus::Error, nullptr, nullptr);
+  callbacks_->complete(LimitStatus::Error, nullptr, nullptr, "");
   callbacks_ = nullptr;
 }
 
