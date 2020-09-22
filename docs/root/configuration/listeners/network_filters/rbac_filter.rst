@@ -10,10 +10,6 @@ block-list (DENY) set of policies based on properties of the connection (IPs, po
 This filter also supports policy in both enforcement and shadow modes. Shadow mode won't effect real
 users, it is used to test that a new set of policies work before rolling out to production.
 
-When a request is denied, the :ref:`RESPONSE_CODE_DETAILS<config_access_log_format_response_code_details>`
-will include the name of the matched policy that caused the deny ("none" if none matched), this helps
-to distinguish the deny from Envoy RBAC filter and the upstream backend.
-
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>`
 * This filter should be configured with the name *envoy.filters.network.rbac*.
 

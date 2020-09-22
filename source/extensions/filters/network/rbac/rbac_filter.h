@@ -74,7 +74,7 @@ private:
   EngineResult engine_result_{Unknown};
   EngineResult shadow_engine_result_{Unknown};
 
-  std::pair<EngineResult, std::string> checkEngine(Filters::Common::RBAC::EnforcementMode mode);
+  EngineResult checkEngine(Filters::Common::RBAC::EnforcementMode mode);
 };
 
 } // namespace RBACFilter
