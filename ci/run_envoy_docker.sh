@@ -22,7 +22,7 @@ if is_windows; then
   BUILD_DIR_MOUNT_DEST=C:/build
   SOURCE_DIR=$(echo "${PWD}" | sed -E "s#/([a-zA-Z])/#\1:/#")
   SOURCE_DIR_MOUNT_DEST=C:/source
-  START_COMMAND="bash -c 'cd source && $*'"
+  START_COMMAND=("bash" "-lc" "cd source && $*")
 else
   [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-ubuntu"
   # We run as root and later drop permissions. This is required to setup the USER
@@ -35,11 +35,10 @@ else
   BUILD_DIR_MOUNT_DEST=/build
   SOURCE_DIR="${PWD}"
   SOURCE_DIR_MOUNT_DEST=/source
-  START_COMMAND="/bin/bash -lc '\
-                  groupadd --gid $(id -g) -f envoygroup \
-                  && useradd -o --uid $(id -u) --gid $(id -g) --no-create-home --home-dir /build envoybuild \
-                  && usermod -a -G pcap envoybuild \
-                  && sudo -EHs -u envoybuild bash -c \"cd /source && $*\"'"
+  START_COMMAND=("/bin/bash" "-lc" "groupadd --gid $(id -g) -f envoygroup \
+    && useradd -o --uid $(id -u) --gid $(id -g) --no-create-home --home-dir /build envoybuild \
+    && usermod -a -G pcap envoybuild \
+    && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
 
 # The IMAGE_ID defaults to the CI hash but can be set to an arbitrary image ID (found with 'docker
@@ -84,4 +83,4 @@ docker run --rm \
        -e BUILD_URI\
        -e REPO_URI \
        "${ENVOY_BUILD_IMAGE}" \
-       ${START_COMMAND[@]}
+       "${START_COMMAND[@]}"
