@@ -1772,10 +1772,4 @@ TEST(StatusCode, Strings) {
   ASSERT_EQ("OK", MessageUtil::CodeEnumToString(ProtobufUtil::error::OK));
 }
 
-TEST(TypeUtilTest, TypeUrlToDescriptorFullName) {
-  EXPECT_EQ("envoy.config.filter.http.ip_tagging.v2.IPTagging",
-            TypeUtil::typeUrlToDescriptorFullName(
-                "type.googleapis.com/envoy.config.filter.http.ip_tagging.v2.IPTagging"));
-}
-
 } // namespace Envoy
