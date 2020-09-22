@@ -483,13 +483,18 @@ TEST_F(HttpFilterTest, AuthWithRequestData) {
     max_request_bytes: 10
   )EOF");
 
+  ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   prepareCheck();
 
+  envoy::service::auth::v3::CheckRequest check_request;
   EXPECT_CALL(*client_, check(_, _, _, testing::A<Tracing::Span&>(), _))
-      .WillOnce(
-          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+      .WillOnce(WithArgs<0, 2>(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest& check_param) -> void {
             request_callbacks_ = &callbacks;
+            check_request = check_param;
           })));
+
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
   data_.add("foo");
@@ -497,6 +502,50 @@ TEST_F(HttpFilterTest, AuthWithRequestData) {
   data_.add("bar");
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(data_.length(), check_request.attributes().request().http().body().size());
+  EXPECT_EQ(0, check_request.attributes().request().http().raw_body().size());
+}
+
+// Checks that the filter buffers the data and initiates the authorization request.
+TEST_F(HttpFilterTest, AuthWithNonUtf8RequestData) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  with_request_body:
+    max_request_bytes: 10
+    pack_as_bytes: true
+  )EOF");
+
+  ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  prepareCheck();
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, _, testing::A<Tracing::Span&>(), _))
+      .WillOnce(WithArgs<0, 2>(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest& check_param) -> void {
+            request_callbacks_ = &callbacks;
+            check_request = check_param;
+          })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  // Use non UTF-8 data to fill up the decoding buffer.
+  uint8_t raw[1] = {0xc0};
+  Buffer::OwnedImpl raw_buffer(raw, 1);
+
+  data_.add(raw_buffer);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  data_.add(raw_buffer);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(0, check_request.attributes().request().http().body().size());
+  EXPECT_EQ(data_.length(), check_request.attributes().request().http().raw_body().size());
 }
 
 // Checks that filter does not buffer data on header-only request.
