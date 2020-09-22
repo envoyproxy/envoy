@@ -8,11 +8,6 @@
 
 namespace Envoy {
 
-#if defined(__APPLE__) || defined(WIN32)
-// freebind/freebind.yaml is not supported on macOS or Windows and is disabled via Bazel.
-constexpr uint64_t LinuxOnlyConfigFileTestCount = 1UL;
-#endif
-
 TEST(ExampleConfigsTest, All) {
   TestEnvironment::exec(
       {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});
@@ -36,11 +31,7 @@ TEST(ExampleConfigsTest, All) {
   RELEASE_ASSERT(::getcwd(cwd, sizeof(cwd)) != nullptr, "");
   RELEASE_ASSERT(::chdir(directory.c_str()) == 0, "");
 
-#if defined(__APPLE__) || defined(WIN32)
-  EXPECT_EQ(config_file_count - LinuxOnlyConfigFileTestCount, ConfigTest::run(directory));
-#else
   EXPECT_EQ(config_file_count, ConfigTest::run(directory));
-#endif
 
   ConfigTest::testMerge();
 
