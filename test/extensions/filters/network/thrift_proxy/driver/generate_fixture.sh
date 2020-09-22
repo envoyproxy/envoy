@@ -55,7 +55,7 @@ if [[ "${METHOD}" == "" ]]; then
     usage
 fi
 shift
-echo "${TEST_TMPDIR}"
+
 FIXTURE_DIR="${TEST_TMPDIR}"
 mkdir -p "${FIXTURE_DIR}"
 
@@ -93,7 +93,7 @@ fi
 "${DRIVER_DIR}/server.py" "${SERVICE_FLAGS[@]}" &
 SERVER_PID="$!"
 
-trap "kill ${SERVER_PID}" EXIT;
+trap 'kill ${SERVER_PID}' EXIT;
 
 
 if [[ -n "$HEADERS" ]]; then

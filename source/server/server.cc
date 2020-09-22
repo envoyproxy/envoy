@@ -491,8 +491,12 @@ void InstanceImpl::initialize(const Options& options,
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
-  if (bootstrap_.dynamic_resources().has_lds_config()) {
-    listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config());
+  if (bootstrap_.dynamic_resources().has_lds_config() ||
+      bootstrap_.dynamic_resources().has_lds_resources_locator()) {
+    listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config(),
+                                    bootstrap_.dynamic_resources().has_lds_resources_locator()
+                                        ? &bootstrap_.dynamic_resources().lds_resources_locator()
+                                        : nullptr);
   }
 
   // We have to defer RTDS initialization until after the cluster manager is
@@ -513,8 +517,10 @@ void InstanceImpl::initialize(const Options& options,
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  guard_dog_ =
-      std::make_unique<Server::GuardDogImpl>(stats_store_, config_.watchdogConfig(), *api_);
+  main_thread_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
+      stats_store_, config_.mainThreadWatchdogConfig(), *api_, "main_thread");
+  worker_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
+      stats_store_, config_.workerWatchdogConfig(), *api_, "workers");
 }
 
 void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
@@ -552,7 +558,7 @@ void InstanceImpl::onRuntimeReady() {
 }
 
 void InstanceImpl::startWorkers() {
-  listener_manager_->startWorkers(*guard_dog_);
+  listener_manager_->startWorkers(*worker_guard_dog_);
   initialization_timer_->complete();
   // Update server stats as soon as initialization is done.
   updateServerStats();
@@ -662,13 +668,13 @@ void InstanceImpl::run() {
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
-  auto watchdog =
-      guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "main_thread");
+  auto watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
+                                                         "main_thread");
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");
-  guard_dog_->stopWatching(watchdog);
+  main_thread_guard_dog_->stopWatching(watchdog);
   watchdog.reset();
 
   terminate();

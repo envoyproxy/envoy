@@ -23,6 +23,16 @@ namespace Envoy {
 
 using Headers = std::vector<std::pair<const std::string, const std::string>>;
 
+void setMeasureTimeoutOnCheckCreated(ConfigHelper& config_helper, bool timeout_on_check) {
+  if (timeout_on_check) {
+    config_helper.addRuntimeOverride(
+        "envoy.reloadable_features.ext_authz_measure_timeout_on_check_created", "true");
+  } else {
+    config_helper.addRuntimeOverride(
+        "envoy.reloadable_features.ext_authz_measure_timeout_on_check_created", "false");
+  }
+}
+
 class ExtAuthzGrpcIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                     public HttpIntegrationTest {
 public:
@@ -35,8 +45,9 @@ public:
         new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
 
-  void initializeConfig() {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  void initializeConfig(bool with_timeout = false) {
+    config_helper_.addConfigModifier([this, with_timeout](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ext_authz_cluster->set_name("ext_authz");
@@ -45,6 +56,11 @@ public:
       TestUtility::loadFromYaml(base_filter_config_, proto_config_);
       setGrpcService(*proto_config_.mutable_grpc_service(), "ext_authz",
                      fake_upstreams_.back()->localAddress());
+
+      if (with_timeout) {
+        proto_config_.mutable_grpc_service()->mutable_timeout()->CopyFrom(
+            Protobuf::util::TimeUtil::MillisecondsToDuration(1));
+      }
 
       proto_config_.mutable_filter_enabled()->set_runtime_key("envoy.ext_authz.enable");
       proto_config_.mutable_filter_enabled()->mutable_default_value()->set_numerator(100);
@@ -333,6 +349,28 @@ attributes:
     cleanup();
   }
 
+  void initiateAndWait() {
+    initiateClientConnection(4);
+    response_->waitForEndStream();
+  }
+
+  void expectCheckRequestTimedout(bool timeout_on_check) {
+    setMeasureTimeoutOnCheckCreated(this->config_helper_, timeout_on_check);
+    initializeConfig(true);
+    setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+    HttpIntegrationTest::initialize();
+    initiateAndWait();
+    if (timeout_on_check) {
+      uint32_t timeouts = test_server_->counter("http.config_test.ext_authz.timeout")->value();
+      EXPECT_EQ(1U, timeouts);
+    }
+
+    EXPECT_TRUE(response_->complete());
+    EXPECT_EQ("403", response_->headers().getStatusValue());
+
+    cleanup();
+  }
+
   void expectFilterDisableCheck(bool deny_at_disable, const std::string& expected_status) {
     initializeConfig();
     setDenyAtDisableRuntimeConfig(deny_at_disable);
@@ -422,20 +460,29 @@ public:
     }
     cleanupUpstreamAndDownstream();
   }
-
-  void setupWithDisabledCaseSensitiveStringMatcher(bool disable_case_sensitive_matcher) {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  void initializeConfig(bool with_timeout = false) {
+    config_helper_.addConfigModifier([this, with_timeout](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ext_authz_cluster->set_name("ext_authz");
 
       TestUtility::loadFromYaml(default_config_, proto_config_);
-
+      if (with_timeout) {
+        proto_config_.mutable_http_service()->mutable_server_uri()->mutable_timeout()->CopyFrom(
+            Protobuf::util::TimeUtil::MillisecondsToDuration(1));
+        proto_config_.clear_failure_mode_allow();
+      }
       envoy::config::listener::v3::Filter ext_authz_filter;
       ext_authz_filter.set_name(Extensions::HttpFilters::HttpFilterNames::get().ExtAuthorization);
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+
       config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ext_authz_filter));
     });
+  }
+
+  void setupWithDisabledCaseSensitiveStringMatcher(bool disable_case_sensitive_matcher) {
+    initializeConfig();
 
     if (disable_case_sensitive_matcher) {
       disableCaseSensitiveStringMatcher();
@@ -479,6 +526,27 @@ public:
     EXPECT_TRUE(response_->complete());
     EXPECT_EQ("200", response_->headers().getStatusValue());
 
+    cleanup();
+  }
+
+  void initiateAndWait() {
+    initiateClientConnection();
+    response_->waitForEndStream();
+  }
+
+  void expectCheckRequestTimedout(bool timeout_on_check) {
+    setMeasureTimeoutOnCheckCreated(this->config_helper_, timeout_on_check);
+    initializeConfig(true);
+    HttpIntegrationTest::initialize();
+
+    initiateAndWait();
+    if (timeout_on_check) {
+      uint32_t timeouts = test_server_->counter("http.config_test.ext_authz.timeout")->value();
+      EXPECT_EQ(1U, timeouts);
+    }
+
+    EXPECT_TRUE(response_->complete());
+    EXPECT_EQ("403", response_->headers().getStatusValue());
     cleanup();
   }
 
@@ -555,6 +623,12 @@ TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
                                      {"multiple", "multiple-second"}});
 }
 
+TEST_P(ExtAuthzGrpcIntegrationTest, CheckTimesOutLegacy) { expectCheckRequestTimedout(false); }
+
+TEST_P(ExtAuthzGrpcIntegrationTest, CheckTimesOutFromCheckCreation) {
+  expectCheckRequestTimedout(true);
+}
+
 TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisable) { expectFilterDisableCheck(false, "200"); }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisable) { expectFilterDisableCheck(true, "403"); }
@@ -578,6 +652,12 @@ TEST_P(ExtAuthzHttpIntegrationTest, DisableCaseSensitiveStringMatcher) {
   const auto* header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
   ASSERT_NE(header_entry, nullptr);
   EXPECT_EQ(case_sensitive_header_value_, header_entry->value().getStringView());
+}
+
+TEST_P(ExtAuthzHttpIntegrationTest, CheckTimesOutLegacy) { expectCheckRequestTimedout(false); }
+
+TEST_P(ExtAuthzHttpIntegrationTest, CheckTimesOutFromCheckCreation) {
+  expectCheckRequestTimedout(true);
 }
 
 class ExtAuthzLocalReplyIntegrationTest : public HttpIntegrationTest,
