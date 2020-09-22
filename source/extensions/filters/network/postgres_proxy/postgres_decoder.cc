@@ -393,10 +393,10 @@ void DecoderImpl::onStartup() {
 // Method generates displayable format of currently processed message.
 const std::string DecoderImpl::genDebugMessage(const MessageProcessor& msg, Buffer::Instance& data,
                                                uint32_t message_len) {
-  auto f = std::get<1>(msg);
+  const auto& f = std::get<1>(msg);
   std::string message = "Unrecognized";
   if (f != nullptr) {
-    auto msgParser = f();
+    const auto msgParser = f();
     msgParser->read(data, message_len);
     message = msgParser->toString();
   }
