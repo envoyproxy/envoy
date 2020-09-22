@@ -139,7 +139,7 @@ public:
    */
   class ActiveUdpListener : public virtual ActiveListener, public Network::UdpListenerCallbacks {
   public:
-    virtual ~ActiveUdpListener() = default;
+    ~ActiveUdpListener() override = default;
 
     /**
      * Returns the worker index that ``data`` should be delivered to. The return value must be in
