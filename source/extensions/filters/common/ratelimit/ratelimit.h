@@ -49,7 +49,8 @@ public:
    */
   virtual void complete(LimitStatus status, DescriptorStatusListPtr&& descriptor_statuses,
                         Http::ResponseHeaderMapPtr&& response_headers_to_add,
-                        Http::RequestHeaderMapPtr&& request_headers_to_add) PURE;
+                        Http::RequestHeaderMapPtr&& request_headers_to_add,
+                        const std::string& response_body) PURE;
 };
 
 /**
