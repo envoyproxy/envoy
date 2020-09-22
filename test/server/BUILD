@@ -379,6 +379,7 @@ envoy_cc_test(
         "//test/mocks/server:options_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",

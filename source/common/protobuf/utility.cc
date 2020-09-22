@@ -21,6 +21,8 @@
 #include "udpa/annotations/sensitive.pb.h"
 #include "yaml-cpp/yaml.h"
 
+using namespace std::chrono_literals;
+
 namespace Envoy {
 namespace {
 
@@ -121,6 +123,9 @@ enum class MessageVersion {
   EARLIER_VERSION,
   // This is the latest version of a message.
   LATEST_VERSION,
+  // Validating to see if the latest version will also be accepted; only apply message validators
+  // without side effects, validations should be strict.
+  LATEST_VERSION_VALIDATE,
 };
 
 using MessageXformFn = std::function<void(Protobuf::Message&, MessageVersion)>;
@@ -153,6 +158,15 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
     // Try apply f with an earlier version of the message, then upgrade the
     // result.
     f(*earlier_message, MessageVersion::EARLIER_VERSION);
+    // If we succeed at the earlier version, we ask the counterfactual, would this have worked at a
+    // later version? If not, this is v2 only and we need to warn. This is a waste of CPU cycles but
+    // we expect that JSON/YAML fragments will not be in use by any CPU limited use cases.
+    try {
+      f(message, MessageVersion::LATEST_VERSION_VALIDATE);
+    } catch (EnvoyException& e) {
+      MessageUtil::onVersionUpgrade(e.what());
+    }
+    // Now we do the real work of upgrading.
     Config::VersionConverter::upgrade(*earlier_message, message);
   } catch (ApiBoostRetryException&) {
     // If we fail at the earlier version, try f at the current version of the
@@ -261,6 +275,22 @@ void ProtoExceptionUtil::throwProtoValidationException(const std::string& valida
   throw ProtoValidationException(validation_error, message);
 }
 
+// TODO(htuch): this is where we will also reject v2 configs by default.
+void MessageUtil::onVersionUpgrade(absl::string_view desc) {
+  const std::string& warning_str =
+      fmt::format("Configuration does not parse cleanly as v3. v2 configuration is "
+                  "deprecated and will be removed from Envoy at the start of Q1 2021: {}",
+                  desc);
+  ENVOY_LOG_MISC(trace, warning_str);
+  ENVOY_LOG_PERIODIC_MISC(warn, 1s, warning_str);
+  Runtime::Loader* loader = Runtime::LoaderSingleton::getExisting();
+  // We only log, and don't bump stats, if we're sufficiently early in server initialization (i.e.
+  // bootstrap).
+  if (loader != nullptr) {
+    loader->countDeprecatedFeatureUse();
+  }
+}
+
 size_t MessageUtil::hash(const Protobuf::Message& message) {
   std::string text_format;
 
@@ -310,6 +340,8 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
     if (message_version == MessageVersion::LATEST_VERSION) {
       validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
                                         strict_status.ToString());
+    } else if (message_version == MessageVersion::LATEST_VERSION_VALIDATE) {
+      throw ProtobufMessage::UnknownProtoFieldException(absl::StrCat("Unknown field in: ", json));
     } else {
       throw ApiBoostRetryException("Unknown field, possibly a rename, try again.");
     }
@@ -357,11 +389,15 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
                                                               MessageVersion message_version) {
       try {
         if (message.ParseFromString(contents)) {
-          MessageUtil::checkForUnexpectedFields(message, validation_visitor);
+          MessageUtil::checkForUnexpectedFields(
+              message, message_version == MessageVersion::LATEST_VERSION_VALIDATE
+                           ? ProtobufMessage::getStrictValidationVisitor()
+                           : validation_visitor);
         }
         return;
       } catch (EnvoyException& ex) {
-        if (message_version == MessageVersion::LATEST_VERSION) {
+        if (message_version == MessageVersion::LATEST_VERSION ||
+            message_version == MessageVersion::LATEST_VERSION_VALIDATE) {
           // Failed reading the latest version - pass the same error upwards
           throw ex;
         }
@@ -387,7 +423,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
       if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
         return;
       }
-      if (message_version == MessageVersion::LATEST_VERSION) {
+      if (message_version == MessageVersion::LATEST_VERSION ||
+          message_version == MessageVersion::LATEST_VERSION_VALIDATE) {
         throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
                              message.GetTypeName() + ")");
       } else {
@@ -599,6 +636,7 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
                                          any_message_with_fixup.DebugString()));
       }
       Config::VersionConverter::annotateWithOriginalType(*earlier_version_desc, message);
+      MessageUtil::onVersionUpgrade(any_full_name);
       return;
     }
   }
