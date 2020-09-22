@@ -31,10 +31,8 @@ TYPED_TEST(IntTest, BasicRead) {
   uint64_t pos = 0;
   uint64_t left = this->data_.length();
   ASSERT_TRUE(this->field_.read(this->data_, pos, left));
-  auto out = this->field_.toString();
 
-  auto out1 = fmt::format(this->field_.getFormat(), 12);
-  ASSERT_THAT(out, out1);
+  ASSERT_THAT(this->field_.toString(), "[12]");
   // pos should be moved forward by the number of bytes read.
   ASSERT_THAT(pos, sizeof(TypeParam));
   ASSERT_THAT(12, this->field_.get());
@@ -50,9 +48,7 @@ TYPED_TEST(IntTest, ReadWithLeftovers) {
   uint64_t pos = 0;
   uint64_t left = this->data_.length();
   ASSERT_TRUE(this->field_.read(this->data_, pos, left));
-  auto out = this->field_.toString();
-  auto out1 = fmt::format(this->field_.getFormat(), 12);
-  ASSERT_THAT(out, out1);
+  ASSERT_THAT(this->field_.toString(), "[12]");
   // pos should be moved forward by the number of bytes read.
   ASSERT_THAT(pos, sizeof(TypeParam));
 
@@ -67,9 +63,7 @@ TYPED_TEST(IntTest, ReadAtOffset) {
   uint64_t pos = 1;
   uint64_t left = this->data_.length() - 1;
   ASSERT_TRUE(this->field_.read(this->data_, pos, left));
-  auto out = this->field_.toString();
-  auto out1 = fmt::format(this->field_.getFormat(), 12);
-  ASSERT_THAT(out, out1);
+  ASSERT_THAT(this->field_.toString(), "[12]");
   // pos should be moved forward by the number of bytes read.
   ASSERT_THAT(pos, 1 + sizeof(TypeParam));
   // Nothing should be left to read.
@@ -97,8 +91,7 @@ TEST(Byte1, Formatting) {
   ASSERT_THAT(pos, 1);
   ASSERT_THAT(left, 0);
 
-  auto out = field.toString();
-  ASSERT_THAT(out, "[I]");
+  ASSERT_THAT(field.toString(), "[I]");
 }
 
 // Tests for String type.

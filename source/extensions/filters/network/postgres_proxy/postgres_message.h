@@ -1,6 +1,7 @@
 #include "common/buffer/buffer_impl.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "fmt/printf.h"
 
 namespace Envoy {
@@ -52,9 +53,8 @@ public:
     return true;
   }
 
-  std::string toString() const { return fmt::format(getFormat(), value_); }
+  std::string toString() const { return fmt::format("[{}]", value_); }
 
-  constexpr const char* getFormat() const { return "[{}]"; }
   T get() const { return value_; }
 
 private:
@@ -74,26 +74,8 @@ public:
   /**
    * See above for parameter and return value description.
    */
-  bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
-    // First find the terminating zero.
-    char zero = 0;
-    ssize_t index = data.search(&zero, 1, pos);
-    if (index == -1) {
-      return false;
-    }
-
-    // Reserve that many bytes in the string.
-    uint64_t size = index - pos;
-    value_.resize(size);
-    // Now copy from buffer to string.
-    data.copyOut(pos, index - pos, value_.data());
-    pos += (size + 1);
-    left -= (size + 1);
-
-    return true;
-  }
-
-  std::string toString() const { return absl::StrCat("[", value_, "]"); }
+  bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left);
+  std::string toString() const;
 
 private:
   std::string value_;
@@ -106,33 +88,8 @@ public:
   /**
    * See above for parameter and return value description.
    */
-  bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
-    if (left > (data.length() - pos)) {
-      return false;
-    }
-    value_.resize(left);
-    data.copyOut(pos, left, value_.data());
-    pos += left;
-    left = 0;
-    return true;
-  }
-
-  std::string toString() const {
-    std::string out = "[";
-    bool first = true;
-    for (const auto& i : value_) {
-      if (first) {
-        absl::StrAppend(&out, i);
-        first = false;
-      } else {
-        std::string buf;
-        buf = fmt::format(" {}", i);
-        absl::StrAppend(&out, buf);
-      }
-    }
-    absl::StrAppend(&out, "]");
-    return out;
-  }
+  bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left);
+  std::string toString() const;
 
 private:
   std::vector<uint8_t> value_;
@@ -154,47 +111,8 @@ public:
   /**
    * See above for parameter and return value description.
    */
-  bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
-    if ((left < sizeof(int32_t)) || ((data.length() - pos) < sizeof(int32_t))) {
-      return false;
-    }
-    len_ = data.peekBEInt<int32_t>(pos);
-    pos += sizeof(int32_t);
-    left -= sizeof(int32_t);
-    if (len_ < 1) {
-      // There is no payload if length is not positive.
-      value_.clear();
-      return true;
-    }
-    if ((left < static_cast<uint64_t>(len_)) ||
-        ((data.length() - pos) < static_cast<uint64_t>(len_))) {
-      return false;
-    }
-    value_.resize(len_);
-    data.copyOut(pos, len_, value_.data());
-    pos += len_;
-    left -= len_;
-    return true;
-  }
-
-  std::string toString() const {
-    std::string out;
-    out = fmt::format("[({} bytes):", len_);
-
-    bool first = true;
-    for (const auto& i : value_) {
-      if (first) {
-        absl::StrAppend(&out, i);
-        first = false;
-      } else {
-        std::string buf;
-        buf = fmt::format(" {}", i);
-        absl::StrAppend(&out, buf);
-      }
-    }
-    absl::StrAppend(&out, "]");
-    return out;
-  }
+  bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left);
+  std::string toString() const;
 
 private:
   int32_t len_;
@@ -213,7 +131,7 @@ public:
     if (((data.length() - pos) < sizeof(uint16_t)) || (left < sizeof(uint16_t))) {
       return false;
     }
-    uint16_t num = data.peekBEInt<uint16_t>(pos);
+    const uint16_t num = data.peekBEInt<uint16_t>(pos);
     pos += sizeof(uint16_t);
     left -= sizeof(uint16_t);
     if (num != 0) {

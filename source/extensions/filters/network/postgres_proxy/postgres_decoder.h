@@ -134,6 +134,11 @@ protected:
   void incSessionsEncrypted() { callbacks_->incSessionsEncrypted(); }
   void incSessionsUnencrypted() { callbacks_->incSessionsUnencrypted(); }
 
+  // Helper method generating currently processed message in
+  // displayable format.
+  const std::string genDebugMessage(const MessageProcessor& msg, Buffer::Instance& data,
+                                    uint32_t message_len);
+
   DecoderCallbacks* callbacks_{};
   PostgresSession session_{};
 

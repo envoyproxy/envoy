@@ -263,24 +263,18 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
     action(this);
   }
 
+  // message_len_ specifies total message length including 4 bytes long
+  // "length" field. The length of message body is total length minus size
+  // of "length" field (4 bytes).
+  uint32_t bytes_to_read = message_len_ - 4;
+
   ENVOY_LOG(debug, "({}) command = {} ({})", msg_processor.direction_, command_,
             std::get<0>(msg.get()));
   ENVOY_LOG(debug, "({}) length = {}", msg_processor.direction_, message_len_);
-  if (ENVOY_LOG_CHECK_LEVEL(debug)) {
-    auto f = std::get<1>(msg.get());
-    std::string message = "Unrecognized";
-    if (f != nullptr) {
-      auto msgParser = f();
-      // message_len_ specifies total message length including 4 bytes long
-      // "length" field. The length of message body is total length minus size
-      // of "length" field (4 bytes).
-      msgParser->read(data, message_len_ - 4);
-      message = msgParser->toString();
-    }
-    ENVOY_LOG(debug, "({}) message = {}", msg_processor.direction_, message);
-  }
+  ENVOY_LOG(debug, "({}) message = {}", msg_processor.direction_,
+            genDebugMessage(msg, data, bytes_to_read));
 
-  data.drain(message_len_ - 4);
+  data.drain(bytes_to_read);
   ENVOY_LOG(trace, "postgres_proxy: {} bytes remaining in buffer", data.length());
 
   return true;
@@ -394,6 +388,19 @@ void DecoderImpl::onStartup() {
       (attributes_.find("user") != attributes_.end())) {
     attributes_["database"] = attributes_["user"];
   }
+}
+
+// Method generates displayable format of currently processed message.
+const std::string DecoderImpl::genDebugMessage(const MessageProcessor& msg, Buffer::Instance& data,
+                                               uint32_t message_len) {
+  auto f = std::get<1>(msg);
+  std::string message = "Unrecognized";
+  if (f != nullptr) {
+    auto msgParser = f();
+    msgParser->read(data, message_len);
+    message = msgParser->toString();
+  }
+  return message;
 }
 
 } // namespace PostgresProxy
