@@ -395,8 +395,8 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddresses) {
   proxy_protocol_socket_->doWrite(msg, false);
 }
 
-// Test onConnected generates header
-TEST_F(ProxyProtocolTest, OnConnectedGeneratesHeaderAndCallsInnerOnConnected) {
+// Test onConnected calls inner onConnected
+TEST_F(ProxyProtocolTest, OnConnectedCallsInnerOnConnected) {
   auto src_addr =
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
   auto dst_addr = Network::Address::InstanceConstSharedPtr(
