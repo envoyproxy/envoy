@@ -106,7 +106,10 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "apple_dns_impl_test",
-    srcs = ["apple_dns_impl_test.cc"],
+    srcs = select({
+        "//bazel:apple": ["apple_dns_impl_test.cc"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:address_interface",
@@ -115,7 +118,6 @@ envoy_cc_test(
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
-        "//source/common/network:apple_dns_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/stats:stats_lib",
@@ -125,7 +127,10 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
+    ] + select({
+        "//bazel:apple": ["//source/common/network:dns_lib"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_test(

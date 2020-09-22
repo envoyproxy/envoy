@@ -18,7 +18,7 @@
 #include "common/event/signal_impl.h"
 #include "common/event/timer_impl.h"
 #include "common/filesystem/watcher_impl.h"
-#include "common/network/apple_dns_impl.h"
+#include "common/network/dns_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/tcp_listener_impl.h"
 #include "common/network/udp_listener_impl.h"
@@ -27,6 +27,10 @@
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "common/signal/signal_action.h"
+#endif
+
+#ifdef __APPLE__
+#include "common/network/apple_dns_impl.h"
 #endif
 
 namespace Envoy {
@@ -118,10 +122,16 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
 }
 
 Network::DnsResolverSharedPtr
-DispatcherImpl::createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>&,
-                                  const bool) {
+DispatcherImpl::createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+                                  const bool use_tcp_for_dns_lookups) {
   ASSERT(isThreadSafe());
+#ifdef __APPLE__
+  UNREFERENCED_PARAMETER(resolvers);
+  UNREFERENCED_PARAMETER(use_tcp_for_dns_lookups);
   return Network::DnsResolverSharedPtr{new Network::AppleDnsResolverImpl(*this)};
+#else
+  return Network::DnsResolverSharedPtr{new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
+#endif
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
