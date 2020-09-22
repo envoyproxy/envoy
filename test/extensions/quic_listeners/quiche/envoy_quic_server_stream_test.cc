@@ -42,7 +42,6 @@ public:
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
           SetQuicReloadableFlag(quic_disable_version_draft_27, !GetParam());
-          SetQuicReloadableFlag(quic_disable_version_draft_25, !GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
@@ -344,30 +343,30 @@ TEST_P(EnvoyQuicServerStreamTest, WatermarkSendBuffer) {
   quic_stream_->encodeData(buffer, false);
 
   EXPECT_EQ(0u, buffer.length());
-  EXPECT_TRUE(quic_stream_->flow_controller()->IsBlocked());
+  EXPECT_TRUE(quic_stream_->IsFlowControlBlocked());
 
   // Receive a WINDOW_UPDATE frame not large enough to drain half of the send
   // buffer.
   quic::QuicWindowUpdateFrame window_update1(quic::kInvalidControlFrameId, quic_stream_->id(),
                                              16 * 1024 + 8 * 1024);
   quic_stream_->OnWindowUpdateFrame(window_update1);
-  EXPECT_FALSE(quic_stream_->flow_controller()->IsBlocked());
+  EXPECT_FALSE(quic_stream_->IsFlowControlBlocked());
   quic_session_.OnCanWrite();
-  EXPECT_TRUE(quic_stream_->flow_controller()->IsBlocked());
+  EXPECT_TRUE(quic_stream_->IsFlowControlBlocked());
 
   // Receive another WINDOW_UPDATE frame to drain the send buffer till below low
   // watermark.
   quic::QuicWindowUpdateFrame window_update2(quic::kInvalidControlFrameId, quic_stream_->id(),
                                              16 * 1024 + 8 * 1024 + 1024);
   quic_stream_->OnWindowUpdateFrame(window_update2);
-  EXPECT_FALSE(quic_stream_->flow_controller()->IsBlocked());
+  EXPECT_FALSE(quic_stream_->IsFlowControlBlocked());
   EXPECT_CALL(stream_callbacks_, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([this]() {
     std::string rest_response(1, 'a');
     Buffer::OwnedImpl buffer(rest_response);
     quic_stream_->encodeData(buffer, true);
   }));
   quic_session_.OnCanWrite();
-  EXPECT_TRUE(quic_stream_->flow_controller()->IsBlocked());
+  EXPECT_TRUE(quic_stream_->IsFlowControlBlocked());
 
   quic::QuicWindowUpdateFrame window_update3(quic::kInvalidControlFrameId, quic_stream_->id(),
                                              32 * 1024 + 1024);
@@ -420,7 +419,7 @@ TEST_P(EnvoyQuicServerStreamTest, HeadersContributeToWatermarkIquic) {
       }));
   EXPECT_CALL(stream_callbacks_, onBelowWriteBufferLowWatermark());
   quic_session_.OnCanWrite();
-  EXPECT_TRUE(quic_stream_->flow_controller()->IsBlocked());
+  EXPECT_TRUE(quic_stream_->IsFlowControlBlocked());
 
   // Update flow control window to write all the buffered data.
   quic::QuicWindowUpdateFrame window_update1(quic::kInvalidControlFrameId, quic_stream_->id(),

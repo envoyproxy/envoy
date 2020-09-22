@@ -28,6 +28,8 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+// Changes or additions to details should be reflected in
+// docs/root/configuration/http/http_conn_man/response_code_details_details.rst
 class Http2ResponseCodeDetailValues {
 public:
   // Invalid HTTP header field was received and stream is going to be
@@ -45,6 +47,10 @@ public:
   const absl::string_view inbound_empty_frame_flood = "http2.inbound_empty_frames_flood";
   // Envoy was configured to drop requests with header keys beginning with underscores.
   const absl::string_view invalid_underscore = "http2.unexpected_underscore";
+  // The peer refused the stream.
+  const absl::string_view remote_refused = "http2.remote_refuse";
+  // The peer reset the stream.
+  const absl::string_view remote_reset = "http2.remote_reset";
 
   const absl::string_view errorDetails(int error_code) const {
     switch (error_code) {
@@ -403,7 +409,7 @@ Status ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size
   // https://nghttp2.org/documentation/types.html#c.nghttp2_send_data_callback
   static const uint64_t FRAME_HEADER_SIZE = 9;
 
-  parent_.outbound_data_frames_++;
+  parent_.protocol_constraints_.incrementOutboundDataFrameCount();
 
   Buffer::OwnedImpl output;
   auto status = parent_.addOutboundFrameFragment(output, framehd, FRAME_HEADER_SIZE);
@@ -547,16 +553,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
           http2_options.override_stream_error_on_invalid_http_message().value()),
-      max_outbound_frames_(http2_options.max_outbound_frames().value()),
-      frame_buffer_releasor_([this]() { releaseOutboundFrame(); }),
-      max_outbound_control_frames_(http2_options.max_outbound_control_frames().value()),
-      control_frame_buffer_releasor_([this]() { releaseOutboundControlFrame(); }),
-      max_consecutive_inbound_frames_with_empty_payload_(
-          http2_options.max_consecutive_inbound_frames_with_empty_payload().value()),
-      max_inbound_priority_frames_per_stream_(
-          http2_options.max_inbound_priority_frames_per_stream().value()),
-      max_inbound_window_update_frames_per_data_frame_sent_(
-          http2_options.max_inbound_window_update_frames_per_data_frame_sent().value()),
+      protocol_constraints_(stats, http2_options),
       skip_encoding_empty_trailers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_skip_encoding_empty_trailers")),
       dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {}
@@ -852,37 +849,19 @@ int ConnectionImpl::onBeforeFrameSend(const nghttp2_frame* frame) {
   return 0;
 }
 
-Status ConnectionImpl::incrementOutboundFrameCount(bool is_outbound_flood_monitored_control_frame) {
-  ++outbound_frames_;
-  if (is_outbound_flood_monitored_control_frame) {
-    ++outbound_control_frames_;
-  }
-  return checkOutboundQueueLimits();
-}
-
 Status ConnectionImpl::addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data,
                                                 size_t length) {
   // Reset the outbound frame type (set in the onBeforeFrameSend callback) since the
   // onBeforeFrameSend callback is not called for DATA frames.
   bool is_outbound_flood_monitored_control_frame = false;
   std::swap(is_outbound_flood_monitored_control_frame, is_outbound_flood_monitored_control_frame_);
-  RETURN_IF_ERROR(incrementOutboundFrameCount(is_outbound_flood_monitored_control_frame));
+  auto releasor =
+      protocol_constraints_.incrementOutboundFrameCount(is_outbound_flood_monitored_control_frame);
+  RETURN_IF_ERROR(checkOutboundFrameLimits());
 
   output.add(data, length);
-  output.addDrainTracker(is_outbound_flood_monitored_control_frame ? control_frame_buffer_releasor_
-                                                                   : frame_buffer_releasor_);
+  output.addDrainTracker(releasor);
   return okStatus();
-}
-
-void ConnectionImpl::releaseOutboundFrame() {
-  ASSERT(outbound_frames_ >= 1);
-  --outbound_frames_;
-}
-
-void ConnectionImpl::releaseOutboundControlFrame() {
-  ASSERT(outbound_control_frames_ >= 1);
-  --outbound_control_frames_;
-  releaseOutboundFrame();
 }
 
 StatusOr<ssize_t> ConnectionImpl::onSend(const uint8_t* data, size_t length) {
@@ -922,8 +901,13 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
         // the connection.
         reason = StreamResetReason::LocalReset;
       } else {
-        reason = error_code == NGHTTP2_REFUSED_STREAM ? StreamResetReason::RemoteRefusedStreamReset
-                                                      : StreamResetReason::RemoteReset;
+        if (error_code == NGHTTP2_REFUSED_STREAM) {
+          reason = StreamResetReason::RemoteRefusedStreamReset;
+          stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
+        } else {
+          reason = StreamResetReason::RemoteReset;
+          stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
+        }
       }
 
       stream->runResetCallbacks(reason);
@@ -1027,10 +1011,9 @@ Status ConnectionImpl::sendPendingFrames() {
       return nghttp2_callback_status_;
     }
 
-    // The frame flood error should set the nghttp2_callback_status_ error, and return at the
-    // statement above.
-    ASSERT(outbound_frames_ <= max_outbound_frames_ &&
-           outbound_control_frames_ <= max_outbound_control_frames_);
+    // Protocol constrain violations should set the nghttp2_callback_status_ error, and return at
+    // the statement above.
+    ASSERT(protocol_constraints_.status().ok());
 
     return codecProtocolError(nghttp2_strerror(rc));
   }
@@ -1410,86 +1393,24 @@ Status ServerConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd,
   ENVOY_CONN_LOG(trace, "track inbound frame type={} flags={} length={} padding_length={}",
                  connection_, static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags),
                  static_cast<uint64_t>(hd->length), padding_length);
-  switch (hd->type) {
-  case NGHTTP2_HEADERS:
-  case NGHTTP2_CONTINUATION:
-    // Track new streams.
-    if (hd->flags & NGHTTP2_FLAG_END_HEADERS) {
-      inbound_streams_++;
-    }
-    FALLTHRU;
-  case NGHTTP2_DATA:
-    // Track frames with an empty payload and no end stream flag.
-    if (hd->length - padding_length == 0 && !(hd->flags & NGHTTP2_FLAG_END_STREAM)) {
-      ENVOY_CONN_LOG(trace, "frame with an empty payload and no end stream flag.", connection_);
-      consecutive_inbound_frames_with_empty_payload_++;
-    } else {
-      consecutive_inbound_frames_with_empty_payload_ = 0;
-    }
-    break;
-  case NGHTTP2_PRIORITY:
-    inbound_priority_frames_++;
-    break;
-  case NGHTTP2_WINDOW_UPDATE:
-    inbound_window_update_frames_++;
-    break;
-  default:
-    break;
-  }
 
-  return checkInboundFrameLimits(hd->stream_id);
+  auto result = protocol_constraints_.trackInboundFrames(hd, padding_length);
+  if (!result.ok()) {
+    ENVOY_CONN_LOG(trace, "error reading frame: {} received in this HTTP/2 session.", connection_,
+                   result.message());
+    if (isInboundFramesWithEmptyPayloadError(result)) {
+      ConnectionImpl::StreamImpl* stream = getStream(hd->stream_id);
+      if (stream) {
+        stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
+      }
+    }
+  }
+  return result;
 }
 
-Status ServerConnectionImpl::checkInboundFrameLimits(int32_t stream_id) {
-  ASSERT(dispatching_downstream_data_);
-  ConnectionImpl::StreamImpl* stream = getStream(stream_id);
-
-  if (consecutive_inbound_frames_with_empty_payload_ >
-      max_consecutive_inbound_frames_with_empty_payload_) {
-    ENVOY_CONN_LOG(trace,
-                   "error reading frame: Too many consecutive frames with an empty payload "
-                   "received in this HTTP/2 session.",
-                   connection_);
-    if (stream) {
-      stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
-    }
-    stats_.inbound_empty_frames_flood_.inc();
-    return bufferFloodError("Too many consecutive frames with an empty payload");
-  }
-
-  if (inbound_priority_frames_ >
-      static_cast<uint64_t>(max_inbound_priority_frames_per_stream_) * (1 + inbound_streams_)) {
-    ENVOY_CONN_LOG(trace,
-                   "error reading frame: Too many PRIORITY frames received in this HTTP/2 session.",
-                   connection_);
-    stats_.inbound_priority_frames_flood_.inc();
-    return bufferFloodError("Too many PRIORITY frames");
-  }
-
-  if (inbound_window_update_frames_ >
-      1 + 2 * (inbound_streams_ +
-               max_inbound_window_update_frames_per_data_frame_sent_ * outbound_data_frames_)) {
-    ENVOY_CONN_LOG(
-        trace,
-        "error reading frame: Too many WINDOW_UPDATE frames received in this HTTP/2 session.",
-        connection_);
-    stats_.inbound_window_update_frames_flood_.inc();
-    return bufferFloodError("Too many WINDOW_UPDATE frames");
-  }
-
-  return okStatus();
-}
-
-Status ServerConnectionImpl::checkOutboundQueueLimits() {
-  if (outbound_frames_ > max_outbound_frames_ && dispatching_downstream_data_) {
-    stats_.outbound_flood_.inc();
-    return bufferFloodError("Too many frames in the outbound queue.");
-  }
-  if (outbound_control_frames_ > max_outbound_control_frames_ && dispatching_downstream_data_) {
-    stats_.outbound_control_flood_.inc();
-    return bufferFloodError("Too many control frames in the outbound queue.");
-  }
-  return okStatus();
+Status ServerConnectionImpl::checkOutboundFrameLimits() {
+  return dispatching_downstream_data_ ? protocol_constraints_.checkOutboundFrameLimits()
+                                      : okStatus();
 }
 
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
@@ -1508,7 +1429,7 @@ Http::Status ServerConnectionImpl::innerDispatch(Buffer::Instance& data) {
   Cleanup cleanup([this]() { dispatching_downstream_data_ = false; });
 
   // Make sure downstream outbound queue was not flooded by the upstream frames.
-  RETURN_IF_ERROR(checkOutboundQueueLimits());
+  RETURN_IF_ERROR(checkOutboundFrameLimits());
   return ConnectionImpl::innerDispatch(data);
 }
 

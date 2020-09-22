@@ -57,6 +57,11 @@ const std::string& queryParamsError() { CONSTRUCT_ON_FIRST_USE(std::string, "err
 const std::string& queryParamsCode() { CONSTRUCT_ON_FIRST_USE(std::string, "code"); }
 const std::string& queryParamsState() { CONSTRUCT_ON_FIRST_USE(std::string, "state"); }
 
+constexpr absl::string_view REDIRECT_RACE = "oauth.race_redirect";
+constexpr absl::string_view REDIRECT_LOGGED_IN = "oauth.logged_in";
+constexpr absl::string_view REDIRECT_FOR_CREDENTIALS = "oauth.missing_credentials";
+constexpr absl::string_view SIGN_OUT = "oauth.sign_out";
+
 template <class T>
 std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_protos) {
   std::vector<Http::HeaderUtility::HeaderData> matchers;
@@ -219,7 +224,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
           Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
               {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))},
                {Http::Headers::get().Location, state}})};
-      decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+      decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_RACE);
     }
 
     // Continue on with the filter stack.
@@ -272,7 +277,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
         fmt::format(AuthorizationEndpointFormat, config_->authorizationEndpoint(),
                     config_->clientId(), escaped_redirect_uri, escaped_state);
     response_headers->setLocation(new_url);
-    decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+    decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 
     config_->stats().oauth_unauthorized_rq_.inc();
 
@@ -348,7 +353,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   response_headers->addReference(Http::Headers::get().SetCookie, SignoutCookieValue);
   response_headers->addReference(Http::Headers::get().SetCookie, SignoutBearerTokenValue);
   response_headers->setLocation(new_path);
-  decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+  decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);
 
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
 }
@@ -419,7 +424,7 @@ void OAuth2Filter::finishFlow() {
 
   response_headers->setLocation(state_);
 
-  decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+  decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_LOGGED_IN);
   config_->stats().oauth_success_.inc();
   decoder_callbacks_->continueDecoding();
 }
