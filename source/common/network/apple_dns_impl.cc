@@ -50,7 +50,7 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
   //       promptly cancel all outstanding queries, rather than individually wait for all
   //       connections to error out.
   //    3. It follows the precedent set in dns_impl with the c-ares library, for consistency of
-  //       style, performace, and expectations between the two implementations.
+  //       style, performance, and expectations between the two implementations.
   // However, using a shared connection brings some complexities detailed in the inline comments
   // for kDNSServiceFlagsShareConnection in dns_sd.h, and copied (and edited) in this implementation
   // where relevant.
