@@ -531,7 +531,7 @@ public:
  * Common base class for both decoder and encoder filters. Functions here are related to the
  * lifecycle of a filter. Currently the life cycle is as follows:
  * - All filters receive onPreDestroy()
- * - All long handlers receive log()
+ * - All log handlers receive log()
  * - All filters receive onDestroy()
  *
  * This means:
