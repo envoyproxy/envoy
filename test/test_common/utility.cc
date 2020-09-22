@@ -33,6 +33,7 @@
 #include "common/network/utility.h"
 
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/common.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/test_time.h"
@@ -401,18 +402,25 @@ class TestImplProvider {
 protected:
   Event::GlobalTimeSystem global_time_system_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> default_stats_store_;
+  testing::NiceMock<Random::MockRandomGenerator> mock_random_generator_;
 };
 
 class TestImpl : public TestImplProvider, public Impl {
 public:
   TestImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store,
            Filesystem::Instance& file_system)
-      : Impl(thread_factory, stats_store, global_time_system_, file_system) {}
+      : Impl(thread_factory, stats_store, global_time_system_, file_system,
+             mock_random_generator_) {}
   TestImpl(Thread::ThreadFactory& thread_factory, Event::TimeSystem& time_system,
            Filesystem::Instance& file_system)
-      : Impl(thread_factory, default_stats_store_, time_system, file_system) {}
+      : Impl(thread_factory, default_stats_store_, time_system, file_system,
+             mock_random_generator_) {}
   TestImpl(Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system)
-      : Impl(thread_factory, default_stats_store_, global_time_system_, file_system) {}
+      : Impl(thread_factory, default_stats_store_, global_time_system_, file_system,
+             mock_random_generator_) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store,
+           Event::TimeSystem& time_system, Filesystem::Instance& file_system)
+      : Impl(thread_factory, stats_store, time_system, file_system, mock_random_generator_) {}
 };
 
 ApiPtr createApiForTest() {
@@ -431,8 +439,8 @@ ApiPtr createApiForTest(Event::TimeSystem& time_system) {
 }
 
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system) {
-  return std::make_unique<Impl>(Thread::threadFactoryForTest(), stat_store, time_system,
-                                Filesystem::fileSystemForTest());
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), stat_store, time_system,
+                                    Filesystem::fileSystemForTest());
 }
 
 } // namespace Api

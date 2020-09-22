@@ -324,12 +324,12 @@ private:
   Assert::ActionRegistrationPtr assert_action_registration_;
   Assert::ActionRegistrationPtr envoy_bug_action_registration_;
   ThreadLocal::Instance& thread_local_;
+  Random::RandomGeneratorPtr random_generator_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<AdminImpl> admin_;
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
-  Random::RandomGeneratorPtr random_generator_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
