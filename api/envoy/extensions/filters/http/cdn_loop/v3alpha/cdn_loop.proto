@@ -31,7 +31,7 @@ message CdnLoopConfig {
   // request header.
   //
   // The default of 0 means a request can transit the CdnLoopFilter
-  // once.  A value of 1 means that a request can transit the
+  // once. A value of 1 means that a request can transit the
   // CdnLoopFilter twice and so on.
   uint32 max_allowed_occurrences = 2;
 }
