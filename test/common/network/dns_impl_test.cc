@@ -19,6 +19,7 @@
 #include "common/network/utility.h"
 #include "common/stream_info/stream_info_impl.h"
 
+#include "test/common/network/dns_utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -454,24 +455,6 @@ public:
     // Make sure we clean this up before dispatcher destruction.
     listener_.reset();
     server_.reset();
-  }
-
-  static std::list<Address::InstanceConstSharedPtr>
-  getAddressList(const std::list<DnsResponse>& response) {
-    std::list<Address::InstanceConstSharedPtr> address;
-
-    for_each(response.begin(), response.end(),
-             [&](DnsResponse resp) { address.emplace_back(resp.address_); });
-    return address;
-  }
-
-  static std::list<std::string> getAddressAsStringList(const std::list<DnsResponse>& response) {
-    std::list<std::string> address;
-
-    for_each(response.begin(), response.end(), [&](DnsResponse resp) {
-      address.emplace_back(resp.address_->ip()->addressAsString());
-    });
-    return address;
   }
 
   ActiveDnsQuery* resolveWithExpectations(const std::string& address,

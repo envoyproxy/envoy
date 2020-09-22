@@ -18,8 +18,8 @@
 #include "common/event/signal_impl.h"
 #include "common/event/timer_impl.h"
 #include "common/filesystem/watcher_impl.h"
+#include "common/network/apple_dns_impl.h"
 #include "common/network/connection_impl.h"
-#include "common/network/dns_impl.h"
 #include "common/network/tcp_listener_impl.h"
 #include "common/network/udp_listener_impl.h"
 
@@ -117,12 +117,11 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
                                                          std::move(transport_socket), options);
 }
 
-Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
-    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-    const bool use_tcp_for_dns_lookups) {
+Network::DnsResolverSharedPtr
+DispatcherImpl::createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>&,
+                                  const bool) {
   ASSERT(isThreadSafe());
-  return Network::DnsResolverSharedPtr{
-      new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
+  return Network::DnsResolverSharedPtr{new Network::AppleDnsResolverImpl(*this)};
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,

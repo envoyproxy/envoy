@@ -13,6 +13,15 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test_library(
+    name = "dns_utility_lib",
+    hdrs = ["dns_utility.h"],
+    deps = [
+        "//include/envoy/network:address_interface",
+        "//include/envoy/network:dns_interface",
+    ],
+)
+
+envoy_cc_test_library(
     name = "listener_impl_test_base_lib",
     hdrs = ["listener_impl_test_base.h"],
     deps = [
@@ -96,9 +105,35 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "apple_dns_impl_test",
+    srcs = ["apple_dns_impl_test.cc"],
+    deps = [
+        ":dns_utility_lib",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/network:address_interface",
+        "//include/envoy/network:dns_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:apple_dns_lib",
+        "//source/common/network:filter_lib",
+        "//source/common/network:listen_socket_lib",
+        "//source/common/stats:stats_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "dns_impl_test",
     srcs = ["dns_impl_test.cc"],
     deps = [
+        ":dns_utility_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:address_interface",
         "//include/envoy/network:dns_interface",

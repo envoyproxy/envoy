@@ -190,10 +190,11 @@ jobs:
       - script: ./ci/mac_ci_steps.sh
         displayName: "Run Mac CI"
         env:
-          BAZEL_BUILD_EXTRA_OPTIONS: "--remote_download_toplevel --flaky_test_attempts=2"
+          BAZEL_BUILD_EXTRA_OPTIONS: "--remote_download_toplevel --flaky_test_attempts=2 --runs_per_test=100"
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+          TEST_TARGETS: "//test/common/network:apple_dns_impl_test"
 
       - task: PublishTestResults@2
         inputs:

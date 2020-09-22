@@ -22,23 +22,26 @@ namespace Network {
 
 AppleDnsResolverImpl::AppleDnsResolverImpl(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {
-  ENVOY_LOG(warn, "Constructing DNS resolver");
+  ENVOY_LOG(error, "Constructing DNS resolver");
   initializeMainSdRef();
 }
 
 AppleDnsResolverImpl::~AppleDnsResolverImpl() {
-  ENVOY_LOG(warn, "Destructing DNS resolver");
+  ENVOY_LOG(error, "Destructing DNS resolver");
   deallocateMainSdRef();
 }
 
 void AppleDnsResolverImpl::deallocateMainSdRef() {
-  ENVOY_LOG(warn, "DNSServiceRefDeallocate main sd ref");
+  ENVOY_LOG(error, "DNSServiceRefDeallocate main sd ref");
   // dns_sd.h says:
   //   If the reference's underlying socket is used in a run loop or select() call, it should
   //   be removed BEFORE DNSServiceRefDeallocate() is called, as this function closes the
   //   reference's socket.
   sd_ref_event_.reset();
+  ENVOY_LOG(error, "DNSServiceRefDeallocate call");
+
   DNSServiceRefDeallocate(main_sd_ref_);
+  ENVOY_LOG(error, "Done deallocating");
 }
 
 void AppleDnsResolverImpl::initializeMainSdRef() {
@@ -57,17 +60,19 @@ void AppleDnsResolverImpl::initializeMainSdRef() {
 
   auto fd = DNSServiceRefSockFD(main_sd_ref_);
   RELEASE_ASSERT(fd != -1, "error in DNSServiceRefSockFD");
-  ENVOY_LOG(warn, "DNS resolver has fd={}", fd);
+  ENVOY_LOG(error, "DNS resolver has fd={}", fd);
 
-  sd_ref_event_ = dispatcher_.createFileEvent(fd,
-    // note: Event::FileTriggerType::Level is used here to closely resemble the c-ares implementation in dns_impl.cc.
-    [this](uint32_t events) { onEventCallback(events); }, Event::FileTriggerType::Level,
-    Event::FileReadyType::Read);
+  sd_ref_event_ = dispatcher_.createFileEvent(
+      fd,
+      // note: Event::FileTriggerType::Level is used here to closely resemble the c-ares
+      // implementation in dns_impl.cc.
+      [this](uint32_t events) { onEventCallback(events); }, Event::FileTriggerType::Level,
+      Event::FileReadyType::Read);
   sd_ref_event_->setEnabled(Event::FileReadyType::Read);
 }
 
 void AppleDnsResolverImpl::onEventCallback(uint32_t events) {
-  ENVOY_LOG(warn, "DNS resolver file event");
+  ENVOY_LOG(error, "DNS resolver file event");
   ASSERT(events & Event::FileReadyType::Read);
   DNSServiceProcessResult(main_sd_ref_);
 }
@@ -75,7 +80,7 @@ void AppleDnsResolverImpl::onEventCallback(uint32_t events) {
 ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
                                               DnsLookupFamily dns_lookup_family,
                                               ResolveCb callback) {
-  ENVOY_LOG(warn, "DNS resolver resolve={}", dns_name);
+  ENVOY_LOG(error, "DNS resolver resolve={}", dns_name);
   std::unique_ptr<PendingResolution> pending_resolution(
       new PendingResolution(*this, callback, dispatcher_, main_sd_ref_, dns_name));
 
@@ -105,7 +110,7 @@ void AppleDnsResolverImpl::removePendingQuery(PendingResolution* query) {
 }
 
 void AppleDnsResolverImpl::flushPendingQueries() {
-  ENVOY_LOG(warn, "DNS Resolver flushing {} queries", queries_with_pending_cb_.size());
+  ENVOY_LOG(error, "DNS Resolver flushing {} queries", queries_with_pending_cb_.size());
   for (std::set<PendingResolution*>::iterator it = queries_with_pending_cb_.begin();
        it != queries_with_pending_cb_.end(); ++it) {
     auto query = *it;
@@ -124,10 +129,10 @@ void AppleDnsResolverImpl::flushPendingQueries() {
     }
 
     if (query->owned_) {
-      ENVOY_LOG(warn, "Resolution for {} completed (async)", query->dns_name_);
+      ENVOY_LOG(error, "Resolution for {} completed (async)", query->dns_name_);
       delete *it;
     } else {
-      ENVOY_LOG(warn, "Resolution for {} completed (synchronously)", query->dns_name_);
+      ENVOY_LOG(error, "Resolution for {} completed (synchronously)", query->dns_name_);
       query->synchronously_completed_ = true;
     }
   }
@@ -137,12 +142,12 @@ void AppleDnsResolverImpl::flushPendingQueries() {
 }
 
 AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
-  ENVOY_LOG(warn, "Destroying PendingResolution for {}", dns_name_);
+  ENVOY_LOG(error, "Destroying PendingResolution for {}", dns_name_);
   DNSServiceRefDeallocate(individual_sd_ref_);
 }
 
 void AppleDnsResolverImpl::PendingResolution::cancel() {
-  ENVOY_LOG(warn, "Cancelling PendingResolution for {}", dns_name_);
+  ENVOY_LOG(error, "Cancelling PendingResolution for {}", dns_name_);
   ASSERT(owned_);
   if (pending_cb_) {
     /* (taken and edited from dns_sd.h)
@@ -160,7 +165,8 @@ void AppleDnsResolverImpl::PendingResolution::cancel() {
      * might have been referring to events coming for the operation you canceled,
      * which will now not be coming because the operation has been canceled.
      */
-    // First, get rid of the current query, because it is cancel, its callback should not be executed during the subsequent flush.
+    // First, get rid of the current query, because it is cancel, its callback should not be
+    // executed during the subsequent flush.
     parent_.removePendingQuery(this);
     // Then, flush all other queries.
     parent_.flushPendingQueries();
@@ -172,7 +178,7 @@ void AppleDnsResolverImpl::PendingResolution::cancel() {
 void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     DNSServiceFlags flags, uint32_t interface_index, DNSServiceErrorType error_code,
     const char* hostname, const struct sockaddr* address, uint32_t ttl) {
-  ENVOY_LOG(warn,
+  ENVOY_LOG(error,
             "DNS for {} resolved with: flags={}[MoreComing={}, Add={}], interface_index={}, "
             "error_code={}, hostname={}",
             dns_name_, flags, flags & kDNSServiceFlagsMoreComing ? "yes" : "no",
@@ -181,19 +187,19 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
 
   // Generic error handling.
   if (error_code != kDNSServiceErr_NoError) {
-    // FIXME: charge stats for known errors.
-
-    // Current query gets a failure status
+    // TODO(junr03): consider creating stats for known error types (timeout, refused connection,
+    // etc.). Currently a bit challenging because there is no scope access wired through. Current
+    // query gets a failure status
     if (!pending_cb_) {
-      ENVOY_LOG(warn, "[Error path] Adding to queries pending callback");
+      ENVOY_LOG(error, "[Error path] Adding to queries pending callback");
       pending_cb_ = {ResolutionStatus::Failure, {}};
       parent_.addPendingQuery(this);
     } else {
-      ENVOY_LOG(warn, "[Error path] Changing status for query already pending flush");
+      ENVOY_LOG(error, "[Error path] Changing status for query already pending flush");
       pending_cb_->status_ = ResolutionStatus::Failure;
     }
 
-    ENVOY_LOG(warn, "[Error path] DNS Resolver flushing queries pending callback");
+    ENVOY_LOG(error, "[Error path] DNS Resolver flushing queries pending callback");
     parent_.flushPendingQueries();
 
     // The main sd ref if destroyed here because a callback with an error is good indication that
@@ -202,9 +208,11 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     // Deallocation of the MainSdRef __has__ to happend __after__ flushing queries. Flushing queries
     // deallocates individual refs, so deallocating the main ref aheadd would cause deallocation of
     // invalid individual refs per dns_sd.h
+    ENVOY_LOG(error, "[Error path] deallocating main sd ref");
     parent_.deallocateMainSdRef();
+    ENVOY_LOG(error, "[Error path] re-initializing main sd ref");
     parent_.initializeMainSdRef();
-
+    ENVOY_LOG(error, "[Error path] done");
     return;
   }
 
@@ -212,15 +220,15 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
   // additive.
   if (flags & kDNSServiceFlagsAdd) {
     auto dns_response = buildDnsResponse(address, ttl);
-    ENVOY_LOG(warn, "Address to add address={}, ttl={}",
+    ENVOY_LOG(error, "Address to add address={}, ttl={}",
               dns_response.address_->ip()->addressAsString(), ttl);
 
     if (!pending_cb_) {
-      ENVOY_LOG(warn, "Adding to queries pending callback");
+      ENVOY_LOG(error, "Adding to queries pending callback");
       pending_cb_ = {ResolutionStatus::Success, {dns_response}};
       parent_.addPendingQuery(this);
     } else {
-      ENVOY_LOG(warn, "New address for query already pending flush");
+      ENVOY_LOG(error, "New address for query already pending flush");
       pending_cb_->responses_.push_back(dns_response);
     }
   }
@@ -242,7 +250,7 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
      * called on them since the last flush), not just the [queries] related to the particular
      * callback that happened to be the last one to be invoked.
      */
-    ENVOY_LOG(warn, "DNS Resolver flushing queries pending callback");
+    ENVOY_LOG(error, "DNS Resolver flushing queries pending callback");
     parent_.flushPendingQueries();
   }
 }
