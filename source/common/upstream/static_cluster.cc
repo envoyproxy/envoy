@@ -23,13 +23,15 @@ StaticClusterImpl::StaticClusterImpl(
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 
+  Event::Dispatcher& dispatcher = factory_context.dispatcher();
+
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
     priority_state_manager_->initializePriorityFor(locality_lb_endpoint);
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       priority_state_manager_->registerHostForPriority(
           lb_endpoint.endpoint().hostname(), resolveProtoAddress(lb_endpoint.endpoint().address()),
-          locality_lb_endpoint, lb_endpoint);
+          locality_lb_endpoint, lb_endpoint, dispatcher.timeSource());
     }
   }
 }

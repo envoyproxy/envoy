@@ -27,7 +27,8 @@ EdsClusterImpl::EdsClusterImpl(
       local_info_(factory_context.localInfo()),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
-                        : cluster.eds_cluster_config().service_name()) {
+                        : cluster.eds_cluster_config().service_name()),
+      time_source_(factory_context.dispatcher().timeSource()) {
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
@@ -58,7 +59,7 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
       priority_state_manager.registerHostForPriority(
           lb_endpoint.endpoint().hostname(),
           parent_.resolveProtoAddress(lb_endpoint.endpoint().address()), locality_lb_endpoint,
-          lb_endpoint);
+          lb_endpoint, parent_.time_source_);
     }
   }
 

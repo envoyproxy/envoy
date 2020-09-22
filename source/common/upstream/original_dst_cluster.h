@@ -114,6 +114,8 @@ private:
   HostMapConstSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);
 
   friend class OriginalDstClusterFactory;
+
+  TimeSource& time_source_;
 };
 
 using OriginalDstClusterSharedPtr = std::shared_ptr<OriginalDstCluster>;

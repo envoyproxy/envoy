@@ -102,8 +102,9 @@ void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   allocHttpHealthCheckerFromProto(input.health_check_config());
   ON_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillByDefault(testing::Return(input.http_verify_cluster()));
+  auto time_source = new NiceMock<MockTimeSystem>();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", *time_source)};
   expectSessionCreate();
   expectStreamCreate(0);
   // This sets up the possibility of testing hosts that never become healthy
@@ -210,8 +211,9 @@ void TcpHealthCheckFuzz::allocTcpHealthCheckerFromProto(
 
 void TcpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase input) {
   allocTcpHealthCheckerFromProto(input.health_check_config());
+  auto time_source = new NiceMock<MockTimeSystem>();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", *time_source)};
   expectSessionCreate();
   expectClientCreate();
   health_checker_->start();
@@ -314,8 +316,9 @@ void GrpcHealthCheckFuzz::allocGrpcHealthCheckerFromProto(
 
 void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase input) {
   allocGrpcHealthCheckerFromProto(input.health_check_config());
+  auto time_source = new NiceMock<MockTimeSystem>();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", *time_source)};
   expectSessionCreate();
   expectStreamCreate(0);
   health_checker_->start();

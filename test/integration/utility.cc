@@ -19,6 +19,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/network_utility.h"
@@ -65,16 +66,10 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                    const std::string& body, Http::CodecClient::Type type,
                                    const std::string& host, const std::string& content_type) {
 
-  NiceMock<Stats::MockIsolatedStatsStore> mock_stats_store;
-  NiceMock<Random::MockRandomGenerator> random;
-  Event::GlobalTimeSystem time_system;
-  NiceMock<Random::MockRandomGenerator> random_generator;
-  Api::Impl api(Thread::threadFactoryForTest(), mock_stats_store, time_system,
-                Filesystem::fileSystemForTest(), random_generator);
-  Event::DispatcherPtr dispatcher(api.allocateDispatcher("test_thread"));
+  auto time_system = std::make_unique<NiceMock<MockTimeSystem>>;
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{
-      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80", time_system.get())};
   Http::CodecClientProd client(
       type,
       dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),

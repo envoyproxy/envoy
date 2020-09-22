@@ -3,9 +3,10 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/mocks/common.h"
 #include "test/mocks/upstream/cluster_info.h"
 
-#include "gtest/gtest.h"
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -13,7 +14,8 @@ namespace {
 
 TEST(HostUtilityTest, All) {
   auto cluster = std::make_shared<NiceMock<MockClusterInfo>>();
-  HostSharedPtr host = makeTestHost(cluster, "tcp://127.0.0.1:80");
+  auto time_source = new NiceMock<MockTimeSystem>();
+  HostSharedPtr host = makeTestHost(cluster, "tcp://127.0.0.1:80", *time_source);
   EXPECT_EQ("healthy", HostUtility::healthFlagsToString(*host));
 
   host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);

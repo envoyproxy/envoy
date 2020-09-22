@@ -587,6 +587,7 @@ envoy_cc_test_library(
         "//source/common/http:codec_client_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/common/upstream:utility_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:printers_lib",

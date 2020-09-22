@@ -145,7 +145,8 @@ private:
   class RedisHost : public Upstream::HostImpl {
   public:
     RedisHost(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-              Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary)
+              Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
+              TimeSource& time_source)
         : Upstream::HostImpl(
               cluster, hostname, address,
               // TODO(zyfjeff): Created through metadata shared pool
@@ -153,7 +154,8 @@ private:
               parent.lbEndpoint().load_balancing_weight().value(),
               parent.localityLbEndpoint().locality(),
               parent.lbEndpoint().endpoint().health_check_config(),
-              parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
+              parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status(),
+              time_source),
           primary_(primary) {}
 
     bool isPrimary() const { return primary_; }
@@ -282,6 +284,8 @@ private:
   const std::string cluster_name_;
   const Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
   const Common::Redis::ClusterRefreshManager::HandlePtr registration_handle_;
+
+  TimeSource& time_source_;
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
