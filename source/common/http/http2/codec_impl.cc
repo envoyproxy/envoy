@@ -487,6 +487,10 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
   auto status = parent_.sendPendingFrames();
   // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
   RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+  if (!parent_.protocol_constraints_.checkOutboundFrameLimits().ok()) {
+    parent_.scheduleProtocolConstrainViolationCallback();
+  }
+
   if (local_end_stream_ && pending_send_data_.length() > 0) {
     createPendingFlushTimer();
   }
@@ -854,12 +858,13 @@ Status ConnectionImpl::addOutboundFrameFragment(Buffer::OwnedImpl& output, const
   // onBeforeFrameSend callback is not called for DATA frames.
   bool is_outbound_flood_monitored_control_frame = false;
   std::swap(is_outbound_flood_monitored_control_frame, is_outbound_flood_monitored_control_frame_);
-  auto releasor =
-      protocol_constraints_.incrementOutboundFrameCount(is_outbound_flood_monitored_control_frame);
-  RETURN_IF_ERROR(checkOutboundFrameLimits());
+  auto status_or_releasor = trackOutboundFrames(is_outbound_flood_monitored_control_frame);
+  if (!status_or_releasor.ok()) {
+    return status_or_releasor.status();
+  }
 
   output.add(data, length);
-  output.addDrainTracker(releasor);
+  output.addDrainTracker(status_or_releasor.value());
   return okStatus();
 }
 
@@ -1109,6 +1114,20 @@ int ConnectionImpl::setAndCheckNghttp2CallbackStatus(Status&& status) {
   // error statuses are silently discarded.
   nghttp2_callback_status_.Update(std::move(status));
   return nghttp2_callback_status_.ok() ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
+}
+
+void ConnectionImpl::scheduleProtocolConstrainViolationCallback() {
+  if (!protocol_constraint_violation_callback_) {
+    protocol_constraint_violation_callback_ = connection_.dispatcher().createSchedulableCallback(
+        [this]() { onProtocolConstrainViolation(); });
+    protocol_constraint_violation_callback_->scheduleCallbackNextIteration();
+  }
+}
+
+void ConnectionImpl::onProtocolConstrainViolation() {
+  // Flooded outbound queue implies that peer is not reading and it does not
+  // make sense to try to flush pending bytes.
+  connection_.close(Envoy::Network::ConnectionCloseType::NoFlush);
 }
 
 ConnectionImpl::Http2Callbacks::Http2Callbacks() {
@@ -1407,9 +1426,14 @@ Status ServerConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd,
   return result;
 }
 
-Status ServerConnectionImpl::checkOutboundFrameLimits() {
-  return dispatching_downstream_data_ ? protocol_constraints_.checkOutboundFrameLimits()
-                                      : okStatus();
+StatusOr<ProtocolConstraints::ReleasorProc>
+ServerConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) {
+  auto releasor =
+      protocol_constraints_.incrementOutboundFrameCount(is_outbound_flood_monitored_control_frame);
+  if (dispatching_downstream_data_ && !protocol_constraints_.checkOutboundFrameLimits().ok()) {
+    return protocol_constraints_.status();
+  }
+  return releasor;
 }
 
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
@@ -1428,7 +1452,7 @@ Http::Status ServerConnectionImpl::innerDispatch(Buffer::Instance& data) {
   Cleanup cleanup([this]() { dispatching_downstream_data_ = false; });
 
   // Make sure downstream outbound queue was not flooded by the upstream frames.
-  RETURN_IF_ERROR(checkOutboundFrameLimits());
+  RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits());
   return ConnectionImpl::innerDispatch(data);
 }
 

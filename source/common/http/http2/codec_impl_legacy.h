@@ -428,6 +428,13 @@ protected:
     return absl::nullopt;
   }
 
+  /**
+   * Callback for terminating connection when protocol constrain has been violated
+   * outside of the dispatch context.
+   */
+  void scheduleProtocolConstrainViolationCallback();
+  void onProtocolConstrainViolation();
+
   static Http2Callbacks http2_callbacks_;
 
   std::list<StreamImplPtr> active_streams_;
@@ -478,12 +485,14 @@ private:
   // Adds buffer fragment for a new outbound frame to the supplied Buffer::OwnedImpl.
   // Returns true on success or false if outbound queue limits were exceeded.
   bool addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
-  virtual void checkOutboundFrameLimits() PURE;
+  virtual Envoy::Http::Http2::ProtocolConstraints::ReleasorProc
+  trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) PURE;
   virtual bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
 
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
   bool pending_deferred_reset_ : 1;
+  Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
 };
 
 /**
@@ -508,14 +517,16 @@ private:
   int onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
 
-  // Presently client connections only perform accounting of outbound frames and do not
+  // Presently client connections do not track or check queue limits for outbound frames and do not
   // terminate connections when queue limits are exceeded. The primary reason is the complexity of
   // the clean-up of upstream connections. The clean-up of upstream connection causes RST_STREAM
   // messages to be sent on corresponding downstream connections. This may actually trigger flood
   // mitigation on the downstream connections, which causes an exception to be thrown in the middle
   // of the clean-up loop, leaving resources in a half cleaned up state.
   // TODO(yanavlasov): add flood mitigation for upstream connections as well.
-  void checkOutboundFrameLimits() override {}
+  Envoy::Http::Http2::ProtocolConstraints::ReleasorProc trackOutboundFrames(bool) override {
+    return Envoy::Http::Http2::ProtocolConstraints::ReleasorProc([]() {});
+  }
   bool trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return true; }
 
   Http::ConnectionCallbacks& callbacks_;
@@ -539,7 +550,8 @@ private:
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   int onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
-  void checkOutboundFrameLimits() override;
+  Envoy::Http::Http2::ProtocolConstraints::ReleasorProc
+  trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) override;
   bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
 

@@ -1744,25 +1744,16 @@ TEST_P(Http2FloodMitigationTest, Data) {
                                          {Http2Frame::Header("response_data_blocks", "1000")});
   sendFrame(request);
 
-  // Wait for 19077 bytes to arrive from upstream (1K DATA frames of size 10 + HEADERS frame)
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 19077);
+  // Wait for connection to be flooded with outbound DATA frames and disconnected.
+  tcp_client_->waitForDisconnect();
 
-  // If the server codec incorrectly thrown an exception on flood detection it would cause
+  // If the server codec had incorrectly thrown an exception on flood detection it would cause
   // the entire upstream to be disconnected. Verify it is still active, and there are no destroyed
   // connections.
   ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
   ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
-
-  // Server codec should be flooded. However it is not disconnected until client sends it
-  // some bytes. Verify that it is still connected and send 1 byte. Flood detection
-  // happens before data is parsed so it does not matter what is being sent.
-  ASSERT_TRUE(tcp_client_->connected());
-  ASSERT_TRUE(tcp_client_->write(std::string("a"), false, false));
-  // Now wait for client to be disconnected and verify it is due to flood checks.
-  tcp_client_->waitForDisconnect();
+  // Verify that the flood check was triggered
   EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
-  EXPECT_EQ(1,
-            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
 // Verify that the server can detect flood of RST_STREAM frames.

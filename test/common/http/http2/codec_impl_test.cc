@@ -2014,6 +2014,9 @@ TEST_P(Http2CodecImplTest, ResponseDataFlood) {
         buffer.move(frame);
       }));
 
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, false);
   // Account for the single HEADERS frame above
@@ -2021,11 +2024,10 @@ TEST_P(Http2CodecImplTest, ResponseDataFlood) {
     Buffer::OwnedImpl data("0");
     EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
   }
-  // Presently flood mitigation is done only when processing downstream data
-  // So we need to send stream from downstream client to trigger mitigation
-  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
-                            "Too many frames in the outbound queue.");
+
+  EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
@@ -2091,16 +2093,17 @@ TEST_P(Http2CodecImplTest, ResponseDataFloodCounterReset) {
   // Drain kMaxOutboundFrames / 2 slices from the send buffer
   buffer.drain(buffer.length() / 2);
 
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
   for (uint32_t i = 0; i < kMaxOutboundFrames / 2 + 1; ++i) {
     Buffer::OwnedImpl data("0");
     EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
   }
 
-  // Presently flood mitigation is done only when processing downstream data
-  // So we need to send a frame from downstream client to trigger mitigation
-  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
-                            "Too many frames in the outbound queue.");
+  EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  violation_callback->invokeCallback();
 }
 
 // Verify that control frames are added to the counter of outbound frames of all types.
