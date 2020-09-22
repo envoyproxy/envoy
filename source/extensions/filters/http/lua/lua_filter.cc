@@ -349,7 +349,8 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
 
   // TODO(mattklein123): Avoid double copy here.
   if (response->body() != nullptr) {
-    lua_pushstring(coroutine_.luaState(), response->bodyAsString().c_str());
+    lua_pushlstring(coroutine_.luaState(), response->bodyAsString().data(),
+                    response->body()->length());
   } else {
     lua_pushnil(coroutine_.luaState());
   }
