@@ -440,10 +440,8 @@ void UpstreamRequest::encodeBodyAndTrailers() {
                        downstream_metadata_map_vector_);
       upstream_->encodeMetadata(downstream_metadata_map_vector_);
       downstream_metadata_map_vector_.clear();
-      if (shouldSendEndStream()) {
-        Buffer::OwnedImpl empty_data("");
-        upstream_->encodeData(empty_data, true);
-      }
+
+      ASSERT(buffered_request_body_);
     }
 
     if (buffered_request_body_) {
