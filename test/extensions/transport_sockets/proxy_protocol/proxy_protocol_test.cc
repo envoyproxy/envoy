@@ -21,6 +21,7 @@ using testing::_;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnNull;
 using testing::ReturnRef;
 
 using envoy::config::core::v3::ProxyProtocolConfig;
@@ -415,32 +416,33 @@ TEST_F(ProxyProtocolTest, OnConnectedGeneratesHeaderAndCallsInnerOnConnected) {
   proxy_protocol_socket_->onConnected();
 }
 
-class FakeTransportSocketFactory : public Network::TransportSocketFactory {
-public:
-  FakeTransportSocketFactory() {}
-
-  Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override {
-    (void)options;
-    return nullptr;
-  }
-
-  bool implementsSecureTransport() const override { return false; }
-};
-
 class ProxyProtocolSocketFactoryTest : public testing::Test {
 public:
-  ProxyProtocolSocketFactoryTest()
-      : testing::Test(),
-        factory_(std::make_unique<FakeTransportSocketFactory>(), ProxyProtocolConfig()) {}
+  ProxyProtocolSocketFactoryTest() : testing::Test() {}
 
-  UpstreamProxyProtocolSocketFactory factory_;
+  void initialize() {
+    auto inner_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
+    inner_factory_ = inner_factory.get();
+    factory_ = std::make_unique<UpstreamProxyProtocolSocketFactory>(std::move(inner_factory),
+                                                                    ProxyProtocolConfig());
+  }
+
+  NiceMock<Network::MockTransportSocketFactory>* inner_factory_;
+  std::unique_ptr<UpstreamProxyProtocolSocketFactory> factory_;
 };
 
-// Test returns createTransportSocket returns nullptr if inner call returns nullptr
+// Test createTransportSocket returns nullptr if inner call returns nullptr
 TEST_F(ProxyProtocolSocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
-  auto socket = factory_.createTransportSocket(nullptr);
-  ASSERT_EQ(nullptr, socket);
+  initialize();
+  EXPECT_CALL(*inner_factory_, createTransportSocket(_)).WillOnce(ReturnNull());
+  ASSERT_EQ(nullptr, factory_->createTransportSocket(nullptr));
+}
+
+// Test implementsSecureTransport calls inner factory
+TEST_F(ProxyProtocolSocketFactoryTest, ImplementsSecureTransportCallInnerFactory) {
+  initialize();
+  EXPECT_CALL(*inner_factory_, implementsSecureTransport()).WillOnce(Return(true));
+  ASSERT_TRUE(factory_->implementsSecureTransport());
 }
 
 } // namespace
