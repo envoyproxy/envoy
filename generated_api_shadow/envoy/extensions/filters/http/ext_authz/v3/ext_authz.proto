@@ -117,17 +117,17 @@ message ExtAuthz {
   // Optional additional prefix to use when emitting statistics. This allows to distinguish
   // emitted statistics between configured *ext_authz* filters in an HTTP filter chain. For example:
   //
-  // .. code_block:: yaml
+  // .. code-block:: yaml
   //
-  // http_filters:
-  //   - name: envoy.filters.http.ext_authz
-  //     typed_config:
-  //       "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
-  //       stat_prefix: waf # This emits ext_authz.waf.ok, ext_authz.waf.denied, etc.
-  //   - name: envoy.filters.http.ext_authz
-  //     typed_config:
-  //       "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
-  //       stat_prefix: blocker # This emits ext_authz.blocker.ok, ext_authz.blocker.denied, etc.
+  //   http_filters:
+  //     - name: envoy.filters.http.ext_authz
+  //       typed_config:
+  //         "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+  //         stat_prefix: waf # This emits ext_authz.waf.ok, ext_authz.waf.denied, etc.
+  //     - name: envoy.filters.http.ext_authz
+  //       typed_config:
+  //         "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+  //         stat_prefix: blocker # This emits ext_authz.blocker.ok, ext_authz.blocker.denied, etc.
   //
   string stat_prefix = 13;
 
