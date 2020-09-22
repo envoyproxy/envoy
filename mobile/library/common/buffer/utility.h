@@ -11,16 +11,23 @@ namespace Utility {
 /**
  * Transform envoy_data to Envoy::Buffer::Instance.
  * @param headers, the envoy_data to transform.
- * @return Envoy::Buffer::InstancePtr, the 1:1 transformation of the envoy_data param.
+ * @return Envoy::Buffer::InstancePtr, the native transformation of the envoy_data param.
  */
 Buffer::InstancePtr toInternalData(envoy_data data);
 
 /**
  * Transform from Buffer::Instance to envoy_data.
  * @param data, the Buffer::Instance to transform.
- * @return envoy_data, the 1:1 transformation of the Buffer::Instance param.
+ * @return envoy_data, the bridge transformation of the Buffer::Instance param.
  */
 envoy_data toBridgeData(Buffer::Instance&);
+
+/**
+ * Copy from Buffer::Instance to envoy_data.
+ * @param data, the Buffer::Instance to copy.
+ * @return envoy_data, the copy produced from the Buffer::Instance param.
+ */
+envoy_data copyToBridgeData(const Buffer::Instance&);
 
 } // namespace Utility
 } // namespace Buffer
