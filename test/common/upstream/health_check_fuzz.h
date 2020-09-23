@@ -25,12 +25,7 @@ public:
 class TcpHealthCheckFuzz : TcpHealthCheckerImplTestBase {
 public:
   void allocTcpHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
-  // Clang tidy throws an error here in regards to a potential leak. It seems to have something to
-  // do with shared_ptr and possible cycles in regards to the clusters host objects. Since all this
-  // test class directly uses the unit test class that has been in master for a long time, this is
-  // likely a false positive.
-  void initialize(test::common::upstream::HealthCheckTestCase
-                      input); // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
+  void initialize(test::common::upstream::HealthCheckTestCase input);
   void respond(std::string data, bool last_action);
   void triggerIntervalTimer();
   void triggerTimeoutTimer(bool last_action);
