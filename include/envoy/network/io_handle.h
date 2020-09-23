@@ -85,6 +85,15 @@ public:
   virtual Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
 
   /**
+   * Write the buffer out to a file descriptor.
+   * @param buffer supplies the buffer to write to.
+   * @return a IoCallUint64Result with err_ = nullptr and rc_ = the number of bytes
+   * written if successful, or err_ = some IoError for failure. If call failed, rc_ shouldn't be
+   * used.
+   */
+  virtual Api::IoCallUint64Result write(Buffer::Instance& buffer) PURE;
+
+  /**
    * Send a message to the address.
    * @param slices points to the location of data to be sent.
    * @param num_slice indicates number of slices |slices| contains.

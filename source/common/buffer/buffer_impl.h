@@ -6,7 +6,6 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/network/io_handle.h"
 
 #include "common/common/assert.h"
 #include "common/common/non_copyable.h"
@@ -573,7 +572,6 @@ public:
   uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override;
   bool startsWith(absl::string_view data) const override;
-  Api::IoCallUint64Result write(Network::IoHandle& io_handle) override;
   std::string toString() const override;
 
   // LibEventInstance

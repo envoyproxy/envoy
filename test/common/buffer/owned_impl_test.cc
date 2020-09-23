@@ -269,45 +269,45 @@ TEST_F(OwnedImplTest, Write) {
   Network::IoSocketHandleImpl io_handle;
   buffer.add("example");
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{7, 0}));
-  Api::IoCallUint64Result result = buffer.write(io_handle);
+  Api::IoCallUint64Result result = io_handle.write(buffer);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(7, result.rc_);
   EXPECT_EQ(0, buffer.length());
 
   buffer.add("example");
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{6, 0}));
-  result = buffer.write(io_handle);
+  result = io_handle.write(buffer);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(6, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
-  result = buffer.write(io_handle);
+  result = io_handle.write(buffer);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
-  result = buffer.write(io_handle);
+  result = io_handle.write(buffer);
   EXPECT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
-  result = buffer.write(io_handle);
+  result = io_handle.write(buffer);
   EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{1, 0}));
-  result = buffer.write(io_handle);
+  result = io_handle.write(buffer);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(1, result.rc_);
   EXPECT_EQ(0, buffer.length());
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).Times(0);
-  result = buffer.write(io_handle);
+  result = io_handle.write(buffer);
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(0, buffer.length());
 }

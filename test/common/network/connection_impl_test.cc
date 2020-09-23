@@ -5,6 +5,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
@@ -16,6 +17,7 @@
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -24,6 +26,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -779,8 +782,6 @@ TEST_P(ConnectionImplTest, WriteWatermarks) {
   // Stick 5 bytes in the connection buffer.
   std::unique_ptr<Buffer::OwnedImpl> buffer(new Buffer::OwnedImpl("hello"));
   int buffer_len = buffer->length();
-  EXPECT_CALL(*client_write_buffer_, write(_))
-      .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::failWrite));
   EXPECT_CALL(*client_write_buffer_, move(_));
   client_write_buffer_->move(*buffer);
 
@@ -950,8 +951,6 @@ TEST_P(ConnectionImplTest, BasicWrite) {
   EXPECT_CALL(*client_write_buffer_, move(_))
       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                             Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
-  EXPECT_CALL(*client_write_buffer_, write(_))
-      .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackWrites));
   EXPECT_CALL(*client_write_buffer_, drain(_))
       .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
   client_connection_->write(buffer_to_write, false);
@@ -977,8 +976,6 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   EXPECT_CALL(*client_write_buffer_, move(_))
       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                             Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
-  EXPECT_CALL(*client_write_buffer_, write(_))
-      .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackWrites));
   EXPECT_CALL(*client_write_buffer_, drain(_))
       .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
   // The write() call on the connection will buffer enough data to bring the connection above the
@@ -987,21 +984,24 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   // connection_impl, and try an immediate drain inside of write() to avoid thrashing here.
   EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark());
+
   client_connection_->write(first_buffer_to_write, false);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(data_to_write, data_written);
 
-  // Now do the write again, but this time configure buffer_ to reject the write
-  // with errno set to EAGAIN via failWrite(). This should result in going above the high
+  // Now do the write again, but this time configure os_sys_calls to reject the write
+  // with errno set to EAGAIN. This should result in going above the high
   // watermark and not returning.
   Buffer::OwnedImpl second_buffer_to_write(data_to_write);
   EXPECT_CALL(*client_write_buffer_, move(_))
       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                             Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
-  EXPECT_CALL(*client_write_buffer_, write(_))
-      .WillOnce(Invoke([&](IoHandle& io_handle) -> Api::IoCallUint64Result {
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, writev(_, _, _))
+      .WillOnce(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
         dispatcher_->exit();
-        return client_write_buffer_->failWrite(io_handle);
+        return {-1, EAGAIN};
       }));
   // The write() call on the connection will buffer enough data to bring the connection above the
   // high watermark and as the data will not flush it should not return below the watermark.
@@ -1010,10 +1010,11 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   client_connection_->write(second_buffer_to_write, false);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
+  // Return to default os_sys_calls implementation
+  os_calls.~TestThreadsafeSingletonInjector();
+
   // Clean up the connection. The close() (called via disconnect) will attempt to flush. The
   // call to write() will succeed, bringing the connection back under the low watermark.
-  EXPECT_CALL(*client_write_buffer_, write(_))
-      .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackWrites));
   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
 
   disconnect(true);
@@ -1034,8 +1035,12 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
   bool is_below = true;
   bool is_above = false;
 
-  ON_CALL(*client_write_buffer_, write(_))
-      .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::failWrite));
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  ON_CALL(os_sys_calls, writev(_, _, _))
+      .WillByDefault(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
+        return {-1, EAGAIN};
+      }));
   ON_CALL(*client_write_buffer_, drain(_))
       .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::baseDrain));
   EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AnyNumber());
@@ -1078,15 +1083,18 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     }
 
     // Do the actual work. Write |buffer_to_write| bytes to the connection and
-    // drain |bytes_to_flush| before having the buffer failWrite()
+    // drain |bytes_to_flush| before having writev syscall fail with EAGAIN
     EXPECT_CALL(*client_write_buffer_, move(_))
         .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
-    EXPECT_CALL(*client_write_buffer_, write(_))
-        .WillOnce(
-            DoAll(Invoke([&](IoHandle&) -> void { client_write_buffer_->drain(bytes_to_flush); }),
-                  Return(testing::ByMove(Api::IoCallUint64Result(
-                      bytes_to_flush, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}))))))
-        .WillRepeatedly(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::failWrite));
+    EXPECT_CALL(os_sys_calls, writev(_, _, _))
+        .WillOnce(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
+          client_write_buffer_->drain(bytes_to_flush);
+          return {-1, EAGAIN};
+        }))
+        .WillRepeatedly(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
+          return {-1, EAGAIN};
+        }));
+
     client_connection_->write(buffer_to_write, false);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }

@@ -30,8 +30,6 @@ namespace TransportSockets {
 namespace ProxyProtocol {
 namespace {
 
-constexpr uint64_t MaxSlices = 16;
-
 class ProxyProtocolTest : public testing::Test {
 public:
   void initialize(ProxyProtocolConfig_Version version,
@@ -59,14 +57,17 @@ TEST_F(ProxyProtocolTest, InjectesHeaderOnlyOnce) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("174.2.2.222", "172.0.0.1", 50000, 80,
                                           Network::Address::IpVersion::v4, expected_buff);
-  auto expected_slices = expected_buff.getRawSlices(MaxSlices);
   initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1, nullptr);
 
-  EXPECT_CALL(io_handle_, writev(RawSliceVectorEqual(expected_slices), expected_slices.size()))
-      .WillOnce(Return(testing::ByMove(Api::IoCallUint64Result(
-          expected_buff.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+      }));
   auto msg = Buffer::OwnedImpl("some data");
   auto msg2 = Buffer::OwnedImpl("more data");
+
   {
     InSequence s;
     EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
@@ -86,12 +87,14 @@ TEST_F(ProxyProtocolTest, BytesProcessedIncludesProxyProtocolHeader) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("174.2.2.222", "172.0.0.1", 50000, 80,
                                           Network::Address::IpVersion::v4, expected_buff);
-  auto expected_slices = expected_buff.getRawSlices(MaxSlices);
   initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1, nullptr);
 
-  EXPECT_CALL(io_handle_, writev(RawSliceVectorEqual(expected_slices), expected_slices.size()))
-      .WillOnce(Return(testing::ByMove(Api::IoCallUint64Result(
-          expected_buff.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+      }));
   auto msg = Buffer::OwnedImpl("some data");
   auto msg2 = Buffer::OwnedImpl("more data");
   {
@@ -117,19 +120,23 @@ TEST_F(ProxyProtocolTest, ReturnsKeepOpenWhenWriteErrorIsAgain) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("174.2.2.222", "172.0.0.1", 50000, 80,
                                           Network::Address::IpVersion::v4, expected_buff);
-  auto expected_slices = expected_buff.getRawSlices(MaxSlices);
   initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1, nullptr);
 
   auto msg = Buffer::OwnedImpl("some data");
   {
     InSequence s;
-    EXPECT_CALL(io_handle_, writev(RawSliceVectorEqual(expected_slices), expected_slices.size()))
-        .WillOnce(Return(testing::ByMove(Api::IoCallUint64Result(
-            0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                               Network::IoSocketError::deleteIoError)))));
-    EXPECT_CALL(io_handle_, writev(RawSliceVectorEqual(expected_slices), expected_slices.size()))
-        .WillOnce(Return(testing::ByMove(Api::IoCallUint64Result(
-            expected_buff.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+    EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+        .WillOnce(Invoke([&](Buffer::Instance&) -> Api::IoCallUint64Result {
+          return Api::IoCallUint64Result(
+              0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                                 Network::IoSocketError::deleteIoError));
+        }));
+    EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+        .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+          auto length = buffer.length();
+          buffer.drain(length);
+          return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+        }));
     EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false))
         .WillOnce(Return(Network::IoResult{Network::PostIoAction::KeepOpen, msg.length(), false}));
   }
@@ -149,16 +156,17 @@ TEST_F(ProxyProtocolTest, ReturnsCloseWhenWriteErrorIsNotAgain) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("174.2.2.222", "172.0.0.1", 50000, 80,
                                           Network::Address::IpVersion::v4, expected_buff);
-  auto expected_slices = expected_buff.getRawSlices(MaxSlices);
   initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1, nullptr);
 
   auto msg = Buffer::OwnedImpl("some data");
   {
     InSequence s;
-    EXPECT_CALL(io_handle_, writev(_, _))
-        .WillOnce(Return(testing::ByMove(
-            Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EADDRNOTAVAIL),
-                                                       [](Api::IoError* err) { delete err; })))));
+    EXPECT_CALL(io_handle_, write(_))
+        .WillOnce(Invoke([&](Buffer::Instance&) -> Api::IoCallUint64Result {
+          return Api::IoCallUint64Result(0,
+                                         Api::IoErrorPtr(new Network::IoSocketError(EADDRNOTAVAIL),
+                                                         Network::IoSocketError::deleteIoError));
+        }));
   }
 
   auto resp = proxy_protocol_socket_->doWrite(msg, false);
@@ -174,12 +182,14 @@ TEST_F(ProxyProtocolTest, V1IPV4LocalAddressWhenTransportOptionsAreNull) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("174.2.2.222", "172.0.0.1", 50000, 80,
                                           Network::Address::IpVersion::v4, expected_buff);
-  auto expected_slices = expected_buff.getRawSlices(MaxSlices);
   initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1, nullptr);
 
-  EXPECT_CALL(io_handle_, writev(RawSliceVectorEqual(expected_slices), expected_slices.size()))
-      .WillOnce(Return(testing::ByMove(Api::IoCallUint64Result(
-          expected_buff.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+      }));
   auto msg = Buffer::OwnedImpl("some data");
   EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
 
@@ -195,13 +205,15 @@ TEST_F(ProxyProtocolTest, V1IPV4LocalAddressesWhenHeaderOptionsAreNull) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("174.2.2.222", "172.0.0.1", 50000, 80,
                                           Network::Address::IpVersion::v4, expected_buff);
-  auto expected_slices = expected_buff.getRawSlices(MaxSlices);
   initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1,
              std::make_shared<Network::TransportSocketOptionsImpl>());
 
-  EXPECT_CALL(io_handle_, writev(RawSliceVectorEqual(expected_slices), 1))
-      .WillOnce(Return(testing::ByMove(
-          Api::IoCallUint64Result(43, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = 43;
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+      }));
   auto msg = Buffer::OwnedImpl("some data");
   EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
 
@@ -217,13 +229,15 @@ TEST_F(ProxyProtocolTest, V1IPV6LocalAddressesWhenHeaderOptionsAreNull) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("a:b:c:d::", "e:b:c:f::", 50000, 8080,
                                           Network::Address::IpVersion::v6, expected_buff);
-  auto expected_slices = expected_buff.getRawSlices(MaxSlices);
   initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1,
              std::make_shared<Network::TransportSocketOptionsImpl>());
 
-  EXPECT_CALL(io_handle_, writev(RawSliceVectorEqual(expected_slices), expected_slices.size()))
-      .WillOnce(Return(testing::ByMove(Api::IoCallUint64Result(
-          expected_buff.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+      }));
   auto msg = Buffer::OwnedImpl("some data");
   EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
 
@@ -248,12 +262,14 @@ TEST_F(ProxyProtocolTest, V1IPV4DownstreamAddresses) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("202.168.0.13", "174.2.2.222", 52000, 80,
                                           Network::Address::IpVersion::v4, expected_buff);
-  auto expected_slices = expected_buff.getRawSlices(MaxSlices);
   initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1, socket_options);
 
-  EXPECT_CALL(io_handle_, writev(RawSliceVectorEqual(expected_slices), expected_slices.size()))
-      .WillOnce(Return(testing::ByMove(Api::IoCallUint64Result(
-          expected_buff.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+      }));
   auto msg = Buffer::OwnedImpl("some data");
   EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
 
@@ -278,12 +294,14 @@ TEST_F(ProxyProtocolTest, V1IPV6DownstreamAddresses) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("1::2:3", "a:b:c:d::", 52000, 80,
                                           Network::Address::IpVersion::v6, expected_buff);
-  auto expected_slices = expected_buff.getRawSlices(MaxSlices);
   initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1, socket_options);
 
-  EXPECT_CALL(io_handle_, writev(RawSliceVectorEqual(expected_slices), expected_slices.size()))
-      .WillOnce(Return(testing::ByMove(Api::IoCallUint64Result(
-          expected_buff.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+      }));
   auto msg = Buffer::OwnedImpl("some data");
   EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
 
@@ -298,12 +316,14 @@ TEST_F(ProxyProtocolTest, V2IPV4LocalCommandWhenTransportOptionsAreNull) {
       Network::Utility::resolveUrl("tcp://0.1.1.2:513");
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV2LocalHeader(expected_buff);
-  auto expected_slices = expected_buff.getRawSlices(MaxSlices);
   initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, nullptr);
 
-  EXPECT_CALL(io_handle_, writev(RawSliceVectorEqual(expected_slices), expected_slices.size()))
-      .WillOnce(Return(testing::ByMove(Api::IoCallUint64Result(
-          expected_buff.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+      }));
   auto msg = Buffer::OwnedImpl("some data");
   EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
 
@@ -318,13 +338,15 @@ TEST_F(ProxyProtocolTest, V2IPV4LocalCommandWhenHeaderOptionsAreNull) {
       Network::Utility::resolveUrl("tcp://0.1.1.2:513");
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV2LocalHeader(expected_buff);
-  auto expected_slices = expected_buff.getRawSlices(MaxSlices);
   initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2,
              std::make_shared<Network::TransportSocketOptionsImpl>());
 
-  EXPECT_CALL(io_handle_, writev(RawSliceVectorEqual(expected_slices), expected_slices.size()))
-      .WillOnce(Return(testing::ByMove(Api::IoCallUint64Result(
-          expected_buff.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+      }));
   auto msg = Buffer::OwnedImpl("some data");
   EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
 
@@ -349,12 +371,14 @@ TEST_F(ProxyProtocolTest, V2IPV4DownstreamAddresses) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV2Header("1.2.3.4", "0.1.1.2", 773, 513,
                                           Network::Address::IpVersion::v4, expected_buff);
-  auto expected_slices = expected_buff.getRawSlices(MaxSlices);
   initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, socket_options);
 
-  EXPECT_CALL(io_handle_, writev(RawSliceVectorEqual(expected_slices), expected_slices.size()))
-      .WillOnce(Return(testing::ByMove(Api::IoCallUint64Result(
-          expected_buff.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+      }));
   auto msg = Buffer::OwnedImpl("some data");
   EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
 
@@ -379,12 +403,14 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddresses) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV2Header("1:2:3::4", "1:100:200:3::", 8, 2,
                                           Network::Address::IpVersion::v6, expected_buff);
-  auto expected_slices = expected_buff.getRawSlices(MaxSlices);
   initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, socket_options);
 
-  EXPECT_CALL(io_handle_, writev(RawSliceVectorEqual(expected_slices), expected_slices.size()))
-      .WillOnce(Return(testing::ByMove(Api::IoCallUint64Result(
-          expected_buff.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+      }));
   auto msg = Buffer::OwnedImpl("some data");
   EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
 

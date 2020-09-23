@@ -54,7 +54,7 @@ IntegrationTcpClient::IntegrationTcpClient(
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options);
 
   ON_CALL(*client_write_buffer_, drain(_))
-      .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::baseDrain));
+      .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
   EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AnyNumber());
 
   connection_->enableHalfClose(enable_half_close);
@@ -116,26 +116,26 @@ AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_st
   if (verify) {
     EXPECT_CALL(*client_write_buffer_, move(_));
     if (!data.empty()) {
-      EXPECT_CALL(*client_write_buffer_, write(_)).Times(AtLeast(1));
+      EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AtLeast(1));
     }
   }
 
-  int bytes_expected = client_write_buffer_->bytes_written() + data.size();
+  uint64_t bytes_expected = client_write_buffer_->bytes_drained() + data.size();
 
   connection_->write(buffer, end_stream);
   do {
     connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-    if (client_write_buffer_->bytes_written() == bytes_expected || disconnected_) {
+    if (client_write_buffer_->bytes_drained() == bytes_expected || disconnected_) {
       break;
     }
   } while (bound.withinBound());
 
   if (!bound.withinBound()) {
     return AssertionFailure() << "Timed out completing write";
-  } else if (verify && (disconnected_ || client_write_buffer_->bytes_written() != bytes_expected)) {
+  } else if (verify && (disconnected_ || client_write_buffer_->bytes_drained() != bytes_expected)) {
     return AssertionFailure()
            << "Failed to complete write or unexpected disconnect. disconnected_: " << disconnected_
-           << " bytes_written: " << client_write_buffer_->bytes_written()
+           << " bytes_drained: " << client_write_buffer_->bytes_drained()
            << " bytes_expected: " << bytes_expected;
   }
 

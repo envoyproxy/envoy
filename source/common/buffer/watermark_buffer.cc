@@ -63,12 +63,6 @@ uint64_t WatermarkBuffer::reserve(uint64_t length, RawSlice* iovecs, uint64_t nu
   return bytes_reserved;
 }
 
-Api::IoCallUint64Result WatermarkBuffer::write(Network::IoHandle& io_handle) {
-  Api::IoCallUint64Result result = OwnedImpl::write(io_handle);
-  checkLowWatermark();
-  return result;
-}
-
 void WatermarkBuffer::appendSliceForTest(const void* data, uint64_t size) {
   OwnedImpl::appendSliceForTest(data, size);
   checkHighAndOverflowWatermarks();

@@ -42,6 +42,13 @@ public:
     }
     return io_handle_.writev(slices, num_slice);
   }
+  Api::IoCallUint64Result write(Buffer::Instance& buffer) override {
+    if (closed_) {
+      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
+                                                        Network::IoSocketError::deleteIoError));
+    }
+    return io_handle_.write(buffer);
+  }
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Envoy::Network::Address::Ip* self_ip,
                                   const Network::Address::Instance& peer_address) override {
