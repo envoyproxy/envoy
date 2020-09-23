@@ -61,6 +61,7 @@ envoy_cc_library(
     deps = [
         ":message_validator_lib",
         ":protobuf",
+        ":type_util_lib",
         ":well_known_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/protobuf:message_validator_interface",
@@ -75,6 +76,16 @@ envoy_cc_library(
         "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
         "@envoy_api//envoy/annotations:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "type_util_lib",
+    srcs = ["type_util.cc"],
+    hdrs = ["type_util.h"],
+    deps = [
+        "//source/common/protobuf",
+        "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
     ],
 )
 
