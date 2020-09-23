@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.mutation.v3alpha;
+
+import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/grpc_service.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.mutation.v3alpha";
+option java_outer_classname = "MutationProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).work_in_progress = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+message Mutation {
+  // gRPC service configuration
+  config.core.v3.GrpcService grpc_service = 1;
+
+  // The version of the API supported by the service itself.
+  config.core.v3.ApiVersion transport_api_version = 2
+      [(validate.rules).enum = {defined_only: true}];
+
+  // If true, then do nothing if the remote service RPC fails.
+  // Otherwise, a failure to call the remote service will cause a
+  // 500 error.
+  bool failure_mode_allow = 3;
+
+  // Specifies a list of metadata namespaces whose values, if present, will be passed to the
+  // mutation service as an opaque *protobuf::Struct*.
+  repeated string metadata_context_namespaces = 4;
+}
