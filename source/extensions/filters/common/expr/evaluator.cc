@@ -25,6 +25,8 @@ ActivationPtr createActivation(const StreamInfo::StreamInfo& info,
   activation->InsertValueProducer(Destination, std::make_unique<PeerWrapper>(info, true));
   activation->InsertValueProducer(Metadata,
                                   std::make_unique<MetadataProducer>(info.dynamicMetadata()));
+  activation->InsertValueProducer(FilterState,
+                                  std::make_unique<FilterStateWrapper>(info.filterState()));
   return activation;
 }
 
