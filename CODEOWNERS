@@ -28,6 +28,8 @@ extensions/filters/common/original_src @snowp @klarose
 # compressor used by http compression filters
 /*/extensions/filters/http/common/compressor @gsagula @rojkov @dio
 /*/extensions/filters/http/compressor @rojkov @dio
+# external processing filter
+/*/extensions/filters/http/ext_proc @gbrail @htuch
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension
