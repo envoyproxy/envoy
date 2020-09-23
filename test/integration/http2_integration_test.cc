@@ -124,8 +124,8 @@ TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
 }
 
 TEST_P(Http2IntegrationTest, Http2DownstreamKeepalive) {
-  constexpr uint64_t interval_ms = 500;
-  constexpr uint64_t timeout_ms = interval_ms / 2;
+  constexpr uint64_t interval_ms = 1;
+  constexpr uint64_t timeout_ms = 250;
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -145,35 +145,10 @@ TEST_P(Http2IntegrationTest, Http2DownstreamKeepalive) {
 
   // This call is NOT running the event loop of the client, so downstream PINGs will
   // not receive a response.
-  test_server_->waitForCounterEq("http2.keepalive_timeout", 1);
+  test_server_->waitForCounterEq("http2.keepalive_timeout", 1,
+                                 std::chrono::milliseconds(timeout_ms * 2));
 
   response->waitForReset();
-}
-
-TEST_P(Http2IntegrationTest, Http2UpstreamKeepalive) {
-  constexpr uint64_t interval_ms = 500;
-  constexpr uint64_t timeout_ms = interval_ms / 2;
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* h2_options =
-        bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_http2_protocol_options();
-    h2_options->mutable_connection_keepalive()->mutable_interval()->set_nanos(interval_ms * 1000 *
-                                                                              1000);
-    h2_options->mutable_connection_keepalive()->mutable_timeout()->set_nanos(timeout_ms * 1000 *
-                                                                             1000);
-  });
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-  initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest();
-
-  // Stop the upstream event loop so that PINGs will not receive a response.
-  fake_upstreams_[0]->cleanUp();
-
-  // Why doesn't this work?
-  // test_server_->waitForCounterEq("http2.keepalive_timeout", 1);
-
-  // response->waitForReset();
 }
 
 static std::string response_metadata_filter = R"EOF(
