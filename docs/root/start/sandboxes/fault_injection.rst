@@ -19,12 +19,19 @@ A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/
 **Step 2: Clone the Envoy repo**
 
 If you have not cloned the Envoy repo, clone it with:
+<<<<<<< HEAD
+=======
 
-``git clone git@github.com:envoyproxy/envoy``
+.. tabs::
 
-or
+   .. code-tab:: console HTTPS
 
-``git clone https://github.com/envoyproxy/envoy.git``
+      git clone https://github.com/envoyproxy/envoy.git
+
+   .. code-tab:: console SSH
+
+      git clone git@github.com:envoyproxy/envoy
+>>>>>>> 5e0058e63... Adds sphinx-tabs && sphinx-copybutton to the documentation
 
 **Step 3: Start all of our containers**
 
