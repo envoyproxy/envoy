@@ -367,7 +367,8 @@ message Http2ProtocolOptions {
   // standardized identifiers.
   repeated SettingsParameter custom_settings_parameters = 13;
 
-  // Send HTTP/2 PING frames to verify that the connection is still healthy.
+  // Send HTTP/2 PING frames to verify that the connection is still healthy. If the remote peer
+  // does not respond within the configured timeout, the connection will be aborted.
   KeepaliveSettings connection_keepalive = 15;
 }
 
