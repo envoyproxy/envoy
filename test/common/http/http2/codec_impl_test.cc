@@ -897,6 +897,7 @@ TEST_P(Http2CodecImplTest, EncodeMetadataWhileDispatchingTest) {
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
+// Validate the keepalive PINGs are sent and received correctly.
 TEST_P(Http2CodecImplTest, Keepalive) {
   constexpr uint32_t interval_ms = 100;
   constexpr uint32_t timeout_ms = 200;
@@ -904,33 +905,36 @@ TEST_P(Http2CodecImplTest, Keepalive) {
                                                                                       1000 * 1000);
   client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_nanos(timeout_ms *
                                                                                      1000 * 1000);
-  auto timeout_timer = new Event::MockTimer(&client_connection_.dispatcher_);
+  auto timeout_timer = new Event::MockTimer(&client_connection_.dispatcher_); /* */
   auto send_timer = new Event::MockTimer(&client_connection_.dispatcher_);
+  EXPECT_CALL(*timeout_timer, disableTimer());
   EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
   initialize();
 
+  // Trigger sending a PING, and validate that an ACK is received based on the timeout timer
+  // being disabled and the interval being re-enabled.
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
+  EXPECT_CALL(*timeout_timer, disableTimer()); // This indicates that an ACK was received.
+  EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
   send_timer->callback_();
 
+  // Test that a timeout closes the connection.
   EXPECT_CALL(client_connection_, close(Network::ConnectionCloseType::NoFlush));
   timeout_timer->callback_();
 }
 
+// Validate that jitter is added as expected based on configuration.
 TEST_P(Http2CodecImplTest, KeepaliveJitter) {
-  constexpr uint32_t interval_ms = 1000;
-  client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_nanos(interval_ms *
-                                                                                      1000 * 1000);
-  client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_nanos(1 * 1000 *
-                                                                                     1000);
+  client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_seconds(1);
+  client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_seconds(1);
   client_http2_options_.mutable_connection_keepalive()->set_interval_jitter_percent(10);
-  auto timeout_timer = new Event::MockTimer(&client_connection_.dispatcher_);
+  /*auto timeout_timer = */ new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
   auto send_timer = new Event::MockTimer(&client_connection_.dispatcher_);
 
   constexpr std::chrono::milliseconds min_expected(1000);
-  constexpr std::chrono::milliseconds max_expected(1100); // 1000ms + 10%
+  constexpr std::chrono::milliseconds max_expected(1099); // 1000ms + 10%
   std::chrono::milliseconds min_observed(5000);
   std::chrono::milliseconds max_observed(0);
-  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(1), _)).Times(AtLeast(1));
   EXPECT_CALL(*send_timer, enableTimer(_, _))
       .WillRepeatedly(Invoke([&](const std::chrono::milliseconds& ms, const ScopeTrackedObject*) {
         EXPECT_GE(ms, std::chrono::milliseconds(1000));
@@ -945,8 +949,8 @@ TEST_P(Http2CodecImplTest, KeepaliveJitter) {
     send_timer->callback_();
   }
 
-  EXPECT_EQ(min_observed, min_expected);
-  EXPECT_EQ(max_observed, max_expected);
+  EXPECT_EQ(min_observed.count(), min_expected.count());
+  EXPECT_EQ(max_observed.count(), max_expected.count());
 }
 
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
