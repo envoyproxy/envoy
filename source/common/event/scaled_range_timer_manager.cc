@@ -17,16 +17,25 @@ namespace Event {
  * Implementation of RangeTimer that can be scaled by the backing manager object.
  *
  * Instances of this class exist in one of 3 states:
- *  - disabled: not enabled
+ *  - inactive: not enabled
  *  - waiting-for-min: enabled, min timeout not elapsed
  *  - scaling-max: enabled, min timeout elapsed, max timeout not elapsed
+ *
+ * The allowed state transitions are:
+ *  - inactive -> waiting-for-min
+ *  - waiting-for-min -> scaling-max | inactive
+ *  - scaling-max -> inactive
+ *
+ * Some methods combine multiple state transitions; enableTimer(0, max) on a
+ * timer in the scaling-max state will logically execute the transition sequence
+ * [scaling-max -> inactive -> waiting-for-min -> scaling-max] in a single
+ * method call. The waiting-for-min transitions are elided for efficiency.
  */
 class ScaledRangeTimerManager::RangeTimerImpl final : public RangeTimer {
 public:
   RangeTimerImpl(TimerCb callback, ScaledRangeTimerManager& manager)
       : manager_(manager), callback_(std::move(callback)),
-        min_duration_timer_(manager.dispatcher_.createTimer([this] { onPendingTimerComplete(); })) {
-  }
+        min_duration_timer_(manager.dispatcher_.createTimer([this] { onMinTimerComplete(); })) {}
 
   ~RangeTimerImpl() override { disableTimer(); }
 
@@ -92,8 +101,8 @@ private:
     ScaledRangeTimerManager::ScalingTimerHandle handle_;
   };
 
-  void onPendingTimerComplete() {
-    ENVOY_LOG_MISC(info, "pending complete for {}", static_cast<void*>(this));
+  void onMinTimerComplete() {
+    ENVOY_LOG_MISC(info, "min timer complete for {}", static_cast<void*>(this));
     ASSERT(absl::holds_alternative<WaitingForMin>(state_));
     WaitingForMin& waiting = absl::get<WaitingForMin>(state_);
 
@@ -114,6 +123,12 @@ private:
 
 ScaledRangeTimerManager::ScaledRangeTimerManager(Dispatcher& dispatcher)
     : dispatcher_(dispatcher), scale_factor_(1.0) {}
+
+ScaledRangeTimerManager::~ScaledRangeTimerManager() {
+  // Scaled timers created by the manager shouldn't outlive it. This is
+  // necessary but not sufficient to guarantee that.
+  ASSERT(queues_.empty());
+}
 
 RangeTimerPtr ScaledRangeTimerManager::createTimer(TimerCb callback) {
   return std::make_unique<RangeTimerImpl>(callback, *this);

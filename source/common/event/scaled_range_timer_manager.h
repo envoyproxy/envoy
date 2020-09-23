@@ -17,6 +17,7 @@ namespace Event {
 class ScaledRangeTimerManager {
 public:
   explicit ScaledRangeTimerManager(Dispatcher& dispatcher);
+  ~ScaledRangeTimerManager();
 
   /**
    * Creates a new range timer backed by the manager. The returned timer will be subject to the
@@ -50,9 +51,9 @@ private:
     const std::chrono::milliseconds duration_;
     // The list of active timers in this queue. This is implemented as a
     // std::list so that the iterators held in ScalingTimerHandle instances are
-    // not invalidated by removal or insertion of other timers. Insertion only
-    // happens at the end, though, since the times used are monotonic, which
-    // keeps the list in sorted order.
+    // not invalidated by removal or insertion of other timers. The timers in
+    // the list are in sorted order by active_time_ because they are only
+    // inserted at the end of the list, and the time is monotonically increasing.
     std::list<Item> range_timers_;
     const TimerPtr timer_;
   };
