@@ -514,7 +514,7 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersWithChangeInScalingFactor) {
   const MonotonicTime start = simTime().monotonicTime();
 
   std::vector<TrackedTimer> timers;
-  timers.reserve(3);
+  timers.reserve(4);
   for (int i = 0; i < 4; i++) {
     timers.emplace_back(manager, simTime());
   }
@@ -532,16 +532,16 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersWithChangeInScalingFactor) {
 
   manager.setScaleFactor(0.5);
 
-  // Now that the scale factor is 0.5, fire times are 0: start 10, 1: start 13, 2: start 14, 3:
-  // start 13. Advance to timer 2's min.
+  // Now that the scale factor is 0.5, fire times are 0: start+10, 1: start+13, 2: start+14, 3:
+  // start+13. Advance to timer 2's min.
   simTime().advanceTimeAndRun(std::chrono::seconds(2), dispatcher_, Dispatcher::RunType::Block);
 
-  // Advance to time start 9.
+  // Advance to time start+9.
   simTime().advanceTimeAndRun(std::chrono::seconds(2), dispatcher_, Dispatcher::RunType::Block);
 
   manager.setScaleFactor(0.1);
-  // Now that the scale factor is reduced, fire times are 0: start 6, 1: start 12.2,
-  // 2: start 8.4, 3: start 10.6. Timers 0 and 2 should fire immediately since their
+  // Now that the scale factor is reduced, fire times are 0: start+6, 1: start+12.2,
+  // 2: start+8.4, 3: start+10.6. Timers 0 and 2 should fire immediately since their
   // trigger times are in the past.
   dispatcher_.run(Dispatcher::RunType::Block);
   EXPECT_THAT(*timers[0].trigger_times, ElementsAre(start + std::chrono::seconds(9)));
@@ -549,24 +549,24 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersWithChangeInScalingFactor) {
 
   simTime().advanceTimeAndRun(std::chrono::seconds(1), dispatcher_, Dispatcher::RunType::Block);
 
-  // The time is now start 10. Re-enable timer 0.
+  // The time is now start+10. Re-enable timer 0.
   ASSERT_FALSE(timers[0].timer->enabled());
   timers[0].timer->enableTimer(std::chrono::seconds(5), std::chrono::seconds(13));
 
-  // Fire times are now 0: start 19, 1: start 13, 2: none, 3: start 13.
+  // Fire times are now 0: start+19, 1: start+13, 2: none, 3: start+13.
   manager.setScaleFactor(0.5);
 
   // Advance to timer 1's min.
   simTime().advanceTimeAndRun(std::chrono::seconds(2), dispatcher_, Dispatcher::RunType::Block);
 
-  // Advance again to start 13, which should trigger both timers 1 and 3.
+  // Advance again to start+13, which should trigger both timers 1 and 3.
   simTime().advanceTimeAndRun(std::chrono::seconds(1), dispatcher_, Dispatcher::RunType::Block);
   EXPECT_THAT(*timers[1].trigger_times, ElementsAre(start + std::chrono::seconds(13)));
   EXPECT_THAT(*timers[3].trigger_times, ElementsAre(start + std::chrono::seconds(13)));
 
   simTime().advanceTimeAndRun(std::chrono::seconds(3), dispatcher_, Dispatcher::RunType::Block);
 
-  // The time is now start 16. Setting the scale factor to 0 should make timer 0 fire immediately.
+  // The time is now start+16. Setting the scale factor to 0 should make timer 0 fire immediately.
   manager.setScaleFactor(0);
   dispatcher_.run(Dispatcher::RunType::Block);
   EXPECT_THAT(*timers[0].trigger_times,
