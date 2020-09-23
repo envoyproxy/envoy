@@ -13,15 +13,6 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test_library(
-    name = "dns_utility_lib",
-    hdrs = ["dns_utility.h"],
-    deps = [
-        "//include/envoy/network:address_interface",
-        "//include/envoy/network:dns_interface",
-    ],
-)
-
-envoy_cc_test_library(
     name = "listener_impl_test_base_lib",
     hdrs = ["listener_impl_test_base.h"],
     deps = [
