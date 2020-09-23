@@ -184,14 +184,14 @@ message KeepaliveSettings {
   // Send HTTP/2 PING frames at this period, in order to test that the connection is still alive.
   google.protobuf.Duration interval = 1 [(validate.rules).duration = {
     required: true
-    gt {nanos: 1000000}
+    gte {nanos: 1000000}
   }];
 
   // How long to wait for a response to a keepalive PING. If a response is not received within this
   // time period, the connection will be aborted.
   google.protobuf.Duration timeout = 2 [(validate.rules).duration = {
     required: true
-    gt {nanos: 1000000}
+    gte {nanos: 1000000}
   }];
 
   // An optional jitter amount as a percentage of interval. If specified,
