@@ -128,7 +128,7 @@ class TestClientConnection : public TestCodecStatsProvider,
 public:
   TestClientConnection(Stats::Scope& scope) : TestCodecStatsProvider(scope) {}
 
-  testing::NiceMock<Random::MockRandomGenerator> random_;
+  testing::NiceMock<Random::MockRandomGenerator> random_generator_;
 };
 
 template <typename CodecImplType>
@@ -140,7 +140,7 @@ public:
                            uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
                            typename CodecImplType::SessionFactory& http2_session_factory)
       : TestClientConnection(scope),
-        CodecImplType(connection, callbacks, http2CodecStats(), random_, http2_options,
+        CodecImplType(connection, callbacks, http2CodecStats(), random_generator_, http2_options,
                       max_request_headers_kb, max_request_headers_count, http2_session_factory) {}
 
   // ClientCodecFacade

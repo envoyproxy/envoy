@@ -945,7 +945,7 @@ TEST_P(Http2CodecImplTest, KeepaliveJitter) {
   initialize();
 
   for (uint64_t i = 0; i < 250; i++) {
-    EXPECT_CALL(client_->random_, random()).WillOnce(Return(i));
+    EXPECT_CALL(client_->random_generator_, random()).WillOnce(Return(i));
     send_timer->callback_();
   }
 
