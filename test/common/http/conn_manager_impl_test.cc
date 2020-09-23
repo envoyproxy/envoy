@@ -2050,55 +2050,6 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
   conn_manager_->onData(fake_input, false);
 }
 
-TEST_F(HttpConnectionManagerImplTest, TestFilterCanEnrichAccessLogs) {
-
-  setup(false, "");
-
-  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
-  std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
-
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(filter);
-        callbacks.addAccessLogHandler(handler);
-      }));
-
-  EXPECT_CALL(*filter, onPreDestroy()).WillOnce(Invoke([&]() {
-    ProtobufWkt::Value metadata_value;
-    metadata_value.set_string_value("value");
-    ProtobufWkt::Struct metadata;
-    metadata.mutable_fields()->insert({"field", metadata_value});
-    filter->callbacks_->streamInfo().setDynamicMetadata("metadata_key", metadata);
-  }));
-
-  EXPECT_CALL(*handler, log(_, _, _, _))
-      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
-        auto dynamic_meta = stream_info.dynamicMetadata().filter_metadata().at("metadata_key");
-        EXPECT_EQ("value", dynamic_meta.fields().at("field").string_value());
-      }));
-
-  NiceMock<MockResponseEncoder> encoder;
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        RequestDecoder* decoder = &conn_manager_->newStream(encoder);
-
-        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
-            {":method", "GET"}, {":authority", "host"}, {":path", "/"}}};
-        decoder->decodeHeaders(std::move(headers), true);
-
-        filter->callbacks_->streamInfo().setResponseCodeDetails("");
-        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
-
-        data.drain(4);
-        return Http::okStatus();
-      }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-}
-
 TEST_F(HttpConnectionManagerImplTest, TestDownstreamDisconnectAccessLog) {
   setup(false, "");
 
