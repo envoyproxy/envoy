@@ -11,6 +11,9 @@ any other filters may send their own local replies with custom details.
 
 Below are the list of reasons the HttpConnectionManager or Router filter may send responses or reset streams.
 
+.. warning::
+  The following list is not guaranteed to be stable, since the details are subject to change.
+
 .. csv-table::
    :header: Name, Description
    :widths: 1, 2
