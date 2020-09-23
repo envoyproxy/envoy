@@ -1,0 +1,188 @@
+static_resources {
+  clusters {
+    name: ";"
+    connect_timeout {
+      seconds: 2304
+      nanos: 132
+    }
+    health_checks {
+      timeout {
+        nanos: 262144
+      }
+      interval {
+        seconds: 2559
+        nanos: 67154560
+      }
+      unhealthy_threshold {
+        value: 122
+      }
+      healthy_threshold {
+        value: 1728053248
+      }
+      alt_port {
+        value: 4
+      }
+      http_health_check {
+        path: "0.0.0.0"
+        receive {
+          text: "@B\017\000\000\000\000\000"
+        }
+        request_headers_to_add {
+          header {
+            key: ";"
+            value: "\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177"
+          }
+          append {
+            value: true
+          }
+        }
+        request_headers_to_remove: ";x"
+        codec_client_type: HTTP3
+      }
+      no_traffic_interval {
+        nanos: 917760
+      }
+      unhealthy_edge_interval {
+        seconds: 2559
+        nanos: 16384
+      }
+      event_log_path: "]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+      interval_jitter_percent: 524288
+      tls_options {
+        alpn_protocols: "/"
+      }
+    }
+    http2_protocol_options {
+    }
+    upstream_bind_config {
+      source_address {
+        address: "0.0.0.0"
+        port_value: 0
+      }
+      freebind {
+        value: true
+      }
+    }
+    common_http_protocol_options {
+      idle_timeout {
+        seconds: 2304
+        nanos: 132
+      }
+    }
+    load_assignment {
+      cluster_name: "domains"
+      endpoints {
+        locality {
+          zone: "6"
+        }
+        load_balancing_weight {
+          value: 122
+        }
+        priority: 122
+      }
+      endpoints {
+        lb_endpoints {
+          endpoint {
+            address {
+              socket_address {
+                protocol: UDP
+                address: "0.0.0.0"
+                port_value: 122
+              }
+            }
+          }
+          health_status: TIMEOUT
+          load_balancing_weight {
+            value: 8960
+          }
+        }
+        priority: 122
+      }
+      endpoints {
+        locality {
+          zone: "\n\000\000\000"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              socket_address {
+                address: "0.0.0.0"
+                port_value: 0
+              }
+            }
+          }
+          health_status: TIMEOUT
+        }
+        load_balancing_weight {
+          value: 122
+        }
+        priority: 122
+      }
+      endpoints {
+        locality {
+          sub_zone: "|"
+        }
+        priority: 122
+        proximity {
+          value: 664184
+        }
+      }
+      endpoints {
+        locality {
+          zone: "77777777"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              socket_address {
+                address: "0.0.0.1"
+                port_value: 0
+                ipv4_compat: true
+              }
+            }
+          }
+          health_status: TIMEOUT
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              socket_address {
+                address: "0.0.0.0"
+                port_value: 0
+              }
+            }
+          }
+          health_status: TIMEOUT
+        }
+        load_balancing_weight {
+          value: 1728053248
+        }
+        priority: 106
+      }
+      policy {
+        endpoint_stale_after {
+          nanos: 262144
+        }
+      }
+    }
+    dns_failure_refresh_rate {
+      base_interval {
+        seconds: 8
+        nanos: 812933685
+      }
+    }
+    upstream_http_protocol_options {
+    }
+  }
+}
+cluster_manager {
+  load_stats_config {
+    transport_api_version: V3
+  }
+}
+stats_sinks {
+  name: "type.googleapis.com/envoy.api.v2.route.Route"
+  typed_config {
+    type_url: "IIIIIIIIIIIIIIII"
+  }
+}
