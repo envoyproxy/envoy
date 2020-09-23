@@ -186,7 +186,7 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
   auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
   EXPECT_EQ("allowed", filter_meta.fields().at("shadow_engine_result").string_value());
   EXPECT_EQ("bar", filter_meta.fields().at("shadow_effective_policy_id").string_value());
-  EXPECT_EQ("rbac_access_denied", callbacks_.details());
+  EXPECT_EQ("rbac_access_denied_matched_policy[none]", callbacks_.details());
   checkAccessLogMetadata(LogResult::Undecided);
 }
 
