@@ -5,6 +5,7 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/statusor.h"
+#include "common/http/headers.h"
 
 #include "extensions/filters/http/cdn_loop/utils.h"
 
@@ -14,16 +15,21 @@ namespace HttpFilters {
 namespace CdnLoop {
 
 namespace {
-const Http::LowerCaseString CdnLoopHeaderName("CDN-Loop");
+
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    cdn_loop_handle(Http::CustomHeaders::get().CdnLoop);
+
 constexpr absl::string_view ParseErrorMessage = "Invalid CDN-Loop header in request.";
 constexpr absl::string_view ParseErrorDetails = "invalid_cdn_loop_header";
 constexpr absl::string_view LoopDetectedMessage = "The server has detected a loop between CDNs.";
 constexpr absl::string_view LoopDetectedDetails = "cdn_loop_detected";
+
 } // namespace
 
 Http::FilterHeadersStatus CdnLoopFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                        bool /*end_stream*/) {
-  if (const Http::HeaderEntry* header_entry = headers.get(CdnLoopHeaderName);
+
+  if (const Http::HeaderEntry* header_entry = headers.getInline(cdn_loop_handle.handle());
       header_entry != nullptr) {
     if (StatusOr<int> count =
             countCdnLoopOccurrences(header_entry->value().getStringView(), cdn_id_);
@@ -38,7 +44,7 @@ Http::FilterHeadersStatus CdnLoopFilter::decodeHeaders(Http::RequestHeaderMap& h
     }
   }
 
-  headers.appendCopy(CdnLoopHeaderName, cdn_id_);
+  headers.appendCopy(Http::CustomHeaders::get().CdnLoop, cdn_id_);
   return Http::FilterHeadersStatus::Continue;
 }
 

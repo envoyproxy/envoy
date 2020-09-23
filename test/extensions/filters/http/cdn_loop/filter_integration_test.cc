@@ -67,6 +67,24 @@ TEST_P(CdnLoopFilterIntegrationTest, CdnLoopHeaderWithOtherCdns) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+TEST_P(CdnLoopFilterIntegrationTest, MultipleCdnLoopHeaders) {
+  config_helper_.addFilter(MaxDefaultConfig);
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},   {":path", "/"},
+                                                 {":scheme", "http"},  {":authority", "host"},
+                                                 {"CDN-Loop", "cdn1"}, {"CDN-Loop", "cdn2"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  const auto* payload_entry = upstream_request_->headers().get(Http::LowerCaseString("CDN-Loop"));
+  ASSERT_NE(payload_entry, nullptr);
+  EXPECT_EQ(payload_entry->value().getStringView(), "cdn1,cdn2,cdn");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 TEST_P(CdnLoopFilterIntegrationTest, CdnLoop0Allowed1Seen) {
   config_helper_.addFilter(MaxDefaultConfig);
   initialize();

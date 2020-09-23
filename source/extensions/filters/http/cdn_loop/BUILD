@@ -19,6 +19,7 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
         "//source/common/common:statusor_lib",
+        "//source/common/http:headers_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )

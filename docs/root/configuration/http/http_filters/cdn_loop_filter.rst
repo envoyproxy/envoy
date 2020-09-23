@@ -19,6 +19,8 @@ RFC 8586 is particular in how the CDN-Loop header should be modified. As such:
   <envoy_v3_api_field_config.route.v3.RouteConfiguration.request_headers_to_remove>` fields should
   not contain the CDN-Loop header.
 
+The filter will coalesce multiple CDN-Loop headers into a single, comma-separated header.
+
 Configuration
 -------------
 

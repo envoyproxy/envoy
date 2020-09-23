@@ -86,6 +86,18 @@ TEST(CdnLoopFilterTest, MultipleTransitsAllowed) {
   }
 }
 
+TEST(CdnLoopFilterTest, MultipleHeadersAllowed) {
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  CdnLoopFilter filter("cdn", 0);
+  filter.setDecoderFilterCallbacks(decoder_callbacks);
+
+  Http::TestRequestHeaderMapImpl request_headers{{"CDN-Loop", "cdn1"}, {"CDN-Loop", "cdn2"}};
+
+  EXPECT_EQ(filter.decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(request_headers.get(Http::LowerCaseString("CDN-Loop"))->value().getStringView(),
+            "cdn1,cdn2,cdn");
+}
+
 TEST(CdnLoopFilterTest, UnparseableHeader) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   EXPECT_CALL(decoder_callbacks, sendLocalReply(Http::Code::BadRequest, _, _, _, _)).Times(1);
