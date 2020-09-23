@@ -47,7 +47,7 @@ the trace headers while making an outbound call to service2.
 Running the Sandbox
 ~~~~~~~~~~~~~~~~~~~
 
-.. include:: _include/docker-install.rst
+.. include:: _include/docker-env-setup.rst
 
 **Step 3: Build the sandbox**
 

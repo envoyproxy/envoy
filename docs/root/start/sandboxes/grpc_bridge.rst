@@ -23,7 +23,7 @@ base routing via its route configuration.
 Running the Sandbox
 ~~~~~~~~~~~~~~~~~~~
 
-.. include:: _include/docker-install.rst
+.. include:: _include/docker-env-setup.rst
 
 **Step 3: Generate the protocol stubs**
 

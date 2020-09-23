@@ -17,7 +17,7 @@ header entry to the original request headers to be forwarded to the upstream ser
 Running the Sandbox
 ~~~~~~~~~~~~~~~~~~~
 
-.. include:: _include/docker-install.rst
+.. include:: _include/docker-env-setup.rst
 
 **Step 3: Start all of our containers**
 

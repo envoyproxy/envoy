@@ -29,7 +29,7 @@ The CORS enforcement choices are:
 Running the Sandboxes
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. include:: _include/docker-install.rst
+.. include:: _include/docker-env-setup.rst
 
 **Step 3: Start all of our containers**
 

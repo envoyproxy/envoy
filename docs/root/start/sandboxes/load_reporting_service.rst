@@ -18,7 +18,7 @@ LRS Server enables the stats by sending LoadStatsResponse. Sending requests to h
 Running the Sandbox
 ~~~~~~~~~~~~~~~~~~~
 
-.. include:: _include/docker-install.rst
+.. include:: _include/docker-env-setup.rst
 
 **Step 3: Build the sandbox**
 

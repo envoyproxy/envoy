@@ -1,3 +1,5 @@
+The following documentation runs through the setup of Envoy described above
+
 **Step 1: Install Docker**
 
 Ensure that you have a recent versions of ``docker`` and ``docker-compose`` installed.

@@ -29,7 +29,7 @@ requests are handled by the service Envoy, and efficiently routed to your servic
 Running the Sandbox
 ~~~~~~~~~~~~~~~~~~~
 
-.. include:: _include/docker-install.rst
+.. include:: _include/docker-env-setup.rst
 
 **Step 3: Start all of our containers**
 

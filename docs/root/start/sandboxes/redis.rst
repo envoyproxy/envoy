@@ -9,7 +9,7 @@ In this example, we show how a :ref:`Redis filter <config_network_filters_redis_
 Running the Sandboxes
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. include:: _include/docker-install.rst
+.. include:: _include/docker-env-setup.rst
 
 **Step 3: Build the sandbox**
 

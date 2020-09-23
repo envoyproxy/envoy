@@ -10,7 +10,7 @@ metrics.
 Running the Sandboxes
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. include:: _include/docker-install.rst
+.. include:: _include/docker-env-setup.rst
 
 **Step 3: Build the sandbox**
 
