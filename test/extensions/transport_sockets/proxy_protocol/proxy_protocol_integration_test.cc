@@ -42,16 +42,20 @@ public:
       transport_socket->mutable_typed_config()->PackFrom(proxy_proto_transport);
 
       if (health_checks_) {
-        auto health_check =
-            bootstrap.mutable_static_resources()->mutable_clusters(0)->add_health_checks();
-        health_check->mutable_interval()->set_seconds(15);
-        health_check->mutable_timeout()->set_nanos(100000000); // 100 ms
-        health_check->mutable_no_traffic_interval()->set_seconds(15);
-        health_check->mutable_unhealthy_threshold()->set_value(3);
-        health_check->mutable_healthy_threshold()->set_value(3);
-        health_check->mutable_tcp_health_check()->mutable_send()->set_text("434c4f53450a");
-        auto recv_payload = health_check->mutable_tcp_health_check()->mutable_receive()->Add();
-        recv_payload->set_text("4f4b");
+        auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+        cluster->set_close_connections_on_host_health_failure(false);
+        cluster->mutable_common_lb_config()->mutable_healthy_panic_threshold()->set_value(0);
+        cluster->add_health_checks()->mutable_timeout()->set_seconds(20);
+        cluster->mutable_health_checks(0)->mutable_reuse_connection()->set_value(true);
+        cluster->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
+        cluster->mutable_health_checks(0)->mutable_no_traffic_interval()->set_seconds(1);
+        cluster->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(1);
+        cluster->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(1);
+        cluster->mutable_health_checks(0)->mutable_tcp_health_check();
+        cluster->mutable_health_checks(0)->mutable_tcp_health_check()->mutable_send()->set_text(
+            "50696E67");
+        cluster->mutable_health_checks(0)->mutable_tcp_health_check()->add_receive()->set_text(
+            "506F6E67");
       }
     });
     BaseIntegrationTest::initialize();
@@ -119,6 +123,7 @@ TEST_P(ProxyProtocolIntegrationTest, TestTLSSocket) {
   }
 
   tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
@@ -126,10 +131,24 @@ TEST_P(ProxyProtocolIntegrationTest, TestTLSSocket) {
 TEST_P(ProxyProtocolIntegrationTest, TestProxyProtocolHealthCheck) {
   setup(envoy::config::core::v3::ProxyProtocolConfig::V1, true,
         "envoy.transport_sockets.raw_buffer");
+  FakeRawConnectionPtr fake_upstream_health_connection;
+  on_server_init_function_ = [&](void) -> void {
+    std::string observed_data;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_health_connection));
+    if (GetParam() == Network::Address::IpVersion::v4) {
+      ASSERT_TRUE(fake_upstream_health_connection->waitForData(48, &observed_data));
+      EXPECT_THAT(observed_data, testing::StartsWith("PROXY TCP4 127.0.0.1 127.0.0.1 "));
+    } else if (GetParam() == Network::Address::IpVersion::v6) {
+      ASSERT_TRUE(fake_upstream_health_connection->waitForData(36, &observed_data));
+      EXPECT_THAT(observed_data, testing::StartsWith("PROXY TCP6 ::1 ::1 "));
+    }
+    ASSERT_TRUE(fake_upstream_health_connection->write("Pong"));
+  };
+
   initialize();
 
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  ASSERT_TRUE(fake_upstream_health_connection->close());
+  ASSERT_TRUE(fake_upstream_health_connection->waitForDisconnect());
 }
 
 // Test sending proxy protocol v2
