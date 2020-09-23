@@ -17,6 +17,6 @@ LLVM_PROFILE_FILE=${TEST_BINARY} fuzz_corpus -seed="${FUZZ_CORPUS_SEED:-1}" -max
 # Passing files instead of a directory will run fuzzing as a regression test.
 # TODO(asraa): Remove manual `|| :`, but this shouldn't be necessary.
 _CORPUS="$(find fuzz_corpus -type f)"
-while read -r line; do CORPUS+=($line); done \
+while read -r line; do CORPUS+=("$line"); done \
     <<< "$_CORPUS"
 ${TEST_BINARY} "${CORPUS[@]}" -rss_limit_mb=8192 || :
