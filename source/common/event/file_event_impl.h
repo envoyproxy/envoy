@@ -65,7 +65,7 @@ public:
 class DefaultEventListener : public EventListener {
 public:
   ~DefaultEventListener() override = default;
-  uint32_t triggeredEvents() override { return pending_events_ & (~EV_CLOSED); }
+  uint32_t triggeredEvents() override { return pending_events_ & (~Event::FileReadyType::Closed); }
   void onEventEnabled(uint32_t enabled_events) override { pending_events_ = enabled_events; }
   void onEventActivated(uint32_t activated_events) override {
     ephermal_events_ |= activated_events;
@@ -78,42 +78,45 @@ public:
 
 private:
   // The persisted intrested events and ready events.
-  uint32_t pending_events_;
+  uint32_t pending_events_{};
   // The events set by activate() and will be cleared after the io callback.
-  uint32_t ephermal_events_;
+  uint32_t ephermal_events_{};
 };
 
 // A FileEvent implementation which is
 class UserSpaceFileEventImpl : public FileEvent {
 public:
   ~UserSpaceFileEventImpl() override {
-    //if (schedulable_.enabled()) {
-      schedulable_.cancel();
+    // if (schedulable_.enabled()) {
+    schedulable_.cancel();
     //}
-    ASSERT(event_counter_  == 1);
+    ASSERT(event_counter_ == 1);
     --event_counter_;
   }
 
   // Event::FileEvent
   void activate(uint32_t events) override {
     event_listener_.onEventEnabled(events);
-    schedulable_.scheduleCallbackNextIteration();
+    if (!schedulable_.enabled()) {
+      schedulable_.scheduleCallbackNextIteration();
+    }
   }
 
   void setEnabled(uint32_t events) override {
     event_listener_.onEventEnabled(events);
-    schedulable_.scheduleCallbackNextIteration();
+    if (!schedulable_.enabled()) {
+      schedulable_.scheduleCallbackNextIteration();
+    }
   }
 
   EventListener& getEventListener() { return event_listener_; }
-  void onEvents() {
-    cb_();
-  }
+  void onEvents() { cb_(); }
   friend class UserSpaceFileEventFactory;
   friend class Network::BufferedIoSocketHandleImpl;
 
 private:
-  UserSpaceFileEventImpl(Event::FileReadyCb cb, uint32_t events, SchedulableCallback& schedulable_cb, int& event_counter)
+  UserSpaceFileEventImpl(Event::FileReadyCb cb, uint32_t events,
+                         SchedulableCallback& schedulable_cb, int& event_counter)
       : schedulable_(schedulable_cb), cb_([this, cb]() {
           auto all_events = getEventListener().triggeredEvents();
           auto epheral_events = getEventListener().getAndClearEpheralEvents();
@@ -131,9 +134,11 @@ private:
 class UserSpaceFileEventFactory {
 public:
   static std::unique_ptr<UserSpaceFileEventImpl>
-  createUserSpaceFileEventImpl(Event::Dispatcher& , Event::FileReadyCb cb,
-                               Event::FileTriggerType, uint32_t events, SchedulableCallback& scheduable_cb, int& event_counter) {
-    return std::unique_ptr<UserSpaceFileEventImpl>(new UserSpaceFileEventImpl(cb, events, scheduable_cb, event_counter));
+  createUserSpaceFileEventImpl(Event::Dispatcher&, Event::FileReadyCb cb, Event::FileTriggerType,
+                               uint32_t events, SchedulableCallback& scheduable_cb,
+                               int& event_counter) {
+    return std::unique_ptr<UserSpaceFileEventImpl>(
+        new UserSpaceFileEventImpl(cb, events, scheduable_cb, event_counter));
   }
 };
 
