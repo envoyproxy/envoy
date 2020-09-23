@@ -29,7 +29,8 @@ public:
   // do with shared_ptr and possible cycles in regards to the clusters host objects. Since all this
   // test class directly uses the unit test class that has been in master for a long time, this is
   // likely a false positive.
-  void initialize(test::common::upstream::HealthCheckTestCase input); // NOLINT
+  void initialize(test::common::upstream::HealthCheckTestCase
+                      input); // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
   void respond(std::string data, bool last_action);
   void triggerIntervalTimer();
   void triggerTimeoutTimer(bool last_action);
