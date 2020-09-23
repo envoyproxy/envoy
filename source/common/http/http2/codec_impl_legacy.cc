@@ -472,7 +472,7 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
   parent_.sendPendingFrames();
 
   if (!parent_.protocol_constraints_.checkOutboundFrameLimits().ok()) {
-    parent_.scheduleProtocolConstrainViolationCallback();
+    parent_.scheduleProtocolConstraintViolationCallback();
   }
 
   if (local_end_stream_ && pending_send_data_.length() > 0) {
@@ -1081,15 +1081,15 @@ void ConnectionImpl::sendSettings(
   }
 }
 
-void ConnectionImpl::scheduleProtocolConstrainViolationCallback() {
+void ConnectionImpl::scheduleProtocolConstraintViolationCallback() {
   if (!protocol_constraint_violation_callback_) {
     protocol_constraint_violation_callback_ = connection_.dispatcher().createSchedulableCallback(
-        [this]() { onProtocolConstrainViolation(); });
+        [this]() { onProtocolConstraintViolation(); });
     protocol_constraint_violation_callback_->scheduleCallbackNextIteration();
   }
 }
 
-void ConnectionImpl::onProtocolConstrainViolation() {
+void ConnectionImpl::onProtocolConstraintViolation() {
   // Flooded outbound queue implies that peer is not reading and it does not
   // make sense to try to flush pending bytes.
   connection_.close(Envoy::Network::ConnectionCloseType::NoFlush);

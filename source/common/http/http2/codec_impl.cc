@@ -488,7 +488,7 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
   // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
   RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
   if (!parent_.protocol_constraints_.checkOutboundFrameLimits().ok()) {
-    parent_.scheduleProtocolConstrainViolationCallback();
+    parent_.scheduleProtocolConstraintViolationCallback();
   }
 
   if (local_end_stream_ && pending_send_data_.length() > 0) {
@@ -1116,15 +1116,15 @@ int ConnectionImpl::setAndCheckNghttp2CallbackStatus(Status&& status) {
   return nghttp2_callback_status_.ok() ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
 }
 
-void ConnectionImpl::scheduleProtocolConstrainViolationCallback() {
+void ConnectionImpl::scheduleProtocolConstraintViolationCallback() {
   if (!protocol_constraint_violation_callback_) {
     protocol_constraint_violation_callback_ = connection_.dispatcher().createSchedulableCallback(
-        [this]() { onProtocolConstrainViolation(); });
+        [this]() { onProtocolConstraintViolation(); });
     protocol_constraint_violation_callback_->scheduleCallbackNextIteration();
   }
 }
 
-void ConnectionImpl::onProtocolConstrainViolation() {
+void ConnectionImpl::onProtocolConstraintViolation() {
   // Flooded outbound queue implies that peer is not reading and it does not
   // make sense to try to flush pending bytes.
   connection_.close(Envoy::Network::ConnectionCloseType::NoFlush);

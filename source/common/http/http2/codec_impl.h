@@ -435,8 +435,8 @@ protected:
    * Callback for terminating connection when protocol constrain has been violated
    * outside of the dispatch context.
    */
-  void scheduleProtocolConstrainViolationCallback();
-  void onProtocolConstrainViolation();
+  void scheduleProtocolConstraintViolationCallback();
+  void onProtocolConstraintViolation();
 
   static Http2Callbacks http2_callbacks_;
 
