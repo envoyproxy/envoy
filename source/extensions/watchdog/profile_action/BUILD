@@ -24,6 +24,7 @@ envoy_cc_library(
         "//include/envoy/thread:thread_interface",
         "//source/common/profiler:profiler_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:symbol_table_lib",
         "@envoy_api//envoy/extensions/watchdog/profile_action/v3alpha:pkg_cc_proto",
     ],
 )

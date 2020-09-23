@@ -4,6 +4,7 @@
 
 #include "extensions/watchdog/profile_action/config.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -42,9 +43,10 @@ TEST(ProfileActionFactoryTest, CanCreateAction) {
       )EOF",
       config);
 
+  Stats::TestUtil::TestStore stats;
   Event::MockDispatcher dispatcher;
-  Api::ApiPtr api = Api::createApiForTest();
-  Server::Configuration::GuardDogActionFactoryContext context{*api, dispatcher};
+  Api::ApiPtr api = Api::createApiForTest(stats);
+  Server::Configuration::GuardDogActionFactoryContext context{*api, dispatcher, stats, "test"};
 
   EXPECT_CALL(dispatcher, createTimer_(_));
   EXPECT_NE(factory->createGuardDogActionFromProto(config, context), nullptr);
