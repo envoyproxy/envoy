@@ -407,20 +407,12 @@ protected:
 
 class TestImpl : public TestImplProvider, public Impl {
 public:
-  TestImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store,
-           Filesystem::Instance& file_system)
-      : Impl(thread_factory, stats_store, global_time_system_, file_system,
-             mock_random_generator_) {}
-  TestImpl(Thread::ThreadFactory& thread_factory, Event::TimeSystem& time_system,
-           Filesystem::Instance& file_system)
-      : Impl(thread_factory, default_stats_store_, time_system, file_system,
-             mock_random_generator_) {}
-  TestImpl(Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system)
-      : Impl(thread_factory, default_stats_store_, global_time_system_, file_system,
-             mock_random_generator_) {}
-  TestImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store,
-           Event::TimeSystem& time_system, Filesystem::Instance& file_system)
-      : Impl(thread_factory, stats_store, time_system, file_system, mock_random_generator_) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
+           Stats::Store* stats_store = nullptr, Event::TimeSystem* time_system = nullptr,
+           Random::RandomGenerator* random = nullptr)
+      : Impl(thread_factory, stats_store ? *stats_store : default_stats_store_,
+             time_system ? *time_system : global_time_system_, file_system,
+             random ? *random : mock_random_generator_) {}
 };
 
 ApiPtr createApiForTest() {
@@ -428,19 +420,29 @@ ApiPtr createApiForTest() {
                                     Filesystem::fileSystemForTest());
 }
 
+ApiPtr createApiForTest(Random::RandomGenerator& random) {
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(),
+                                    Filesystem::fileSystemForTest(), nullptr, nullptr, &random);
+}
+
 ApiPtr createApiForTest(Stats::Store& stat_store) {
-  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), stat_store,
-                                    Filesystem::fileSystemForTest());
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+                                    &stat_store);
+}
+
+ApiPtr createApiForTest(Stats::Store& stat_store, Random::RandomGenerator& random) {
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+                                    &stat_store, nullptr, &random);
 }
 
 ApiPtr createApiForTest(Event::TimeSystem& time_system) {
-  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), time_system,
-                                    Filesystem::fileSystemForTest());
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+                                    nullptr, &time_system);
 }
 
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system) {
-  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), stat_store, time_system,
-                                    Filesystem::fileSystemForTest());
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+                                    &stat_store, &time_system);
 }
 
 } // namespace Api

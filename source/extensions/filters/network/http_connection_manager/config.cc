@@ -167,9 +167,9 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   // as these captured objects are also global singletons.
   return [singletons, filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-        *filter_config, context.drainDecision(), context.random(), context.httpContext(),
-        context.runtime(), context.localInfo(), context.clusterManager(), context.overloadManager(),
-        context.dispatcher().timeSource())});
+        *filter_config, context.drainDecision(), context.api().randomGenerator(),
+        context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
+        context.overloadManager(), context.dispatcher().timeSource())});
   };
 }
 
@@ -270,7 +270,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     request_id_extension_ =
         Http::RequestIDExtensionFactory::fromProto(config.request_id_extension(), context_);
   } else {
-    request_id_extension_ = Http::RequestIDExtensionFactory::defaultInstance(context_.random());
+    request_id_extension_ =
+        Http::RequestIDExtensionFactory::defaultInstance(context_.api().randomGenerator());
   }
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
@@ -709,9 +710,9 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   // as these captured objects are also global singletons.
   return [singletons, filter_config, &context, &read_callbacks]() -> Http::ApiListenerPtr {
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
-        *filter_config, context.drainDecision(), context.random(), context.httpContext(),
-        context.runtime(), context.localInfo(), context.clusterManager(), context.overloadManager(),
-        context.dispatcher().timeSource());
+        *filter_config, context.drainDecision(), context.api().randomGenerator(),
+        context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
+        context.overloadManager(), context.dispatcher().timeSource());
 
     // This factory creates a new ConnectionManagerImpl in the absence of its usual environment as
     // an L4 filter, so this factory needs to take a few actions.
