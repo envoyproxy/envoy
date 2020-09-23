@@ -91,6 +91,7 @@ The following attributes are exposed to the language runtime:
    destination.address, string, Downstream connection local address
    destination.port, int, Downstream connection local port
    metadata, :ref:`Metadata<envoy_api_msg_core.Metadata>`, Dynamic metadata
+   filter_state, map string to bytes, Filter state mapping data names to their serialized string value
    connection.mtls, bool, Indicates whether TLS is applied to the downstream connection and the peer ceritificate is presented
    connection.requested_server_name, string, Requested server name in the downstream TLS connection
    connection.tls_version, string, TLS version of the downstream TLS connection
