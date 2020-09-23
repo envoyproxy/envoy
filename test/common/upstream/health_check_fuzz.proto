@@ -74,8 +74,7 @@ message Action {
 message HealthCheckTestCase {
   envoy.config.core.v3.HealthCheck health_check_config = 1
       [(validate.rules).message.required = true];
-  repeated Action actions =
-      2; //TODO: Timeouts might eventually come up from this becoming too big. If so, can simply add a check in replay loop.
+  repeated Action actions = 2;
   bool http_verify_cluster = 3; //Determines if verify cluster setting is on
   bool start_failed = 4;
 }

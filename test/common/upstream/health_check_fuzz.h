@@ -48,7 +48,7 @@ public:
   serializeResponse(grpc::health::v1::HealthCheckResponse::ServingStatus status);
   Buffer::OwnedImpl
   makeBufferToRespondWith(test::common::upstream::GrpcRespondBytes grpc_respond_bytes);
-  // This has three components, headers, raw bytes, or trailers
+  // This has three components, headers, raw bytes, and trailers
   void respond(test::common::upstream::GrpcRespond grpc_respond);
   void triggerIntervalTimer(bool expect_client_create);
   void triggerTimeoutTimer(bool last_action);

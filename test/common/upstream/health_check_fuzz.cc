@@ -58,6 +58,8 @@ void HttpHealthCheckFuzz::respond(const test::fuzz::Headers& headers, absl::stri
 
   response_headers->setStatus(status);
 
+  // TODO: Add check here against http util library once that fix is merged
+
   // Responding with http can cause client to close, if so create a new one.
   bool client_will_close = false;
   if (response_headers->Connection()) {
@@ -308,11 +310,12 @@ Buffer::OwnedImpl GrpcHealthCheckFuzz::makeBufferToRespondWith(
 }
 
 // Logic from respondResponseSpec() in unit tests
-void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respond) { //TODO: Between every single type of response, check if it called rpc complete. If it did, then you have to invoke the interval timer again. I think you could do this by simply checking if interval timer got enabled after every call
+void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respond) {
   if (!test_sessions_[0]->timeout_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping response.");
     return;
   }
+  // These booleans help figure out when to end the stream
   bool has_data = false;
   bool has_trailers = false;
 
@@ -328,285 +331,278 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respo
       }
       break;
     }
-    default: { // shouldn't hit
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    default: // If the fuzzer generates an empty grpc_respond_bytes message
       break;
     }
-    }
   }
-    //TODO: Get rid of this? always have a response trailers
-    if (grpc_respond.has_grpc_respond_trailers()) {
-      if (grpc_respond.grpc_respond_trailers().has_trailers()) {
-        if (grpc_respond.grpc_respond_trailers().trailers().headers_size() != 0) {
-          has_trailers = true;
-        }
+  // TODO: Should I hardcode trailers? Particularly grpc-status = 0?
+  if (grpc_respond.has_grpc_respond_trailers()) {
+    if (grpc_respond.grpc_respond_trailers().has_trailers()) {
+      if (grpc_respond.grpc_respond_trailers().trailers().headers_size() != 0) {
+        has_trailers = true;
       }
     }
+  }
 
-    ENVOY_LOG_MISC(trace, "Has data: {}. Has trailers: {}.", has_data, has_trailers);
+  ENVOY_LOG_MISC(trace, "Has data: {}. Has trailers: {}.", has_data, has_trailers);
 
-    bool end_stream_on_headers = !has_data && !has_trailers;
+  bool end_stream_on_headers = !has_data && !has_trailers;
 
-    std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers =
-        std::make_unique<Http::TestResponseHeaderMapImpl>(
-            Fuzz::fromHeaders<Http::TestResponseHeaderMapImpl>(
-                grpc_respond.grpc_respond_headers().headers(), {}, {}));
+  std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers =
+      std::make_unique<Http::TestResponseHeaderMapImpl>(
+          Fuzz::fromHeaders<Http::TestResponseHeaderMapImpl>(
+              grpc_respond.grpc_respond_headers().headers(), {}, {}));
 
-    response_headers->setStatus("200"); // Required for gRPC
+  response_headers->setStatus("200"); // Required for gRPC
 
-    ENVOY_LOG_MISC(trace, "Responded headers {}", *response_headers.get());
-    test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
-                                                                 end_stream_on_headers);
+  ENVOY_LOG_MISC(trace, "Responded headers {}", *response_headers.get());
+  test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
+                                                               end_stream_on_headers);
 
-    //Perhaps adding a check for interval timer here, you invoke interval callback than exit. When you exit, it logically means that the rpc is done with, because that maps to the health checkers rpc being done as well, represented by a call to rpc complete.
-    /*if (test_sessions_[0]->interval_timer_->enabled_) {
-      ENVOY_LOG_MISC(trace, "Interval timer was disabled. Rpc is complete.");
-      return;
-    }*/
+  // If the interval timer is enabled, that means that the rpc is complete, as decodeHeaders hit a
+  // certain branch that called onRpcComplete(), logically representing a completed rpc call. Thus,
+  // skip the next responses until explicility invoking interval timer as cleanup.
+  if (has_data && !test_sessions_[0]->interval_timer_->enabled_) {
+    bool end_stream_on_data = !has_trailers;
+    auto bufferToRespondWith = makeBufferToRespondWith(grpc_respond.grpc_respond_bytes());
+    ENVOY_LOG_MISC(trace, "Responded with data");
+    test_sessions_[0]->stream_response_callbacks_->decodeData(bufferToRespondWith,
+                                                              end_stream_on_data);
+  }
 
-    //If the interval timer is enabled, that means that the rpc is complete, as decodeHeaders hit a certain branch that called onRpcComplete(). Thus, skip the next responses until expicility invoking interval timer as cleanup.
-    if (has_data && !test_sessions_[0]->interval_timer_->enabled_) {
-      bool end_stream_on_data = !has_trailers;
-      auto bufferToRespondWith = makeBufferToRespondWith(grpc_respond.grpc_respond_bytes());
-      ENVOY_LOG_MISC(trace, "Responded with data");
-      test_sessions_[0]->stream_response_callbacks_->decodeData(bufferToRespondWith,
-                                                                end_stream_on_data);
-    }
+  if (has_trailers && !test_sessions_[0]->interval_timer_->enabled_) {
+    std::unique_ptr<Http::TestResponseTrailerMapImpl> response_trailers =
+        std::make_unique<Http::TestResponseTrailerMapImpl>(
+            Fuzz::fromHeaders<Http::TestResponseTrailerMapImpl>(
+                grpc_respond.grpc_respond_trailers().trailers(), {}, {}));
 
-    //TODO: get rid of has_trailers, and put in interval timer
-    if (has_trailers && !test_sessions_[0]->interval_timer_->enabled_) {
-      std::unique_ptr<Http::TestResponseTrailerMapImpl> response_trailers =
-          std::make_unique<Http::TestResponseTrailerMapImpl>(
-              Fuzz::fromHeaders<Http::TestResponseTrailerMapImpl>(
-                  grpc_respond.grpc_respond_trailers().trailers(), {}, {}));
+    ENVOY_LOG_MISC(trace, "Responded trailers {}", *response_trailers.get());
 
-      ENVOY_LOG_MISC(trace, "Responded trailers {}", *response_trailers.get());
+    test_sessions_[0]->stream_response_callbacks_->decodeTrailers(std::move(response_trailers));
+  }
 
-      test_sessions_[0]->stream_response_callbacks_->decodeTrailers(std::move(response_trailers)); //Trailers always call onRpcComplete. However, it seems like theres never a scenario where theres no trailers in the unit tests. Thus, this will always get called, calling onRpcComplete and setting stage for calling interval timer below.
-    }
+  // This means that the response did not represent a full rpc response.
+  if (!test_sessions_[0]->interval_timer_->enabled_) {
+    return;
+  }
 
-    // Responses call onRpcComplete(), which blows away client if reuse connection
-    // is set to false or the health checker had a goaway event with no error flag
-    if (!reuse_connection_ || received_no_error_goaway_) {
-      ENVOY_LOG_MISC(trace, "Creating client and stream after response.");
-      triggerIntervalTimer(true);
-    } else { // Still want to invoke interval timer after every response to not have the fuzzer have
-             // to wait for a triggerIntervalTimer event
-      ENVOY_LOG_MISC(trace, "Creating stream after response.");
-      triggerIntervalTimer(false);
-    }
+  // Once it gets here the health checker will have called onRpcComplete(), logically representing a
+  // completed rpc call, which blows away client if reuse connection is set to false or the health
+  // checker had a goaway event with no error flag.
+  if (!reuse_connection_ || received_no_error_goaway_) {
+    ENVOY_LOG_MISC(trace, "Creating client and stream after response.");
+    triggerIntervalTimer(true);
+  } else { // Still want to invoke interval timer after every response to not have the fuzzer have
+           // to wait for a triggerIntervalTimer event
+    ENVOY_LOG_MISC(trace, "Creating stream after response.");
+    triggerIntervalTimer(false);
+  }
 
+  received_no_error_goaway_ = false; // from resetState()
+}
+
+void GrpcHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
+  if (!test_sessions_[0]->interval_timer_->enabled_) {
+    ENVOY_LOG_MISC(trace, "Interval timer is disabled. Skipping trigger interval timer.");
+    return;
+  }
+  if (expect_client_create) {
+    expectClientCreate(0);
+  }
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
+}
+
+void GrpcHealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
+  if (!test_sessions_[0]->timeout_timer_->enabled_) {
+    ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping trigger timeout timer.");
+    return;
+  }
+  ENVOY_LOG_MISC(trace, "Triggered timeout timer");
+  test_sessions_[0]->timeout_timer_->invokeCallback(); // This closes the client, turns off
+                                                       // timeout and enables interval
+
+  if ((!reuse_connection_ || received_no_error_goaway_) && !last_action) {
+    ENVOY_LOG_MISC(trace, "Creating client and stream after timeout.");
+    triggerIntervalTimer(true);
+  } else {
     received_no_error_goaway_ = false; // from resetState()
   }
+}
 
-  void GrpcHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
-    if (!test_sessions_[0]->interval_timer_->enabled_) {
-      ENVOY_LOG_MISC(trace, "Interval timer is disabled. Skipping trigger interval timer.");
+void GrpcHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) {
+  test_sessions_[0]->client_connection_->raiseEvent(event_type);
+  if (!last_action && event_type != Network::ConnectionEvent::Connected) {
+    // Close events will always blow away the client
+    ENVOY_LOG_MISC(trace, "Creating client and stream from close event");
+    // Interval timer is guaranteed to be enabled from a close event - calls
+    // onResetStream which handles failure, turning interval timer on and timeout off
+    triggerIntervalTimer(true);
+  }
+}
+
+void GrpcHealthCheckFuzz::raiseGoAway(bool no_error) {
+  if (no_error) {
+    test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
+    // Will cause other events to blow away client, because this is a "graceful" go away
+    received_no_error_goaway_ = true;
+  } else {
+    // go away events without noerror flag explicitly blow away client
+    test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
+    triggerIntervalTimer(true);
+  }
+}
+
+Network::ConnectionEvent
+HealthCheckFuzz::getEventTypeFromProto(const test::common::upstream::RaiseEvent& event) {
+  switch (event) {
+  case test::common::upstream::RaiseEvent::CONNECTED: {
+    return Network::ConnectionEvent::Connected;
+  }
+  case test::common::upstream::RaiseEvent::REMOTE_CLOSE: {
+    return Network::ConnectionEvent::RemoteClose;
+  }
+  case test::common::upstream::RaiseEvent::LOCAL_CLOSE: {
+    return Network::ConnectionEvent::LocalClose;
+  }
+  default: // shouldn't hit
+    NOT_REACHED_GCOVR_EXCL_LINE;
+    break;
+  }
+}
+
+void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTestCase input) {
+  switch (input.health_check_config().health_checker_case()) {
+  case envoy::config::core::v3::HealthCheck::kHttpHealthCheck: {
+    type_ = HealthCheckFuzz::Type::HTTP;
+    http_fuzz_test_ = std::make_unique<HttpHealthCheckFuzz>();
+    try {
+      http_fuzz_test_->initialize(input);
+    } catch (EnvoyException& e) {
+      ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
       return;
     }
-    if (expect_client_create) {
-      expectClientCreate(0);
-    }
-    expectStreamCreate(0);
-    test_sessions_[0]->interval_timer_->invokeCallback();
+    replay(input);
+    break;
   }
-
-  void GrpcHealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
-    // Timeout timer needs to be explicitly enabled, usually by a call to onIntervalBase().
-    if (!test_sessions_[0]->timeout_timer_->enabled_) {
-      ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping trigger timeout timer.");
+  case envoy::config::core::v3::HealthCheck::kTcpHealthCheck: {
+    type_ = HealthCheckFuzz::Type::TCP;
+    tcp_fuzz_test_ = std::make_unique<TcpHealthCheckFuzz>();
+    try {
+      tcp_fuzz_test_->initialize(input);
+    } catch (EnvoyException& e) {
+      ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
       return;
     }
-    ENVOY_LOG_MISC(trace, "Triggered timeout timer");
-    test_sessions_[0]->timeout_timer_->invokeCallback(); // This closes the client, turns off
-                                                         // timeout and enables interval
-    if (!last_action) {
-      ENVOY_LOG_MISC(trace, "Creating client and stream from network timeout");
-      triggerIntervalTimer(true);
-    }
-
-    if (!reuse_connection_ || received_no_error_goaway_) {
-      ENVOY_LOG_MISC(trace, "Creating client and stream after timeout.");
-      triggerIntervalTimer(true);
-    } else {
-      received_no_error_goaway_ = false; // from resetState()
-    }
+    replay(input);
+    break;
   }
-
-  void GrpcHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type,
-                                       bool last_action) {
-    test_sessions_[0]->client_connection_->raiseEvent(event_type);
-    if (!last_action && event_type != Network::ConnectionEvent::Connected) {
-      // Close events will always blow away the client
-      ENVOY_LOG_MISC(trace, "Creating client and stream from close event");
-      // Interval timer is guaranteed to be enabled from a close event - calls
-      // onResetStream which handles failure, turning interval timer on and timeout off
-      triggerIntervalTimer(true);
+  case envoy::config::core::v3::HealthCheck::kGrpcHealthCheck: {
+    type_ = HealthCheckFuzz::Type::GRPC;
+    grpc_fuzz_test_ = std::make_unique<GrpcHealthCheckFuzz>();
+    try {
+      grpc_fuzz_test_->initialize(input);
+    } catch (EnvoyException& e) {
+      ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
+      return;
     }
+    replay(input);
+    break;
   }
-
-  void GrpcHealthCheckFuzz::raiseGoAway(bool no_error) {
-    if (no_error) {
-      test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
-      // Will cause other events to blow away client, because this is a "graceful" go away
-      received_no_error_goaway_ = true;
-    } else {
-      // go away events without noerror flag explicitly blow away client
-      test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
-      triggerIntervalTimer(true);
-    }
+  default:
+    break;
   }
+}
 
-  Network::ConnectionEvent HealthCheckFuzz::getEventTypeFromProto(
-      const test::common::upstream::RaiseEvent& event) {
-    switch (event) {
-    case test::common::upstream::RaiseEvent::CONNECTED: {
-      return Network::ConnectionEvent::Connected;
-    }
-    case test::common::upstream::RaiseEvent::REMOTE_CLOSE: {
-      return Network::ConnectionEvent::RemoteClose;
-    }
-    case test::common::upstream::RaiseEvent::LOCAL_CLOSE: {
-      return Network::ConnectionEvent::LocalClose;
-    }
-    default: // shouldn't hit
-      NOT_REACHED_GCOVR_EXCL_LINE;
+void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& input) {
+  constexpr auto max_actions = 64;
+  for (int i = 0; i < std::min(max_actions, input.actions().size()); ++i) {
+    const auto& event = input.actions(i);
+    const bool last_action = i == std::min(max_actions, input.actions().size()) - 1;
+    ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
+    switch (event.action_selector_case()) {
+    case test::common::upstream::Action::kRespond: {
+      switch (type_) {
+      case HealthCheckFuzz::Type::HTTP: {
+        http_fuzz_test_->respond(event.respond().http_respond().headers(),
+                                 event.respond().http_respond().status());
+        break;
+      }
+      case HealthCheckFuzz::Type::TCP: {
+        tcp_fuzz_test_->respond(event.respond().tcp_respond().data(), last_action);
+        break;
+      }
+      case HealthCheckFuzz::Type::GRPC: {
+        grpc_fuzz_test_->respond(event.respond().grpc_respond());
+        break;
+      }
+      default:
+        break;
+      }
       break;
     }
-  }
-
-  void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTestCase input) {
-    switch (input.health_check_config().health_checker_case()) {
-    case envoy::config::core::v3::HealthCheck::kHttpHealthCheck: {
-      type_ = HealthCheckFuzz::Type::HTTP;
-      http_fuzz_test_ = std::make_unique<HttpHealthCheckFuzz>();
-      try { // Catches exceptions related to initializing health checker
-        http_fuzz_test_->initialize(input);
-      } catch (EnvoyException& e) {
-        ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-        return;
+    case test::common::upstream::Action::kTriggerIntervalTimer: {
+      switch (type_) {
+      case HealthCheckFuzz::Type::HTTP: {
+        http_fuzz_test_->triggerIntervalTimer(false);
+        break;
       }
-      replay(input);
+      case HealthCheckFuzz::Type::TCP: {
+        tcp_fuzz_test_->triggerIntervalTimer();
+        break;
+      }
+      case HealthCheckFuzz::Type::GRPC: {
+        grpc_fuzz_test_->triggerIntervalTimer(false);
+        break;
+      }
+      default:
+        break;
+      }
       break;
     }
-    case envoy::config::core::v3::HealthCheck::kTcpHealthCheck: {
-      type_ = HealthCheckFuzz::Type::TCP;
-      tcp_fuzz_test_ = std::make_unique<TcpHealthCheckFuzz>();
-      try { // Catches exceptions related to initializing health checker
-        tcp_fuzz_test_->initialize(input);
-      } catch (EnvoyException& e) {
-        ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-        return;
+    case test::common::upstream::Action::kTriggerTimeoutTimer: {
+      switch (type_) {
+      case HealthCheckFuzz::Type::HTTP: {
+        http_fuzz_test_->triggerTimeoutTimer(last_action);
+        break;
       }
-      replay(input);
+      case HealthCheckFuzz::Type::TCP: {
+        tcp_fuzz_test_->triggerTimeoutTimer(last_action);
+        break;
+      }
+      case HealthCheckFuzz::Type::GRPC: {
+        grpc_fuzz_test_->triggerTimeoutTimer(last_action);
+        break;
+      }
+      default:
+        break;
+      }
       break;
     }
-    case envoy::config::core::v3::HealthCheck::kGrpcHealthCheck: {
-      type_ = HealthCheckFuzz::Type::GRPC;
-      grpc_fuzz_test_ = std::make_unique<GrpcHealthCheckFuzz>();
-      try { // Catches exceptions related to initializing health checker
-        grpc_fuzz_test_->initialize(input);
-      } catch (EnvoyException& e) {
-        ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-        return;
+    case test::common::upstream::Action::kRaiseEvent: {
+      switch (type_) {
+      case HealthCheckFuzz::Type::HTTP: {
+        http_fuzz_test_->raiseEvent(getEventTypeFromProto(event.raise_event()), last_action);
+        break;
       }
-      replay(input);
+      case HealthCheckFuzz::Type::TCP: {
+        tcp_fuzz_test_->raiseEvent(getEventTypeFromProto(event.raise_event()), last_action);
+        break;
+      }
+      case HealthCheckFuzz::Type::GRPC: {
+        grpc_fuzz_test_->raiseEvent(getEventTypeFromProto(event.raise_event()), last_action);
+        break;
+      }
+      default:
+        break;
+      }
       break;
     }
     default:
       break;
     }
   }
-
-  void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& input) {
-    constexpr auto max_actions = 64;
-    for (int i = 0; i < std::min(max_actions, input.actions().size()); ++i) {
-      const auto& event = input.actions(i);
-      const bool last_action = i == std::min(max_actions, input.actions().size()) - 1;
-      ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
-      switch (event.action_selector_case()) {
-      case test::common::upstream::Action::kRespond: {
-        switch (type_) {
-        case HealthCheckFuzz::Type::HTTP: {
-          http_fuzz_test_->respond(event.respond().http_respond().headers(),
-                                   event.respond().http_respond().status());
-          break;
-        }
-        case HealthCheckFuzz::Type::TCP: {
-          tcp_fuzz_test_->respond(event.respond().tcp_respond().data(), last_action);
-          break;
-        }
-        case HealthCheckFuzz::Type::GRPC: {
-          grpc_fuzz_test_->respond(event.respond().grpc_respond());
-          break;
-        }
-        default:
-          break;
-        }
-        break;
-      }
-      case test::common::upstream::Action::kTriggerIntervalTimer: {
-        switch (type_) {
-        case HealthCheckFuzz::Type::HTTP: {
-          http_fuzz_test_->triggerIntervalTimer(false);
-          break;
-        }
-        case HealthCheckFuzz::Type::TCP: {
-          tcp_fuzz_test_->triggerIntervalTimer();
-          break;
-        }
-        case HealthCheckFuzz::Type::GRPC: {
-          grpc_fuzz_test_->triggerIntervalTimer(false);
-          break;
-        }
-        default:
-          break;
-        }
-        break;
-      }
-      case test::common::upstream::Action::kTriggerTimeoutTimer: {
-        switch (type_) {
-        case HealthCheckFuzz::Type::HTTP: {
-          http_fuzz_test_->triggerTimeoutTimer(last_action);
-          break;
-        }
-        case HealthCheckFuzz::Type::TCP: {
-          tcp_fuzz_test_->triggerTimeoutTimer(last_action);
-          break;
-        }
-        case HealthCheckFuzz::Type::GRPC: {
-          grpc_fuzz_test_->triggerTimeoutTimer(last_action);
-          break;
-        }
-        default:
-          break;
-        }
-        break;
-      }
-      case test::common::upstream::Action::kRaiseEvent: {
-        switch (type_) {
-        case HealthCheckFuzz::Type::HTTP: {
-          http_fuzz_test_->raiseEvent(getEventTypeFromProto(event.raise_event()), last_action);
-          break;
-        }
-        case HealthCheckFuzz::Type::TCP: {
-          tcp_fuzz_test_->raiseEvent(getEventTypeFromProto(event.raise_event()), last_action);
-          break;
-        }
-        case HealthCheckFuzz::Type::GRPC: {
-          grpc_fuzz_test_->raiseEvent(getEventTypeFromProto(event.raise_event()), last_action);
-          break;
-        }
-        default:
-          break;
-        }
-        break;
-      }
-      default:
-        break;
-      }
-    }
-  }
+}
 
 } // namespace Upstream
-} // namespace Upstream
+} // namespace Envoy
