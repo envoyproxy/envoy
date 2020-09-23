@@ -16,12 +16,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::DoAll;
-using testing::Eq;
-using testing::Invoke;
-using testing::NiceMock;
 using testing::Return;
-using testing::WithArg;
 
 namespace Envoy {
 namespace Network {
