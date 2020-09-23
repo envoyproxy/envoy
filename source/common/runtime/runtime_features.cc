@@ -57,6 +57,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.test_feature_true",
     // Begin alphabetically sorted section.
     "envoy.deprecated_features.allow_deprecated_extension_names",
+    "envoy.reloadable_features.always_apply_route_header_rules",
     "envoy.reloadable_features.activate_fds_next_event_loop",
     "envoy.reloadable_features.activate_timers_next_event_loop",
     "envoy.reloadable_features.allow_500_after_100",
@@ -95,6 +96,9 @@ constexpr const char* runtime_features[] = {
 // When features are added here, there should be a tracking bug assigned to the
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
+    // Allow Envoy to upgrade or downgrade version of type url, should be removed when support for
+    // v2 url is removed from codebase.
+    "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade",
     // TODO(asraa) flip this feature after codec errors are handled
     "envoy.reloadable_features.new_codec_behavior",
     // TODO(alyssawilk) flip true after the release.
