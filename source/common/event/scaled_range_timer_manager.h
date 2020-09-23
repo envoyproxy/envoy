@@ -76,7 +76,7 @@ private:
 
   struct Hash {
     // Magic declaration to allow heterogeneous lookup.
-    using is_transparent = void;
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
 
     size_t operator()(const std::chrono::milliseconds duration) const {
       return hash_(duration.count());
@@ -88,7 +88,7 @@ private:
 
   struct Eq {
     // Magic declaration to allow heterogeneous lookup.
-    using is_transparent = void;
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
 
     bool operator()(const std::unique_ptr<Queue>& lhs, std::chrono::milliseconds rhs) const {
       return lhs->duration_ == rhs;

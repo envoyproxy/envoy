@@ -15,14 +15,9 @@ namespace Envoy {
 namespace Event {
 namespace {
 
-using testing::_;
 using testing::ElementsAre;
 using testing::InSequence;
-using testing::IsEmpty;
-using testing::Mock;
 using testing::MockFunction;
-using testing::NiceMock;
-using testing::StrictMock;
 
 class ScopeTrackingDispatcher : public WrappedDispatcher {
 public:
@@ -324,6 +319,7 @@ TEST_F(ScaledRangeTimerManagerTest, SingleTimerSameMinMax) {
 TEST_F(ScaledRangeTimerManagerTest, MultipleTimersNoScaling) {
   ScaledRangeTimerManager manager(dispatcher_);
   std::vector<TrackedTimer> timers;
+  timers.reserve(3);
 
   const MonotonicTime start = simTime().monotonicTime();
   for (int i = 0; i < 3; ++i) {
@@ -346,6 +342,7 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersNoScaling) {
 TEST_F(ScaledRangeTimerManagerTest, MultipleTimersWithScaling) {
   ScaledRangeTimerManager manager(dispatcher_);
   std::vector<TrackedTimer> timers;
+  timers.reserve(3);
 
   for (int i = 0; i < 3; ++i) {
     timers.emplace_back(manager, simTime());
@@ -386,6 +383,7 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersWithScaling) {
 TEST_F(ScaledRangeTimerManagerTest, MultipleTimersSameTimes) {
   ScaledRangeTimerManager manager(dispatcher_);
   std::vector<TrackedTimer> timers;
+  timers.reserve(3);
 
   const MonotonicTime start = simTime().monotonicTime();
 
@@ -406,6 +404,7 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersSameTimes) {
 TEST_F(ScaledRangeTimerManagerTest, MultipleTimersSameTimesFastClock) {
   ScaledRangeTimerManager manager(dispatcher_);
   std::vector<TrackedTimer> timers;
+  timers.reserve(3);
 
   const MonotonicTime start = simTime().monotonicTime();
 
@@ -515,6 +514,7 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersWithChangeInScalingFactor) {
   const MonotonicTime start = simTime().monotonicTime();
 
   std::vector<TrackedTimer> timers;
+  timers.reserve(3);
   for (int i = 0; i < 4; i++) {
     timers.emplace_back(manager, simTime());
   }
