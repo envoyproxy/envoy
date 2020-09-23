@@ -84,10 +84,10 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
 GuardDogImpl::~GuardDogImpl() { stop(); }
 
 void GuardDogImpl::step() {
-  // Hold mutex_ for the duration of the step() function to ensure that watchdog liveness checks and
-  // test interlock operations happen in the expected order. Calls to forceCheckForTest() should
-  // result in a full iteration of the step() function to process recent watchdog touches and
-  // monotonic time changes.
+  // Hold mutex_ for the duration of the step() function to ensure that watchdog still alive checks
+  // and test interlocks happen in the expected order. Calls to forceCheckForTest() should result in
+  // a full iteration of the step() function to process recent watchdog touches and monotonic time
+  // changes.
   Thread::LockGuard guard(mutex_);
   if (!run_thread_) {
     return;

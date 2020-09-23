@@ -24,15 +24,14 @@ public:
 
   Thread::ThreadId threadId() const override { return thread_id_; }
   // Used by GuardDogImpl determine if the watchdog was touched recently and reset the touch status.
-  bool getTouchedAndReset() { return touched_.exchange(false, std::memory_order_acq_rel); }
+  bool getTouchedAndReset() { return touched_.exchange(false, std::memory_order_relaxed); }
 
   // Server::WatchDog
   void startWatchdog(Event::Dispatcher& dispatcher) override;
   void touch() override {
     // Set touched_ if not already set.
     bool expected = false;
-    touched_.compare_exchange_strong(expected, true, std::memory_order_release,
-                                     std::memory_order_acquire);
+    touched_.compare_exchange_strong(expected, true, std::memory_order_relaxed);
   }
 
 private:
