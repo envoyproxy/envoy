@@ -44,8 +44,8 @@ void AppleDnsResolverImpl::deallocateMainSdRef() {
 void AppleDnsResolverImpl::initializeMainSdRef() {
   // This implementation uses a shared connection for three main reasons:
   //    1. Efficiency of concurrent resolutions by sharing the same underlying UDS to the DNS
-  //       daemon.
-  //    2. An error on a connection to the daemon is good indication that other connection,
+  //       server.
+  //    2. An error on a connection to the DNS server is good indication that other connections,
   //       even if not shared, would not succeed. So it is better to share one connection and
   //       promptly cancel all outstanding queries, rather than individually wait for all
   //       connections to error out.
@@ -141,10 +141,10 @@ void AppleDnsResolverImpl::flushPendingQueries(const bool with_error) {
 
   if (with_error) {
     // The main sd ref is destroyed here because a callback with an error is good indication that
-    // the connection to the DNS deamon is faulty and needs to be torn down.
+    // the connection to the DNS server is faulty and needs to be torn down.
     //
     // Deallocation of the MainSdRef __has__ to happen __after__ flushing queries. Flushing queries
-    // deallocates individual refs, so deallocating the main ref ahead would cause deallocation of
+    // de-allocates individual refs, so deallocating the main ref ahead would cause deallocation of
     // invalid individual refs per dns_sd.h
     ENVOY_LOG(error, "[Error path] deallocating main sd ref");
     deallocateMainSdRef();
