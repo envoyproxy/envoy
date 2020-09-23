@@ -25,8 +25,9 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
   for (auto& cluster : *sanitizedInput.mutable_static_resources()->mutable_clusters()) {
     for (auto& health_check : *cluster.mutable_health_checks()) {
       if (health_check.http_health_check().codec_client_type() ==
-          envoy::type::v3::CodecClientType::HTTP3)
+          envoy::type::v3::CodecClientType::HTTP3) {
         health_check.mutable_http_health_check()->clear_codec_client_type();
+      }
     }
   }
   testing::NiceMock<MockOptions> options;
