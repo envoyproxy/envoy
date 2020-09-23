@@ -191,9 +191,10 @@ message KeepaliveSettings {
     gt {nanos: 1000000}
   }];
 
-  // An optional jitter amount as a percentage of interval_ms. If specified,
-  // during every interval Envoy will add interval_ms *
+  // An optional jitter amount as a percentage of interval. If specified,
+  // during every interval Envoy will add interval *
   // interval_jitter_percent / 100 to the wait time.
+  // A value of zero/unspecified means there will be no jitter.
   uint32 interval_jitter_percent = 3;
 }
 
