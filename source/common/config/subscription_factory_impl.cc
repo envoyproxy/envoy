@@ -30,12 +30,13 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   Config::Utility::checkLocalInfo(type_url, local_info_);
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
+  auto& runtime_snapshot = runtime_.snapshot();
 
   const auto transport_api_version = config.api_config_source().transport_api_version();
   if (transport_api_version == envoy::config::core::v3::ApiVersion::V2 &&
-      runtime_.snapshot().runtimeFeatureEnabled(
+      runtime_snapshot.runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_deprecated_v2_api_warning")) {
-    runtime_.snapshot().countDeprecatedFeatureUse();
+    runtime_snapshot.countDeprecatedFeatureUse();
     ENVOY_LOG(warn,
               "xDS of version v2 has been deprecated and will be removed in subsequent versions");
   }
