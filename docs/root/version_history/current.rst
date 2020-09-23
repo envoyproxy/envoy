@@ -58,6 +58,7 @@ Bug Fixes
 * listener: fixed crash at listener inplace update when connetion load balancer is set.
 * rocketmq_proxy network-level filter: fixed an issue involving incorrect header lengths. In debug mode it causes crash and in release mode it causes underflow.
 * thrift_proxy: fixed crashing bug on request overflow.
+* tls: fix read resumption after triggering buffer high-watermark and all remaining request/response bytes are stored in the SSL connection's internal buffers.
 * udp_proxy: fixed a crash due to UDP packets being processed after listener removal.
 
 Removed Config or Runtime
