@@ -583,7 +583,7 @@ public:
   virtual Http::RequestIDExtensionSharedPtr getRequestIDExtension() const PURE;
 
   /**
-   * @return Connection ID for the downstream connection.
+   * @return Connection ID of the downstream connection, or unset if not available.
    **/
   virtual absl::optional<uint64_t> connectionID() const PURE;
 
