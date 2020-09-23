@@ -409,10 +409,7 @@ envoy_cc_library(
         "//bazel:linux": ["udp_gso_batch_writer.cc"],
         "//conditions:default": [],
     }),
-    hdrs = select({
-        "//bazel:linux": ["udp_gso_batch_writer.h"],
-        "//conditions:default": [],
-    }),
+    hdrs = ["udp_gso_batch_writer.h"],
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     visibility = [

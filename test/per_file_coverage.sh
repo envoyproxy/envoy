@@ -70,7 +70,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog/abort_action:42.9" # Death tests don't report LCOV
 "source/server:94.6"
 "source/server/config_validation:76.8"
-"source/server/admin:95.5"
+"source/server/admin:95.3"
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"

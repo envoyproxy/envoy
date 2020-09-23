@@ -1,5 +1,10 @@
 #pragma once
 
+#if !defined(__linux__)
+#define UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT 0
+#else
+#define UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT 1
+
 #pragma GCC diagnostic push
 // QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -122,3 +127,5 @@ private:
 
 } // namespace Quic
 } // namespace Envoy
+
+#endif // defined(__linux__)

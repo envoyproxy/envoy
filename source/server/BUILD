@@ -328,6 +328,7 @@ envoy_cc_library(
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:filter_matcher_lib",
         "//source/common/network:listen_socket_lib",
+        "//source/common/network:listener_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",

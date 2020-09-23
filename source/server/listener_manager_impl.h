@@ -302,7 +302,7 @@ private:
   std::list<DrainingListener> draining_listeners_;
   std::list<DrainingFilterChainsManager> draining_filter_chains_manager_;
 
-  std::list<WorkerPtr> workers_;
+  std::vector<WorkerPtr> workers_;
   bool workers_started_{};
   absl::optional<StopListenersType> stop_listeners_type_;
   Stats::ScopePtr scope_;
