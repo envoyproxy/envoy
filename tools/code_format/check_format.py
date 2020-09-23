@@ -15,6 +15,10 @@ import traceback
 import shutil
 import paths
 
+EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
+                     "./source/extensions/extensions_build_config.bzl",
+                     "./bazel/toolchains/configs/", "./tools/testdata/check_format/",
+                     "./tools/pyformat/", "./third_party/")
 SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".md", ".mm", ".proto",
             ".rst")
 DOCS_SUFFIX = (".md", ".rst")
@@ -106,13 +110,13 @@ TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s
 EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
 COMMENT_REGEX = re.compile(r"//|\*")
 DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
-DOT_MULTI_SPACE_REGEX = re.compile("\\. +")
 VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
 VERSION_HISTORY_SECTION_NAME = re.compile("^[A-Z][A-Za-z ]*$")
 RELOADABLE_FLAG_REGEX = re.compile(".*(.)(envoy.reloadable_features.[^ ]*)\s.*")
 # Check for punctuation in a terminal ref clause, e.g.
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
 REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
+DOT_MULTI_SPACE_REGEX = re.compile("\\. +")
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -188,30 +192,24 @@ UNOWNED_EXTENSIONS = {
 
 class FormatChecker:
 
-  def __init__(self, command_line_args):
-    self.operation_type = command_line_args.operation_type
-    self.target_path = command_line_args.target_path
-    self.api_prefix = command_line_args.api_prefix
-    self.api_shadow_root = command_line_args.api_shadow_prefix
-    self.envoy_build_rule_check = not command_line_args.skip_envoy_build_rule_check
-    self.namespace_check = command_line_args.namespace_check
-    self.namespace_check_excluded_paths = command_line_args.namespace_check_excluded_paths + [
+  def __init__(self, args):
+    self.operation_type = args.operation_type
+    self.target_path = args.target_path
+    self.api_prefix = args.api_prefix
+    self.api_shadow_root = args.api_shadow_prefix
+    self.envoy_build_rule_check = not args.skip_envoy_build_rule_check
+    self.namespace_check = args.namespace_check
+    self.namespace_check_excluded_paths = args.namespace_check_excluded_paths + [
         "./tools/api_boost/testdata/",
         "./tools/clang_tools/",
     ]
-    self.build_fixer_check_excluded_paths = command_line_args.build_fixer_check_excluded_paths + [
+    self.build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths + [
         "./bazel/external/",
         "./bazel/toolchains/",
         "./bazel/BUILD",
         "./tools/clang_tools",
     ]
-    self.include_dir_order = command_line_args.include_dir_order
-    self.excluded_prefixes = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-",
-                              "./.cache", "./source/extensions/extensions_build_config.bzl",
-                              "./bazel/toolchains/configs/", "./tools/testdata/check_format/",
-                              "./tools/pyformat/", "./third_party/")
-    if command_line_args.add_excluded_prefixes:
-      self.excluded_prefixes += tuple(command_line_args.add_excluded_prefixes)
+    self.include_dir_order = args.include_dir_order
 
   # Map a line transformation function across each line of a file,
   # writing the result lines as requested.
@@ -385,19 +383,6 @@ class FormatChecker:
 
     return (file_path.endswith('.h') and not file_path.startswith("./test/")) or file_path in EXCEPTION_DENYLIST \
         or self.isInSubdir(file_path, 'tools/testdata')
-
-  def findSubstringAndReturnError(self, pattern, file_path, error_message):
-    text = self.readFile(file_path)
-    if pattern in text:
-      error_messages = [file_path + ": " + error_message]
-      for i, line in enumerate(text.splitlines()):
-        if pattern in line:
-          error_messages.append("  %s:%s" % (file_path, i + 1))
-      return error_messages
-    return []
-
-  def errorIfNoSubstringFound(self, pattern, file_path, error_message):
-    return [] if pattern in self.readFile(file_path) else [file_path + ": " + error_message]
 
   def isApiFile(self, file_path):
     return file_path.startswith(self.api_prefix) or file_path.startswith(self.api_shadow_root)
@@ -678,15 +663,27 @@ class FormatChecker:
       # The std::atomic_* free functions are functionally equivalent to calling
       # operations on std::atomic<T> objects, so prefer to use that instead.
       reportError("Don't use free std::atomic_* functions, use std::atomic<T> members instead.")
-    # Blocking the use of std::any, std::optional, std::variant for now as iOS 11/macOS 10.13
-    # does not support these functions at runtime.
+    # Block usage of certain std types/functions as iOS 11 and macOS 10.13
+    # do not support these at runtime.
     # See: https://github.com/envoyproxy/envoy/issues/12341
     if self.tokenInLine("std::any", line):
       reportError("Don't use std::any; use absl::any instead")
+    if self.tokenInLine("std::get_if", line):
+      reportError("Don't use std::get_if; use absl::get_if instead")
+    if self.tokenInLine("std::holds_alternative", line):
+      reportError("Don't use std::holds_alternative; use absl::holds_alternative instead")
+    if self.tokenInLine("std::make_optional", line):
+      reportError("Don't use std::make_optional; use absl::make_optional instead")
+    if self.tokenInLine("std::monostate", line):
+      reportError("Don't use std::monostate; use absl::monostate instead")
     if self.tokenInLine("std::optional", line):
       reportError("Don't use std::optional; use absl::optional instead")
+    if self.tokenInLine("std::string_view", line):
+      reportError("Don't use std::string_view; use absl::string_view instead")
     if self.tokenInLine("std::variant", line):
       reportError("Don't use std::variant; use absl::variant instead")
+    if self.tokenInLine("std::visit", line):
+      reportError("Don't use std::visit; use absl::visit instead")
     if "__attribute__((packed))" in line and file_path != "./include/envoy/common/platform.h":
       # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
       # can be used instead
@@ -893,7 +890,7 @@ class FormatChecker:
     return []
 
   def checkFormat(self, file_path):
-    if file_path.startswith(self.excluded_prefixes):
+    if file_path.startswith(EXCLUDED_PREFIXES):
       return []
 
     if not file_path.endswith(SUFFIXES):
@@ -926,7 +923,6 @@ class FormatChecker:
 
   def checkOwners(self, dir_name, owned_directories, error_messages):
     """Checks to make sure a given directory is present either in CODEOWNERS or OWNED_EXTENSIONS
-
     Args:
       dir_name: the directory being checked.
       owned_directories: directories currently listed in CODEOWNERS.
@@ -955,7 +951,6 @@ class FormatChecker:
 
   def checkFormatVisitor(self, arg, dir_name, names):
     """Run checkFormat in parallel for the given files.
-
     Args:
       arg: a tuple (pool, result_list, owned_directories, error_messages)
         pool and result_list are for starting tasks asynchronously.
@@ -998,36 +993,6 @@ class FormatChecker:
         print("ERROR: %s" % e)
       return True
     return False
-
-  # Returns the list of directories with owners listed in CODEOWNERS. May append errors to
-  # error_messages.
-  def ownedDirectories(self, error_messages):
-    owned = []
-    maintainers = [
-        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@asraa',
-        '@yavlasov', '@junr03', '@dio', '@jmarantz'
-    ]
-
-    try:
-      with open('./CODEOWNERS') as f:
-        for line in f:
-          # If this line is of the form "extensions/... @owner1 @owner2" capture the directory
-          # name and store it in the list of directories with documented owners.
-          m = EXTENSIONS_CODEOWNERS_REGEX.search(line)
-          if m is not None and not line.startswith('#'):
-            owned.append(m.group(1).strip())
-            owners = re.findall('@\S+', m.group(2).strip())
-            if len(owners) < 2:
-              error_messages.append("Extensions require at least 2 owners in CODEOWNERS:\n"
-                                    "    {}".format(line))
-            maintainer = len(set(owners).intersection(set(maintainers))) > 0
-            if not maintainer:
-              error_messages.append("Extensions require at least one maintainer OWNER:\n"
-                                    "    {}".format(line))
-
-      return owned
-    except IOError:
-      return []  # for the check format tests.
 
 
 if __name__ == "__main__":
@@ -1079,7 +1044,8 @@ if __name__ == "__main__":
                       default=",".join(common.includeDirOrder()),
                       help="specify the header block include directory order.")
   args = parser.parse_args()
-
+  if args.add_excluded_prefixes:
+    EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
   format_checker = FormatChecker(args)
 
   # Check whether all needed external tools are available.
@@ -1087,9 +1053,39 @@ if __name__ == "__main__":
   if format_checker.checkErrorMessages(ct_error_messages):
     sys.exit(1)
 
+  # Returns the list of directories with owners listed in CODEOWNERS. May append errors to
+  # error_messages.
+  def ownedDirectories(error_messages):
+    owned = []
+    maintainers = [
+        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@asraa',
+        '@yavlasov', '@junr03', '@dio', '@jmarantz', '@antoniovicente'
+    ]
+
+    try:
+      with open('./CODEOWNERS') as f:
+        for line in f:
+          # If this line is of the form "extensions/... @owner1 @owner2" capture the directory
+          # name and store it in the list of directories with documented owners.
+          m = EXTENSIONS_CODEOWNERS_REGEX.search(line)
+          if m is not None and not line.startswith('#'):
+            owned.append(m.group(1).strip())
+            owners = re.findall('@\S+', m.group(2).strip())
+            if len(owners) < 2:
+              error_messages.append("Extensions require at least 2 owners in CODEOWNERS:\n"
+                                    "    {}".format(line))
+            maintainer = len(set(owners).intersection(set(maintainers))) > 0
+            if not maintainer:
+              error_messages.append("Extensions require at least one maintainer OWNER:\n"
+                                    "    {}".format(line))
+
+      return owned
+    except IOError:
+      return []  # for the check format tests.
+
   # Calculate the list of owned directories once per run.
   error_messages = []
-  owned_directories = format_checker.ownedDirectories(error_messages)
+  owned_directories = ownedDirectories(error_messages)
 
   if os.path.isfile(args.target_path):
     error_messages += format_checker.checkFormat("./" + args.target_path)
