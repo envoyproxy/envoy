@@ -2,6 +2,8 @@
 
 #include "common/network/buffered_io_socket_handle_impl.h"
 
+#include "test/mocks/event/mocks.h"
+
 #include "absl/container/fixed_array.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -17,6 +19,10 @@ namespace Envoy {
 namespace Network {
 namespace {
 
+class MockFileEventCallback {
+public:
+  MOCK_METHOD(void, called, (uint32_t arg));
+};
 class BufferedIoSocketHandleTest : public testing::Test {
 public:
   BufferedIoSocketHandleTest() : buf_(1024) {
@@ -34,6 +40,11 @@ public:
     EXPECT_FALSE(res.ok());
     EXPECT_EQ(Api::IoError::IoErrorCode::Again, res.err_->getErrorCode());
   }
+  NiceMock<Event::MockDispatcher> dispatcher_{};
+
+  // Owned by BufferedIoSocketHandle.
+  NiceMock<Event::MockSchedulableCallback>* scheduable_cb_;
+  MockFileEventCallback cb_;
   std::unique_ptr<Network::BufferedIoSocketHandleImpl> io_handle_;
   std::unique_ptr<Network::BufferedIoSocketHandleImpl> io_handle_peer_;
   absl::FixedArray<char> buf_;
@@ -109,30 +120,17 @@ TEST_F(BufferedIoSocketHandleTest, FlowControl) {
   EXPECT_TRUE(handle_as_peer->isWritable());
 }
 
-// This test fixture test that io handle is impacted by peer.
-class BufferedIoSocketHandlePeerTest : public testing::Test {
-public:
-  BufferedIoSocketHandlePeerTest() : buf_(1024) {
-    io_handle_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
-    io_handle_peer_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
-    io_handle_->setWritablePeer(io_handle_peer_.get());
-    io_handle_peer_->setWritablePeer(io_handle_.get());
-  }
-  ~BufferedIoSocketHandlePeerTest() override {
-    io_handle_->close();
-    io_handle_peer_->close();
-  }
-  void expectAgain() {
-    auto res = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
-    EXPECT_FALSE(res.ok());
-    EXPECT_EQ(Api::IoError::IoErrorCode::Again, res.err_->getErrorCode());
-  }
-  std::unique_ptr<Network::BufferedIoSocketHandleImpl> io_handle_;
-  std::unique_ptr<Network::BufferedIoSocketHandleImpl> io_handle_peer_;
-  absl::FixedArray<char> buf_;
-};
+TEST_F(BufferedIoSocketHandleTest, EventScheduleBasic) {
+  scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  auto ev = io_handle_->createFileEvent(
+      dispatcher_, [this](uint32_t events) { cb_.called(events); },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
-TEST_F(BufferedIoSocketHandlePeerTest, TestRecvDrain) {}
+  EXPECT_CALL(cb_, called(_));
+  scheduable_cb_->invokeCallback();
+  ev.reset();
+}
 
 } // namespace
 } // namespace Network

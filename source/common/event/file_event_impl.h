@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <event2/event.h>
 
 #include "envoy/event/file_event.h"
 
@@ -8,6 +9,10 @@
 #include "common/event/event_impl_base.h"
 
 namespace Envoy {
+namespace Network {
+class BufferedIoSocketHandleImpl;
+}
+
 namespace Event {
 
 /**
@@ -42,44 +47,94 @@ private:
   const bool activate_fd_events_next_event_loop_;
 };
 
-class TimerWrappedFileEventImpl : public FileEvent {
+// Forward declare for friend class.
+class UserSpaceFileEventFactory;
+
+class EventListener {
 public:
-  TimerWrappedFileEventImpl(SchedulableCallbackPtr schedulable)
-      : schedulable_(std::move(schedulable)) {}
-
-  ~TimerWrappedFileEventImpl() {
-    if (schedulable_->enabled()) {
-      schedulable_->cancel();
-    }
-  }
-  // Event::FileEvent
-  void activate(uint32_t) override { schedulable_->scheduleCallbackNextIteration(); }
-  void setEnabled(uint32_t) override { schedulable_->scheduleCallbackNextIteration(); }
-
-private:
-  SchedulableCallbackPtr schedulable_;
+  virtual ~EventListener() = default;
+  virtual uint32_t triggeredEvents() PURE;
+  virtual void onEventEnabled(uint32_t enabled_events) PURE;
+  virtual void onEventActivated(uint32_t enabled_events) PURE;
+  virtual uint32_t getAndClearEpheralEvents() PURE;
 };
 
-/**
- * This file event is a helper event to be always active. It works with BufferedIoSocketHandleImpl
- * so that the socket handle will call io methods ASAP and obtain the error code.
- */
-class AlwaysActiveFileEventImpl : public FileEvent {
+// Return the enabled events except EV_CLOSED. This implementation is generally good since only
+// epoll supports EV_CLOSED. The event owner must assume EV_CLOSED is not reliable. Also event owner
+// must assume OS could notify events which are not actually triggered.
+class DefaultEventListener : public EventListener {
 public:
-  AlwaysActiveFileEventImpl(SchedulableCallbackPtr schedulable)
-      : schedulable_(std::move(schedulable)) {}
-
-  ~AlwaysActiveFileEventImpl() override {
-    if (schedulable_->enabled()) {
-      schedulable_->cancel();
-    }
+  ~DefaultEventListener() override = default;
+  uint32_t triggeredEvents() override { return pending_events_ & (~EV_CLOSED); }
+  void onEventEnabled(uint32_t enabled_events) override { pending_events_ = enabled_events; }
+  void onEventActivated(uint32_t activated_events) override {
+    ephermal_events_ |= activated_events;
   }
-  // Event::FileEvent
-  void activate(uint32_t) override { schedulable_->scheduleCallbackNextIteration(); }
-  void setEnabled(uint32_t) override { schedulable_->scheduleCallbackNextIteration(); }
+  uint32_t getAndClearEpheralEvents() override {
+    auto res = ephermal_events_;
+    ephermal_events_ = 0;
+    return res;
+  }
 
 private:
-  SchedulableCallbackPtr schedulable_;
+  // The persisted intrested events and ready events.
+  uint32_t pending_events_;
+  // The events set by activate() and will be cleared after the io callback.
+  uint32_t ephermal_events_;
+};
+
+// A FileEvent implementation which is
+class UserSpaceFileEventImpl : public FileEvent {
+public:
+  ~UserSpaceFileEventImpl() override {
+    //if (schedulable_.enabled()) {
+      schedulable_.cancel();
+    //}
+    ASSERT(event_counter_  == 1);
+    --event_counter_;
+  }
+
+  // Event::FileEvent
+  void activate(uint32_t events) override {
+    event_listener_.onEventEnabled(events);
+    schedulable_.scheduleCallbackNextIteration();
+  }
+
+  void setEnabled(uint32_t events) override {
+    event_listener_.onEventEnabled(events);
+    schedulable_.scheduleCallbackNextIteration();
+  }
+
+  EventListener& getEventListener() { return event_listener_; }
+  void onEvents() {
+    cb_();
+  }
+  friend class UserSpaceFileEventFactory;
+  friend class Network::BufferedIoSocketHandleImpl;
+
+private:
+  UserSpaceFileEventImpl(Event::FileReadyCb cb, uint32_t events, SchedulableCallback& schedulable_cb, int& event_counter)
+      : schedulable_(schedulable_cb), cb_([this, cb]() {
+          auto all_events = getEventListener().triggeredEvents();
+          auto epheral_events = getEventListener().getAndClearEpheralEvents();
+          cb(all_events | epheral_events);
+        }),
+        event_counter_(event_counter) {
+    event_listener_.onEventEnabled(events);
+  }
+  DefaultEventListener event_listener_;
+  SchedulableCallback& schedulable_;
+  std::function<void()> cb_;
+  int& event_counter_;
+};
+
+class UserSpaceFileEventFactory {
+public:
+  static std::unique_ptr<UserSpaceFileEventImpl>
+  createUserSpaceFileEventImpl(Event::Dispatcher& , Event::FileReadyCb cb,
+                               Event::FileTriggerType, uint32_t events, SchedulableCallback& scheduable_cb, int& event_counter) {
+    return std::unique_ptr<UserSpaceFileEventImpl>(new UserSpaceFileEventImpl(cb, events, scheduable_cb, event_counter));
+  }
 };
 
 } // namespace Event

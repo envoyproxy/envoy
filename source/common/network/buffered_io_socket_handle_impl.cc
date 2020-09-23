@@ -122,10 +122,17 @@ Address::InstanceConstSharedPtr BufferedIoSocketHandleImpl::peerAddress() {
 
 Event::FileEventPtr BufferedIoSocketHandleImpl::createFileEvent(Event::Dispatcher& dispatcher,
                                                                 Event::FileReadyCb cb,
-                                                                Event::FileTriggerType,
+                                                                Event::FileTriggerType trigger_type,
                                                                 uint32_t events) {
-  return std::make_unique<Event::TimerWrappedFileEventImpl>(
-      dispatcher.createSchedulableCallback([cb, events]() -> void { cb(events); }));
+  ASSERT(event_counter_ == 0);
+  ++event_counter_;
+  io_callback_ = dispatcher.createSchedulableCallback([this]() { user_file_event_->onEvents(); });
+  auto res = Event::UserSpaceFileEventFactory::createUserSpaceFileEventImpl(
+      dispatcher, cb, trigger_type, events, *io_callback_, event_counter_);
+  user_file_event_ = res.get();
+  // Blindly activate the events.
+  io_callback_->scheduleCallbackNextIteration();
+  return res;
 }
 
 Api::SysCallIntResult BufferedIoSocketHandleImpl::shutdown(int how) {

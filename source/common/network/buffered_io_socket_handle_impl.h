@@ -6,10 +6,12 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/io_handle.h"
 
+#include "common/event/file_event_impl.h"
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/logger.h"
 #include "common/network/io_socket_error_impl.h"
 #include "common/network/peer_buffer.h"
+#include <memory>
 
 namespace Envoy {
 namespace Network {
@@ -75,7 +77,12 @@ public:
 
   Buffer::WatermarkBuffer& getBufferForTest() { return owned_buffer_; }
   void scheduleWriteEvent() {}
-  void scheduleNextEvent() {}
+  void scheduleNextEvent() {
+    // It's possible there is no pending file event so as no io_callback.
+    if (io_callback_) {
+      io_callback_->scheduleCallbackNextIteration();
+    }
+  }
 
   void setWritablePeer(WritablePeer* writable_peer) {
     // Swapping writable peer is undefined behavior.
@@ -94,9 +101,7 @@ public:
     writable_peer_ = nullptr;
     peer_closed_ = true;
   }
-  bool isWritable() const override {
-    return !isOverHighWatermark();
-  }
+  bool isWritable() const override { return !isOverHighWatermark(); }
   Buffer::Instance* getWriteBuffer() override { return &owned_buffer_; }
   // ReadableSource
   bool isPeerShutDownWrite() const override { return read_end_stream_; }
@@ -107,6 +112,12 @@ private:
   // Support isOpen() and close(). IoHandle owner must invoke close() to avoid potential resource
   // leak.
   bool closed_;
+
+  Event::UserSpaceFileEventImpl* user_file_event_;
+  int event_counter_{0};
+  // Trigger of the io event.
+  Event::SchedulableCallbackPtr io_callback_;
+
   // True if owned_buffer_ is not addable. Note that owned_buffer_ may have pending data to drain.
   bool read_end_stream_{false};
   Buffer::WatermarkBuffer owned_buffer_;
