@@ -23,6 +23,20 @@ typed_config:
           - any: true
 )EOF";
 
+const std::string RBAC_CONFIG_WITH_DENY_ACTION = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
+  rules:
+    action: DENY
+    policies:
+      "deny policy":
+        permissions:
+          - header: { name: ":method", exact_match: "GET" }
+        principals:
+          - any: true
+)EOF";
+
 const std::string RBAC_CONFIG_WITH_PREFIX_MATCH = R"EOF(
 name: rbac
 typed_config:
@@ -85,6 +99,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, RBACIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(RBACIntegrationTest, Allowed) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.addFilter(RBAC_CONFIG);
   initialize();
 
@@ -105,9 +120,11 @@ TEST_P(RBACIntegrationTest, Allowed) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("via_upstream"));
 }
 
 TEST_P(RBACIntegrationTest, Denied) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.addFilter(RBAC_CONFIG);
   initialize();
 
@@ -125,6 +142,32 @@ TEST_P(RBACIntegrationTest, Denied) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::HasSubstr("rbac_access_denied_matched_policy[none]"));
+}
+
+TEST_P(RBACIntegrationTest, DeniedWithDenyAction) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.addFilter(RBAC_CONFIG_WITH_DENY_ACTION);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+  // Note the whitespace in the policy id is replaced by '_'.
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::HasSubstr("rbac_access_denied_matched_policy[deny_policy]"));
 }
 
 TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {

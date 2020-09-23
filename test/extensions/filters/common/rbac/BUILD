@@ -44,6 +44,15 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "utility_test",
+    srcs = ["utility_test.cc"],
+    extension_name = "envoy.filters.http.rbac",
+    deps = [
+        "//source/extensions/filters/common/rbac:utility_lib",
+    ],
+)
+
 envoy_extension_cc_mock(
     name = "engine_mocks",
     hdrs = ["mocks.h"],

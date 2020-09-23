@@ -59,6 +59,7 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
   if (engine_result_ == Allow) {
     return Network::FilterStatus::Continue;
   } else if (engine_result_ == Deny) {
+    // TODO(yangminzhu): Set the corresponding response detail once supported in network filter.
     callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
@@ -83,36 +84,33 @@ void RoleBasedAccessControlFilter::setDynamicMetadata(std::string shadow_engine_
 EngineResult
 RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode mode) {
   const auto engine = config_->engine(mode);
+  std::string effective_policy_id;
   if (engine != nullptr) {
-    std::string effective_policy_id;
-
     // Check authorization decision and do Action operations
-    if (engine->handleAction(callbacks_->connection(), callbacks_->connection().streamInfo(),
-                             &effective_policy_id)) {
+    bool allowed = engine->handleAction(
+        callbacks_->connection(), callbacks_->connection().streamInfo(), &effective_policy_id);
+    const std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
+    if (allowed) {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
-        ENVOY_LOG(debug, "shadow allowed, matched policy {}",
-                  effective_policy_id.empty() ? "none" : effective_policy_id);
+        ENVOY_LOG(debug, "shadow allowed, matched policy {}", log_policy_id);
         config_->stats().shadow_allowed_.inc();
         setDynamicMetadata(
             Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed,
             effective_policy_id);
       } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
-        ENVOY_LOG(debug, "enforced allowed, matched policy {}",
-                  effective_policy_id.empty() ? "none" : effective_policy_id);
+        ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
         config_->stats().allowed_.inc();
       }
       return Allow;
     } else {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
-        ENVOY_LOG(debug, "shadow denied, matched policy {}",
-                  effective_policy_id.empty() ? "none" : effective_policy_id);
+        ENVOY_LOG(debug, "shadow denied, matched policy {}", log_policy_id);
         config_->stats().shadow_denied_.inc();
         setDynamicMetadata(
             Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied,
             effective_policy_id);
       } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
-        ENVOY_LOG(debug, "enforced denied, matched policy {}",
-                  effective_policy_id.empty() ? "none" : effective_policy_id);
+        ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
         config_->stats().denied_.inc();
       }
       return Deny;
