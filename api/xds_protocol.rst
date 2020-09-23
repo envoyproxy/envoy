@@ -664,12 +664,12 @@ resources after a specified period of time if contact with the management server
 be used, for example, to terminate a fault injection test when the management server can no longer
 be reached.
 
-For clients that support the 'envoy.config.supports-resource-ttl' client feature, A TTL field may 
-be specified on each :ref:`Resource <envoy_api_msg_Resource>`. A timer is started for each 
-:ref:`Resource <envoy_api_msg_Resource>` that has a TTL specified. When the timer expires, the 
+For clients that support the *envoy.config.supports-resource-ttl* client feature, A TTL field may
+be specified on each :ref:`Resource <envoy_api_msg_Resource>`. A timer is started for each
+:ref:`Resource <envoy_api_msg_Resource>` that has a TTL specified. When the timer expires, the
 specific resource is removed.
 
-To update the TTL associated with a Resource, the management server resends the resource with a 
+To update the TTL associated with a *Resource*, the management server resends the resource with a
 new TTL. To remove the TTL, the management server resends the resource with the TTL field unset.
 
 SotW TTL
