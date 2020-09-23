@@ -446,7 +446,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       socket_factory_(std::make_shared<FakeListenSocketFactory>(socket_)),
       api_(Api::createApiForTest(stats_store_)), time_system_(time_system),
       dispatcher_(api_->allocateDispatcher("fake_upstream")),
-      handler_(new Server::ConnectionHandlerImpl(*dispatcher_)),
+      handler_(new Server::ConnectionHandlerImpl(*dispatcher_, 0)),
       read_disable_on_new_connection_(true), enable_half_close_(enable_half_close),
       listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
