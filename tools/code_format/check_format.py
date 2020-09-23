@@ -773,6 +773,16 @@ def checkSourceLine(line, file_path, reportError):
                 "Lua API (bad light userdata pointer) on ARM64 architecture. See " +
                 "https://github.com/LuaJIT/LuaJIT/issues/450#issuecomment-433659873 for details.")
 
+  #Fix for https://github.com/envoyproxy/envoy/issues/10535
+  if file_path.endswith(PROTO_SUFFIX):
+    exclude_path = ['v1', 'v2', 'generated_api_shadow']
+    result = PROTO_VALIDATION_STRING.search(line)
+    if result is not None:
+      if not any(x in file_path for x in exclude_path):
+        reportError(
+            "Proto validation Error in file: %s. 'min_bytes' is DEPRECATED, Use 'min_len'." %
+            file_path)
+
 
 def checkBuildLine(line, file_path, reportError):
   if "@bazel_tools" in line and not (isStarlarkFile(file_path) or
@@ -865,7 +875,6 @@ def checkSourcePath(file_path):
     package_name, error_message = packageNameForProto(file_path)
     if package_name is None:
       error_messages += error_message
-    error_messages += checkProtoValidation(file_path)
   return error_messages
 
 
@@ -905,19 +914,6 @@ def clangFormat(file_path):
   command = "%s -i %s" % (CLANG_FORMAT_PATH, file_path)
   if os.system(command) != 0:
     return ["clang-format rewrite error: %s" % (file_path)]
-  return []
-
-
-# Fix for https://github.com/envoyproxy/envoy/issues/10535
-def checkProtoValidation(file_path):
-  exclude_path = ['v1', 'v2', 'generated_api_shadow']
-  result = PROTO_VALIDATION_STRING.search(readFile(file_path))
-  if result is not None:
-    if not any(x in file_path for x in exclude_path):
-      return [
-          "Proto validation Error in file: %s. 'min_bytes' is DEPRECATED, Use 'min_len'." %
-          (file_path)
-      ]
   return []
 
 

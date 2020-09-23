@@ -249,8 +249,7 @@ def runChecks():
                                 "Don't use std::variant; use absl::variant instead")
   errors += checkUnfixableError(
       "throw.cc", "Don't introduce throws into exception-free files, use error statuses instead.")
-  errors += checkUnfixableError("pgv_string.proto",
-                                "Proto validation Error in file, use min_len instead.")
+  errors += checkUnfixableError("pgv_string.proto", "Proto validation Error in file")
   errors += checkFileExpectingOK("commented_throw.cc")
 
   # The following files have errors that can be automatically fixed.
