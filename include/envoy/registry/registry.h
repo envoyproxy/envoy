@@ -345,7 +345,7 @@ private:
   static std::unique_ptr<absl::flat_hash_map<std::string, Base*>> buildFactoriesByType() {
     auto mapping = std::make_unique<absl::flat_hash_map<std::string, Base*>>();
 
-    for (const auto& [[[maybe_unused]]factory_name, factory] : factories()) {
+    for (const auto& [[[maybe_unused]] factory_name, factory] : factories()) {
       if (factory == nullptr) {
         continue;
       }
