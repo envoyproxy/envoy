@@ -584,6 +584,7 @@ ConnectionImpl::~ConnectionImpl() {
 }
 
 void ConnectionImpl::sendKeepalive() {
+  // Include the current time as the payload to help with debugging.
   SystemTime now = connection_.dispatcher().timeSource().systemTime();
   uint64_t ms_since_epoch =
       std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
@@ -600,6 +601,7 @@ void ConnectionImpl::sendKeepalive() {
   keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
 }
 void ConnectionImpl::onKeepaliveResponse() {
+  // Check the timers for nullptr in case the peer sent an unsolicited PING ACK.
   if (keepalive_timeout_timer_ != nullptr) {
     keepalive_timeout_timer_->disableTimer();
   }
