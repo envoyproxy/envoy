@@ -8,6 +8,7 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -389,29 +390,54 @@ TEST_F(DeltaSubscriptionStateTest, AddedAndRemoved) {
 }
 
 TEST_F(DeltaSubscriptionStateTest, ResourceTTL) {
-  Event::MockTimer* timer = new Event::MockTimer();
-  Event::TimerCb timer_cb;
-  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
-    timer_cb = cb;
-    return timer;
-  }));
-  EXPECT_CALL(*timer, enableTimer(_, _));
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.delta_ttl", "true"}});
 
-  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
-  auto* resource = added_resources.Add();
-  resource->set_name("name1");
-  resource->set_version("version1A");
+  auto create_resource_with_ttl = [](absl::optional<std::chrono::seconds> ttl_s) {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
+    auto* resource = added_resources.Add();
+    resource->set_name("name1");
+    resource->set_version("version1A");
 
-  ProtobufWkt::Duration ttl;
-  ttl.set_seconds(10);
-  resource->mutable_ttl()->CopyFrom(ttl);
+    if (ttl_s) {
+      ProtobufWkt::Duration ttl;
+      ttl.set_seconds(ttl_s->count());
+      resource->mutable_ttl()->CopyFrom(ttl);
+    }
 
-  deliverDiscoveryResponse(added_resources, {}, "debug1", "nonce1");
+    return added_resources;
+  };
 
+  Event::MockTimer* timer = new Event::MockTimer(&dispatcher_);
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(10000), _));
+  deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(10)), {}, "debug1",
+                           "nonce1");
+
+  // Increase the TTL.
+  timer = new Event::MockTimer(&dispatcher_);
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(20000), _));
+  deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(20)), {}, "debug1",
+                           "nonce1");
+
+  // Remove the TTL.
+  deliverDiscoveryResponse(create_resource_with_ttl(absl::nullopt), {}, "debug1", "nonce1");
+
+  // Add back the TTL.
+  timer = new Event::MockTimer(&dispatcher_);
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(20000), _));
+  deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(20)), {}, "debug1",
+                           "nonce1");
+
+  // Invoke the TTL.
   EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _)).Times(1);
+  timer->invokeCallback();
 
-  // simulate timer fire
-  timer_cb();
+  // Disable the runtime flag and attempt to set a TTL - this should not create a timer.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.delta_ttl", "false"}});
+  deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(20)), {}, "debug1",
+                           "nonce1");
 }
 
 } // namespace

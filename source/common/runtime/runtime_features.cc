@@ -63,6 +63,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.allow_prefetch",
     "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.consume_all_retry_headers",
+    "envoy.reloadable_features.delta_ttl",
     "envoy.reloadable_features.disallow_unbounded_access_logs",
     "envoy.reloadable_features.early_errors_via_hcm",
     "envoy.reloadable_features.enable_deprecated_v2_api_warning",

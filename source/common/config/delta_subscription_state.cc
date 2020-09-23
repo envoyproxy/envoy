@@ -6,6 +6,7 @@
 #include "common/common/assert.h"
 #include "common/common/hash.h"
 #include "common/config/utility.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Config {
@@ -167,7 +168,9 @@ DeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
 void DeltaSubscriptionState::addResourceState(
     const envoy::service::discovery::v3::Resource& resource) {
   Event::TimerPtr ttl_timer;
-  if (resource.has_ttl()) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.delta_ttl")) {
+  }
+  if (resource.has_ttl() && Runtime::runtimeFeatureEnabled("envoy.reloadable_features.delta_ttl")) {
     ttl_timer = dispatcher_.createTimer([this, resource]() -> void {
       Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> empty_resources;
       Protobuf::RepeatedPtrField<std::string> remove_resources;
