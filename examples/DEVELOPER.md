@@ -219,28 +219,12 @@ not contain deprecated features.
 Configuration files that have been added to your sandbox should be listed in ``examples/BUILD``, in
 the ``filegroup.srcs`` section.
 
-### Increment the expected number of configuration files in `example_configs_test.cc`
-
-You will also need to increment the number of expected files in ``test/config_test/example_configs_test.cc``
-
-Find the section shown in the following code block:
-
-```c++
-#if defined(__APPLE__) || defined(WIN32)
-  // freebind/freebind.yaml is not supported on macOS or Windows and is disabled via Bazel.
-  EXPECT_EQ(37UL, ConfigTest::run(directory));
-#else
-  EXPECT_EQ(38UL, ConfigTest::run(directory));
-#endif
-```
-
-If, for example, your sandbox includes 2 new configuration files - you should change `37 -> 39`
-and `38 -> 40` (current numbers may differ).
-
 ### Exclude configs from example configuration tests
 
-The CI script to find the configuration files will search for all files with a `yaml` or `lua`
-extension. If your sandbox example contains non-envoy configuration files that should not be
+The CI script to find the configuration files will search for all files in the examples folders
+with a `yaml` or `lua` extension, to ensure that they have been added to the `BUILD` file.
+
+If your sandbox example contains non-envoy configuration files that should not be
 checked you can exclude them by setting the `EXCLUDED_BUILD_CONFIGS` in `ci/verify_examples.sh`.
 
 Given a sandbox with the name `example-sandbox`, and a configuration file that should be excluded
