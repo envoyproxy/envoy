@@ -20,6 +20,7 @@ if is_windows; then
   [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-windows2019"
   DEFAULT_ENVOY_DOCKER_BUILD_DIR=C:/Windows/Temp/envoy-docker-build
   BUILD_DIR_MOUNT_DEST=C:/build
+  # Replace MSYS style drive letter (/c/) with driver letter designation (C:/)
   SOURCE_DIR=$(echo "${PWD}" | sed -E "s#/([a-zA-Z])/#\1:/#")
   SOURCE_DIR_MOUNT_DEST=C:/source
   START_COMMAND=("bash" "-c" "cd source && $*")
@@ -45,13 +46,15 @@ fi
 # images').
 [[ -z "${IMAGE_ID}" ]] && IMAGE_ID="${ENVOY_BUILD_SHA}"
 [[ -z "${ENVOY_DOCKER_BUILD_DIR}" ]] && ENVOY_DOCKER_BUILD_DIR="${DEFAULT_ENVOY_DOCKER_BUILD_DIR}"
+# Replace backslash with forward slash for Windows style paths
+ENVOY_DOCKER_BUILD_DIR="${ENVOY_DOCKER_BUILD_DIR//\\//}"
+mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 
 [[ -t 1 ]] && ENVOY_DOCKER_OPTIONS+=("-it")
 [[ -f .git ]] && [[ ! -d .git ]] && ENVOY_DOCKER_OPTIONS+=(-v "$(git rev-parse --git-common-dir):$(git rev-parse --git-common-dir)")
 
 export ENVOY_BUILD_IMAGE="${IMAGE_NAME}:${IMAGE_ID}"
 
-mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
 docker run --rm \
        "${ENVOY_DOCKER_OPTIONS[@]}" \
