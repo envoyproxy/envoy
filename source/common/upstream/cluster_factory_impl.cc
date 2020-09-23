@@ -96,7 +96,10 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
       resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
     }
     const bool use_tcp_for_dns_lookups = cluster.use_tcp_for_dns_lookups();
-    return context.dispatcher().createDnsResolver(resolvers, use_tcp_for_dns_lookups);
+    const bool use_apple_api_for_dns_lookups =
+        context.runtime().snapshot().getBoolean("dns.use_apple_api_for_dns_lookups", false);
+    return context.dispatcher().createDnsResolver(resolvers, use_tcp_for_dns_lookups,
+                                                  use_apple_api_for_dns_lookups);
   }
 
   return context.dnsResolver();

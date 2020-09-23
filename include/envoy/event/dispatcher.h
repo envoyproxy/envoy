@@ -120,11 +120,13 @@ public:
    * empty, it will not use any specific resolvers, but use defaults (/etc/resolv.conf)
    * @param use_tcp_for_dns_lookups if set to true, tcp will be used to perform dns lookups.
    * Otherwise, udp is used.
+   * @param use_apple_api_for_dns_lookups if set to true, Apple APIs will be used to perform dns
+   * lookups. This is only available in Apple systems (macOS, iOS), and is a no-op otherwise.
    * @return Network::DnsResolverSharedPtr that is owned by the caller.
    */
   virtual Network::DnsResolverSharedPtr
   createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-                    bool use_tcp_for_dns_lookups) PURE;
+                    bool use_tcp_for_dns_lookups, const bool use_apple_api_for_dns_lookups) PURE;
 
   /**
    * Creates a file event that will signal when a file is readable or writable. On UNIX systems this

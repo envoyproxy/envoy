@@ -30,7 +30,8 @@ public:
     config_.set_name("foo");
     config_.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
 
-    EXPECT_CALL(dispatcher_, createDnsResolver(_, _)).WillOnce(Return(resolver_));
+    EXPECT_CALL(dispatcher_, createDnsResolver(_, _, false /* use_apple_api_for_dns_lookups */))
+        .WillOnce(Return(resolver_));
     dns_cache_ =
         std::make_unique<DnsCacheImpl>(dispatcher_, tls_, random_, loader_, store_, config_);
     update_callbacks_handle_ = dns_cache_->addUpdateCallbacks(update_callbacks_);
@@ -681,7 +682,9 @@ TEST(DnsCacheImplOptionsTest, UseTcpForDnsLookupsOptionSet) {
 
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
   config.set_use_tcp_for_dns_lookups(true);
-  EXPECT_CALL(dispatcher, createDnsResolver(_, true)).WillOnce(Return(resolver));
+  EXPECT_CALL(dispatcher, createDnsResolver(_, true /* use_tcp_for_dns_lookups */,
+                                            false /* use_apple_api_for_dns_lookups */))
+      .WillOnce(Return(resolver));
   DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
 }
 
@@ -695,9 +698,31 @@ TEST(DnsCacheImplOptionsTest, UseTcpForDnsLookupsOptionUnSet) {
 
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
   config.set_use_tcp_for_dns_lookups(false);
-  EXPECT_CALL(dispatcher, createDnsResolver(_, false)).WillOnce(Return(resolver));
+  EXPECT_CALL(dispatcher, createDnsResolver(_, false /* use_tcp_for_dns_lookups */,
+                                            false /* use_apple_api_for_dns_lookups */))
+      .WillOnce(Return(resolver));
   DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
 }
+
+#ifdef __APPLE__
+TEST(DnsCacheImplOptionsTest, UseAppleApiForDnsLookupst) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Runtime::MockLoader> loader;
+  Stats::IsolatedStoreImpl store;
+
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+  config.set_use_tcp_for_dns_lookups(false);
+  EXPECT_CALL(loader.snapshot_, getBoolean("dns.use_apple_api_for_dns_lookups", false))
+      .WillOnce(Return(true));
+  EXPECT_CALL(dispatcher, createDnsResolver(_, false /* use_tcp_for_dns_lookups */,
+                                            false /* use_apple_api_for_dns_lookups */))
+      .WillOnce(Return(resolver));
+  DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
+}
+#endif
 
 // DNS cache manager config tests.
 TEST(DnsCacheManagerImplTest, LoadViaConfig) {

@@ -20,9 +20,9 @@ class DnsFilterResolver : Logger::Loggable<Logger::Id::filter> {
 public:
   DnsFilterResolver(DnsFilterResolverCallback& callback, AddressConstPtrVec resolvers,
                     std::chrono::milliseconds timeout, Event::Dispatcher& dispatcher,
-                    uint64_t max_pending_lookups)
+                    uint64_t max_pending_lookups, Runtime::Loader& runtime)
       : timeout_(timeout), dispatcher_(dispatcher),
-        resolver_(dispatcher.createDnsResolver(resolvers, false /* use_tcp_for_dns_lookups */)),
+        resolver_(dispatcher.createDnsResolver(resolvers, false /* use_tcp_for_dns_lookups */, runtime.snapshot().getBoolean("dns.use_apple_api_for_dns_lookups", false)),
         callback_(callback), max_pending_lookups_(max_pending_lookups) {}
   /**
    * @brief entry point to resolve the name in a DnsQueryRecord

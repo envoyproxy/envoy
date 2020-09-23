@@ -475,7 +475,9 @@ void InstanceImpl::initialize(const Options& options,
   ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
 
   const bool use_tcp_for_dns_lookups = bootstrap_.use_tcp_for_dns_lookups();
-  dns_resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups);
+  dns_resolver_ = dispatcher_->createDnsResolver(
+      {}, use_tcp_for_dns_lookups,
+      runtime().snapshot().getBoolean("dns.use_apple_api_for_dns_lookups", false));
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,

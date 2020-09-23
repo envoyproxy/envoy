@@ -110,7 +110,7 @@ public:
                const Network::ConnectionSocket::OptionsSharedPtr& options));
   MOCK_METHOD(Network::DnsResolverSharedPtr, createDnsResolver,
               (const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-               const bool use_tcp_for_dns_lookups));
+               const bool use_tcp_for_dns_lookups, const bool use_apple_api_for_dns_lookups));
   MOCK_METHOD(FileEvent*, createFileEvent_,
               (os_fd_t fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
   MOCK_METHOD(Filesystem::Watcher*, createFilesystemWatcher_, ());
