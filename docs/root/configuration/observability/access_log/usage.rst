@@ -357,9 +357,11 @@ The following command operators are supported:
     Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
 
 %CONNECTION_ID%
-  ID of the downstream connection. It can be used to cross-reference TCP access
-  log across multiple log sinks, or to cross-reference timer-based reports for
-  the same connection.
+  An identifier for the downstream connection. It can be used to
+  cross-reference TCP access logs across multiple log sinks, or to
+  cross-reference timer-based reports for the same connection. The identifier
+  is unique with high likelihood within an execution, but can duplicate across
+  multiple instances or between restarts.
 
 %GRPC_STATUS%
   gRPC status code which is easy to interpret with text message corresponding with number.
