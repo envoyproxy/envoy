@@ -16,7 +16,7 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerato
                            Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                           std::chrono::milliseconds pool_idle_timeout)
+                           absl::optional<std::chrono::milliseconds> pool_idle_timeout)
     : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
                            transport_socket_options, Protocol::Http2, pool_idle_timeout),
       random_generator_(random_generator) {}
@@ -95,7 +95,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                 std::chrono::milliseconds pool_idle_timeout) {
+                 absl::optional<std::chrono::milliseconds> pool_idle_timeout) {
   return std::make_unique<Http::Http2::ProdConnPoolImpl>(
       dispatcher, random_generator, host, priority, options, transport_socket_options,
       pool_idle_timeout);

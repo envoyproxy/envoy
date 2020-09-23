@@ -23,7 +23,7 @@ public:
                Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-               std::chrono::milliseconds pool_idle_timeout);
+               absl::optional<std::chrono::milliseconds> pool_idle_timeout);
 
   ~ConnPoolImpl() override;
 
@@ -102,7 +102,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                 std::chrono::milliseconds pool_idle_timeout);
+                 absl::optional<std::chrono::milliseconds> pool_idle_timeout);
 
 } // namespace Http1
 } // namespace Http

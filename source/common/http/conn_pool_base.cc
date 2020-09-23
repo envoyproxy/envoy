@@ -48,7 +48,7 @@ HttpConnPoolImplBase::HttpConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-    Http::Protocol protocol, std::chrono::milliseconds pool_idle_timeout)
+    Http::Protocol protocol, absl::optional<std::chrono::milliseconds> pool_idle_timeout)
     : Envoy::ConnectionPool::ConnPoolImplBase(
           host, priority, dispatcher, options,
           wrapTransportSocketOptions(transport_socket_options, protocol), pool_idle_timeout) {}
