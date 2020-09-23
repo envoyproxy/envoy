@@ -79,6 +79,7 @@ The following attributes are exposed to the language runtime:
    request.total_size, int, Total size of the request including the headers
    request.protocol, string, Request protocol e.g. "HTTP/2"
    response.code, int, Response HTTP status code
+   response.code_details, string, Internal response code details (subject to change)
    response.grpc_status, int, Response gRPC status code
    response.headers, string map, All response headers
    response.trailers, string map, All response trailers
@@ -90,6 +91,7 @@ The following attributes are exposed to the language runtime:
    destination.address, string, Downstream connection local address
    destination.port, int, Downstream connection local port
    metadata, :ref:`Metadata<envoy_api_msg_core.Metadata>`, Dynamic metadata
+   filter_state, map string to bytes, Filter state mapping data names to their serialized string value
    connection.mtls, bool, Indicates whether TLS is applied to the downstream connection and the peer ceritificate is presented
    connection.requested_server_name, string, Requested server name in the downstream TLS connection
    connection.tls_version, string, TLS version of the downstream TLS connection

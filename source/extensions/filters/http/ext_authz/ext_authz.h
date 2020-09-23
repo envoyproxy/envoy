@@ -38,6 +38,7 @@ namespace ExtAuthz {
   COUNTER(ok)                                                                                      \
   COUNTER(denied)                                                                                  \
   COUNTER(error)                                                                                   \
+  COUNTER(timeout)                                                                                 \
   COUNTER(failure_mode_allowed)
 
 /**
@@ -59,6 +60,7 @@ public:
         failure_mode_allow_(config.failure_mode_allow()),
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
+        pack_as_bytes_(config.with_request_body().pack_as_bytes()),
         status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
         runtime_(runtime), http_context_(http_context),
         filter_enabled_(config.has_filter_enabled()
@@ -76,6 +78,7 @@ public:
         stats_(generateStats(stats_prefix, scope)), ext_authz_ok_(pool_.add("ext_authz.ok")),
         ext_authz_denied_(pool_.add("ext_authz.denied")),
         ext_authz_error_(pool_.add("ext_authz.error")),
+        ext_authz_timeout_(pool_.add("ext_authz.timeout")),
         ext_authz_failure_mode_allowed_(pool_.add("ext_authz.failure_mode_allowed")) {}
 
   bool allowPartialMessage() const { return allow_partial_message_; }
@@ -87,6 +90,8 @@ public:
   bool clearRouteCache() const { return clear_route_cache_; }
 
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
+
+  bool packAsBytes() const { return pack_as_bytes_; }
 
   Http::Code statusOnError() const { return status_on_error_; }
 
@@ -130,6 +135,7 @@ private:
   const bool failure_mode_allow_;
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
+  const bool pack_as_bytes_;
   const Http::Code status_on_error_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
@@ -154,6 +160,7 @@ public:
   const Stats::StatName ext_authz_ok_;
   const Stats::StatName ext_authz_denied_;
   const Stats::StatName ext_authz_error_;
+  const Stats::StatName ext_authz_timeout_;
   const Stats::StatName ext_authz_failure_mode_allowed_;
 };
 

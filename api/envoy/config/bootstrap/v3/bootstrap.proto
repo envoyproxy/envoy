@@ -40,7 +40,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 27]
+// [#next-free-field: 28]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -176,7 +176,13 @@ message Bootstrap {
   }];
 
   // Optional watchdog configuration.
-  Watchdog watchdog = 8;
+  // This is for a single watchdog configuration for the entire system.
+  // Deprecated in favor of *watchdogs* which has finer granularity.
+  Watchdog watchdog = 8 [deprecated = true];
+
+  // Optional watchdogs configuration.
+  // This is used for specifying different watchdogs for the different subsystems.
+  Watchdogs watchdogs = 27;
 
   // Configuration for an external tracing provider.
   //
@@ -334,6 +340,17 @@ message ClusterManager {
   // <envoy_api_field_config.core.v3.ApiConfigSource.api_type>` :ref:`GRPC
   // <envoy_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>`.
   core.v3.ApiConfigSource load_stats_config = 4;
+}
+
+// Allows you to specify different watchdog configs for different subsystems.
+// This allows finer tuned policies for the watchdog. If a subsystem is omitted
+// the default values for that system will be used.
+message Watchdogs {
+  // Watchdog for the main thread.
+  Watchdog main_thread_watchdog = 1;
+
+  // Watchdog for the worker threads.
+  Watchdog worker_watchdog = 2;
 }
 
 // Envoy process watchdog configuration. When configured, this monitors for
