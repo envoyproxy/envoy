@@ -418,8 +418,6 @@ TEST_F(ProxyProtocolTest, OnConnectedCallsInnerOnConnected) {
 
 class ProxyProtocolSocketFactoryTest : public testing::Test {
 public:
-  ProxyProtocolSocketFactoryTest() {}
-
   void initialize() {
     auto inner_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
     inner_factory_ = inner_factory.get();
