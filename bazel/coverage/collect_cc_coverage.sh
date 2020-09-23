@@ -41,6 +41,8 @@
 # gcda or profraw) and uses either lcov or gcov to get the coverage data.
 # The coverage data is placed in $COVERAGE_OUTPUT_FILE.
 
+read -ra COVERAGE_GCOV_OPTIONS <<< "${COVERAGE_GCOV_OPTIONS:-}"
+
 # Checks if clang llvm coverage should be used instead of lcov.
 function uses_llvm() {
   if stat "${COVERAGE_DIR}"/*.profraw >/dev/null 2>&1; then
@@ -136,7 +138,7 @@ function gcov_coverage() {
           # Don't generate branch coverage (-b) because of a gcov issue that
           # segfaults when both -i and -b are used (see
           # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84879).
-          "${GCOV}" -i "$COVERAGE_GCOV_OPTIONS" -o "$(dirname "${gcda}")" "${gcda}"
+          "${GCOV}" -i "${COVERAGE_GCOV_OPTIONS[@]}" -o "$(dirname "${gcda}")" "${gcda}"
 
           # Append all .gcov files in the current directory to the output file.
           cat ./*.gcov >> "$output_file"
