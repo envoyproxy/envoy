@@ -49,6 +49,7 @@ envoy_cc_test(
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",

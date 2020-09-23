@@ -181,7 +181,7 @@ envoy_cc_library(
     ],
     tags = ["nofips"],
     deps = [
-        ":envoy_quic_crypto_server_stream_lib",
+        ":envoy_quic_proof_source_lib",
         ":envoy_quic_stream_lib",
         ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",
@@ -409,10 +409,7 @@ envoy_cc_library(
         "//bazel:linux": ["udp_gso_batch_writer.cc"],
         "//conditions:default": [],
     }),
-    hdrs = select({
-        "//bazel:linux": ["udp_gso_batch_writer.h"],
-        "//conditions:default": [],
-    }),
+    hdrs = ["udp_gso_batch_writer.h"],
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     visibility = [
@@ -443,16 +440,5 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/common/api:os_sys_calls_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "envoy_quic_crypto_server_stream_lib",
-    srcs = ["envoy_quic_crypto_server_stream.cc"],
-    hdrs = ["envoy_quic_crypto_server_stream.h"],
-    tags = ["nofips"],
-    deps = [
-        ":envoy_quic_proof_source_lib",
-        "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
     ],
 )

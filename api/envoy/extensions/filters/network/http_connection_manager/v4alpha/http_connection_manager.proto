@@ -573,27 +573,29 @@ message LocalReplyConfig {
   // The configuration to form response body from the :ref:`command operators <config_access_log_command_operators>`
   // and to specify response content type as one of: plain/text or application/json.
   //
-  // Example one: plain/text body_format.
+  // Example one: "plain/text" ``body_format``.
   //
-  // .. code-block::
+  // .. validated-code-block:: yaml
+  //   :type-name: envoy.config.core.v3.SubstitutionFormatString
   //
-  //   text_format: %LOCAL_REPLY_BODY%:%RESPONSE_CODE%:path=$REQ(:path)%
+  //   text_format: "%LOCAL_REPLY_BODY%:%RESPONSE_CODE%:path=%REQ(:path)%\n"
   //
-  // The following response body in `plain/text` format will be generated for a request with
+  // The following response body in "plain/text" format will be generated for a request with
   // local reply body of "upstream connection error", response_code=503 and path=/foo.
   //
-  // .. code-block::
+  // .. code-block:: text
   //
   //   upstream connect error:503:path=/foo
   //
-  //  Example two: application/json body_format.
+  // Example two: "application/json" ``body_format``.
   //
-  // .. code-block::
+  // .. validated-code-block:: yaml
+  //   :type-name: envoy.config.core.v3.SubstitutionFormatString
   //
-  //  json_format:
-  //    status: %RESPONSE_CODE%
-  //    message: %LOCAL_REPLY_BODY%
-  //    path: $REQ(:path)%
+  //   json_format:
+  //     status: "%RESPONSE_CODE%"
+  //     message: "%LOCAL_REPLY_BODY%"
+  //     path: "%REQ(:path)%"
   //
   // The following response body in "application/json" format would be generated for a request with
   // local reply body of "upstream connection error", response_code=503 and path=/foo.
