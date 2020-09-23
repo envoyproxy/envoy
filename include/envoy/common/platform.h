@@ -288,16 +288,3 @@ struct mmsghdr {
 // On non-Linux platforms use 128 which is libevent listener default
 #define ENVOY_TCP_BACKLOG_SIZE 128
 #endif
-
-// Used for retrieving TCP round-trip time.
-#if defined(__linux__)
-// On Linux, default to the actual TCP_INFO defined in kernel's netinet/tcp.h header.
-#define ENVOY_TCP_INFO TCP_INFO
-#else
-// Define ENVOY_TCP_INFO to an unused value.
-#define ENVOY_TCP_INFO -1
-// Define tcp_info to a struct with just the fields needed to compile on other platforms.
-struct tcp_info {
-  uint32_t tcpi_rtt;
-};
-#endif
