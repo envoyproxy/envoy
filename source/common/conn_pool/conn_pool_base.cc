@@ -13,7 +13,7 @@ ConnPoolImplBase::ConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-    std::chrono::milliseconds pool_idle_timeout)
+    absl::optional<std::chrono::milliseconds> pool_idle_timeout)
     : host_(host), priority_(priority), dispatcher_(dispatcher), socket_options_(options),
       transport_socket_options_(transport_socket_options), idle_timeout_(pool_idle_timeout),
       idle_timer_(dispatcher.createTimer([this]() {
@@ -307,11 +307,11 @@ void ConnPoolImplBase::checkForDrained() {
 }
 
 void ConnPoolImplBase::checkForIdle() {
-  if (idle_pool_callbacks_.empty() || idle_timeout_ == std::chrono::milliseconds::max()) {
+  if (idle_pool_callbacks_.empty() || !idle_timeout_) {
     return;
   }
   if (!idle_timer_->enabled() && !hasActiveConnectionsImpl()) {
-    idle_timer_->enableTimer(idle_timeout_);
+    idle_timer_->enableTimer(*idle_timeout_);
   }
 }
 

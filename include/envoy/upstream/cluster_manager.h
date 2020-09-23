@@ -319,7 +319,7 @@ public:
                    ResourcePriority priority, Http::Protocol protocol,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                   std::chrono::milliseconds pool_idle_timeout) PURE;
+                   absl::optional<std::chrono::milliseconds> pool_idle_timeout) PURE;
 
   /**
    * Allocate a TCP connection pool for the host. Pools are separated by 'priority' and
@@ -330,7 +330,7 @@ public:
                       ResourcePriority priority,
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
                       Network::TransportSocketOptionsSharedPtr transport_socket_options,
-                      std::chrono::milliseconds pool_idle_timeout) PURE;
+                      absl::optional<std::chrono::milliseconds> pool_idle_timeout) PURE;
 
   /**
    * Allocate a cluster from configuration proto.

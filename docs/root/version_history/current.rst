@@ -68,7 +68,7 @@ New Features
 * access log: added :ref:`omit_empty_values<envoy_v3_api_field_config.core.v3.SubstitutionFormatString.omit_empty_values>` option to omit unset value from formatted log.
 * admin: added the ability to dump init manager unready targets information :ref:`/init_dump <operations_admin_interface_init_dump>` and :ref:`/init_dump?mask={} <operations_admin_interface_init_dump_by_mask>`.
 * build: enable building envoy :ref:`arm64 images <arm_binaries>` by buildx tool in x86 CI platform.
-* cluster: added :ref:`connection_pool_idle_timeout <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_idle_timeout>`, which controls how long the cluster manager waits before deleting pool that has seen no activity. The original and default behavior is that pools will not be deleted unless a limit would be exceeded.
+* cluster: added :ref:`connection_pool_idle_timeout <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_idle_timeout>`, which controls how long the cluster manager waits before deleting a pool that has seen no activity. The original and default behavior is that pools will not be deleted unless a limit would be exceeded.
 * cluster: added new :ref:`connection_pool_per_downstream_connection <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_per_downstream_connection>` flag, which enable creation of a new connection pool for each downstream connection.
 * decompressor filter: reports compressed and uncompressed bytes in trailers.
 * dns_filter: added support for answering :ref:`service record<envoy_v3_api_msg_data.dns.v3.DnsTable.DnsService>` queries.

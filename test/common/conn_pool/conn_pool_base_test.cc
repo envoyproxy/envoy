@@ -57,7 +57,7 @@ public:
 
 class ConnPoolImplBaseTest : public testing::Test {
 public:
-  void initialize(std::chrono::milliseconds pool_idle_timeout = std::chrono::milliseconds::max()) {
+  void initialize(absl::optional<std::chrono::milliseconds> pool_idle_timeout = absl::nullopt) {
     pool_ =
         std::make_unique<TestConnPoolImplBase>(host_, Upstream::ResourcePriority::Default,
                                                dispatcher_, nullptr, nullptr, pool_idle_timeout);

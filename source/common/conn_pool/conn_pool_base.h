@@ -106,7 +106,7 @@ public:
                    Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                   std::chrono::milliseconds pool_idle_timeout);
+                   absl::optional<std::chrono::milliseconds> pool_idle_timeout);
   virtual ~ConnPoolImplBase();
 
   // A helper function to get the specific context type from the base class context.
@@ -238,7 +238,7 @@ private:
   // After the pool enters a state in which it has no active connections, the idle timeout callbacks
   // will be called after `idle_timeout_` milliseconds. A value of
   // `std::chrono::milliseconds::max()` is used to disable the timeout
-  std::chrono::milliseconds idle_timeout_;
+  absl::optional<std::chrono::milliseconds> idle_timeout_;
 
   // The timer that fires to trigger the idle timeout callbacks
   Event::TimerPtr idle_timer_;

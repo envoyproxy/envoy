@@ -89,7 +89,7 @@ public:
   MOCK_METHOD(bool, addedViaApi, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, connectTimeout, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
-  MOCK_METHOD(std::chrono::milliseconds, poolIdleTimeout, (), (const));
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, poolIdleTimeout, (), (const));
   MOCK_METHOD(float, prefetchRatio, (), (const));
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
   MOCK_METHOD(uint64_t, features, (), (const));

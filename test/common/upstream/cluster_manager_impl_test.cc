@@ -29,6 +29,8 @@ using ::testing::ReturnNew;
 using ::testing::ReturnRef;
 using ::testing::SaveArg;
 
+using namespace std::chrono_literals;
+
 envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml,
                                                                  bool avoid_boosting = true) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
@@ -3878,7 +3880,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsIdleTimeout) {
 
   {
     auto* cp1 = new NiceMock<Http::ConnectionPool::MockInstance>();
-    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, std::chrono::milliseconds(1000)))
+    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, absl::optional<std::chrono::milliseconds>(1s)))
         .WillOnce(Return(cp1));
     std::function<void()> idle_callback;
     EXPECT_CALL(*cp1, addIdlePoolTimeoutCallback).WillOnce(SaveArg<0>(&idle_callback));
@@ -3893,7 +3895,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsIdleTimeout) {
     idle_callback();
 
     auto* cp2 = new NiceMock<Http::ConnectionPool::MockInstance>();
-    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, std::chrono::milliseconds(1000)))
+    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, absl::optional<std::chrono::milliseconds>(1s)))
         .WillOnce(Return(cp2));
     EXPECT_CALL(*cp2, addIdlePoolTimeoutCallback);
 
@@ -3904,7 +3906,8 @@ TEST_F(ClusterManagerImplTest, ConnPoolsIdleTimeout) {
 
   {
     auto* tcp1 = new NiceMock<Tcp::ConnectionPool::MockInstance>();
-    EXPECT_CALL(factory_, allocateTcpConnPool_(_, _, _, _, _, std::chrono::milliseconds(1000)))
+    EXPECT_CALL(factory_,
+                allocateTcpConnPool_(_, _, _, _, _, absl::optional<std::chrono::milliseconds>(1s)))
         .WillOnce(Return(tcp1));
     std::function<void()> idle_callback;
     EXPECT_CALL(*tcp1, addIdlePoolTimeoutCallback).WillOnce(SaveArg<0>(&idle_callback));
@@ -3918,7 +3921,8 @@ TEST_F(ClusterManagerImplTest, ConnPoolsIdleTimeout) {
     idle_callback();
 
     auto* tcp2 = new NiceMock<Tcp::ConnectionPool::MockInstance>();
-    EXPECT_CALL(factory_, allocateTcpConnPool_(_, _, _, _, _, std::chrono::milliseconds(1000)))
+    EXPECT_CALL(factory_,
+                allocateTcpConnPool_(_, _, _, _, _, absl::optional<std::chrono::milliseconds>(1s)))
         .WillOnce(Return(tcp2));
 
     // This time we expect tcp2 since tcp1 will have been destroyed

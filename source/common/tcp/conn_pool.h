@@ -122,7 +122,7 @@ public:
                Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                Network::TransportSocketOptionsSharedPtr transport_socket_options,
-               std::chrono::milliseconds pool_idle_timeout)
+               absl::optional<std::chrono::milliseconds> pool_idle_timeout)
       : Envoy::ConnectionPool::ConnPoolImplBase(host, priority, dispatcher, options,
                                                 transport_socket_options, pool_idle_timeout),
         upstream_ready_cb_(dispatcher.createSchedulableCallback([this]() {
