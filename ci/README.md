@@ -156,8 +156,11 @@ can control this by setting `ENVOY_DOCKER_BUILD_DIR` in the environment, e.g. to
 generate the binary in `C:\Users\foo\build\envoy\source\exe` you can run:
 
 ```bash
-ENVOY_DOCKER_BUILD_DIR=C:/Users/foo/build ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
+ENVOY_DOCKER_BUILD_DIR="C:\Users\foo\build" ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
+
+Note the quotations around the `ENVOY_DOCKER_BUILD_DIR` value to preserve the backslashes in the
+path.
 
 If you would like to run an interactive session to keep the build container running (to persist your local build environment), run:
 

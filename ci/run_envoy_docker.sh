@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -e
 
 # shellcheck source=ci/envoy_build_sha.sh
 . "$(dirname "$0")"/envoy_build_sha.sh

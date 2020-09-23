@@ -220,6 +220,8 @@ jobs:
         displayName: "Run Windows CI"
         env:
           ENVOY_DOCKER_BUILD_DIR: "$(Build.StagingDirectory)"
+          # Override global Docker options which are relevant for Linux only
+          ENVOY_DOCKER_OPTIONS: ""
           ENVOY_RBE: "true"
           BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs)"
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
