@@ -13,6 +13,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CdnLoop {
 
+using testing::HasSubstr;
+
 TEST(CdnLoopFilterFactoryTest, ValidValuesWork) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   Http::StreamDecoderFilterSharedPtr filter;
@@ -35,7 +37,8 @@ TEST(CdnLoopFilterFactoryTest, BlankCdnIdThrows) {
   envoy::extensions::filters::http::cdn_loop::v3alpha::CdnLoopConfig config;
   CdnLoopFilterFactory factory;
 
-  EXPECT_THROW(factory.createFilterFactoryFromProto(config, "stats", context), EnvoyException);
+  EXPECT_THAT_THROWS_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
+                             EnvoyException, HasSubstr("value length must be at least"));
 }
 
 } // namespace CdnLoop
