@@ -111,6 +111,8 @@ public:
         file_updater_1_(injected_resource_filename_1_),
         file_updater_2_(injected_resource_filename_2_) {}
 
+  ~QuicHttpIntegrationTest() { cleanupUpstreamAndDownstream(); }
+
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
       uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override {
     // Setting socket options is not supported.
