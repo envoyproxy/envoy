@@ -31,7 +31,7 @@ jobs:
         run: ./ci/linux_ci_setup.sh
       - name: 'Run tests'
         run: |
-          export PATH=/usr/lib/llvm-8/bin:$PATH
+          export PATH=/usr/lib/llvm-10/bin:$PATH
           export CC=clang
           export CXX=clang++
           bazelisk test --config=clang-tsan --test_output=all //test/...
@@ -47,7 +47,7 @@ jobs:
         run: ./ci/linux_ci_setup.sh
       - name: 'Run tests'
         run: |
-          export PATH=/usr/lib/llvm-8/bin:$PATH
+          export PATH=/usr/lib/llvm-10/bin:$PATH
           export CC=clang
           export CXX=clang++
           bazelisk test --config=clang-asan --test_output=all //test/...

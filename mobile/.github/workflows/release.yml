@@ -23,7 +23,7 @@ jobs:
           git config --global user.name "envoy-bot"
       - name: 'Build envoy.aar distributable'
         run: |
-          export PATH=/usr/lib/llvm-8/bin:$PATH
+          export PATH=/usr/lib/llvm-10/bin:$PATH
           export CC=clang
           export CXX=clang++
           export ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk-bundle

@@ -18,19 +18,19 @@ sudo apt-get update
 
 export DEBIAN_FRONTEND=noninteractive
 sudo apt-get install -y wget software-properties-common make cmake git \
-  unzip bc libtool ninja-build automake zip time \
+  unzip bc libtool ninja-build automake zip time lcov \
   apt-transport-https
 
-# clang 8.
+# clang 10
 wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-sudo apt-add-repository "deb https://apt.llvm.org/xenial/ llvm-toolchain-xenial-8 main"
+sudo apt-add-repository "deb https://apt.llvm.org/xenial/ llvm-toolchain-xenial-10 main"
 sudo apt-get update
-sudo apt-get install -y clang-8 lld-8 libc++-8-dev libc++abi-8-dev
+sudo apt-get install -y clang-10 lld-10 libc++-10-dev libc++abi-10-dev
 
 sudo update-alternatives --remove-all clang
 sudo update-alternatives --remove-all clang++
-sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-8 100
-sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-8 100
+sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-10 100
+sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-10 100
 
 sudo apt-get install gnupg2
 gpg --version
