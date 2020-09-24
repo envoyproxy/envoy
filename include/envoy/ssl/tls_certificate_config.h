@@ -50,6 +50,17 @@ public:
    * password was inlined.
    */
   virtual const std::string& passwordPath() const PURE;
+
+  /**
+   * @return a byte vector of ocsp response.
+   */
+  virtual const std::vector<uint8_t>& ocspStaple() const PURE;
+
+  /**
+   * @return path of the ocsp response file for this certificate or "<inline>" if the
+   * ocsp response was inlined.
+   */
+  virtual const std::string& ocspStaplePath() const PURE;
 };
 
 using TlsCertificateConfigPtr = std::unique_ptr<TlsCertificateConfig>;

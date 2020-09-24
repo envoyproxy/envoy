@@ -186,19 +186,19 @@ public:
    * @return std::vector<uint8_t>& a reference to the underlying bytestring representation
    * of the OCSP response
    */
-  const std::vector<uint8_t>& rawBytes() { return raw_bytes_; }
+  const std::vector<uint8_t>& rawBytes() const { return raw_bytes_; }
 
   /**
    * @return OcspResponseStatus whether the OCSP response was successfully created
    * or a status indicating an error in the OCSP process
    */
-  OcspResponseStatus getResponseStatus() { return response_->status_; }
+  OcspResponseStatus getResponseStatus() const { return response_->status_; }
 
   /**
    * @param cert a X509& SSL certificate
    * @returns bool whether this OCSP response contains the revocation status of `cert`
    */
-  bool matchesCertificate(X509& cert);
+  bool matchesCertificate(X509& cert) const;
 
   /**
    * Determines whether the OCSP response can no longer be considered valid.
@@ -209,6 +209,25 @@ public:
    * @returns bool if the OCSP response is expired.
    */
   bool isExpired();
+
+  /**
+   * @returns the seconds until this OCSP response expires.
+   */
+  uint64_t secondsUntilExpiration() const;
+
+  /**
+   * @return The beginning of the validity window for this response.
+   */
+  Envoy::SystemTime getThisUpdate() const;
+
+  /**
+   * The time at which this response is considered to expire. If
+   * the underlying response does not have a value, then the current
+   * time is returned.
+   *
+   * @return The end of the validity window for this response.
+   */
+  Envoy::SystemTime getNextUpdate() const;
 
 private:
   const std::vector<uint8_t> raw_bytes_;

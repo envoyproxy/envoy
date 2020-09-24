@@ -26,6 +26,9 @@ class SslContextManagerNoTlsStub final : public Envoy::Ssl::ContextManager {
   }
 
   size_t daysUntilFirstCertExpires() const override { return std::numeric_limits<int>::max(); }
+  absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override {
+    return absl::nullopt;
+  }
 
   void iterateContexts(std::function<void(const Envoy::Ssl::Context&)> /* callback */) override{};
 

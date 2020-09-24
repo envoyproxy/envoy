@@ -10,7 +10,10 @@ envoy_package()
 
 filegroup(
     name = "certs",
-    srcs = glob(["*.pem"]),
+    srcs = glob([
+        "*.pem",
+        "*.der",
+    ]),
 )
 
 envoy_cc_test_library(

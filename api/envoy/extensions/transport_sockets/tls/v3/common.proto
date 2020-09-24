@@ -151,7 +151,9 @@ message TlsCertificate {
   // TLS private key is not password encrypted.
   config.core.v3.DataSource password = 3 [(udpa.annotations.sensitive) = true];
 
-  // [#not-implemented-hide:]
+  // The OCSP response to be stapled with this certificate during the handshake.
+  // The response must be DER-encoded and may only be  provided via ``filename`` or
+  // ``inline_bytes``. The response may pertain to only one certificate.
   config.core.v3.DataSource ocsp_staple = 4;
 
   // [#not-implemented-hide:]
@@ -205,7 +207,7 @@ message CertificateValidationContext {
     ACCEPT_UNTRUSTED = 1;
   }
 
-  reserved 4;
+  reserved 4, 5;
 
   reserved "verify_subject_alt_name";
 
@@ -314,9 +316,6 @@ message CertificateValidationContext {
   //   therefore this option must be used together with :ref:`trusted_ca
   //   <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
   repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9;
-
-  // [#not-implemented-hide:] Must present a signed time-stamped OCSP response.
-  google.protobuf.BoolValue require_ocsp_staple = 5;
 
   // [#not-implemented-hide:] Must present signed certificate time-stamp.
   google.protobuf.BoolValue require_signed_certificate_timestamp = 6;

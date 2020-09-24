@@ -6,6 +6,7 @@
 #include "envoy/extensions/transport_sockets/tls/v3/tls.pb.validate.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
+#include "common/common/base64.h"
 #include "common/json/json_loader.h"
 #include "common/secret/sds_api.h"
 #include "common/stats/isolated_store_impl.h"
@@ -569,6 +570,220 @@ TEST_F(SslContextImplTest, MustHaveSubjectOrSAN) {
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
   EXPECT_THROW_WITH_REGEX(manager_.createSslServerContext(store_, server_context_config, {}),
                           EnvoyException, "has neither subject CN nor SAN names");
+}
+
+class SslServerContextImplOcspTest : public SslContextImplTest {
+public:
+  Envoy::Ssl::ServerContextSharedPtr loadConfig(ServerContextConfigImpl& cfg) {
+    return manager_.createSslServerContext(store_, cfg, std::vector<std::string>{});
+  }
+
+  Envoy::Ssl::ServerContextSharedPtr loadConfigYaml(const std::string& yaml) {
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+    ServerContextConfigImpl cfg(tls_context, factory_context_);
+    return loadConfig(cfg);
+  }
+};
+
+TEST_F(SslServerContextImplOcspTest, TestFilenameOcspStapleConfigLoads) {
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/good_cert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
+      ocsp_staple:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp.der"
+  ocsp_staple_policy: must_staple
+  )EOF";
+  loadConfigYaml(tls_context_yaml);
+}
+
+TEST_F(SslServerContextImplOcspTest, TestInlineBytesOcspStapleConfigLoads) {
+  auto der_response = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp.der"));
+  auto base64_response = Base64::encode(der_response.c_str(), der_response.length(), true);
+  const std::string tls_context_yaml = fmt::format(R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{{{ test_tmpdir }}}}/ocsp_test_data/good_cert.pem"
+      private_key:
+        filename: "{{{{ test_tmpdir }}}}/ocsp_test_data/good_key.pem"
+      ocsp_staple:
+       inline_bytes: "{}"
+  ocsp_staple_policy: must_staple
+  )EOF",
+                                                   base64_response);
+
+  loadConfigYaml(tls_context_yaml);
+}
+
+TEST_F(SslServerContextImplOcspTest, TestInlineStringOcspStapleConfigFails) {
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/good_cert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
+      ocsp_staple:
+       inline_string: "abcd"
+  ocsp_staple_policy: must_staple
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(tls_context_yaml), EnvoyException,
+                            "OCSP staple cannot be provided via inline_string");
+}
+
+TEST_F(SslServerContextImplOcspTest, TestMismatchedOcspStapleConfigFails) {
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_cert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_key.pem"
+      ocsp_staple:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp.der"
+  ocsp_staple_policy: must_staple
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(tls_context_yaml), EnvoyException,
+                            "OCSP response does not match its TLS certificate");
+}
+
+TEST_F(SslServerContextImplOcspTest, TestStaplingRequiredWithoutStapleConfigFails) {
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/good_cert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
+  ocsp_staple_policy: must_staple
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(tls_context_yaml), EnvoyException,
+                            "Required OCSP response is missing from TLS context");
+}
+
+TEST_F(SslServerContextImplOcspTest, TestUnsuccessfulOcspResponseConfigFails) {
+  std::vector<uint8_t> data = {
+      // SEQUENCE
+      0x30, 3,
+      // OcspResponseStatus - InternalError
+      0xau, 1, 2,
+      // no response bytes
+  };
+  std::string der_response(data.begin(), data.end());
+  auto base64_response = Base64::encode(der_response.c_str(), der_response.length(), true);
+  const std::string tls_context_yaml = fmt::format(R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{{{ test_tmpdir }}}}/ocsp_test_data/good_cert.pem"
+      private_key:
+        filename: "{{{{ test_tmpdir }}}}/ocsp_test_data/good_key.pem"
+      ocsp_staple:
+       inline_bytes: "{}"
+  ocsp_staple_policy: must_staple
+  )EOF",
+                                                   base64_response);
+
+  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(tls_context_yaml), EnvoyException,
+                            "OCSP response was unsuccessful");
+}
+
+TEST_F(SslServerContextImplOcspTest, TestMustStapleCertWithoutStapleConfigFails) {
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_cert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_key.pem"
+  ocsp_staple_policy: lenient_stapling
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(tls_context_yaml), EnvoyException,
+                            "OCSP response is required for must-staple certificate");
+}
+
+TEST_F(SslServerContextImplOcspTest, TestMustStapleCertWithoutStapleFeatureFlagOff) {
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_cert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_key.pem"
+  ocsp_staple_policy: lenient_stapling
+  )EOF";
+
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.require_ocsp_response_for_must_staple_certs", "false"}});
+  loadConfigYaml(tls_context_yaml);
+}
+
+TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/good_cert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
+      ocsp_staple:
+        filename: "{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp.der"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto context = loadConfigYaml(yaml);
+
+  constexpr absl::string_view this_update = "This Update: ";
+  constexpr absl::string_view next_update = "Next Update: ";
+
+  auto ocsp_text_details =
+      absl::StrSplit(TestEnvironment::readFileToStringForTest(
+                         TestEnvironment::substitute(
+                             "{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp_details.txt"),
+                         true),
+                     '\n');
+  std::string valid_from, expiration;
+  for (const auto& detail : ocsp_text_details) {
+    std::string::size_type pos = detail.find(this_update);
+    if (pos != std::string::npos) {
+      valid_from = detail.substr(pos + this_update.size());
+      continue;
+    }
+
+    pos = detail.find(next_update);
+    if (pos != std::string::npos) {
+      expiration = detail.substr(pos + next_update.size());
+      continue;
+    }
+  }
+
+  std::string ocsp_json = absl::StrCat(R"EOF({
+"valid_from": ")EOF",
+                                       convertTimeCertInfoToCertDetails(valid_from), R"EOF(",
+"expiration": ")EOF",
+                                       convertTimeCertInfoToCertDetails(expiration), R"EOF("
+}
+)EOF");
+
+  envoy::admin::v3::CertificateDetails::OcspDetails ocsp_details;
+  TestUtility::loadFromJson(ocsp_json, ocsp_details);
+
+  MessageDifferencer message_differencer;
+  message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
+  EXPECT_TRUE(message_differencer.Compare(ocsp_details,
+                                          context->getCertChainInformation()[0]->ocsp_details()));
 }
 
 class SslServerContextImplTicketTest : public SslContextImplTest {

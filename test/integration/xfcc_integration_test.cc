@@ -745,6 +745,8 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"server.parent_connections", "server.parent_connections"},
       {"server.total_connections", "server.total_connections"},
       {"server.days_until_first_cert_expiring", "server.days_until_first_cert_expiring"},
+      {"server.seconds_until_first_ocsp_response_expiring",
+       "server.seconds_until_first_ocsp_response_expiring"},
       {"server.version", "server.version"}};
 
   auto test_name_against_mapping =
