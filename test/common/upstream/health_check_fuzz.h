@@ -13,7 +13,7 @@ class HttpHealthCheckFuzz : HttpHealthCheckerImplTestBase {
 public:
   void allocHttpHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input);
-  void respond(const test::fuzz::Headers& headers, absl::string_view status);
+  void respond(const test::fuzz::Headers& headers, uint64_t status);
   void triggerIntervalTimer(bool expect_client_create);
   void triggerTimeoutTimer(bool last_action);
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action);
@@ -43,11 +43,6 @@ class GrpcHealthCheckFuzz : GrpcHealthCheckerImplTestBaseUtils {
 public:
   void allocGrpcHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input);
-  // From unit tests
-  static std::vector<uint8_t>
-  serializeResponse(grpc::health::v1::HealthCheckResponse::ServingStatus status);
-  Buffer::OwnedImpl
-  makeBufferToRespondWith(test::common::upstream::GrpcRespondBytes grpc_respond_bytes);
   // This has three components, headers, raw bytes, and trailers
   void respond(test::common::upstream::GrpcRespond grpc_respond);
   void triggerIntervalTimer(bool expect_client_create);

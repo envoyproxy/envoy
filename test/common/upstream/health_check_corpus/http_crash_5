@@ -44,13 +44,15 @@ actions {
           value: "200"
         }
       }
-      status: "200"
+      status: 200
     }
     tcp_respond {
             
     }
     grpc_respond {
-      
+      grpc_respond_headers {
+        
+      }
     }
   }
 }

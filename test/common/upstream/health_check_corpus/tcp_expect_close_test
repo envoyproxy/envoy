@@ -32,7 +32,9 @@ actions {
             data: "\x02"
         }
         grpc_respond {
+            grpc_respond_headers {
 
+            }
         }
     }
 }
@@ -42,13 +44,15 @@ actions {
 actions {
     respond {
         http_respond {
-            status: "1"
+            status: 1
         }
         tcp_respond {
             data: "\x02"
         }
         grpc_respond {
-            
+            grpc_respond_headers {
+                
+            }
         }
     }
 }

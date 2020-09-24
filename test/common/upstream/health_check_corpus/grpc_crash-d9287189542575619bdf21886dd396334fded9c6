@@ -24,7 +24,7 @@ actions {
           value: "200"
         }
       }
-      status: "200"
+      status: 200
     }
     tcp_respond {
     }
@@ -44,7 +44,7 @@ actions {
             value: "application/grpc"
           }
         }
-        status: "200"
+        status: 200
       }
       grpc_respond_bytes {
         status: SERVICE_UNKNOWN

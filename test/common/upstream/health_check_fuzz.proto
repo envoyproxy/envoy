@@ -7,20 +7,13 @@ import "test/fuzz/common.proto";
 import "envoy/config/core/v3/health_check.proto";
 import "google/protobuf/empty.proto";
 
-message HttpRespond { //TODO: Split this across headers, body, and trailers?
+message HttpRespond {
   test.fuzz.Headers headers = 1;
-  //https://github.com/nodejs/http-parser/blob/master/http_parser.c#L852
-  string status = 2 [(validate.rules).string = {pattern: "[0-9]+$*", min_len: 1}];
+  uint64 status = 2;
 }
 
 message TcpRespond {
   bytes data = 1;
-}
-
-message GrpcRespondHeaders {
-  test.fuzz.Headers headers = 1;
-  //https://github.com/nodejs/http-parser/blob/master/http_parser.c#L852
-  string status = 2 [(validate.rules).string = {pattern: "[0-9]+$*", min_len: 1}];
 }
 
 enum ServingStatus {
@@ -30,8 +23,14 @@ enum ServingStatus {
   SERVICE_UNKNOWN = 3; // Used only by the Watch method.
 }
 
+message GrpcRespondHeaders {
+  test.fuzz.Headers headers = 1;
+  uint64 status = 2;
+}
+
 message GrpcRespondBytes {
   oneof grpc_respond_bytes_selector {
+    option (validate.required) = true;
     //Structured response, which will get converted to raw bytes
     ServingStatus status = 1;
     bytes data = 2; //Raw bytes
@@ -40,14 +39,20 @@ message GrpcRespondBytes {
 
 message GrpcRespondTrailers {
   test.fuzz.Headers trailers = 1;
+  uint64 grpc_status = 2;
 }
 
 message GrpcRespond {
-  GrpcRespondHeaders grpc_respond_headers = 1;
+  GrpcRespondHeaders grpc_respond_headers = 1 [(validate.rules).message.required = true];
   GrpcRespondBytes grpc_respond_bytes = 2;
   GrpcRespondTrailers grpc_respond_trailers = 3;
 }
 
+/*
+The three types of health checkers (HTTP, TCP, and gRPC) share a lot of logic, thus allowing the fuzzer to use a single action
+stream across all three. However, the main difference comes from the type of data parsed as a response. Switching across the
+health checker type allows the fuzzer to choose the correct action sequence.
+*/
 message Respond {
   HttpRespond http_respond = 1 [(validate.rules).message.required = true];
   TcpRespond tcp_respond = 2 [(validate.rules).message.required = true];

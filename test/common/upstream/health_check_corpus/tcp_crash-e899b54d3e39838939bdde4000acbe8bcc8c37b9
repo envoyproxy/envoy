@@ -32,12 +32,14 @@ actions {
     http_respond {
       headers {
       }
-      status: "200"
+      status: 200
     }
     tcp_respond {
     }
     grpc_respond {
-      
+      grpc_respond_headers {
+        
+      }
     }
   }
 }

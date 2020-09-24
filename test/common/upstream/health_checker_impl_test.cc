@@ -4440,7 +4440,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgress) {
 
   // GOAWAY should cause a new connection to be created.
   expectClientCreate(0);
-  expectHealthcheckStart(0); // esentially a stream
+  expectHealthcheckStart(0);
   test_sessions_[0]->interval_timer_->invokeCallback();
 
   expectHealthcheckStop(0);
