@@ -57,13 +57,22 @@ private:
 
   class ResourceState {
   public:
-    explicit ResourceState(const envoy::service::discovery::v3::Resource& resource,
-                           Event::TimerPtr ttl_timer)
+    ResourceState(const envoy::service::discovery::v3::Resource& resource,
+                  Event::TimerPtr ttl_timer)
         : version_(resource.version()), ttl_timer_(std::move(ttl_timer)) {}
 
     // Builds a ResourceState in the waitingForServer state.
     ResourceState() = default;
 
+    static ResourceState waitingForServerResource(ResourceState old_version) {
+      ResourceState new_state;
+      new_state.ttl_timer_ = std::move(old_version.ttl_timer_);
+      if (new_state.ttl_timer_) {
+        new_state.ttl_timer_->disableTimer();
+      }
+
+      return new_state;
+    }
     // If true, we currently have no version of this resource - we are waiting for the server to
     // provide us with one.
     bool waitingForServer() const { return version_ == absl::nullopt; }

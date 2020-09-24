@@ -409,27 +409,32 @@ TEST_F(DeltaSubscriptionStateTest, ResourceTTL) {
     return added_resources;
   };
 
-  Event::MockTimer* timer = new Event::MockTimer(&dispatcher_);
-  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(10000), _));
-  deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(10)), {}, "debug1",
-                           "nonce1");
+  {
+    Event::MockTimer* timer = new Event::MockTimer(&dispatcher_);
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(10000), _));
+    deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(10)), {}, "debug1",
+                             "nonce1");
+  }
 
-  // Increase the TTL.
-  timer = new Event::MockTimer(&dispatcher_);
-  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(20000), _));
-  deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(20)), {}, "debug1",
-                           "nonce1");
+  {
+    // Increase the TTL.
+    Event::MockTimer* timer = new Event::MockTimer(&dispatcher_);
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(20000), _));
+    deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(20)), {}, "debug1",
+                             "nonce1");
+  }
 
   // Remove the TTL.
   deliverDiscoveryResponse(create_resource_with_ttl(absl::nullopt), {}, "debug1", "nonce1");
 
   // Add back the TTL.
-  timer = new Event::MockTimer(&dispatcher_);
+  Event::MockTimer* timer = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(20000), _));
   deliverDiscoveryResponse(create_resource_with_ttl(std::chrono::seconds(20)), {}, "debug1",
                            "nonce1");
 
   // Invoke the TTL.
+  EXPECT_CALL(*timer, disableTimer());
   EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _)).Times(1);
   timer->invokeCallback();
 
