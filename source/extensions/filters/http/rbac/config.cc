@@ -19,6 +19,8 @@ Http::FilterFactoryCb RoleBasedAccessControlFilterConfigFactory::createFilterFac
                                                                      context.scope());
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    // Idea 1, pass the matcher object as well.
+    // Just an idea, seems practically impossible because every filter needs to change its code.
     callbacks.addStreamDecoderFilter(std::make_shared<RoleBasedAccessControlFilter>(config));
   };
 }

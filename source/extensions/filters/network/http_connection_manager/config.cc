@@ -447,6 +447,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   const auto& filters = config.http_filters();
   for (int32_t i = 0; i < filters.size(); i++) {
     processFilter(filters[i], i, "http", filter_factories_, "http", i == filters.size() - 1);
+    // Idea 2, Store the matcher object in a vector and returns to FilterManager later.
+    matchers_.push_back(filters[i].has_match() ? absl::optional(filters[i].match())
+                                               : absl::nullopt);
   }
 
   for (const auto& upgrade_config : config.upgrade_configs()) {

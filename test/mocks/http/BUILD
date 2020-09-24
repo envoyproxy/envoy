@@ -56,6 +56,7 @@ envoy_cc_mock(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:host_mocks",
+        "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
     ],
 )
 

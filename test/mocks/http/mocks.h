@@ -8,6 +8,7 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/conn_pool.h"
@@ -114,6 +115,8 @@ public:
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type, const FilterChainFactory::UpgradeMap* upgrade_map,
                FilterChainFactoryCallbacks& callbacks));
+  MOCK_METHOD(absl::optional<envoy::config::common::matcher::v3::MatchPredicate>,
+              getFilterMatchPredicate, (std::size_t index));
 };
 
 class MockStreamFilterCallbacksBase {

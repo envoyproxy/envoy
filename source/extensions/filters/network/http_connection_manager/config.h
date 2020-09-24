@@ -7,6 +7,7 @@
 #include <map>
 #include <string>
 
+#include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/config/config_provider_manager.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -103,6 +104,11 @@ public:
   bool createUpgradeFilterChain(absl::string_view upgrade_type,
                                 const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
                                 Http::FilterChainFactoryCallbacks& callbacks) override;
+  // Idea 2.
+  absl::optional<envoy::config::common::matcher::v3::MatchPredicate>
+  getFilterMatchPredicate(std::size_t index) override {
+    return index < matchers_.size() ? matchers_[index] : absl::nullopt;
+  }
 
   // Http::ConnectionManagerConfig
   Http::RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
@@ -255,6 +261,8 @@ private:
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;
   // request timeout is disabled by default
   static const uint64_t RequestTimeoutMs = 0;
+
+  std::vector<absl::optional<envoy::config::common::matcher::v3::MatchPredicate>> matchers_;
 };
 
 /**

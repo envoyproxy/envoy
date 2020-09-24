@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.network.http_connection_manager.v3;
 
 import "envoy/config/accesslog/v3/accesslog.proto";
+import "envoy/config/common/matcher/v3/matcher.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
@@ -797,7 +798,7 @@ message ScopedRds {
       [(validate.rules).message = {required: true}];
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message HttpFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpFilter";
@@ -810,6 +811,10 @@ message HttpFilter {
   // select an extension if the type of the configuration proto is not
   // sufficient. It also serves as a resource name in ExtensionConfigDS.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // If specified, the http filter will be enabled only if match evaluates to true.
+  // Just an example matcher object.
+  config.common.matcher.v3.MatchPredicate match = 6;
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.

@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/network/filter.h"
@@ -112,6 +113,8 @@ public:
                                 Http::FilterChainFactoryCallbacks&) override {
     return false;
   }
+  absl::optional<envoy::config::common::matcher::v3::MatchPredicate>
+  getFilterMatchPredicate(std::size_t) override { return absl::nullopt; }
 
   // Http::ConnectionManagerConfig
   Http::RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }

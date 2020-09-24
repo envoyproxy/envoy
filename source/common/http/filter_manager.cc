@@ -392,6 +392,9 @@ void ActiveStreamDecoderFilter::requestDataTooLarge() {
 
 void FilterManager::addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter,
                                                  bool dual_filter) {
+  // Problem
+  // Ideally if we can get the matcher object here, the remaining work will be easy, but how to get
+  // the matcher object here without changing filter code?
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
   filter->setDecoderFilterCallbacks(*wrapper);
   // Note: configured decoder filters are appended to decoder_filters_.
@@ -444,11 +447,24 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       commonDecodePrefix(filter, FilterIterationStartState::AlwaysStartFromNext);
   std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
 
-  for (; entry != decoder_filters_.end(); entry++) {
+  for (int i = 0; entry != decoder_filters_.end(); entry++, i++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
     (*entry)->end_stream_ = state_.decoding_headers_only_ ||
                             (end_stream && continue_data_entry == decoder_filters_.end());
+    // Idea 2
+    // FilterManager gets the matcher object dynamically by using the index of the filter, this can
+    // also be done in early steps (not necessarily in decodeHeaders), we just need to evaluate the
+    // matcher object here (not demonstrated in this PR).
+    //
+    // This has big issues because it assumes **all** filters are added to the FilterManager exactly
+    // once, otherwise the index will mismatch, but we actually won't know whether the std::function
+    // callback is really adding its filter or not.
+    const auto& m = filter_chain_factory_.getFilterMatchPredicate(i);
+    if (m.has_value()) {
+      ENVOY_STREAM_LOG(error, "ymzhu: found MatchPredicate on filter: {}", *this,
+                       m.value().DebugString());
+    }
     FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
 
     ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && (*entry)->end_stream_),

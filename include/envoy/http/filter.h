@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/event/dispatcher.h"
@@ -890,6 +891,12 @@ public:
   virtual bool createUpgradeFilterChain(absl::string_view upgrade,
                                         const UpgradeMap* per_route_upgrade_map,
                                         FilterChainFactoryCallbacks& callbacks) PURE;
+
+  /**
+   * Idea 2, called by FilterManager to get the matcher object by index of the http_filters field.
+   */
+  virtual absl::optional<envoy::config::common::matcher::v3::MatchPredicate>
+  getFilterMatchPredicate(std::size_t index) PURE;
 };
 
 } // namespace Http

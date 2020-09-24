@@ -65,6 +65,7 @@ envoy_cc_library(
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/access_loggers/file:file_access_log_lib",
         "//source/server:listener_manager_lib",
+        "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
     ],
 )
 
