@@ -68,7 +68,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
     case envoy::config::core::v3::ApiConfigSource::GRPC:
       return std::make_unique<GrpcSubscriptionImpl>(
-          std::shared_ptr<Config::GrpcMuxImpl>(new Config::GrpcMuxImpl(
+          std::make_shared<Config::GrpcMuxImpl>(
               local_info_,
               Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                      api_config_source, scope, true)
@@ -76,7 +76,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               dispatcher_, sotwGrpcMethod(type_url, api_config_source.transport_api_version()),
               api_config_source.transport_api_version(), random_, scope,
               Utility::parseRateLimitSettings(api_config_source),
-              api_config_source.set_node_on_first_message_only())),
+              api_config_source.set_node_on_first_message_only()),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated*/ false);
