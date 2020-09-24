@@ -37,7 +37,7 @@ public:
   virtual const std::string& nodeName() const PURE;
 
   /**
-   * v2 API Node protobuf. This is the full node identity presented to management servers.
+   * This is the full node identity presented to management servers.
    */
   virtual const envoy::config::core::v3::Node& node() const PURE;
 };
