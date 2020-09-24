@@ -12,6 +12,7 @@
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/udp_default_writer_config.h"
+#include "common/network/udp_listener_impl.h"
 #include "common/network/utility.h"
 
 #include "server/connection_handler_impl.h"
@@ -43,7 +44,7 @@ class ConnectionHandlerTest : public testing::Test, protected Logger::Loggable<L
 public:
   ConnectionHandlerTest()
       : socket_factory_(std::make_shared<Network::MockListenSocketFactory>()),
-        handler_(new ConnectionHandlerImpl(dispatcher_)),
+        handler_(new ConnectionHandlerImpl(dispatcher_, 0)),
         filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
         listener_filter_matcher_(std::make_shared<NiceMock<Network::MockListenerFilterMatcher>>()),
         access_log_(std::make_shared<AccessLog::MockInstance>()) {
@@ -110,6 +111,9 @@ public:
     Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
       return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
     }
+    Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
+      return *udp_listener_worker_router_;
+    }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }
@@ -138,6 +142,7 @@ public:
     const bool continue_on_listener_filters_timeout_;
     std::unique_ptr<Network::ActiveUdpListenerFactory> udp_listener_factory_;
     std::unique_ptr<Network::UdpPacketWriterFactory> udp_writer_factory_;
+    Network::UdpListenerWorkerRouterPtr udp_listener_worker_router_;
     Network::ConnectionBalancerSharedPtr connection_balancer_;
     BasicResourceLimitImpl open_connections_;
     const std::vector<AccessLog::InstanceSharedPtr> access_logs_;
@@ -175,6 +180,7 @@ public:
     MOCK_METHOD(Network::Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
     MOCK_METHOD(Api::IoCallUint64Result, send, (const Network::UdpSendData&), (override));
     MOCK_METHOD(Api::IoCallUint64Result, flush, (), (override));
+    MOCK_METHOD(void, activateRead, (), (override));
 
   private:
     ConnectionHandlerTest& parent_;
@@ -221,6 +227,8 @@ public:
                                       Network::UdpListenerCallbacks&) -> Network::UdpListener* {
             return dynamic_cast<Network::UdpListener*>(listener);
           }));
+      listeners_.back()->udp_listener_worker_router_ =
+          std::make_unique<Network::UdpListenerWorkerRouterImpl>(1);
     }
 
     if (balanced_connection_handler != nullptr) {

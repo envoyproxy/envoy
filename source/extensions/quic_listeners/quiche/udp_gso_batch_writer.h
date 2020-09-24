@@ -1,6 +1,10 @@
 #pragma once
 
-#if defined(__GNUC__)
+#if !defined(__linux__)
+#define UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT 0
+#else
+#define UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT 1
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
@@ -123,3 +127,5 @@ private:
 
 } // namespace Quic
 } // namespace Envoy
+
+#endif // defined(__linux__)
