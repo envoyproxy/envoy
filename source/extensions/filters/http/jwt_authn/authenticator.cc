@@ -140,6 +140,7 @@ void AuthenticatorImpl::startVerify() {
   tokens_.pop_back();
 
   jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
+  ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
   const Status status = jwt_->parseFromString(curr_token_->token());
   if (status != Status::Ok) {
     doneWithStatus(status);

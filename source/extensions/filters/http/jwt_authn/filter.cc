@@ -83,7 +83,7 @@ void Filter::setPayload(const ProtobufWkt::Struct& payload) {
 }
 
 void Filter::onComplete(const Status& status) {
-  ENVOY_LOG(debug, "Called Filter : check complete {}",
+  ENVOY_LOG(debug, "Jwt authentication completed with: {}",
             ::google::jwt_verify::getStatusString(status));
   // This stream has been reset, abort the callback.
   if (state_ == Responded) {
