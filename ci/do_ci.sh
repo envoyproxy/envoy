@@ -194,7 +194,7 @@ elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
 
   echo "bazel release build with gcc..."
-  bazel_binary_build release
+  bazel_binary_build fastbuild
   exit 0
 elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   setup_clang_toolchain
