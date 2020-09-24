@@ -75,6 +75,7 @@ New Features
 * build: enable building envoy :ref:`arm64 images <arm_binaries>` by buildx tool in x86 CI platform.
 * cluster: added new :ref:`connection_pool_per_downstream_connection <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_per_downstream_connection>` flag, which enable creation of a new connection pool for each downstream connection.
 * decompressor filter: reports compressed and uncompressed bytes in trailers.
+* dns: added support for doing DNS resolution using Apple's DnsService APIs in Apple platforms (macOS, iOS). This feature is off by default, and is only configurable via runtime by setting ``dns.use_apple_api_for_dns_lookups`` to true.
 * dns_filter: added support for answering :ref:`service record<envoy_v3_api_msg_data.dns.v3.DnsTable.DnsService>` queries.
 * dynamic_forward_proxy: added :ref:`use_tcp_for_dns_lookups<envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.use_tcp_for_dns_lookups>` option to use TCP for DNS lookups in order to match the DNS options for :ref:`Clusters<envoy_v3_api_msg_config.cluster.v3.Cluster>`.
 * ext_authz filter: added support for emitting dynamic metadata for both :ref:`HTTP <config_http_filters_ext_authz_dynamic_metadata>` and :ref:`network <config_network_filters_ext_authz_dynamic_metadata>` filters.
