@@ -1132,7 +1132,7 @@ message HedgePolicy {
   // * At any time, a successful response (i.e. not triggering any of the retry-on conditions) would be returned to the client.
   // * Before per-try timeout, an error response (per retry-on conditions) would be retried immediately or returned ot the client
   //   if there are no more retries available.
-  // * After per-try timeout, an error response would be discard, as a retry in the form of a hedged request is already in progress.
+  // * After per-try timeout, an error response would be discarded, as a retry in the form of a hedged request is already in progress.
   //
   // Note: For this to have effect, the :ref:`RetryPolicy <envoy_api_msg_route.RetryPolicy>` must be one that retries on timeout
   // (e.g. `gateway-error`).
