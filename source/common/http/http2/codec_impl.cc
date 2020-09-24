@@ -737,6 +737,9 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   ASSERT(frame->hd.type != NGHTTP2_CONTINUATION);
 
   if ((frame->hd.type == NGHTTP2_PING) && (frame->ping.hd.flags & NGHTTP2_FLAG_ACK)) {
+    // The ``opaque_data`` should be exactly what was sent in the ping, which is
+    // was the current time when the ping was sent. This can be useful while debugging
+    // to match the ping and ack.
     uint64_t data;
     static_assert(sizeof(data) == sizeof(frame->ping.opaque_data), "Sizes are equal");
     memcpy(&data, frame->ping.opaque_data, sizeof(data));
