@@ -29,8 +29,15 @@ public:
                             [this]() -> void {
                               over_high_watermark_ = false;
                               triggered_high_to_low_watermark_ = true;
+                              if (writable_peer_) {
+                                writable_peer_->onPeerBufferWritable();
+                              }
                             },
-                            [this]() -> void { over_high_watermark_ = true; }, []() -> void {}) {}
+                            [this]() -> void {
+                              over_high_watermark_ = true;
+                              // low to high is checked by peer after peer writes data.
+                            },
+                            []() -> void {}) {}
 
   ~BufferedIoSocketHandleImpl() override { ASSERT(closed_); }
 
@@ -77,6 +84,8 @@ public:
 
   Buffer::WatermarkBuffer& getBufferForTest() { return owned_buffer_; }
   void scheduleWriteEvent() {}
+  void scheduleReadEvent() {}
+
   void scheduleNextEvent() {
     // It's possible there is no pending file event so as no io_callback.
     if (io_callback_) {
@@ -94,12 +103,16 @@ public:
   // WritablePeer
   void setWriteEnd() override { read_end_stream_ = true; }
   void maybeSetNewData() override {
-    scheduleWriteEvent();
+    scheduleReadEvent();
     scheduleNextEvent();
   }
   void onPeerDestroy() override {
     writable_peer_ = nullptr;
     peer_closed_ = true;
+  }
+  void onPeerBufferWritable() override {
+    scheduleWriteEvent();
+    scheduleNextEvent();
   }
   bool isWritable() const override { return !isOverHighWatermark(); }
   Buffer::Instance* getWriteBuffer() override { return &owned_buffer_; }

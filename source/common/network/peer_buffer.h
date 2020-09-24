@@ -47,6 +47,11 @@ public:
    */
   virtual bool isWritable() const PURE;
 
+  /**
+   * Raised by the peer when the peer switch from high water mark to low. 
+   */
+  virtual void onPeerBufferWritable() PURE;
+
   //   virtual bool triggeredHighToLowWatermark() const PURE;
   //   virtual void clearTriggeredHighToLowWatermark() PURE;
   //   virtual void setTriggeredHighToLowWatermark() PURE;

@@ -33,8 +33,12 @@ public:
     io_handle_peer_->setWritablePeer(io_handle_.get());
   }
   ~BufferedIoSocketHandleTest() override {
-    io_handle_->close();
-    io_handle_peer_->close();
+    if (io_handle_->isOpen()) {
+      io_handle_->close();
+    }
+    if (io_handle_peer_->isOpen()) {
+      io_handle_peer_->close();
+    }
   }
   void expectAgain() {
     auto res = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
@@ -232,34 +236,70 @@ TEST_F(BufferedIoSocketHandleTest, TestDrainToLowWaterMarkTriggerReadEvent) {
   EXPECT_TRUE(io_handle_->isReadable());
   EXPECT_FALSE(handle_as_peer->isWritable());
 
-  bool writable_flipped = false;
-  // During the repeated recv, the writable flag must switch to true.
-  while (internal_buffer.length() > 0) {
-    SCOPED_TRACE(internal_buffer.length());
-    EXPECT_TRUE(io_handle_->isReadable());
-    bool writable = handle_as_peer->isWritable();
-    if (writable) {
-      writable_flipped = true;
-    } else {
-      ASSERT_FALSE(writable_flipped);
-    }
-    auto res = io_handle_->recv(buf_.data(), 32, 0);
-    EXPECT_TRUE(res.ok());
-    EXPECT_EQ(32, res.rc_);
-  }
-  ASSERT_EQ(0, internal_buffer.length());
-  ASSERT_TRUE(writable_flipped);
+  // Clear invoke callback on peer.
+  scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  auto ev = io_handle_peer_->createFileEvent(
+      dispatcher_, [this](uint32_t events) { cb_.called(events); },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+  ASSERT_TRUE(scheduable_cb_->enabled());
+  EXPECT_CALL(cb_, called(_));
+  scheduable_cb_->invokeCallback();
+  ASSERT_FALSE(scheduable_cb_->enabled());
 
-  // Finally the buffer is empty.
-  EXPECT_FALSE(io_handle_->isReadable());
-  EXPECT_TRUE(handle_as_peer->isWritable());
+  {
+    auto res = io_handle_->recv(buf_.data(), 1, 0);
+    EXPECT_FALSE(handle_as_peer->isWritable());
+  }
+  {
+    EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration()).Times(1);
+    auto res = io_handle_->recv(buf_.data(), 232, 0);
+    EXPECT_TRUE(handle_as_peer->isWritable());
+  }
+
+  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration()).Times(1);
+  io_handle_->close();
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestClose) {
+  std::string accumulator;
+  scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  bool should_close = false;
+  auto ev = io_handle_->createFileEvent(
+      dispatcher_,
+      [this, &should_close, handle = io_handle_.get(), &accumulator](uint32_t events) {
+        if (events & Event::FileReadyType::Read) {
+          auto res = io_handle_->recv(buf_.data(), buf_.size(), 0);
+          if (res.ok()) {
+            accumulator += absl::string_view(buf_.data(), res.rc_);
+          } else if (res.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+            ENVOY_LOG_MISC(debug, "lambdai: EAGAIN");
+          } else {
+            ENVOY_LOG_MISC(debug, "lambdai: close, not schedule event");
+            should_close = true;
+          }
+        }
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+  scheduable_cb_->invokeCallback();
+
+  // Not closed yet.
+  ASSERT_FALSE(should_close);
+
+  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  io_handle_peer_->close();
+
+  ASSERT_TRUE(scheduable_cb_->enabled());
+  scheduable_cb_->invokeCallback();
+  ASSERT_TRUE(should_close);
+
+  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration()).Times(0);
+  io_handle_->close();
+  ev.reset();
 }
 
-TEST_F(BufferedIoSocketHandleTest, TestShutdown) {
-}
+TEST_F(BufferedIoSocketHandleTest, TestShutdown) {}
 
 } // namespace
 } // namespace Network
