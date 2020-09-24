@@ -15,12 +15,24 @@ namespace Tcp {
 OriginalConnPoolImpl::OriginalConnPoolImpl(
     Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
     Upstream::ResourcePriority priority, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options)
+    Network::TransportSocketOptionsSharedPtr transport_socket_options,
+    absl::optional<std::chrono::milliseconds> pool_idle_timeout)
     : dispatcher_(dispatcher), host_(host), priority_(priority), socket_options_(options),
       transport_socket_options_(transport_socket_options),
-      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })) {}
+      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })),
+      idle_timeout_(pool_idle_timeout) {
+  if (idle_timeout_) {
+    idle_timer_ = dispatcher.createTimer([this]() {
+      ASSERT(!hasActiveConnections());
+      for (const Instance::IdlePoolTimeoutCb& cb : idle_pool_callbacks_) {
+        cb();
+      }
+    });
+  }
+}
 
 OriginalConnPoolImpl::~OriginalConnPoolImpl() {
+  ASSERT(!idle_timer_);
   while (!ready_conns_.empty()) {
     ready_conns_.front()->conn_->close(Network::ConnectionCloseType::NoFlush);
   }
@@ -38,6 +50,8 @@ OriginalConnPoolImpl::~OriginalConnPoolImpl() {
 }
 
 void OriginalConnPoolImpl::drainConnections() {
+  ENVOY_LOG(debug, "draining connections");
+  idle_timer_.reset();
   while (!ready_conns_.empty()) {
     ready_conns_.front()->conn_->close(Network::ConnectionCloseType::NoFlush);
   }
@@ -74,7 +88,6 @@ void OriginalConnPoolImpl::addDrainedCallback(DrainedCb cb) {
 
 void OriginalConnPoolImpl::addIdlePoolTimeoutCallback(IdlePoolTimeoutCb cb) {
   idle_pool_callbacks_.push_back(cb);
-  checkForIdle();
 }
 
 void OriginalConnPoolImpl::assignConnection(ActiveConn& conn,
@@ -89,6 +102,9 @@ void OriginalConnPoolImpl::assignConnection(ActiveConn& conn,
 void OriginalConnPoolImpl::checkForDrained() {
   if (!drained_callbacks_.empty() && pending_requests_.empty() && busy_conns_.empty() &&
       pending_conns_.empty()) {
+    ENVOY_LOG(debug, "in draining state");
+    // We are draining, so we no longer need to track the idle timeout
+    idle_timer_.reset();
     while (!ready_conns_.empty()) {
       ready_conns_.front()->conn_->close(Network::ConnectionCloseType::NoFlush);
     }
@@ -99,15 +115,17 @@ void OriginalConnPoolImpl::checkForDrained() {
   }
 }
 
-void OriginalConnPoolImpl::checkForIdle() {
-  if (idle_pool_callbacks_.empty()) {
-    return;
+void OriginalConnPoolImpl::disablePoolIdleTimer() {
+  if (idle_timer_ && idle_timer_->enabled()) {
+    ENVOY_LOG(debug, "disabling idle timer");
+    idle_timer_->disableTimer();
   }
+}
 
-  if (pending_requests_.empty() && busy_conns_.empty() && pending_conns_.empty()) {
-    for (const IdlePoolTimeoutCb& cb : idle_pool_callbacks_) {
-      cb();
-    }
+void OriginalConnPoolImpl::checkForPoolIdle() {
+  if (idle_timer_ && !idle_timer_->enabled() && !hasActiveConnections()) {
+    ENVOY_LOG(debug, "enabling idle timer");
+    idle_timer_->enableTimer(*idle_timeout_);
   }
 }
 
@@ -119,6 +137,8 @@ void OriginalConnPoolImpl::createNewConnection() {
 
 ConnectionPool::Cancellable*
 OriginalConnPoolImpl::newConnection(ConnectionPool::Callbacks& callbacks) {
+  disablePoolIdleTimer();
+
   if (!ready_conns_.empty()) {
     ready_conns_.front()->moveBetweenLists(ready_conns_, busy_conns_);
     ENVOY_CONN_LOG(debug, "using existing connection", *busy_conns_.front()->conn_);
@@ -216,6 +236,7 @@ void OriginalConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::Connecti
     if (check_for_drained) {
       checkForDrained();
     }
+    checkForPoolIdle();
   }
 
   if (conn.connect_timer_) {
@@ -283,6 +304,9 @@ void OriginalConnPoolImpl::onUpstreamReady() {
     assignConnection(conn, pending_requests_.back()->callbacks_);
     pending_requests_.pop_back();
   }
+
+  // We deferred this idle check in `processIdleConnections` so we check here
+  checkForPoolIdle();
 }
 
 void OriginalConnPoolImpl::processIdleConnection(ActiveConn& conn, bool new_connection,
@@ -328,9 +352,10 @@ void OriginalConnPoolImpl::processIdleConnection(ActiveConn& conn, bool new_conn
   if (delay && !pending_requests_.empty() && !upstream_ready_enabled_) {
     upstream_ready_enabled_ = true;
     upstream_ready_cb_->scheduleCallbackCurrentIteration();
+  } else {
+    checkForPoolIdle();
   }
 
-  checkForIdle();
   checkForDrained();
 }
 

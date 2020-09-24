@@ -152,7 +152,9 @@ public:
                          Network::ConnectionEvent event);
   // See if the drain process has started and/or completed.
   void checkForDrained();
-  void checkForIdle();
+
+  // See if the pool has gone idle (no active or pending streams).
+  void checkForIdlePool();
 
   void onUpstreamReady();
   ConnectionPool::Cancellable* newStream(AttachContext& context);
@@ -204,9 +206,10 @@ protected:
 
   PendingStream* addToPendingStreamsList(PendingStreamPtr&& pending_stream) {
     LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
-    idle_timer_->disableTimer();
     return pending_streams_.front().get();
   }
+
+  void disablePoolIdleTimer();
 
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;

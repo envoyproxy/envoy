@@ -15,19 +15,22 @@ ConnPoolImplBase::ConnPoolImplBase(
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
     absl::optional<std::chrono::milliseconds> pool_idle_timeout)
     : host_(host), priority_(priority), dispatcher_(dispatcher), socket_options_(options),
-      transport_socket_options_(transport_socket_options), idle_timeout_(pool_idle_timeout),
-      idle_timer_(dispatcher.createTimer([this]() {
-        if (!hasActiveConnectionsImpl()) {
-          for (const Instance::IdlePoolTimeoutCb& cb : idle_pool_callbacks_) {
-            cb();
-          }
-        }
-      })) {}
+      transport_socket_options_(transport_socket_options), idle_timeout_(pool_idle_timeout) {
+  if (idle_timeout_) {
+    idle_timer_ = dispatcher.createTimer([this]() {
+      ASSERT(!hasActiveConnectionsImpl());
+      for (const Instance::IdlePoolTimeoutCb& cb : idle_pool_callbacks_) {
+        cb();
+      }
+    });
+  }
+}
 
 ConnPoolImplBase::~ConnPoolImplBase() {
   ASSERT(ready_clients_.empty());
   ASSERT(busy_clients_.empty());
   ASSERT(connecting_clients_.empty());
+  ASSERT(!idle_timer_);
 }
 
 void ConnPoolImplBase::destructAllConnections() {
@@ -76,6 +79,13 @@ float ConnPoolImplBase::perUpstreamPrefetchRatio() const {
     return host_->cluster().perUpstreamPrefetchRatio();
   } else {
     return 1.0;
+  }
+}
+
+void ConnPoolImplBase::disablePoolIdleTimer() {
+  if (idle_timer_ && idle_timer_->enabled()) {
+    ENVOY_LOG(debug, "disabling pool idle timer");
+    idle_timer_->disableTimer();
   }
 }
 
@@ -143,8 +153,6 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
       transitionActiveClientState(client, Envoy::ConnectionPool::ActiveClient::State::BUSY);
     }
 
-    idle_timer_->disableTimer();
-
     num_active_streams_++;
     host_->stats().rq_total_.inc();
     host_->stats().rq_active_.inc();
@@ -175,11 +183,13 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
     if (!delay_attaching_stream) {
       onUpstreamReady();
     }
+    checkForIdlePool();
   }
-  checkForIdle();
 }
 
 ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context) {
+  disablePoolIdleTimer();
+
   if (!ready_clients_.empty()) {
     ActiveClient& client = *ready_clients_.front();
     ENVOY_CONN_LOG(debug, "using existing connection", client);
@@ -263,12 +273,14 @@ bool ConnPoolImplBase::hasActiveConnectionsImpl() const {
 
 void ConnPoolImplBase::addIdlePoolTimeoutCallbackImpl(Instance::IdlePoolTimeoutCb cb) {
   idle_pool_callbacks_.push_back(cb);
-  checkForIdle();
 }
 
 void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
   // Create a separate list of elements to close to avoid mutate-while-iterating problems.
   std::list<ActiveClient*> to_close;
+
+  // The pool is draining, so we don't ever want to run the idle callbacks after this point
+  idle_timer_.reset();
 
   for (auto& client : ready_clients_) {
     if (client->numActiveStreams() == 0) {
@@ -321,11 +333,8 @@ void ConnPoolImplBase::checkForDrained() {
   }
 }
 
-void ConnPoolImplBase::checkForIdle() {
-  if (idle_pool_callbacks_.empty() || !idle_timeout_) {
-    return;
-  }
-  if (!idle_timer_->enabled() && !hasActiveConnectionsImpl()) {
+void ConnPoolImplBase::checkForIdlePool() {
+  if (idle_timer_ && !idle_timer_->enabled() && !hasActiveConnectionsImpl()) {
     idle_timer_->enableTimer(*idle_timeout_);
   }
 }
@@ -400,8 +409,6 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     checkForDrained();
   }
 
-  checkForIdle();
-
   if (client.connect_timer_) {
     client.connect_timer_->disableTimer();
     client.connect_timer_.reset();
@@ -473,7 +480,6 @@ void ConnPoolImplBase::onPendingStreamCancel(PendingStream& stream,
 
   host_->cluster().stats().upstream_rq_cancelled_.inc();
   checkForDrained();
-  checkForIdle();
 }
 
 namespace {

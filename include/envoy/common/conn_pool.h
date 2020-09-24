@@ -73,6 +73,10 @@ public:
   /**
    * Register a callback that gets called when the connection pool has had no pending requests or
    * busy connections for a configured timeout duration.
+   *
+   * NOTE: The "idle" state is not the same as the "drained" state. A pool may be drained before it
+   * has a chance to go idle (e.g. a host is removed), and a pool is drained after it has
+   * gone idle.
    */
   virtual void addIdlePoolTimeoutCallback(IdlePoolTimeoutCb cb) PURE;
 

@@ -3891,6 +3891,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsIdleTimeout) {
                                                             Http::Protocol::Http11, nullptr));
 
     // Trigger the idle callback so we remove the connection pool
+    EXPECT_CALL(*cp1, addDrainedCallback).WillOnce(Invoke([](auto cb) { cb(); }));
     idle_callback();
 
     auto* cp2 = new NiceMock<Http::ConnectionPool::MockInstance>();
@@ -3917,6 +3918,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsIdleTimeout) {
                                                             nullptr));
 
     // Trigger the idle callback so we remove the connection pool
+    EXPECT_CALL(*tcp1, addDrainedCallback).WillOnce(Invoke([](auto cb) { cb(); }));
     idle_callback();
 
     auto* tcp2 = new NiceMock<Tcp::ConnectionPool::MockInstance>();
