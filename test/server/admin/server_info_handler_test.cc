@@ -126,7 +126,11 @@ TEST_P(AdminInstanceTest, GetRequest) {
     EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), local_info.clusterName());
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(),
-            server_info_proto.node().cluster());
+              server_info_proto.node().cluster());
+    EXPECT_EQ(server_info_proto.command_line_options().service_node(), "");
+    EXPECT_EQ(server_info_proto.command_line_options().service_zone(), "");
+    EXPECT_EQ(server_info_proto.node().id(), local_info.nodeName());
+    EXPECT_EQ(server_info_proto.node().locality().zone(), local_info.zoneName());
   }
 
   {
@@ -145,7 +149,11 @@ TEST_P(AdminInstanceTest, GetRequest) {
     EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), local_info.clusterName());
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(),
-            server_info_proto.node().cluster());
+              server_info_proto.node().cluster());
+    EXPECT_EQ(server_info_proto.command_line_options().service_node(), "");
+    EXPECT_EQ(server_info_proto.command_line_options().service_zone(), "");
+    EXPECT_EQ(server_info_proto.node().id(), local_info.nodeName());
+    EXPECT_EQ(server_info_proto.node().locality().zone(), local_info.zoneName());
   }
 
   Http::TestResponseHeaderMapImpl response_headers;
@@ -164,6 +172,10 @@ TEST_P(AdminInstanceTest, GetRequest) {
   EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), local_info.clusterName());
   EXPECT_EQ(server_info_proto.command_line_options().service_cluster(),
             server_info_proto.node().cluster());
+  EXPECT_EQ(server_info_proto.command_line_options().service_node(), "");
+  EXPECT_EQ(server_info_proto.command_line_options().service_zone(), "");
+  EXPECT_EQ(server_info_proto.node().id(), local_info.nodeName());
+  EXPECT_EQ(server_info_proto.node().locality().zone(), local_info.zoneName());
 }
 
 TEST_P(AdminInstanceTest, PostRequest) {
