@@ -34,7 +34,7 @@ function setup_gcc_toolchain() {
     export BAZEL_COMPILER=gcc
     echo "$CC/$CXX toolchain configured"
   else
-    export BAZEL_BUILD_OPTIONS=("--config=remote-gcc" "${BAZEL_BUILD_OPTIONS[@]}")
+    BAZEL_BUILD_OPTIONS=("--config=remote-gcc" "${BAZEL_BUILD_OPTIONS[@]}")
   fi
 }
 
@@ -42,15 +42,15 @@ function setup_clang_toolchain() {
   ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
   if [[ -z "${ENVOY_RBE}" ]]; then
     if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
-      export BAZEL_BUILD_OPTIONS=("--config=libc++" "${BAZEL_BUILD_OPTIONS[@]}")
+      BAZEL_BUILD_OPTIONS=("--config=libc++" "${BAZEL_BUILD_OPTIONS[@]}")
     else
-      export BAZEL_BUILD_OPTIONS=("--config=clang" "${BAZEL_BUILD_OPTIONS[@]}")
+      BAZEL_BUILD_OPTIONS=("--config=clang" "${BAZEL_BUILD_OPTIONS[@]}")
     fi
   else
     if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
-      export BAZEL_BUILD_OPTIONS=("--config=remote-clang-libc++" "${BAZEL_BUILD_OPTIONS[@]}")
+      BAZEL_BUILD_OPTIONS=("--config=remote-clang-libc++" "${BAZEL_BUILD_OPTIONS[@]}")
     else
-      export BAZEL_BUILD_OPTIONS=("--config=remote-clang" "${BAZEL_BUILD_OPTIONS[@]}")
+      BAZEL_BUILD_OPTIONS=("--config=remote-clang" "${BAZEL_BUILD_OPTIONS[@]}")
     fi
   fi
   echo "clang toolchain with ${ENVOY_STDLIB} configured"
@@ -69,7 +69,7 @@ export PATH=/opt/llvm/bin:${PATH}
 export CLANG_FORMAT="${CLANG_FORMAT:-clang-format}"
 
 if [[ -f "/etc/redhat-release" ]]; then
-  export BAZEL_BUILD_EXTRA_OPTIONS+=("--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1")
+  BAZEL_BUILD_EXTRA_OPTIONS+=("--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1")
 fi
 
 function cleanup() {
@@ -89,7 +89,7 @@ export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
 # Use https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_repository_cache_hardlinks
 # to save disk space.
-export BAZEL_BUILD_OPTIONS=(
+BAZEL_BUILD_OPTIONS=(
   "${BAZEL_OPTIONS[@]}"
   "--verbose_failures"
   "--show_task_finish"

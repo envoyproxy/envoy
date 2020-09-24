@@ -8,7 +8,8 @@ set -e
 ENVOY_FILTER_EXAMPLE_GITSHA="493e2e5bee10bbed1c3c097e09d83d7f672a9f2e"
 ENVOY_FILTER_EXAMPLE_SRCDIR="${BUILD_DIR}/envoy-filter-example"
 
-export ENVOY_FILTER_EXAMPLE_TESTS=(
+# shellcheck disable=SC2034
+ENVOY_FILTER_EXAMPLE_TESTS=(
     "//:echo2_integration_test"
     "//http-filter-example:http_filter_integration_test"
     "//:envoy_binary_test")

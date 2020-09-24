@@ -68,6 +68,7 @@ public:
   Network::Connection& connection() const override;
   void onSuccess(SSL* ssl) override;
   void onFailure() override;
+  Network::TransportSocketCallbacks* transportSocketCallbacks() override { return callbacks_; }
 
   SSL* rawSslForTest() const { return rawSsl(); }
 
