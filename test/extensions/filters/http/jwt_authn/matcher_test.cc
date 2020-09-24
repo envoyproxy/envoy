@@ -162,6 +162,36 @@ TEST_F(MatcherTest, TestMatchPathAndHeader) {
   EXPECT_FALSE(matcher->matches(headers));
 }
 
+TEST_F(MatcherTest, TestMatchConnect) {
+  const char config[] = R"(match:
+  connect_matcher: {})";
+  RequirementRule rule;
+  TestUtility::loadFromYaml(config, rule);
+  MatcherConstPtr matcher = Matcher::create(rule);
+  auto headers = TestRequestHeaderMapImpl{{":method", "CONNECT"}};
+  EXPECT_TRUE(matcher->matches(headers));
+  headers = TestRequestHeaderMapImpl{{":method", "GET"}};
+  EXPECT_FALSE(matcher->matches(headers));
+}
+
+TEST_F(MatcherTest, TestMatchConnectQuery) {
+  const char config[] = R"(match:
+  connect_matcher: {}
+  query_parameters:
+  - name: foo
+    string_match:
+      exact: "bar")";
+  RequirementRule rule;
+  TestUtility::loadFromYaml(config, rule);
+  MatcherConstPtr matcher = Matcher::create(rule);
+  auto headers = TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":path", "/boo?foo=bar"}};
+  EXPECT_TRUE(matcher->matches(headers));
+  headers = TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/boo?foo=bar"}};
+  EXPECT_FALSE(matcher->matches(headers));
+  headers = TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":path", "/boo?ok=bye"}};
+  EXPECT_FALSE(matcher->matches(headers));
+}
+
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters

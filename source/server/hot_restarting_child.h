@@ -12,7 +12,8 @@ namespace Server {
  */
 class HotRestartingChild : HotRestartingBase, Logger::Loggable<Logger::Id::main> {
 public:
-  HotRestartingChild(int base_id, int restart_epoch);
+  HotRestartingChild(int base_id, int restart_epoch, const std::string& socket_path,
+                     mode_t socket_mode);
 
   int duplicateParentListenSocket(const std::string& address);
   std::unique_ptr<envoy::HotRestartMessage> getParentStats();

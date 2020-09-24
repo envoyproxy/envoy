@@ -882,6 +882,13 @@ ProtobufWkt::Value ValueUtil::stringValue(const std::string& str) {
   return val;
 }
 
+ProtobufWkt::Value ValueUtil::optionalStringValue(const absl::optional<std::string>& str) {
+  if (str.has_value()) {
+    return ValueUtil::stringValue(str.value());
+  }
+  return ValueUtil::nullValue();
+}
+
 ProtobufWkt::Value ValueUtil::boolValue(bool b) {
   ProtobufWkt::Value val;
   val.set_bool_value(b);
@@ -938,14 +945,6 @@ void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
       std::chrono::time_point_cast<std::chrono::milliseconds>(system_clock_time)
           .time_since_epoch()
           .count()));
-}
-
-absl::string_view TypeUtil::typeUrlToDescriptorFullName(absl::string_view type_url) {
-  const size_t pos = type_url.rfind('/');
-  if (pos != absl::string_view::npos) {
-    type_url = type_url.substr(pos + 1);
-  }
-  return type_url;
 }
 
 } // namespace Envoy

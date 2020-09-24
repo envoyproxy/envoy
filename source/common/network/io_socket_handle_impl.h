@@ -13,12 +13,13 @@ namespace Envoy {
 namespace Network {
 
 /**
- * IoHandle derivative for sockets
+ * IoHandle derivative for sockets.
  */
 class IoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
 public:
-  explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false)
-      : fd_(fd), socket_v6only_(socket_v6only) {}
+  explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
+                              absl::optional<int> domain = absl::nullopt)
+      : fd_(fd), socket_v6only_(socket_v6only), domain_(domain) {}
 
   // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;
@@ -85,6 +86,7 @@ protected:
 
   os_fd_t fd_;
   int socket_v6only_{false};
+  const absl::optional<int> domain_;
 
   // The minimum cmsg buffer size to filled in destination address, packets dropped and gso
   // size when receiving a packet. It is possible for a received packet to contain both IPv4
@@ -92,6 +94,5 @@ protected:
   const size_t cmsg_space_{CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
                            CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(uint16_t))};
 };
-
 } // namespace Network
 } // namespace Envoy

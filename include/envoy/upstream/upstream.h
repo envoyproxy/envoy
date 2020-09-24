@@ -735,7 +735,12 @@ public:
   /**
    * @return how many streams should be anticipated per each current stream.
    */
-  virtual float prefetchRatio() const PURE;
+  virtual float perUpstreamPrefetchRatio() const PURE;
+
+  /**
+   * @return how many streams should be anticipated per each current stream.
+   */
+  virtual float peekaheadRatio() const PURE;
 
   /**
    * @return soft limit on size of the cluster's connections read and write buffers.
@@ -811,6 +816,12 @@ public:
    */
   virtual const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
   lbRingHashConfig() const PURE;
+
+  /**
+   * @return configuration for maglev load balancing, only used if type is set to maglev_lb.
+   */
+  virtual const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>&
+  lbMaglevConfig() const PURE;
 
   /**
    * @return const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>& the
