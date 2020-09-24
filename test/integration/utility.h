@@ -121,11 +121,8 @@ private:
                   event == Network::ConnectionEvent::LocalClose);
       connected_ |= (event == Network::ConnectionEvent::Connected);
     }
-    void onAboveWriteBufferHighWatermark() override { high_watermark_triggered_ = true; }
-    void onBelowWriteBufferLowWatermark() override {
-      high_watermark_triggered_ = false;
-      write_cb_();
-    }
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override { write_cb_(); }
 
     Network::ConnectionEvent last_connection_event_;
 
@@ -133,7 +130,6 @@ private:
     WriteCb write_cb_;
     bool connected_{false};
     bool closed_{false};
-    bool high_watermark_triggered_{false};
   };
 
   Stats::IsolatedStoreImpl stats_store_;
