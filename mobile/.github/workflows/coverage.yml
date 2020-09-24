@@ -1,0 +1,34 @@
+name: coverage
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - 'library/common/**'
+      - 'test/**'
+
+jobs:
+  coverage:
+    name: coverage
+    runs-on: ubuntu-18.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: 'Install dependencies'
+        run: ./ci/linux_ci_setup.sh
+      - name: 'Run coverage'
+        run: |
+          export PATH=/usr/lib/llvm-10/bin:$PATH
+          export CC=clang
+          export CXX=clang++
+          export COVERAGE_THRESHOLD=95
+          ./envoy/test/run_envoy_bazel_coverage.sh //test/...
+          tar -czvf coverage.tar.gz generated/coverage
+      - uses: actions/upload-artifact@v1
+        with:
+          name: coverage.tar.gz
+          path: coverage.tar.gz

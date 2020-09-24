@@ -19,7 +19,7 @@ jobs:
         run: ./ci/linux_ci_setup.sh
       - name: 'Build test binary'
         run: |
-          export PATH=/usr/lib/llvm-8/bin:$PATH
+          export PATH=/usr/lib/llvm-10/bin:$PATH
           export CC=clang
           export CXX=clang++
           bazelisk build //test/performance:test_binary_size --config=sizeopt
@@ -40,7 +40,7 @@ jobs:
       - name: 'Build test binary'
         run: |
           git checkout main && git pull origin main && git submodule update
-          export PATH=/usr/lib/llvm-8/bin:$PATH
+          export PATH=/usr/lib/llvm-10/bin:$PATH
           export CC=clang
           export CXX=clang++
           bazelisk build //test/performance:test_binary_size --config=sizeopt
