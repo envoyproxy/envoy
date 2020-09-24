@@ -811,13 +811,13 @@ message HttpFilter {
   // sufficient. It also serves as a resource name in ExtensionConfigDS.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
-  // Filter specific configuration which depends on the filter being instantiated. See the supported
-  // filters for further documentation.
   oneof config_type {
+    // Filter specific configuration which depends on the filter being instantiated. See the supported
+    // filters for further documentation.
     google.protobuf.Any typed_config = 4;
 
     // Configuration source specifier for an extension configuration discovery service.
-    // In case of a failure and without the default configuration, the HTTP listener responds with 500.
+    // In case of a failure and without the default configuration, the HTTP listener responds with code 500.
     // Extension configs delivered through this mechanism are not expected to require warming (see https://github.com/envoyproxy/envoy/issues/12061).
     config.core.v3.ExtensionConfigSource config_discovery = 5;
   }
