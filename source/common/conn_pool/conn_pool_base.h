@@ -151,7 +151,6 @@ public:
   void onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                          Network::ConnectionEvent event);
   void checkForDrained();
-  void checkForIdle();
 
   void onUpstreamReady();
   ConnectionPool::Cancellable* newStream(AttachContext& context);
@@ -198,9 +197,10 @@ protected:
 
   PendingStream* addToPendingStreamsList(PendingStreamPtr&& pending_stream) {
     LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
-    idle_timer_->disableTimer();
     return pending_streams_.front().get();
   }
+
+  void disablePoolIdleTimer();
 
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;

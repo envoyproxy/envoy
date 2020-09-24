@@ -11,6 +11,7 @@
 namespace Envoy {
 namespace ConnectionPool {
 
+using testing::AnyNumber;
 using testing::InvokeWithoutArgs;
 using testing::Return;
 
@@ -156,14 +157,14 @@ TEST_F(ConnPoolImplBaseTest, NoPrefetchIfDegraded) {
   pool_->destructAllConnections();
 }
 
-TEST_F(ConnPoolImplBaseTest, TimeoutTest) {
+TEST_F(ConnPoolImplBaseTest, PoolIdleTimeoutTriggered) {
   static constexpr std::chrono::milliseconds IDLE_TIMEOUT{5000};
 
   // Default behavior for other timers associated with the pool
-  EXPECT_CALL(dispatcher_, createTimer_(_));
-
+  EXPECT_CALL(dispatcher_, createTimer_(_)).RetiresOnSaturation();
   // Inject this timer into the pool so we can add some expectations
   auto* timer_ptr = new NiceMock<Event::MockTimer>(&dispatcher_);
+
   initialize(IDLE_TIMEOUT);
 
   testing::MockFunction<void()> idle_pool_callback;
@@ -182,12 +183,59 @@ TEST_F(ConnPoolImplBaseTest, TimeoutTest) {
   EXPECT_CALL(*timer_ptr, enableTimer(IDLE_TIMEOUT, _));
   EXPECT_CALL(*clients_.back(), numActiveStreams).WillRepeatedly(Return(0));
   pool_->onStreamClosed(*clients_.back(), false);
-  clients_.back()->close();
+  // `checkForDrained` is always called after `onStreamClosed` in subclasses, so we call it here
+  pool_->checkForDrained();
 
   // Emulate the idle timeout firing and expect our callback to be triggered
   EXPECT_CALL(idle_pool_callback, Call).Times(1);
+  dispatcher_.clearDeferredDeleteList();
   timer_ptr->invokeCallback();
 }
 
+TEST_F(ConnPoolImplBaseTest, PoolIdleTimeoutNotTriggered) {
+  static constexpr std::chrono::milliseconds IDLE_TIMEOUT{5000};
+
+  // Default behavior for other timers associated with the pool
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(AnyNumber());
+  // Inject this timer into the pool so we can add some expectations
+  auto* timer_ptr = new NiceMock<Event::MockTimer>(&dispatcher_);
+
+  initialize(IDLE_TIMEOUT);
+
+  testing::MockFunction<void()> idle_pool_callback;
+  pool_->addIdlePoolTimeoutCallbackImpl(idle_pool_callback.AsStdFunction());
+
+  // Create a new stream using the pool
+  EXPECT_CALL(*pool_, instantiateActiveClient);
+  pool_->newStream(context_);
+  ASSERT_EQ(1, clients_.size());
+
+  // Emulate the new upstream connection establishment
+  EXPECT_CALL(*pool_, onPoolReady);
+  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+
+  // Close the newly-created stream and expect the timer to be set
+  EXPECT_CALL(*timer_ptr, enableTimer(IDLE_TIMEOUT, _));
+  EXPECT_CALL(*clients_.back(), numActiveStreams).WillRepeatedly(Return(0));
+  pool_->onStreamClosed(*clients_.back(), false);
+  // `checkForDrained` is always called after `onStreamClosed` in subclasses, so we call it here
+  pool_->checkForDrained();
+
+  EXPECT_CALL(*timer_ptr, disableTimer);
+  EXPECT_CALL(*pool_, instantiateActiveClient);
+  pool_->newStream(context_);
+  ASSERT_EQ(2, clients_.size());
+
+  // Emulate the new upstream connection establishment
+  EXPECT_CALL(*pool_, onPoolReady);
+  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+
+  // Close the newly-created stream and expect the timer to be set
+  EXPECT_CALL(*timer_ptr, enableTimer(IDLE_TIMEOUT, _));
+  EXPECT_CALL(*clients_.back(), numActiveStreams).WillRepeatedly(Return(0));
+  pool_->onStreamClosed(*clients_.back(), false);
+  // `checkForDrained` is always called after `onStreamClosed` in subclasses, so we call it here
+  pool_->checkForDrained();
+}
 } // namespace ConnectionPool
 } // namespace Envoy
