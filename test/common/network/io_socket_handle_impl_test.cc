@@ -94,12 +94,6 @@ TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
 #if !defined(__linux__)
 
 TEST(IoSocketHandleImpl, LastRoundTripTimeAlwaysReturnsEmptyOptional) {
-  NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
-  auto os_calls =
-      std::make_unique<Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl>>(
-          &os_sys_calls);
-  EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _)).WillOnce(Return(-1));
-
   IoSocketHandleImpl io_handle;
   EXPECT_THAT(io_handle.lastRoundTripTime(), Eq(absl::optional<std::chrono::milliseconds>{}));
 }
