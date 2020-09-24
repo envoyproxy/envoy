@@ -17,9 +17,15 @@
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
+#include "test/mocks/common.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/runtime/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -51,9 +57,21 @@ namespace {
 class AppleDnsImplTest : public testing::Test {
 public:
   AppleDnsImplTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {
+    envoy::config::bootstrap::v3::LayeredRuntime config;
+    // The existence of an admin layer is required for mergeValues() to work.
+    config.add_layers()->mutable_admin_layer();
 
-  void SetUp() override { resolver_ = dispatcher_->createDnsResolver({}, false); }
+    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
+        std::make_unique<Runtime::LoaderImpl>(*dispatcher_, tls_, config, local_info_, store_,
+                                              generator_, validation_visitor_, *api_));
+  }
+
+  void SetUp() override {
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"dns.use_apple_api_for_dns_lookups", "true"}});
+    resolver_ = dispatcher_->createDnsResolver({}, false);
+  }
 
   ActiveDnsQuery* resolveWithExpectations(const std::string& address,
                                           const DnsLookupFamily lookup_family,
@@ -106,6 +124,12 @@ public:
 protected:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  testing::NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::IsolatedStoreImpl store_;
+  Random::MockRandomGenerator generator_;
+  testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
   DnsResolverSharedPtr resolver_;
 };
 

@@ -126,9 +126,15 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
     const bool use_tcp_for_dns_lookups) {
   ASSERT(isThreadSafe());
 #ifdef __APPLE__
-  UNREFERENCED_PARAMETER(resolvers);
-  UNREFERENCED_PARAMETER(use_tcp_for_dns_lookups);
-  return Network::DnsResolverSharedPtr{new Network::AppleDnsResolverImpl(*this)};
+  if (Runtime::LoaderSingleton::getExisting()->snapshot().getBoolean(
+          "dns.use_apple_api_for_dns_lookups", false)) {
+    UNREFERENCED_PARAMETER(resolvers);
+    UNREFERENCED_PARAMETER(use_tcp_for_dns_lookups);
+    return Network::DnsResolverSharedPtr{new Network::AppleDnsResolverImpl(*this)};
+  } else {
+    return Network::DnsResolverSharedPtr{
+        new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
+  }
 #else
   return Network::DnsResolverSharedPtr{
       new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
