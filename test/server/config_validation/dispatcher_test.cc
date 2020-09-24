@@ -23,10 +23,9 @@ namespace Envoy {
 class ConfigValidation : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   ConfigValidation() {
-    validation_ = std::make_unique<Api::ValidationImpl>(Thread::threadFactoryForTest(),
-                                                        stats_store_, test_time_.timeSystem(),
-                                                        Filesystem::fileSystemForTest(),
-                                                        random_generator_);
+    validation_ = std::make_unique<Api::ValidationImpl>(
+        Thread::threadFactoryForTest(), stats_store_, test_time_.timeSystem(),
+        Filesystem::fileSystemForTest(), random_generator_);
     dispatcher_ = validation_->allocateDispatcher("test_thread");
   }
 
