@@ -123,10 +123,10 @@ public:
   WriteFilterCallbacks* write_callbacks_{};
 };
 
-class MockListenerCallbacks : public ListenerCallbacks {
+class MockTcpListenerCallbacks : public TcpListenerCallbacks {
 public:
-  MockListenerCallbacks();
-  ~MockListenerCallbacks() override;
+  MockTcpListenerCallbacks();
+  ~MockTcpListenerCallbacks() override;
 
   void onAccept(ConnectionSocketPtr&& socket) override { onAccept_(socket); }
 
@@ -139,11 +139,14 @@ public:
   MockUdpListenerCallbacks();
   ~MockUdpListenerCallbacks() override;
 
-  MOCK_METHOD(void, onData, (UdpRecvData & data));
+  MOCK_METHOD(void, onData, (UdpRecvData && data));
   MOCK_METHOD(void, onReadReady, ());
   MOCK_METHOD(void, onWriteReady, (const Socket& socket));
   MOCK_METHOD(void, onReceiveError, (Api::IoError::IoErrorCode err));
   MOCK_METHOD(Network::UdpPacketWriter&, udpPacketWriter, ());
+  MOCK_METHOD(uint32_t, workerIndex, (), (const));
+  MOCK_METHOD(void, onDataWorker, (Network::UdpRecvData && data));
+  MOCK_METHOD(void, post, (Network::UdpRecvData && data));
 };
 
 class MockDrainDecision : public DrainDecision {
@@ -356,9 +359,11 @@ public:
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(Network::ActiveUdpListenerFactory*, udpListenerFactory, ());
   MOCK_METHOD(Network::UdpPacketWriterFactoryOptRef, udpPacketWriterFactory, ());
+  MOCK_METHOD(Network::UdpListenerWorkerRouterOptRef, udpListenerWorkerRouter, ());
   MOCK_METHOD(ConnectionBalancer&, connectionBalancer, ());
   MOCK_METHOD(ResourceLimit&, openConnections, ());
   MOCK_METHOD(uint32_t, tcpBacklogSize, (), (const));
+  MOCK_METHOD(Init::Manager&, initManager, ());
 
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
@@ -371,6 +376,7 @@ public:
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;
   MockListenSocketFactory socket_factory_;
   SocketSharedPtr socket_;
+  UdpListenerWorkerRouterPtr udp_listener_worker_router_;
   Stats::IsolatedStoreImpl scope_;
   std::string name_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
@@ -397,6 +403,7 @@ public:
   MOCK_METHOD(void, addListener,
               (absl::optional<uint64_t> overridden_listener, ListenerConfig& config));
   MOCK_METHOD(void, removeListeners, (uint64_t listener_tag));
+  MOCK_METHOD(UdpListenerCallbacksOptRef, getUdpListenerCallbacks, (uint64_t listener_tag));
   MOCK_METHOD(void, removeFilterChains,
               (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
                std::function<void()> completion));
@@ -424,8 +431,7 @@ public:
 
 class MockResolvedAddress : public Address::Instance {
 public:
-  MockResolvedAddress(const std::string& logical, const std::string& physical)
-      : logical_(logical), physical_(physical) {}
+  MockResolvedAddress(const std::string& logical, const std::string& physical);
   ~MockResolvedAddress() override;
 
   bool operator==(const Address::Instance& other) const override {
@@ -436,6 +442,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, connect, (os_fd_t), (const));
   MOCK_METHOD(const Address::Ip*, ip, (), (const));
   MOCK_METHOD(const Address::Pipe*, pipe, (), (const));
+  MOCK_METHOD(Address::EnvoyInternalAddress*, envoyInternalAddress, (), (const));
   MOCK_METHOD(IoHandlePtr, socket, (Socket::Type), (const));
   MOCK_METHOD(Address::Type, type, (), (const));
   MOCK_METHOD(const sockaddr*, sockAddr, (), (const));
@@ -470,7 +477,8 @@ public:
 
 class MockUdpPacketWriter : public UdpPacketWriter {
 public:
-  MockUdpPacketWriter() = default;
+  MockUdpPacketWriter();
+  ~MockUdpPacketWriter() override;
 
   MOCK_METHOD(Api::IoCallUint64Result, writePacket,
               (const Buffer::Instance& buffer, const Address::Ip* local_ip,
@@ -496,6 +504,7 @@ public:
   MOCK_METHOD(Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, send, (const UdpSendData&));
   MOCK_METHOD(Api::IoCallUint64Result, flush, ());
+  MOCK_METHOD(void, activateRead, ());
 
   Event::MockDispatcher dispatcher_;
 };

@@ -58,8 +58,8 @@ protected:
   }
 
   void advanceMsAndLoop(int64_t delay_ms) {
-    time_system_.advanceTimeAsync(std::chrono::milliseconds(delay_ms));
-    base_scheduler_.run(Dispatcher::RunType::NonBlock);
+    time_system_.advanceTimeAndRun(std::chrono::milliseconds(delay_ms), base_scheduler_,
+                                   Dispatcher::RunType::NonBlock);
   }
 
   void advanceSystemMsAndLoop(int64_t delay_ms) {
