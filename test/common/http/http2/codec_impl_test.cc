@@ -898,7 +898,7 @@ TEST_P(Http2CodecImplTest, EncodeMetadataWhileDispatchingTest) {
 }
 
 // Validate the keepalive PINGs are sent and received correctly.
-TEST_P(Http2CodecImplTest, Keepalive) {
+TEST_P(Http2CodecImplTest, ConnectionKeepalive) {
   constexpr uint32_t interval_ms = 100;
   constexpr uint32_t timeout_ms = 200;
   client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_nanos(interval_ms *
@@ -925,7 +925,7 @@ TEST_P(Http2CodecImplTest, Keepalive) {
 }
 
 // Validate that jitter is added as expected based on configuration.
-TEST_P(Http2CodecImplTest, KeepaliveJitter) {
+TEST_P(Http2CodecImplTest, ConnectionKeepaliveJitter) {
   client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_seconds(1);
   client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_seconds(1);
   client_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(10);
