@@ -31,11 +31,15 @@ A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/
 
 If you have not cloned the Envoy repo, clone it with:
 
-``git clone git@github.com:envoyproxy/envoy``
+.. tabs::
 
-or
+   .. code-tab:: console HTTPS
 
-``git clone https://github.com/envoyproxy/envoy.git``
+      git clone https://github.com/envoyproxy/envoy.git
+
+   .. code-tab:: console SSH
+
+      git clone git@github.com:envoyproxy/envoy
 
 **Step 3: Build the sandbox**
 
