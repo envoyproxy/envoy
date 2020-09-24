@@ -64,8 +64,6 @@ build:asan --copt -D__SANITIZE_ADDRESS__
 build:asan --test_env=ASAN_OPTIONS=handle_abort=1:allow_addr2line=true:check_initialization_order=true:strict_init_order=true:detect_odr_violation=1
 build:asan --test_env=UBSAN_OPTIONS=halt_on_error=true:print_stacktrace=1
 build:asan --test_env=ASAN_SYMBOLIZER_PATH
-# TODO(mattklein123): Set this universally.
-build:asan --define=dynamic_link_tests=true
 
 # Clang ASAN/UBSAN
 build:clang-asan --config=asan
@@ -131,7 +129,6 @@ build:coverage --action_env=GCOV=llvm-profdata
 build:coverage --copt=-DNDEBUG
 # 1.5x original timeout + 300s for trace merger in all categories
 build:coverage --test_timeout=390,750,1500,5700
-# TODO(mattklein123): Set this universally.
 build:coverage --define=dynamic_link_tests=true
 build:coverage --define=ENVOY_CONFIG_COVERAGE=1
 build:coverage --cxxopt="-DENVOY_CONFIG_COVERAGE=1"
