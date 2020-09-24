@@ -42,7 +42,7 @@ namespace Network {
 namespace {
 
 // Note: this test suite is, unfortunately, not hermetic. Apple's APIs do not allow overriding the
-// IP address used for resolution programatically via API calls (only in system settings), and worse
+// IP address used for resolution via API calls (only in system settings), and worse
 // yet does not allow overriding the port number used _at all_. Therefore, the tests do not use a
 // test DNS server like in dns_impl_test, and thus affords less flexibility in testing scenarios: no
 // concurrent requests, no expressive error responses, etc. Further experiments could be done in
