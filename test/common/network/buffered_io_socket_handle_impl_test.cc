@@ -299,7 +299,42 @@ TEST_F(BufferedIoSocketHandleTest, TestClose) {
   ev.reset();
 }
 
-TEST_F(BufferedIoSocketHandleTest, TestShutdown) {}
+TEST_F(BufferedIoSocketHandleTest, TestShutdown) {
+  std::string accumulator;
+  scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  bool should_close = false;
+  auto ev = io_handle_->createFileEvent(
+      dispatcher_,
+      [this, &should_close, handle = io_handle_.get(), &accumulator](uint32_t events) {
+        if (events & Event::FileReadyType::Read) {
+          auto res = io_handle_->recv(buf_.data(), buf_.size(), 0);
+          if (res.ok()) {
+            accumulator += absl::string_view(buf_.data(), res.rc_);
+          } else if (res.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+            ENVOY_LOG_MISC(debug, "lambdai: EAGAIN");
+          } else {
+            ENVOY_LOG_MISC(debug, "lambdai: close, not schedule event");
+            should_close = true;
+          }
+        }
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+  scheduable_cb_->invokeCallback();
+
+  // Not closed yet.
+  ASSERT_FALSE(should_close);
+
+  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  io_handle_peer_->shutdown(ENVOY_SHUT_WR);
+
+  ASSERT_TRUE(scheduable_cb_->enabled());
+  scheduable_cb_->invokeCallback();
+  ASSERT_TRUE(should_close);
+
+  io_handle_->close();
+  ev.reset();
+}
 
 } // namespace
 } // namespace Network
