@@ -1235,6 +1235,7 @@ TEST_P(AdsClusterV3Test, XdsBatching) {
 }
 
 // Verify CDS is paused during cluster warming.
+/*
 TEST_P(AdsClusterV3Test, LdsUdpaUrl) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     const std::string udpa_url_str =
@@ -1247,5 +1248,5 @@ TEST_P(AdsClusterV3Test, LdsUdpaUrl) {
   });
   initialize();
 }
-
+*/
 } // namespace Envoy

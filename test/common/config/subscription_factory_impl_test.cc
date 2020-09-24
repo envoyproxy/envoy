@@ -77,7 +77,7 @@ class SubscriptionFactoryTestApiConfigSource
       public testing::WithParamInterface<envoy::config::core::v3::ApiConfigSource::ApiType> {};
 
 TEST_F(SubscriptionFactoryTest, NoConfigSpecifier) {
-  envoy::config::core::v3::ConfigSource config;
+  s envoy::config::core::v3::ConfigSource config;
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config), EnvoyException,
       "Missing config source specifier in envoy::config::core::v3::ConfigSource");
@@ -220,7 +220,6 @@ TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscription) {
 }
 
 TEST_F(SubscriptionFactoryTest, GrpcCollectionSubscription) {
-
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);

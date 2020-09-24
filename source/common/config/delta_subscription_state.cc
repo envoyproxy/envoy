@@ -142,14 +142,14 @@ DeltaSubscriptionState::getNextRequestAckless() {
   std::vector<udpa::core::v1::ResourceLocator> resource_urls_added;
   std::vector<udpa::core::v1::ResourceLocator> resource_urls_removed;
   for (std::string const& resource : names_added_) {
-    if (resource.substr(0, 7) == "udpa://") {
+    if (absl::StartsWith(resource, "udpa://")) {
       resource_urls_added.push_back(UdpaResourceIdentifier::decodeUrl(resource));
     } else {
       resource_names_added.push_back(resource);
     }
   }
   for (std::string const& resource : names_removed_) {
-    if (resource.substr(0, 7) == "udpa://") {
+    if (absl::StartsWith(resource, "udpa://")) {
       resource_urls_removed.push_back(UdpaResourceIdentifier::decodeUrl(resource));
     } else {
       resource_names_removed.push_back(resource);

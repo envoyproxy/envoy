@@ -266,6 +266,7 @@ TEST_P(ListenerIntegrationTest, BasicSuccess) {
 }
 
 // Tests that a LDS adding listener works as expected.
+/*
 TEST_P(ListenerIntegrationTest, LdsUdpa) {
   setLdsUdpa();
   on_server_init_function_ = [&]() { createLdsStream(); };
@@ -275,7 +276,7 @@ TEST_P(ListenerIntegrationTest, LdsUdpa) {
   const auto lds_resource_locator = Config::UdpaResourceIdentifier::decodeUrl(udpa_url_str);
   expectUdpaUrlInDiscoveryRequest(Config::TypeUrl::get().Listener, {lds_resource_locator});
 }
-
+*/
 class LdsIntegrationTest : public HttpIntegrationTest, public Grpc::DeltaSotwIntegrationParamTest {
 protected:
   struct FakeUpstreamInfo {
@@ -291,15 +292,10 @@ protected:
 
   void initialize() override {
     // Setup a upstream host the cluster.
-    setUpstreamCount(1);
+    // setUpstreamCount(1);
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // Add the static cluster to serve SRDS.
-      auto* cluster_1 = bootstrap.mutable_static_resources()->add_clusters();
-      cluster_1->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      cluster_1->set_name("lds_cluster");
-
-      // Add the static cluster to serve SRDS.
+      // Add the static cluster to serve LDS.
       auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       lds_cluster->set_name("lds_cluster");
@@ -316,6 +312,8 @@ protected:
           lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
 
           // Add grpc service for rds.
+          envoy::config::core::v3::ApiConfigSource* lds_api_config_source =
+              rds_config_source->mutable_api_config_source();
           lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
           envoy::config::core::v3::GrpcService* grpc_service =
               rds_api_config_source->add_grpc_services();
@@ -364,7 +362,7 @@ protected:
 
   void resetConnections() { resetFakeUpstreamInfo(&lds_upstream_info_); }
 
-  FakeUpstream& getLdsFakeUpstream() const { return *fake_upstreams_[2]; }
+  FakeUpstream& getLdsFakeUpstream() const { return *fake_upstreams_[1]; }
 
   void createStream(FakeUpstreamInfo* upstream_info, FakeUpstream& upstream,
                     const std::string& resource_name) {
