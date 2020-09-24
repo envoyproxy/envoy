@@ -762,6 +762,7 @@ class FormatChecker:
           "Don't use lua_pushlightuserdata, since it can cause unprotected error in call to" +
           "Lua API (bad light userdata pointer) on ARM64 architecture. See " +
           "https://github.com/LuaJIT/LuaJIT/issues/450#issuecomment-433659873 for details.")
+
     #Fix for https://github.com/envoyproxy/envoy/issues/10535
     if file_path.endswith(PROTO_SUFFIX):
       exclude_path = ['v1', 'v2', 'generated_api_shadow']
