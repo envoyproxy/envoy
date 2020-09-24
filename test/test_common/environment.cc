@@ -343,7 +343,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
 
 std::string TestEnvironment::readFileToStringForTest(const std::string& filename,
                                                      bool require_existence) {
-  std::ifstream file(filename, std::ios::binary);
+  std::ifstream file(filename);
   if (file.fail()) {
     if (!require_existence) {
       return "";

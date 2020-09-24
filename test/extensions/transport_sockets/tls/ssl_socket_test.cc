@@ -4840,7 +4840,7 @@ TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
 
   for (uint32_t i = 0; i < num_writes; i++) {
     Buffer::OwnedImpl data(std::string(write_size, 'a'));
-    client_transport_socket_->doWrite(data, false);
+    client_connection_->write(data, false);
   }
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);

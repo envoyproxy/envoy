@@ -85,6 +85,7 @@ private:
   Network::PostIoAction doHandshake();
   void drainErrorQueue();
   void shutdownSsl();
+  void shutdownBasic();
   bool isThreadSafe() const {
     return callbacks_ != nullptr && callbacks_->connection().dispatcher().isThreadSafe();
   }
