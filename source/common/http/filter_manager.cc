@@ -880,16 +880,13 @@ void FilterManager::sendDirectLocalReply(
             state_.non_100_response_headers_encoded_ = true;
             filter_manager_callbacks_.encodeHeaders(*filter_manager_callbacks_.responseHeaders(),
                                                     end_stream);
-            maybeEndEncode(end_stream);
+            maybeEndEncode(end_stream && !state_.local_complete_);
           },
           [&](Buffer::Instance& data, bool end_stream) -> void {
             filter_manager_callbacks_.encodeData(data, end_stream);
-            maybeEndEncode(end_stream);
+            maybeEndEncode(end_stream && !state_.local_complete_);
           }},
-      Utility::LocalReplyData{
-          filter_manager_callbacks_.requestHeaders().has_value() &&
-              Grpc::Common::hasGrpcContentType(filter_manager_callbacks_.requestHeaders()->get()),
-          code, body, grpc_status, is_head_request});
+      Utility::LocalReplyData{state_.is_grpc_request_, code, body, grpc_status, is_head_request});
   maybeEndEncode(state_.local_complete_);
 }
 
