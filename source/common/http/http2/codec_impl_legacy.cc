@@ -1085,7 +1085,7 @@ void ConnectionImpl::scheduleProtocolConstraintViolationCallback() {
   if (!protocol_constraint_violation_callback_) {
     protocol_constraint_violation_callback_ = connection_.dispatcher().createSchedulableCallback(
         [this]() { onProtocolConstraintViolation(); });
-    protocol_constraint_violation_callback_->scheduleCallbackNextIteration();
+    protocol_constraint_violation_callback_->scheduleCallbackCurrentIteration();
   }
 }
 
