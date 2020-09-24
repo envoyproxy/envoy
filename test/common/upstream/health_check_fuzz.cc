@@ -147,8 +147,8 @@ void TcpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase 
   // likely a false positive.
   if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
     interval_timer_->invokeCallback();
-  } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
-}
+  }
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 void TcpHealthCheckFuzz::respond(std::string data, bool last_action) {
   if (!timeout_timer_->enabled_) {
