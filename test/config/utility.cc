@@ -904,6 +904,10 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
       bootstrap_.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   initializeTls(options, *tls_context.mutable_common_tls_context());
+  if (options.ocsp_staple_required_) {
+    tls_context.set_ocsp_staple_policy(
+        envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::MUST_STAPLE);
+  }
   filter_chain->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
@@ -967,6 +971,10 @@ void ConfigHelper::initializeTls(
         TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
     tls_certificate->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
+    if (options.rsa_cert_ocsp_staple_) {
+      tls_certificate->mutable_ocsp_staple()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/server_ocsp_resp.der"));
+    }
   }
   if (options.ecdsa_cert_) {
     auto* tls_certificate = common_tls_context.add_tls_certificates();
@@ -974,6 +982,10 @@ void ConfigHelper::initializeTls(
         TestEnvironment::runfilesPath("test/config/integration/certs/server_ecdsacert.pem"));
     tls_certificate->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/server_ecdsakey.pem"));
+    if (options.ecdsa_cert_ocsp_staple_) {
+      tls_certificate->mutable_ocsp_staple()->set_filename(TestEnvironment::runfilesPath(
+          "test/config/integration/certs/server_ecdsa_ocsp_resp.der"));
+    }
   }
 }
 
