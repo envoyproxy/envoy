@@ -357,7 +357,7 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   auto addr4 = Network::Utility::parseInternetAddressAndPort("127.0.0.1:54");
   char addr6str[INET6_ADDRSTRLEN];
   auto addr6 = Network::Utility::parseInternetAddressAndPort("[::1]:54");
-  auto resolver = dispatcher_->createDnsResolver({addr4, addr6}, false, false);
+  auto resolver = dispatcher_->createDnsResolver({addr4, addr6}, false);
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
@@ -408,7 +408,7 @@ private:
 TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
   auto test_instance(std::make_shared<CustomInstance>("127.0.0.1", 45));
   EXPECT_EQ(test_instance->asString(), "127.0.0.1:borked_port_45");
-  auto resolver = dispatcher_->createDnsResolver({test_instance}, false, false);
+  auto resolver = dispatcher_->createDnsResolver({test_instance}, false);
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
@@ -424,8 +424,8 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
   envoy::config::core::v3::Address pipe_address;
   pipe_address.mutable_pipe()->set_path("foo");
   auto pipe_instance = Network::Utility::protobufAddressToAddress(pipe_address);
-  EXPECT_THROW_WITH_MESSAGE(dispatcher_->createDnsResolver({pipe_instance}, false, false),
-                            EnvoyException, "DNS resolver 'foo' is not an IP address");
+  EXPECT_THROW_WITH_MESSAGE(dispatcher_->createDnsResolver({pipe_instance}, false), EnvoyException,
+                            "DNS resolver 'foo' is not an IP address");
 }
 
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -434,8 +434,7 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   void SetUp() override {
-    resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups(),
-                                               false /* use_apple_api_for_dns_lookups */);
+    resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups());
 
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
     server_ = std::make_unique<TestDnsServer>(*dispatcher_);

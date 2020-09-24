@@ -74,7 +74,7 @@ public:
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override {
-    return dispatcher().createDnsResolver({}, false, false);
+    return dispatcher().createDnsResolver({}, false);
   }
   void drainListeners() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   DrainManager& drainManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

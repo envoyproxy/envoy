@@ -123,16 +123,13 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-    const bool use_tcp_for_dns_lookups, const bool use_apple_api_for_dns_lookups) {
+    const bool use_tcp_for_dns_lookups) {
   ASSERT(isThreadSafe());
 #ifdef __APPLE__
-  if (use_apple_api_for_dns_lookups) {
-    return Network::DnsResolverSharedPtr{new Network::AppleDnsResolverImpl(*this)};
-  }
-  return Network::DnsResolverSharedPtr{
-      new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
+  UNREFERENCED_PARAMETER(resolvers);
+  UNREFERENCED_PARAMETER(use_tcp_for_dns_lookups);
+  return Network::DnsResolverSharedPtr{new Network::AppleDnsResolverImpl(*this)};
 #else
-  UNREFERENCED_PARAMETER(use_apple_api_for_dns_lookups);
   return Network::DnsResolverSharedPtr{
       new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
 #endif

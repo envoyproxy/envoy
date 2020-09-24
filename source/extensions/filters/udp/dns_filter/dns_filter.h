@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/filter.h"
-#include "envoy/runtime/runtime.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/matchers.h"
@@ -94,7 +93,6 @@ public:
   uint64_t retryCount() const { return retry_count_; }
   Random::RandomGenerator& random() const { return random_; }
   uint64_t maxPendingLookups() const { return max_pending_lookups_; }
-  Runtime::Loader& runtime() const { return runtime_; }
 
 private:
   static DnsFilterStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
@@ -122,7 +120,6 @@ private:
   std::chrono::milliseconds resolver_timeout_;
   Random::RandomGenerator& random_;
   uint64_t max_pending_lookups_;
-  Runtime::Loader& runtime_;
 };
 
 using DnsFilterEnvoyConfigSharedPtr = std::shared_ptr<const DnsFilterEnvoyConfig>;

@@ -149,7 +149,7 @@ void UberFilterFuzzer::perFilterSetup() {
   encoder_callbacks_.stream_info_.protocol_ = Envoy::Http::Protocol::Http2;
 
   // Prepare expectations for dynamic forward proxy.
-  ON_CALL(factory_context_.dispatcher_, createDnsResolver(_, _, _))
+  ON_CALL(factory_context_.dispatcher_, createDnsResolver(_, _))
       .WillByDefault(testing::Return(resolver_));
 
   // Prepare expectations for TAP config.
