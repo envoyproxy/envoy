@@ -191,7 +191,7 @@ elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
   setup_gcc_toolchain
 
   echo "Testing ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c opt "${TEST_TARGETS[@]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
 
   echo "bazel release build with gcc..."
   bazel_binary_build release
