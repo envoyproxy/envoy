@@ -788,7 +788,16 @@ void FilterManager::sendLocalReplyViaFilterChain(
   Utility::sendLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
-          modify_headers,
+          [this, modify_headers](ResponseHeaderMap& headers) -> void {
+            if (streamInfo().route_entry_ &&
+                Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.always_apply_route_header_rules")) {
+              streamInfo().route_entry_->finalizeResponseHeaders(headers, streamInfo());
+            }
+            if (modify_headers) {
+              modify_headers(headers);
+            }
+          },
           [this](ResponseHeaderMap& response_headers, Code& code, std::string& body,
                  absl::string_view& content_type) -> void {
             // TODO(snowp): This &get() business isn't nice, rework LocalReply and others to accept
@@ -822,7 +831,16 @@ void FilterManager::sendDirectLocalReply(
   Http::Utility::sendLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
-          modify_headers,
+          [this, modify_headers](ResponseHeaderMap& headers) -> void {
+            if (streamInfo().route_entry_ &&
+                Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.always_apply_route_header_rules")) {
+              streamInfo().route_entry_->finalizeResponseHeaders(headers, streamInfo());
+            }
+            if (modify_headers) {
+              modify_headers(headers);
+            }
+          },
           [&](ResponseHeaderMap& response_headers, Code& code, std::string& body,
               absl::string_view& content_type) -> void {
             local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().has_value()

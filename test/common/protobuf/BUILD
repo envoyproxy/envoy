@@ -46,6 +46,14 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "type_util_test",
+    srcs = ["type_util_test.cc"],
+    deps = [
+        "//source/common/protobuf:type_util_lib",
+    ],
+)
+
 envoy_cc_fuzz_test(
     name = "value_util_fuzz_test",
     srcs = ["value_util_fuzz_test.cc"],
