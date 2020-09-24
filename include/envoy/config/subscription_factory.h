@@ -28,6 +28,27 @@ public:
                                absl::string_view type_url, Stats::Scope& scope,
                                SubscriptionCallbacks& callbacks,
                                OpaqueResourceDecoder& resource_decoder) PURE;
+
+  /**
+   * Collection subscription factory interface for UDPA URLs.
+   *
+   * @param collection_locator collection resource locator.
+   * @param config envoy::config::core::v3::ConfigSource for authority resolution.
+   * @param type_url type URL for the resources inside the collection.
+   * @param scope stats scope for any stats tracked by the subscription.
+   * @param callbacks the callbacks needed by all [Collection]Subscription objects, to deliver
+   *                  config updates. The callbacks must not result in the deletion of the
+   *                  CollectionSubscription object.
+   * @param resource_decoder how incoming opaque resource objects are to be decoded.
+   *
+   * @return SubscriptionPtr subscription object corresponding for collection_locator.
+   */
+  virtual SubscriptionPtr
+  collectionSubscriptionFromUrl(const udpa::core::v1::ResourceLocator& collection_locator,
+                                const envoy::config::core::v3::ConfigSource& config,
+                                absl::string_view type_url, Stats::Scope& scope,
+                                SubscriptionCallbacks& callbacks,
+                                OpaqueResourceDecoder& resource_decoder) PURE;
 };
 
 } // namespace Config

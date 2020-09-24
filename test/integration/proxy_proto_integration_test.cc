@@ -133,11 +133,11 @@ TEST_P(ProxyProtoIntegrationTest, AccessLog) {
 
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   const std::string log_line = waitForAccessLog(access_log_name_);
-  const std::vector<absl::string_view> tokens = StringUtil::splitToken(log_line, " ");
+  const std::vector<absl::string_view> tokens = StringUtil::splitToken(log_line, " ", false, true);
 
   ASSERT_EQ(2, tokens.size());
   EXPECT_EQ(tokens[0], Network::Test::getLoopbackAddressString(GetParam()));
-  EXPECT_EQ(tokens[1], "1.2.3.4:12345\n");
+  EXPECT_EQ(tokens[1], "1.2.3.4:12345");
 }
 
 TEST_P(ProxyProtoIntegrationTest, DEPRECATED_FEATURE_TEST(OriginalDst)) {

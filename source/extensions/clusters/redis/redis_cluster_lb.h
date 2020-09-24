@@ -189,6 +189,9 @@ private:
 
     // Upstream::LoadBalancerBase
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override;
+    Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
+      return nullptr;
+    }
 
   private:
     const SlotArraySharedPtr slot_array_;
