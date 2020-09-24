@@ -905,6 +905,7 @@ TEST_P(Http2CodecImplTest, Keepalive) {
                                                                                       1000 * 1000);
   client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_nanos(timeout_ms *
                                                                                      1000 * 1000);
+  client_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(0);
   auto timeout_timer = new Event::MockTimer(&client_connection_.dispatcher_); /* */
   auto send_timer = new Event::MockTimer(&client_connection_.dispatcher_);
   EXPECT_CALL(*timeout_timer, disableTimer());
@@ -927,7 +928,7 @@ TEST_P(Http2CodecImplTest, Keepalive) {
 TEST_P(Http2CodecImplTest, KeepaliveJitter) {
   client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_seconds(1);
   client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_seconds(1);
-  client_http2_options_.mutable_connection_keepalive()->set_interval_jitter_percent(10);
+  client_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(10);
   /*auto timeout_timer = */ new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
   auto send_timer = new Event::MockTimer(&client_connection_.dispatcher_);
 

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.config.core.v4alpha;
 
+import "envoy/type/v3/percent.proto";
+
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -194,11 +196,10 @@ message KeepaliveSettings {
     gte {nanos: 1000000}
   }];
 
-  // An optional jitter amount as a percentage of interval. If specified,
-  // during every interval Envoy will add interval *
-  // interval_jitter_percent / 100 to the wait time.
-  // A value of zero/unspecified means there will be no jitter.
-  uint32 interval_jitter_percent = 3;
+  // A random jitter amount as a percentage of interval that will be added to each interval.
+  // A value of zero means there will be no jitter.
+  // The default value is 15%.
+  type.v3.Percent interval_jitter = 3;
 }
 
 // [#next-free-field: 16]

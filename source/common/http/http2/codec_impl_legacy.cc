@@ -543,8 +543,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
         PROTOBUF_GET_MS_REQUIRED(http2_options.connection_keepalive(), interval));
     keepalive_timeout_ = std::chrono::milliseconds(
         PROTOBUF_GET_MS_REQUIRED(http2_options.connection_keepalive(), timeout));
-    keepalive_interval_jitter_percent_ =
-        http2_options.connection_keepalive().interval_jitter_percent();
+    keepalive_interval_jitter_percent_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+        http2_options.connection_keepalive(), interval_jitter, 15.0);
 
     keepalive_send_timer_ = connection.dispatcher().createTimer([this]() { sendKeepalive(); });
     keepalive_timeout_timer_ =
