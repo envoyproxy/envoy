@@ -168,8 +168,6 @@ DeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
 void DeltaSubscriptionState::addResourceState(
     const envoy::service::discovery::v3::Resource& resource) {
   Event::TimerPtr ttl_timer;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.delta_ttl")) {
-  }
   if (resource.has_ttl() && Runtime::runtimeFeatureEnabled("envoy.reloadable_features.delta_ttl")) {
     ttl_timer = dispatcher_.createTimer(
         [this, resource_name = resource.name(), version = resource.version()]() -> void {
