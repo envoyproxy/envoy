@@ -60,7 +60,7 @@ public:
    * Obtain a map from logger key to log level. Useful for testing, e.g. in macros such as
    * EXPECT_LOG_CONTAINS_ALL_OF_HELPER.
    */
-  FancyLogLevelMap getAllFancyLogLevels() ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
+  FancyLogLevelMap getAllFancyLogLevelsForTest() ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
 private:
   /**
