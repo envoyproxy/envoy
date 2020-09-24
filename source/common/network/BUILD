@@ -93,8 +93,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "apple_dns_lib",
-    srcs = ["apple_dns_impl.cc"],
-    hdrs = ["apple_dns_impl.h"],
+    srcs = select({
+        "//bazel:apple": ["apple_dns_impl.cc"],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        "//bazel:apple": ["apple_dns_impl.h"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":address_lib",
         ":utility_lib",
