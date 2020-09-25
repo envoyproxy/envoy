@@ -312,7 +312,7 @@ REPOSITORY_LOCATIONS = dict(
     kafka_server_binary = dict(
         sha256 = "a009624fae678fa35968f945e18e45fbea9a30fa8080d5dcce7fdea726120027",
         strip_prefix = "kafka_2.12-2.2.0",
-        urls = ["http://us.mirrors.quenda.co/apache/kafka/2.2.0/kafka_2.12-2.2.0.tgz"],
+        urls = ["https://mirrors.gigenet.com/apache/kafka/2.2.0/kafka_2.12-2.2.0.tgz"],
     ),
     kafka_python_client = dict(
         sha256 = "81f24a5d297531495e0ccb931fbd6c4d1ec96583cf5a730579a3726e63f59c47",
