@@ -17,7 +17,6 @@
 #elif defined(__GNUC__) && __GNUC__ >= 5
 #pragma GCC diagnostic ignored "-Wsuggest-override"
 #endif
-#endif
 
 #include "quiche/quic/core/batch_writer/quic_gso_batch_writer.h"
 
@@ -25,9 +24,7 @@
 #pragma clang diagnostic pop
 #endif
 
-#if defined(__GNUC__)
 #pragma GCC diagnostic pop
-#endif
 
 #include "envoy/network/udp_packet_writer_handler.h"
 
