@@ -92,16 +92,16 @@ public:
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
             response_pb, "cluster_name");
-            if (update) {
-              EXPECT_CALL(callbacks_,
-                          onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), version))
-                  .WillOnce(ThrowOnRejectedConfig(accept));
-              if (accept) {
-                version_ = version;
-              } else {
-                EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
-              }
-            }
+    if (update) {
+      EXPECT_CALL(callbacks_,
+                  onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), version))
+          .WillOnce(ThrowOnRejectedConfig(accept));
+      if (accept) {
+        version_ = version;
+      } else {
+        EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
+      }
+    }
     updateFile(file_json);
   }
 

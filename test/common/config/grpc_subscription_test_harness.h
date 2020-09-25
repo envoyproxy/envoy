@@ -121,7 +121,8 @@ public:
             *response, "cluster_name");
 
     if (update) {
-      EXPECT_CALL(callbacks_, onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), version))
+      EXPECT_CALL(callbacks_,
+                  onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), version))
           .WillOnce(ThrowOnRejectedConfig(accept));
 
       if (accept) {
