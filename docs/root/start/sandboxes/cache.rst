@@ -4,7 +4,7 @@ Cache Filter
 ============
 .. TODO(yosrym93): When a documentation is written for a production-ready Cache Filter, link to it through this doc.
 
-In this example, we demonstrate how HTTP caching can be utilized in Envoy by using the Cache Filter. 
+In this example, we demonstrate how HTTP caching can be utilized in Envoy by using the Cache Filter.
 The setup of this sandbox is based on the setup of the :ref:`Front Proxy sandbox <install_sandboxes_front_proxy>`.
 
 All incoming requests are routed via the front Envoy, which acts as a reverse proxy sitting on
@@ -14,10 +14,10 @@ to the services, and requests to ``/admin`` respectively. Two backend services a
 
 The front Envoy is configured to run the Cache Filter, which stores cacheable responses in an in-memory cache,
 and serves it to subsequent requests. In this demo, the responses that are served by the deployed services are stored in :repo:`/examples/cache/responses.yaml`.
-This file is mounted to both services' containers, so any changes made to the stored responses while the services are running should be instantly effective (no need to rebuild or rerun). 
+This file is mounted to both services' containers, so any changes made to the stored responses while the services are running should be instantly effective (no need to rebuild or rerun).
 
-For the purposes of the demo, a response's date of creation is appended to its body before being served. 
-An Etag is computed for every response for validation purposes, which only depends on the response body in the yaml file (i.e. the appended date is not taken into account). 
+For the purposes of the demo, a response's date of creation is appended to its body before being served.
+An Etag is computed for every response for validation purposes, which only depends on the response body in the yaml file (i.e. the appended date is not taken into account).
 Cached responses can be identified by having an ``age`` header. Validated responses can be identified by having a generation date older than the ``date`` header;
 as when a response is validated the ``date`` header is updated, while the body stays the same. Validated responses do not have an ``age`` header.
 Responses served from the backend service have no ``age`` header, and their ``date`` header is the same as their generation date.
@@ -25,28 +25,7 @@ Responses served from the backend service have no ``age`` header, and their ``da
 Running the Sandbox
 ~~~~~~~~~~~~~~~~~~~
 
-The following documentation runs through the setup of an Envoy cluster organized
-as is described in the image above.
-
-**Step 1: Install Docker**
-
-Ensure that you have a recent versions of ``docker`` and ``docker-compose`` installed.
-
-A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
-
-**Step 2: Clone the Envoy repo**
-
-If you have not cloned the Envoy repo, clone it with:
-
-.. tabs::
-
-   .. code-tab:: console HTTPS
-
-      git clone https://github.com/envoyproxy/envoy.git
-
-   .. code-tab:: console SSH
-
-      git clone git@github.com:envoyproxy/envoy
+.. include:: _include/docker-env-setup.rst
 
 **Step 3: Start all of our containers**
 
@@ -58,11 +37,11 @@ If you have not cloned the Envoy repo, clone it with:
     $ docker-compose up -d
     $ docker-compose ps
 
-           Name                      Command            State                             Ports                          
+           Name                      Command            State                             Ports
     ------------------------------------------------------------------------------------------------------------------------
     cache_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
-    cache_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp                                      
-    cache_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp    
+    cache_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
+    cache_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
 
 **Step 4: Test Envoy's HTTP caching capabilities**
 
@@ -70,7 +49,7 @@ You can now send a request to both services via the ``front-envoy``. Note that s
 identical requests to different services have different cache entries (i.e. a request sent to service 2 will not be served by a cached
 response produced by service 1).
 
-To send a request: 
+To send a request:
 
 ``curl -i localhost:8000/service/<service_no>/<response>``
 
@@ -87,10 +66,10 @@ The provided example responses are:
 
 - ``private``
     This response is private; it cannot be stored by shared caches (such as proxies). It will always be served from the backend service.
-    
+
 - ``no-cache``
     This response has to be validated every time before being served.
-    
+
 You can change the responses' headers and bodies (or add new ones) while the sandbox is running to experiment.
 
 Example responses
@@ -116,7 +95,7 @@ Example responses
     Response body generated at: Fri, 11 Sep 2020 03:20:40 GMT
 
 Naturally, response ``date`` header is the same time as the generated time.
-Sending the same request after 30 seconds gives the same exact response with the same generation date, 
+Sending the same request after 30 seconds gives the same exact response with the same generation date,
 but with an ``age`` header as it was served from cache:
 
 .. code-block:: console
@@ -154,13 +133,13 @@ After 1 minute and 1 second:
     This response will stay fresh for one minute
     Response body generated at: Fri, 11 Sep 2020 03:20:40 GMT
 
-The same response was served after being validated with the backend service. 
-You can verify this as the response generation time is the same, 
-but the response ``date`` header was updated with the validation response date. 
+The same response was served after being validated with the backend service.
+You can verify this as the response generation time is the same,
+but the response ``date`` header was updated with the validation response date.
 Also, no ``age`` header.
 
-Every time the response is validated, it stays fresh for another minute. 
-If the response body changes while the cached response is still fresh, 
+Every time the response is validated, it stays fresh for another minute.
+If the response body changes while the cached response is still fresh,
 the cached response will still be served. The cached response will only be updated when it is no longer fresh.
 
 2. private
@@ -181,8 +160,8 @@ the cached response will still be served. The cached response will only be updat
     This is a private response, it will not be cached by Envoy
     Response body generated at: Fri, 11 Sep 2020 03:22:28 GMT
 
-No matter how many times you make this request, you will always receive a new response; 
-new date of generation, new ``date`` header, and no ``age`` header. 
+No matter how many times you make this request, you will always receive a new response;
+new date of generation, new ``date`` header, and no ``age`` header.
 
 3. no-cache
 ^^^^^^^^^^^
@@ -219,7 +198,7 @@ After a few seconds:
     This response can be cached, but it has to be validated on each request
     Response body generated at: Fri, 11 Sep 2020 03:23:07 GMT
 
-You will receive a cached response that has the same generation time. 
+You will receive a cached response that has the same generation time.
 However, the ``date`` header will always be updated as this response will always be validated first.
 Also, no ``age`` header.
 
@@ -244,5 +223,5 @@ You will receive a new response that's served from the backend service.
 The new response will be cached for subsequent requests.
 
 You can also add new responses to the yaml file with different ``cache-control`` headers and start experimenting!
-To learn more about caching and ``cache-control`` headers visit 
+To learn more about caching and ``cache-control`` headers visit
 the `MDN Web Docs <https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching>`_.
