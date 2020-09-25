@@ -1,4 +1,5 @@
 #pragma once
+
 #include "test/common/upstream/health_check_fuzz.pb.validate.h"
 #include "test/common/upstream/health_checker_impl_test_utils.h"
 #include "test/fuzz/common.pb.h"
@@ -22,7 +23,7 @@ public:
   Type type_;
 
 private:
-  void respondHttp(const test::fuzz::Headers& headers, absl::string_view status);
+  void respondHttp(const test::fuzz::Headers& headers, uint64_t status);
   void triggerIntervalTimer(bool expect_client_create);
   void triggerTimeoutTimer(bool last_action);
   void allocHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);

@@ -47,8 +47,7 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
   replay(input);
 }
 
-void HealthCheckFuzz::respondHttp(const test::fuzz::Headers& headers, absl::string_view status) {
-
+void HealthCheckFuzz::respondHttp(const test::fuzz::Headers& headers, uint64_t status) {
   // Timeout timer needs to be explicitly enabled, usually by onIntervalBase() (Callback on interval
   // timer).
   if (!test_sessions_[0]->timeout_timer_->enabled_) {

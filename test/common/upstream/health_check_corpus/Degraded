@@ -37,7 +37,7 @@ actions {
                     value: "true"
                 }
             }
-            status: "200"
+            status: 200
         }
     }
 }
@@ -55,7 +55,7 @@ actions {
                     value: "200"
                 }
             }
-            status: "200"
+            status: 200
         }
     }
 }

@@ -9,8 +9,7 @@ import "google/protobuf/empty.proto";
 
 message HttpRespond { //TODO: Split this across headers, body, and trailers?
   test.fuzz.Headers headers = 1;
-  //https://github.com/nodejs/http-parser/blob/master/http_parser.c#L852
-  string status = 2 [(validate.rules).string = {pattern: "[0-9]+$*", min_len: 1}];
+  uint64 status = 2;
 }
 
 message Respond {
