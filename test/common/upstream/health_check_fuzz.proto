@@ -39,6 +39,9 @@ message GrpcRespondBytes {
     ServingStatus status = 1; //TODO: Split structured response as well?
     GrpcRespondUnstructuredBytes grpc_respond_unstructured_bytes = 2;
   }
+  //This value will determine how many fixed bytes will make up a structured response
+  //It will be moded against the byte size of the serialized response.
+  uint64 chunk_size_for_structured_response = 3;
 }
 
 message GrpcRespondTrailers {

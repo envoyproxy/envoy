@@ -45,6 +45,7 @@ actions {
           }
         }
         status: 200
+        chunk_size_for_structured_response: 3
       }
       grpc_respond_bytes {
         status: SERVICE_UNKNOWN
