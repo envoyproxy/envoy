@@ -230,11 +230,13 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
   {
     auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url("bar");
+    response->set_version_info("bar-version");
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
 
   {
     invalid_response->set_type_url("foo");
+    invalid_response->set_version_info("foo-version");
     invalid_response->mutable_resources()->Add()->set_type_url("bar");
     EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _))
         .WillOnce(Invoke([](Envoy::Config::ConfigUpdateFailureReason, const EnvoyException* e) {
@@ -265,6 +267,7 @@ TEST_F(GrpcMuxImplTest, RpcErrorMessageTruncated) {
   { // Large error message sent back to management server is truncated.
     const std::string very_large_type_url(1 << 20, 'A');
     invalid_response->set_type_url("foo");
+    invalid_response->set_version_info("invalid");
     invalid_response->mutable_resources()->Add()->set_type_url(very_large_type_url);
     EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _))
         .WillOnce(Invoke([&very_large_type_url](Envoy::Config::ConfigUpdateFailureReason,
@@ -327,10 +330,6 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
 
     EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(10000), _));
     // No update, just a change in TTL.
-    EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
-          EXPECT_EQ(1, resources.size());
-        }));
     expectSendMessage(type_url, {"x"}, "1");
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
@@ -346,10 +345,6 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
 
     EXPECT_CALL(*ttl_timer, disableTimer());
     // No update, just a change in TTL.
-    EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
-          EXPECT_EQ(1, resources.size());
-        }));
     expectSendMessage(type_url, {"x"}, "1");
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
@@ -366,10 +361,6 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
 
     EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(10000), _));
     // No update, just a change in TTL.
-    EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
-          EXPECT_EQ(1, resources.size());
-        }));
     expectSendMessage(type_url, {"x"}, "1");
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
@@ -379,9 +370,10 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
         EXPECT_EQ(0, resources.size());
       }));
   // Fire the TTL timer.
+  expectSendMessage(type_url, {"x"}, "");
   ttl_timer->invokeCallback();
 
-  expectSendMessage(type_url, {}, "1");
+  expectSendMessage(type_url, {}, "");
 }
 
 // Validate behavior when watches has an unknown resource name.

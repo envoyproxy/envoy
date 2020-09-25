@@ -161,6 +161,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
     api_state_[type_url].ttl_timer_ = dispatcher_.createTimer([this, type_url] {
       for (const auto& w : api_state_[type_url].watches_) {
         w->callbacks_.onConfigUpdate({}, "");
+        api_state_[type_url].request_.clear_version_info();
+        queueDiscoveryRequest(type_url);
       }
     });
   }
@@ -170,6 +172,14 @@ void GrpcMuxImpl::onDiscoveryResponse(
         std::chrono::milliseconds(DurationUtil::durationToMilliseconds(message->ttl())));
   } else if (api_state_[type_url].ttl_timer_) {
     api_state_[type_url].ttl_timer_->disableTimer();
+  }
+
+  // If the server responded with the same version that was requested, this is a TTL heartbeat and we should not
+  // attempt to process the actual resources.
+  if (message->version_info() == api_state_[type_url].request_.version_info()) {
+    api_state_[type_url].request_.set_response_nonce(message->nonce());
+    queueDiscoveryRequest(type_url);
+    return;
   }
 
   if (api_state_[type_url].watches_.empty()) {
