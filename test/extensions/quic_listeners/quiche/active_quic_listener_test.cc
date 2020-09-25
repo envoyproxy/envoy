@@ -230,7 +230,7 @@ protected:
 
       do {
         Api::IoCallUint64Result result =
-            result_buffer->read(client_socket->ioHandle(), bytes_to_read - bytes_read);
+            client_socket->ioHandle().read(*result_buffer, bytes_to_read - bytes_read);
 
         if (result.ok()) {
           bytes_read += result.rc_;
