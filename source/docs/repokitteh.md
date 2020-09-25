@@ -101,10 +101,24 @@ Restarts all failed Azure pipelines.
 
 Two types of approvals:
 1. Global approvals, done by approving the PR using Github's review approval feature.
-2. Partial approval, done by commenting "/lgtm [label]" where label is the label
+2. Partial approval, done by commenting `/lgtm [label]` where label is the label
    associated with the path. This does not affect GitHub's PR approve status, only
    this module's maintained commit status. This approval is automatically revoked
    if any further changes are done to the relevant files in this spec.
+
+For maintainers, the following checks can be cleared with `/lgtm <check>`:
+
+* pr-check/release-notes: blocks submit unless current.rst is modified
+  for any change to source/ or api/.
+* pr-check/docs: blocks submit unless docs/ is modified for any change to
+  source/.
+* pr-check/tests: block submit unless test/ is modified for any change
+  to source/.
+
+For API shepherds, the following checks can be cleared with `/lgtm <check>`:
+
+* api: any PR modifying api/ review requires this check to pass.
+* v2-freeze: any PR modifying the v2 APIs requires this check to pass.
 
 #### Backport labeling
 
