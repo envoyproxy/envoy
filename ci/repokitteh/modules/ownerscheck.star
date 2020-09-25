@@ -6,6 +6,7 @@
 #     {
 #       "owner": "envoyproxy/api-shepherds!",
 #       "path": "api/",
+#       "exclude_path": "foo/",
 #       "label": "api",
 #       "allow_global_approval": True,
 #       "github_status_label" = "any API change",
@@ -13,7 +14,8 @@
 #   ],
 # )
 #
-# This module will maintain a commit status per specified path regex (also aka as spec).
+# This module will maintain a commit status per specified path regex (also aka as spec),
+# as long as 'exclude_path' does not match the path as well.
 #
 # Two types of approvals:
 # 1. Global approvals, done by approving the PR using Github's review approval feature.
@@ -53,8 +55,15 @@ def _get_relevant_specs(specs, changed_files):
   relevant = []
 
   for spec in specs:
-    path_match = spec["path"]
+    exclude_path_match = spec.get("exclude_path_match", None)
 
+    if exclude_path_match:
+      exclude_files = [f for f in changed_files if match(exclude_path_match, f['filename'])]
+      if len(exclude_files) > 0:
+        print("excluded")
+        return []
+
+    path_match = spec["path"]
     files = [f for f in changed_files if match(path_match, f['filename'])]
     allow_global_approval = spec.get("allow_global_approval", True)
     status_label = spec.get("github_status_label", "")
