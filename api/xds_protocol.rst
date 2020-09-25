@@ -678,7 +678,7 @@ SotW TTL
 ^^^^^^^^
 
 As SotW xDS does not have notion of a :ref:`Resource <envoy_api_msg_Resource>`, TTLs apply to the
-entire response. The TTL can similarily be reset by sending another response, even if the version
+entire response. The TTL can similarly be reset by sending another response, even if the version
 has not changed. To avoid having to send a large amount of data over the wire, an empty response
 with the same version as the client requested can be sent to update the TTL without causing the
 resources to be removed.
