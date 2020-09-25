@@ -1,4 +1,4 @@
-// Dummy main implementation for noop-ing tests.
+asdf// Dummy main implementation for noop-ing tests.
 // TODO(htuch): remove when we have a solution for
 // https://github.com/bazelbuild/bazel/issues/3510
 
