@@ -110,8 +110,8 @@ on 127.0.0.1:5678 is provided below:
       lb_policy: ROUND_ROBIN
       http2_protocol_options:
         connection_keepalive:
-          interval: 1s
-          timeout: 1s
+          interval: 30s
+          timeout: 5s
       upstream_connection_options:
         # configure a TCP keep-alive to detect and reconnect to the admin
         # server in the event of a TCP socket half open connection
@@ -196,8 +196,8 @@ below:
         # Configure an HTTP/2 keep-alive to detect connection issues and reconnect
         # to the admin server if the connection is no longer responsive.
         connection_keepalive:
-          interval: 1s
-          timeout: 1s
+          interval: 30s
+          timeout: 5s
       load_assignment:
         cluster_name: xds_cluster
         endpoints:

@@ -702,8 +702,8 @@ An example minimal ``bootstrap.yaml`` fragment for ADS configuration is:
         # of intermediate proxies.
         http2_protocol_options:
           connection_keepalive:
-            interval: 1s
-            timeout: 1s
+            interval: 30s
+            timeout: 5s
         upstream_connection_options:
           tcp_keepalive:
             ...
