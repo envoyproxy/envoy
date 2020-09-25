@@ -339,7 +339,7 @@ protected:
 #define ENVOY_SPDLOG_LEVEL(LEVEL)                                                                  \
   (static_cast<spdlog::level::level_enum>(Envoy::Logger::Logger::LEVEL))
 
-#define ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL) (ENVOY_SPDLOG_LEVEL(LEVEL) >= LOGGER.level())
+#define ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL) (ENVOY_SPDLOG_LEVEL(LEVEL) >= (LOGGER).level())
 
 // Compare levels before invoking logger. This is an optimization to avoid
 // executing expressions computing log contents when they would be suppressed.
@@ -355,12 +355,17 @@ protected:
 #define ENVOY_LOG_CHECK_LEVEL(LEVEL) ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)
 
 /**
- * Convenience macro to log to a user-specified logger.
- * Maps directly to ENVOY_LOG_COMP_AND_LOG - it could contain macro logic itself, without
- * redirection, but left in case various implementations are required in the future (based on log
- * level for example).
+ * Convenience macro to log to a user-specified logger. When fancy logging is used, the specific
+ * logger is ignored and instead the file-specific logger is used.
  */
-#define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...) ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ##__VA_ARGS__)
+#define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...)                                                    \
+  do {                                                                                             \
+    if (Envoy::Logger::Context::useFancyLogger()) {                                                \
+      FANCY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
+    } else {                                                                                       \
+      ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ##__VA_ARGS__);                                        \
+    }                                                                                              \
+  } while (0)
 
 /**
  * Convenience macro to get logger.
@@ -393,68 +398,88 @@ protected:
 /**
  * Command line options for log macros: use Fancy Logger or not.
  */
-#define ENVOY_LOG(LEVEL, ...)                                                                      \
-  do {                                                                                             \
-    if (Envoy::Logger::Context::useFancyLogger()) {                                                \
-      FANCY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
-    } else {                                                                                       \
-      ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__);                                   \
-    }                                                                                              \
-  } while (0)
+#define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
 
-#define ENVOY_LOG_FIRST_N(LEVEL, N, ...)                                                           \
+#define ENVOY_LOG_FIRST_N_TO_LOGGER(LOGGER, LEVEL, N, ...)                                         \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)) {                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
       static auto* countdown = new std::atomic<uint64_t>();                                        \
       if (countdown->fetch_add(1) < N) {                                                           \
-        ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                           \
+        ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                         \
       }                                                                                            \
     }                                                                                              \
   } while (0)
 
-#define ENVOY_LOG_ONCE(LEVEL, ...)                                                                 \
+#define ENVOY_LOG_FIRST_N(LEVEL, N, ...)                                                           \
+  ENVOY_LOG_FIRST_N_TO_LOGGER(ENVOY_LOGGER(), LEVEL, N, ##__VA_ARGS__)
+
+#define ENVOY_LOG_FIRST_N_MISC(LEVEL, N, ...)                                                      \
+  ENVOY_LOG_FIRST_N_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, N, ##__VA_ARGS__)
+
+#define ENVOY_LOG_ONCE_TO_LOGGER(LOGGER, LEVEL, ...)                                               \
+  ENVOY_LOG_FIRST_N_TO_LOGGER(LOGGER, LEVEL, 1, ##__VA_ARGS__)
+
+#define ENVOY_LOG_ONCE(LEVEL, ...) ENVOY_LOG_ONCE_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
+
+#define ENVOY_LOG_ONCE_MISC(LEVEL, ...)                                                            \
+  ENVOY_LOG_ONCE_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, ##__VA_ARGS__)
+
+#define ENVOY_LOG_EVERY_NTH_TO_LOGGER(LOGGER, LEVEL, N, ...)                                       \
   do {                                                                                             \
-    ENVOY_LOG_FIRST_N(LEVEL, 1, ##__VA_ARGS__);                                                    \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+      static auto* count = new std::atomic<uint64_t>();                                            \
+      if ((count->fetch_add(1) % N) == 0) {                                                        \
+        ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                         \
+      }                                                                                            \
+    }                                                                                              \
   } while (0)
 
 #define ENVOY_LOG_EVERY_NTH(LEVEL, N, ...)                                                         \
+  ENVOY_LOG_EVERY_NTH_TO_LOGGER(ENVOY_LOGGER(), LEVEL, N, ##__VA_ARGS__)
+
+#define ENVOY_LOG_EVERY_NTH_MISC(LEVEL, N, ...)                                                    \
+  ENVOY_LOG_EVERY_NTH_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, N, ##__VA_ARGS__)
+
+#define ENVOY_LOG_EVERY_POW_2_TO_LOGGER(LOGGER, LEVEL, ...)                                        \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)) {                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
       static auto* count = new std::atomic<uint64_t>();                                            \
-      if ((count->fetch_add(1) % N) == 0) {                                                        \
-        ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                           \
+      if (std::bitset<64>(1 /* for the first hit*/ + count->fetch_add(1)).count() == 1) {          \
+        ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                         \
       }                                                                                            \
     }                                                                                              \
   } while (0)
 
 #define ENVOY_LOG_EVERY_POW_2(LEVEL, ...)                                                          \
-  do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)) {                                             \
-      static auto* count = new std::atomic<uint64_t>();                                            \
-      if (std::bitset<64>(1 /* for the first hit*/ + count->fetch_add(1)).count() == 1) {          \
-        ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                           \
-      }                                                                                            \
-    }                                                                                              \
-  } while (0)
+  ENVOY_LOG_EVERY_POW_2_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
+
+#define ENVOY_LOG_EVERY_POW_2_MISC(LEVEL, ...)                                                     \
+  ENVOY_LOG_EVERY_POW_2_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, ##__VA_ARGS__)
 
 // This is to get us to pass the format check. We reference a real-world time source here.
 // We'd have to introduce a singleton for a time source here, and consensus was that avoiding
 // that is preferable.
 using t_logclock = std::chrono::steady_clock; // NOLINT
 
-#define ENVOY_LOG_PERIODIC(LEVEL, CHRONO_DURATION, ...)                                            \
+#define ENVOY_LOG_PERIODIC_TO_LOGGER(LOGGER, LEVEL, CHRONO_DURATION, ...)                          \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)) {                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
       static auto* last_hit = new std::atomic<int64_t>();                                          \
       auto last = last_hit->load();                                                                \
       const auto now = t_logclock::now().time_since_epoch().count();                               \
       if ((now - last) >                                                                           \
               std::chrono::duration_cast<std::chrono::nanoseconds>(CHRONO_DURATION).count() &&     \
           last_hit->compare_exchange_strong(last, now)) {                                          \
-        ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                           \
+        ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                         \
       }                                                                                            \
     }                                                                                              \
   } while (0)
+
+#define ENVOY_LOG_PERIODIC(LEVEL, CHRONO_DURATION, ...)                                            \
+  ENVOY_LOG_PERIODIC_TO_LOGGER(ENVOY_LOGGER(), LEVEL, CHRONO_DURATION, ##__VA_ARGS__)
+
+#define ENVOY_LOG_PERIODIC_MISC(LEVEL, CHRONO_DURATION, ...)                                       \
+  ENVOY_LOG_PERIODIC_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, CHRONO_DURATION, ##__VA_ARGS__)
 
 #define ENVOY_FLUSH_LOG()                                                                          \
   do {                                                                                             \

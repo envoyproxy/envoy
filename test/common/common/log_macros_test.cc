@@ -50,33 +50,33 @@ TEST(Logger, All) {
   ENVOY_LOG_MISC(info, "fake message");
 }
 
-TEST(Logger, evaluateParams) {
+TEST(Logger, EvaluateParams) {
   uint32_t i = 1;
 
   // Set logger's level to low level.
   // Log message with higher severity and make sure that params were evaluated.
-  GET_MISC_LOGGER().set_level(spdlog::level::info);
+  LogLevelSetter save_levels(spdlog::level::info);
   ENVOY_LOG_MISC(warn, "test message '{}'", i++);
 
   EXPECT_THAT(i, testing::Eq(2));
 }
 
-TEST(Logger, doNotEvaluateParams) {
+TEST(Logger, DoNotEvaluateParams) {
   uint32_t i = 1;
 
   // Set logger's logging level high and log a message with lower severity
   // params should not be evaluated.
-  GET_MISC_LOGGER().set_level(spdlog::level::critical);
+  LogLevelSetter save_levels(spdlog::level::critical);
   ENVOY_LOG_MISC(error, "test message '{}'", i++);
   EXPECT_THAT(i, testing::Eq(1));
 }
 
-TEST(Logger, logAsStatement) {
+TEST(Logger, LogAsStatement) {
   // Just log as part of if ... statement
   uint32_t i = 1, j = 1;
 
   // Set logger's logging level to high
-  GET_MISC_LOGGER().set_level(spdlog::level::critical);
+  LogLevelSetter save_levels(spdlog::level::critical);
 
   // Make sure that if statement inside of LOGGER macro does not catch trailing
   // else ....
@@ -99,7 +99,7 @@ TEST(Logger, logAsStatement) {
   EXPECT_THAT(j, testing::Eq(1));
 }
 
-TEST(Logger, checkLoggerLevel) {
+TEST(Logger, CheckLoggerLevel) {
   class LogTestClass : public Logger::Loggable<Logger::Id::misc> {
   public:
     void setLevel(const spdlog::level::level_enum level) { ENVOY_LOGGER().set_level(level); }
@@ -142,69 +142,124 @@ void spamCall(std::function<void()>&& call_to_spam, const uint32_t num_threads) 
   }
 }
 
-TEST(Logger, SparseLogMacros) {
-  class SparseLogMacrosTestHelper : public Logger::Loggable<Logger::Id::filter> {
-  public:
-    SparseLogMacrosTestHelper() { ENVOY_LOGGER().set_level(spdlog::level::info); }
-    void logSomething() { ENVOY_LOG_ONCE(error, "foo1 '{}'", evaluations()++); }
-    void logSomethingElse() { ENVOY_LOG_ONCE(error, "foo2 '{}'", evaluations()++); }
-    void logSomethingBelowLogLevelOnce() { ENVOY_LOG_ONCE(debug, "foo3 '{}'", evaluations()++); }
-    void logSomethingThrice() { ENVOY_LOG_FIRST_N(error, 3, "foo4 '{}'", evaluations()++); }
-    void logEverySeventh() { ENVOY_LOG_EVERY_NTH(error, 7, "foo5 '{}'", evaluations()++); }
-    void logEveryPow2() { ENVOY_LOG_EVERY_POW_2(error, "foo6 '{}'", evaluations()++); }
-    void logEverySecond() { ENVOY_LOG_PERIODIC(error, 1s, "foo7 '{}'", evaluations()++); }
-    std::atomic<int32_t>& evaluations() { MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<int32_t>); };
-  };
+class SparseLogMacrosTest : public testing::TestWithParam<bool>,
+                            public Logger::Loggable<Logger::Id::filter> {
+public:
+  SparseLogMacrosTest() : use_misc_macros_(GetParam()) { evaluations() = 0; }
+
+  void logSomething() {
+    if (use_misc_macros_) {
+      ENVOY_LOG_ONCE_MISC(error, "foo1 '{}'", evaluations()++);
+    } else {
+      ENVOY_LOG_ONCE(error, "foo1 '{}'", evaluations()++);
+    }
+  }
+
+  void logSomethingElse() {
+    if (use_misc_macros_) {
+      ENVOY_LOG_ONCE_MISC(error, "foo2 '{}'", evaluations()++);
+    } else {
+      ENVOY_LOG_ONCE(error, "foo2 '{}'", evaluations()++);
+    }
+  }
+
+  void logSomethingBelowLogLevelOnce() {
+    if (use_misc_macros_) {
+      ENVOY_LOG_ONCE_MISC(debug, "foo3 '{}'", evaluations()++);
+    } else {
+      ENVOY_LOG_ONCE(debug, "foo3 '{}'", evaluations()++);
+    }
+  }
+
+  void logSomethingThrice() {
+    if (use_misc_macros_) {
+      ENVOY_LOG_FIRST_N_MISC(error, 3, "foo4 '{}'", evaluations()++);
+    } else {
+      ENVOY_LOG_FIRST_N(error, 3, "foo4 '{}'", evaluations()++);
+    }
+  }
+
+  void logEverySeventh() {
+    if (use_misc_macros_) {
+      ENVOY_LOG_EVERY_NTH_MISC(error, 7, "foo5 '{}'", evaluations()++);
+    } else {
+      ENVOY_LOG_EVERY_NTH(error, 7, "foo5 '{}'", evaluations()++);
+    }
+  }
+
+  void logEveryPow2() {
+    if (use_misc_macros_) {
+      ENVOY_LOG_EVERY_POW_2_MISC(error, "foo6 '{}'", evaluations()++);
+    } else {
+      ENVOY_LOG_EVERY_POW_2(error, "foo6 '{}'", evaluations()++);
+    }
+  }
+
+  void logEverySecond() {
+    if (use_misc_macros_) {
+      ENVOY_LOG_PERIODIC_MISC(error, 1s, "foo7 '{}'", evaluations()++);
+    } else {
+      ENVOY_LOG_PERIODIC(error, 1s, "foo7 '{}'", evaluations()++);
+    }
+  }
+  std::atomic<int32_t>& evaluations() { MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<int32_t>); };
+
+  const bool use_misc_macros_;
+  LogLevelSetter save_levels_{spdlog::level::info};
+};
+
+INSTANTIATE_TEST_SUITE_P(MiscOrNot, SparseLogMacrosTest, testing::Values(false, true));
+
+TEST_P(SparseLogMacrosTest, All) {
   constexpr uint32_t kNumThreads = 100;
-  SparseLogMacrosTestHelper helper;
   spamCall(
-      [&helper]() {
-        helper.logSomething();
-        helper.logSomething();
+      [this]() {
+        logSomething();
+        logSomething();
       },
       kNumThreads);
-  EXPECT_EQ(1, helper.evaluations());
+  EXPECT_EQ(1, evaluations());
   spamCall(
-      [&helper]() {
-        helper.logSomethingElse();
-        helper.logSomethingElse();
+      [this]() {
+        logSomethingElse();
+        logSomethingElse();
       },
       kNumThreads);
   // Two distinct log lines ought to result in two evaluations, and no more.
-  EXPECT_EQ(2, helper.evaluations());
+  EXPECT_EQ(2, evaluations());
 
-  spamCall([&helper]() { helper.logSomethingThrice(); }, kNumThreads);
+  spamCall([this]() { logSomethingThrice(); }, kNumThreads);
   // Single log line should be emitted 3 times.
-  EXPECT_EQ(5, helper.evaluations());
+  EXPECT_EQ(5, evaluations());
 
-  spamCall([&helper]() { helper.logEverySeventh(); }, kNumThreads);
+  spamCall([this]() { logEverySeventh(); }, kNumThreads);
   // (100 threads / log every 7th) + 1s = 15 more evaluations upon logging very 7th.
-  EXPECT_EQ(20, helper.evaluations());
+  EXPECT_EQ(20, evaluations());
 
-  helper.logEveryPow2();
+  logEveryPow2();
   // First call ought to propagate.
-  EXPECT_EQ(21, helper.evaluations());
+  EXPECT_EQ(21, evaluations());
 
-  spamCall([&helper]() { helper.logEveryPow2(); }, kNumThreads);
+  spamCall([this]() { logEveryPow2(); }, kNumThreads);
   // 64 is the highest power of two that fits when kNumThreads == 100.
   // We should log on 2, 4, 8, 16, 32, 64, which means we can expect to add 6 more evaluations.
-  EXPECT_EQ(27, helper.evaluations());
+  EXPECT_EQ(27, evaluations());
 
-  spamCall([&helper]() { helper.logEverySecond(); }, kNumThreads);
+  spamCall([this]() { logEverySecond(); }, kNumThreads);
   // First call ought to evaluate.
-  EXPECT_EQ(28, helper.evaluations());
+  EXPECT_EQ(28, evaluations());
 
   // We expect one log entry / second. Therefore each spamCall ought to result in one
   // more evaluation. This depends on real time and not sim time, hopefully 1 second
   // is enough to not introduce flakes in practice.
   std::this_thread::sleep_for(1s); // NOLINT
-  spamCall([&helper]() { helper.logEverySecond(); }, kNumThreads);
-  EXPECT_EQ(29, helper.evaluations());
+  spamCall([this]() { logEverySecond(); }, kNumThreads);
+  EXPECT_EQ(29, evaluations());
 
-  spamCall([&helper]() { helper.logSomethingBelowLogLevelOnce(); }, kNumThreads);
+  spamCall([this]() { logSomethingBelowLogLevelOnce(); }, kNumThreads);
   // We shouldn't observe additional argument evaluations for log lines below the configured
   // log level.
-  EXPECT_EQ(29, helper.evaluations());
+  EXPECT_EQ(29, evaluations());
 }
 
 TEST(RegistryTest, LoggerWithName) {
