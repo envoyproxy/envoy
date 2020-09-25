@@ -14,14 +14,32 @@ health_check_config {
   healthy_threshold {
     value: 2
   }
-  http_health_check {
-    path: "/healthcheck"
-    service_name_matcher {
-      prefix: "locations"
-    }
+  tcp_health_check {
+      send {
+            text: "01"
+        }
+        receive [{
+            text: "02"
+        }]
   }
+  no_traffic_interval {
+    seconds: 1
+  }
+  event_log_path: "200"
   initial_jitter {
     seconds: 1
+  }
+  transport_socket_match_criteria {
+    fields {
+      key: ""
+      value {
+        bool_value: true
+      }
+    }
+  }
+}
+actions {
+  trigger_interval_timer {
   }
 }
 actions {
@@ -37,10 +55,9 @@ actions {
           value: "locations-production-iad"
         }
       }
-      status: 200
+      status: "200"
     }
     tcp_respond {
-            
     }
   }
 }

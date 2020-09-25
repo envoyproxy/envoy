@@ -1,6 +1,7 @@
 health_check_config {
   timeout {
     seconds: 1
+    nanos: 2097152
   }
   interval {
     seconds: 1
@@ -12,20 +13,14 @@ health_check_config {
     value: 2
   }
   healthy_threshold {
-  }
-  alt_port {
     value: 2
   }
   reuse_connection {
   }
-  http_health_check {
-    path: "/healthcheck"
-    service_name_matcher {
-      prefix: "locations"
+  tcp_health_check {
+    send {
+      binary: "\001\000\000\r"
     }
-  }
-  no_traffic_interval {
-    seconds: 1
   }
 }
 actions {
@@ -37,15 +32,14 @@ actions {
           value: "200"
         }
         headers {
-          key: ":status"
-          value: "200"
-        }
-        headers {
           key: "x-envoy-degraded"
           value: "true"
         }
       }
-      status: 200
+      status: "200"
+    }
+    tcp_respond {
+      data: "0"
     }
   }
 }
@@ -58,14 +52,13 @@ actions {
     http_respond {
       headers {
         headers {
-          key: "200"
+          key: ":status"
           value: "200"
         }
       }
-      status: 200
+      status: "200"
     }
     tcp_respond {
-            
     }
   }
 }

@@ -1,6 +1,7 @@
 health_check_config {
   timeout {
     seconds: 1
+    nanos: 196608
   }
   interval {
     seconds: 1
@@ -12,39 +13,28 @@ health_check_config {
     value: 2
   }
   healthy_threshold {
-    value: 2
+    value: 16580610
   }
-  http_health_check {
-    path: "/healthcheck"
-    service_name_matcher {
-      prefix: "locations"
-    }
+  alt_port {
+    value: 16580610
+  }
+  tcp_health_check {
   }
   no_traffic_interval {
     seconds: 5
+  }
+  initial_jitter {
+    nanos: 1701314560
   }
 }
 actions {
   respond {
     http_respond {
       headers {
-        headers {
-          key: ":status"
-          value: "200"
-        }
       }
-      status: 200
+      status: "200"
     }
     tcp_respond {
-    
     }
-  }
-}
-actions {
-  raise_event: REMOTE_CLOSE
-}
-actions {
-  trigger_interval_timer {
-      
   }
 }
