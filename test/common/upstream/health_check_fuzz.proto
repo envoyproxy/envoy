@@ -28,12 +28,16 @@ message GrpcRespondHeaders {
   uint64 status = 2;
 }
 
+message GrpcRespondUnstructuredBytes {
+  repeated bytes data = 1;
+}
+
 message GrpcRespondBytes {
   oneof grpc_respond_bytes_selector {
     option (validate.required) = true;
     //Structured response, which will get converted to raw bytes
-    ServingStatus status = 1;
-    bytes data = 2; //Raw bytes
+    ServingStatus status = 1; //TODO: Split structured response as well?
+    GrpcRespondUnstructuredBytes grpc_respond_unstructured_bytes = 2;
   }
 }
 
