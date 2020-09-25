@@ -12,8 +12,13 @@ message HttpRespond { //TODO: Split this across headers, body, and trailers?
   uint64 status = 2;
 }
 
+message TcpRespond {
+  bytes data = 1;
+}
+
 message Respond {
   HttpRespond http_respond = 1 [(validate.rules).message.required = true];
+  TcpRespond tcp_respond = 2 [(validate.rules).message.required = true];
 }
 
 enum RaiseEvent {

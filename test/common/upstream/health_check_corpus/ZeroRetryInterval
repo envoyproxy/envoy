@@ -36,6 +36,9 @@ actions {
             }
             status: 200
         }
+        tcp_respond {
+            
+        }
     }
 }
 http_verify_cluster : true
