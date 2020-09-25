@@ -3,10 +3,7 @@
 #include "test/test_common/test_runtime.h"
 
 using testing::_;
-using testing::An;
-using testing::AnyNumber;
 using testing::AtLeast;
-using testing::Eq;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
