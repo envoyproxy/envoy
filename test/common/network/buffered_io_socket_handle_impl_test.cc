@@ -262,6 +262,8 @@ TEST_F(BufferedIoSocketHandleTest, TestDrainToLowWaterMarkTriggerReadEvent) {
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestClose) {
+  auto& internal_buffer = io_handle_->getBufferForTest();
+  internal_buffer.add("abcd");
   std::string accumulator;
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
@@ -296,10 +298,14 @@ TEST_F(BufferedIoSocketHandleTest, TestClose) {
 
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration()).Times(0);
   io_handle_->close();
+  EXPECT_EQ(4, accumulator.size());
   ev.reset();
 }
 
 TEST_F(BufferedIoSocketHandleTest, TestShutdown) {
+  auto& internal_buffer = io_handle_->getBufferForTest();
+  internal_buffer.add("abcd");
+
   std::string accumulator;
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
@@ -331,8 +337,105 @@ TEST_F(BufferedIoSocketHandleTest, TestShutdown) {
   ASSERT_TRUE(scheduable_cb_->enabled());
   scheduable_cb_->invokeCallback();
   ASSERT_TRUE(should_close);
+  EXPECT_EQ(4, accumulator.size());
+  io_handle_->close();
+  ev.reset();
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestWriteToPeer) {
+  std::string raw_data("0123456789");
+  absl::InlinedVector<Buffer::RawSlice, 4> slices{
+      // Contains 1 byte.
+      Buffer::RawSlice{static_cast<void*>(raw_data.data()), 1},
+      // Contains 0 byte.
+      Buffer::RawSlice{nullptr, 1},
+      // Contains 0 byte.
+      Buffer::RawSlice{raw_data.data() + 1, 0},
+      // Contains 2 byte.
+      Buffer::RawSlice{raw_data.data() + 1, 2},
+  };
+  io_handle_peer_->writev(slices.data(), slices.size());
+  auto& internal_buffer = io_handle_->getBufferForTest();
+  EXPECT_EQ(3, internal_buffer.length());
+  EXPECT_EQ("012", internal_buffer.toString());
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestWriteScheduleWritableEvent) {
+  std::string accumulator;
+  scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  bool should_close = false;
+  auto ev = io_handle_->createFileEvent(
+      dispatcher_,
+      [this, &should_close, handle = io_handle_.get(), &accumulator](uint32_t events) {
+        if (events & Event::FileReadyType::Read) {
+          auto& internal_buffer = handle->getBufferForTest();
+          Buffer::RawSlice slice;
+          internal_buffer.reserve(1024, &slice, 1);
+          auto res = io_handle_->readv(1024, &slice, 1);
+          if (res.ok()) {
+            accumulator += absl::string_view(static_cast<char*>(slice.mem_), res.rc_);
+          } else if (res.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+            ENVOY_LOG_MISC(debug, "lambdai: EAGAIN");
+          } else {
+            ENVOY_LOG_MISC(debug, "lambdai: close, not schedule event");
+            should_close = true;
+          }
+        }
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+  scheduable_cb_->invokeCallback();
+  EXPECT_FALSE(scheduable_cb_->enabled());
+
+  std::string raw_data("0123456789");
+  Buffer::RawSlice slice{static_cast<void*>(raw_data.data()), raw_data.size()};
+  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  io_handle_peer_->writev(&slice, 1);
+
+  EXPECT_TRUE(scheduable_cb_->enabled());
+  scheduable_cb_->invokeCallback();
+  EXPECT_EQ("0123456789", accumulator);
+  EXPECT_FALSE(should_close);
 
   io_handle_->close();
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestReadFlowAfterShutdownWrite) {
+
+  io_handle_peer_->shutdown(ENVOY_SHUT_WR);
+
+  std::string accumulator;
+  scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  bool should_close = false;
+  auto ev = io_handle_peer_->createFileEvent(
+      dispatcher_,
+      [this, &should_close, handle = io_handle_peer_.get(), &accumulator](uint32_t events) {
+        if (events & Event::FileReadyType::Read) {
+          auto res = io_handle_peer_->recv(buf_.data(), buf_.size(), 0);
+          if (res.ok()) {
+            accumulator += absl::string_view(buf_.data(), res.rc_);
+          } else if (res.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+            ENVOY_LOG_MISC(debug, "lambdai: EAGAIN");
+          } else {
+            ENVOY_LOG_MISC(debug, "lambdai: close, not schedule event");
+            should_close = true;
+          }
+        }
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+  scheduable_cb_->invokeCallback();
+
+  EXPECT_FALSE(scheduable_cb_->enabled());
+  std::string raw_data("0123456789");
+  Buffer::RawSlice slice{static_cast<void*>(raw_data.data()), raw_data.size()};
+  io_handle_->writev(&slice, 1);
+  EXPECT_TRUE(scheduable_cb_->enabled());
+
+  scheduable_cb_->invokeCallback();
+  EXPECT_FALSE(scheduable_cb_->enabled());
+  EXPECT_EQ(raw_data, accumulator);
+
   ev.reset();
 }
 
