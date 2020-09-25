@@ -47,7 +47,7 @@ BAZEL_BUILD_OPTIONS=(
     -c opt
     --show_task_finish
     --verbose_failures
-    "--test_output=errors"
+    "--test_output=all"
     "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
     "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 
@@ -59,25 +59,7 @@ mkdir -p "${ENVOY_BUILD_DIR}"
 ENVOY_DELIVERY_DIR="${ENVOY_BUILD_DIR}"/source/exe
 mkdir -p "${ENVOY_DELIVERY_DIR}"
 
-# Test to validate updates of all dependency libraries in bazel/external and bazel/foreign_cc
-# bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //bazel/... --build_tag_filters=-skip_on_windows
-
-# Complete envoy-static build (nothing needs to be skipped, build failure indicates broken dependencies)
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //source/exe:envoy-static
-
-# Copy binary to delivery directory
-cp -f bazel-bin/source/exe/envoy-static.exe "${ENVOY_DELIVERY_DIR}/envoy.exe"
-
-# Copy for azp, creating a tar archive
-tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${ENVOY_DELIVERY_DIR}" envoy.exe
-
-# Test invocations of known-working tests on Windows
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" //test/... --test_tag_filters=-skip_on_windows,-fails_on_windows,-flaky_on_windows --build_tests_only
-
-# Build tests that are known-flaky or known-failing to ensure no compilation regressions
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //test/... --test_tag_filters=-skip_on_windows,fails_on_windows,flaky_on_windows --build_tests_only
-
-# Summarize tests bypasssed to monitor the progress of porting to Windows
-echo "Tests bypassed as skip_on_windows: $(bazel query 'kind(".*test rule", attr("tags", "skip_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known unbuildable or inapplicable tests"
-echo "Tests bypassed as fails_on_windows: $(bazel query 'kind(".*test rule", attr("tags", "fails_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known incompatible tests"
-echo "Tests bypassed as flaky_on_windows: $(bazel query 'kind(".*test rule", attr("tags", "flaky_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known unstable tests"
+for i in {1..50}; do
+  bazel "${BAZEL_STARTUP_OPTIONS}" test "${BAZEL_BUILD_OPTIONS[@]}" //test/extensions/transport_sockets/tls:handshaker_test --test_tag_filters=-skip_on_windows,-fails_on_windows,-flaky_on_windows --build_tests_only --nocache_test_results
+  echo "Passed attempt $i"
+done

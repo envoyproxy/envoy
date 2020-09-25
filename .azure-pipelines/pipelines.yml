@@ -211,7 +211,7 @@ jobs:
           BUILD_URI: $(Build.BuildUri)
 
   - job: Windows
-    dependsOn: ["format"]
+    dependsOn: []
     timeoutInMinutes: 360
     pool:
       vmImage: "windows-latest"
