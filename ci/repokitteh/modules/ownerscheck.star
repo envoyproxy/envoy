@@ -5,6 +5,7 @@
 #   paths=[
 #     {
 #       "owner": "envoyproxy/api-shepherds!",
+#       "do_not_mention": True,
 #       "path": "api/",
 #       "exclude_path": "foo/",
 #       "label": "api",
@@ -29,6 +30,9 @@
 #
 # 'label' refers to a GitHub label applied to any matching PR. The GitHub check status
 # can be customized with `github_status_label`.
+#
+# 'do_not_mention' can be used to avoid mentioning the owner. This is useful when the owner is a
+# wide group.
 
 load("text", "match")
 load("github.com/repokitteh/modules/lib/utils.star", "react")
@@ -70,6 +74,7 @@ def _get_relevant_specs(specs, changed_files):
     if files:
       relevant.append(struct(files=files,
                              owner=spec["owner"],
+                             do_not_mention=spec.get("do_not_mention", False),
                              label=spec.get("label", None),
                              path_match=path_match,
                              allow_global_approval=allow_global_approval,
@@ -172,6 +177,9 @@ def _comment(config, results, force=False):
 
     if mention[0] != '@':
       mention = '@' + mention
+
+    if mention[0] == '@' and spec.do_not_mention:
+      mention = mention[1:]
 
     if mention[-1] == '!':
       mention = mention[:-1]
