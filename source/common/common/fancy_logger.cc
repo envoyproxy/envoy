@@ -90,7 +90,7 @@ void FancyContext::setAllFancyLoggers(spdlog::level::level_enum level)
   }
 }
 
-FancyLogLevelMap FancyContext::getAllFancyLogLevels() ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
+FancyLogLevelMap FancyContext::getAllFancyLogLevelsForTest() ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
   FancyLogLevelMap log_levels;
   absl::ReaderMutexLock l(&fancy_log_lock_);
   for (const auto& it : *fancy_log_map_) {

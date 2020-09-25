@@ -8,7 +8,7 @@ namespace Envoy {
 
 LogLevelSetter::LogLevelSetter(spdlog::level::level_enum log_level) {
   if (Logger::Context::useFancyLogger()) {
-    previous_fancy_levels_ = getFancyContext().getAllFancyLogLevels();
+    previous_fancy_levels_ = getFancyContext().getAllFancyLogLevelsForTest();
     getFancyContext().setAllFancyLoggers(log_level);
   } else {
     for (Logger::Logger& logger : Logger::Registry::loggers()) {
