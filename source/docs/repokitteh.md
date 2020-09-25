@@ -108,11 +108,11 @@ Two types of approvals:
 
 For maintainers, the following checks can be cleared with `/lgtm <check>`:
 
-* pr-check/release-notes: blocks submit unless current.rst is modified
+* pr/release: blocks submit unless current.rst is modified
   for any change to source/ or api/.
-* pr-check/docs: blocks submit unless docs/ is modified for any change to
+* pr/docs: blocks submit unless docs/ is modified for any change to
   source/.
-* pr-check/tests: block submit unless test/ is modified for any change
+* pr/tests: block submit unless test/ is modified for any change
   to source/.
 
 For API shepherds, the following checks can be cleared with `/lgtm <check>`:
