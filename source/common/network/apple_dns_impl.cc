@@ -85,7 +85,7 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
 
   DNSServiceErrorType error = pending_resolution->dnsServiceGetAddrInfo(dns_lookup_family);
   if (error != kDNSServiceErr_NoError) {
-    ENVOY_LOG(error, "DNS resolver error in dnsServiceGetAddrInfo for {}", dns_name);
+    ENVOY_LOG(warn, "DNS resolver error in dnsServiceGetAddrInfo for {}", dns_name);
     return nullptr;
   }
 
@@ -118,13 +118,13 @@ void AppleDnsResolverImpl::flushPendingQueries(const bool with_error) {
       query->callback_(query->pending_cb_->status_, std::move(query->pending_cb_->responses_));
     } catch (const EnvoyException& e) {
       ENVOY_LOG(critical, "EnvoyException in DNSService callback: {}", e.what());
-      query->dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
+      throw EnvoyException(e.what());
     } catch (const std::exception& e) {
       ENVOY_LOG(critical, "std::exception in DNSService callback: {}", e.what());
-      query->dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
+      throw EnvoyException(e.what());
     } catch (...) {
       ENVOY_LOG(critical, "Unknown exception in DNSService callback");
-      query->dispatcher_.post([] { throw EnvoyException("unknown"); });
+      throw EnvoyException("unknown");
     }
 
     if (query->owned_) {
@@ -146,11 +146,8 @@ void AppleDnsResolverImpl::flushPendingQueries(const bool with_error) {
     // Deallocation of the MainSdRef __has__ to happen __after__ flushing queries. Flushing queries
     // de-allocates individual refs, so deallocating the main ref ahead would cause deallocation of
     // invalid individual refs per dns_sd.h
-    ENVOY_LOG(error, "[Error path] deallocating main sd ref");
     deallocateMainSdRef();
-    ENVOY_LOG(error, "[Error path] re-initializing main sd ref");
     initializeMainSdRef();
-    ENVOY_LOG(error, "[Error path] done");
   }
 }
 
@@ -204,15 +201,15 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     // etc.). Currently a bit challenging because there is no scope access wired through. Current
     // query gets a failure status
     if (!pending_cb_) {
-      ENVOY_LOG(error, "[Error path] Adding to queries pending callback");
+      ENVOY_LOG(warn, "[Error path] Adding to queries pending callback");
       pending_cb_ = {ResolutionStatus::Failure, {}};
       parent_.addPendingQuery(this);
     } else {
-      ENVOY_LOG(error, "[Error path] Changing status for query already pending flush");
+      ENVOY_LOG(warn, "[Error path] Changing status for query already pending flush");
       pending_cb_->status_ = ResolutionStatus::Failure;
     }
 
-    ENVOY_LOG(error, "[Error path] DNS Resolver flushing queries pending callback");
+    ENVOY_LOG(warn, "[Error path] DNS Resolver flushing queries pending callback");
     parent_.flushPendingQueries(true /* with_error */);
     // Note: Nothing can follow this call to flushPendingQueries due to deletion of this
     // object upon resolution.
@@ -274,8 +271,6 @@ AppleDnsResolverImpl::PendingResolution::dnsServiceGetAddrInfo(DnsLookupFamily d
   case DnsLookupFamily::Auto:
     protocol = kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6;
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   // TODO: explore caching: there are caching flags in the dns_sd.h flags, allow expired answers

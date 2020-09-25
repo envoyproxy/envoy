@@ -131,14 +131,10 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
     UNREFERENCED_PARAMETER(resolvers);
     UNREFERENCED_PARAMETER(use_tcp_for_dns_lookups);
     return Network::DnsResolverSharedPtr{new Network::AppleDnsResolverImpl(*this)};
-  } else {
-    return Network::DnsResolverSharedPtr{
-        new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
   }
-#else
+#endif
   return Network::DnsResolverSharedPtr{
       new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
-#endif
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
