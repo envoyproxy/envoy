@@ -29,7 +29,7 @@ public:
     quic::QuicIpAddress peer_ip;
     peer_ip.FromString("::1");
     peer_address_ = quic::QuicSocketAddress(peer_ip, /*port=*/123);
-    ON_CALL(os_sys_calls_, socket(_, _, _)).WillByDefault(Return(Api::SysCallIntResult{3, 0}));
+    ON_CALL(os_sys_calls_, socket(_, _, _)).WillByDefault(Return(Api::SysCallSocketResult{3, 0}));
     ON_CALL(os_sys_calls_, close(3)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
   }
 
