@@ -48,11 +48,12 @@ public:
 
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Server::MockAdmin> admin_;
-  Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
+  NiceMock<Upstream::TestClusterManagerFactory> factory_;
+  NiceMock<Random::MockRandomGenerator>& random_{factory_.random_};
+  Api::ApiPtr api_{Api::createApiForTest(stats_store_, random_)};
   Upstream::ThreadLocalCluster* cluster_;
 
   Event::SimulatedTimeSystem time_system_;
-  NiceMock<Upstream::TestClusterManagerFactory> factory_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   std::unique_ptr<Upstream::TestClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
@@ -170,22 +171,22 @@ TEST_F(AggregateClusterUpdateTest, LoadBalancingTest) {
 
   Upstream::HostConstSharedPtr host;
   for (int i = 0; i < 33; ++i) {
-    EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
+    EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
     EXPECT_EQ(host3, cluster_->loadBalancer().chooseHost(nullptr));
   }
 
   for (int i = 33; i < 66; ++i) {
-    EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
+    EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
     EXPECT_EQ(host6, cluster_->loadBalancer().chooseHost(nullptr));
   }
 
   for (int i = 66; i < 99; ++i) {
-    EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
+    EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
     EXPECT_EQ(host1, cluster_->loadBalancer().chooseHost(nullptr));
   }
 
   for (int i = 99; i < 100; ++i) {
-    EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
+    EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
     EXPECT_EQ(host4, cluster_->loadBalancer().chooseHost(nullptr));
   }
 
@@ -209,24 +210,24 @@ TEST_F(AggregateClusterUpdateTest, LoadBalancingTest) {
   //   Priority 0: 1/3 healthy, 1/3 degraded
   //   Priority 1: 1/3 healthy, 1/3 degraded
   for (int i = 0; i < 33; ++i) {
-    EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
+    EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
     host = cluster_->loadBalancer().chooseHost(nullptr);
     EXPECT_EQ(host6, cluster_->loadBalancer().chooseHost(nullptr));
   }
 
   for (int i = 33; i < 66; ++i) {
-    EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
+    EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
     host = cluster_->loadBalancer().chooseHost(nullptr);
     EXPECT_EQ(host9, cluster_->loadBalancer().chooseHost(nullptr));
   }
 
   for (int i = 66; i < 99; ++i) {
-    EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
+    EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
     EXPECT_EQ(host4, cluster_->loadBalancer().chooseHost(nullptr));
   }
 
   for (int i = 99; i < 100; ++i) {
-    EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
+    EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
     EXPECT_EQ(host7, cluster_->loadBalancer().chooseHost(nullptr));
   }
 }
@@ -290,12 +291,12 @@ TEST_F(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
       nullptr, {host1, host2, host3}, {}, 100);
 
   for (int i = 0; i < 50; ++i) {
-    EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
+    EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
     EXPECT_EQ(host3, cluster_->loadBalancer().chooseHost(nullptr));
   }
 
   for (int i = 50; i < 100; ++i) {
-    EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
+    EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
     EXPECT_EQ(host1, cluster_->loadBalancer().chooseHost(nullptr));
   }
 }

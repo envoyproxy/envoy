@@ -31,7 +31,6 @@ public:
    * @param health_check_config supplies the health check proto.
    * @param cluster supplies the owning cluster.
    * @param runtime supplies the runtime loader.
-   * @param random supplies the random generator.
    * @param dispatcher supplies the dispatcher.
    * @param log_manager supplies the log_manager.
    * @param validation_visitor message validation visitor instance.
@@ -40,7 +39,7 @@ public:
    */
   static HealthCheckerSharedPtr
   create(const envoy::config::core::v3::HealthCheck& health_check_config,
-         Upstream::Cluster& cluster, Runtime::Loader& runtime, Random::RandomGenerator& random,
+         Upstream::Cluster& cluster, Runtime::Loader& runtime,
          Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 };

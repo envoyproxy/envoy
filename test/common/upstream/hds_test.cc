@@ -61,7 +61,7 @@ class HdsTest : public testing::Test {
 protected:
   HdsTest()
       : retry_timer_(new Event::MockTimer()), server_response_timer_(new Event::MockTimer()),
-        async_client_(new Grpc::MockAsyncClient()), api_(Api::createApiForTest(stats_store_)),
+        async_client_(new Grpc::MockAsyncClient()), api_(Api::createApiForTest(stats_store_, random_)),
         ssl_context_manager_(api_->timeSource()) {
     node_.set_id("hds-node");
   }
@@ -86,7 +86,7 @@ protected:
     hds_delegate_ = std::make_unique<HdsDelegate>(
         stats_store_, Grpc::RawAsyncClientPtr(async_client_),
         envoy::config::core::v3::ApiVersion::AUTO, dispatcher_, runtime_, stats_store_,
-        ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_, admin_,
+        ssl_context_manager_, test_factory_, log_manager_, cm_, local_info_, admin_,
         singleton_manager_, tls_, validation_visitor_, *api_);
   }
 
