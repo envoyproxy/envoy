@@ -18,6 +18,10 @@ export NO_PROXY="${no_proxy:-}"
 
 if is_windows; then
   [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-windows2019"
+  # TODO(sunjayBhatia): Currently ENVOY_DOCKER_OPTIONS is ignored on Windows because
+  # CI sets it to a Linux-specific value. Undo this once https://github.com/envoyproxy/envoy/issues/13272
+  # is resolved.
+  ENVOY_DOCKER_OPTIONS=()
   DEFAULT_ENVOY_DOCKER_BUILD_DIR=C:/Windows/Temp/envoy-docker-build
   BUILD_DIR_MOUNT_DEST=C:/build
   # Replace MSYS style drive letter (/c/) with driver letter designation (C:/)
