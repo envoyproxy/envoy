@@ -36,7 +36,7 @@ Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
     tracer->setReporter(std::make_unique<TraceSegmentReporter>(
         factory_context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
             proto_config.grpc_service(), factory_context.scope(), false),
-        dispatcher, tracing_stats_, client_config_));
+        dispatcher, factory_context.random(), tracing_stats_, client_config_));
     return std::make_shared<TlsTracer>(std::move(tracer));
   });
 }

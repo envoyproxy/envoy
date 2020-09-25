@@ -39,8 +39,9 @@ public:
 
     TestUtility::loadFromYaml(yaml_string, client_config_);
 
-    reporter_ = std::make_unique<TraceSegmentReporter>(
-        std::move(mock_client_factory), mock_dispatcher_, tracing_stats_, client_config_);
+    reporter_ = std::make_unique<TraceSegmentReporter>(std::move(mock_client_factory),
+                                                       mock_dispatcher_, mock_random_generator_,
+                                                       tracing_stats_, client_config_);
   }
 
 protected:

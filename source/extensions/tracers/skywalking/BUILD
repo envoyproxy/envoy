@@ -19,6 +19,7 @@ envoy_cc_library(
         ":skywalking_stats_lib",
         ":skywalking_types_lib",
         "//include/envoy/grpc:async_client_manager_interface",
+        "//source/common/common:backoff_lib",
         "//source/common/grpc:async_client_lib",
         "@com_github_apache_skywalking_data_collect_protocol//:protocol_cc_proto",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",

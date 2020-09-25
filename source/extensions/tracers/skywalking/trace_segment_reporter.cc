@@ -74,14 +74,22 @@ const Http::LowerCaseString& authenticationTokenKey() {
 
 TraceSegmentReporter::TraceSegmentReporter(
     Grpc::AsyncClientFactoryPtr&& factory, Event::Dispatcher& dispatcher,
-    SkyWalkingTracerStats& stats, const envoy::config::trace::v3::ClientConfig& client_config)
+    Random::RandomGenerator& random_generator, SkyWalkingTracerStats& stats,
+    const envoy::config::trace::v3::ClientConfig& client_config)
     : tracing_stats_(stats), simple_authentication_token_(client_config.authentication()),
       client_(factory->create()),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "TraceSegmentReportService.collect")) {
+          "TraceSegmentReportService.collect")),
+      random_generator_(random_generator) {
+
   max_delayed_segments_cache_size_ = client_config.has_max_cache_size()
                                          ? client_config.max_cache_size().value()
                                          : DEFAULT_DELAYED_SEGMENTS_CACHE_SIZE;
+
+  static constexpr uint32_t RetryInitialDelayMs = 500;
+  static constexpr uint32_t RetryMaxDelayMs = 30000;
+  backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
+      RetryInitialDelayMs, RetryMaxDelayMs, random_generator_);
 
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   establishNewStream();
@@ -142,12 +150,13 @@ void TraceSegmentReporter::establishNewStream() {
   if (!delayed_segments_cache_.empty()) {
     flushTraceSegments();
   }
+  backoff_strategy_->reset();
 }
 
 void TraceSegmentReporter::handleFailure() { setRetryTimer(); }
 
 void TraceSegmentReporter::setRetryTimer() {
-  retry_timer_->enableTimer(std::chrono::milliseconds(5000));
+  retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
 }
 
 } // namespace SkyWalking

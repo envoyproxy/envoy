@@ -5,6 +5,7 @@
 #include "envoy/config/trace/v3/skywalking.pb.h"
 #include "envoy/grpc/async_client_manager.h"
 
+#include "common/common/backoff_strategy.h"
 #include "common/Common.pb.h"
 #include "common/grpc/async_client_impl.h"
 
@@ -23,7 +24,8 @@ using TraceSegmentPtr = std::unique_ptr<SegmentObject>;
 class TraceSegmentReporter : Grpc::AsyncStreamCallbacks<Commands> {
 public:
   explicit TraceSegmentReporter(Grpc::AsyncClientFactoryPtr&& factory,
-                                Event::Dispatcher& dispatcher, SkyWalkingTracerStats& stats,
+                                Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
+                                SkyWalkingTracerStats& stats,
                                 const envoy::config::trace::v3::ClientConfig& client_config);
 
   // Grpc::AsyncStreamCallbacks
@@ -62,11 +64,13 @@ private:
   Grpc::AsyncStream<SegmentObject> stream_{};
   const Protobuf::MethodDescriptor& service_method_;
 
+  Random::RandomGenerator& random_generator_;
   // If the connection is unavailable when reporting data, the created SegmentObject will be cached
   // in the queue, and when a new connection is established, the cached data will be reported.
   std::queue<TraceSegmentPtr> delayed_segments_cache_;
 
   Event::TimerPtr retry_timer_;
+  BackOffStrategyPtr backoff_strategy_;
 };
 
 using TraceSegmentReporterPtr = std::unique_ptr<TraceSegmentReporter>;
