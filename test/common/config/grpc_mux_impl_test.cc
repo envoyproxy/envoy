@@ -334,8 +334,8 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
 
-  // Refresh the TTL with a response that doesn't contain the previous resources, but the same version.
-  // This should not trigger a onConfigUpdate call.
+  // Refresh the TTL with a response that doesn't contain the previous resources, but the same
+  // version. This should not trigger a onConfigUpdate call.
   {
     auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(type_url);
