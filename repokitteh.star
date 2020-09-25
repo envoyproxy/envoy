@@ -45,7 +45,7 @@ use(
       "do_not_tag": True,
       "path": "source/",
       "exclude_path": "test/",
-      "label": "pr/test",
+      "label": "pr/tests",
       "allow_global_approval": False,
       "github_status_label": "testing validation",
     },
