@@ -1,16 +1,42 @@
-# Developer-local docs build
+# Building documentation locally
+
+## Building in an existing envoy development environment
+
+If you have an existing envoy development environment, you should have the necessary dependencies
+and requirements and be able to build the documentation directly.
 
 ```bash
 ./docs/build.sh
 ```
 
-The output can be found in `generated/docs`. By default configuration examples are going to be validated during build. 
+The output can be found in `generated/docs`. By default configuration examples are going to be validated during build.
 To disable validation, set `SPHINX_SKIP_CONFIG_VALIDATION` environment variable to `true`:
 
 ```bash
 SPHINX_SKIP_CONFIG_VALIDATION=true docs/build.sh
 ```
 
+## Using the Docker build container to build the documentation
+
+If you *do not* have an existing development environment, you may wish to use the Docker build
+image that is used in continuous integration.
+
+This can be done as follows:
+
+```
+./ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
+```
+
+To use this method you will need a minimum of 4-5GB of disk space available to accomodate the build image.
+
+# Creating a Pull Request with documentation changes
+
+When you create a Pull Request the documentation is rendered by CircleCI.
+
+This can be viewed by clicking "Details" in "ci/circleci: docs" check. From there click "ARTIFACTS", and then
+"generated/docs/index.html".
+
+You should be able to see your changes.
 
 # How the Envoy website and docs are updated
 
