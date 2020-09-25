@@ -47,6 +47,9 @@ def _repository_locations():
 
         if "project_url" not in location:
             _fail_missing_attribute("project_url", key)
+        s = location["project_url"]
+        if not s.startswith("https://") and not s.startswith("http://"):
+            fail("project_url must start with https:// or http://: " + s)
         mutable_location.pop("project_url")
 
         if "version" not in location:

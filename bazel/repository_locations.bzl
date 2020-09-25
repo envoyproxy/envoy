@@ -44,7 +44,7 @@ USE_CATEGORIES_WITH_CPE_OPTIONAL = ["build", "other", "test"]
 DEPENDENCY_REPOSITORIES_SPEC = dict(
     bazel_compdb = dict(
         project_name = "bazel-compilation-database",
-        project_desc = "clang JSON compilation database support for Bazel",
+        project_desc = "Clang JSON compilation database support for Bazel",
         project_url = "https://github.com/grailbio/bazel-compilation-database",
         version = "0.4.5",
         sha256 = "bcecfd622c4ef272fd4ba42726a52e140b961c4eac23025f18b346c968a8cfb4",
@@ -100,7 +100,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     ),
     boringssl = dict(
         project_name = "BoringSSL",
-        project_desc = "Minimal OSS fork",
+        project_desc = "Minimal OpenSSL fork",
         project_url = "https://github.com/google/boringssl",
         version = "597b810379e126ae05d32c1d94b1a9464385acd0",
         sha256 = "1ea42456c020daf0a9b0f9e8d8bc3a403c9314f4f54230c617257af996cd5fa6",
@@ -247,7 +247,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     ),
     com_github_grpc_grpc = dict(
         project_name = "gRPC",
-        project_desc = "Google gRPC C core library",
+        project_desc = "gRPC C core library",
         project_url = "https://grpc.io",
         # TODO(JimmyCYJ): Bump to release 1.27
         # This sha on grpc:v1.25.x branch is specifically chosen to fix gRPC STS call credential options.
@@ -261,7 +261,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     ),
     com_github_luajit_luajit = dict(
         project_name = "LuaJIT",
-        project_desc = "Just-In-Time Compiler for Lua",
+        project_desc = "Just-In-Time compiler for Lua",
         project_url = "https://luajit.org",
         version = "2.1.0-beta3",
         sha256 = "409f7fe570d3c16558e594421c47bdd130238323c9d6fd6c83dedd2aaeb082a8",
@@ -456,7 +456,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     ),
     com_github_twitter_common_lang = dict(
         project_name = "twitter.common.lang (Thrift)",
-        project_desc = "twitter.common python language and compatibility facilities.",
+        project_desc = "twitter.common Python language and compatibility facilities",
         project_url = "https://pypi.org/project/twitter.common.lang",
         version = "0.3.9",
         sha256 = "56d1d266fd4767941d11c27061a57bc1266a3342e551bde3780f9e9eb5ad0ed1",
@@ -467,7 +467,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     ),
     com_github_twitter_common_rpc = dict(
         project_name = "twitter.common.rpc (Thrift)",
-        project_desc = "twitter.common thrift helpers including finagle and ssl transports",
+        project_desc = "twitter.common Thrift helpers including Finagle and SSL transports",
         project_url = "https://pypi.org/project/twitter.common.rpc",
         version = "0.3.9",
         sha256 = "0792b63fb2fb32d970c2e9a409d3d00633190a22eb185145fe3d9067fdaa4514",
@@ -478,7 +478,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     ),
     com_github_twitter_common_finagle_thrift = dict(
         project_name = "twitter.common.finagle-thrift",
-        project_desc = "twitter.common thrift stubs for zipkin rpc tracing support in finagle",
+        project_desc = "twitter.common Thrift stubs for Zipkin RPC tracing support in Finagle",
         project_url = "https://pypi.org/project/twitter.common.finagle-thrift",
         version = "0.3.9",
         sha256 = "1e3a57d11f94f58745e6b83348ecd4fa74194618704f45444a15bc391fde497a",
@@ -594,7 +594,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     # This should be removed, see https://github.com/envoyproxy/envoy/issues/11816.
     com_github_curl = dict(
         project_name = "curl",
-        project_desc = "Library for transferring data with URLs",
+        project_desc = "Library for transferring data with URLs (OpenCensus and AWS X-Ray dependency)",
         project_url = "https://curl.haxx.se",
         version = "7.72.0",
         sha256 = "d4d5899a3868fbb6ae1856c3e55a32ce35913de3956d1973caccd37bd0174fa2",
@@ -619,7 +619,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     ),
     com_googlesource_quiche = dict(
         project_name = "QUICHE",
-        project_desc = "QUICHE (QUIC, Http/2, Etc) is Google‘s implementation of QUIC and related protocols",
+        project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://quiche.googlesource.com/quiche",
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/f555d99a084cdd086a349548c70fb558ac5847cf.tar.gz
         version = "f555d99a084cdd086a349548c70fb558ac5847cf",
@@ -642,9 +642,9 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         cpe = "N/A",
     ),
     com_google_cel_cpp = dict(
-        project_name = "Common Expression Language C++",
-        project_desc = "Common Expression Language C++",
-        project_url = "CEL C++ library",
+        project_name = "Common Expression Language (CEL) C++ library",
+        project_desc = "Common Expression Language (CEL) C++ library",
+        project_url = "https://opensource.google/projects/cel",
         version = "b9453a09b28a1531c4917e8792b3ea61f6b1a447",
         sha256 = "cad7d01139947d78e413d112cb8f7431fbb33cf66b0adf9c280824803fc2a72e",
         strip_prefix = "cel-cpp-{version}",
@@ -655,7 +655,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     ),
     com_github_google_flatbuffers = dict(
         project_name = "FlatBuffers",
-        project_desc = "Cross platform serialization library architected for maximum memory efficiency (used for Wasm)",
+        project_desc = "Cross platform serialization library architected for maximum memory efficiency (Wasm dependency)",
         project_url = "https://github.com/google/flatbuffers",
         version = "a83caf5910644ba1c421c002ef68e42f21c15f9f",
         sha256 = "b8efbc25721e76780752bad775a97c3f77a0250271e2db37fc747b20e8b0f24a",
@@ -694,7 +694,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     ),
     upb = dict(
         project_name = "upb",
-        project_desc = "A small protobuf implementation in C (used by gRPC)",
+        project_desc = "A small protobuf implementation in C (gRPC dependency)",
         project_url = "https://github.com/protocolbuffers/upb",
         version = "8a3ae1ef3e3e3f26b45dec735c5776737fc7247f",
         sha256 = "e9f281c56ab1eb1f97a80ca8a83bb7ef73d230eabb8591f83876f4e7b85d9b47",
