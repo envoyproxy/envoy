@@ -370,7 +370,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/08/10  12275    37061       38000   Re-organize tls histogram maps to improve continuity.
   // 2020/08/11  12202    37061       38500   router: add new retry back-off strategy
   // 2020/09/11  12973                38993   upstream: predictive prefetch
-  // 2020/09/23                       39244   switch to google tcmalloc
+  // 2020/09/23  13251                39244   switch to google tcmalloc
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
