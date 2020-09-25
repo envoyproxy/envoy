@@ -41,8 +41,15 @@ def _repository_locations():
             _fail_missing_attribute("project_name", key)
         mutable_location.pop("project_name")
 
+        if "project_desc" not in location:
+            _fail_missing_attribute("project_desc", key)
+        mutable_location.pop("project_desc")
+
         if "project_url" not in location:
             _fail_missing_attribute("project_url", key)
+        s = location["project_url"]
+        if not s.startswith("https://") and not s.startswith("http://"):
+            fail("project_url must start with https:// or http://: " + s)
         mutable_location.pop("project_url")
 
         if "version" not in location:
@@ -53,7 +60,21 @@ def _repository_locations():
             _fail_missing_attribute("use_category", key)
         mutable_location.pop("use_category")
 
+        if "last_updated" not in location:
+            _fail_missing_attribute("last_updated", key)
+        s = location["last_updated"]
+
+        # Starlark doesn't have regexes.
+        if len(s) != 10 or s[4] != "-" or s[7] != "-":
+            fail("last_updated must match YYYY-DD-MM: " + s)
+        mutable_location.pop("last_updated")
+
         if "cpe" in location:
+            s = location["cpe"]
+
+            # Starlark doesn't have regexes.
+            if s != "N/A" and (not s.startswith("cpe:2.3:a:") or not s.endswith(":*") and len(s.split(":")) != 6):
+                fail("CPE must match cpe:2.3:a:<facet>:<facet>:*: " + s)
             mutable_location.pop("cpe")
         elif not [category for category in USE_CATEGORIES_WITH_CPE_OPTIONAL if category in location["use_category"]]:
             _fail_missing_attribute("cpe", key)
