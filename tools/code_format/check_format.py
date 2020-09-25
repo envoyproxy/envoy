@@ -763,15 +763,12 @@ class FormatChecker:
           "Lua API (bad light userdata pointer) on ARM64 architecture. See " +
           "https://github.com/LuaJIT/LuaJIT/issues/450#issuecomment-433659873 for details.")
 
-    #Fix for https://github.com/envoyproxy/envoy/issues/10535
     if file_path.endswith(PROTO_SUFFIX):
       exclude_path = ['v1', 'v2', 'generated_api_shadow']
       result = PROTO_VALIDATION_STRING.search(line)
       if result is not None:
         if not any(x in file_path for x in exclude_path):
-          reportError(
-              "Proto validation Error in file: %s. 'min_bytes' is DEPRECATED, Use 'min_len'." %
-              file_path)
+          reportError("min_bytes is DEPRECATED, Use min_len.")
 
   def checkBuildLine(self, line, file_path, reportError):
     if "@bazel_tools" in line and not (self.isStarlarkFile(file_path) or
