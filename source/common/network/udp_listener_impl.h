@@ -36,6 +36,7 @@ public:
   const Address::InstanceConstSharedPtr& localAddress() const override;
   Api::IoCallUint64Result send(const UdpSendData& data) override;
   Api::IoCallUint64Result flush() override;
+  void activateRead() override;
 
   void processPacket(Address::InstanceConstSharedPtr local_address,
                      Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
@@ -59,6 +60,20 @@ private:
 
   TimeSource& time_source_;
   Event::FileEventPtr file_event_;
+};
+
+class UdpListenerWorkerRouterImpl : public UdpListenerWorkerRouter {
+public:
+  UdpListenerWorkerRouterImpl(uint32_t concurrency);
+
+  // UdpListenerWorkerRouter
+  void registerWorkerForListener(UdpListenerCallbacks& listener) override;
+  void unregisterWorkerForListener(UdpListenerCallbacks& listener) override;
+  void deliver(uint32_t dest_worker_index, UdpRecvData&& data) override;
+
+private:
+  absl::Mutex mutex_;
+  std::vector<UdpListenerCallbacks*> workers_ ABSL_GUARDED_BY(mutex_);
 };
 
 } // namespace Network

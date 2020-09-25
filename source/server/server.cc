@@ -72,7 +72,7 @@ InstanceImpl::InstanceImpl(
                                          : absl::nullopt)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
-      handler_(new ConnectionHandlerImpl(*dispatcher_)),
+      handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
@@ -216,6 +216,13 @@ void InstanceImpl::updateServerStats() {
                                         parent_stats.parent_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
+
+  auto secs_until_ocsp_response_expires =
+      sslContextManager().secondsUntilFirstOcspResponseExpires();
+  if (secs_until_ocsp_response_expires) {
+    server_stats_->seconds_until_first_ocsp_response_expiring_.set(
+        secs_until_ocsp_response_expires.value());
+  }
   server_stats_->state_.set(
       enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
   server_stats_->stats_recent_lookups_.set(
@@ -517,8 +524,10 @@ void InstanceImpl::initialize(const Options& options,
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  guard_dog_ =
-      std::make_unique<Server::GuardDogImpl>(stats_store_, config_.watchdogConfig(), *api_);
+  main_thread_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
+      stats_store_, config_.mainThreadWatchdogConfig(), *api_, "main_thread");
+  worker_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
+      stats_store_, config_.workerWatchdogConfig(), *api_, "workers");
 }
 
 void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
@@ -556,7 +565,7 @@ void InstanceImpl::onRuntimeReady() {
 }
 
 void InstanceImpl::startWorkers() {
-  listener_manager_->startWorkers(*guard_dog_);
+  listener_manager_->startWorkers(*worker_guard_dog_);
   initialization_timer_->complete();
   // Update server stats as soon as initialization is done.
   updateServerStats();
@@ -666,13 +675,13 @@ void InstanceImpl::run() {
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
-  auto watchdog =
-      guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "main_thread");
+  auto watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
+                                                         "main_thread");
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");
-  guard_dog_->stopWatching(watchdog);
+  main_thread_guard_dog_->stopWatching(watchdog);
   watchdog.reset();
 
   terminate();

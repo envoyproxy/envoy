@@ -349,7 +349,8 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
 
   // TODO(mattklein123): Avoid double copy here.
   if (response->body() != nullptr) {
-    lua_pushstring(coroutine_.luaState(), response->bodyAsString().c_str());
+    lua_pushlstring(coroutine_.luaState(), response->bodyAsString().data(),
+                    response->body()->length());
   } else {
     lua_pushnil(coroutine_.luaState());
   }
@@ -427,8 +428,9 @@ int StreamHandleWrapper::luaBody(lua_State* state) {
       if (body_wrapper_.get() != nullptr) {
         body_wrapper_.pushStack();
       } else {
-        body_wrapper_.reset(
-            Filters::Common::Lua::BufferWrapper::create(state, *callbacks_.bufferedBody()), true);
+        body_wrapper_.reset(Filters::Common::Lua::BufferWrapper::create(
+                                state, const_cast<Buffer::Instance&>(*callbacks_.bufferedBody())),
+                            true);
       }
       return 1;
     }
@@ -761,8 +763,8 @@ void Filter::scriptLog(spdlog::level::level_enum level, const char* message) {
 
 void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                                        lua_State*) {
-  callbacks_->streamInfo().setResponseCodeDetails(HttpResponseCodeDetails::get().LuaResponse);
-  callbacks_->encodeHeaders(std::move(headers), body == nullptr);
+  callbacks_->encodeHeaders(std::move(headers), body == nullptr,
+                            HttpResponseCodeDetails::get().LuaResponse);
   if (body && !parent_.destroyed_) {
     callbacks_->encodeData(*body, true);
   }

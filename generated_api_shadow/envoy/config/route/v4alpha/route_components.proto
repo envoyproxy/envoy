@@ -786,7 +786,7 @@ message RouteAction {
     // <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_, use that value as the
     // *max_stream_duration*, but limit the applied timeout to the maximum value specified here.
     // If set to 0, the `grpc-timeout` header is used without modification.
-    google.protobuf.Duration grpc_max_timeout = 2;
+    google.protobuf.Duration grpc_timeout_header_max = 2;
 
     // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by
     // subtracting the provided duration from the header. This is useful for allowing Envoy to set
@@ -794,7 +794,7 @@ message RouteAction {
     // makes it more likely that Envoy will handle the timeout instead of having the call canceled
     // by the client. If, after applying the offset, the resulting timeout is zero or negative,
     // the stream will timeout immediately.
-    google.protobuf.Duration grpc_timeout_offset = 3;
+    google.protobuf.Duration grpc_timeout_header_offset = 3;
   }
 
   reserved 12, 18, 19, 16, 22, 21, 10;
@@ -1005,7 +1005,9 @@ message RouteAction {
   // limits. By default, if the route configured rate limits, the virtual host
   // :ref:`rate_limits <envoy_api_field_config.route.v4alpha.VirtualHost.rate_limits>` are not applied to the
   // request.
-  google.protobuf.BoolValue include_vh_rate_limits = 14;
+  //
+  // This field is deprecated. Please use :ref:`vh_rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits>`
+  google.protobuf.BoolValue hidden_envoy_deprecated_include_vh_rate_limits = 14 [deprecated = true];
 
   // Specifies a list of hash policies to use for ring hash load balancing. Each
   // hash policy is evaluated individually and the combined result is used to

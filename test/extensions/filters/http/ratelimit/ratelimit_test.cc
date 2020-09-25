@@ -10,6 +10,7 @@
 #include "common/http/headers.h"
 
 #include "extensions/filters/http/ratelimit/ratelimit.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/filters/common/ratelimit/mocks.h"
 #include "test/extensions/filters/common/ratelimit/utils.h"
@@ -106,6 +107,7 @@ public:
   NiceMock<Router::MockRateLimitPolicyEntry> route_rate_limit_;
   NiceMock<Router::MockRateLimitPolicyEntry> vh_rate_limit_;
   std::vector<RateLimit::Descriptor> descriptor_{{{{"descriptor_key", "descriptor_value"}}}};
+  std::vector<RateLimit::Descriptor> descriptor_two_{{{{"key", "value"}}}};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Http::ContextImpl http_context_;
 };
@@ -483,7 +485,7 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
                     ->statsScope()
                     .counterFromStatName(ratelimit_failure_mode_allowed_)
                     .value());
-  EXPECT_EQ("rate_limiter_error", filter_callbacks_.details_);
+  EXPECT_EQ("rate_limiter_error", filter_callbacks_.details());
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponse) {
@@ -523,7 +525,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
   EXPECT_EQ(
       1U,
       filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_429_).value());
-  EXPECT_EQ("request_rate_limited", filter_callbacks_.details_);
+  EXPECT_EQ("request_rate_limited", filter_callbacks_.details());
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {
@@ -865,13 +867,16 @@ TEST_F(HttpRateLimitFilterTest, ExternalRequestType) {
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
 }
 
-TEST_F(HttpRateLimitFilterTest, ExcludeVirtualHost) {
+TEST_F(HttpRateLimitFilterTest, DEPRECATED_FEATURE_TEST(ExcludeVirtualHost)) {
   std::string external_filter_config = R"EOF(
   {
     "domain": "foo"
   }
   )EOF";
   SetUpTest(external_filter_config);
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute vh_settings;
+  vh_settings.clear_vh_rate_limits();
+  FilterConfigPerRoute per_route_config_(vh_settings);
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
@@ -880,6 +885,14 @@ TEST_F(HttpRateLimitFilterTest, ExcludeVirtualHost) {
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_,
+              perFilterConfig(HttpFilterNames::get().RateLimit))
+      .WillOnce(Return(&per_route_config_));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
+      .WillOnce(Return(false));
+
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0))
       .Times(0);
@@ -906,6 +919,293 @@ TEST_F(HttpRateLimitFilterTest, ExcludeVirtualHost) {
 
   EXPECT_EQ(
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
+}
+
+// Tests that the route rate limit is used when VhRateLimitsOptions::OVERRIDE and route rate limit
+// is set
+TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) {
+  SetUpTest(filter_config_);
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
+  settings.set_vh_rate_limits(
+      envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OVERRIDE);
+  FilterConfigPerRoute per_route_config_(settings);
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _, _))
+      .WillOnce(SetArgReferee<1>(descriptor_));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
+      .WillOnce(Return(false));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_,
+              perFilterConfig(HttpFilterNames::get().RateLimit))
+      .WillOnce(Return(&per_route_config_));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
+      .WillOnce(Return(false));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+              getApplicableRateLimit(0))
+      .Times(0);
+
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"descriptor_key", "descriptor_value"}}}}),
+                              _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr);
+          })));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  EXPECT_EQ(
+      1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
+}
+
+// Tests that the virtual host rate limit is used when VhRateLimitsOptions::OVERRIDE is set and
+// route rate limit is empty
+TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) {
+  SetUpTest(filter_config_);
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
+  settings.set_vh_rate_limits(
+      envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OVERRIDE);
+  FilterConfigPerRoute per_route_config_(settings);
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
+      .WillOnce(Return(false));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_,
+              perFilterConfig(HttpFilterNames::get().RateLimit))
+      .WillOnce(Return(&per_route_config_));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+              getApplicableRateLimit(0))
+      .Times(1);
+
+  EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _, _, _))
+      .WillOnce(SetArgReferee<1>(descriptor_));
+
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"descriptor_key", "descriptor_value"}}}}),
+                              _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr);
+          })));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  EXPECT_EQ(
+      1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
+}
+
+// Tests that the virtual host rate limit is used when VhRateLimitsOptions::INCLUDE is set and route
+// rate limit is empty
+TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) {
+  SetUpTest(filter_config_);
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
+  settings.set_vh_rate_limits(
+      envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE);
+  FilterConfigPerRoute per_route_config_(settings);
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
+      .WillOnce(Return(false));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_,
+              perFilterConfig(HttpFilterNames::get().RateLimit))
+      .WillOnce(Return(&per_route_config_));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+              getApplicableRateLimit(0))
+      .Times(1);
+
+  EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _, _, _))
+      .WillOnce(SetArgReferee<1>(descriptor_two_));
+
+  EXPECT_CALL(*client_,
+              limit(_, "foo",
+                    testing::ContainerEq(std::vector<RateLimit::Descriptor>{{{{"key", "value"}}}}),
+                    _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr);
+          })));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  EXPECT_EQ(
+      1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
+}
+
+// Tests that the virtual host rate limit is used when VhRateLimitsOptions::INCLUDE and route rate
+// limit is set
+TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitSet) {
+  SetUpTest(filter_config_);
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
+  settings.set_vh_rate_limits(
+      envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE);
+  FilterConfigPerRoute per_route_config_(settings);
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _, _))
+      .WillOnce(SetArgReferee<1>(descriptor_));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
+      .WillOnce(Return(false));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_,
+              perFilterConfig(HttpFilterNames::get().RateLimit))
+      .WillOnce(Return(&per_route_config_));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+              getApplicableRateLimit(0))
+      .Times(1);
+
+  EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _, _, _))
+      .WillOnce(SetArgReferee<1>(descriptor_two_));
+
+  EXPECT_CALL(*client_,
+              limit(_, "foo",
+                    testing::ContainerEq(std::vector<RateLimit::Descriptor>{{{{"key", "value"}}}}),
+                    _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr);
+          })));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  EXPECT_EQ(
+      1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
+}
+
+// Tests that the route rate limit is used when VhRateLimitsOptions::IGNORE and route rate limit is
+// set
+TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
+  SetUpTest(filter_config_);
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
+  settings.set_vh_rate_limits(
+      envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::IGNORE);
+  FilterConfigPerRoute per_route_config_(settings);
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _, _))
+      .WillOnce(SetArgReferee<1>(descriptor_));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
+      .WillOnce(Return(false));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_,
+              perFilterConfig(HttpFilterNames::get().RateLimit))
+      .WillOnce(Return(&per_route_config_));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+              getApplicableRateLimit(0))
+      .Times(0);
+
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"descriptor_key", "descriptor_value"}}}}),
+                              _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr);
+          })));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  EXPECT_EQ(
+      1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
+}
+
+// Tests that no rate limit is used when VhRateLimitsOptions::IGNORE is set and route rate limit
+// empty
+TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
+  SetUpTest(filter_config_);
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute settings;
+  settings.set_vh_rate_limits(
+      envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::IGNORE);
+  FilterConfigPerRoute per_route_config_(settings);
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
+      .WillOnce(Return(false));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_,
+              perFilterConfig(HttpFilterNames::get().RateLimit))
+      .WillOnce(Return(&per_route_config_));
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+              getApplicableRateLimit(0))
+      .Times(0);
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  EXPECT_EQ(
+      0, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
 }
 
 TEST_F(HttpRateLimitFilterTest, ConfigValueTest) {

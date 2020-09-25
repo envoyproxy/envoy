@@ -24,10 +24,14 @@ BSON
 BPF
 CAS
 CB
+CDN
 CDS
 CEL
 DSR
+HEXDIG
+HEXDIGIT
 LTT
+OWS
 TIDs
 ceil
 CHACHA
@@ -217,6 +221,7 @@ Nilsson
 Nonhashable
 Oauth
 OCSP
+OID
 OK
 OOM
 OOMs
@@ -468,6 +473,7 @@ canonicalizing
 cardinality
 casted
 charset
+checkin
 checksum
 chrono
 chroot
@@ -862,6 +868,7 @@ pausable
 pcall
 pcap
 pclose
+performant
 pfctl
 pipelined
 pipelining
@@ -982,6 +989,7 @@ resolvers
 responder
 restarter
 resync
+retransmitting
 retriable
 retriggers
 revalidated
@@ -1022,6 +1030,7 @@ setsockopt
 sig
 sigaction
 sigactions
+siginfo
 signalstack
 siloed
 sim

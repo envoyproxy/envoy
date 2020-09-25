@@ -1019,7 +1019,7 @@ envoy_cc_test(
     tags = ["flaky_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
-        "//source/extensions/resource_monitors/injected_resource:config",
+        "//test/common/config:dummy_config_proto_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
@@ -1240,7 +1240,6 @@ envoy_cc_test(
         "uds_integration_test.cc",
         "uds_integration_test.h",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/event:dispatcher_includes",

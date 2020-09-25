@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package test.common.upstream;
+
+import "validate/validate.proto";
+import "test/fuzz/common.proto";
+import "envoy/config/core/v3/health_check.proto";
+import "google/protobuf/empty.proto";
+
+message HttpRespond { //TODO: Split this across headers, body, and trailers?
+  test.fuzz.Headers headers = 1;
+  uint64 status = 2;
+}
+
+message Respond {
+  HttpRespond http_respond = 1 [(validate.rules).message.required = true];
+}
+
+enum RaiseEvent {
+  CONNECTED = 0;
+  REMOTE_CLOSE = 1;
+  LOCAL_CLOSE = 2;
+}
+
+message Action {
+  oneof action_selector {
+    option (validate.required) = true;
+    Respond respond = 1;
+    google.protobuf.Empty trigger_interval_timer = 2;
+    //TODO: respondBody, respondTrailers
+    google.protobuf.Empty trigger_timeout_timer = 3;
+    RaiseEvent raise_event = 4;
+  }
+}
+
+message HealthCheckTestCase {
+  envoy.config.core.v3.HealthCheck health_check_config = 1
+      [(validate.rules).message.required = true];
+  repeated Action actions =
+      2; //TODO: Timeouts might eventually come up from this becoming too big. If so, can simply add a check in replay loop.
+  bool http_verify_cluster = 3; //Determines if verify cluster setting is on
+  bool start_failed = 4;
+}

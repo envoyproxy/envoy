@@ -8,6 +8,8 @@
 #pragma GCC diagnostic ignored "-Wtype-limits"
 
 #include "quiche/quic/core/http/quic_server_session_base.h"
+#include "quiche/quic/core/quic_crypto_server_stream.h"
+#include "quiche/quic/core/tls_server_handshaker.h"
 
 #pragma GCC diagnostic pop
 
@@ -15,7 +17,6 @@
 
 #include "extensions/quic_listeners/quiche/quic_filter_manager_connection_impl.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_crypto_server_stream.h"
 
 namespace Envoy {
 namespace Quic {
@@ -52,7 +53,7 @@ public:
                           quic::ConnectionCloseSource source) override;
   void Initialize() override;
   void OnCanWrite() override;
-  void OnOneRttKeysAvailable() override;
+  void OnTlsHandshakeComplete() override;
   // quic::QuicSpdySession
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
 
