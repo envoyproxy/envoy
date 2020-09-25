@@ -61,6 +61,7 @@ public:
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString CacheControl{"cache-control"};
+  const LowerCaseString CdnLoop{"cdn-loop"};
   const LowerCaseString ContentEncoding{"content-encoding"};
   const LowerCaseString Etag{"etag"};
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
