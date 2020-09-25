@@ -9,8 +9,10 @@ and requirements and be able to build the documentation directly.
 ./docs/build.sh
 ```
 
-The output can be found in `generated/docs`. By default configuration examples are going to be validated during build.
-To disable validation, set `SPHINX_SKIP_CONFIG_VALIDATION` environment variable to `true`:
+The output can be found in `generated/docs`.
+
+By default configuration examples are going to be validated during build. To disable validation,
+set `SPHINX_SKIP_CONFIG_VALIDATION` environment variable to `true`:
 
 ```bash
 SPHINX_SKIP_CONFIG_VALIDATION=true docs/build.sh
@@ -27,7 +29,7 @@ This can be done as follows:
 ./ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
 ```
 
-To use this method you will need a minimum of 4-5GB of disk space available to accomodate the build image.
+To use this method you will need a minimum of 4-5GB of disk space available to accommodate the build image.
 
 # Creating a Pull Request with documentation changes
 
