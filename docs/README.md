@@ -35,7 +35,7 @@ To use this method you will need a minimum of 4-5GB of disk space available to a
 
 When you create a Pull Request the documentation is rendered by CircleCI.
 
-This can be viewed by clicking "Details" in "ci/circleci: docs" check. From there click "ARTIFACTS", and then
+This can be viewed by clicking "Details" in the "ci/circleci: docs" check. From there click "ARTIFACTS", and then
 "generated/docs/index.html".
 
 You should be able to see your changes.
