@@ -61,7 +61,7 @@ TEST(IoSocketHandleImplTest, TestIoSocketError) {
   EXPECT_EQ(errorDetails(123), error9.getErrorDetails());
 }
 
-#if defined(__linux__)
+#ifdef TCP_INFO
 
 TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsEmptyOptionalIfGetSocketFails) {
   NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
@@ -91,7 +91,7 @@ TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
 
 #endif
 
-#if !defined(__linux__)
+#ifndef TCP_INFO
 
 TEST(IoSocketHandleImpl, LastRoundTripTimeAlwaysReturnsEmptyOptional) {
   IoSocketHandleImpl io_handle;
