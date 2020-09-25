@@ -24,7 +24,7 @@ use(
     },
     {
       "owner": "envoyproxy/maintainers!",
-      "do_not_tag": True;
+      "do_not_tag": True,
       "path": "api/|source/",
       "exclude_path": "docs/root/version_history/current.rst",
       "label": "pr-check/release-notes",
@@ -33,7 +33,7 @@ use(
     },
     {
       "owner": "envoyproxy/maintainers!",
-      "do_not_tag": True;
+      "do_not_tag": True,
       "path": "source/",
       "exclude_path": "docs/root/",
       "label": "pr-check/docs",
@@ -42,7 +42,7 @@ use(
     },
     {
       "owner": "envoyproxy/maintainers!",
-      "do_not_tag": True;
+      "do_not_tag": True,
       "path": "source/",
       "exclude_path": "test/",
       "label": "pr-check/test",
