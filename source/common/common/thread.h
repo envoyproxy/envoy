@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cassert>
 #include <cstring>
 #include <functional>
 #include <memory>
@@ -19,12 +20,24 @@ namespace Thread {
  */
 class MutexBasicLockable : public BasicLockable {
 public:
+#ifndef NDEBBUG
+  ~MutexBasicLockable() override { destroyed_ = true; }
+#endif
+
   // BasicLockable
-  void lock() ABSL_EXCLUSIVE_LOCK_FUNCTION() override { mutex_.Lock(); }
+  void lock() ABSL_EXCLUSIVE_LOCK_FUNCTION() override {
+#ifndef NDEBUG
+    assert(!destroyed_);
+#endif
+    mutex_.Lock();
+  }
   bool tryLock() ABSL_EXCLUSIVE_TRYLOCK_FUNCTION(true) override { return mutex_.TryLock(); }
   void unlock() ABSL_UNLOCK_FUNCTION() override { mutex_.Unlock(); }
 
 private:
+#ifndef NDEBUG
+  bool destroyed_{false};
+#endif
   friend class CondVar;
   absl::Mutex mutex_;
 };
