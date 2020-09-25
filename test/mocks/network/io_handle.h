@@ -24,6 +24,7 @@ public:
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, readv,
               (uint64_t max_length, Buffer::RawSlice* slices, uint64_t num_slice));
+  MOCK_METHOD(Api::IoCallUint64Result, read, (Buffer::Instance & buffer, uint64_t max_length));
   MOCK_METHOD(Api::IoCallUint64Result, writev,
               (const Buffer::RawSlice* slices, uint64_t num_slice));
   MOCK_METHOD(Api::IoCallUint64Result, sendmsg,

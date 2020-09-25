@@ -194,15 +194,6 @@ public:
   virtual void move(Instance& rhs, uint64_t length) PURE;
 
   /**
-   * Read from a file descriptor directly into the buffer.
-   * @param io_handle supplies the io handle to read from.
-   * @param max_length supplies the maximum length to read.
-   * @return a IoCallUint64Result with err_ = nullptr and rc_ = the number of bytes
-   * read if successful, or err_ = some IoError for failure. If call failed, rc_ shouldn't be used.
-   */
-  virtual Api::IoCallUint64Result read(Network::IoHandle& io_handle, uint64_t max_length) PURE;
-
-  /**
    * Reserve space in the buffer.
    * @param length supplies the amount of space to reserve.
    * @param iovecs supplies the slices to fill with reserved memory.
