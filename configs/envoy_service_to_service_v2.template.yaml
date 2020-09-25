@@ -456,8 +456,12 @@ static_resources:
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
+    http2_protocol_options:
+      connection_keepalive:
+        interval: 1s
+        timeout: 1s
     load_assignment:
-      cluster_name: local_service_grpc
+      cluster_name: rds
       endpoints:
       - lb_endpoints:
         - endpoint:

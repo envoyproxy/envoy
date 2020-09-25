@@ -99,7 +99,10 @@ This example shows how to configure secrets fetched from remote SDS servers:
 
     clusters:
       - name: sds_server_mtls
-        http2_protocol_options: {}
+        http2_protocol_options:
+          connection_keepalive:
+            interval: 1s
+            timeout: 1s
         load_assignment:
           cluster_name: sds_server_mtls
           endpoints:

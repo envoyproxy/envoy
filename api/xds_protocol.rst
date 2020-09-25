@@ -695,12 +695,12 @@ An example minimal ``bootstrap.yaml`` fragment for ADS configuration is:
             address: <ADS management server IP address>
             port_value: <ADS management server port>
         lb_policy: ROUND_ROBIN
-        http2_protocol_options: {}
-        upstream_connection_options:
-          # configure a TCP keep-alive to detect and reconnect to the admin
-          # server in the event of a TCP socket disconnection
-          tcp_keepalive:
-            ...
+        http2_protocol_options:
+          # Configure an HTTP/2 keep-alive to detect connection issues and reconnect
+          # to the admin server if the connection is no longer responsive.
+          connection_keepalive:
+            interval: 1s
+            timeout: 1s
     admin:
       ...
 
