@@ -12,6 +12,7 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.tracers.lightstep",
     "envoy.tracers.datadog",
     "envoy.tracers.opencensus",
+    "envoy.watchdog.abort_action",
 ]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
@@ -95,10 +96,6 @@ _default_envoy_build_config = repository_rule(
 # Python dependencies.
 def _python_deps():
     # TODO(htuch): convert these to pip3_import.
-    _repository_impl(
-        name = "com_github_apache_thrift",
-        build_file = "@envoy//bazel/external:apache_thrift.BUILD",
-    )
     _repository_impl(
         name = "com_github_twitter_common_lang",
         build_file = "@envoy//bazel/external:twitter_common_lang.BUILD",
@@ -678,8 +675,6 @@ def _com_github_curl():
         build_file_content = BUILD_ALL_CONTENT + """
 cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
 """,
-        patches = ["@envoy//bazel/foreign_cc:curl-revert-cmake-minreqver.patch"],
-        patch_args = ["-p1"],
         **location
     )
     native.bind(

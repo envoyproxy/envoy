@@ -261,7 +261,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
       enable_dispatcher_stats_(enable_dispatcher_stats) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
-        worker_factory.createWorker(server.overloadManager(), absl::StrCat("worker_", i)));
+        worker_factory.createWorker(i, server.overloadManager(), absl::StrCat("worker_", i)));
   }
 }
 
@@ -338,8 +338,8 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
   if (config.address().has_envoy_internal_address() || config.has_internal_listener()) {
     if (!config.has_internal_listener() || !config.has_internal_listener()) {
       ENVOY_LOG(debug,
-                "listener {} has envoy internal address {}. Internal address cannot be used by "
-                "listener yet",
+                "listener {} has envoy internal address {}. This address must be used with "
+                "internal listener.",
                 config.name(), config.address().envoy_internal_address().DebugString());
       return false;
     }

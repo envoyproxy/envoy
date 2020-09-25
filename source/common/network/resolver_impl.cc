@@ -55,14 +55,15 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Addres
         kServerListenerName:
       return std::make_shared<EnvoyInternalInstance>(
           address.envoy_internal_address().server_listener_name());
-    default:
-      throw EnvoyException("Internal address must be a server listener name: " +
-                           address.DebugString());
+    case envoy::config::core::v3::EnvoyInternalAddress::AddressNameSpecifierCase::
+        ADDRESS_NAME_SPECIFIER_NOT_SET:
+      break;
     }
-  default:
-    throw EnvoyException("Address must be a socket, pipe or envoy internal: " +
-                         address.DebugString());
+    break;
+  case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
+    break;
   }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 InstanceConstSharedPtr

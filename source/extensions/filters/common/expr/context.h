@@ -37,12 +37,16 @@ constexpr absl::string_view Protocol = "protocol";
 // Symbols for traversing the response properties
 constexpr absl::string_view Response = "response";
 constexpr absl::string_view Code = "code";
+constexpr absl::string_view CodeDetails = "code_details";
 constexpr absl::string_view Trailers = "trailers";
 constexpr absl::string_view Flags = "flags";
 constexpr absl::string_view GrpcStatus = "grpc_status";
 
 // Per-request or per-connection metadata
 constexpr absl::string_view Metadata = "metadata";
+
+// Per-request or per-connection filter state
+constexpr absl::string_view FilterState = "filter_state";
 
 // Connection properties
 constexpr absl::string_view Connection = "connection";
@@ -100,6 +104,9 @@ private:
   const T* value_;
 };
 
+// Wrapper for accessing properties from internal data structures.
+// Note that CEL assumes no ownership of the underlying data, so temporary
+// data must be arena-allocated.
 class BaseWrapper : public google::api::expr::runtime::CelMap,
                     public google::api::expr::runtime::CelValueProducer {
 public:
@@ -108,7 +115,14 @@ public:
   const google::api::expr::runtime::CelList* ListKeys() const override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  CelValue Produce(ProtobufWkt::Arena*) override { return CelValue::CreateMap(this); }
+  CelValue Produce(ProtobufWkt::Arena* arena) override {
+    // Producer is unique per evaluation arena since activation is re-created.
+    arena_ = arena;
+    return CelValue::CreateMap(this);
+  }
+
+protected:
+  ProtobufWkt::Arena* arena_;
 };
 
 class RequestWrapper : public BaseWrapper {
@@ -172,6 +186,15 @@ public:
 
 private:
   const envoy::config::core::v3::Metadata& metadata_;
+};
+
+class FilterStateWrapper : public BaseWrapper {
+public:
+  FilterStateWrapper(const StreamInfo::FilterState& filter_state) : filter_state_(filter_state) {}
+  absl::optional<CelValue> operator[](CelValue key) const override;
+
+private:
+  const StreamInfo::FilterState& filter_state_;
 };
 
 } // namespace Expr

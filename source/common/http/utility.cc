@@ -318,7 +318,7 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
     if (header.key() == Http::Headers::get().Cookie.get()) {
 
       // Split the cookie header into individual cookies.
-      for (const auto s : StringUtil::splitToken(header.value().getStringView(), ";")) {
+      for (const auto& s : StringUtil::splitToken(header.value().getStringView(), ";")) {
         // Find the key part of the cookie (i.e. the name of the cookie).
         size_t first_non_space = s.find_first_not_of(" ");
         size_t equals_index = s.find('=');
@@ -435,11 +435,16 @@ Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions&
 
 void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
                              const LocalReplyData& local_reply_data) {
+  absl::string_view details;
+  if (callbacks.streamInfo().responseCodeDetails().has_value()) {
+    details = callbacks.streamInfo().responseCodeDetails().value();
+  };
+
   sendLocalReply(
       is_reset,
       Utility::EncodeFunctions{nullptr, nullptr,
                                [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-                                 callbacks.encodeHeaders(std::move(headers), end_stream);
+                                 callbacks.encodeHeaders(std::move(headers), end_stream, details);
                                },
                                [&](Buffer::Instance& data, bool end_stream) -> void {
                                  callbacks.encodeData(data, end_stream);
@@ -723,6 +728,14 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
     host = uri.substr(host_pos, path_pos - host_pos);
     path = uri.substr(path_pos);
   }
+}
+
+std::string Utility::localPathFromFilePath(const absl::string_view& file_path) {
+  if (file_path.size() >= 3 && file_path[1] == ':' && file_path[2] == '/' &&
+      std::isalpha(file_path[0])) {
+    return std::string(file_path);
+  }
+  return absl::StrCat("/", file_path);
 }
 
 RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri) {

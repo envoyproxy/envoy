@@ -331,6 +331,8 @@ TEST(InteralInstanceTest, Basic) {
   EXPECT_EQ(nullptr, address.ip());
   EXPECT_EQ(nullptr, address.pipe());
   EXPECT_NE(nullptr, address.envoyInternalAddress());
+  EXPECT_EQ(nullptr, address.sockAddr());
+  EXPECT_EQ(static_cast<decltype(address.sockAddrLen())>(0), address.sockAddrLen());
 }
 
 #ifndef WIN32

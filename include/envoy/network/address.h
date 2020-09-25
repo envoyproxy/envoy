@@ -102,22 +102,25 @@ public:
 };
 
 /**
- * Interface for a generic Pipe address
+ * Interface for a generic Pipe address.
  */
 class Pipe {
 public:
   virtual ~Pipe() = default;
   /**
-   * @return abstract namespace flag
+   * @return abstract namespace flag.
    */
   virtual bool abstractNamespace() const PURE;
 
   /**
-   * @return pipe mode
+   * @return pipe mode.
    */
   virtual mode_t mode() const PURE;
 };
 
+/**
+ * Interface for a generic internal address.
+ */
 class EnvoyInternalAddress {
 public:
   virtual ~EnvoyInternalAddress() = default;
@@ -184,12 +187,13 @@ public:
   virtual const EnvoyInternalAddress* envoyInternalAddress() const PURE;
 
   /**
-   * @return the underlying structure wherein the address is stored
+   * @return the underlying structure wherein the address is stored. Return nullptr if the address
+   * type is internal address.
    */
   virtual const sockaddr* sockAddr() const PURE;
 
   /**
-   * @return length of the address container
+   * @return length of the address container.
    */
   virtual socklen_t sockAddrLen() const PURE;
 
@@ -199,7 +203,7 @@ public:
   virtual Type type() const PURE;
 
   /**
-   * @return SocketInterface to be used with the address
+   * @return SocketInterface to be used with the address.
    */
   virtual const Network::SocketInterface& socketInterface() const PURE;
 };

@@ -14,12 +14,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
 
-struct RcDetailsValues {
-  // The rbac filter rejected the request
-  const std::string RbacAccessDenied = "rbac_access_denied";
-};
-using RcDetails = ConstSingleton<RcDetailsValues>;
-
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope)
@@ -112,18 +106,18 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
       config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine != nullptr) {
     std::string effective_policy_id;
-
-    if (engine->handleAction(*callbacks_->connection(), headers, callbacks_->streamInfo(),
-                             &effective_policy_id)) {
-      ENVOY_LOG(debug, "enforced allowed, matched policy {}",
-                effective_policy_id.empty() ? "none" : effective_policy_id);
+    bool allowed = engine->handleAction(*callbacks_->connection(), headers,
+                                        callbacks_->streamInfo(), &effective_policy_id);
+    const std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
+    if (allowed) {
+      ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
       config_->stats().allowed_.inc();
       return Http::FilterHeadersStatus::Continue;
     } else {
-      ENVOY_LOG(debug, "enforced denied, matched policy {}",
-                effective_policy_id.empty() ? "none" : effective_policy_id);
+      ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
       callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr,
-                                 absl::nullopt, RcDetails::get().RbacAccessDenied);
+                                 absl::nullopt,
+                                 Filters::Common::RBAC::responseDetail(log_policy_id));
       config_->stats().denied_.inc();
       return Http::FilterHeadersStatus::StopIteration;
     }

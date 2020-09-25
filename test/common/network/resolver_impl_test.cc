@@ -71,12 +71,10 @@ TEST(ResolverTest, InternalListenerNameFromProtoAddress) {
             resolveProtoAddress(internal_listener_address)->asString());
 }
 
-TEST(ResolverTest, UnsupportedInternalAddressFromProtoAddress) {
+TEST(ResolverTest, UninitializedInternalAddressFromProtoAddress) {
   envoy::config::core::v3::Address internal_address;
   internal_address.mutable_envoy_internal_address();
-  EXPECT_THROW_WITH_MESSAGE(
-      resolveProtoAddress(internal_address), EnvoyException,
-      "Internal address must be a server listener name: envoy_internal_address {\n}\n");
+  EXPECT_DEATH(resolveProtoAddress(internal_address), "panic");
 }
 
 // Validate correct handling of ipv4_compat field.
@@ -172,8 +170,7 @@ TEST(ResolverTest, NonStandardResolver) {
 
 TEST(ResolverTest, UninitializedAddress) {
   envoy::config::core::v3::Address address;
-  EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(address), EnvoyException,
-                            "Address must be a socket, pipe or envoy internal: ");
+  EXPECT_DEATH(resolveProtoAddress(address), "panic");
 }
 
 TEST(ResolverTest, NoSuchResolver) {
