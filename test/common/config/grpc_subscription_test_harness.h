@@ -99,7 +99,7 @@ public:
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
-                           const std::string& version, bool accept) override {
+                           const std::string& version, bool accept, bool update) override {
     std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
         new envoy::service::discovery::v3::DiscoveryResponse());
     response->set_version_info(version);
@@ -119,16 +119,20 @@ public:
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
             *response, "cluster_name");
-    EXPECT_CALL(callbacks_, onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), version))
-        .WillOnce(ThrowOnRejectedConfig(accept));
-    if (accept) {
-      expectSendMessage(last_cluster_names_, version, false);
-      version_ = version;
-    } else {
-      EXPECT_CALL(callbacks_, onConfigUpdateFailed(
-                                  Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
-      expectSendMessage(last_cluster_names_, version_, false,
-                        Grpc::Status::WellKnownGrpcStatus::Internal, "bad config");
+
+    if (update) {
+      EXPECT_CALL(callbacks_, onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), version))
+          .WillOnce(ThrowOnRejectedConfig(accept));
+
+      if (accept) {
+        expectSendMessage(last_cluster_names_, version, false);
+        version_ = version;
+      } else {
+        EXPECT_CALL(callbacks_, onConfigUpdateFailed(
+                                    Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
+        expectSendMessage(last_cluster_names_, version_, false,
+                          Grpc::Status::WellKnownGrpcStatus::Internal, "bad config");
+      }
     }
     mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
     EXPECT_EQ(control_plane_stats_.identifier_.value(), "ground_control_foo123");

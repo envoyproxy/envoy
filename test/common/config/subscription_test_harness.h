@@ -53,9 +53,10 @@ public:
    * @param cluster_names cluster names to provide in the response
    * @param version version_info to provide in the response.
    * @param accept will the onConfigUpdate() callback accept the response?
+   * @param update will the onConfigUpdate() callback be called?
    */
   virtual void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
-                                   const std::string& version, bool accept) PURE;
+                                   const std::string& version, bool accept, bool update) PURE;
 
   virtual testing::AssertionResult statsAre(uint32_t attempt, uint32_t success, uint32_t rejected,
                                             uint32_t failure, uint32_t init_fetch_timeout,

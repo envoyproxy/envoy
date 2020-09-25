@@ -66,16 +66,16 @@ TEST_F(GrpcSubscriptionImplTest, RepeatedNonce) {
   // First with the initial, empty version update to "0".
   updateResourceInterest({"cluster2"});
   EXPECT_TRUE(statsAre(2, 0, 0, 0, 0, 0, 0, ""));
-  deliverConfigUpdate({"cluster0", "cluster2"}, "0", false);
+  deliverConfigUpdate({"cluster0", "cluster2"}, "0", false, true);
   EXPECT_TRUE(statsAre(3, 0, 1, 0, 0, 0, 0, ""));
-  deliverConfigUpdate({"cluster0", "cluster2"}, "0", true);
+  deliverConfigUpdate({"cluster0", "cluster2"}, "0", true, true);
   EXPECT_TRUE(statsAre(4, 1, 1, 0, 0, TEST_TIME_MILLIS, 7148434200721666028, "0"));
   // Now with version "0" update to "1".
   updateResourceInterest({"cluster3"});
   EXPECT_TRUE(statsAre(5, 1, 1, 0, 0, TEST_TIME_MILLIS, 7148434200721666028, "0"));
-  deliverConfigUpdate({"cluster3"}, "42", false);
+  deliverConfigUpdate({"cluster3"}, "42", false, true);
   EXPECT_TRUE(statsAre(6, 1, 2, 0, 0, TEST_TIME_MILLIS, 7148434200721666028, "0"));
-  deliverConfigUpdate({"cluster3"}, "42", true);
+  deliverConfigUpdate({"cluster3"}, "42", true, true);
   EXPECT_TRUE(statsAre(7, 2, 2, 0, 0, TEST_TIME_MILLIS, 7919287270473417401, "42"));
 }
 
@@ -83,7 +83,7 @@ TEST_F(GrpcSubscriptionImplTest, UpdateTimeNotChangedOnUpdateReject) {
   InSequence s;
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
-  deliverConfigUpdate({"cluster0", "cluster2"}, "0", false);
+  deliverConfigUpdate({"cluster0", "cluster2"}, "0", false, true);
   EXPECT_TRUE(statsAre(2, 0, 1, 0, 0, 0, 0, ""));
 }
 
@@ -91,14 +91,15 @@ TEST_F(GrpcSubscriptionImplTest, UpdateTimeChangedOnUpdateSuccess) {
   InSequence s;
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
-  deliverConfigUpdate({"cluster0", "cluster2"}, "0", true);
+  deliverConfigUpdate({"cluster0", "cluster2"}, "0", true, true);
   EXPECT_TRUE(statsAre(2, 1, 0, 0, 0, TEST_TIME_MILLIS, 7148434200721666028, "0"));
 
   // Advance the simulated time and verify that a trivial update (no change) also changes the update
   // time.
+  // TODO(snowp): Now a trivial change does not update the stats, is that ok?
   simTime().setSystemTime(SystemTime(std::chrono::milliseconds(TEST_TIME_MILLIS + 1)));
-  deliverConfigUpdate({"cluster0", "cluster2"}, "0", true);
-  EXPECT_TRUE(statsAre(2, 2, 0, 0, 0, TEST_TIME_MILLIS + 1, 7148434200721666028, "0"));
+  deliverConfigUpdate({"cluster0", "cluster2"}, "0", true, false);
+  EXPECT_TRUE(statsAre(2, 1, 0, 0, 0, TEST_TIME_MILLIS, 7148434200721666028, "0"));
 }
 
 } // namespace
