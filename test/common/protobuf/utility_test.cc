@@ -32,6 +32,8 @@
 #include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"
 
+using namespace std::chrono_literals;
+
 namespace Envoy {
 
 class RuntimeStatsHelper {
@@ -265,7 +267,7 @@ TEST_F(ProtobufUtilityTest, LoadBinaryProtoFromFile) {
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
 
-TEST_F(ProtobufUtilityTest, LoadBinaryV2ProtoFromFile) {
+TEST_F(ProtobufUtilityTest, DEPRECATED_FEATURE_TEST(LoadBinaryV2ProtoFromFile)) {
   // Allow the use of v2.Bootstrap.runtime.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.deprecated_features:envoy.config.bootstrap.v2.Bootstrap.runtime", "True "}});
@@ -1258,6 +1260,30 @@ TEST_F(ProtobufUtilityTest, UnpackToNextVersion) {
   MessageUtil::unpackTo(source_any, dst);
   EXPECT_GT(runtime_deprecated_feature_use_.value(), 0);
   EXPECT_TRUE(dst.ignore_health_on_host_removal());
+}
+
+// Validate warning messages on v2 upgrades.
+TEST_F(ProtobufUtilityTest, V2UpgradeWarningLogs) {
+  API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
+  // First attempt works.
+  EXPECT_LOG_CONTAINS("warn", "Configuration does not parse cleanly as v3",
+                      MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
+                                                ProtobufMessage::getNullValidationVisitor()));
+  // Second attempt immediately after fails.
+  EXPECT_LOG_NOT_CONTAINS("warn", "Configuration does not parse cleanly as v3",
+                          MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}",
+                                                    dst,
+                                                    ProtobufMessage::getNullValidationVisitor()));
+  // Third attempt works, since this is a different log message.
+  EXPECT_LOG_CONTAINS("warn", "Configuration does not parse cleanly as v3",
+                      MessageUtil::loadFromJson("{drain_connections_on_host_removal: false}", dst,
+                                                ProtobufMessage::getNullValidationVisitor()));
+  // This is kind of terrible, but it's hard to do dependency injection at onVersionUpgradeWarn().
+  std::this_thread::sleep_for(5s); // NOLINT
+  // We can log the original warning again.
+  EXPECT_LOG_CONTAINS("warn", "Configuration does not parse cleanly as v3",
+                      MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
+                                                ProtobufMessage::getNullValidationVisitor()));
 }
 
 // MessageUtility::loadFromJson() throws on garbage JSON.
