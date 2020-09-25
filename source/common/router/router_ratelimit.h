@@ -131,7 +131,6 @@ private:
   const std::string default_value_;
 };
 
-
 /**
  * Action for filter metadata rate limiting.
  */

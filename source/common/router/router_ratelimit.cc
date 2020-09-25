@@ -129,10 +129,11 @@ FilterMetaDataAction::FilterMetaDataAction(
     : metadata_key_(action.metadata_key()), descriptor_key_(action.descriptor_key()),
       default_value_(action.default_value()) {}
 
-bool FilterMetaDataAction::populateDescriptor(
-    const Router::RouteEntry& route, RateLimit::Descriptor& descriptor, const std::string&,
-    const Http::HeaderMap&, const Network::Address::Instance&,
-    const envoy::config::core::v3::Metadata*) const {
+bool FilterMetaDataAction::populateDescriptor(const Router::RouteEntry& route,
+                                              RateLimit::Descriptor& descriptor, const std::string&,
+                                              const Http::HeaderMap&,
+                                              const Network::Address::Instance&,
+                                              const envoy::config::core::v3::Metadata*) const {
   const ProtobufWkt::Value& metadata_value =
       Envoy::Config::Metadata::metadataValue(&route.metadata(), metadata_key_);
 
