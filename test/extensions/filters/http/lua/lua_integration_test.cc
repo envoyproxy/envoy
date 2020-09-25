@@ -146,6 +146,39 @@ public:
     registerTestServerPorts({"http"});
   }
 
+  void testRewriteResponse(const std::string& code) {
+    initializeFilter(code);
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                   {":path", "/test/long/url"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "host"},
+                                                   {"x-forwarded-for", "10.0.0.1"}};
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers);
+    Http::StreamEncoder& encoder = encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+    Buffer::OwnedImpl request_data("done");
+    encoder.encodeData(request_data, true);
+
+    waitForNextUpstreamRequest();
+
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
+    upstream_request_->encodeHeaders(response_headers, false);
+    Buffer::OwnedImpl response_data1("good");
+    upstream_request_->encodeData(response_data1, false);
+    Buffer::OwnedImpl response_data2("bye");
+    upstream_request_->encodeData(response_data2, true);
+
+    response->waitForEndStream();
+
+    EXPECT_EQ(
+        "2",
+        response->headers().get(Http::LowerCaseString("content-length"))->value().getStringView());
+    EXPECT_EQ("ok", response->body());
+    cleanup();
+  }
+
   void cleanup() {
     codec_client_->close();
     if (fake_lua_connection_ != nullptr) {
@@ -898,6 +931,47 @@ TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
 
   cleanup();
 #endif
+}
+
+// Rewrite response buffer.
+TEST_P(LuaIntegrationTest, RewriteResponseBuffer) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  inline_code: |
+    function envoy_on_response(response_handle)
+      local content_length = response_handle:body():setBytes("ok")
+      response_handle:logTrace(content_length)
+
+      response_handle:headers():replace("content-length", content_length)
+    end
+)EOF";
+
+  testRewriteResponse(FILTER_AND_CODE);
+}
+
+// Rewrite chunked response body.
+TEST_P(LuaIntegrationTest, RewriteChunkedBody) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  inline_code: |
+    function envoy_on_response(response_handle)
+      response_handle:headers():replace("content-length", 2)
+      local last
+      for chunk in response_handle:bodyChunks() do
+        chunk:setBytes("")
+        last = chunk
+      end
+      last:setBytes("ok")
+    end
+)EOF";
+
+  testRewriteResponse(FILTER_AND_CODE);
 }
 
 } // namespace

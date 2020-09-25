@@ -23,7 +23,9 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
-      first_stream_request_(true), transport_api_version_(transport_api_version) {
+      first_stream_request_(true), transport_api_version_(transport_api_version),
+      enable_type_url_downgrade_and_upgrade_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade")) {
   Config::Utility::checkLocalInfo("ads", local_info);
 }
 
@@ -76,6 +78,9 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
     api_state_[type_url].request_.mutable_node()->MergeFrom(local_info_.node());
     api_state_[type_url].subscribed_ = true;
     subscriptions_.emplace_back(type_url);
+    if (enable_type_url_downgrade_and_upgrade_) {
+      registerVersionedTypeUrl(type_url);
+    }
   }
 
   // This will send an updated request on each subscription.
@@ -113,19 +118,41 @@ ScopedResume GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
   });
 }
 
+void GrpcMuxImpl::registerVersionedTypeUrl(const std::string& type_url) {
+  TypeUrlMap& type_url_map = typeUrlMap();
+  if (type_url_map.find(type_url) != type_url_map.end()) {
+    return;
+  }
+  // If type_url is v3, earlier_type_url will contain v2 type url.
+  const absl::optional<std::string> earlier_type_url = ApiTypeOracle::getEarlierTypeUrl(type_url);
+  // Register v2 to v3 and v3 to v2 type_url mapping in the hash map.
+  if (earlier_type_url.has_value()) {
+    type_url_map[earlier_type_url.value()] = type_url;
+    type_url_map[type_url] = earlier_type_url.value();
+  }
+}
+
 void GrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
     ControlPlaneStats& control_plane_stats) {
-  const std::string& type_url = message->type_url();
+  std::string type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
   if (message->has_control_plane()) {
     control_plane_stats.identifier_.set(message->control_plane().identifier());
   }
+  // If this type url is not watched(no subscriber or no watcher), try another version of type url.
+  if (enable_type_url_downgrade_and_upgrade_ && api_state_.count(type_url) == 0) {
+    registerVersionedTypeUrl(type_url);
+    TypeUrlMap& type_url_map = typeUrlMap();
+    if (type_url_map.find(type_url) != type_url_map.end()) {
+      type_url = type_url_map[type_url];
+    }
+  }
   if (api_state_.count(type_url) == 0) {
-    ENVOY_LOG(warn, "Ignoring the message for type URL {} as it has no current subscribers.",
-              type_url);
     // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
     // protocol violation
+    ENVOY_LOG(warn, "Ignoring the message for type URL {} as it has no current subscribers.",
+              type_url);
     return;
   }
   if (api_state_[type_url].watches_.empty()) {
@@ -164,10 +191,10 @@ void GrpcMuxImpl::onDiscoveryResponse(
     OpaqueResourceDecoder& resource_decoder =
         api_state_[type_url].watches_.front()->resource_decoder_;
     for (const auto& resource : message->resources()) {
-      if (type_url != resource.type_url()) {
+      if (message->type_url() != resource.type_url()) {
         throw EnvoyException(
             fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
-                        resource.type_url(), type_url, message->DebugString()));
+                        resource.type_url(), message->type_url(), message->DebugString()));
       }
       resources.emplace_back(
           new DecodedResourceImpl(resource_decoder, resource, message->version_info()));
