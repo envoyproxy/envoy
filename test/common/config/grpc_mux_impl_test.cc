@@ -334,6 +334,20 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
 
+  // Refresh the TTL with a response that doesn't contain the previous resources, but the same version.
+  // This should not trigger a onConfigUpdate call.
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_version_info("1");
+    response->mutable_ttl()->set_seconds(10);
+
+    EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(10000), _));
+    // No update, just a change in TTL.
+    expectSendMessage(type_url, {"x"}, "1");
+    grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
+  }
+
   // Remove the TTL.
   {
     auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
