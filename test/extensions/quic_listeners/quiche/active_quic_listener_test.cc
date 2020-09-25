@@ -42,8 +42,8 @@
 #include "gmock/gmock.h"
 #include "extensions/quic_listeners/quiche/active_quic_listener_config.h"
 #include "extensions/quic_listeners/quiche/platform/envoy_quic_clock.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "extensions/quic_listeners/quiche/udp_gso_batch_writer.h"
 
 using testing::Return;
 using testing::ReturnRef;
