@@ -82,6 +82,8 @@ public:
   const std::string AwsLambda = "envoy.filters.http.aws_lambda";
   // OAuth filter
   const std::string OAuth = "envoy.filters.http.oauth2";
+  // Mutation filter
+  const std::string Mutation = "envoy.filters.http.mutation";
 };
 
 using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;
