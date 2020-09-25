@@ -78,7 +78,7 @@ public:
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
-                           const std::string& version, bool accept) override {
+                           const std::string& version, bool accept, bool update) override {
     std::string file_json = "{\"versionInfo\":\"" + version + "\",\"resources\":[";
     for (const auto& cluster : cluster_names) {
       file_json += "{\"@type\":\"type.googleapis.com/"
@@ -92,13 +92,16 @@ public:
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
             response_pb, "cluster_name");
-    EXPECT_CALL(callbacks_, onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), version))
-        .WillOnce(ThrowOnRejectedConfig(accept));
-    if (accept) {
-      version_ = version;
-    } else {
-      EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
-    }
+            if (update) {
+              EXPECT_CALL(callbacks_,
+                          onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), version))
+                  .WillOnce(ThrowOnRejectedConfig(accept));
+              if (accept) {
+                version_ = version;
+              } else {
+                EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
+              }
+            }
     updateFile(file_json);
   }
 

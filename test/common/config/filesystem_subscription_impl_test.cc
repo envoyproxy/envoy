@@ -28,7 +28,7 @@ TEST_F(FilesystemSubscriptionImplTest, BadJsonRecovery) {
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
   updateFile(";!@#badjso n");
   EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0, 0, ""));
-  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
+  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true, true);
   EXPECT_TRUE(statsAre(3, 1, 0, 1, 0, TEST_TIME_MILLIS, 7148434200721666028, "0"));
 }
 
@@ -73,11 +73,11 @@ TEST_F(FilesystemSubscriptionImplTest, UpdateTimeNotChangedOnUpdateReject) {
 TEST_F(FilesystemSubscriptionImplTest, UpdateTimeChangedOnUpdateSuccess) {
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
-  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
+  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true, true);
   EXPECT_TRUE(statsAre(2, 1, 0, 0, 0, TEST_TIME_MILLIS, 7148434200721666028, "0"));
   // Advance the simulated time.
   simTime().setSystemTime(SystemTime(std::chrono::milliseconds(TEST_TIME_MILLIS + 1)));
-  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
+  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true, true);
   EXPECT_TRUE(statsAre(3, 2, 0, 0, 0, TEST_TIME_MILLIS + 1, 7148434200721666028, "0"));
 }
 

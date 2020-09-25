@@ -128,7 +128,7 @@ public:
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
-                           const std::string& version, bool accept) override {
+                           const std::string& version, bool accept, bool update) override {
     auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
     last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
     response->set_nonce(last_response_nonce_);
@@ -147,14 +147,16 @@ public:
         resource->mutable_resource()->PackFrom(API_DOWNGRADE(*load_assignment));
       }
     }
-    Protobuf::RepeatedPtrField<std::string> removed_resources;
-    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, version)).WillOnce(ThrowOnRejectedConfig(accept));
-    if (accept) {
-      expectSendMessage({}, version);
-    } else {
-      EXPECT_CALL(callbacks_, onConfigUpdateFailed(
-                                  Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
-      expectSendMessage({}, {}, Grpc::Status::WellKnownGrpcStatus::Internal, "bad config", {});
+    if (update) {
+      Protobuf::RepeatedPtrField<std::string> removed_resources;
+      EXPECT_CALL(callbacks_, onConfigUpdate(_, _, version)).WillOnce(ThrowOnRejectedConfig(accept));
+      if (accept) {
+        expectSendMessage({}, version);
+      } else {
+        EXPECT_CALL(callbacks_, onConfigUpdateFailed(
+                                    Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
+        expectSendMessage({}, {}, Grpc::Status::WellKnownGrpcStatus::Internal, "bad config", {});
+      }
     }
     static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
         ->onDiscoveryResponse(std::move(response), control_plane_stats_);

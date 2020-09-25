@@ -59,7 +59,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseHoldsRequest) {
 
 TEST_F(DeltaSubscriptionImplTest, ResponseCausesAck) {
   startSubscription({"name1"});
-  deliverConfigUpdate({"name1"}, "someversion", true);
+  deliverConfigUpdate({"name1"}, "someversion", true, true);
 }
 
 // Checks that after a pause(), no ACK requests are sent until resume(), but that after the
