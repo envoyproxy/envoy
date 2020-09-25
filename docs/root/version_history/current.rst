@@ -1,8 +1,6 @@
 1.16.0 (Pending)
 ================
 
-asdf
-
 Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
