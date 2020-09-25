@@ -1134,8 +1134,8 @@ message HedgePolicy {
   //   if there are no more retries available.
   // * After per-try timeout, an error response would be discarded, as a retry in the form of a hedged request is already in progress.
   //
-  // Note: For this to have effect, the :ref:`RetryPolicy <envoy_api_msg_route.RetryPolicy>` must be one that retries on timeout
-  // (e.g. `gateway-error`).
+  // Note: For this to have effect, you must have a :ref:`RetryPolicy <envoy_api_msg_route.RetryPolicy>` that retries at least
+  // one error code and specifies a maximum number of retries.
   //
   // Defaults to false.
   bool hedge_on_per_try_timeout = 3;
