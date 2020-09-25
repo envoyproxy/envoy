@@ -315,7 +315,7 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
   options->emplace_back(std::move(option));
   quic_listener_.reset();
   EXPECT_THROW_WITH_REGEX(
-      std::make_unique<ActiveQuicListener>(
+      (void)std::make_unique<ActiveQuicListener>(
           0, 1, *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_,
           options, false,
           ActiveQuicListenerFactoryPeer::runtimeEnabled(
