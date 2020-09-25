@@ -368,7 +368,7 @@ public:
    * depending on where we are in the major version deprecation cycle.
    * @param desc description of upgrade to include in warning or exception.
    */
-  static void onVersionUpgrade(absl::string_view desc);
+  static void onVersionUpgradeWarn(absl::string_view desc);
 
   /**
    * Obtain a string field from a protobuf message dynamically.

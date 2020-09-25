@@ -164,7 +164,7 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
     try {
       f(message, MessageVersion::LATEST_VERSION_VALIDATE);
     } catch (EnvoyException& e) {
-      MessageUtil::onVersionUpgrade(e.what());
+      MessageUtil::onVersionUpgradeWarn(e.what());
     }
     // Now we do the real work of upgrading.
     Config::VersionConverter::upgrade(*earlier_message, message);
@@ -276,7 +276,7 @@ void ProtoExceptionUtil::throwProtoValidationException(const std::string& valida
 }
 
 // TODO(htuch): this is where we will also reject v2 configs by default.
-void MessageUtil::onVersionUpgrade(absl::string_view desc) {
+void MessageUtil::onVersionUpgradeWarn(absl::string_view desc) {
   const std::string& warning_str =
       fmt::format("Configuration does not parse cleanly as v3. v2 configuration is "
                   "deprecated and will be removed from Envoy at the start of Q1 2021: {}",
@@ -636,7 +636,7 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
                                          any_message_with_fixup.DebugString()));
       }
       Config::VersionConverter::annotateWithOriginalType(*earlier_version_desc, message);
-      MessageUtil::onVersionUpgrade(any_full_name);
+      MessageUtil::onVersionUpgradeWarn(any_full_name);
       return;
     }
   }
