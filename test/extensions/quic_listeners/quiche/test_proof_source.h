@@ -1,15 +1,14 @@
-#ifdef __GNUC__
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 #pragma GCC diagnostic ignored "-Wtype-limits"
+#endif
+
 #include "quiche/quic/test_tools/test_certificates.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
-#else
-#include "quiche/quic/test_tools/test_certificates.h"
 #endif
 
 #include <memory>
