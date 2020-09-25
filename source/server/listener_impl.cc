@@ -19,6 +19,7 @@
 #include "common/network/resolver_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/socket_option_impl.h"
+#include "common/network/udp_listener_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_features.h"
@@ -377,6 +378,9 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
     udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message, concurrency);
+
+    udp_listener_worker_router_ =
+        std::make_unique<Network::UdpListenerWorkerRouterImpl>(concurrency);
   }
 }
 

@@ -778,7 +778,7 @@ message RouteAction {
     // <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_, use that value as the
     // *max_stream_duration*, but limit the applied timeout to the maximum value specified here.
     // If set to 0, the `grpc-timeout` header is used without modification.
-    google.protobuf.Duration grpc_max_timeout = 2;
+    google.protobuf.Duration grpc_timeout_header_max = 2;
 
     // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by
     // subtracting the provided duration from the header. This is useful for allowing Envoy to set
@@ -786,7 +786,7 @@ message RouteAction {
     // makes it more likely that Envoy will handle the timeout instead of having the call canceled
     // by the client. If, after applying the offset, the resulting timeout is zero or negative,
     // the stream will timeout immediately.
-    google.protobuf.Duration grpc_timeout_offset = 3;
+    google.protobuf.Duration grpc_timeout_header_offset = 3;
   }
 
   reserved 12, 18, 19, 16, 22, 21, 10;

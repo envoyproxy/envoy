@@ -61,22 +61,22 @@ function filter_excludes() {
 
 function run_clang_tidy() {
   python3 "${LLVM_PREFIX}/share/clang/run-clang-tidy.py" \
-    -clang-tidy-binary=${CLANG_TIDY} \
-    -clang-apply-replacements-binary=${CLANG_APPLY_REPLACEMENTS} \
-    -export-fixes=${FIX_YAML} -j ${NUM_CPUS:-0} -p ${SRCDIR} -quiet \
-    ${APPLY_CLANG_TIDY_FIXES:+-fix} $@
+    -clang-tidy-binary="${CLANG_TIDY}" \
+    -clang-apply-replacements-binary="${CLANG_APPLY_REPLACEMENTS}" \
+    -export-fixes=${FIX_YAML} -j "${NUM_CPUS:-0}" -p "${SRCDIR}" -quiet \
+    ${APPLY_CLANG_TIDY_FIXES:+-fix} "$@"
 }
 
 function run_clang_tidy_diff() {
-  git diff $1 | filter_excludes | \
+  git diff "$1" | filter_excludes | \
     python3 "${LLVM_PREFIX}/share/clang/clang-tidy-diff.py" \
-      -clang-tidy-binary=${CLANG_TIDY} \
-      -export-fixes=${FIX_YAML} -j ${NUM_CPUS:-0} -p 1 -quiet
+      -clang-tidy-binary="${CLANG_TIDY}" \
+      -export-fixes="${FIX_YAML}" -j "${NUM_CPUS:-0}" -p 1 -quiet
 }
 
 if [[ $# -gt 0 ]]; then
-  echo "Running clang-tidy on: $@"
-  run_clang_tidy $@
+  echo "Running clang-tidy on: $*"
+  run_clang_tidy "$@"
 elif [[ "${RUN_FULL_CLANG_TIDY}" == 1 ]]; then
   echo "Running a full clang-tidy"
   run_clang_tidy
@@ -87,15 +87,15 @@ else
     elif [[ "${BUILD_REASON}" == *CI ]]; then
       DIFF_REF="HEAD^"
     else
-      DIFF_REF=$(${ENVOY_SRCDIR}/tools/git/last_github_commit.sh)
+      DIFF_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
     fi
   fi
-  echo "Running clang-tidy-diff against ${DIFF_REF} ($(git rev-parse ${DIFF_REF})), current HEAD ($(git rev-parse HEAD))"
-  run_clang_tidy_diff ${DIFF_REF}
+  echo "Running clang-tidy-diff against ${DIFF_REF} ($(git rev-parse "${DIFF_REF}")), current HEAD ($(git rev-parse HEAD))"
+  run_clang_tidy_diff "${DIFF_REF}"
 fi
 
 if [[ -s "${FIX_YAML}" ]]; then
   echo "clang-tidy check failed, potentially fixed by clang-apply-replacements:"
-  cat ${FIX_YAML}
+  cat "${FIX_YAML}"
   exit 1
 fi

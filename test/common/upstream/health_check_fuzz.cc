@@ -42,7 +42,7 @@ void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   }
 }
 
-void HttpHealthCheckFuzz::respond(const test::fuzz::Headers& headers, absl::string_view status) {
+void HttpHealthCheckFuzz::respond(const test::fuzz::Headers& headers, uint64_t status) {
   // Timeout timer needs to be explicitly enabled, usually by onIntervalBase() (Callback on interval
   // timer).
   if (!test_sessions_[0]->timeout_timer_->enabled_) {
