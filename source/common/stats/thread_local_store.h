@@ -498,6 +498,9 @@ private:
   NullHistogramImpl null_histogram_;
   NullTextReadoutImpl null_text_readout_;
 
+  mutable Thread::MutexBasicLockable hist_mutex_;
+  StatSet<ParentHistogramImpl> histogram_set_ ABSL_GUARDED_BY(hist_mutex_);
+
   // Retain storage for deleted stats; these are no longer in maps because the
   // matcher-pattern was established after they were created. Since the stats
   // are held by reference in code that expects them to be there, we can't
@@ -516,9 +519,6 @@ private:
   uint64_t next_histogram_id_ ABSL_GUARDED_BY(hist_mutex_) = 0;
 
   StatNameSetPtr well_known_tags_;
-
-  mutable Thread::MutexBasicLockable hist_mutex_;
-  StatSet<ParentHistogramImpl> histogram_set_ ABSL_GUARDED_BY(hist_mutex_);
 };
 
 using ThreadLocalStoreImplPtr = std::unique_ptr<ThreadLocalStoreImpl>;
