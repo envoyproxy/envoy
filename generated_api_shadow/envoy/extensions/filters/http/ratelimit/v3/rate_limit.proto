@@ -60,7 +60,6 @@ message RateLimit {
   // The filter's behaviour in case the rate limiting service does
   // not respond back. When it is set to true, Envoy will not allow traffic in case of
   // communication failure between rate limiting service and the proxy.
-  // Defaults to false.
   bool failure_mode_deny = 5;
 
   // Specifies whether a `RESOURCE_EXHAUSTED` gRPC code must be returned instead
@@ -100,9 +99,8 @@ message RateLimit {
   XRateLimitHeadersRFCVersion enable_x_ratelimit_headers = 8
       [(validate.rules).enum = {defined_only: true}];
 
-  // Disables emitting the :ref:`x-envoy-ratelimited<config_http_filters_router_filter_x-envoy-ratelimited>` header
-  // in case of 429 responses.
-  // Defaults to false.
+  // Disables emitting the :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` header
+  // in case of rate limiting (i.e. 429 responses).
   bool disable_x_envoy_ratelimited_header = 9;
 }
 
