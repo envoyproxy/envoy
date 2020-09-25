@@ -1,7 +1,8 @@
 #pragma once
 
-#include <cstdint>
 #include <event2/event.h>
+
+#include <cstdint>
 
 #include "envoy/event/file_event.h"
 

@@ -17,7 +17,7 @@ namespace Network {
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::close() {
   ASSERT(!closed_);
-  if (!peer_closed_) {
+  if (!write_shutdown_) {
     ASSERT(writable_peer_);
     // Notify the peer we won't write more data. shutdown(WRITE).
     writable_peer_->setWriteEnd();
@@ -25,7 +25,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::close() {
     writable_peer_->onPeerDestroy();
     writable_peer_->maybeSetNewData();
     writable_peer_ = nullptr;
-    peer_closed_ = true;
+    write_shutdown_ = true;
   }
   closed_ = true;
   return IoSocketError::ioResultSocketInvalidAddress();
@@ -64,7 +64,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
   if (!writable_peer_) {
     return sysCallResultToIoCallResult(Api::SysCallSizeResult{-1, SOCKET_ERROR_INTR});
   }
-  if (!writable_peer_->isWritable()) {
+  if (writable_peer_->isWriteEndSet() || !writable_peer_->isWritable()) {
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                IoSocketError::deleteIoError)};
   }
@@ -72,9 +72,6 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
   uint64_t num_bytes_to_write = 0;
   for (uint64_t i = 0; i < num_slice; i++) {
     if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
-      // Buffer::BufferFragmentImpl fragment(
-      //     slices[i].mem_, slices[i].len_,
-      //     [](const void*, size_t, const Buffer::BufferFragmentImpl*) {});
       writable_peer_->getWriteBuffer()->add(slices[i].mem_, slices[i].len_);
       num_bytes_to_write += slices[i].len_;
     }
@@ -180,13 +177,12 @@ Event::FileEventPtr BufferedIoSocketHandleImpl::createFileEvent(Event::Dispatche
 Api::SysCallIntResult BufferedIoSocketHandleImpl::shutdown(int how) {
   if ((how == ENVOY_SHUT_WR) || (how == ENVOY_SHUT_RDWR)) {
     ASSERT(!closed_);
-    if (!peer_closed_) {
+    if (!write_shutdown_) {
       ASSERT(writable_peer_);
       // Notify the peer we won't write more data. shutdown(WRITE).
       writable_peer_->setWriteEnd();
       writable_peer_->maybeSetNewData();
-      writable_peer_ = nullptr;
-      peer_closed_ = true;
+      write_shutdown_ = true;
     }
   }
   return {0, 0};

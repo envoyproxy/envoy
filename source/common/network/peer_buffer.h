@@ -25,6 +25,7 @@ public:
    * Set the flag to indicate no further write from peer.
    */
   virtual void setWriteEnd() PURE;
+  virtual bool isWriteEndSet() PURE;
 
   /**
    * Raised when peer is destroyed. No further write to peer is allowed.
@@ -48,7 +49,7 @@ public:
   virtual bool isWritable() const PURE;
 
   /**
-   * Raised by the peer when the peer switch from high water mark to low. 
+   * Raised by the peer when the peer switch from high water mark to low.
    */
   virtual void onPeerBufferWritable() PURE;
 

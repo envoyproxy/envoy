@@ -1,17 +1,18 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/io_error.h"
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/io_handle.h"
 
-#include "common/event/file_event_impl.h"
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/logger.h"
+#include "common/event/file_event_impl.h"
 #include "common/network/io_socket_error_impl.h"
 #include "common/network/peer_buffer.h"
-#include <memory>
 
 namespace Envoy {
 namespace Network {
@@ -25,19 +26,22 @@ class BufferedIoSocketHandleImpl : public IoHandle,
                                    protected Logger::Loggable<Logger::Id::io> {
 public:
   BufferedIoSocketHandleImpl()
-      : closed_{false}, owned_buffer_(
-                            [this]() -> void {
-                              over_high_watermark_ = false;
-                              triggered_high_to_low_watermark_ = true;
-                              if (writable_peer_) {
-                                writable_peer_->onPeerBufferWritable();
-                              }
-                            },
-                            [this]() -> void {
-                              over_high_watermark_ = true;
-                              // low to high is checked by peer after peer writes data.
-                            },
-                            []() -> void {}) {}
+      : closed_{false},
+        owned_buffer_(
+            [this]() -> void {
+              over_high_watermark_ = false;
+              triggered_high_to_low_watermark_ = true;
+              if (writable_peer_) {
+                ENVOY_LOG_MISC(debug, "lambdai: {} switch to low water mark {}",
+                               static_cast<void*>(this), static_cast<void*>(writable_peer_));
+                writable_peer_->onPeerBufferWritable();
+              }
+            },
+            [this]() -> void {
+              over_high_watermark_ = true;
+              // low to high is checked by peer after peer writes data.
+            },
+            []() -> void {}) {}
 
   ~BufferedIoSocketHandleImpl() override { ASSERT(closed_); }
 
@@ -96,19 +100,20 @@ public:
   void setWritablePeer(WritablePeer* writable_peer) {
     // Swapping writable peer is undefined behavior.
     ASSERT(!writable_peer_);
-    ASSERT(!peer_closed_);
+    ASSERT(!write_shutdown_);
     writable_peer_ = writable_peer;
   }
 
   // WritablePeer
   void setWriteEnd() override { read_end_stream_ = true; }
+  bool isWriteEndSet() override { return read_end_stream_; }
   void maybeSetNewData() override {
     scheduleReadEvent();
     scheduleNextEvent();
   }
   void onPeerDestroy() override {
     writable_peer_ = nullptr;
-    peer_closed_ = true;
+    write_shutdown_ = true;
   }
   void onPeerBufferWritable() override {
     scheduleWriteEvent();
@@ -140,7 +145,7 @@ private:
   WritablePeer* writable_peer_{nullptr};
 
   // The flag whether the peer is valid. Any write attempt should check flag.
-  bool peer_closed_{false};
+  bool write_shutdown_{false};
 
   bool over_high_watermark_{false};
   bool triggered_high_to_low_watermark_{true};

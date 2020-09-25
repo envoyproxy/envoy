@@ -1,8 +1,10 @@
 #include <sys/socket.h>
 
+#include "envoy/event/file_event.h"
+
+#include "common/buffer/buffer_impl.h"
 #include "common/network/buffered_io_socket_handle_impl.h"
 
-#include "envoy/event/file_event.h"
 #include "test/mocks/event/mocks.h"
 
 #include "absl/container/fixed_array.h"
@@ -276,9 +278,9 @@ TEST_F(BufferedIoSocketHandleTest, TestClose) {
           if (res.ok()) {
             accumulator += absl::string_view(buf_.data(), res.rc_);
           } else if (res.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-            ENVOY_LOG_MISC(debug, "lambdai: EAGAIN");
+            ENVOY_LOG_MISC(debug, "read returns EAGAIN");
           } else {
-            ENVOY_LOG_MISC(debug, "lambdai: close, not schedule event");
+            ENVOY_LOG_MISC(debug, "will close");
             should_close = true;
           }
         }
@@ -318,9 +320,9 @@ TEST_F(BufferedIoSocketHandleTest, TestShutdown) {
           if (res.ok()) {
             accumulator += absl::string_view(buf_.data(), res.rc_);
           } else if (res.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-            ENVOY_LOG_MISC(debug, "lambdai: EAGAIN");
+            ENVOY_LOG_MISC(debug, "read returns EAGAIN");
           } else {
-            ENVOY_LOG_MISC(debug, "lambdai: close, not schedule event");
+            ENVOY_LOG_MISC(debug, "will close");
             should_close = true;
           }
         }
@@ -367,18 +369,18 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteScheduleWritableEvent) {
   bool should_close = false;
   auto ev = io_handle_->createFileEvent(
       dispatcher_,
-      [this, &should_close, handle = io_handle_.get(), &accumulator](uint32_t events) {
+      [&should_close, handle = io_handle_.get(), &accumulator](uint32_t events) {
         if (events & Event::FileReadyType::Read) {
-          auto& internal_buffer = handle->getBufferForTest();
+          Buffer::OwnedImpl buf;
           Buffer::RawSlice slice;
-          internal_buffer.reserve(1024, &slice, 1);
-          auto res = io_handle_->readv(1024, &slice, 1);
+          buf.reserve(1024, &slice, 1);
+          auto res = handle->readv(1024, &slice, 1);
           if (res.ok()) {
             accumulator += absl::string_view(static_cast<char*>(slice.mem_), res.rc_);
           } else if (res.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-            ENVOY_LOG_MISC(debug, "lambdai: EAGAIN");
+            ENVOY_LOG_MISC(debug, "read returns EAGAIN");
           } else {
-            ENVOY_LOG_MISC(debug, "lambdai: close, not schedule event");
+            ENVOY_LOG_MISC(debug, "will close");
             should_close = true;
           }
         }
@@ -400,25 +402,28 @@ TEST_F(BufferedIoSocketHandleTest, TestWriteScheduleWritableEvent) {
   io_handle_->close();
 }
 
-TEST_F(BufferedIoSocketHandleTest, TestReadFlowAfterShutdownWrite) {
-
+TEST_F(BufferedIoSocketHandleTest, TestReadAfterShutdownWrite) {
   io_handle_peer_->shutdown(ENVOY_SHUT_WR);
-
+  ENVOY_LOG_MISC(debug, "lambdai: after {} shutdown write ",
+                 static_cast<void*>(io_handle_peer_.get()));
   std::string accumulator;
   scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
   bool should_close = false;
   auto ev = io_handle_peer_->createFileEvent(
       dispatcher_,
-      [this, &should_close, handle = io_handle_peer_.get(), &accumulator](uint32_t events) {
+      [&should_close, handle = io_handle_peer_.get(), &accumulator](uint32_t events) {
         if (events & Event::FileReadyType::Read) {
-          auto res = io_handle_peer_->recv(buf_.data(), buf_.size(), 0);
+          Buffer::OwnedImpl buf;
+          Buffer::RawSlice slice;
+          buf.reserve(1024, &slice, 1);
+          auto res = handle->readv(1024, &slice, 1);
           if (res.ok()) {
-            accumulator += absl::string_view(buf_.data(), res.rc_);
+            accumulator += absl::string_view(static_cast<char*>(slice.mem_), res.rc_);
           } else if (res.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-            ENVOY_LOG_MISC(debug, "lambdai: EAGAIN");
+            ENVOY_LOG_MISC(debug, "read returns EAGAIN");
           } else {
-            ENVOY_LOG_MISC(debug, "lambdai: close, not schedule event");
+            ENVOY_LOG_MISC(debug, "will close");
             should_close = true;
           }
         }
@@ -429,6 +434,7 @@ TEST_F(BufferedIoSocketHandleTest, TestReadFlowAfterShutdownWrite) {
   EXPECT_FALSE(scheduable_cb_->enabled());
   std::string raw_data("0123456789");
   Buffer::RawSlice slice{static_cast<void*>(raw_data.data()), raw_data.size()};
+  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
   io_handle_->writev(&slice, 1);
   EXPECT_TRUE(scheduable_cb_->enabled());
 
@@ -436,7 +442,35 @@ TEST_F(BufferedIoSocketHandleTest, TestReadFlowAfterShutdownWrite) {
   EXPECT_FALSE(scheduable_cb_->enabled());
   EXPECT_EQ(raw_data, accumulator);
 
+  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  io_handle_->close();
   ev.reset();
+}
+
+TEST_F(BufferedIoSocketHandleTest, TestNotififyWritableAfterShutdownWrite) {
+  auto& peer_internal_buffer = io_handle_peer_->getBufferForTest();
+  peer_internal_buffer.setWatermarks(128);
+  std::string big_chunk(256, 'a');
+  peer_internal_buffer.add(big_chunk);
+  EXPECT_FALSE(io_handle_peer_->isWritable());
+
+  io_handle_peer_->shutdown(ENVOY_SHUT_WR);
+  ENVOY_LOG_MISC(debug, "lambdai: after {} shutdown write ",
+                 static_cast<void*>(io_handle_peer_.get()));
+
+  scheduable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  auto ev = io_handle_->createFileEvent(
+      dispatcher_, [&, handle = io_handle_.get()](uint32_t) {}, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read);
+  scheduable_cb_->invokeCallback();
+  EXPECT_FALSE(scheduable_cb_->enabled());
+
+  EXPECT_CALL(*scheduable_cb_, scheduleCallbackNextIteration());
+  peer_internal_buffer.drain(peer_internal_buffer.length());
+  EXPECT_TRUE(scheduable_cb_->enabled());
+
+  io_handle_->close();
 }
 
 } // namespace
