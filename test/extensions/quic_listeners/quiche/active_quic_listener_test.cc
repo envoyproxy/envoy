@@ -26,6 +26,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/udp_packet_writer_handler_impl.h"
+#include "common/runtime/runtime_impl.h"
 #include "extensions/quic_listeners/quiche/active_quic_listener.h"
 #include "test/extensions/quic_listeners/quiche/test_utils.h"
 #include "test/extensions/quic_listeners/quiche/test_proof_source.h"
