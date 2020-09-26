@@ -17,13 +17,13 @@ thread_local InstanceImpl::ThreadLocalData InstanceImpl::thread_local_data_;
 
 InstanceImpl::~InstanceImpl() {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
-  ASSERT(state_ == State::Shutdown);
+  ASSERT(shutdown_);
   thread_local_data_.data_.clear();
 }
 
 SlotPtr InstanceImpl::allocateSlot() {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
-  ASSERT(state_ != State::Shutdown);
+  ASSERT(!shutdown_);
 
   if (free_slot_indexes_.empty()) {
     SlotPtr slot(new SlotImpl(*this, slots_.size()));
@@ -38,25 +38,9 @@ SlotPtr InstanceImpl::allocateSlot() {
   return slot;
 }
 
-/*bool InstanceImpl::SlotImpl::currentThreadRegistered() {
-  return thread_local_data_.data_.size() > index_;
-}
-
-void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb) {
-  parent_.runOnAllThreads([this, cb]() { setThreadLocal(index_, cb(get())); });
-}
-
-void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
-  parent_.runOnAllThreads([this, cb]() { setThreadLocal(index_, cb(get())); }, complete_cb);
-}
-
-ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() {
-  ASSERT(currentThreadRegistered());
-  return thread_local_data_.data_[index_];
-}*/
-
-InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint64_t index)
-    : parent_(parent), index_(index), ref_count_(/*not used.*/ nullptr,
+InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
+    : parent_(parent), index_(index),
+      ref_count_(/*not used.*/ nullptr,
                  [index, &parent = parent_](uint32_t* /* not used */) {
                    // On destruction, post a cleanup callback on main thread, this could happen on
                    // any thread.
@@ -65,52 +49,65 @@ InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint64_t index)
       still_alive_guard_(std::make_shared<bool>(true)) {}
 
 Event::PostCb InstanceImpl::SlotImpl::wrapCallback(Event::PostCb cb) {
-  // Capture active_callback_guard_ so that we can synchronize slot destruction. See ~SlotImpl().
-  // Also capture still_alive_guard_ so we can verify the slot is still alive as it might have
-  // been destroyed pre-running state. See SlotImpl(). fixfix
-  return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), cb] {
+  // See the header file and comments for still_alive_guard_ and ref_count_ for the purpose
+  // of these captures.
+  return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), ref_count = ref_count_,
+          cb] {
     if (still_alive_guard.lock()) {
       cb();
     }
   };
 }
 
-ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() {
-  ASSERT(currentThreadRegistered());
-  return thread_local_data_.data_[index_];
-}
-
-void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
-  runOnAllThreads([cb]() { setThreadLocal(index_, cb(get())); }, complete_cb);
-}
-
-void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb) {
-  runOnAllThreads([cb]() { setThreadLocal(index_, cb(get())); });
+bool InstanceImpl::SlotImpl::currentThreadRegisteredWorker(uint32_t index) {
+  return thread_local_data_.data_.size() > index;
 }
 
 bool InstanceImpl::SlotImpl::currentThreadRegistered() {
-  return slot_->currentThreadRegistered();
+  return currentThreadRegisteredWorker(index_);
+}
+
+ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::getWorker(uint32_t index) {
+  ASSERT(currentThreadRegisteredWorker(index));
+  return thread_local_data_.data_[index];
+}
+
+ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() { return getWorker(index_); }
+
+void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
+  runOnAllThreads([cb, index = index_]() { setThreadLocal(index, cb(getWorker(index))); },
+                  complete_cb);
+}
+
+void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb) {
+  runOnAllThreads([cb, index = index_]() { setThreadLocal(index, cb(getWorker(index))); });
 }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(Event::PostCb cb) {
-  // Use ref_count_ to bookkeep how many on-the-fly callback are out there.
-  slot_->runOnAllThreads(wrapCallback([cb, ref_count = this->ref_count_]() { cb(); }));
+  parent_.runOnAllThreads(wrapCallback([cb]() { cb(); }));
 }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) {
-  // Use ref_count_ to bookkeep how many on-the-fly callback are out there.
-  slot_->runOnAllThreads(
+  parent_.runOnAllThreads(
       wrapCallback([cb, main_callback, ref_count = this->ref_count_]() { cb(); }), main_callback);
 }
 
 void InstanceImpl::SlotImpl::set(InitializeCb cb) {
-  slot_->set([cb, ref_count = this->ref_count_](Event::Dispatcher& dispatcher)
-                 -> ThreadLocalObjectSharedPtr { return cb(dispatcher); });
+  ASSERT(std::this_thread::get_id() == parent_.main_thread_id_);
+  ASSERT(!parent_.shutdown_);
+
+  for (Event::Dispatcher& dispatcher : parent_.registered_threads_) {
+    dispatcher.post(wrapCallback(
+        [index = index_, cb, &dispatcher]() -> void { setThreadLocal(index, cb(dispatcher)); }));
+  }
+
+  // Handle main thread.
+  setThreadLocal(index_, cb(*parent_.main_thread_dispatcher_));
 }
 
 void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_thread) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
-  ASSERT(state_ != State::Shutdown);
+  ASSERT(!shutdown_);
 
   if (main_thread) {
     main_thread_dispatcher_ = &dispatcher;
@@ -124,17 +121,15 @@ void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_threa
 
 // Puts the slot into a deferred delete container, the slot will be destructed when its out-going
 // callback reference count goes to 0.
-void InstanceImpl::recycle(SlotImplPtr&& slot) {
+void InstanceImpl::recycle(uint32_t slot) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
-  ASSERT(slot != nullptr);
-  auto* slot_addr = slot.get();
-  deferred_deletes_.insert({slot_addr, std::move(slot)});
+  deferred_deletes_.insert(slot);
 }
 
 // Called by the SlotImpl ref_count destructor, the SlotImpl in the deferred deletes map can be
 // destructed now.
-void InstanceImpl::scheduleCleanup(SlotImpl* slot) {
-  if (state_ == State::Shutdown) {
+void InstanceImpl::scheduleCleanup(uint32_t slot) {
+  if (shutdown_) {
     // If server is shutting down, do nothing here.
     // The destruction of SlotImpl has already transferred the SlotImpl to the deferred_deletes_
     // queue. No matter if this method is called from a Worker thread, the SlotImpl will be
@@ -143,47 +138,44 @@ void InstanceImpl::scheduleCleanup(SlotImpl* slot) {
   }
   if (std::this_thread::get_id() == main_thread_id_) {
     // If called from main thread, save a callback.
-    ASSERT(deferred_deletes_.contains(slot));
-    deferred_deletes_.erase(slot);
+    removeSlot(slot);
     return;
   }
-  main_thread_dispatcher_->post([slot, this]() {
-    ASSERT(deferred_deletes_.contains(slot));
-    // The slot is guaranteed to be put into the deferred_deletes_ map by SlotImpl destructor.
-    deferred_deletes_.erase(slot);
-  });
+  main_thread_dispatcher_->post([slot, this]() { removeSlot(slot); });
 }
 
-void InstanceImpl::removeSlot(SlotImpl& slot) {
+void InstanceImpl::removeSlot(uint32_t slot) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(deferred_deletes_.contains(slot));
+  // The slot is guaranteed to be put into the deferred_deletes_ map by SlotImpl destructor.
+  deferred_deletes_.erase(slot);
 
   // When shutting down, we do not post slot removals to other threads. This is because the other
   // threads have already shut down and the dispatcher is no longer alive. There is also no reason
   // to do removal, because no allocations happen during shutdown and shutdownThread() will clean
   // things up on the other thread.
-  if (state_ == State::Shutdown) {
+  if (shutdown_) {
     return;
   }
 
-  const uint64_t index = slot.index_;
-  slots_[index] = nullptr;
-  ASSERT(std::find(free_slot_indexes_.begin(), free_slot_indexes_.end(), index) ==
+  slots_[slot] = nullptr;
+  ASSERT(std::find(free_slot_indexes_.begin(), free_slot_indexes_.end(), slot) ==
              free_slot_indexes_.end(),
          fmt::format("slot index {} already in free slot set!", index));
-  free_slot_indexes_.push_back(index);
-  runOnAllThreads([index]() -> void {
+  free_slot_indexes_.push_back(slot);
+  runOnAllThreads([slot]() -> void {
     // This runs on each thread and clears the slot, making it available for a new allocations.
     // This is safe even if a new allocation comes in, because everything happens with post() and
     // will be sequenced after this removal.
-    if (index < thread_local_data_.data_.size()) {
-      thread_local_data_.data_[index] = nullptr;
+    if (slot < thread_local_data_.data_.size()) {
+      thread_local_data_.data_[slot] = nullptr;
     }
   });
 }
 
 void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
-  ASSERT(state_ != State::Shutdown);
+  ASSERT(!shutdown_);
 
   for (Event::Dispatcher& dispatcher : registered_threads_) {
     dispatcher.post(cb);
@@ -195,7 +187,7 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
 
 void InstanceImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_complete_cb) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
-  ASSERT(state_ != State::Shutdown);
+  ASSERT(!shutdown_);
   // Handle main thread first so that when the last worker thread wins, we could just call the
   // all_threads_complete_cb method. Parallelism of main thread execution is being traded off
   // for programming simplicity here.
@@ -212,19 +204,6 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_c
   }
 }
 
-void InstanceImpl::SlotImpl::set(InitializeCb cb) {
-  ASSERT(std::this_thread::get_id() == parent_.main_thread_id_);
-  ASSERT(parent_.state_ != State::Shutdown);
-
-  for (Event::Dispatcher& dispatcher : parent_.registered_threads_) {
-    const uint32_t index = index_;
-    dispatcher.post([index, cb, &dispatcher]() -> void { setThreadLocal(index, cb(dispatcher)); });
-  }
-
-  // Handle main thread.
-  setThreadLocal(index_, cb(*parent_.main_thread_dispatcher_));
-}
-
 void InstanceImpl::setThreadLocal(uint32_t index, ThreadLocalObjectSharedPtr object) {
   if (thread_local_data_.data_.size() <= index) {
     thread_local_data_.data_.resize(index + 1);
@@ -233,19 +212,14 @@ void InstanceImpl::setThreadLocal(uint32_t index, ThreadLocalObjectSharedPtr obj
   thread_local_data_.data_[index] = object;
 }
 
-void InstanceImpl::startGlobalThreading() {
-  ASSERT(state_ == State::Initializing);
-  state_ = State::Running;
-}
-
 void InstanceImpl::shutdownGlobalThreading() {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
-  ASSERT(state_ != State::Shutdown);
-  state_ = State::Shutdown;
+  ASSERT(!shutdown_);
+  shutdown_ = true;
 }
 
 void InstanceImpl::shutdownThread() {
-  ASSERT(state_ == State::Shutdown);
+  ASSERT(shutdown_);
 
   // Destruction of slots is done in *reverse* order. This is so that filters and higher layer
   // things that are built on top of the cluster manager, stats, etc. will be destroyed before

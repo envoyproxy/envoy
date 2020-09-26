@@ -122,12 +122,6 @@ public:
   virtual void registerThread(Event::Dispatcher& dispatcher, bool main_thread) PURE;
 
   /**
-   * This should be called by the main thread before any worker threads start to run. This will
-   * ensure that threaded slot updates are properly synchronized with slot removal.
-   */
-  virtual void startGlobalThreading() PURE;
-
-  /**
    * This should be called by the main thread before any worker threads start to exit. This will
    * block TLS removal during slot destruction, given that worker threads are about to call
    * shutdownThread(). This avoids having to implement de-registration of threads.

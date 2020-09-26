@@ -565,7 +565,6 @@ void InstanceImpl::onRuntimeReady() {
 }
 
 void InstanceImpl::startWorkers() {
-  thread_local_.startGlobalThreading();
   listener_manager_->startWorkers(*worker_guard_dog_);
   initialization_timer_->complete();
   // Update server stats as soon as initialization is done.
