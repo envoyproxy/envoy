@@ -6,8 +6,8 @@ Incompatible Behavior Changes
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
 * build: added visibility rules for upstream. If these cause visibility related breakage, see notes in //BUILD.
-* watchdog: added two guarddogs, breaking the aggregated stats for the single guarddog system. The aggregated stats for the guarddogs will have the following prefixes: `main_thread` and `workers`. Concretely, anything monitoring `server.watchdog_miss` and `server.watchdog_mega_miss` will need to be updated.
 * dns: ``envoy.restart_features.use_apple_api_for_dns_lookups`` is on by default. This flag only affects Apple platforms (macOS, iOS). It is incompatible to have the runtime flag set to true at the same time as specifying the ``use_tcp_for_dns_lookups`` option or custom dns resolvers. Doing so will cause failure.
+* watchdog: added two guarddogs, breaking the aggregated stats for the single guarddog system. The aggregated stats for the guarddogs will have the following prefixes: `main_thread` and `workers`. Concretely, anything monitoring `server.watchdog_miss` and `server.watchdog_mega_miss` will need to be updated.
 
 Minor Behavior Changes
 ----------------------
