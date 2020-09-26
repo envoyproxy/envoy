@@ -65,12 +65,12 @@ bool HttpConnPoolImplBase::hasActiveConnections() const {
 }
 
 ConnectionPool::Cancellable*
-HttpConnPoolImplBase::newPendingRequest(Envoy::ConnectionPool::AttachContext& context) {
+HttpConnPoolImplBase::newPendingStream(Envoy::ConnectionPool::AttachContext& context) {
   Http::ResponseDecoder& decoder = *typedContext<HttpAttachContext>(context).decoder_;
   Http::ConnectionPool::Callbacks& callbacks = *typedContext<HttpAttachContext>(context).callbacks_;
   ENVOY_LOG(debug, "queueing stream due to no available connections");
-  Envoy::ConnectionPool::PendingRequestPtr pending_stream(
-      new HttpPendingRequest(*this, decoder, callbacks));
+  Envoy::ConnectionPool::PendingStreamPtr pending_stream(
+      new HttpPendingStream(*this, decoder, callbacks));
   LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
   return pending_streams_.front().get();
 }

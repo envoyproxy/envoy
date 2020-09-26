@@ -110,6 +110,11 @@ Config::SharedConfig::SharedConfig(
   if (config.has_tunneling_config()) {
     tunneling_config_ = config.tunneling_config();
   }
+  if (config.has_max_downstream_connection_duration()) {
+    const uint64_t connection_duration =
+        DurationUtil::durationToMilliseconds(config.max_downstream_connection_duration());
+    max_downstream_connection_duration_ = std::chrono::milliseconds(connection_duration);
+  }
 }
 
 Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
@@ -309,6 +314,9 @@ void Filter::DownstreamCallbacks::onBelowWriteBufferLowWatermark() {
 }
 
 void Filter::UpstreamCallbacks::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::Connected) {
+    return;
+  }
   if (drainer_ == nullptr) {
     parent_->onUpstreamEvent(event);
   } else {
@@ -505,8 +513,7 @@ void Filter::onPoolReadyBase(Upstream::HostDescriptionConstSharedPtr& host,
   getStreamInfo().onUpstreamHostSelected(host);
   getStreamInfo().setUpstreamLocalAddress(local_address);
   getStreamInfo().setUpstreamSslConnection(ssl_info);
-  // Simulate the event that onPoolReady represents.
-  upstream_callbacks_->onEvent(Network::ConnectionEvent::Connected);
+  onUpstreamConnection();
   read_callbacks_->continueReading();
 }
 
@@ -581,6 +588,15 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   return Network::FilterStatus::StopIteration;
 }
 
+Network::FilterStatus Filter::onNewConnection() {
+  if (config_->maxDownstreamConnectionDuration()) {
+    connection_duration_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onMaxDownstreamConnectionDuration(); });
+    connection_duration_timer_->enableTimer(config_->maxDownstreamConnectionDuration().value());
+  }
+  return initializeUpstreamConnection();
+}
+
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   if (upstream_) {
     Tcp::ConnectionPool::ConnectionDataPtr conn_data(upstream_->onDownstreamEvent(event));
@@ -637,31 +653,34 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
         read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
       }
     }
-  } else if (event == Network::ConnectionEvent::Connected) {
-    // Re-enable downstream reads now that the upstream connection is established
-    // so we have a place to send downstream data to.
-    read_callbacks_->connection().readDisable(false);
+  }
+}
 
-    read_callbacks_->upstreamHost()->outlierDetector().putResult(
-        Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
+void Filter::onUpstreamConnection() {
+  connecting_ = false;
+  // Re-enable downstream reads now that the upstream connection is established
+  // so we have a place to send downstream data to.
+  read_callbacks_->connection().readDisable(false);
 
-    getStreamInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
-    ENVOY_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
-              getStreamInfo().requestedServerName());
+  read_callbacks_->upstreamHost()->outlierDetector().putResult(
+      Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
 
-    if (config_->idleTimeout()) {
-      // The idle_timer_ can be moved to a Drainer, so related callbacks call into
-      // the UpstreamCallbacks, which has the same lifetime as the timer, and can dispatch
-      // the call to either TcpProxy or to Drainer, depending on the current state.
-      idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
-          [upstream_callbacks = upstream_callbacks_]() { upstream_callbacks->onIdleTimeout(); });
-      resetIdleTimer();
-      read_callbacks_->connection().addBytesSentCallback([this](uint64_t) { resetIdleTimer(); });
-      if (upstream_) {
-        upstream_->addBytesSentCallback([upstream_callbacks = upstream_callbacks_](uint64_t) {
-          upstream_callbacks->onBytesSent();
-        });
-      }
+  getStreamInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
+  ENVOY_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
+            getStreamInfo().requestedServerName());
+
+  if (config_->idleTimeout()) {
+    // The idle_timer_ can be moved to a Drainer, so related callbacks call into
+    // the UpstreamCallbacks, which has the same lifetime as the timer, and can dispatch
+    // the call to either TcpProxy or to Drainer, depending on the current state.
+    idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [upstream_callbacks = upstream_callbacks_]() { upstream_callbacks->onIdleTimeout(); });
+    resetIdleTimer();
+    read_callbacks_->connection().addBytesSentCallback([this](uint64_t) { resetIdleTimer(); });
+    if (upstream_) {
+      upstream_->addBytesSentCallback([upstream_callbacks = upstream_callbacks_](uint64_t) {
+        upstream_callbacks->onBytesSent();
+      });
     }
   }
 }
@@ -671,6 +690,13 @@ void Filter::onIdleTimeout() {
   config_->stats().idle_timeout_.inc();
 
   // This results in also closing the upstream connection.
+  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+}
+
+void Filter::onMaxDownstreamConnectionDuration() {
+  ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
+  getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::DurationTimeout);
+  config_->stats().max_downstream_connection_duration_.inc();
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 

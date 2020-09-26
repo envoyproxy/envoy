@@ -45,7 +45,7 @@ void truncate(std::string& str, absl::optional<uint32_t> max_length) {
 
 // Matches newline pattern in a StartTimeFormatter format string.
 const std::regex& getStartTimeNewlinePattern() {
-  CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n");
+  CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*(E|O)?n");
 }
 const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
 
@@ -203,7 +203,7 @@ ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& re
         auto* fields = output.mutable_fields();
         JsonFormatMapVisitor visitor{json_format_map_callback, providers_callback};
         for (const auto& pair : *format.value_) {
-          ProtobufWkt::Value value = std::visit(visitor, pair.second);
+          ProtobufWkt::Value value = absl::visit(visitor, pair.second);
           if (omit_empty_values_ && value.kind_case() == ProtobufWkt::Value::kNullValue) {
             continue;
           }

@@ -1,4 +1,6 @@
 #include "common/network/utility.h"
+#include "common/router/string_accessor_impl.h"
+#include "common/stream_info/filter_state_impl.h"
 
 #include "extensions/filters/common/expr/context.h"
 
@@ -241,6 +243,9 @@ TEST(Context, ResponseAttributes) {
   EXPECT_CALL(info, bytesSent()).WillRepeatedly(Return(123));
   EXPECT_CALL(info, responseFlags()).WillRepeatedly(Return(0x1));
 
+  const absl::optional<std::string> code_details = "unauthorized";
+  EXPECT_CALL(info, responseCodeDetails()).WillRepeatedly(ReturnRef(code_details));
+
   {
     auto value = response[CelValue::CreateStringView(Undefined)];
     EXPECT_FALSE(value.has_value());
@@ -277,6 +282,13 @@ TEST(Context, ResponseAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
     EXPECT_EQ(404, value.value().Int64OrDie());
+  }
+
+  {
+    auto value = response[CelValue::CreateStringView(CodeDetails)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(code_details.value(), value.value().StringOrDie().value());
   }
 
   {
@@ -326,6 +338,16 @@ TEST(Context, ResponseAttributes) {
 
   {
     auto value = empty_response[CelValue::CreateStringView(GrpcStatus)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = empty_response[CelValue::CreateStringView(Code)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = empty_response[CelValue::CreateStringView(CodeDetails)];
     EXPECT_FALSE(value.has_value());
   }
 
@@ -603,6 +625,32 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(upstream_transport_failure_reason, value.value().StringOrDie().value());
+  }
+}
+
+TEST(Context, FilterStateAttributes) {
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  FilterStateWrapper wrapper(filter_state);
+  ProtobufWkt::Arena arena;
+  wrapper.Produce(&arena);
+
+  const std::string key = "filter_state_key";
+  const std::string serialized = "filter_state_value";
+  const std::string missing = "missing_key";
+
+  auto accessor = std::make_shared<Envoy::Router::StringAccessorImpl>(serialized);
+  filter_state.setData(key, accessor, StreamInfo::FilterState::StateType::ReadOnly);
+
+  {
+    auto value = wrapper[CelValue::CreateStringView(missing)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = wrapper[CelValue::CreateStringView(key)];
+    EXPECT_TRUE(value.has_value());
+    EXPECT_TRUE(value.value().IsBytes());
+    EXPECT_EQ(serialized, value.value().BytesOrDie().value());
   }
 }
 
