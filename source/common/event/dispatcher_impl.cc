@@ -130,15 +130,20 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
   ASSERT(isThreadSafe());
 #ifdef __APPLE__
   if (!DispatcherImpl::use_apple_api_for_dns_lookups.has_value()) {
-    use_apple_api_for_dns_lookups = Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_apple_api_for_dns_lookups");
+    use_apple_api_for_dns_lookups =
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_apple_api_for_dns_lookups");
   }
 
   if (DispatcherImpl::use_apple_api_for_dns_lookups.value()) {
     if (!resolvers.empty()) {
-      ENVOY_LOG(warn, "defining custom resolvers is not possible when using Apple APIs for DNS resolution");
+      ENVOY_LOG(
+          warn,
+          "defining custom resolvers is not possible when using Apple APIs for DNS resolution");
     }
     if (use_tcp_for_dns_lookups) {
-      ENVOY_LOG(warn, "using TCP for DNS lookups is not possible when using Apple APIs for DNS resolution");
+      ENVOY_LOG(
+          warn,
+          "using TCP for DNS lookups is not possible when using Apple APIs for DNS resolution");
     }
     return Network::DnsResolverSharedPtr{new Network::AppleDnsResolverImpl(*this)};
   }
