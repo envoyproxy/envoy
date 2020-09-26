@@ -87,6 +87,8 @@ Api::SysCallIntResult FakeConnectionSocket::getSocketOption(int level, int, void
 #endif
 }
 
+absl::optional<std::chrono::milliseconds> FakeConnectionSocket::lastRoundTripTime() { return {}; }
+
 } // namespace ListenerFilters
 } // namespace Extensions
 } // namespace Envoy

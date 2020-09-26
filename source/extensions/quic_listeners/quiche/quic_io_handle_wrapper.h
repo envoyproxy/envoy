@@ -1,3 +1,4 @@
+#include <chrono>
 #include <iostream>
 
 #include "envoy/network/io_handle.h"
@@ -112,6 +113,7 @@ public:
     return io_handle_.createFileEvent(dispatcher, cb, trigger, events);
   }
   Api::SysCallIntResult shutdown(int how) override { return io_handle_.shutdown(how); }
+  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; }
 
 private:
   Network::IoHandle& io_handle_;

@@ -116,6 +116,7 @@ public:
     return {0, 0};
   }
   Api::SysCallIntResult setBlockingForTest(bool) override { return {0, 0}; }
+  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; }
 
 private:
   Network::IoHandlePtr io_handle_;
