@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 
 #include "envoy/api/io_error.h"
@@ -265,6 +266,13 @@ public:
    * Shut down part of a full-duplex connection (see man 2 shutdown)
    */
   virtual Api::SysCallIntResult shutdown(int how) PURE;
+
+  /**
+   *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip
+   *  time of the connection. If the platform does not support this, then an empty optional is
+   *  returned.
+   */
+  virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() PURE;
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;
