@@ -116,14 +116,11 @@ void AppleDnsResolverImpl::flushPendingQueries(const bool with_error) {
     try {
       ASSERT(query->pending_cb_);
       query->callback_(query->pending_cb_->status_, std::move(query->pending_cb_->responses_));
-    } catch (const EnvoyException& e) {
-      ENVOY_LOG(critical, "EnvoyException in DNSService callback: {}", e.what());
-      throw EnvoyException(e.what());
     } catch (const std::exception& e) {
-      ENVOY_LOG(critical, "std::exception in DNSService callback: {}", e.what());
+      ENVOY_LOG(warn, "std::exception in DNSService callback: {}", e.what());
       throw EnvoyException(e.what());
     } catch (...) {
-      ENVOY_LOG(critical, "Unknown exception in DNSService callback");
+      ENVOY_LOG(warn, "Unknown exception in DNSService callback");
       throw EnvoyException("unknown");
     }
 

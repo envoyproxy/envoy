@@ -98,5 +98,6 @@ message DnsCacheConfig {
 
   // [#next-major-version: Reconcile DNS options in a single message.]
   // Always use TCP queries instead of UDP queries for DNS lookups.
+  // This value is a no-op if the ``envoy.reloadable_features.use_apple_api_for_dns_lookups`` runtime value is true during server startup.
   bool use_tcp_for_dns_lookups = 8;
 }

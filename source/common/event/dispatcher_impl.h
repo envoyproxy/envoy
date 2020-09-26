@@ -103,6 +103,9 @@ private:
     return run_tid_.isEmpty() || run_tid_ == api_.threadFactory().currentThreadId();
   }
 
+  // This value is snapped once during creation of the first DNS resolver.
+  static absl::optional<bool> use_apple_api_for_dns_lookups;
+
   const std::string name_;
   Api::Api& api_;
   std::string stats_prefix_;

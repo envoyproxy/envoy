@@ -22,6 +22,7 @@
 #include "common/network/dns_impl.h"
 #include "common/network/tcp_listener_impl.h"
 #include "common/network/udp_listener_impl.h"
+#include "common/runtime/runtime_features.h"
 
 #include "event2/event.h"
 
@@ -121,15 +122,24 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
                                                          std::move(transport_socket), options);
 }
 
+absl::optional<bool> DispatcherImpl::use_apple_api_for_dns_lookups = absl::nullopt;
+
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
     const bool use_tcp_for_dns_lookups) {
   ASSERT(isThreadSafe());
 #ifdef __APPLE__
-  if (Runtime::LoaderSingleton::getExisting()->snapshot().getBoolean(
-          "dns.use_apple_api_for_dns_lookups", false)) {
-    UNREFERENCED_PARAMETER(resolvers);
-    UNREFERENCED_PARAMETER(use_tcp_for_dns_lookups);
+  if (!DispatcherImpl::use_apple_api_for_dns_lookups.has_value()) {
+    use_apple_api_for_dns_lookups = Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_apple_api_for_dns_lookups");
+  }
+
+  if (DispatcherImpl::use_apple_api_for_dns_lookups.value()) {
+    if (!resolvers.empty()) {
+      ENVOY_LOG(warn, "defining custom resolvers is not possible when using Apple APIs for DNS resolution");
+    }
+    if (use_tcp_for_dns_lookups) {
+      ENVOY_LOG(warn, "using TCP for DNS lookups is not possible when using Apple APIs for DNS resolution");
+    }
     return Network::DnsResolverSharedPtr{new Network::AppleDnsResolverImpl(*this)};
   }
 #endif

@@ -220,6 +220,7 @@ message Bootstrap {
   // when :ref:`dns_resolvers <envoy_api_field_config.cluster.v4alpha.Cluster.dns_resolvers>` and
   // :ref:`use_tcp_for_dns_lookups <envoy_api_field_config.cluster.v4alpha.Cluster.use_tcp_for_dns_lookups>` are
   // specified.
+  // This value is a no-op if the ``envoy.reloadable_features.use_apple_api_for_dns_lookups`` runtime value is true during server startup.
   bool use_tcp_for_dns_lookups = 20;
 
   // Specifies optional bootstrap extensions to be instantiated at startup time.

@@ -69,7 +69,7 @@ public:
 
   void SetUp() override {
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"dns.use_apple_api_for_dns_lookups", "true"}});
+        {{"envoy.reloadable_features.use_apple_api_for_dns_lookups", "true"}});
     resolver_ = dispatcher_->createDnsResolver({}, false);
   }
 
