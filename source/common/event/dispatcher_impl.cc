@@ -171,7 +171,7 @@ Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& s
                                                     backlog_size);
 }
 
-Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr&& socket,
+Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr socket,
                                                           Network::UdpListenerCallbacks& cb) {
   ASSERT(isThreadSafe());
   return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource());

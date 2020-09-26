@@ -222,6 +222,7 @@ Nilsson
 Nonhashable
 Oauth
 OCSP
+OID
 OK
 OOM
 OOMs
@@ -868,6 +869,7 @@ pausable
 pcall
 pcap
 pclose
+performant
 pfctl
 pipelined
 pipelining
@@ -988,6 +990,7 @@ resolvers
 responder
 restarter
 resync
+retransmitting
 retriable
 retriggers
 revalidated
