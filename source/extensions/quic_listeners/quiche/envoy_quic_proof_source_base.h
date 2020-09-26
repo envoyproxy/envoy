@@ -6,17 +6,21 @@
 
 #include "absl/strings/str_cat.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
+
 #include "quiche/quic/core/crypto/proof_source.h"
 #include "quiche/quic/core/quic_versions.h"
 #include "quiche/quic/core/crypto/crypto_protocol.h"
 #include "quiche/quic/platform/api/quic_reference_counted.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
 #include "quiche/common/platform/api/quiche_string_piece.h"
+
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "openssl/ssl.h"
 #include "envoy/network/filter.h"
