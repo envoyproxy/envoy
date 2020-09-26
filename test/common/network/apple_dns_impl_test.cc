@@ -57,21 +57,9 @@ namespace {
 class AppleDnsImplTest : public testing::Test {
 public:
   AppleDnsImplTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {
-    envoy::config::bootstrap::v3::LayeredRuntime config;
-    // The existence of an admin layer is required for mergeValues() to work.
-    config.add_layers()->mutable_admin_layer();
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
-    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
-        std::make_unique<Runtime::LoaderImpl>(*dispatcher_, tls_, config, local_info_, store_,
-                                              generator_, validation_visitor_, *api_));
-  }
-
-  void SetUp() override {
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.use_apple_api_for_dns_lookups", "true"}});
-    resolver_ = dispatcher_->createDnsResolver({}, false);
-  }
+  void SetUp() override { resolver_ = dispatcher_->createDnsResolver({}, false); }
 
   ActiveDnsQuery* resolveWithExpectations(const std::string& address,
                                           const DnsLookupFamily lookup_family,
@@ -124,12 +112,6 @@ public:
 protected:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  testing::NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::IsolatedStoreImpl store_;
-  Random::MockRandomGenerator generator_;
-  testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
   DnsResolverSharedPtr resolver_;
 };
 
