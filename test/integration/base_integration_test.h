@@ -289,6 +289,32 @@ public:
                                                  *dispatcher_);
   }
 
+  // Helper to create FakeUpstream.
+  // Creates a fake upstream bound to the specified unix domain socket path.
+  std::unique_ptr<FakeUpstream> createFakeUpstream(const std::string& uds_path,
+                                                   FakeHttpConnection::Type type) {
+    return std::make_unique<FakeUpstream>(uds_path, type, timeSystem());
+  }
+  // Creates a fake upstream bound to the specified |address|.
+  std::unique_ptr<FakeUpstream>
+  createFakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
+                     FakeHttpConnection::Type type, bool enable_half_close = false,
+                     bool udp_fake_upstream = false) {
+    return std::make_unique<FakeUpstream>(address, type, timeSystem(), enable_half_close,
+                                          udp_fake_upstream);
+  }
+  // Creates a fake upstream bound to INADDR_ANY and the specified |port|.
+  std::unique_ptr<FakeUpstream> createFakeUpstream(FakeHttpConnection::Type type,
+                                                   bool enable_half_close = false) {
+    return std::make_unique<FakeUpstream>(0, type, version_, timeSystem(), enable_half_close);
+  }
+  std::unique_ptr<FakeUpstream>
+  createFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                     FakeHttpConnection::Type type) {
+    return std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, type, version_,
+                                          timeSystem());
+  }
+
 protected:
   bool initialized() const { return initialized_; }
 

@@ -90,11 +90,11 @@ protected:
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     // Create the LDS upstream (fake_upstreams_[1]).
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
-                                                  timeSystem(), enable_half_close_));
+    fake_upstreams_.emplace_back(
+        createFakeUpstream(FakeHttpConnection::Type::HTTP2, enable_half_close_));
     // Create the RDS upstream (fake_upstreams_[2]).
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
-                                                  timeSystem(), enable_half_close_));
+    fake_upstreams_.emplace_back(
+        createFakeUpstream(FakeHttpConnection::Type::HTTP2, enable_half_close_));
   }
 
   void resetFakeUpstreamInfo(FakeUpstreamInfo* upstream_info) {
