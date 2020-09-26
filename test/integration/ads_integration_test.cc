@@ -1234,19 +1234,4 @@ TEST_P(AdsClusterV3Test, XdsBatching) {
   initialize();
 }
 
-// Verify CDS is paused during cluster warming.
-/*
-TEST_P(AdsClusterV3Test, LdsUdpaUrl) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    const std::string udpa_url_str =
-        "udpa://some-authority/envoy.config.listeners.v3.Listener/my-listeners/*";
-    const auto lds_resource_locator = Config::UdpaResourceIdentifier::decodeUrl(udpa_url_str);
-    bootstrap.mutable_dynamic_resources()->mutable_lds_resources_locator()->MergeFrom(
-        lds_resource_locator);
-    bootstrap.mutable_dynamic_resources()->clear_lds_config();
-    bootstrap.mutable_dynamic_resources()->clear_cds_config();
-  });
-  initialize();
-}
-*/
 } // namespace Envoy
