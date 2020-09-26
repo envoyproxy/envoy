@@ -172,16 +172,17 @@ protected:
     if (client_write_buffer_) {
       EXPECT_CALL(*client_write_buffer_, drain(_))
           .Times(AnyNumber())
-          .WillOnce(Invoke([&](uint64_t size) -> void { client_write_buffer_->baseDrain(size); }));
+          .WillRepeatedly(
+              Invoke([&](uint64_t size) -> void { client_write_buffer_->baseDrain(size); }));
     }
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
-    client_connection_->close(ConnectionCloseType::NoFlush);
     if (wait_for_remote_close) {
       EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
           .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
-
+      client_connection_->close(ConnectionCloseType::NoFlush);
       dispatcher_->run(Event::Dispatcher::RunType::Block);
     } else {
+      client_connection_->close(ConnectionCloseType::NoFlush);
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     }
   }
@@ -977,7 +978,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                             Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
   EXPECT_CALL(*client_write_buffer_, drain(_))
-      .WillRepeatedly(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
+      .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
   // The write() call on the connection will buffer enough data to bring the connection above the
   // high watermark but the subsequent drain immediately brings it back below.
   // A nice future performance optimization would be to latch if the socket is writable in the
@@ -996,13 +997,18 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   EXPECT_CALL(*client_write_buffer_, move(_))
       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                             Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
+  bool client_closed = false, server_closed = false;
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .WillOnce(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
         dispatcher_->exit();
-        return {-1, EAGAIN};
+        return {-1, SOCKET_ERROR_AGAIN};
       }));
+  ON_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillByDefault(Invoke([&](Network::ConnectionEvent) -> void { client_closed = true; }));
+  ON_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillByDefault(Invoke([&](Network::ConnectionEvent) -> void { server_closed = true; }));
   // The write() call on the connection will buffer enough data to bring the connection above the
   // high watermark and as the data will not flush it should not return below the watermark.
   EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
@@ -1016,6 +1022,8 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   // Clean up the connection. The close() (called via disconnect) will attempt to flush. The
   // call to write() will succeed, bringing the connection back under the low watermark.
   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
+
+  fprintf(stdout, "client closed %u server closed %u\n", client_closed, server_closed);
 
   disconnect(true);
 }
@@ -1039,7 +1047,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   ON_CALL(os_sys_calls, writev(_, _, _))
       .WillByDefault(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
-        return {-1, EAGAIN};
+        return {-1, SOCKET_ERROR_AGAIN};
       }));
   ON_CALL(*client_write_buffer_, drain(_))
       .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::baseDrain));
@@ -1089,10 +1097,10 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     EXPECT_CALL(os_sys_calls, writev(_, _, _))
         .WillOnce(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
           client_write_buffer_->drain(bytes_to_flush);
-          return {-1, EAGAIN};
+          return {-1, SOCKET_ERROR_AGAIN};
         }))
         .WillRepeatedly(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
-          return {-1, EAGAIN};
+          return {-1, SOCKET_ERROR_AGAIN};
         }));
 
     client_connection_->write(buffer_to_write, false);
