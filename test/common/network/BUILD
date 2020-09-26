@@ -94,7 +94,29 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
-
+envoy_cc_test(
+    name = "closing_connection_impl_test",
+    srcs = ["closing_connection_impl_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:empty_string",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:connection_lib",
+        "//source/common/network:listen_socket_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/stats:stats_lib",
+        "//test/mocks/buffer:buffer_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
 envoy_cc_test(
     name = "dns_impl_test",
     srcs = ["dns_impl_test.cc"],
@@ -118,6 +140,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
+
 
 envoy_cc_test(
     name = "filter_manager_impl_test",

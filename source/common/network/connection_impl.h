@@ -215,5 +215,61 @@ private:
   StreamInfo::StreamInfoImpl stream_info_;
 };
 
+/**
+ * libevent implementation of Network::ClientConnection expecting connect() fails immediately.
+ */
+class ClosingClientConnectionImpl : virtual public ClientConnection {
+public:
+  ClosingClientConnectionImpl(Event::Dispatcher& dispatcher,
+                              const Address::InstanceConstSharedPtr& remote_address,
+                              const Address::InstanceConstSharedPtr& source_address);
+
+  // Network::ClientConnection
+  void connect() override;
+  void addFilter(FilterSharedPtr filter) override;
+  void addReadFilter(ReadFilterSharedPtr filter) override;
+  void addWriteFilter(WriteFilterSharedPtr filter) override;
+  bool initializeReadFilters() override;
+  void addConnectionCallbacks(ConnectionCallbacks& cb) override;
+  void addBytesSentCallback(BytesSentCb) override;
+  void enableHalfClose(bool enabled) override;
+  void close(Network::ConnectionCloseType type) override;
+  Event::Dispatcher& dispatcher() override;
+  uint64_t id() const override;
+  void hashKey(std::vector<uint8_t>& hash) const override;
+  std::string nextProtocol() const override;
+  void noDelay(bool enable) override;
+  void readDisable(bool disable) override;
+  void detectEarlyCloseWhenReadDisabled(bool should_detect) override;
+  bool readEnabled() const override;
+  const Network::Address::InstanceConstSharedPtr& remoteAddress() const override;
+  const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override;
+  absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
+  const Network::Address::InstanceConstSharedPtr& localAddress() const override;
+  void setConnectionStats(const ConnectionStats& stats) override;
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override;
+  absl::string_view requestedServerName() const override;
+  State state() const override;
+  void write(Buffer::Instance& data, bool end_stream) override;
+  void setBufferLimits(uint32_t limit) override;
+  uint32_t bufferLimit() const override;
+  bool localAddressRestored() const override;
+  bool aboveHighWatermark() const override;
+  const ConnectionSocket::OptionsSharedPtr& socketOptions() const override;
+  StreamInfo::StreamInfo& streamInfo() override;
+  const StreamInfo::StreamInfo& streamInfo() const override;
+  void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
+  absl::string_view transportFailureReason() const override;
+
+public:
+  Event::Dispatcher& dispatcher_;
+  const Network::Address::InstanceConstSharedPtr remote_address_;
+  const Network::Address::InstanceConstSharedPtr source_address_;
+  ConnectionSocketPtr socket_;
+
+  StreamInfo::StreamInfoImpl stream_info_;
+  std::list<Network::ConnectionCallbacks*> callbacks_;
+};
+
 } // namespace Network
 } // namespace Envoy

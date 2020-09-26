@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "common/common/macros.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -774,5 +775,80 @@ void ClientConnectionImpl::connect() {
     }
   }
 }
+
+ClosingClientConnectionImpl::ClosingClientConnectionImpl(
+    Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
+    const Network::Address::InstanceConstSharedPtr& source_address)
+
+    : dispatcher_(dispatcher), remote_address_(remote_address), source_address_(source_address),
+      stream_info_(dispatcher.timeSource()) {}
+void ClosingClientConnectionImpl::connect() {}
+
+void ClosingClientConnectionImpl::addFilter(FilterSharedPtr) {}
+void ClosingClientConnectionImpl::addWriteFilter(WriteFilterSharedPtr) {}
+void ClosingClientConnectionImpl::addReadFilter(ReadFilterSharedPtr) {}
+bool ClosingClientConnectionImpl::initializeReadFilters() { return true; }
+void ClosingClientConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb) {
+  callbacks_.push_back(&cb);
+}
+void ClosingClientConnectionImpl::addBytesSentCallback(BytesSentCb) {}
+void ClosingClientConnectionImpl::enableHalfClose(bool) {}
+void ClosingClientConnectionImpl::close(ConnectionCloseType close_type) {
+  UNREFERENCED_PARAMETER(close_type);
+  return;
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
+Event::Dispatcher& ClosingClientConnectionImpl::dispatcher() { return dispatcher_; }
+uint64_t ClosingClientConnectionImpl::id() const { return 0; }
+void ClosingClientConnectionImpl::hashKey(std::vector<uint8_t>&) const {}
+std::string ClosingClientConnectionImpl::nextProtocol() const { return EMPTY_STRING; }
+void ClosingClientConnectionImpl::noDelay(bool) {}
+void ClosingClientConnectionImpl::readDisable(bool) {
+  // Always enable read since we want to trigger the read and lead to close().
+}
+void ClosingClientConnectionImpl::detectEarlyCloseWhenReadDisabled(bool) {}
+bool ClosingClientConnectionImpl::readEnabled() const { return true; }
+const Network::Address::InstanceConstSharedPtr& ClosingClientConnectionImpl::remoteAddress() const {
+  return remote_address_;
+}
+// TODO(lambdai): add transport socket option add set up the remote address.
+const Network::Address::InstanceConstSharedPtr&
+ClosingClientConnectionImpl::directRemoteAddress() const {
+  return remote_address_;
+}
+absl::optional<ClientConnection::UnixDomainSocketPeerCredentials>
+ClosingClientConnectionImpl::unixSocketPeerCredentials() const {
+  return absl::nullopt;
+}
+const Network::Address::InstanceConstSharedPtr& ClosingClientConnectionImpl::localAddress() const {
+  return source_address_;
+}
+void ClosingClientConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
+  UNREFERENCED_PARAMETER(stats);
+}
+Ssl::ConnectionInfoConstSharedPtr ClosingClientConnectionImpl::ssl() const { return nullptr; }
+absl::string_view ClosingClientConnectionImpl::requestedServerName() const { return EMPTY_STRING; }
+Connection::State ClosingClientConnectionImpl::state() const { return Connection::State::Open; }
+void ClosingClientConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
+  UNREFERENCED_PARAMETER(data);
+  UNREFERENCED_PARAMETER(end_stream);
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
+void ClosingClientConnectionImpl::setBufferLimits(uint32_t) {}
+uint32_t ClosingClientConnectionImpl::bufferLimit() const { return 65000; }
+bool ClosingClientConnectionImpl::localAddressRestored() const { return true; }
+bool ClosingClientConnectionImpl::aboveHighWatermark() const { return false; }
+const ConnectionSocket::OptionsSharedPtr& ClosingClientConnectionImpl::socketOptions() const {
+  return socket_->options();
+}
+StreamInfo::StreamInfo& ClosingClientConnectionImpl::streamInfo() { return stream_info_; }
+const StreamInfo::StreamInfo& ClosingClientConnectionImpl::streamInfo() const {
+  return stream_info_;
+}
+void ClosingClientConnectionImpl::setDelayedCloseTimeout(std::chrono::milliseconds) {}
+absl::string_view ClosingClientConnectionImpl::transportFailureReason() const {
+  return EMPTY_STRING;
+}
+
 } // namespace Network
 } // namespace Envoy
