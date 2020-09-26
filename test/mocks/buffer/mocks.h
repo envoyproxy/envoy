@@ -32,7 +32,7 @@ public:
     BaseClass::drain(size);
   }
 
-  uint64_t bytes_drained() const { return bytes_drained_; }
+  uint64_t bytesDrained() const { return bytes_drained_; }
 
 private:
   uint64_t bytes_drained_{0};

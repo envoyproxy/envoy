@@ -120,22 +120,22 @@ AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_st
     }
   }
 
-  uint64_t bytes_expected = client_write_buffer_->bytes_drained() + data.size();
+  uint64_t bytes_expected = client_write_buffer_->bytesDrained() + data.size();
 
   connection_->write(buffer, end_stream);
   do {
     connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-    if (client_write_buffer_->bytes_drained() == bytes_expected || disconnected_) {
+    if (client_write_buffer_->bytesDrained() == bytes_expected || disconnected_) {
       break;
     }
   } while (bound.withinBound());
 
   if (!bound.withinBound()) {
     return AssertionFailure() << "Timed out completing write";
-  } else if (verify && (disconnected_ || client_write_buffer_->bytes_drained() != bytes_expected)) {
+  } else if (verify && (disconnected_ || client_write_buffer_->bytesDrained() != bytes_expected)) {
     return AssertionFailure()
            << "Failed to complete write or unexpected disconnect. disconnected_: " << disconnected_
-           << " bytes_drained: " << client_write_buffer_->bytes_drained()
+           << " bytes_drained: " << client_write_buffer_->bytesDrained()
            << " bytes_expected: " << bytes_expected;
   }
 

@@ -977,7 +977,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                             Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
   EXPECT_CALL(*client_write_buffer_, drain(_))
-      .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
+      .WillRepeatedly(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
   // The write() call on the connection will buffer enough data to bring the connection above the
   // high watermark but the subsequent drain immediately brings it back below.
   // A nice future performance optimization would be to latch if the socket is writable in the
