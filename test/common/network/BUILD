@@ -132,7 +132,7 @@ envoy_cc_test(
     name = "dns_impl_test",
     srcs = ["dns_impl_test.cc"],
     args = [
-        "--runtime-feature-disable-for-tests=envoy.reloadable_features.use_apple_api_for_dns_lookups",
+        "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
     ],
     deps = [
         "//include/envoy/event:dispatcher_interface",

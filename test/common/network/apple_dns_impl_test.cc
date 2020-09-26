@@ -115,6 +115,15 @@ protected:
   DnsResolverSharedPtr resolver_;
 };
 
+TEST_F(AppleDnsImplTest, InvalidConfigOptions) {
+  EXPECT_DEATH(
+      dispatcher_->createDnsResolver({}, true),
+      "using TCP for DNS lookups is not possible when using Apple APIs for DNS resolution");
+  EXPECT_DEATH(
+      dispatcher_->createDnsResolver({nullptr}, false),
+      "defining custom resolvers is not possible when using Apple APIs for DNS resolution");
+}
+
 // Validate that when AppleDnsResolverImpl is destructed with outstanding requests,
 // that we don't invoke any callbacks if the query was cancelled. This is a regression test from
 // development, where segfaults were encountered due to callback invocations on

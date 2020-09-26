@@ -88,7 +88,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.strict_1xx_and_204_response_headers",
     "envoy.reloadable_features.tls_use_io_handle_bio",
     "envoy.reloadable_features.unify_grpc_handling",
-    "envoy.reloadable_features.use_apple_api_for_dns_lookups",
+    "envoy.restart_features.use_apple_api_for_dns_lookups",
 };
 
 // This is a section for officially sanctioned runtime features which are too

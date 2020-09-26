@@ -839,12 +839,12 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_api_enum_value_config.cluster.v4alpha.Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_api_enum_value_config.cluster.v4alpha.Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
-  // This value is a no-op if the ``envoy.reloadable_features.use_apple_api_for_dns_lookups`` runtime value is true during server startup.
+  // This value is a no-op if the ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during server startup.
   repeated core.v4alpha.Address dns_resolvers = 18;
 
   // [#next-major-version: Reconcile DNS options in a single message.]
   // Always use TCP queries instead of UDP queries for DNS lookups.
-  // This value is a no-op if the ``envoy.reloadable_features.use_apple_api_for_dns_lookups`` runtime value is true during server startup.
+  // This value is a no-op if the ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during server startup.
   bool use_tcp_for_dns_lookups = 45;
 
   // If specified, outlier detection will be enabled for this upstream cluster.
