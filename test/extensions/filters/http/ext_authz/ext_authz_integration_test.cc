@@ -284,11 +284,7 @@ public:
 
   void cleanup() {
     if (fake_ext_authz_connection_ != nullptr) {
-      if (clientType() != Grpc::ClientType::GoogleGrpc) {
-        AssertionResult result = fake_ext_authz_connection_->close();
-        RELEASE_ASSERT(result, result.message());
-      }
-      AssertionResult result = fake_ext_authz_connection_->waitForDisconnect();
+      AssertionResult result = fake_ext_authz_connection_->close();
       RELEASE_ASSERT(result, result.message());
     }
     cleanupUpstreamAndDownstream();
@@ -768,6 +764,70 @@ body_format:
       "message": ""
 })";
   EXPECT_TRUE(TestUtility::jsonStringEqual(response->body(), expected_body));
+
+  cleanup();
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
+  initializeConfig();
+  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  HttpIntegrationTest::initialize();
+  initiateClientConnection(4, Headers{}, Headers{});
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
+  if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    // Make sure one google grpc client is created
+    EXPECT_EQ(1, test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
+  }
+  sendExtAuthzResponse(Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+                       Http::TestRequestHeaderMapImpl{});
+
+  waitForSuccessfulUpstreamResponse("200", Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+                                    Http::TestRequestHeaderMapImpl{});
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
+  TestUtility::feedBufferWithRandomCharacters(request_body_, 4);
+  response_ = codec_client_->makeRequestWithBody(headers, request_body_.toString());
+
+  auto result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+  RELEASE_ASSERT(result, result.message());
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  result = ext_authz_request_->waitForGrpcMessage(*dispatcher_, check_request);
+  RELEASE_ASSERT(result, result.message());
+
+  EXPECT_EQ("POST", ext_authz_request_->headers().getMethodValue());
+  EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.auth.{}.Authorization", "Check",
+                                                apiVersion()),
+            ext_authz_request_->headers().getPathValue());
+  EXPECT_EQ("application/grpc", ext_authz_request_->headers().getContentTypeValue());
+  result = ext_authz_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    // Make sure one google grpc client is created
+    EXPECT_EQ(1, test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
+  }
+  sendExtAuthzResponse(Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+                       Http::TestRequestHeaderMapImpl{});
+
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(response_size_, true);
+
+  response_->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_body_.length(), upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+  EXPECT_EQ(response_size_, response_->body().size());
 
   cleanup();
 }
