@@ -138,15 +138,14 @@ TEST_F(CheckRequestUtilsTest, TcpPeerCertificate) {
 
 // Verify that createHttpCheck's dependencies are invoked when it's called.
 // Verify that check request object has no request data.
-// Verify that a client supplied EnvoyAuthPartialBody will not affect the
+// Verify that a client supplied x-envoy-auth-partial-body will not affect the
 // CheckRequest call.
 TEST_F(CheckRequestUtilsTest, BasicHttp) {
   const uint64_t size = 0;
   envoy::service::auth::v3::CheckRequest request_;
 
-  // A client supplied EnvoyAuthPartialBody header should be ignored.
-  Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().EnvoyAuthPartialBody.get(), "1"}};
+  // A client supplied x-envoy-auth-partial-body header should be ignored.
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-auth-partial-body", "1"}};
 
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
@@ -159,8 +158,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ(request_.attributes().request().http().headers().end(),
-            request_.attributes().request().http().headers().find(
-                Http::Headers::get().EnvoyAuthPartialBody.get()));
+            request_.attributes().request().http().headers().find("x-envoy-auth-partial-body"));
   EXPECT_TRUE(request_.attributes().request().has_time());
 }
 
@@ -180,8 +178,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
                                      /*pack_as_bytes=*/false, /*include_peer_certificate=*/false);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
-  EXPECT_EQ("true", request_.attributes().request().http().headers().at(
-                        Http::Headers::get().EnvoyAuthPartialBody.get()));
+  EXPECT_EQ("true",
+            request_.attributes().request().http().headers().at("x-envoy-auth-partial-body"));
 }
 
 // Verify that check request object has all the request data.
@@ -200,8 +198,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
   ASSERT_EQ(buffer_->length(), request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
             request_.attributes().request().http().body());
-  EXPECT_EQ("false", request_.attributes().request().http().headers().at(
-                         Http::Headers::get().EnvoyAuthPartialBody.get()));
+  EXPECT_EQ("false",
+            request_.attributes().request().http().headers().at("x-envoy-auth-partial-body"));
 }
 
 // Verify that check request object has all the request data and packed as bytes instead of UTF-8
@@ -242,8 +240,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBodyPackAsBytes) {
 
   EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
             request_.attributes().request().http().raw_body());
-  EXPECT_EQ("false", request_.attributes().request().http().headers().at(
-                         Http::Headers::get().EnvoyAuthPartialBody.get()));
+  EXPECT_EQ("false",
+            request_.attributes().request().http().headers().at("x-envoy-auth-partial-body"));
 }
 
 // Verify that createHttpCheck extract the proper attributes from the http request into CheckRequest
