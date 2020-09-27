@@ -37,7 +37,7 @@ message ResourceMonitor {
   //   <envoy_api_msg_config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig>`
   // * :ref:`envoy.resource_monitors.injected_resource
   //   <envoy_api_msg_config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig>`
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Configuration for the resource monitor being instantiated.
   oneof config_type {
@@ -69,7 +69,7 @@ message Trigger {
       "envoy.config.overload.v2alpha.Trigger";
 
   // The name of the resource this is a trigger for.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   oneof trigger_oneof {
     option (validate.required) = true;
@@ -87,7 +87,7 @@ message OverloadAction {
   // The name of the overload action. This is just a well-known string that listeners can
   // use for registering callbacks. Custom overload actions should be named using reverse
   // DNS to ensure uniqueness.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // A set of triggers for this action. The state of the action is the maximum
   // state of all triggers, which can be scaling between 0 and 1 or saturated. Listeners
