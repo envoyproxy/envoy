@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/event/timer.h"
 #include "envoy/network/transport_socket.h"
 
 #include "common/buffer/watermark_buffer.h"
@@ -216,7 +217,7 @@ private:
 };
 
 /**
- * libevent implementation of Network::ClientConnection expecting connect() fails immediately.
+ * libevent implementation of Network::ClientConnection. It schedule close() immediately.
  */
 class ClosingClientConnectionImpl : virtual public ClientConnection {
 public:
@@ -261,14 +262,18 @@ public:
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
   absl::string_view transportFailureReason() const override;
 
+private:
+  void closeSocket();
+
 public:
   Event::Dispatcher& dispatcher_;
+  Event::TimerPtr immediate_close_timer_;
   const Network::Address::InstanceConstSharedPtr remote_address_;
   const Network::Address::InstanceConstSharedPtr source_address_;
-  ConnectionSocketPtr socket_;
-
+  ConnectionSocket::OptionsSharedPtr socket_options_;
   StreamInfo::StreamInfoImpl stream_info_;
   std::list<Network::ConnectionCallbacks*> callbacks_;
+  bool is_closed_{false};
 };
 
 } // namespace Network

@@ -780,8 +780,12 @@ ClosingClientConnectionImpl::ClosingClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr& source_address)
 
-    : dispatcher_(dispatcher), remote_address_(remote_address), source_address_(source_address),
-      stream_info_(dispatcher.timeSource()) {}
+    : dispatcher_(dispatcher),
+      immediate_close_timer_(dispatcher.createTimer([this]() { closeSocket(); })),
+      remote_address_(remote_address), source_address_(source_address),
+      stream_info_(dispatcher.timeSource()) {
+  immediate_close_timer_->enableTimer(std::chrono::milliseconds(0));
+}
 void ClosingClientConnectionImpl::connect() {}
 
 void ClosingClientConnectionImpl::addFilter(FilterSharedPtr) {}
@@ -793,10 +797,12 @@ void ClosingClientConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb
 }
 void ClosingClientConnectionImpl::addBytesSentCallback(BytesSentCb) {}
 void ClosingClientConnectionImpl::enableHalfClose(bool) {}
-void ClosingClientConnectionImpl::close(ConnectionCloseType close_type) {
-  UNREFERENCED_PARAMETER(close_type);
-  return;
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+void ClosingClientConnectionImpl::close(ConnectionCloseType) {
+  if (is_closed_) {
+    ASSERT(!immediate_close_timer_->enabled());
+    return;
+  }
+  closeSocket();
 }
 Event::Dispatcher& ClosingClientConnectionImpl::dispatcher() { return dispatcher_; }
 uint64_t ClosingClientConnectionImpl::id() const { return 0; }
@@ -828,18 +834,16 @@ void ClosingClientConnectionImpl::setConnectionStats(const ConnectionStats& stat
 }
 Ssl::ConnectionInfoConstSharedPtr ClosingClientConnectionImpl::ssl() const { return nullptr; }
 absl::string_view ClosingClientConnectionImpl::requestedServerName() const { return EMPTY_STRING; }
-Connection::State ClosingClientConnectionImpl::state() const { return Connection::State::Open; }
-void ClosingClientConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
-  UNREFERENCED_PARAMETER(data);
-  UNREFERENCED_PARAMETER(end_stream);
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+Connection::State ClosingClientConnectionImpl::state() const {
+  return is_closed_ ? Connection::State::Closed : Connection::State::Open;
 }
+void ClosingClientConnectionImpl::write(Buffer::Instance&, bool) {}
 void ClosingClientConnectionImpl::setBufferLimits(uint32_t) {}
 uint32_t ClosingClientConnectionImpl::bufferLimit() const { return 65000; }
 bool ClosingClientConnectionImpl::localAddressRestored() const { return true; }
 bool ClosingClientConnectionImpl::aboveHighWatermark() const { return false; }
 const ConnectionSocket::OptionsSharedPtr& ClosingClientConnectionImpl::socketOptions() const {
-  return socket_->options();
+  return socket_options_;
 }
 StreamInfo::StreamInfo& ClosingClientConnectionImpl::streamInfo() { return stream_info_; }
 const StreamInfo::StreamInfo& ClosingClientConnectionImpl::streamInfo() const {
@@ -850,5 +854,16 @@ absl::string_view ClosingClientConnectionImpl::transportFailureReason() const {
   return EMPTY_STRING;
 }
 
+void ClosingClientConnectionImpl::closeSocket() {
+  if (is_closed_) {
+    ASSERT(!immediate_close_timer_->enabled());
+    return;
+  }
+  is_closed_ = true;
+  for (ConnectionCallbacks* callback : callbacks_) {
+    callback->onEvent(ConnectionEvent::RemoteClose);
+  }
+  immediate_close_timer_->disableTimer();
+}
 } // namespace Network
 } // namespace Envoy
