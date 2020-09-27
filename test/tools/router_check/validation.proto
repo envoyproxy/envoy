@@ -21,7 +21,7 @@ message Validation {
 message ValidationItem {
   // Name of the test case. There is no uniqueness constraint among the test case names.
   // The name has to be non empty.
-  string test_name = 1 [(validate.rules).string.min_bytes = 1];
+  string test_name = 1 [(validate.rules).string.min_len = 1];
 
   // The input constraints of the test case.
   ValidationInput input = 2 [(validate.rules).message.required = true];
@@ -38,17 +38,17 @@ message ValidationInput {
   // This pseudo-header field includes the authority portion of the target URI.
   // Clients that generate HTTP/2 requests directly SHOULD use the :authority pseudo-header field
   // instead of the Host header field.
-  string authority = 1 [(validate.rules).string.min_bytes = 1];
+  string authority = 1 [(validate.rules).string.min_len = 1];
 
   // The :path pseudo-header field includes the path and query parts of the target URI.
   // This pseudo-header field MUST NOT be empty for http or https URIs.
   // http or https URIs that do not contain a path component MUST include a value of '/'
   // The exception to this rule is an OPTIONS request for an http or https URI that does not include
   // a path component.
-  string path = 2 [(validate.rules).string.min_bytes = 1];
+  string path = 2 [(validate.rules).string.min_len = 1];
 
   // This pseudo-header field includes the HTTP method.
-  string method = 4 [(validate.rules).string.min_bytes = 3];
+  string method = 4 [(validate.rules).string.min_len = 3];
 
   // An integer used to identify the target for weighted cluster selection.
   // The default value of random_value is 0.

@@ -37,7 +37,7 @@ message DubboProxy {
       "envoy.config.filter.network.dubbo_proxy.v2alpha1.DubboProxy";
 
   // The human readable prefix to use when emitting statistics.
-  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // Configure the protocol used.
   ProtocolType protocol_type = 2 [(validate.rules).enum = {defined_only: true}];
@@ -62,7 +62,7 @@ message DubboFilter {
 
   // The name of the filter to instantiate. The name must match a supported
   // filter.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Filter specific configuration which depends on the filter being
   // instantiated. See the supported filters for further documentation.

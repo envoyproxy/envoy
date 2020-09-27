@@ -72,7 +72,7 @@ message ThriftProxy {
   ProtocolType protocol = 3 [(validate.rules).enum = {defined_only: true}];
 
   // The human readable prefix to use when emitting statistics.
-  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // The route table for the connection manager is static and is specified in this property.
   RouteConfiguration route_config = 4;
@@ -95,7 +95,7 @@ message ThriftFilter {
   // [#comment:TODO(zuercher): Auto generate the following list]
   // * :ref:`envoy.filters.thrift.router <config_thrift_filters_router>`
   // * :ref:`envoy.filters.thrift.rate_limit <config_thrift_filters_rate_limit>`
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.

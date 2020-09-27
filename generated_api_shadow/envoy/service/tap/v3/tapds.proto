@@ -42,7 +42,7 @@ message TapResource {
       "envoy.service.tap.v2alpha.TapResource";
 
   // The name of the tap configuration.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Tap config to apply
   config.tap.v3.TapConfig config = 2;

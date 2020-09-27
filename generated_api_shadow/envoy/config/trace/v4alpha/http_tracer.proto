@@ -52,7 +52,7 @@ message Tracing {
     // - *envoy.tracers.datadog*
     // - *envoy.tracers.opencensus*
     // - *envoy.tracers.xray*
-    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+    string name = 1 [(validate.rules).string = {min_len: 1}];
 
     // Trace driver specific configuration which depends on the driver being instantiated.
     // See the trace drivers for examples:

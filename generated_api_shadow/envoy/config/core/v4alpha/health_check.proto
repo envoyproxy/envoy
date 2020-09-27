@@ -67,7 +67,7 @@ message HealthCheck {
       option (validate.required) = true;
 
       // Hex encoded payload. E.g., "000000FF".
-      string text = 1 [(validate.rules).string = {min_bytes: 1}];
+      string text = 1 [(validate.rules).string = {min_len: 1}];
 
       // [#not-implemented-hide:] Binary payload.
       bytes binary = 2;
@@ -91,9 +91,8 @@ message HealthCheck {
 
     // Specifies the HTTP path that will be requested during health checking. For example
     // */healthcheck*.
-    string path = 2 [
-      (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}
-    ];
+    string path = 2
+        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // [#not-implemented-hide:] HTTP specific payload.
     Payload send = 3;
@@ -187,7 +186,7 @@ message HealthCheck {
     reserved "config";
 
     // The registered name of the custom health checker.
-    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+    string name = 1 [(validate.rules).string = {min_len: 1}];
 
     // A custom health checker specific configuration which depends on the custom health checker
     // being instantiated. See :api:`envoy/config/health_checker` for reference.

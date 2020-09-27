@@ -29,7 +29,7 @@ message ExtAuthz {
       "envoy.config.filter.network.ext_authz.v2.ExtAuthz";
 
   // The prefix to use when emitting statistics.
-  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // The external authorization gRPC service configuration.
   // The default timeout is set to 200ms by this filter.

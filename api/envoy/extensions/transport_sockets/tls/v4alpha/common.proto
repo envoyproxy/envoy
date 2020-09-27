@@ -121,7 +121,7 @@ message PrivateKeyProvider {
 
   // Private key method provider name. The name must match a
   // supported private key method provider type.
-  string provider_name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string provider_name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Private key method provider specific configuration.
   oneof config_type {
@@ -268,7 +268,7 @@ message CertificateValidationContext {
   //   because SPKI is tied to a private key, so it doesn't change when the certificate
   //   is renewed using the same private key.
   repeated string verify_certificate_spki = 3
-      [(validate.rules).repeated = {items {string {min_bytes: 44 max_bytes: 44}}}];
+      [(validate.rules).repeated = {items {string {min_len: 44 max_bytes: 44}}}];
 
   // An optional list of hex-encoded SHA-256 hashes. If specified, Envoy will verify that
   // the SHA-256 of the DER-encoded presented certificate matches one of the specified values.
@@ -297,7 +297,7 @@ message CertificateValidationContext {
   // <envoy_api_field_extensions.transport_sockets.tls.v4alpha.CertificateValidationContext.verify_certificate_spki>` are specified,
   // a hash matching value from either of the lists will result in the certificate being accepted.
   repeated string verify_certificate_hash = 2
-      [(validate.rules).repeated = {items {string {min_bytes: 64 max_bytes: 95}}}];
+      [(validate.rules).repeated = {items {string {min_len: 64 max_bytes: 95}}}];
 
   // An optional list of Subject Alternative name matchers. Envoy will verify that the
   // Subject Alternative Name of the presented certificate matches one of the specified matches.

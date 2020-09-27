@@ -88,10 +88,10 @@ message OutlierDetectionEvent {
   google.protobuf.UInt64Value secs_since_last_action = 3;
 
   // The :ref:`cluster <envoy_api_msg_config.cluster.v3.Cluster>` that owns the ejected host.
-  string cluster_name = 4 [(validate.rules).string = {min_bytes: 1}];
+  string cluster_name = 4 [(validate.rules).string = {min_len: 1}];
 
   // The URL of the ejected host. E.g., ``tcp://1.2.3.4:80``.
-  string upstream_url = 5 [(validate.rules).string = {min_bytes: 1}];
+  string upstream_url = 5 [(validate.rules).string = {min_len: 1}];
 
   // The action that took place.
   Action action = 6 [(validate.rules).enum = {defined_only: true}];

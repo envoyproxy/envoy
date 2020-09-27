@@ -42,7 +42,7 @@ message TapResource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.service.tap.v3.TapResource";
 
   // The name of the tap configuration.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Tap config to apply
   config.tap.v4alpha.TapConfig config = 2;

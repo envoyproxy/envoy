@@ -138,7 +138,7 @@ message CommonTlsContext {
 
     // opaque name used to specify certificate instances or types. For example, "ROOTCA" to specify
     // a root-certificate (validation context) or "TLS" to specify a new tls-certificate.
-    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+    string name = 1 [(validate.rules).string = {min_len: 1}];
 
     // Provider specific config.
     // Note: an implementation is expected to dedup multiple instances of the same config

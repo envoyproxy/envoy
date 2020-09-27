@@ -62,7 +62,7 @@ message JwtProvider {
   // Example: https://securetoken.google.com
   // Example: 1234567-compute@developer.gserviceaccount.com
   //
-  string issuer = 1 [(validate.rules).string = {min_bytes: 1}];
+  string issuer = 1 [(validate.rules).string = {min_len: 1}];
 
   // The list of JWT `audiences <https://tools.ietf.org/html/rfc7519#section-4.1.3>`_ are
   // allowed to access. A JWT containing any of these audiences will be accepted. If not specified,
@@ -220,7 +220,7 @@ message JwtHeader {
 
   // The HTTP header name.
   string name = 1
-      [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // The value prefix. The value format is "value_prefix<token>"
   // For example, for "Authorization: Bearer <token>", value_prefix="Bearer " with a space at the
@@ -414,7 +414,7 @@ message FilterStateRule {
       "envoy.extensions.filters.http.jwt_authn.v3.FilterStateRule";
 
   // The filter state name to retrieve the `Router::StringAccessor` object.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // A map of string keys to requirements. The string key is the string value
   // in the FilterState with the name specified in the *name* field above.

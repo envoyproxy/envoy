@@ -24,7 +24,7 @@ message Squash {
       "envoy.config.filter.http.squash.v2.Squash";
 
   // The name of the cluster that hosts the Squash server.
-  string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
+  string cluster = 1 [(validate.rules).string = {min_len: 1}];
 
   // When the filter requests the Squash server to create a DebugAttachment, it will use this
   // structure as template for the body of the request. It can contain reference to environment

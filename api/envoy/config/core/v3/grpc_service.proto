@@ -35,13 +35,13 @@ message GrpcService {
     // The name of the upstream gRPC cluster. SSL credentials will be supplied
     // in the :ref:`Cluster <envoy_api_msg_config.cluster.v3.Cluster>` :ref:`transport_socket
     // <envoy_api_field_config.cluster.v3.Cluster.transport_socket>`.
-    string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
+    string cluster_name = 1 [(validate.rules).string = {min_len: 1}];
 
     // The `:authority` header in the grpc request. If this field is not set, the authority header value will be `cluster_name`.
     // Note that this authority does not override the SNI. The SNI is provided by the transport socket of the cluster.
     string authority = 2
         [(validate.rules).string =
-             {min_bytes: 0 max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}];
+             {min_len: 0 max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}];
   }
 
   // [#next-free-field: 9]
@@ -160,10 +160,10 @@ message GrpcService {
 
         // The path of subject token, a security token that represents the
         // identity of the party on behalf of whom the request is being made.
-        string subject_token_path = 6 [(validate.rules).string = {min_bytes: 1}];
+        string subject_token_path = 6 [(validate.rules).string = {min_len: 1}];
 
         // Type of the subject token.
-        string subject_token_type = 7 [(validate.rules).string = {min_bytes: 1}];
+        string subject_token_type = 7 [(validate.rules).string = {min_len: 1}];
 
         // The path of actor token, a security token that represents the identity
         // of the acting party. The acting party is authorized to use the
@@ -230,7 +230,7 @@ message GrpcService {
     // The target URI when using the `Google C++ gRPC client
     // <https://github.com/grpc/grpc>`_. SSL credentials will be supplied in
     // :ref:`channel_credentials <envoy_api_field_config.core.v3.GrpcService.GoogleGrpc.channel_credentials>`.
-    string target_uri = 1 [(validate.rules).string = {min_bytes: 1}];
+    string target_uri = 1 [(validate.rules).string = {min_len: 1}];
 
     ChannelCredentials channel_credentials = 2;
 
@@ -247,7 +247,7 @@ message GrpcService {
     //
     //    streams_total, Counter, Total number of streams opened
     //    streams_closed_<gRPC status code>, Counter, Total streams closed with <gRPC status code>
-    string stat_prefix = 4 [(validate.rules).string = {min_bytes: 1}];
+    string stat_prefix = 4 [(validate.rules).string = {min_len: 1}];
 
     // The name of the Google gRPC credentials factory to use. This must have been registered with
     // Envoy. If this is empty, a default credentials factory will be used that sets up channel

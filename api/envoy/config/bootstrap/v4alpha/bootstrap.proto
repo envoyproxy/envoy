@@ -496,7 +496,7 @@ message RuntimeLayer {
 
   // Descriptive name for the runtime layer. This is only used for the runtime
   // :http:get:`/runtime` output.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   oneof layer_specifier {
     option (validate.required) = true;

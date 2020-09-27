@@ -22,7 +22,7 @@ message GrpcMethodList {
         "envoy.api.v2.core.GrpcMethodList.Service";
 
     // The name of the gRPC service.
-    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+    string name = 1 [(validate.rules).string = {min_len: 1}];
 
     // The names of the gRPC methods in this service.
     repeated string method_names = 2 [(validate.rules).repeated = {min_items: 1}];

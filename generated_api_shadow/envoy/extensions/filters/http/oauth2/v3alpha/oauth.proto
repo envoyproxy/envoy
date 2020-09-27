@@ -26,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 message OAuth2Credentials {
   // The client_id to be used in the authorize calls. This value will be URL encoded when sent to the OAuth server.
-  string client_id = 1 [(validate.rules).string = {min_bytes: 1}];
+  string client_id = 1 [(validate.rules).string = {min_len: 1}];
 
   // The secret used to retrieve the access token. This value will be URL encoded when sent to the OAuth server.
   transport_sockets.tls.v3.SdsSecretConfig token_secret = 2
@@ -50,7 +50,7 @@ message OAuth2Config {
   config.core.v3.HttpUri token_endpoint = 1;
 
   // The endpoint redirect to for authorization in response to unauthorized requests.
-  string authorization_endpoint = 2 [(validate.rules).string = {min_bytes: 1}];
+  string authorization_endpoint = 2 [(validate.rules).string = {min_len: 1}];
 
   // Credentials used for OAuth.
   OAuth2Credentials credentials = 3 [(validate.rules).message = {required: true}];
@@ -60,7 +60,7 @@ message OAuth2Config {
   // documentation on :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`.
   //
   // This URI should not contain any query parameters.
-  string redirect_uri = 4 [(validate.rules).string = {min_bytes: 1}];
+  string redirect_uri = 4 [(validate.rules).string = {min_len: 1}];
 
   // Matching criteria used to determine whether a path appears to be the result of a redirect from the authorization server.
   type.matcher.v3.PathMatcher redirect_path_matcher = 5
