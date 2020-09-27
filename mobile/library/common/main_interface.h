@@ -101,10 +101,32 @@ envoy_status_t set_preferred_network(envoy_network_t network);
  * @param engine, the engine that owns the counter.
  * @param elements, the string that identifies the counter to increment.
  * @param count, the count to increment by.
- * @param envoy_status_t, the resulting status of the operation.
  */
 envoy_status_t record_counter(envoy_engine_t engine, const char* elements, uint64_t count);
 
+/**
+ * Set a gauge of a given string of elements with the given value.
+ * @param engine, the engine that owns the gauge.
+ * @param elements, the string that identifies the gauge to set value with.
+ * @param value, the value to set to the gauge.
+ */
+envoy_status_t record_gauge_set(envoy_engine_t engine, const char* elements, uint64_t value);
+
+/**
+ * Add the gauge with the given string of elements and by the given amount.
+ * @param engine, the engine that owns the gauge.
+ * @param elements, the string that identifies the gauge to add to.
+ * @param amount, the amount to add to the gauge.
+ */
+envoy_status_t record_gauge_add(envoy_engine_t engine, const char* elements, uint64_t amount);
+
+/**
+ * Subtract from the gauge with the given string of elements and by the given amount.
+ * @param engine, the engine that owns the gauge.
+ * @param elements, the string that identifies the gauge to subtract from.
+ * @param amount, amount to subtract from the gauge.
+ */
+envoy_status_t record_gauge_sub(envoy_engine_t engine, const char* elements, uint64_t amount);
 /**
  * Statically register APIs leveraging platform libraries.
  * Warning: Must be completed before any calls to run_engine().
