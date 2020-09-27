@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+
+. tools/shell_utils.sh
+
+set -e
+
+# We also validate that the tag and version match at this point if needed.
+if [ -n "$CIRCLE_TAG" ]
+then
+  # Check the git tag matches the version number in the VERSION file.
+  VERSION_NUMBER=$(cat VERSION)
+  if [ "v${VERSION_NUMBER}" != "${CIRCLE_TAG}" ]; then
+    echo "Given git tag does not match the VERSION file content:"
+    echo "${CIRCLE_TAG} vs $(cat VERSION)"
+    exit 1
+  fi
+  # Check the version_history.rst contains current release version.
+  grep --fixed-strings "$VERSION_NUMBER" docs/root/version_history/current.rst \
+    || (echo "Git tag not found in version_history/current.rst" && exit 1)
+
+  # Now that we know there is a match, we can use the tag.
+  export ENVOY_BLOB_SHA="$CIRCLE_TAG"
+else
+  BUILD_SHA=$(git rev-parse HEAD)
+  export ENVOY_BLOB_SHA="$BUILD_SHA"
+fi
+
+SCRIPT_DIR="$(dirname "$0")"
+BUILD_DIR=build_schema
+DOCS_OUTPUT_DIR="${DOCS_OUTPUT_DIR:-generated/docs}"
+GENERATED_RST_DIR="${GENERATED_RST_DIR:-generated/rst}"
+
+rm -rf "${DOCS_OUTPUT_DIR}"
+mkdir -p "${DOCS_OUTPUT_DIR}"
+
+rm -rf "${GENERATED_RST_DIR}"
+mkdir -p "${GENERATED_RST_DIR}"
+
+source_venv "$BUILD_DIR"
+# pip3 install -r "${SCRIPT_DIR}"/requirements.txt
+
+# Clean up any stale files in the API tree output. Bazel remembers valid cached
+# files still.
+rm -rf bazel-bin/external/envoy_api_canonical
+
+EXTENSION_DB_PATH="$(realpath "${BUILD_DIR}/extension_db.json")"
+export EXTENSION_DB_PATH
+
+# This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
+IFS=" " read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
+BAZEL_BUILD_OPTIONS+=(
+    "--remote_download_outputs=all"
+    "--strategy=protoschema=sandboxed,local"
+    "--action_env=ENVOY_BLOB_SHA"
+    "--action_env=EXTENSION_DB_PATH")
+
+# Generate extension database. This maps from extension name to extension
+# metadata, based on the envoy_cc_extension() Bazel target attributes.
+# ./docs/generate_extension_db.py "${EXTENSION_DB_PATH}"
+
+# Generate RST for the lists of trusted/untrusted extensions in
+# intro/arch_overview/security docs.
+# mkdir -p "${GENERATED_RST_DIR}"/intro/arch_overview/security
+# ./docs/generate_extension_rst.py "${EXTENSION_DB_PATH}" "${GENERATED_RST_DIR}"/intro/arch_overview/security
+
+# Generate RST for external dependency docs in intro/arch_overview/security.
+# ./docs/generate_external_dep_rst.py "${GENERATED_RST_DIR}"/intro/arch_overview/security
+
+function generate_api_schema() {
+  declare -r API_VERSION=$1
+  echo "Generating ${API_VERSION} API SCHEMA..."
+
+  # Generate the extensions docs
+  echo "RUNNING BAZEL BUILD WITH ASPECT..."
+  echo "BAZEL BUILD OPTIONS: ${BAZEL_BUILD_OPTIONS[@]}"
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" @envoy_api_canonical//:"${API_VERSION}"_protos --aspects \
+    tools/protoschema/protoschema.bzl%protoschema_aspect --output_groups=rst
+  echo "FINISHED RUNNING BAZEL BUILD WITH ASPECT"
+}
+
+generate_api_schema v2
+generate_api_schema v3

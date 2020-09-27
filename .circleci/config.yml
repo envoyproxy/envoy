@@ -58,6 +58,13 @@ jobs:
        - store_artifacts:
            path: generated/docs
 
+   schema:
+     executor: ubuntu-build
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - run: ci/do_circle_ci.sh schema
+
 workflows:
   version: 2
   all:
@@ -69,3 +76,4 @@ workflows:
           filters:
             tags:
               only: /^v.*/
+      - schema

@@ -52,6 +52,16 @@ def _python_deps():
         extra_pip_args = ["--require-hashes"],
     )
     pip3_import(
+        # project_name = "PyYAML",
+        # project_url = "https://github.com/yaml/pyyaml",
+        # version = "5.3.1",
+        # use_category = ["other"],
+        # cpe = "cpe:2.3:a:pyyaml:pyyaml:*",
+        name = "protoschema_pip3",
+        requirements = "@envoy//tools/protoschema:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip3_import(
         # project_name = "Apache Thrift",
         # project_url = "http://thrift.apache.org/",
         # version = "0.11.0",

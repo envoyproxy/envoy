@@ -404,6 +404,10 @@ elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."
   docs/build.sh
   exit 0
+elif [[ "$CI_TARGET" == "schema" ]]; then
+  echo "generating schema..."
+  docs/build-schema.sh
+  exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   echo "verify examples..."
   docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"

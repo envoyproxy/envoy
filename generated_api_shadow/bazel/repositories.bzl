@@ -11,6 +11,10 @@ def api_dependencies():
         locations = REPOSITORY_LOCATIONS,
     )
     envoy_http_archive(
+        "com_github_chrusty_protoc_gen_jsonschema",
+        locations = REPOSITORY_LOCATIONS,
+    )
+    envoy_http_archive(
         name = "com_google_googleapis",
         locations = REPOSITORY_LOCATIONS,
     )
