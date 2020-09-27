@@ -39,20 +39,12 @@ SlotPtr InstanceImpl::allocateSlot() {
 }
 
 InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
-    : parent_(parent), index_(index),
-      ref_count_(/*not used.*/ nullptr,
-                 [index, &parent = parent_](uint32_t* /* not used */) {
-                   // On destruction, post a cleanup callback on main thread, this could happen on
-                   // any thread.
-                   parent.scheduleCleanup(index);
-                 }),
-      still_alive_guard_(std::make_shared<bool>(true)) {}
+    : parent_(parent), index_(index), still_alive_guard_(std::make_shared<bool>(true)) {}
 
 Event::PostCb InstanceImpl::SlotImpl::wrapCallback(Event::PostCb cb) {
   // See the header file and comments for still_alive_guard_ and ref_count_ for the purpose
   // of these captures.
-  return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), ref_count = ref_count_,
-          cb] {
+  return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), cb] {
     if (still_alive_guard.lock()) {
       cb();
     }
@@ -88,8 +80,7 @@ void InstanceImpl::SlotImpl::runOnAllThreads(Event::PostCb cb) {
 }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) {
-  parent_.runOnAllThreads(
-      wrapCallback([cb, main_callback, ref_count = this->ref_count_]() { cb(); }), main_callback);
+  parent_.runOnAllThreads(wrapCallback([cb, main_callback]() { cb(); }), main_callback);
 }
 
 void InstanceImpl::SlotImpl::set(InitializeCb cb) {
@@ -119,36 +110,8 @@ void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_threa
   }
 }
 
-// Puts the slot into a deferred delete container, the slot will be destructed when its out-going
-// callback reference count goes to 0.
-void InstanceImpl::recycle(uint32_t slot) {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
-  deferred_deletes_.insert(slot);
-}
-
-// Called by the SlotImpl ref_count destructor, the SlotImpl in the deferred deletes map can be
-// destructed now.
-void InstanceImpl::scheduleCleanup(uint32_t slot) {
-  if (shutdown_) {
-    // If server is shutting down, do nothing here.
-    // The destruction of SlotImpl has already transferred the SlotImpl to the deferred_deletes_
-    // queue. No matter if this method is called from a Worker thread, the SlotImpl will be
-    // destructed on main thread when InstanceImpl destructs.
-    return;
-  }
-  if (std::this_thread::get_id() == main_thread_id_) {
-    // If called from main thread, save a callback.
-    removeSlot(slot);
-    return;
-  }
-  main_thread_dispatcher_->post([slot, this]() { removeSlot(slot); });
-}
-
 void InstanceImpl::removeSlot(uint32_t slot) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
-  ASSERT(deferred_deletes_.contains(slot));
-  // The slot is guaranteed to be put into the deferred_deletes_ map by SlotImpl destructor.
-  deferred_deletes_.erase(slot);
 
   // When shutting down, we do not post slot removals to other threads. This is because the other
   // threads have already shut down and the dispatcher is no longer alive. There is also no reason
@@ -166,7 +129,8 @@ void InstanceImpl::removeSlot(uint32_t slot) {
   runOnAllThreads([slot]() -> void {
     // This runs on each thread and clears the slot, making it available for a new allocations.
     // This is safe even if a new allocation comes in, because everything happens with post() and
-    // will be sequenced after this removal.
+    // will be sequenced after this removal. It is also safe if there are callbacks pending on
+    // other threads because they will run first.
     if (slot < thread_local_data_.data_.size()) {
       thread_local_data_.data_[slot] = nullptr;
     }
