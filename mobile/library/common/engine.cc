@@ -115,6 +115,42 @@ envoy_status_t Engine::recordCounter(const std::string& elements, uint64_t count
   return ENVOY_FAILURE;
 }
 
+envoy_status_t Engine::recordGaugeSet(const std::string& elements, uint64_t value) {
+  if (server_ && client_scope_) {
+    server_->dispatcher().post([this, elements, value]() -> void {
+      Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(elements)},
+                                        Stats::Gauge::ImportMode::NeverImport)
+          .set(value);
+    });
+    return ENVOY_SUCCESS;
+  }
+  return ENVOY_FAILURE;
+}
+
+envoy_status_t Engine::recordGaugeAdd(const std::string& elements, uint64_t amount) {
+  if (server_ && client_scope_) {
+    server_->dispatcher().post([this, elements, amount]() -> void {
+      Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(elements)},
+                                        Stats::Gauge::ImportMode::NeverImport)
+          .add(amount);
+    });
+    return ENVOY_SUCCESS;
+  }
+  return ENVOY_FAILURE;
+}
+
+envoy_status_t Engine::recordGaugeSub(const std::string& elements, uint64_t amount) {
+  if (server_ && client_scope_) {
+    server_->dispatcher().post([this, elements, amount]() -> void {
+      Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(elements)},
+                                        Stats::Gauge::ImportMode::NeverImport)
+          .sub(amount);
+    });
+    return ENVOY_SUCCESS;
+  }
+  return ENVOY_FAILURE;
+}
+
 Http::Dispatcher& Engine::httpDispatcher() { return *http_dispatcher_; }
 
 } // namespace Envoy
