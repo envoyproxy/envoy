@@ -81,9 +81,14 @@ public:
   bool encrypted() const { return encrypted_; }
 
 protected:
-  // Message action defines the Decoder's method which will be invoked
+  // MsgAction defines the Decoder's method which will be invoked
   // when a specific message has been decoded.
   using MsgAction = std::function<void(DecoderImpl*)>;
+
+  // MsgBodyReader is a function which returns a pointer to a Message
+  // class which is able to read the Postgres message body.
+  // The Postgres message body structure depends on the message type.
+  using MsgBodyReader = std::function<std::unique_ptr<Message>()>;
 
   // MessageProcessor has the following fields:
   // first - string with message description
@@ -91,8 +96,7 @@ protected:
   // which is capable of parsing the message's body.
   // third - vector of Decoder's methods which are invoked when the message
   // is processed.
-  using MessageProcessor =
-      std::tuple<std::string, std::function<std::unique_ptr<Message>()>, std::vector<MsgAction>>;
+  using MessageProcessor = std::tuple<std::string, MsgBodyReader, std::vector<MsgAction>>;
 
   // Frontend and Backend messages.
   using MsgGroup = struct {

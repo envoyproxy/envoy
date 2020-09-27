@@ -9,7 +9,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace PostgresProxy {
 
-#define BODY_FORMAT(...) []() -> std::unique_ptr<Message> { return createMsg<__VA_ARGS__>(); }
+#define BODY_FORMAT(...)                                                                           \
+  []() -> std::unique_ptr<Message> { return createMsgBodyReader<__VA_ARGS__>(); }
 #define NO_BODY BODY_FORMAT()
 
 void DecoderImpl::initialize() {
@@ -393,7 +394,7 @@ void DecoderImpl::onStartup() {
 // Method generates displayable format of currently processed message.
 const std::string DecoderImpl::genDebugMessage(const MessageProcessor& msg, Buffer::Instance& data,
                                                uint32_t message_len) {
-  const auto& f = std::get<1>(msg);
+  const MsgBodyReader& f = std::get<1>(msg);
   std::string message = "Unrecognized";
   if (f != nullptr) {
     const auto msgParser = f();

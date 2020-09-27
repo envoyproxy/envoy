@@ -135,7 +135,7 @@ public:
     pos += sizeof(uint16_t);
     left -= sizeof(uint16_t);
     if (num != 0) {
-      for (auto i = 0; i < num; i++) {
+      for (uint16_t i = 0; i < num; i++) {
         auto item = std::make_unique<T>();
         if (!item->read(data, pos, left)) {
           return false;
@@ -149,6 +149,9 @@ public:
   std::string toString() const {
     std::string out = fmt::format("[Array of {}:{{", value_.size());
 
+    // Iterate through all elements in the array.
+    // No delimiter is required between elements, as each
+    // element is wrapped in "[]" or "{}".
     for (const auto& i : value_) {
       absl::StrAppend(&out, i->toString());
     }
@@ -187,6 +190,9 @@ public:
   std::string toString() const {
     std::string out;
 
+    // Iterate through all repeated elements.
+    // No delimiter is required between elements, as each
+    // element is wrapped in "[]" or "{}".
     for (const auto& i : value_) {
       absl::StrAppend(&out, i->toString());
     }
@@ -260,7 +266,7 @@ public:
 
 // Helper function to create pointer to a Sequence structure and is used by Postgres
 // decoder after learning the type of Postgres message.
-template <typename... Types> std::unique_ptr<Message> createMsg() {
+template <typename... Types> std::unique_ptr<Message> createMsgBodyReader() {
   return std::make_unique<Sequence<Types...>>();
 }
 

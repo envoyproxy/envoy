@@ -551,9 +551,9 @@ TEST(Sequence, NotEnoughData) {
   ASSERT_FALSE(field.read(data, pos, left));
 }
 
-// Tests for Message interface and helper function createMsg.
+// Tests for Message interface and helper function createMsgBodyReader.
 TEST(PostgresMessage, SingleFieldInt32) {
-  std::unique_ptr<Message> msg = createMsg<Int32>();
+  std::unique_ptr<Message> msg = createMsgBodyReader<Int32>();
 
   Buffer::OwnedImpl data;
   data.writeBEInt<uint32_t>(12);
@@ -563,7 +563,7 @@ TEST(PostgresMessage, SingleFieldInt32) {
 }
 
 TEST(PostgresMessage, SingleFieldInt16) {
-  std::unique_ptr<Message> msg = createMsg<Int16>();
+  std::unique_ptr<Message> msg = createMsgBodyReader<Int16>();
 
   Buffer::OwnedImpl data;
   data.writeBEInt<uint16_t>(12);
@@ -573,7 +573,7 @@ TEST(PostgresMessage, SingleFieldInt16) {
 }
 
 TEST(PostgresMessage, SingleByteN) {
-  std::unique_ptr<Message> msg = createMsg<ByteN>();
+  std::unique_ptr<Message> msg = createMsgBodyReader<ByteN>();
 
   Buffer::OwnedImpl data;
   data.writeBEInt<uint8_t>(0);
@@ -591,7 +591,7 @@ TEST(PostgresMessage, SingleByteN) {
 }
 
 TEST(PostgresMessage, MultipleValues1) {
-  std::unique_ptr<Message> msg = createMsg<Int32, Int16>();
+  std::unique_ptr<Message> msg = createMsgBodyReader<Int32, Int16>();
 
   Buffer::OwnedImpl data;
   data.writeBEInt<uint32_t>(12);
@@ -603,7 +603,7 @@ TEST(PostgresMessage, MultipleValues1) {
 }
 
 TEST(PostgresMessage, MultipleValues2) {
-  std::unique_ptr<Message> msg = createMsg<Int16, Int32, Int16>();
+  std::unique_ptr<Message> msg = createMsgBodyReader<Int16, Int32, Int16>();
 
   Buffer::OwnedImpl data;
   data.writeBEInt<uint16_t>(13);
@@ -617,7 +617,7 @@ TEST(PostgresMessage, MultipleValues2) {
 }
 
 TEST(PostgresMessage, MultipleValues3) {
-  std::unique_ptr<Message> msg = createMsg<Int32, Int16, Int32, Int16>();
+  std::unique_ptr<Message> msg = createMsgBodyReader<Int32, Int16, Int32, Int16>();
 
   Buffer::OwnedImpl data;
   data.writeBEInt<uint32_t>(12);
@@ -633,7 +633,7 @@ TEST(PostgresMessage, MultipleValues3) {
 }
 
 TEST(PostgresMessage, MultipleValues4) {
-  std::unique_ptr<Message> msg = createMsg<Int16, Int32, Int16, Int32, Int16>();
+  std::unique_ptr<Message> msg = createMsgBodyReader<Int16, Int32, Int16, Int32, Int16>();
 
   Buffer::OwnedImpl data;
   data.writeBEInt<uint16_t>(13);
@@ -651,7 +651,7 @@ TEST(PostgresMessage, MultipleValues4) {
 }
 
 TEST(PostgresMessage, MultipleValues5) {
-  std::unique_ptr<Message> msg = createMsg<Int32, Int16, Int32, Int16, Int32, Int16>();
+  std::unique_ptr<Message> msg = createMsgBodyReader<Int32, Int16, Int32, Int16, Int32, Int16>();
 
   Buffer::OwnedImpl data;
   data.writeBEInt<uint32_t>(12);
@@ -671,7 +671,8 @@ TEST(PostgresMessage, MultipleValues5) {
 }
 
 TEST(PostgresMessage, MultipleValues6) {
-  std::unique_ptr<Message> msg = createMsg<String, Int32, Int16, Int32, Int16, Int32, Int16>();
+  std::unique_ptr<Message> msg =
+      createMsgBodyReader<String, Int32, Int16, Int32, Int16, Int32, Int16>();
 
   Buffer::OwnedImpl data;
   data.add("test");
@@ -694,7 +695,7 @@ TEST(PostgresMessage, MultipleValues6) {
 }
 
 TEST(PostgresMessage, MultipleValues7) {
-  std::unique_ptr<Message> msg = createMsg<String, Array<Int32>>();
+  std::unique_ptr<Message> msg = createMsgBodyReader<String, Array<Int32>>();
 
   Buffer::OwnedImpl data;
   data.add("test");
@@ -714,7 +715,7 @@ TEST(PostgresMessage, MultipleValues7) {
 }
 
 TEST(PostgresMessage, ArraySet1) {
-  std::unique_ptr<Message> msg = createMsg<Array<Int16>>();
+  std::unique_ptr<Message> msg = createMsgBodyReader<Array<Int16>>();
 
   Buffer::OwnedImpl data;
   // There will be 3 elements in the array.
@@ -730,7 +731,7 @@ TEST(PostgresMessage, ArraySet1) {
 }
 
 TEST(PostgresMessage, ArraySet2) {
-  std::unique_ptr<Message> msg = createMsg<Array<VarByteN>, Int16>();
+  std::unique_ptr<Message> msg = createMsgBodyReader<Array<VarByteN>, Int16>();
 
   Buffer::OwnedImpl data;
   // Array of 1 element of VarByteN.
@@ -753,7 +754,7 @@ TEST(PostgresMessage, ArraySet2) {
 }
 
 TEST(PostgresMessage, ArraySet3) {
-  std::unique_ptr<Message> msg = createMsg<Array<Int16>, Array<VarByteN>, Int16>();
+  std::unique_ptr<Message> msg = createMsgBodyReader<Array<Int16>, Array<VarByteN>, Int16>();
 
   Buffer::OwnedImpl data;
   // There will be 3 elements in the array.
@@ -782,7 +783,7 @@ TEST(PostgresMessage, ArraySet3) {
 }
 
 TEST(PostgresMessage, ArraySet4) {
-  std::unique_ptr<Message> msg = createMsg<Array<VarByteN>, Array<Int16>>();
+  std::unique_ptr<Message> msg = createMsgBodyReader<Array<VarByteN>, Array<Int16>>();
 
   Buffer::OwnedImpl data;
   // Array of 1 element of VarByteN.
@@ -807,7 +808,7 @@ TEST(PostgresMessage, ArraySet4) {
 }
 
 TEST(PostgresMessage, ArraySet5) {
-  std::unique_ptr<Message> msg = createMsg<Array<Int16>, Array<VarByteN>, Array<Int16>>();
+  std::unique_ptr<Message> msg = createMsgBodyReader<Array<Int16>, Array<VarByteN>, Array<Int16>>();
 
   Buffer::OwnedImpl data;
   // There will be 3 elements in the first array.
@@ -838,7 +839,8 @@ TEST(PostgresMessage, ArraySet5) {
 }
 
 TEST(PostgresMessage, ArraySet6) {
-  std::unique_ptr<Message> msg = createMsg<String, Array<Int16>, Array<VarByteN>, Array<Int16>>();
+  std::unique_ptr<Message> msg =
+      createMsgBodyReader<String, Array<Int16>, Array<VarByteN>, Array<Int16>>();
 
   Buffer::OwnedImpl data;
   // Write string.
@@ -874,7 +876,7 @@ TEST(PostgresMessage, ArraySet6) {
 }
 
 TEST(PostgresMessage, Repeated1) {
-  std::unique_ptr<Message> msg = createMsg<Repeated<String>>();
+  std::unique_ptr<Message> msg = createMsgBodyReader<Repeated<String>>();
 
   Buffer::OwnedImpl data;
   // Write 3 strings.
@@ -893,7 +895,7 @@ TEST(PostgresMessage, Repeated1) {
 }
 
 TEST(PostgresMessage, Repeated2) {
-  std::unique_ptr<Message> msg = createMsg<Int32, Repeated<String>>();
+  std::unique_ptr<Message> msg = createMsgBodyReader<Int32, Repeated<String>>();
 
   Buffer::OwnedImpl data;
   data.writeBEInt<int32_t>(115);
@@ -914,7 +916,7 @@ TEST(PostgresMessage, Repeated2) {
 }
 
 TEST(PostgresMessage, NotEnoughData) {
-  std::unique_ptr<Message> msg = createMsg<Int32, String>();
+  std::unique_ptr<Message> msg = createMsgBodyReader<Int32, String>();
   Buffer::OwnedImpl data;
   // Write only 3 bytes into the buffer.
   data.writeBEInt<uint8_t>(0);
