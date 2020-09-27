@@ -42,8 +42,7 @@ InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
     : parent_(parent), index_(index), still_alive_guard_(std::make_shared<bool>(true)) {}
 
 Event::PostCb InstanceImpl::SlotImpl::wrapCallback(Event::PostCb cb) {
-  // See the header file and comments for still_alive_guard_ and ref_count_ for the purpose
-  // of these captures.
+  // See the header file comments for still_alive_guard_ for the purpose of this capture.
   return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), cb] {
     if (still_alive_guard.lock()) {
       cb();
