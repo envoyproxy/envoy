@@ -33,7 +33,10 @@ actions {
                     value: "200"
                 }
             }
-            status: "200"
+            status: 200
+        }
+        tcp_respond {
+            
         }
     }
 }
@@ -49,7 +52,10 @@ actions {
                     value: "200"
                 }
             }
-            status: "200"
+            status: 200
+        }
+        tcp_respond {
+            
         }
     }
 }
