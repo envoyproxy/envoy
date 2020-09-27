@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/http/header_map.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
@@ -22,7 +23,6 @@
 #include "common/stream_info/utility.h"
 
 #include "absl/strings/str_split.h"
-#include "envoy/http/header_map.h"
 #include "fmt/format.h"
 
 using Envoy::Config::Metadata;
@@ -1157,23 +1157,24 @@ ProtobufWkt::Value StartTimeFormatter::formatValue(
 EnvFormatter::EnvFormatter(const std::string& key) : key_(key) {}
 
 absl::optional<std::string> EnvFormatter::format(const Http::RequestHeaderMap&,
-    const Http::ResponseHeaderMap&,
-    const Http::ResponseTrailerMap&,
-    const StreamInfo::StreamInfo&,
-    absl::string_view) const {
-      const char* val = std::getenv(key_.c_str());
-      if (val == nullptr) {
-        return "";
-      }
-      return val;
+                                                 const Http::ResponseHeaderMap&,
+                                                 const Http::ResponseTrailerMap&,
+                                                 const StreamInfo::StreamInfo&,
+                                                 absl::string_view) const {
+  const char* val = std::getenv(key_.c_str());
+  if (val == nullptr) {
+    return absl::nullopt;
+  }
+  return val;
 }
 
-ProtobufWkt::Value EnvFormatter::formatValue(const Http::RequestHeaderMap&request_headers,
-    const Http::ResponseHeaderMap& response_headers,
-    const Http::ResponseTrailerMap& response_trailers,
-    const StreamInfo::StreamInfo& stream_info,
-    absl::string_view local_reply_body) const {
-      return ValueUtil::optionalStringValue(format(request_headers, response_headers, response_trailers, stream_info, local_reply_body));
+ProtobufWkt::Value EnvFormatter::formatValue(const Http::RequestHeaderMap& request_headers,
+                                             const Http::ResponseHeaderMap& response_headers,
+                                             const Http::ResponseTrailerMap& response_trailers,
+                                             const StreamInfo::StreamInfo& stream_info,
+                                             absl::string_view local_reply_body) const {
+  return ValueUtil::optionalStringValue(
+      format(request_headers, response_headers, response_trailers, stream_info, local_reply_body));
 }
 
 } // namespace Formatter
