@@ -67,6 +67,7 @@ public:
   Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                                       Event::FileTriggerType trigger, uint32_t events) override;
   Api::SysCallIntResult shutdown(int how) override;
+  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
 
 protected:
   // Converts a SysCallSizeResult to IoCallUint64Result.

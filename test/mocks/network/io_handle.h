@@ -55,6 +55,7 @@ public:
               (Event::Dispatcher & dispatcher, Event::FileReadyCb cb,
                Event::FileTriggerType trigger, uint32_t events));
   MOCK_METHOD(Api::SysCallIntResult, shutdown, (int how));
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
 };
 
 } // namespace Network
