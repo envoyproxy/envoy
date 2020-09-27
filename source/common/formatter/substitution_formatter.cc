@@ -22,6 +22,7 @@
 #include "common/stream_info/utility.h"
 
 #include "absl/strings/str_split.h"
+#include "envoy/http/header_map.h"
 #include "fmt/format.h"
 
 using Envoy::Config::Metadata;
@@ -288,6 +289,7 @@ std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::str
   std::vector<FormatterProviderPtr> formatters;
   static constexpr absl::string_view DYNAMIC_META_TOKEN{"DYNAMIC_METADATA("};
   static constexpr absl::string_view FILTER_STATE_TOKEN{"FILTER_STATE("};
+  static constexpr absl::string_view ENV_TOKEN{"ENV("};
   const std::regex command_w_args_regex(R"EOF(^%([A-Z]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
 
   static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
@@ -385,6 +387,18 @@ std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::str
       } else if (absl::StartsWith(token, "GRPC_STATUS")) {
         formatters.emplace_back(FormatterProviderPtr{
             new GrpcStatusFormatter("grpc-status", "", absl::optional<size_t>())});
+      } else if (absl::StartsWith(token, ENV_TOKEN)) {
+        std::string key;
+        absl::optional<size_t> max_length;
+        std::vector<std::string> path;
+        const size_t start = ENV_TOKEN.size();
+
+        parseCommand(token, start, "", key, path, max_length);
+        if (key.empty()) {
+          throw EnvoyException("Invalid env configuration, key cannot be empty.");
+        }
+
+        formatters.push_back(std::make_unique<EnvFormatter>(key));
       } else {
         formatters.emplace_back(FormatterProviderPtr{new StreamInfoFormatter(token)});
       }
@@ -1138,6 +1152,28 @@ ProtobufWkt::Value StartTimeFormatter::formatValue(
     absl::string_view local_reply_body) const {
   return ValueUtil::optionalStringValue(
       format(request_headers, response_headers, response_trailers, stream_info, local_reply_body));
+}
+
+EnvFormatter::EnvFormatter(const std::string& key) : key_(key) {}
+
+absl::optional<std::string> EnvFormatter::format(const Http::RequestHeaderMap&,
+    const Http::ResponseHeaderMap&,
+    const Http::ResponseTrailerMap&,
+    const StreamInfo::StreamInfo&,
+    absl::string_view) const {
+      const char* val = std::getenv(key_.c_str());
+      if (val == nullptr) {
+        return "";
+      }
+      return val;
+}
+
+ProtobufWkt::Value EnvFormatter::formatValue(const Http::RequestHeaderMap&request_headers,
+    const Http::ResponseHeaderMap& response_headers,
+    const Http::ResponseTrailerMap& response_trailers,
+    const StreamInfo::StreamInfo& stream_info,
+    absl::string_view local_reply_body) const {
+      return ValueUtil::optionalStringValue(format(request_headers, response_headers, response_trailers, stream_info, local_reply_body));
 }
 
 } // namespace Formatter

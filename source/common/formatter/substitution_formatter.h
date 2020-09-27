@@ -382,5 +382,24 @@ private:
   const Envoy::DateFormatter date_formatter_;
 };
 
+/**
+ * FormatterProvider for env value from StreamInfo.
+ */
+class EnvFormatter : public FormatterProvider {
+public:
+  EnvFormatter(const std::string& key);
+
+  // FormatterProvider
+  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                     absl::string_view) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                 absl::string_view) const override;
+
+private:
+  std::string key_;
+};
+
 } // namespace Formatter
 } // namespace Envoy
