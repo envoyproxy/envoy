@@ -57,12 +57,6 @@ SliceDataPtr WatermarkBuffer::extractMutableFrontSlice() {
   return result;
 }
 
-Api::IoCallUint64Result WatermarkBuffer::read(Network::IoHandle& io_handle, uint64_t max_length) {
-  Api::IoCallUint64Result result = OwnedImpl::read(io_handle, max_length);
-  checkHighAndOverflowWatermarks();
-  return result;
-}
-
 uint64_t WatermarkBuffer::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
   uint64_t bytes_reserved = OwnedImpl::reserve(length, iovecs, num_iovecs);
   checkHighAndOverflowWatermarks();
