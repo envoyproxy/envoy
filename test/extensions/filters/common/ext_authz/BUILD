@@ -16,6 +16,7 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/protobuf",
         "//source/extensions/filters/common/ext_authz:check_request_utils_lib",
+        "//source/extensions/filters/common/ext_authz:ext_authz_interface",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",

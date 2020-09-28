@@ -6,6 +6,8 @@
 #include "common/http/http2/codec_impl_legacy.h"
 #include "common/http/utility.h"
 
+#include "test/mocks/common.h"
+
 namespace Envoy {
 namespace Http {
 namespace Http2 {
@@ -83,7 +85,7 @@ public:
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action)
       : TestServerConnection(scope),
-        CodecImplType(connection, callbacks, http2CodecStats(), http2_options,
+        CodecImplType(connection, callbacks, http2CodecStats(), random_, http2_options,
                       max_request_headers_kb, max_request_headers_count,
                       headers_with_underscores_action) {}
 
@@ -103,6 +105,8 @@ public:
 protected:
   // Overrides ServerConnectionImpl::onSettingsForTest().
   void onSettingsForTest(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
+
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
 using TestServerConnectionImplLegacy =
@@ -123,6 +127,8 @@ class TestClientConnection : public TestCodecStatsProvider,
                              public ClientCodecFacade {
 public:
   TestClientConnection(Stats::Scope& scope) : TestCodecStatsProvider(scope) {}
+
+  testing::NiceMock<Random::MockRandomGenerator> random_generator_;
 };
 
 template <typename CodecImplType>
@@ -134,7 +140,7 @@ public:
                            uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
                            typename CodecImplType::SessionFactory& http2_session_factory)
       : TestClientConnection(scope),
-        CodecImplType(connection, callbacks, http2CodecStats(), http2_options,
+        CodecImplType(connection, callbacks, http2CodecStats(), random_generator_, http2_options,
                       max_request_headers_kb, max_request_headers_count, http2_session_factory) {}
 
   // ClientCodecFacade
