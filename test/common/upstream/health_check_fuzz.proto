@@ -36,7 +36,7 @@ message GrpcRespondBytes {
   oneof grpc_respond_bytes_selector {
     option (validate.required) = true;
     //Structured response, which will get converted to raw bytes
-    ServingStatus status = 1; //TODO: Split structured response as well?
+    ServingStatus status = 1 [(validate.rules).enum.defined_only = true];
     GrpcRespondUnstructuredBytes grpc_respond_unstructured_bytes = 2;
   }
   //This value will determine how many fixed bytes will make up a structured response
@@ -79,7 +79,7 @@ message Action {
     google.protobuf.Empty trigger_interval_timer = 2;
     //TODO: respondBody, respondTrailers
     google.protobuf.Empty trigger_timeout_timer = 3;
-    RaiseEvent raise_event = 4;
+    RaiseEvent raise_event = 4 [(validate.rules).enum.defined_only = true];
   }
 }
 
