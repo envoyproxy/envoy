@@ -13,7 +13,8 @@ namespace Memory {
 
 uint64_t Stats::totalCurrentlyAllocated() {
   return tcmalloc::MallocExtension::GetNumericProperty("generic.current_allocated_bytes")
-      .value_or(0) + tcmalloc::MallocExtension::GetProperties()["tcmalloc.cpu_free"].value;
+             .value_or(0) +
+         tcmalloc::MallocExtension::GetProperties()["tcmalloc.cpu_free"].value;
 }
 
 uint64_t Stats::totalCurrentlyReserved() {
