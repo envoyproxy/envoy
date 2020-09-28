@@ -21,6 +21,9 @@
 #include "common/signal/fatal_error_handler.h"
 
 namespace Envoy {
+namespace Network {
+class BufferedIoSocketHandleImpl;
+}
 namespace Event {
 
 /**
@@ -34,8 +37,9 @@ public:
   DispatcherImpl(const std::string& name, Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
                  Event::TimeSystem& time_system);
   ~DispatcherImpl() override;
-  using InternalConnectionCallback = std::function<void(
-      const Network::Address::InstanceConstSharedPtr& address, Network::ConnectionPtr server_conn)>;
+  using InternalConnectionCallback =
+      std::function<void(const Network::Address::InstanceConstSharedPtr& address,
+                         std::unique_ptr<Network::BufferedIoSocketHandleImpl> internal_socket)>;
   /**
    * @return event_base& the libevent base.
    */

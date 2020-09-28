@@ -239,6 +239,7 @@ envoy_cc_library(
     name = "listener_lib",
     srcs = [
         "base_listener_impl.cc",
+        "internal_listener_impl.cc",
         "tcp_listener_impl.cc",
         "udp_listener_impl.cc",
     ],
@@ -264,6 +265,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/event:dispatcher_includes",
+        "//source/common/network:buffered_io_socket_handle_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

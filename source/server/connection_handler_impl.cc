@@ -794,10 +794,16 @@ void ConnectionHandlerImpl::ActiveInternalSocket::newConnection() {
   connected_ = true;
 
   // Set default transport protocol if none of the listener filters did it.
-  if (socket_->detectedTransportProtocol().empty()) {
-    socket_->setDetectedTransportProtocol(
-        Extensions::TransportSockets::TransportProtocolNames::get().RawBuffer);
+  if (!socket_->detectedTransportProtocol().empty() &&
+      socket_->detectedTransportProtocol() !=
+          Extensions::TransportSockets::TransportProtocolNames::get().RawBuffer) {
+    ENVOY_LOG(warn,
+              "internal connection does not support transport protocol {}, use raw buffer "
+              "transport socket. ",
+              socket_->detectedTransportProtocol());
   }
+  socket_->setDetectedTransportProtocol(
+      Extensions::TransportSockets::TransportProtocolNames::get().RawBuffer);
   // TODO(lambdai): add integration test
   // TODO: Address issues in wider scope. See https://github.com/envoyproxy/envoy/issues/8925
   // Erase accept filter states because accept filters may not get the opportunity to clean up.
@@ -854,7 +860,7 @@ void ConnectionHandlerImpl::ActiveInternalListener::shutdownListener() {
 }
 
 void ConnectionHandlerImpl::ActiveInternalListener::onNewSocket(
-    Network::ConnectionSocketPtr, Network::ConnectionSocketPtr socket) {
+    Network::ConnectionSocketPtr socket) {
   ActiveInternalSocketPtr active_socket =
       std::make_unique<ActiveInternalSocket>(*this, std::move(socket));
   // Create and run the filters

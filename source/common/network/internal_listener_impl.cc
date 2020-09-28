@@ -11,6 +11,7 @@
 #include "common/common/utility.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
+#include "common/network/buffered_io_socket_handle_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 
 #include "absl/strings/str_cat.h"
@@ -18,24 +19,18 @@
 namespace Envoy {
 namespace Network {
 namespace {
-uint64_t next_internal_connection_id = 0;
+// uint64_t next_internal_connection_id = 0;
 }
-void InternalListenerImpl::setupInternalListener(Event::DispatcherImpl& dispatcher,
-                                                 const std::string& listener_id) {
+void InternalListenerImpl::setupInternalListener(Event::DispatcherImpl& dispatcher) {
   dispatcher.registerInternalListener(
-      listener_id,
-      [this](const Address::InstanceConstSharedPtr& address, Network::ConnectionPtr server_conn) {
-        address->asString()
+      internal_listener_id_,
+      [this](const Address::InstanceConstSharedPtr& client_address,
+             std::unique_ptr<Network::BufferedIoSocketHandleImpl> internal_socket) {
         auto socket = std::make_unique<Network::InternalConnectionSocketImpl>(
-            nullptr,
-            // Local
-            address,
-            // Remote
-            std::make_shared<Network::Address::EnvoyInternalAddress>(absl::StrCat(
-              address->asString(),
-              "-",
-              ++next_internal_connection_id));
-        cb_.setupNewConnection(std::move(server_conn), std::move(socket));
+            std::move(internal_socket),
+            std::make_shared<Network::Address::EnvoyInternalInstance>(internal_listener_id_),
+            client_address);
+        cb_.onNewSocket(std::move(socket));
       });
 }
 

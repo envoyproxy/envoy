@@ -68,7 +68,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                IoSocketError::deleteIoError)};
   }
-  // Write along with iteration. Buffer guarantee the fragment is always appendable.
+  // Write along with iteration. Buffer guarantee the fragment is always append-able.
   uint64_t num_bytes_to_write = 0;
   for (uint64_t i = 0; i < num_slice; i++) {
     if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {

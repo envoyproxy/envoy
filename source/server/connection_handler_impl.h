@@ -216,8 +216,7 @@ private:
     // Network::InternalListenerCallbacks
     void setupNewConnection(Network::ConnectionPtr server_conn,
                             Network::ConnectionSocketPtr socket) override;
-    void onNewSocket(Network::ConnectionSocketPtr socket,
-                     Network::ConnectionSocketPtr server_conn) override;
+    void onNewSocket(Network::ConnectionSocketPtr socket) override;
     // ActiveListenerImplBase
     Network::Listener* listener() override { return internal_listener_.get(); }
     void pauseListening() override { internal_listener_->disable(); }

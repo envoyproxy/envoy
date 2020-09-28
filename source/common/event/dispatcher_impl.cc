@@ -19,6 +19,7 @@
 #include "common/event/signal_impl.h"
 #include "common/event/timer_impl.h"
 #include "common/filesystem/watcher_impl.h"
+#include "common/network/buffered_io_socket_handle_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
 #include "common/network/tcp_listener_impl.h"
@@ -133,12 +134,13 @@ DispatcherImpl::createInternalConnection(Network::Address::InstanceConstSharedPt
   if (iter == internal_listeners_.end()) {
     ENVOY_LOG_MISC(debug, "lambdai: no valid listener registered for envoy internal address {}",
                    internal_address->asString());
-    return std::make_unique<Network::ClosingClientConnectionImpl>(*this, internal_address, local_address);
+    return std::make_unique<Network::ClosingClientConnectionImpl>(*this, internal_address,
+                                                                  local_address);
   }
-  Network::ConnectionPtr server_conn{};
   Network::ClientConnectionPtr client_conn{};
+  auto server_io_handle = std::make_unique<Network::BufferedIoSocketHandleImpl>();
 
-  (iter->second)(internal_address, std::move(server_conn));
+  (iter->second)(internal_address, std::move(server_io_handle));
   return client_conn;
 }
 

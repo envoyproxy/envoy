@@ -94,6 +94,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
+
 envoy_cc_test(
     name = "closing_connection_impl_test",
     srcs = ["closing_connection_impl_test.cc"],
@@ -117,6 +118,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
+
 envoy_cc_test(
     name = "dns_impl_test",
     srcs = ["dns_impl_test.cc"],
@@ -140,7 +142,6 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
-
 
 envoy_cc_test(
     name = "filter_manager_impl_test",

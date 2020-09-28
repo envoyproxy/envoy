@@ -78,7 +78,7 @@ public:
   }
 
 private:
-  // The persisted intrested events and ready events.
+  // The persisted interested events and ready events.
   uint32_t pending_events_{};
   // The events set by activate() and will be cleared after the io callback.
   uint32_t ephermal_events_{};

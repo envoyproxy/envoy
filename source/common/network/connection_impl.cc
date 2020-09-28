@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <memory>
 
-#include "common/common/macros.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -14,6 +13,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/macros.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
