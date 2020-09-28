@@ -78,9 +78,8 @@ message ClusterStatus {
   // 3. Outlier detection is not enabled for this cluster.
   type.v3.Percent local_origin_success_rate_ejection_threshold = 5;
 
-  // :ref:`Circuit breaking settings <arch_overview_circuit_break>` for the cluster for defined
-  // priorities.
-  map<string, config.cluster.v3.CircuitBreakers> circuit_breakers = 6;
+  // :ref:`Circuit breaking <arch_overview_circuit_break>` settings of the cluster.
+  config.cluster.v3.CircuitBreakers circuit_breakers = 6;
 }
 
 // Current state of a particular host.
