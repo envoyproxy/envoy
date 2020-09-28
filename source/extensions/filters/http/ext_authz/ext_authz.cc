@@ -166,8 +166,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
   switch (response->status) {
   case CheckStatus::OK: {
+    // Any changes to request headers can affect how the request is going to be
+    // routed. If we are changing the headers we also need to clear the route
+    // cache.
     if (config_->clearRouteCache() &&
-        (!response->headers_to_set.empty() || !response->headers_to_append.empty())) {
+        (!response->headers_to_set.empty() || !response->headers_to_append.empty() ||
+         !response->headers_to_remove.empty())) {
       ENVOY_STREAM_LOG(debug, "ext_authz is clearing route cache", *callbacks_);
       callbacks_->clearRouteCache();
     }
@@ -198,6 +202,18 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         // TODO(dio): Consider to use addCopy instead.
         request_headers_->appendCopy(header.first, header.second);
       }
+    }
+
+    ENVOY_STREAM_LOG(trace, "ext_authz filter removed header(s) from the request:", *callbacks_);
+    for (const auto& header : response->headers_to_remove) {
+      // We don't allow removing any :-prefixed headers, nor Host, as removing
+      // them would make the request malformed.
+      if (absl::StartsWithIgnoreCase(absl::string_view(header.get()), ":") ||
+          header == Http::Headers::get().HostLegacy) {
+        continue;
+      }
+      ENVOY_STREAM_LOG(trace, "'{}'", *callbacks_, header.get());
+      request_headers_->remove(header);
     }
 
     if (!response->dynamic_metadata.fields().empty()) {

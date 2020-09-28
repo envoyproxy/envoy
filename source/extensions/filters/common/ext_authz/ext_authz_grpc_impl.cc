@@ -71,6 +71,11 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     authz_response->status = CheckStatus::OK;
     if (response->has_ok_response()) {
       toAuthzResponseHeader(authz_response, response->ok_response().headers());
+      if (response->ok_response().headers_to_remove_size() > 0) {
+        for (const auto& header : response->ok_response().headers_to_remove()) {
+          authz_response->headers_to_remove.push_back(Http::LowerCaseString(header));
+        }
+      }
     }
   } else {
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
