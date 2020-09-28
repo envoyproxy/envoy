@@ -132,10 +132,11 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
   if (use_apple_api_for_dns_lookups) {
     RELEASE_ASSERT(
         resolvers.empty(),
-        "defining custom resolvers is not possible when using Apple APIs for DNS resolution");
-    RELEASE_ASSERT(
-        !use_tcp_for_dns_lookups,
-        "using TCP for DNS lookups is not possible when using Apple APIs for DNS resolution");
+        "defining custom resolvers is not possible when using Apple APIs for DNS resolution. "
+        "Apple's API only allows overriding DNS resolvers via system settings.");
+    RELEASE_ASSERT(!use_tcp_for_dns_lookups,
+                   "using TCP for DNS lookups is not possible when using Apple APIs for DNS "
+                   "resolution. Apple' API only uses UDP for DNS resolution");
     return Network::DnsResolverSharedPtr{new Network::AppleDnsResolverImpl(*this)};
   }
 #endif
