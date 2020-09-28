@@ -37,7 +37,7 @@ public:
   Http::CodecClient::Type codecClientType() { return codec_client_type_; }
 };
 
-class HttpHealthCheckerImplTest : public testing::Test, public HealthCheckerTestBase {
+class HttpHealthCheckerImplTestBase : public HealthCheckerTestBase {
 public:
   struct TestSession {
     Event::MockTimer* interval_timer_{};
@@ -54,73 +54,37 @@ public:
       absl::node_hash_map<std::string,
                           const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig>;
 
-  void allocHealthChecker(const std::string& yaml, bool avoid_boosting = true);
-
-  void addCompletionCallback();
-
-  void setupNoServiceValidationHCWithHttp2();
-
-  void setupInitialJitter();
-
-  void setupIntervalJitterPercent();
-
-  void setupNoServiceValidationHC();
-
-  void setupNoServiceValidationHCOneUnhealthy();
-
-  void setupNoServiceValidationHCAlwaysLogFailure();
-
-  void setupNoServiceValidationNoReuseConnectionHC();
-
-  void setupHealthCheckIntervalOverridesHC();
-
-  void setupServiceValidationHC();
-
-  void setupDeprecatedServiceNameValidationHC(const std::string& prefix);
-
-  void setupServicePrefixPatternValidationHC();
-
-  void setupServiceExactPatternValidationHC();
-
-  void setupServiceRegexPatternValidationHC();
-
-  void setupServiceValidationWithCustomHostValueHC(const std::string& host);
-
-  const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig
-  makeHealthCheckConfig(const uint32_t port_value);
-
-  void appendTestHosts(std::shared_ptr<MockClusterMockPrioritySet> cluster,
-                       const HostWithHealthCheckMap& hosts, const std::string& protocol = "tcp://",
-                       const uint32_t priority = 0);
-
-  void setupServiceValidationWithAdditionalHeaders();
-
-  void setupServiceValidationWithoutUserAgent();
-
   void expectSessionCreate(const HostWithHealthCheckMap& health_check_map);
 
   void expectClientCreate(size_t index, const HostWithHealthCheckMap& health_check_map);
 
   void expectStreamCreate(size_t index);
 
-  void respond(size_t index, const std::string& code, bool conn_close, bool proxy_close = false,
-               bool body = false, bool trailers = false,
-               const absl::optional<std::string>& service_cluster = absl::optional<std::string>(),
-               bool degraded = false);
-
   void expectSessionCreate();
   void expectClientCreate(size_t index);
-
-  void expectSuccessStartFailedFailFirst(
-      const absl::optional<std::string>& health_checked_cluster = absl::optional<std::string>());
-
-  MOCK_METHOD(void, onHostStatus, (HostSharedPtr host, HealthTransition changed_state));
 
   std::vector<TestSessionPtr> test_sessions_;
   std::shared_ptr<TestHttpHealthCheckerImpl> health_checker_;
   std::list<uint32_t> connection_index_{};
   std::list<uint32_t> codec_index_{};
   const HostWithHealthCheckMap health_checker_map_{};
+};
+
+// TODO(zasweq): This class here isn't currently being used in the unit test class.
+// The class here expects the creates the timeout first, then the interval. This is due
+// to the normal expectation call to be opposite, or LIFO (Last in, First Out). The InSequence
+// object makes the tcp health checker unit tests FIFO (First in, First out). We should standardize
+// this amongst the three unit test classes.
+class TcpHealthCheckerImplTestBase : public HealthCheckerTestBase {
+public:
+  void expectSessionCreate();
+  void expectClientCreate();
+
+  std::shared_ptr<TcpHealthCheckerImpl> health_checker_;
+  Network::MockClientConnection* connection_{};
+  Event::MockTimer* timeout_timer_{};
+  Event::MockTimer* interval_timer_{};
+  Network::ReadFilterSharedPtr read_filter_;
 };
 
 } // namespace Upstream

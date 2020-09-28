@@ -59,6 +59,7 @@ message DeniedHttpResponse {
 }
 
 // HTTP attributes for an OK response.
+// [#next-free-field: 6]
 message OkHttpResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.auth.v3.OkHttpResponse";
@@ -74,6 +75,23 @@ message OkHttpResponse {
   // by Leaving `append` as false, the filter will either add a new header, or override an existing
   // one if there is a match.
   repeated config.core.v4alpha.HeaderValueOption headers = 2;
+
+  // HTTP entity headers to remove from the original request before dispatching
+  // it to the upstream. This allows the authorization service to act on auth
+  // related headers (like `Authorization`), process them, and consume them.
+  // Under this model, the upstream will either receive the request (if it's
+  // authorized) or not receive it (if it's not), but will not see headers
+  // containing authorization credentials.
+  //
+  // Pseudo headers (such as `:authority`, `:method`, `:path` etc), as well as
+  // the header `Host`, may not be removed as that would make the request
+  // malformed. If mentioned in `headers_to_remove` these special headers will
+  // be ignored.
+  //
+  // When using the HTTP service this must instead be set by the HTTP
+  // authorization service as a comma separated list like so:
+  // ``x-envoy-auth-headers-to-remove: one-auth-header, another-auth-header``.
+  repeated string headers_to_remove = 5;
 }
 
 // Intended for gRPC and Network Authorization servers `only`.

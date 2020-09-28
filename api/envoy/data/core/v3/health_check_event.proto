@@ -40,7 +40,7 @@ message HealthCheckEvent {
 
   config.core.v3.Address host = 2;
 
-  string cluster_name = 3 [(validate.rules).string = {min_bytes: 1}];
+  string cluster_name = 3 [(validate.rules).string = {min_len: 1}];
 
   oneof event {
     option (validate.required) = true;

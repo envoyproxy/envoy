@@ -1,12 +1,15 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_source_base.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
+
 #include "quiche/quic/core/quic_data_writer.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 

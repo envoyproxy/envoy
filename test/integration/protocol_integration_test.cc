@@ -854,6 +854,16 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
 // Test hitting the encoder buffer filter with too many response bytes to buffer. Given the request
 // headers are sent on early, the stream/connection will be reset.
 TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* route_config = hcm.mutable_route_config();
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        auto* header = virtual_host->mutable_response_headers_to_add()->Add()->mutable_header();
+        header->set_key("foo");
+        header->set_value("bar");
+      });
+
   useAccessLog();
   config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
@@ -886,6 +896,11 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("500", response->headers().getStatusValue());
+  // Regression test all sendLocalReply paths add route-requested headers.
+  auto foo = Http::LowerCaseString("foo");
+  ASSERT_TRUE(response->headers().get(foo) != nullptr);
+  EXPECT_EQ("bar", response->headers().get(foo)->value().getStringView());
+
   // Regression test https://github.com/envoyproxy/envoy/issues/9881 by making
   // sure this path does standard HCM header transformations.
   EXPECT_TRUE(response->headers().Date() != nullptr);
@@ -1945,7 +1960,7 @@ TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
 TEST_P(DownstreamProtocolIntegrationTest, TestPrefetch) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->mutable_prefetch_policy()->mutable_prefetch_ratio()->set_value(1.5);
+    cluster->mutable_prefetch_policy()->mutable_per_upstream_prefetch_ratio()->set_value(1.5);
   });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

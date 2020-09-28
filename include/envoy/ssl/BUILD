@@ -29,6 +29,7 @@ envoy_cc_library(
     hdrs = ["context_config.h"],
     deps = [
         ":certificate_validation_context_config_interface",
+        ":handshaker_interface",
         ":tls_certificate_config_interface",
     ],
 )
@@ -81,7 +82,10 @@ envoy_cc_library(
     hdrs = ["handshaker.h"],
     external_deps = ["ssl"],
     deps = [
+        "//include/envoy/api:api_interface",
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:post_io_action_interface",
+        "//include/envoy/protobuf:message_validator_interface",
     ],
 )
