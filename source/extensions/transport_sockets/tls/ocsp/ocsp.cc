@@ -94,6 +94,10 @@ OcspResponseWrapper::OcspResponseWrapper(std::vector<uint8_t> der_response, Time
     : raw_bytes_(std::move(der_response)), response_(readDerEncodedOcspResponse(raw_bytes_)),
       time_source_(time_source) {
 
+  if (response_->status_ != OcspResponseStatus::Successful) {
+    throw EnvoyException("OCSP response was unsuccessful");
+  }
+
   if (response_->response_ == nullptr) {
     throw EnvoyException("OCSP response has no body");
   }
@@ -116,7 +120,7 @@ OcspResponseWrapper::OcspResponseWrapper(std::vector<uint8_t> der_response, Time
 // Though different issuers could produce certificates with the same serial
 // number, this is check is to prevent operator error and a collision in this
 // case is unlikely.
-bool OcspResponseWrapper::matchesCertificate(X509& cert) {
+bool OcspResponseWrapper::matchesCertificate(X509& cert) const {
   std::string cert_serial_number = CertUtility::getSerialNumberFromCertificate(cert);
   std::string resp_cert_serial_number = response_->response_->getCertSerialNumber();
   return resp_cert_serial_number == cert_serial_number;
@@ -125,6 +129,28 @@ bool OcspResponseWrapper::matchesCertificate(X509& cert) {
 bool OcspResponseWrapper::isExpired() {
   auto& next_update = response_->response_->getNextUpdate();
   return next_update == absl::nullopt || next_update < time_source_.systemTime();
+}
+
+uint64_t OcspResponseWrapper::secondsUntilExpiration() const {
+  auto& next_update = response_->response_->getNextUpdate();
+  auto now = time_source_.systemTime();
+  if (!next_update || next_update.value() <= now) {
+    return 0;
+  }
+  return std::chrono::duration_cast<std::chrono::seconds>(next_update.value() - now).count();
+}
+
+Envoy::SystemTime OcspResponseWrapper::getThisUpdate() const {
+  return response_->response_->getThisUpdate();
+}
+
+Envoy::SystemTime OcspResponseWrapper::getNextUpdate() const {
+  auto& next_update = response_->response_->getNextUpdate();
+  if (next_update) {
+    return *next_update;
+  }
+
+  return time_source_.systemTime();
 }
 
 std::unique_ptr<OcspResponse> Asn1OcspUtility::parseOcspResponse(CBS& cbs) {

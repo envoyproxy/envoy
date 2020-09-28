@@ -79,6 +79,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/server:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",
+        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:network_utility_lib",
@@ -137,7 +138,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/server:guarddog_lib",
         "//test/mocks:common_lib",
-        "//test/mocks/server:main_mocks",
+        "//test/mocks/server:watchdog_config_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -270,15 +271,14 @@ envoy_cc_test(
     srcs = ["listener_manager_impl_quic_only_test.cc"],
     tags = [
         "nofips",
-        # Skipping as quiche quic_stream_send_buffer.cc does not currently compile on Windows
+        # Skipping as quiche quic_gso_batch_writer.h does not exist on Windows
+        # required by quic_stream_send_buffer.cc
         "skip_on_windows",
     ],
     deps = [
         ":listener_manager_impl_test_lib",
         ":utility_lib",
-        "//source/extensions/quic_listeners/quiche:active_quic_listener_config_lib",
-        "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
-        "//source/extensions/quic_listeners/quiche:udp_gso_batch_writer_config_lib",
+        "//source/extensions/quic_listeners/quiche:quic_factory_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

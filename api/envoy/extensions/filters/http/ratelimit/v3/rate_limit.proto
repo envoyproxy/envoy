@@ -34,7 +34,7 @@ message RateLimit {
   }
 
   // The rate limit domain to use when calling the rate limit service.
-  string domain = 1 [(validate.rules).string = {min_bytes: 1}];
+  string domain = 1 [(validate.rules).string = {min_len: 1}];
 
   // Specifies the rate limit configurations to be applied with the same
   // stage number. If not set, the default stage number is 0.
@@ -99,4 +99,20 @@ message RateLimit {
   // Disabled by default.
   XRateLimitHeadersRFCVersion enable_x_ratelimit_headers = 8
       [(validate.rules).enum = {defined_only: true}];
+}
+
+message RateLimitPerRoute {
+  enum VhRateLimitsOptions {
+    // Use the virtual host rate limits unless the route has a rate limit policy.
+    OVERRIDE = 0;
+
+    // Use the virtual host rate limits even if the route has a rate limit policy.
+    INCLUDE = 1;
+
+    // Ignore the virtual host rate limits even if the route does not have a rate limit policy.
+    IGNORE = 2;
+  }
+
+  // Specifies if the rate limit filter should include the virtual host rate limits.
+  VhRateLimitsOptions vh_rate_limits = 1 [(validate.rules).enum = {defined_only: true}];
 }

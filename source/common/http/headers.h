@@ -61,6 +61,7 @@ public:
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString CacheControl{"cache-control"};
+  const LowerCaseString CdnLoop{"cdn-loop"};
   const LowerCaseString ContentEncoding{"content-encoding"};
   const LowerCaseString Etag{"etag"};
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
@@ -132,7 +133,6 @@ public:
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
   const LowerCaseString EnvoyAttemptCount{absl::StrCat(prefix(), "-attempt-count")};
-  const LowerCaseString EnvoyAuthPartialBody{absl::StrCat(prefix(), "-auth-partial-body")};
   const LowerCaseString EnvoyCluster{absl::StrCat(prefix(), "-cluster")};
   const LowerCaseString EnvoyDegraded{absl::StrCat(prefix(), "-degraded")};
   const LowerCaseString EnvoyDownstreamServiceCluster{
@@ -209,6 +209,7 @@ public:
   const LowerCaseString TE{"te"};
   const LowerCaseString Upgrade{"upgrade"};
   const LowerCaseString UserAgent{"user-agent"};
+  const LowerCaseString Vary{"vary"};
   const LowerCaseString Via{"via"};
   const LowerCaseString WWWAuthenticate{"www-authenticate"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};

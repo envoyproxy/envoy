@@ -136,11 +136,6 @@ public:
   MissingFieldException(const std::string& field_name, const Protobuf::Message& message);
 };
 
-class TypeUtil {
-public:
-  static absl::string_view typeUrlToDescriptorFullName(absl::string_view type_url);
-};
-
 class RepeatedPtrUtil {
 public:
   static std::string join(const Protobuf::RepeatedPtrField<std::string>& source,
@@ -494,6 +489,14 @@ public:
    * @return wrapped string.
    */
   static ProtobufWkt::Value stringValue(const std::string& str);
+
+  /**
+   * Wrap optional std::string into ProtobufWkt::Value string value.
+   * If the argument contains a null optional, return ProtobufWkt::NULL_VALUE.
+   * @param str string to be wrapped.
+   * @return wrapped string.
+   */
+  static ProtobufWkt::Value optionalStringValue(const absl::optional<std::string>& str);
 
   /**
    * Wrap boolean into ProtobufWkt::Value boolean value.

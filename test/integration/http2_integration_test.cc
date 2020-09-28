@@ -517,7 +517,6 @@ TEST_P(Http2MetadataIntegrationTest, ProxyLargeMetadataInRequest) {
 TEST_P(Http2MetadataIntegrationTest, RequestMetadataReachSizeLimit) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
@@ -830,7 +829,6 @@ TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 // Verify the case where there is an HTTP/2 codec/protocol error with an active stream.
 TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Sends a request.
@@ -906,9 +904,6 @@ TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
       });
   initialize();
 
-  // Envoy will close some number of connections when request times out.
-  // Make sure they don't cause assertion failures when we ignore them.
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   // With upstream request timeout Envoy should send a gRPC-Status "DEADLINE EXCEEDED".
   // TODO: Properly map request timeout to "DEADLINE EXCEEDED" instead of "SERVICE UNAVAILABLE".
@@ -1573,7 +1568,6 @@ TEST_P(Http2FrameIntegrationTest, SetDetailsTwice) {
   autonomous_upstream_ = true;
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   beginSession();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Send two concatenated frames, the first with too many headers, and the second an invalid frame
   // (push_promise)
@@ -1737,7 +1731,6 @@ TEST_P(Http2FloodMitigationTest, Data) {
   autonomous_upstream_ = true;
   autonomous_allow_incomplete_streams_ = true;
   beginSession();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Do not read from the socket and send request that causes autonomous upstream
   // to respond with 1000 DATA frames. The Http2FloodMitigationTest::beginSession()
@@ -1819,7 +1812,6 @@ TEST_P(Http2FloodMitigationTest, TooManyStreams) {
   // keep client streams open, eventually maxing them out and causing client connection to be
   // closed.
   writev_matcher_->setSourcePort(fake_upstreams_[0]->localAddress()->ip()->port());
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Exceed the number of streams allowed by the server. The server should stop reading from the
   // client.
@@ -1871,7 +1863,6 @@ TEST_P(Http2FloodMitigationTest, EmptyHeadersContinuation) {
 TEST_P(Http2FloodMitigationTest, EmptyData) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   beginSession();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   uint32_t request_idx = 0;
   auto request = Http2Frame::makePostRequest(request_idx, "host", "/");
@@ -1899,7 +1890,6 @@ TEST_P(Http2FloodMitigationTest, PriorityIdleStream) {
 
 TEST_P(Http2FloodMitigationTest, PriorityOpenStream) {
   beginSession();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Open stream.
   uint32_t request_idx = 0;
@@ -1915,7 +1905,6 @@ TEST_P(Http2FloodMitigationTest, PriorityOpenStream) {
 TEST_P(Http2FloodMitigationTest, PriorityClosedStream) {
   autonomous_upstream_ = true;
   beginSession();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Open stream.
   uint32_t request_idx = 0;
@@ -1933,7 +1922,6 @@ TEST_P(Http2FloodMitigationTest, PriorityClosedStream) {
 
 TEST_P(Http2FloodMitigationTest, WindowUpdate) {
   beginSession();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Open stream.
   uint32_t request_idx = 0;
@@ -1978,7 +1966,6 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
       });
   autonomous_upstream_ = true;
   beginSession();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Send invalid request.
   uint32_t request_idx = 0;

@@ -24,6 +24,7 @@ envoy_cc_test(
     ],
     deps = [
         ":config_test_lib",
+        "//source/common/filesystem:filesystem_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],

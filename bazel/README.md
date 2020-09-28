@@ -13,7 +13,7 @@ sudo chmod +x /usr/local/bin/bazel
 
 On macOS, run the following command:
 ```
-brew install bazelbuild/tap/bazelisk
+brew install bazelisk
 ```
 
 On Windows, run the following commands:
@@ -36,6 +36,9 @@ independently sourced, the following steps should be followed:
 1. `bazel build -c opt //source/exe:envoy-static` from the repository root.
 
 ## Quick start Bazel build for developers
+
+This section describes how to and what dependencies to install to get started building Envoy with Bazel.
+If you would rather use a pre-build Docker image with required tools installed, skip to [this section](#building-envoy-with-the-ci-docker-image).
 
 As a developer convenience, a [WORKSPACE](https://github.com/envoyproxy/envoy/blob/master/WORKSPACE) and
 [rules for building a recent
@@ -112,12 +115,28 @@ for how to update or override dependencies.
     consider uninstalling binutils.
 
     ### Windows
-    On Windows, you'll need to install several dependencies manually.
 
-    [python3](https://www.python.org/downloads/): Specifically, the Windows-native flavor. The POSIX flavor
-    available via MSYS2 will not work, nor will the Windows Store flavor. You need to add a symlink for `python3.exe` pointing to
-    the installed `python.exe` for Bazel rules which follow POSIX conventions. Be sure to add
-    `pip.exe` to the PATH and install the `wheel` package.
+    Install bazelisk in the PATH using the `bazel.exe` executable name as described above in the first section.
+
+    When building Envoy, Bazel creates very long path names. One way to work around these excessive path
+    lengths is to change the output base directory for bazel to a very short root path. The CI pipeline
+    for Windows uses `C:\_eb` as the bazel base path. This and other preferences should be set up by placing
+    the following bazelrc configuration line in a system `%ProgramData%\bazel.bazelrc` file or the individual
+    user's `%USERPROFILE%\.bazelrc` file (rather than including it on every bazel command line):
+    ```
+    startup --output_base=C:/_eb
+    ```
+
+    Bazel also creates file symlinks when building Envoy. It's strongly recommended to enable file symlink support 
+    using [Bazel's instructions](https://docs.bazel.build/versions/master/windows.html#enable-symlink-support).
+    For other common issues, see the 
+    [Using Bazel on Windows](https://docs.bazel.build/versions/master/windows.html) page.
+
+    [python3](https://www.python.org/downloads/): Specifically, the Windows-native flavor distributed
+    by python.org. The POSIX flavor available via MSYS2, the Windows Store flavor and other distributions
+    will not work. Add a symlink for `python3.exe` pointing to the installed `python.exe` for Envoy scripts
+    and Bazel rules which follow POSIX python conventions. Add `pip.exe` to the PATH and install the `wheel`
+    package.
     ```
     mklink %USERPROFILE%\Python38\python3.exe %USERPROFILE%\Python38\python.exe
     set PATH=%PATH%;%USERPROFILE%\Python38
@@ -127,56 +146,65 @@ for how to update or override dependencies.
 
     [Build Tools for Visual Studio 2019](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019):
     For building with MSVC (the `msvc-cl` config option), you must install at least the VC++ workload.
-    You may also download Visual Studio 2019 and use the Build Tools packaged with that
-    installation. Earlier versions of VC++ Build Tools/Visual Studio are not recommended at this
-    time. If installed in a non-standard filesystem location, be sure to set the `BAZEL_VC`
-    environment variable to the path of the VC++ package to allow Bazel to find your installation
-    of VC++. Use caution to ensure the `link.exe` that resolves on your PATH is from VC++ Build Tools and
-    not MSYS2.
+    You may alternately install the entire Visual Studio 2019 and use the Build Tools installed in that
+    package. Earlier versions of VC++ Build Tools/Visual Studio are not recommended or supported.
+    If installed in a non-standard filesystem location, be sure to set the `BAZEL_VC` environment variable
+    to the path of the VC++ package to allow Bazel to find your installation of VC++. NOTE: ensure that
+    the `link.exe` that resolves on your PATH is from VC++ Build Tools and not `/usr/bin/link.exe` from MSYS2,
+    which is determined by their relative ordering in your PATH.
     ```
     set BAZEL_VC=%USERPROFILE%\VSBT2019\VC
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\VC\Tools\MSVC\14.26.28801\bin\Hostx64\x64
     ```
 
     Ensure `CMake` and `ninja` binaries are on the PATH. The versions packaged with VC++ Build
-    Tools are sufficient.
+    Tools are sufficient in most cases, but are 32 bit binaries. These flavors will not run in
+    the project's GCP CI remote build environment, so 64 bit builds from the CMake and ninja
+    projects are used instead.
     ```
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja
     ```
 
-    [MSYS2 shell](https://msys2.github.io/): Set the `BAZEL_SH` environment variable to the path
-    of the installed MSYS2 `bash.exe` executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment
-    variable to a value of `*` is often advisable to ensure argument parsing in the MSYS2 shell
-    behaves as expected.
+    [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys32. 
+    
+    Set the `BAZEL_SH` environment variable to the path of the installed MSYS2 `bash.exe` 
+    executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment variable to a value 
+    of `*` is often advisable to ensure argument parsing in the MSYS2 shell behaves as expected.
     ```
     set PATH=%PATH%;%USERPROFILE%\msys64\usr\bin
     set BAZEL_SH=%USERPROFILE%\msys64\usr\bin\bash.exe
     set MSYS2_ARG_CONV_EXCL=*
     ```
-    In addition, because of the behavior of the `rules_foreign_cc` component of Bazel, set the
-    `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
-    `C:\Windows\TEMP`). This variable is used frequently by `mktemp` from MSYS2 in the Envoy Bazel
-    build and can cause problems if not set to a value outside the MSYS2 filesystem. Note that
-    using the `ci/windows_ci_steps.sh` script (to build and run tests) will create a directory
-    symlink linking `C:\c` to `C:\` in order to enable build scripts run via MSYS2 to access
-    dependencies in the temporary directory specified above. If you are not using that script, you
-    will need to create that symlink manually.
+
+    Set the `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
+    `C:\Windows\TEMP`), and create a directory symlink `C:\c` to `C:\`, so that the MSYS2
+    path `/c/Windows/TEMP` is equivalent to the Windows path `C:\Windows\TEMP`:
     ```
     set TMPDIR=C:\Windows\TEMP
     mklink /d C:\c C:\
     ```
+
+    The TMPDIR path and MSYS2 `mktemp` command are used frequently by the `rules_foreign_cc`
+    component of Bazel as well as Envoy's test scripts, causing problems if not set to a path
+    accessible to both Windows and msys commands. [Note the `ci/windows_ci_steps.sh` script
+    which builds envoy and run tests in CI creates this symlink automatically.]
+
     In the MSYS2 shell, install additional packages via pacman:
     ```
     pacman -S diffutils patch unzip zip
     ```
 
-    [Git](https://git-scm.com/downloads): The version installable via MSYS2 is also sufficient.
+    [Git](https://git-scm.com/downloads): This version from the Git project, or the version
+    distributed using pacman under MSYS2 will both work, ensure one is on the PATH:.
     ```
     set PATH=%PATH%;%USERPROFILE%\Git\bin
     ```
 
-    Lastly, persist environment variable changes.
+    Lastly, persist environment variable changes. NOTE: The paths in this document are given as
+    examples, make sure to verify you are using the correct paths for your environment. Also note
+    that these examples assume using a `cmd.exe` shell to set environment variables etc., be sure
+    to do the equivalent if using a different shell.
     ```
     setx PATH "%PATH%"
     setx BAZEL_SH "%BAZEL_SH%"
@@ -191,7 +219,8 @@ for how to update or override dependencies.
    in your shell for buildifier to work.
 1. `go get -u github.com/bazelbuild/buildtools/buildozer` to install buildozer. You may need to set `BUILDOZER_BIN` to `$GOPATH/bin/buildozer`
    in your shell for buildozer to work.
-1. `bazel build //source/exe:envoy-static` from the Envoy source directory.
+1. `bazel build //source/exe:envoy-static` from the Envoy source directory. Add `-c opt` for an optimized release build or
+   `-c dbg` for an unoptimized, fully instrumented debugging build.
 
 ## Building Envoy with the CI Docker image
 
@@ -203,7 +232,8 @@ On Linux, run:
 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
-On Windows:
+From a Windows host with Docker installed, the Windows containers feature enabled, and bash (installed via
+MSYS2 or Git bash), run:
 
 ```
 ./ci/run_envoy_docker_windows.sh './ci/windows_ci_steps.sh'
