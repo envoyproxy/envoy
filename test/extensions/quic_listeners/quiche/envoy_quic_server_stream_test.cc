@@ -1,14 +1,17 @@
 #include <string>
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
 
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
+
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "common/event/libevent_scheduler.h"
 #include "common/http/headers.h"

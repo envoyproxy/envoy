@@ -172,27 +172,61 @@ TEST_F(Asn1UtilityTest, GetOptionalMissingValueTest) {
 TEST_F(Asn1UtilityTest, ParseOptionalTest) {
   std::vector<uint8_t> nothing;
   std::vector<uint8_t> explicit_optional_true = {0, 3, 0x1u, 1, 0xff};
+  std::vector<uint8_t> missing_val_bool = {0x1u, 1};
 
-  CBS cbs_true, cbs_explicit_optional_true, cbs_empty_seq, cbs_nothing;
-  CBS_init(&cbs_true, asn1_true.data(), asn1_true.size());
-  CBS_init(&cbs_explicit_optional_true, explicit_optional_true.data(),
-           explicit_optional_true.size());
-  CBS_init(&cbs_empty_seq, asn1_empty_seq.data(), asn1_empty_seq.size());
-  CBS_init(&cbs_nothing, nothing.data(), nothing.size());
-
-  auto parseBool = [](CBS& cbs) -> bool {
+  auto parse_bool = [](CBS& cbs) -> bool {
     int res;
     CBS_get_asn1_bool(&cbs, &res);
     return res;
   };
 
-  absl::optional<bool> expected(true);
-  EXPECT_EQ(expected, absl::get<0>(Asn1Utility::parseOptional<bool>(cbs_explicit_optional_true,
-                                                                    parseBool, 0)));
-  EXPECT_EQ(absl::nullopt, absl::get<0>(Asn1Utility::parseOptional<bool>(cbs_empty_seq, parseBool,
-                                                                         CBS_ASN1_BOOLEAN)));
-  EXPECT_EQ(absl::nullopt, absl::get<0>(Asn1Utility::parseOptional<bool>(cbs_nothing, parseBool,
-                                                                         CBS_ASN1_BOOLEAN)));
+  auto parse_bool_fail = [](CBS&) -> ParsingResult<bool> {
+    std::cout << "failing" << std::endl;
+    return absl::string_view{"failed"};
+  };
+
+  {
+    CBS cbs_explicit_optional_true;
+    CBS_init(&cbs_explicit_optional_true, explicit_optional_true.data(),
+             explicit_optional_true.size());
+
+    absl::optional<bool> expected(true);
+    EXPECT_EQ(expected, absl::get<0>(Asn1Utility::parseOptional<bool>(cbs_explicit_optional_true,
+                                                                      parse_bool, 0)));
+  }
+
+  {
+    CBS cbs_empty_seq;
+    CBS_init(&cbs_empty_seq, asn1_empty_seq.data(), asn1_empty_seq.size());
+    EXPECT_EQ(absl::nullopt, absl::get<0>(Asn1Utility::parseOptional<bool>(
+                                 cbs_empty_seq, parse_bool, CBS_ASN1_BOOLEAN)));
+  }
+
+  {
+    CBS cbs_nothing;
+    CBS_init(&cbs_nothing, nothing.data(), nothing.size());
+
+    EXPECT_EQ(absl::nullopt, absl::get<0>(Asn1Utility::parseOptional<bool>(cbs_nothing, parse_bool,
+                                                                           CBS_ASN1_BOOLEAN)));
+  }
+
+  {
+    CBS cbs_missing_val;
+    CBS_init(&cbs_missing_val, missing_val_bool.data(), missing_val_bool.size());
+
+    EXPECT_EQ("Failed to parse ASN.1 element tag",
+              absl::get<1>(
+                  Asn1Utility::parseOptional<bool>(cbs_missing_val, parse_bool, CBS_ASN1_BOOLEAN)));
+  }
+
+  {
+    CBS cbs_explicit_optional_true;
+    CBS_init(&cbs_explicit_optional_true, explicit_optional_true.data(),
+             explicit_optional_true.size());
+
+    EXPECT_EQ("failed", absl::get<1>(Asn1Utility::parseOptional<bool>(cbs_explicit_optional_true,
+                                                                      parse_bool_fail, 0)));
+  }
 }
 
 TEST_F(Asn1UtilityTest, ParseOidTest) {
@@ -212,6 +246,16 @@ TEST_F(Asn1UtilityTest, ParseOidTest) {
   bssl::UniquePtr<uint8_t> scoped(buf);
 
   EXPECT_EQ(oid, absl::get<0>(Asn1Utility::parseOid(cbs)));
+}
+
+TEST_F(Asn1UtilityTest, ParseOidInvalidValueTest) {
+  // 0x80 is not valid within an OID
+  std::vector<uint8_t> invalid_oid = {0x6, 0x6, 0x29, 0x80, 0x1, 0x1, 0x1, 0x1};
+
+  CBS cbs;
+  CBS_init(&cbs, invalid_oid.data(), invalid_oid.size());
+
+  EXPECT_EQ("Failed to parse oid", absl::get<1>(Asn1Utility::parseOid(cbs)));
 }
 
 TEST_F(Asn1UtilityTest, ParseGeneralizedTimeWrongFormatErrorTest) {
@@ -261,31 +305,32 @@ void cbbAddAsn1Int64(CBB* cbb, int64_t value) {
     ASSERT_TRUE(CBB_add_asn1_uint64(cbb, value));
   }
 
-  union {
-    int64_t i;
-    uint8_t bytes[sizeof(int64_t)];
-  } u;
-  u.i = value;
-  int start = 7;
-  // Skip leading sign-extension bytes unless they are necessary.
-  while (start > 0 && (u.bytes[start] == 0xff && (u.bytes[start - 1] & 0x80))) {
-    start--;
+  // Skip past bytes that are purely sign extension.
+  int start;
+  for (start = 7; start > 0; start--) {
+    uint8_t byte = (value >> start * 8) & 0xFF;
+    if (byte != 0xFF) {
+      break;
+    }
+
+    uint8_t next_byte = (value >> (start - 1) * 8) & 0xFF;
+    if ((next_byte & 0x80) == 0) {
+      break;
+    }
   }
 
   CBB child;
   ASSERT_TRUE(CBB_add_asn1(cbb, &child, CBS_ASN1_INTEGER));
   for (int i = start; i >= 0; i--) {
-    ASSERT_TRUE(CBB_add_u8(&child, u.bytes[i]));
+    uint8_t byte = (value >> i * 8) & 0xFF;
+    ASSERT_TRUE(CBB_add_u8(&child, byte));
   }
   CBB_flush(cbb);
 }
 
 TEST_F(Asn1UtilityTest, ParseIntegerTest) {
   std::vector<std::pair<int64_t, std::string>> integers = {
-      {1, "01"},
-      {10, "0a"},
-      {1000000, "0f4240"},
-      {-1, "-01"},
+      {1, "01"}, {10, "0a"}, {1000000, "0f4240"}, {-1, "-01"}, {-128, "-80"},
   };
   bssl::ScopedCBB cbb;
   CBS cbs;
@@ -338,6 +383,15 @@ TEST_F(Asn1UtilityTest, SkipOptionalMalformedTagTest) {
 
   EXPECT_EQ("Failed to parse ASN.1 element tag",
             absl::get<1>(Asn1Utility::skipOptional(cbs, CBS_ASN1_SEQUENCE)));
+}
+
+TEST_F(Asn1UtilityTest, SkipMalformedTagTest) {
+  std::vector<uint8_t> malformed_seq = {0x30};
+  CBS cbs;
+  CBS_init(&cbs, malformed_seq.data(), malformed_seq.size());
+
+  EXPECT_EQ("Failed to parse ASN.1 element",
+            absl::get<1>(Asn1Utility::skip(cbs, CBS_ASN1_SEQUENCE)));
 }
 
 } // namespace

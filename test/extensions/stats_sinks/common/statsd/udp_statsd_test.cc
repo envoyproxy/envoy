@@ -70,7 +70,7 @@ TEST(UdpOverUdsStatsdSinkTest, InitWithPipeAddress) {
   // Do the flush which should have somewhere to write now.
   sink.flush(snapshot);
   Buffer::OwnedImpl receive_buffer;
-  receive_buffer.read(sock.ioHandle(), 32);
+  sock.ioHandle().read(receive_buffer, 32);
   EXPECT_EQ("envoy.test_counter:1|c", receive_buffer.toString());
 }
 #endif
