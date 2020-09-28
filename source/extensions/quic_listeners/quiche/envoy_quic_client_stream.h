@@ -1,13 +1,16 @@
 #pragma once
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
+
 #include "quiche/quic/core/http/quic_spdy_client_stream.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "extensions/quic_listeners/quiche/envoy_quic_stream.h"
 

@@ -33,28 +33,7 @@ the trace headers while making an outbound call to service2.
 Running the Sandbox
 ~~~~~~~~~~~~~~~~~~~
 
-The following documentation runs through the setup of an Envoy cluster organized
-as is described above.
-
-**Step 1: Install Docker**
-
-Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
-
-A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
-
-**Step 2: Clone the Envoy repo**
-
-If you have not cloned the Envoy repo, clone it with:
-
-.. tabs::
-
-   .. code-tab:: console HTTPS
-
-      git clone https://github.com/envoyproxy/envoy.git
-
-   .. code-tab:: console SSH
-
-      git clone git@github.com:envoyproxy/envoy
+.. include:: _include/docker-env-setup.rst
 
 **Step 3: Build the sandbox**
 

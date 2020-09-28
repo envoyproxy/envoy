@@ -49,13 +49,13 @@ message MetadataKey {
       option (validate.required) = true;
 
       // If specified, use the key to retrieve the value in a Struct.
-      string key = 1 [(validate.rules).string = {min_bytes: 1}];
+      string key = 1 [(validate.rules).string = {min_len: 1}];
     }
   }
 
   // The key name of Metadata to retrieve the Struct from the metadata.
   // Typically, it represents a builtin subsystem or custom extension.
-  string key = 1 [(validate.rules).string = {min_bytes: 1}];
+  string key = 1 [(validate.rules).string = {min_len: 1}];
 
   // The path to retrieve the Value from the Struct. It can be a prefix or a full path,
   // e.g. ``[prop, xyz]`` for a struct or ``[prop, foo]`` for a string in the example,
