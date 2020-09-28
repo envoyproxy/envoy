@@ -24,7 +24,7 @@ message LocalRateLimit {
 
   // The prefix to use when emitting :ref:`statistics
   // <config_network_filters_local_rate_limit_stats>`.
-  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // The token bucket configuration to use for rate limiting connections that are processed by the
   // filter's filter chain. Each incoming connection processed by the filter consumes a single

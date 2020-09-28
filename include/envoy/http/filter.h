@@ -416,8 +416,10 @@ public:
    *
    * @param headers supplies the headers to be encoded.
    * @param end_stream supplies whether this is a header only request/response.
+   * @param details supplies the details of why this response was sent.
    */
-  virtual void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) PURE;
+  virtual void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
+                             absl::string_view details) PURE;
 
   /**
    * Called with data to be encoded, optionally indicating end of stream.
@@ -523,15 +525,6 @@ public:
    */
   virtual void
   requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
-
-  /**
-   *
-   * @return absl::optional<Router::ConfigConstSharedPtr>. Contains a value if a non-scoped RDS
-   * route config provider is used. Scoped RDS provides are not supported at the moment, as
-   * retrieval of a route configuration in their case requires passing of http request headers
-   * as a parameter.
-   */
-  virtual absl::optional<Router::ConfigConstSharedPtr> routeConfig() PURE;
 };
 
 /**

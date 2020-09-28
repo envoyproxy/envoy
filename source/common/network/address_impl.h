@@ -10,6 +10,8 @@
 #include "envoy/network/address.h"
 #include "envoy/network/socket.h"
 
+#include "common/common/assert.h"
+
 namespace Envoy {
 namespace Network {
 namespace Address {
@@ -84,6 +86,7 @@ public:
   bool operator==(const Instance& rhs) const override;
   const Ip* ip() const override { return &ip_; }
   const Pipe* pipe() const override { return nullptr; }
+  const EnvoyInternalAddress* envoyInternalAddress() const override { return nullptr; }
   const sockaddr* sockAddr() const override {
     return reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_);
   }
@@ -157,6 +160,7 @@ public:
   bool operator==(const Instance& rhs) const override;
   const Ip* ip() const override { return &ip_; }
   const Pipe* pipe() const override { return nullptr; }
+  const EnvoyInternalAddress* envoyInternalAddress() const override { return nullptr; }
   const sockaddr* sockAddr() const override {
     return reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_);
   }
@@ -219,6 +223,7 @@ public:
   bool operator==(const Instance& rhs) const override;
   const Ip* ip() const override { return nullptr; }
   const Pipe* pipe() const override { return &pipe_; }
+  const EnvoyInternalAddress* envoyInternalAddress() const override { return nullptr; }
   const sockaddr* sockAddr() const override {
     return reinterpret_cast<const sockaddr*>(&pipe_.address_);
   }
@@ -243,6 +248,33 @@ private:
   };
 
   PipeHelper pipe_;
+};
+
+class EnvoyInternalInstance : public InstanceBase {
+public:
+  /**
+   * Construct from a string name.
+   */
+  explicit EnvoyInternalInstance(const std::string& address_id,
+                                 const SocketInterface* sock_interface = nullptr);
+
+  // Network::Address::Instance
+  bool operator==(const Instance& rhs) const override;
+  const Ip* ip() const override { return nullptr; }
+  const Pipe* pipe() const override { return nullptr; }
+  const EnvoyInternalAddress* envoyInternalAddress() const override { return &internal_address_; }
+  // TODO(lambdai): Verify all callers accepts nullptr.
+  const sockaddr* sockAddr() const override { return nullptr; }
+  socklen_t sockAddrLen() const override { return 0; }
+
+private:
+  struct EnvoyInternalAddressImpl : public EnvoyInternalAddress {
+    explicit EnvoyInternalAddressImpl(const std::string& address_id) : address_id_(address_id) {}
+    ~EnvoyInternalAddressImpl() override = default;
+    const std::string& addressId() const override { return address_id_; }
+    const std::string address_id_;
+  };
+  EnvoyInternalAddressImpl internal_address_;
 };
 
 } // namespace Address

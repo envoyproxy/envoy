@@ -9,6 +9,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/guarddog.h"
+#include "envoy/stats/scope.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -19,6 +20,8 @@ namespace Configuration {
 struct GuardDogActionFactoryContext {
   Api::Api& api_;
   Event::Dispatcher& dispatcher_; // not owned (this is the guard dog's dispatcher)
+  Stats::Scope& stats_;           // not owned (this is the server's stats scope)
+  absl::string_view guarddog_name_;
 };
 
 class GuardDogAction {
@@ -27,13 +30,14 @@ public:
   /**
    * Callback function for when the GuardDog observes an event.
    * @param event the event the GuardDog observes.
-   * @param thread_ltt_pairs pairs of the relevant thread to the event, and the
-   *  last time touched (LTT) of those threads with their watchdog.
+   * @param thread_last_checkin_pairs pair of the relevant thread to the event, and the
+   *  last check in time of those threads with their watchdog.
    * @param now the current time.
    */
-  virtual void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
-                   const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs,
-                   MonotonicTime now) PURE;
+  virtual void
+  run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
+      const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_last_checkin_pairs,
+      MonotonicTime now) PURE;
 };
 
 using GuardDogActionPtr = std::unique_ptr<GuardDogAction>;
