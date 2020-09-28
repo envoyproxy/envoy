@@ -386,12 +386,12 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         project_url = "https://brotli.org",
         # Use the dev branch of brotli to resolve compilation issues.
         # TODO(rojkov): Remove when brotli > 1.0.9 is released.
-        # 2020-09-17 development branch
         version = "0cd2e3926e95e7e2930f57ae3f4885508d462a25",
         sha256 = "93810780e60304b51f2c9645fe313a6e4640711063ed0b860cfa60999dd256c5",
         strip_prefix = "brotli-{version}",
         urls = ["https://github.com/google/brotli/archive/{version}.tar.gz"],
         use_category = ["dataplane"],
+        last_updated = "2020-09-17",
         cpe = "cpe:2.3:a:google:brotli:*",
     ),
     com_github_zlib_ng_zlib_ng = dict(
