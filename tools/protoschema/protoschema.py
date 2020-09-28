@@ -34,7 +34,7 @@ class JSONSchemaFormatVisitor(visitor.Visitor):
 
 
 def Main():
-  plugin.Plugin([plugin.DirectOutputDescriptor('.rst', JSONSchemaFormatVisitor)])
+  plugin.Plugin([plugin.DirectOutputDescriptor('.json', JSONSchemaFormatVisitor)])
 
 
 if __name__ == '__main__':
