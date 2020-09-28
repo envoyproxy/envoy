@@ -1389,7 +1389,8 @@ void ConnectionManagerImpl::ActiveStream::onDecoderFilterAboveWriteBufferHighWat
   connection_manager_.stats_.named_.downstream_flow_control_paused_reading_total_.inc();
 }
 
-void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl::string_view) {
+void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_reason,
+                                                        absl::string_view) {
   // NOTE: This function gets called in all of the following cases:
   //       1) We TX an app level reset
   //       2) The codec TX a codec level reset
@@ -1402,7 +1403,10 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl:
   // DownstreamProtocolError and propagate the details upwards.
   const absl::string_view encoder_details = response_encoder_->getStream().responseDetails();
   if (!encoder_details.empty()) {
-    filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
+    if (reset_reason == StreamResetReason::LocalReset) {
+      filter_manager_.streamInfo().setResponseFlag(
+          StreamInfo::ResponseFlag::DownstreamProtocolError);
+    }
     filter_manager_.streamInfo().setResponseCodeDetails(encoder_details);
   }
 
