@@ -387,8 +387,10 @@ TEST_P(ProtocolIntegrationTest, FaultyFilterWithConnect) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Missing host for CONNECT
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "CONNECT"}, {":scheme", "http"}, {":authority", "www.host.com:80"}});
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "CONNECT"}, {":scheme", "http"}, {":authority", "www.host.com:80"}},
+      downstream_protocol_ != Http::CodecClient::Type::HTTP1);
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
@@ -2070,7 +2072,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "host.com:80"}});
+      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "host.com:80"}}, false);
 
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
     // Because CONNECT requests for HTTP/1 do not include a path, they will fail

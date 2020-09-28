@@ -2,6 +2,7 @@
 
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/http/codec_client.h"
 #include "common/tcp_proxy/upstream.h"
 
 namespace Envoy {
@@ -19,16 +20,18 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
     if (!cluster) {
       return nullptr;
     }
-    // TODO(snowp): Ideally we should prevent this from being configured, but that's tricky to get
-    // right since whether a cluster is invalid depends on both the tcp_proxy config + cluster
-    // config.
-    if ((cluster->info()->features() & Upstream::ClusterInfo::Features::HTTP2) == 0) {
-      ENVOY_LOG_MISC(error, "Attempted to tunnel over HTTP/1.1, this is not supported. Set "
-                            "http2_protocol_options on the cluster.");
-      return nullptr;
-    }
-    auto ret = std::make_unique<TcpProxy::HttpConnPool>(cluster_name, cluster_manager, context,
-                                                        config.value(), upstream_callbacks);
+    auto ret = [&] {
+      if ((cluster->info()->features() & Upstream::ClusterInfo::Features::HTTP2) != 0) {
+        return std::make_unique<TcpProxy::HttpConnPool>(cluster_name, cluster_manager, context,
+                                                        config.value(), upstream_callbacks,
+                                                        Http::CodecClient::Type::HTTP2);
+      } else {
+        return std::make_unique<TcpProxy::HttpConnPool>(cluster_name, cluster_manager, context,
+                                                        config.value(), upstream_callbacks,
+                                                        Http::CodecClient::Type::HTTP1);
+      }
+    }();
+
     return (ret->valid() ? std::move(ret) : nullptr);
   }
   auto ret = std::make_unique<TcpProxy::TcpConnPool>(cluster_name, cluster_manager, context,
