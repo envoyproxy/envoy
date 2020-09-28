@@ -1615,14 +1615,14 @@ message RateLimit {
       string default_value = 3;
     }
 
-    // The following descriptor entry is appended when the filter metadata contains a key value:
+    // The following descriptor entry is appended when the route entry metadata contains a key value:
     //
     // .. code-block:: cpp
     //
-    //   ("<descriptor_key>", "<value_queried_from_filter_metadata>")
-    message FilterMetaData {
+    //   ("<descriptor_key>", "<value_queried_from_route_entry_metadata>")
+    message RouteEntryMetaData {
       option (udpa.annotations.versioning).previous_message_type =
-          "envoy.config.route.v3.RateLimit.Action.FilterMetaData";
+          "envoy.config.route.v3.RateLimit.Action.RouteEntryMetaData";
 
       // The key to use in the descriptor entry.
       string descriptor_key = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -1660,8 +1660,8 @@ message RateLimit {
       // Rate limit on dynamic metadata.
       DynamicMetaData dynamic_metadata = 7;
 
-      // Rate limit on filter metadata.
-      FilterMetaData filter_metadata = 8;
+      // Rate limit on route entry metadata.
+      RouteEntryMetaData route_entry_metadata = 8;
     }
   }
 

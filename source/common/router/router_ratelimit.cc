@@ -124,16 +124,16 @@ bool DynamicMetaDataAction::populateDescriptor(
   return false;
 }
 
-FilterMetaDataAction::FilterMetaDataAction(
-    const envoy::config::route::v3::RateLimit::Action::FilterMetaData& action)
+RouteEntryMetaDataAction::RouteEntryMetaDataAction(
+    const envoy::config::route::v3::RateLimit::Action::RouteEntryMetaData& action)
     : metadata_key_(action.metadata_key()), descriptor_key_(action.descriptor_key()),
       default_value_(action.default_value()) {}
 
-bool FilterMetaDataAction::populateDescriptor(const Router::RouteEntry& route,
-                                              RateLimit::Descriptor& descriptor, const std::string&,
-                                              const Http::HeaderMap&,
-                                              const Network::Address::Instance&,
-                                              const envoy::config::core::v3::Metadata*) const {
+bool RouteEntryMetaDataAction::populateDescriptor(const Router::RouteEntry& route,
+                                                  RateLimit::Descriptor& descriptor,
+                                                  const std::string&, const Http::HeaderMap&,
+                                                  const Network::Address::Instance&,
+                                                  const envoy::config::core::v3::Metadata*) const {
   const ProtobufWkt::Value& metadata_value =
       Envoy::Config::Metadata::metadataValue(&route.metadata(), metadata_key_);
 
@@ -191,8 +191,8 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kDynamicMetadata:
       actions_.emplace_back(new DynamicMetaDataAction(action.dynamic_metadata()));
       break;
-    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kFilterMetadata:
-      actions_.emplace_back(new FilterMetaDataAction(action.filter_metadata()));
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kRouteEntryMetadata:
+      actions_.emplace_back(new RouteEntryMetaDataAction(action.route_entry_metadata()));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kHeaderValueMatch:
       actions_.emplace_back(new HeaderValueMatchAction(action.header_value_match()));

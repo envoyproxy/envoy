@@ -134,9 +134,10 @@ private:
 /**
  * Action for filter metadata rate limiting.
  */
-class FilterMetaDataAction : public RateLimitAction {
+class RouteEntryMetaDataAction : public RateLimitAction {
 public:
-  FilterMetaDataAction(const envoy::config::route::v3::RateLimit::Action::FilterMetaData& action);
+  RouteEntryMetaDataAction(
+      const envoy::config::route::v3::RateLimit::Action::RouteEntryMetaData& action);
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
                           const std::string& local_service_cluster, const Http::HeaderMap& headers,

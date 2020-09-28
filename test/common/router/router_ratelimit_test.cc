@@ -668,10 +668,10 @@ filter_metadata:
   EXPECT_TRUE(descriptors_.empty());
 }
 
-TEST_F(RateLimitPolicyEntryTest, FilterMetaDataMatch) {
+TEST_F(RateLimitPolicyEntryTest, RouteEnryMetaDataMatch) {
   const std::string yaml = R"EOF(
 actions:
-- filter_metadata:
+- route_entry_metadata:
     descriptor_key: fake_key
     default_value: fake_value
     metadata_key:
@@ -700,10 +700,10 @@ filter_metadata:
 }
 
 // Tests that the default_value is used in the descriptor when the metadata_key is empty.
-TEST_F(RateLimitPolicyEntryTest, FilterMetaDataNoMatchWithDefaultValue) {
+TEST_F(RateLimitPolicyEntryTest, RouteEnryMetaDataNoMatchWithDefaultValue) {
   const std::string yaml = R"EOF(
 actions:
-- filter_metadata:
+- route_entry_metadata:
     descriptor_key: fake_key
     default_value: fake_value
     metadata_key:
@@ -731,10 +731,10 @@ filter_metadata:
               testing::ContainerEq(descriptors_));
 }
 
-TEST_F(RateLimitPolicyEntryTest, FilterMetaDataNoMatch) {
+TEST_F(RateLimitPolicyEntryTest, RouteEnryMetaDataNoMatch) {
   const std::string yaml = R"EOF(
 actions:
-- filter_metadata:
+- route_entry_metadata:
     descriptor_key: fake_key
     metadata_key:
       key: 'envoy.xxx'
@@ -760,10 +760,10 @@ filter_metadata:
   EXPECT_TRUE(descriptors_.empty());
 }
 
-TEST_F(RateLimitPolicyEntryTest, FilterMetaDataEmptyValue) {
+TEST_F(RateLimitPolicyEntryTest, RouteEnryMetaDataEmptyValue) {
   const std::string yaml = R"EOF(
 actions:
-- filter_metadata:
+- route_entry_metadata:
     descriptor_key: fake_key
     metadata_key:
       key: 'envoy.xxx'
@@ -789,10 +789,10 @@ filter_metadata:
   EXPECT_TRUE(descriptors_.empty());
 }
 // Tests that no descriptor is generated when both the metadata_key and default_value are empty.
-TEST_F(RateLimitPolicyEntryTest, FilterMetaDataAndDefaultValueEmpty) {
+TEST_F(RateLimitPolicyEntryTest, RouteEnryMetaDataAndDefaultValueEmpty) {
   const std::string yaml = R"EOF(
 actions:
-- filter_metadata:
+- route_entry_metadata:
     descriptor_key: fake_key
     default_value: ""
     metadata_key:
@@ -819,10 +819,10 @@ filter_metadata:
   EXPECT_TRUE(descriptors_.empty());
 }
 
-TEST_F(RateLimitPolicyEntryTest, FilterMetaDataNonStringMatch) {
+TEST_F(RateLimitPolicyEntryTest, RouteEnryMetaDataNonStringMatch) {
   const std::string yaml = R"EOF(
 actions:
-- filter_metadata:
+- route_entry_metadata:
     descriptor_key: fake_key
     metadata_key:
       key: 'envoy.xxx'
