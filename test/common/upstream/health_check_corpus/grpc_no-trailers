@@ -47,14 +47,6 @@ actions {
                 status: SERVING
                 chunk_size_for_structured_response: 3
             }
-            grpc_respond_trailers {
-            trailers {
-                headers {
-                    key: "grpc-status"
-                    value: "0"
-                }
-            }
             }
         }
     }
-}
