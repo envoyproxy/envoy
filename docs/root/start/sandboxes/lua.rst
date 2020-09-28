@@ -14,7 +14,8 @@ Running the Sandboxes
 
 .. include:: _include/docker-env-setup.rst
 
-**Step 3: Build the sandbox**
+Step 3: Build the sandbox
+*************************
 
 .. code-block:: console
 
@@ -29,7 +30,8 @@ Running the Sandboxes
   lua_proxy_1         /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
   lua_web_service_1   node ./index.js                  Up      0.0.0.0:8080->80/tcp
 
-**Step 4: Send a request to the service**
+Step 4: Send a request to the service
+*************************************
 
 The output from the ``curl`` command below should include the headers ``foo``.
 

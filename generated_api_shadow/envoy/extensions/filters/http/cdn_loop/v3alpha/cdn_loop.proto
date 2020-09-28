@@ -25,7 +25,7 @@ message CdnLoopConfig {
   // pseudonym or hostname the CDN is in control of.
   //
   // cdn_id must not be empty.
-  string cdn_id = 1 [(validate.rules).string = {min_bytes: 1}];
+  string cdn_id = 1 [(validate.rules).string = {min_len: 1}];
 
   // The maximum allowed count of cdn_id in the downstream CDN-Loop
   // request header.

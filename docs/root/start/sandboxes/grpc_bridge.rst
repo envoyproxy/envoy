@@ -25,7 +25,8 @@ Running the Sandbox
 
 .. include:: _include/docker-env-setup.rst
 
-**Step 3: Generate the protocol stubs**
+Step 3: Generate the protocol stubs
+***********************************
 
 A docker-compose file is provided that generates the stubs for both ``client`` and ``server`` from the
 specification in the ``protos`` directory.
@@ -65,7 +66,8 @@ respective directories:
 
 These generated ``python`` and ``go`` stubs can be included as external modules.
 
-**Step 4: Start all of our containers**
+Step 4: Start all of our containers
+***********************************
 
 To build this sandbox example and start the example services, run the following commands:
 
