@@ -20,6 +20,7 @@ py_binary(
         "//tools/api_proto_plugin",
         "//tools/config_validation:validate_fragment",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
+        "@com_github_chrusty_protoc_gen_jsonschema",
         "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_google_protobuf//:protobuf_python",
         requirement("PyYAML"),
