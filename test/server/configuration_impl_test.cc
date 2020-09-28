@@ -60,10 +60,10 @@ protected:
       : api_(Api::createApiForTest()),
         cluster_manager_factory_(
             server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
-            server_.random(), server_.dnsResolver(), server_.sslContextManager(),
-            server_.dispatcher(), server_.localInfo(), server_.secretManager(),
-            server_.messageValidationContext(), *api_, server_.httpContext(), server_.grpcContext(),
-            server_.accessLogManager(), server_.singletonManager()) {}
+            server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher(),
+            server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
+            server_.httpContext(), server_.grpcContext(), server_.accessLogManager(),
+            server_.singletonManager()) {}
 
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
     envoy::config::metrics::v3::StatsdSink statsd_sink;

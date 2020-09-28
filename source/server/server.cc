@@ -487,8 +487,8 @@ void InstanceImpl::initialize(const Options& options,
   dns_resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,
-      dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
+      *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, dns_resolver_,
+      *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
       messageValidationContext(), *api_, http_context_, grpc_context_, access_log_manager_,
       *singleton_manager_);
 

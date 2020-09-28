@@ -12,16 +12,18 @@ namespace Configuration {
  */
 class TransportSocketFactoryContextImpl : public TransportSocketFactoryContext {
 public:
-  TransportSocketFactoryContextImpl(
-      Server::Admin& admin, Ssl::ContextManager& context_manager, Stats::Scope& stats_scope,
-      Upstream::ClusterManager& cm, const LocalInfo::LocalInfo& local_info,
-      Event::Dispatcher& dispatcher, Envoy::Random::RandomGenerator& random, Stats::Store& stats,
-      Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
-      ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+  TransportSocketFactoryContextImpl(Server::Admin& admin, Ssl::ContextManager& context_manager,
+                                    Stats::Scope& stats_scope, Upstream::ClusterManager& cm,
+                                    const LocalInfo::LocalInfo& local_info,
+                                    Event::Dispatcher& dispatcher, Stats::Store& stats,
+                                    Singleton::Manager& singleton_manager,
+                                    ThreadLocal::SlotAllocator& tls,
+                                    ProtobufMessage::ValidationVisitor& validation_visitor,
+                                    Api::Api& api)
       : admin_(admin), context_manager_(context_manager), stats_scope_(stats_scope),
-        cluster_manager_(cm), local_info_(local_info), dispatcher_(dispatcher), random_(random),
-        stats_(stats), singleton_manager_(singleton_manager), tls_(tls),
-        validation_visitor_(validation_visitor), api_(api) {}
+        cluster_manager_(cm), local_info_(local_info), dispatcher_(dispatcher), stats_(stats),
+        singleton_manager_(singleton_manager), tls_(tls), validation_visitor_(validation_visitor),
+        api_(api) {}
 
   /**
    * Pass an init manager to register dynamic secret provider.
@@ -39,7 +41,6 @@ public:
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
   const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
-  Envoy::Random::RandomGenerator& random() override { return random_; }
   Stats::Store& stats() override { return stats_; }
   Init::Manager& initManager() override {
     ASSERT(init_manager_ != nullptr);
@@ -59,7 +60,6 @@ private:
   Upstream::ClusterManager& cluster_manager_;
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;
-  Envoy::Random::RandomGenerator& random_;
   Stats::Store& stats_;
   Singleton::Manager& singleton_manager_;
   ThreadLocal::SlotAllocator& tls_;

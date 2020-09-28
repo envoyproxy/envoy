@@ -26,7 +26,7 @@ Stats::ScopePtr generateStatsScope(const envoy::config::cluster::v3::Cluster& co
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::create(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
     Stats::Store& stats, ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-    Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime, Random::RandomGenerator&,
+    Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
     Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
     const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
     Singleton::Manager& singleton_manager, Outlier::EventLoggerSharedPtr outlier_event_logger,
@@ -107,8 +107,8 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
   auto stats_scope = generateStatsScope(cluster, context.stats());
   Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       context.admin(), context.sslContextManager(), *stats_scope, context.clusterManager(),
-      context.localInfo(), context.dispatcher(), context.random(), context.stats(),
-      context.singletonManager(), context.tls(), context.messageValidationVisitor(), context.api());
+      context.localInfo(), context.dispatcher(), context.stats(), context.singletonManager(),
+      context.tls(), context.messageValidationVisitor(), context.api());
 
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
       createClusterImpl(cluster, context, factory_context, std::move(stats_scope));

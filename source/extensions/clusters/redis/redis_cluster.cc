@@ -43,7 +43,7 @@ RedisCluster::RedisCluster(
           cluster.has_load_assignment()
               ? cluster.load_assignment()
               : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts())),
-      local_info_(factory_context.localInfo()), random_(factory_context.random()),
+      local_info_(factory_context.localInfo()), random_(api.randomGenerator()),
       redis_discovery_session_(*this, redis_client_factory), lb_factory_(std::move(lb_factory)),
       auth_username_(
           NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authUsername(info(), api)),
@@ -397,7 +397,8 @@ RedisClusterFactory::createClusterWithConfig(
                               std::move(stats_scope), context.addedViaApi(), nullptr),
                           nullptr);
   }
-  auto lb_factory = std::make_shared<RedisClusterLoadBalancerFactory>(context.random());
+  auto lb_factory =
+      std::make_shared<RedisClusterLoadBalancerFactory>(context.api().randomGenerator());
   return std::make_pair(std::make_shared<RedisCluster>(
                             cluster, proto_config,
                             NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,

@@ -481,8 +481,8 @@ void ListenerImpl::buildFilterChains() {
   Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
       parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
       parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
-      parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
-      parent_.server_.threadLocal(), validation_visitor_, parent_.server_.api());
+      parent_.server_.stats(), parent_.server_.singletonManager(), parent_.server_.threadLocal(),
+      validation_visitor_, parent_.server_.api());
   transport_factory_context.setInitManager(*dynamic_init_manager_);
   // The init manager is a little messy. Will refactor when filter chain manager could accept
   // network filter chain update.
