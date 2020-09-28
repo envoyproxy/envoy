@@ -1636,7 +1636,7 @@ message RateLimit {
     //   ("<descriptor_key>", "<value_queried_from_route_entry_metadata>")
     message RouteEntryMetaData {
       // The key to use in the descriptor entry.
-      string descriptor_key = 1 [(validate.rules).string = {min_bytes: 1}];
+      string descriptor_key = 1 [(validate.rules).string = {min_len: 1}];
 
       // Metadata struct that defines the key and path to retrieve the string value. A match will
       // only happen if the value in the filter metadata is of type string.
