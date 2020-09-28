@@ -90,6 +90,78 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
   tls_.shutdownThread();
 }
 
+struct ThreadStatus {
+  uint64_t thread_local_calls_{0};
+  bool all_threads_complete_ = false;
+};
+
+TEST_F(ThreadLocalInstanceImplTest, CallbackNotInvokedAfterDeletion) {
+  InSequence s;
+
+  // Allocate a slot and invoke all callback variants. Hold all callbacks and destroy the slot.
+  // Make sure that recycling happens appropriately.
+  SlotPtr slot = tls_.allocateSlot();
+
+  std::list<Event::PostCb> holder;
+  EXPECT_CALL(thread_dispatcher_, post(_)).Times(6).WillRepeatedly(Invoke([&](Event::PostCb cb) {
+    // Holds the posted callback.
+    holder.push_back(cb);
+  }));
+
+  uint32_t total_callbacks = 0;
+  slot->set([&total_callbacks](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    // Callbacks happen on the main thread but not the workers, so track the total.
+    total_callbacks++;
+    return nullptr;
+  });
+  slot->runOnAllThreads([&total_callbacks](ThreadLocal::ThreadLocalObjectSharedPtr)
+                            -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    // Callbacks happen on the main thread but not the workers, so track the total.
+    total_callbacks++;
+    return nullptr;
+  });
+  slot->runOnAllThreads([&total_callbacks]() {
+    // Callbacks happen on the main thread but not the workers, so track the total.
+    total_callbacks++;
+  });
+  ThreadStatus thread_status;
+  slot->runOnAllThreads([&thread_status]() -> void { ++thread_status.thread_local_calls_; },
+                        [&thread_status]() -> void {
+                          // Callbacks happen on the main thread but not the workers.
+                          EXPECT_EQ(thread_status.thread_local_calls_, 1);
+                          thread_status.all_threads_complete_ = true;
+                        });
+  EXPECT_FALSE(thread_status.all_threads_complete_);
+  ThreadStatus thread_status2;
+  slot->runOnAllThreads(
+      [&thread_status2](
+          ThreadLocal::ThreadLocalObjectSharedPtr) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        ++thread_status2.thread_local_calls_;
+        return nullptr;
+      },
+      [&thread_status2]() -> void {
+        // Callbacks happen on the main thread but not the workers.
+        EXPECT_EQ(thread_status2.thread_local_calls_, 1);
+        thread_status2.all_threads_complete_ = true;
+      });
+  EXPECT_FALSE(thread_status2.all_threads_complete_);
+
+  EXPECT_EQ(3, total_callbacks);
+  slot.reset();
+  EXPECT_EQ(freeSlotIndexesListSize(), 1);
+
+  EXPECT_CALL(main_dispatcher_, post(_)).Times(2);
+  while (!holder.empty()) {
+    holder.front()();
+    holder.pop_front();
+  }
+  EXPECT_EQ(3, total_callbacks);
+  EXPECT_TRUE(thread_status.all_threads_complete_);
+  EXPECT_TRUE(thread_status2.all_threads_complete_);
+
+  tls_.shutdownGlobalThreading();
+}
+
 // Test that the config passed into the update callback is the previous version stored in the slot.
 TEST_F(ThreadLocalInstanceImplTest, UpdateCallback) {
   InSequence s;
@@ -135,17 +207,12 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
   EXPECT_CALL(main_dispatcher_, post(_));
 
   // Ensure that the thread local call back and all_thread_complete call back are called.
-  struct {
-    uint64_t thread_local_calls_{0};
-    bool all_threads_complete_ = false;
-  } thread_status;
-
+  ThreadStatus thread_status;
   tlsptr->runOnAllThreads([&thread_status]() -> void { ++thread_status.thread_local_calls_; },
                           [&thread_status]() -> void {
                             EXPECT_EQ(thread_status.thread_local_calls_, 2);
                             thread_status.all_threads_complete_ = true;
                           });
-
   EXPECT_TRUE(thread_status.all_threads_complete_);
 
   tls_.shutdownGlobalThreading();

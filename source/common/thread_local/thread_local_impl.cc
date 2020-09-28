@@ -26,14 +26,14 @@ SlotPtr InstanceImpl::allocateSlot() {
   ASSERT(!shutdown_);
 
   if (free_slot_indexes_.empty()) {
-    SlotPtr slot(new SlotImpl(*this, slots_.size()));
+    SlotPtr slot = std::make_unique<SlotImpl>(*this, slots_.size());
     slots_.push_back(slot.get());
     return slot;
   }
   const uint32_t idx = free_slot_indexes_.front();
   free_slot_indexes_.pop_front();
   ASSERT(idx < slots_.size());
-  SlotPtr slot(new SlotImpl(*this, idx));
+  SlotPtr slot = std::make_unique<SlotImpl>(*this, idx);
   slots_[idx] = slot.get();
   return slot;
 }
@@ -41,8 +41,9 @@ SlotPtr InstanceImpl::allocateSlot() {
 InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
     : parent_(parent), index_(index), still_alive_guard_(std::make_shared<bool>(true)) {}
 
-Event::PostCb InstanceImpl::SlotImpl::wrapCallback(Event::PostCb cb) {
-  // See the header file comments for still_alive_guard_ for the purpose of this capture.
+Event::PostCb InstanceImpl::SlotImpl::wrapCallback(Event::PostCb&& cb) {
+  // See the header file comments for still_alive_guard_ for the purpose of this capture and the
+  // expired check below.
   return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), cb] {
     if (!still_alive_guard.expired()) {
       cb();
@@ -66,20 +67,24 @@ ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::getWorker(uint32_t index) {
 ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() { return getWorker(index_); }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
+  // See the header file comments for still_alive_guard_ for why we capture index_. Note
+  // that wrapCallback() is performed by the other variant of runOnAllThreads().
   runOnAllThreads([cb, index = index_]() { setThreadLocal(index, cb(getWorker(index))); },
                   complete_cb);
 }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb) {
+  // See the header file comments for still_alive_guard_ for why we capture index_. Note
+  // that wrapCallback() is performed by the other variant of runOnAllThreads().
   runOnAllThreads([cb, index = index_]() { setThreadLocal(index, cb(getWorker(index))); });
 }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(Event::PostCb cb) {
-  parent_.runOnAllThreads(wrapCallback(cb));
+  parent_.runOnAllThreads(wrapCallback(std::move(cb)));
 }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) {
-  parent_.runOnAllThreads(wrapCallback(cb), main_callback);
+  parent_.runOnAllThreads(wrapCallback(std::move(cb)), main_callback);
 }
 
 void InstanceImpl::SlotImpl::set(InitializeCb cb) {
@@ -87,6 +92,7 @@ void InstanceImpl::SlotImpl::set(InitializeCb cb) {
   ASSERT(!parent_.shutdown_);
 
   for (Event::Dispatcher& dispatcher : parent_.registered_threads_) {
+    // See the header file comments for still_alive_guard_ for why we capture index_.
     dispatcher.post(wrapCallback(
         [index = index_, cb, &dispatcher]() -> void { setThreadLocal(index, cb(dispatcher)); }));
   }
