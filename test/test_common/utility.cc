@@ -421,8 +421,8 @@ ApiPtr createApiForTest() {
 }
 
 ApiPtr createApiForTest(Random::RandomGenerator& random) {
-  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(),
-                                    Filesystem::fileSystemForTest(), nullptr, nullptr, &random);
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+                                    nullptr, nullptr, &random);
 }
 
 ApiPtr createApiForTest(Stats::Store& stat_store) {

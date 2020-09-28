@@ -39,8 +39,8 @@ public:
    */
   static HealthCheckerSharedPtr
   create(const envoy::config::core::v3::HealthCheck& health_check_config,
-         Upstream::Cluster& cluster, Runtime::Loader& runtime,
-         Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
+         Upstream::Cluster& cluster, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
+         AccessLog::AccessLogManager& log_manager,
          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 };
 

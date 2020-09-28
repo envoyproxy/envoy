@@ -280,9 +280,10 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
 
-  info_ = info_factory.createClusterInfo(
-      {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
-       local_info, dispatcher, api.randomGenerator(), singleton_manager, tls, validation_visitor, api});
+  info_ = info_factory.createClusterInfo({admin, runtime_, cluster_, bind_config_, stats_,
+                                          ssl_context_manager_, added_via_api_, cm, local_info,
+                                          dispatcher, api.randomGenerator(), singleton_manager, tls,
+                                          validation_visitor, api});
 
   // Temporary structure to hold Host pointers grouped by locality, to build
   // initial_hosts_per_locality_.
