@@ -37,9 +37,9 @@ modify different aspects of the server:
 
 .. note::
 
-  For an endpoint with *?format=json*, it dumps data as a JSON-serialized proto. Default fields are
-  not rendered. For example for */clusters?format=json*, the circuit breakers thresholds priority
-  field is omitted when its value is :ref:`DEFAULT priority
+  For an endpoint with *?format=json*, it dumps data as a JSON-serialized proto. Fields with default
+  values are not rendered. For example for */clusters?format=json*, the circuit breakers thresholds
+  priority field is omitted when its value is :ref:`DEFAULT priority
   <envoy_v3_api_enum_value_config.core.v3.RoutingPriority.DEFAULT>` as shown below:
 
   .. code-block:: json
