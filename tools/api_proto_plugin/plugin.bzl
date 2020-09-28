@@ -62,10 +62,10 @@ def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes):
     args += [src.path for src in target[ProtoInfo].direct_sources]
     env = {}
 
-    print("Running protoc with args: %s" % args)
-    print("Running protoc with inputs: %s" % inputs)
-    print("Running protoc with outputs: %s" % outputs)
-    print("Running protoc with mnemonic: %s" % mnemonic)
+    # print("Running protoc with args: %s" % args)
+    # print("Running protoc with inputs: %s" % inputs)
+    # print("Running protoc with outputs: %s" % outputs)
+    # print("Running protoc with mnemonic: %s" % mnemonic)
     ctx.actions.run(
         executable = ctx.executable._protoc,
         arguments = args,
