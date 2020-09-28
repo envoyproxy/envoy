@@ -33,6 +33,7 @@ public:
 
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
+  Api::IoCallUint64Result read(Buffer::Instance& buffer, uint64_t max_length) override;
 
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
 
@@ -64,6 +65,7 @@ public:
   Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                                       Event::FileTriggerType trigger, uint32_t events) override;
   Api::SysCallIntResult shutdown(int how) override;
+  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
 
 protected:
   // Converts a SysCallSizeResult to IoCallUint64Result.

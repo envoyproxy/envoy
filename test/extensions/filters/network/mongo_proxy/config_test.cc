@@ -89,7 +89,7 @@ TEST(MongoFilterConfigTest, InvalidExtraProperty) {
 
 TEST(MongoFilterConfigTest, EmptyConfig) {
   handleInvalidConfiguration(
-      "{}", R"(StatPrefix: \["value length must be at least " '\\x01' " bytes"\])");
+      "{}", R"(StatPrefix: \["value length must be at least " '\\x01' " runes"\])");
 }
 
 TEST(MongoFilterConfigTest, InvalidFaultsEmptyConfig) {

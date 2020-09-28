@@ -62,8 +62,7 @@ class HealthCheckFuzz {
 public:
   HealthCheckFuzz() = default;
   // This will delegate to the specific classes
-  void initializeAndReplay(test::common::upstream::HealthCheckTestCase
-                               input); // This will delegate to the specific classes
+  void initializeAndReplay(test::common::upstream::HealthCheckTestCase input);
   enum class Type {
     HTTP,
     TCP,

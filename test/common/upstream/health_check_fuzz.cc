@@ -215,10 +215,14 @@ void TcpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase 
     ENVOY_LOG_MISC(trace, "Health Checker is only testing to connect");
     empty_response_ = false;
   }
+  // Clang tidy throws an error here in regards to a potential leak. It seems to have something to
+  // do with shared_ptr and possible cycles in regards to the clusters host objects. Since all this
+  // test class directly uses the unit test class that has been in master for a long time, this is
+  // likely a false positive.
   if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
     interval_timer_->invokeCallback();
   }
-}
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 void TcpHealthCheckFuzz::respond(std::string data, bool last_action) {
   if (!timeout_timer_->enabled_) {

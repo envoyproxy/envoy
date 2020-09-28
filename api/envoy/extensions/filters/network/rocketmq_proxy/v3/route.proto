@@ -48,7 +48,7 @@ message RouteMatch {
 
 message RouteAction {
   // Indicates the upstream cluster to which the request should be routed.
-  string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
+  string cluster = 1 [(validate.rules).string = {min_len: 1}];
 
   // Optional endpoint metadata match criteria used by the subset load balancer.
   config.core.v3.Metadata metadata_match = 2;
