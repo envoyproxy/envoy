@@ -36,7 +36,7 @@ BAZEL_BUILD_OPTIONS=(
 if [[ $# -gt 0 ]]; then
   TEST_TARGETS=$*
 else
-  TEST_TARGETS="//test/integration/... //test/common/network:apple_dns_impl_test"
+  TEST_TARGETS='//test/integration/... //test/common/network:apple_dns_impl_test'
 fi
 
 if [[ "$TEST_TARGETS" == "//test/..." || "$TEST_TARGETS" == "//test/integration/..." ]]; then
