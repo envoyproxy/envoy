@@ -1,8 +1,8 @@
 # Building documentation locally
 
-## Building in an existing envoy development environment
+## Building in an existing Envoy development environment
 
-If you have an existing envoy development environment, you should have the necessary dependencies
+If you have an existing Envoy development environment, you should have the necessary dependencies
 and requirements and be able to build the documentation directly.
 
 ```bash
