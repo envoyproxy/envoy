@@ -7,7 +7,6 @@
 
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/http/filter.h"
-#include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/stats/scope.h"
@@ -54,8 +53,8 @@ struct ExtAuthzFilterStats {
 class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-               const LocalInfo::LocalInfo&, Stats::Scope& scope, Runtime::Loader& runtime,
-               Http::Context& http_context, const std::string& stats_prefix)
+               Stats::Scope& scope, Runtime::Loader& runtime, Http::Context& http_context,
+               const std::string& stats_prefix)
       : allow_partial_message_(config.with_request_body().allow_partial_message()),
         failure_mode_allow_(config.failure_mode_allow()),
         clear_route_cache_(config.clear_route_cache()),
