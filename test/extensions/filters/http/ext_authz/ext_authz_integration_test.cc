@@ -815,11 +815,10 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
     // Make sure one google grpc client is created
     EXPECT_EQ(1, test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
   }
-  sendExtAuthzResponse(Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
                        Http::TestRequestHeaderMapImpl{});
 
-  waitForSuccessfulUpstreamResponse("200", Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-                                    Http::TestRequestHeaderMapImpl{});
+  waitForSuccessfulUpstreamResponse("200");
 
   Http::TestRequestHeaderMapImpl headers{
       {":method", "POST"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
@@ -845,7 +844,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
     // Make sure one google grpc client is created
     EXPECT_EQ(1, test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
   }
-  sendExtAuthzResponse(Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
                        Http::TestRequestHeaderMapImpl{});
 
   result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
