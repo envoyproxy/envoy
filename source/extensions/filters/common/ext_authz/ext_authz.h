@@ -12,6 +12,7 @@
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/http_tracer.h"
 
+#include "common/http/headers.h"
 #include "common/runtime/runtime_features.h"
 #include "common/singleton/const_singleton.h"
 
@@ -32,6 +33,21 @@ struct TracingConstantValues {
 };
 
 using TracingConstants = ConstSingleton<TracingConstantValues>;
+
+/**
+ * Constant auth related HTTP headers. All lower case. This group of headers can
+ * contain prefix override headers.
+ */
+class HeaderValues {
+public:
+  const char* prefix() const { return ThreadSafeSingleton<Http::PrefixValue>::get().prefix(); }
+
+  const Http::LowerCaseString EnvoyAuthPartialBody{absl::StrCat(prefix(), "-auth-partial-body")};
+  const Http::LowerCaseString EnvoyAuthHeadersToRemove{
+      absl::StrCat(prefix(), "-auth-headers-to-remove")};
+};
+
+using Headers = ConstSingleton<HeaderValues>;
 
 /**
  * Possible async results for a check call.

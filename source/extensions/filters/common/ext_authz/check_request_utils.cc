@@ -21,6 +21,8 @@
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "extensions/filters/common/ext_authz/ext_authz.h"
+
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -28,10 +30,6 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace ExtAuthz {
-
-static const Http::LowerCaseString& getHeaderNameForPartialBody() {
-  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "x-envoy-auth-partial-body");
-}
 
 void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v3::AttributeContext::Peer& peer,
                                            const Network::Connection& connection,
@@ -121,8 +119,8 @@ void CheckRequestUtils::setHttpRequest(
   // Fill in the headers.
   auto* mutable_headers = httpreq.mutable_headers();
   headers.iterate([mutable_headers](const Envoy::Http::HeaderEntry& e) {
-    // Skip any client x-envoy-auth-partial-body header, which could interfere with internal use.
-    if (e.key().getStringView() != getHeaderNameForPartialBody().get()) {
+    // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
+    if (e.key().getStringView() != Headers::get().EnvoyAuthPartialBody.get()) {
       (*mutable_headers)[std::string(e.key().getStringView())] =
           std::string(e.value().getStringView());
     }
@@ -145,7 +143,7 @@ void CheckRequestUtils::setHttpRequest(
     }
 
     // Add in a header to detect when a partial body is used.
-    (*mutable_headers)[getHeaderNameForPartialBody().get()] =
+    (*mutable_headers)[Headers::get().EnvoyAuthPartialBody.get()] =
         length != decoding_buffer->length() ? "true" : "false";
   }
 }

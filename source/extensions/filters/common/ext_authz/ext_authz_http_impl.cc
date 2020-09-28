@@ -208,10 +208,6 @@ ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatch
       createStringMatchers(list, disable_lowercase_string_matcher));
 }
 
-static const Http::LowerCaseString& getHeaderNameStoringHeadersToRemove() {
-  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "x-envoy-auth-headers-to-remove");
-}
-
 RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config)
     : cm_(cm), config_(config) {}
 
@@ -342,7 +338,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
 
   // Extract headers-to-remove from the storage header coming from the
   // authorization server.
-  const auto& storage_header_name = getHeaderNameStoringHeadersToRemove();
+  const auto& storage_header_name = Headers::get().EnvoyAuthHeadersToRemove;
   // If we are going to construct an Ok response we need to save the
   // headers_to_remove in a variable first.
   std::vector<Http::LowerCaseString> headers_to_remove;
