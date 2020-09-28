@@ -302,7 +302,9 @@ bool Filter::isBufferFull() const {
 }
 
 void Filter::continueDecoding() {
-  filter_return_ = FilterReturn::ContinueDecoding;
+  // When the buffer is full, we do stop decoding here. The data "decoding" here is only for the
+  // check request.
+  filter_return_ = isBufferFull() ? FilterReturn::StopDecoding : FilterReturn::ContinueDecoding;
   if (!initiating_call_) {
     callbacks_->continueDecoding();
   }
