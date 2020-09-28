@@ -303,7 +303,7 @@ public:
     return std::make_unique<FakeUpstream>(address, type, timeSystem(), enable_half_close,
                                           udp_fake_upstream);
   }
-  // Creates a fake upstream bound to INADDR_ANY and the specified |port|.
+  // Creates a fake upstream bound to INADDR_ANY and there is no specified port.
   std::unique_ptr<FakeUpstream> createFakeUpstream(FakeHttpConnection::Type type,
                                                    bool enable_half_close = false) {
     return std::make_unique<FakeUpstream>(0, type, version_, timeSystem(), enable_half_close);

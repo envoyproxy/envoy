@@ -71,10 +71,8 @@ public:
     // Create the regular (i.e. not an xDS server) upstreams. We create them manually here after
     // initialize() because finalize() expects all fake_upstreams_ to correspond to a static
     // cluster in the bootstrap config - which we don't want since we're testing dynamic CDS!
-    fake_upstreams_.emplace_back(
-        createFakeUpstream(FakeHttpConnection::Type::HTTP2, enable_half_close_));
-    fake_upstreams_.emplace_back(
-        createFakeUpstream(FakeHttpConnection::Type::HTTP2, enable_half_close_));
+    fake_upstreams_.emplace_back(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
+    fake_upstreams_.emplace_back(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
     cluster1_ = ConfigHelper::buildStaticCluster(
         ClusterName1, fake_upstreams_[UpstreamIndex1]->localAddress()->ip()->port(),
         Network::Test::getLoopbackAddressString(ipVersion()));
