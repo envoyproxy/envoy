@@ -35,7 +35,8 @@ Running the Sandbox
 
 .. include:: _include/docker-env-setup.rst
 
-**Step 3: Build the sandbox**
+Step 3: Build the sandbox
+*************************
 
 To build this sandbox example, and start the example apps run the following commands:
 
@@ -54,7 +55,8 @@ To build this sandbox example, and start the example apps run the following comm
     zipkin-tracing_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
     zipkin-tracing_zipkin_1        /busybox/sh run.sh             Up      9410/tcp, 0.0.0.0:9411->9411/tcp
 
-**Step 4: Generate some load**
+Step 4: Generate some load
+**************************
 
 You can now send a request to service1 via the front-envoy as follows:
 
@@ -78,7 +80,8 @@ You can now send a request to service1 via the front-envoy as follows:
     Hello from behind Envoy (service 1)! hostname: f26027f1ce28 resolvedhostname: 172.19.0.6
     * Connection #0 to host 192.168.99.100 left intact
 
-**Step 5: View the traces in Zipkin UI**
+Step 5: View the traces in Zipkin UI
+************************************
 
 Point your browser to http://localhost:9411 . You should see the Zipkin dashboard.
 Set the service to "front-proxy" and set the start time to a few minutes before
