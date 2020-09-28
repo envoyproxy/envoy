@@ -45,8 +45,6 @@ private:
     void runOnAllThreads(const UpdateCb& cb) override;
     void runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) override;
     bool currentThreadRegistered() override;
-    void runOnAllThreads(Event::PostCb cb) override;
-    void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) override;
     void set(InitializeCb cb) override;
 
     InstanceImpl& parent_;

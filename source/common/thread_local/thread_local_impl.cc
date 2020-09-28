@@ -67,24 +67,16 @@ ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::getWorker(uint32_t index) {
 ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() { return getWorker(index_); }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
-  // See the header file comments for still_alive_guard_ for why we capture index_. Note
-  // that wrapCallback() is performed by the other variant of runOnAllThreads().
-  runOnAllThreads([cb, index = index_]() { setThreadLocal(index, cb(getWorker(index))); },
-                  complete_cb);
+  // See the header file comments for still_alive_guard_ for why we capture index_.
+  parent_.runOnAllThreads(
+      wrapCallback([cb, index = index_]() { setThreadLocal(index, cb(getWorker(index))); }),
+      complete_cb);
 }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb) {
-  // See the header file comments for still_alive_guard_ for why we capture index_. Note
-  // that wrapCallback() is performed by the other variant of runOnAllThreads().
-  runOnAllThreads([cb, index = index_]() { setThreadLocal(index, cb(getWorker(index))); });
-}
-
-void InstanceImpl::SlotImpl::runOnAllThreads(Event::PostCb cb) {
-  parent_.runOnAllThreads(wrapCallback(std::move(cb)));
-}
-
-void InstanceImpl::SlotImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) {
-  parent_.runOnAllThreads(wrapCallback(std::move(cb)), main_callback);
+  // See the header file comments for still_alive_guard_ for why we capture index_.
+  parent_.runOnAllThreads(
+      wrapCallback([cb, index = index_]() { setThreadLocal(index, cb(getWorker(index))); }));
 }
 
 void InstanceImpl::SlotImpl::set(InitializeCb cb) {
