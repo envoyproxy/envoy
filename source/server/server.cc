@@ -583,8 +583,8 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
   ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
   return std::make_unique<Runtime::LoaderImpl>(
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
-      server.stats(), server.random(), server.messageValidationContext().dynamicValidationVisitor(),
-      server.api());
+      server.stats(), server.api().randomGenerator(),
+      server.messageValidationContext().dynamicValidationVisitor(), server.api());
 }
 
 void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path) {

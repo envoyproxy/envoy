@@ -172,9 +172,6 @@ Http::Context& ListenerFactoryContextBaseImpl::httpContext() { return server_.ht
 const LocalInfo::LocalInfo& ListenerFactoryContextBaseImpl::localInfo() const {
   return server_.localInfo();
 }
-Envoy::Random::RandomGenerator& ListenerFactoryContextBaseImpl::random() {
-  return server_.random();
-}
 Envoy::Runtime::Loader& ListenerFactoryContextBaseImpl::runtime() { return server_.runtime(); }
 Stats::Scope& ListenerFactoryContextBaseImpl::scope() { return *global_scope_; }
 Singleton::Manager& ListenerFactoryContextBaseImpl::singletonManager() {
@@ -582,9 +579,6 @@ Http::Context& PerListenerFactoryContextImpl::httpContext() {
 }
 const LocalInfo::LocalInfo& PerListenerFactoryContextImpl::localInfo() const {
   return listener_factory_context_base_->localInfo();
-}
-Envoy::Random::RandomGenerator& PerListenerFactoryContextImpl::random() {
-  return listener_factory_context_base_->random();
 }
 Envoy::Runtime::Loader& PerListenerFactoryContextImpl::runtime() {
   return listener_factory_context_base_->runtime();

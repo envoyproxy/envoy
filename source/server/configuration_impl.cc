@@ -164,7 +164,7 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
     // We shouldn't have overflow issues due to the range of Duration.
     // This won't be entirely uniform, depending on how large max_skew
     // is relation to uint64.
-    kill_timeout += (server.random().random() % max_kill_timeout_jitter) + 1;
+    kill_timeout += (server.api().randomGenerator().random() % max_kill_timeout_jitter) + 1;
   }
 
   kill_timeout_ = std::chrono::milliseconds(kill_timeout);

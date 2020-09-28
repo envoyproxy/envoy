@@ -647,7 +647,6 @@ public:
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
-  Envoy::Random::RandomGenerator& random() override { return api().randomGenerator(); }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Stats::Scope& scope() override { return stats_scope_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }

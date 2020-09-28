@@ -300,7 +300,8 @@ InstanceSharedPtr AccessLogFactory::fromProto(const envoy::config::accesslog::v3
                                               Server::Configuration::FactoryContext& context) {
   FilterPtr filter;
   if (config.has_filter()) {
-    filter = FilterFactory::fromProto(config.filter(), context.runtime(), context.random(),
+    filter = FilterFactory::fromProto(config.filter(), context.runtime(),
+                                      context.api().randomGenerator(),
                                       context.messageValidationVisitor());
   }
 

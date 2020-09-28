@@ -88,10 +88,6 @@ const LocalInfo::LocalInfo& PerFilterChainFactoryContextImpl::localInfo() const 
   return parent_context_.localInfo();
 }
 
-Envoy::Random::RandomGenerator& PerFilterChainFactoryContextImpl::random() {
-  return parent_context_.random();
-}
-
 Envoy::Runtime::Loader& PerFilterChainFactoryContextImpl::runtime() {
   return parent_context_.runtime();
 }
@@ -635,7 +631,6 @@ bool FactoryContextImpl::healthCheckFailed() { return server_.healthCheckFailed(
 Http::Context& FactoryContextImpl::httpContext() { return server_.httpContext(); }
 Init::Manager& FactoryContextImpl::initManager() { return server_.initManager(); }
 const LocalInfo::LocalInfo& FactoryContextImpl::localInfo() const { return server_.localInfo(); }
-Envoy::Random::RandomGenerator& FactoryContextImpl::random() { return server_.random(); }
 Envoy::Runtime::Loader& FactoryContextImpl::runtime() { return server_.runtime(); }
 Stats::Scope& FactoryContextImpl::scope() { return global_scope_; }
 Singleton::Manager& FactoryContextImpl::singletonManager() { return server_.singletonManager(); }
