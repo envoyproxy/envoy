@@ -14,6 +14,7 @@
 #include "common/api/os_sys_calls_impl_linux.h"
 #endif
 
+#include "test/mocks/common.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/test_time.h"
@@ -47,6 +48,7 @@ public:
   testing::NiceMock<Filesystem::MockInstance> file_system_;
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
 class MockOsSysCalls : public OsSysCallsImpl {
