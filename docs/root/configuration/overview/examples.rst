@@ -108,7 +108,10 @@ on 127.0.0.1:5678 is provided below:
       connect_timeout: 0.25s
       type: STATIC
       lb_policy: ROUND_ROBIN
-      http2_protocol_options: {}
+      http2_protocol_options:
+        connection_keepalive:
+          interval: 30s
+          timeout: 5s
       upstream_connection_options:
         # configure a TCP keep-alive to detect and reconnect to the admin
         # server in the event of a TCP socket half open connection
@@ -189,11 +192,12 @@ below:
       connect_timeout: 0.25s
       type: STATIC
       lb_policy: ROUND_ROBIN
-      http2_protocol_options: {}
-      upstream_connection_options:
-        # configure a TCP keep-alive to detect and reconnect to the admin
-        # server in the event of a TCP socket half open connection
-        tcp_keepalive: {}
+      http2_protocol_options:
+        # Configure an HTTP/2 keep-alive to detect connection issues and reconnect
+        # to the admin server if the connection is no longer responsive.
+        connection_keepalive:
+          interval: 30s
+          timeout: 5s
       load_assignment:
         cluster_name: xds_cluster
         endpoints:

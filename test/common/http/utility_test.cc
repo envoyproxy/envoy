@@ -821,8 +821,8 @@ TEST(HttpUtility, ResolveMostSpecificPerFilterConfig) {
   EXPECT_EQ(&testConfig, resolved_filter_config);
 }
 
-// Verify that resolveMostSpecificPerFilterConfigGeneric indeed returns the most specific per filter
-// config.
+// Verify that resolveMostSpecificPerFilterConfigGeneric indeed returns the most specific per
+// filter config.
 TEST(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;

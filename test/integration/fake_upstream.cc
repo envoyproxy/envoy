@@ -295,12 +295,12 @@ FakeHttpConnection::FakeHttpConnection(
     Http::Http2::CodecStats& stats = fake_upstream.http2CodecStats();
 #ifdef ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, stats, http2_options, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        shared_connection_.connection(), *this, stats, random_, http2_options,
+        max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
 #else
     codec_ = std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, stats, http2_options, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        shared_connection_.connection(), *this, stats, random_, http2_options,
+        max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
 #endif
     ASSERT(type == Type::HTTP2);
   }

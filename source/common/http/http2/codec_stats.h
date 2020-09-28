@@ -27,6 +27,7 @@ namespace Http2 {
   COUNTER(trailers)                                                                                \
   COUNTER(tx_flush_timeout)                                                                        \
   COUNTER(tx_reset)                                                                                \
+  COUNTER(keepalive_timeout)                                                                       \
   GAUGE(streams_active, Accumulate)                                                                \
   GAUGE(pending_send_bytes, Accumulate)
 

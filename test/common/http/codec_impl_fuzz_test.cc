@@ -464,6 +464,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   NiceMock<MockConnectionCallbacks> client_callbacks;
   NiceMock<Network::MockConnection> server_connection;
   NiceMock<MockServerConnectionCallbacks> server_callbacks;
+  NiceMock<Random::MockRandomGenerator> random;
   uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
   uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
   uint32_t max_response_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
@@ -479,7 +480,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   if (http2) {
     client = std::make_unique<Http2::ClientConnectionImpl>(
         client_connection, client_callbacks, Http2::CodecStats::atomicGet(http2_stats, stats_store),
-        client_http2_options, max_request_headers_kb, max_response_headers_count,
+        random, client_http2_options, max_request_headers_kb, max_response_headers_count,
         Http2::ProdNghttp2SessionFactory::get());
   } else {
     client = std::make_unique<Http1::ClientConnectionImpl>(
@@ -492,7 +493,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         fromHttp2Settings(input.h2_settings().server())};
     server = std::make_unique<Http2::ServerConnectionImpl>(
         server_connection, server_callbacks, Http2::CodecStats::atomicGet(http2_stats, stats_store),
-        server_http2_options, max_request_headers_kb, max_request_headers_count,
+        random, server_http2_options, max_request_headers_kb, max_request_headers_count,
         headers_with_underscores_action);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};

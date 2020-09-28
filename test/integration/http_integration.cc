@@ -66,10 +66,11 @@ typeToCodecType(Http::CodecClient::Type type) {
 } // namespace
 
 IntegrationCodecClient::IntegrationCodecClient(
-    Event::Dispatcher& dispatcher, Network::ClientConnectionPtr&& conn,
-    Upstream::HostDescriptionConstSharedPtr host_description, CodecClient::Type type)
-    : CodecClientProd(type, std::move(conn), host_description, dispatcher), dispatcher_(dispatcher),
-      callbacks_(*this), codec_callbacks_(*this) {
+    Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
+    Network::ClientConnectionPtr&& conn, Upstream::HostDescriptionConstSharedPtr host_description,
+    CodecClient::Type type)
+    : CodecClientProd(type, std::move(conn), host_description, dispatcher, random),
+      dispatcher_(dispatcher), callbacks_(*this), codec_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
   dispatcher.run(Event::Dispatcher::RunType::Block);
@@ -226,8 +227,8 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   cluster->http1_settings_.enable_trailers_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
-  return std::make_unique<IntegrationCodecClient>(*dispatcher_, std::move(conn), host_description,
-                                                  downstream_protocol_);
+  return std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
+                                                  host_description, downstream_protocol_);
 }
 
 Network::TransportSocketFactoryPtr HttpIntegrationTest::createUpstreamTlsContext() {

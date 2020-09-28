@@ -19,8 +19,8 @@ namespace Http1 {
  */
 class ConnPoolImpl : public Http::HttpConnPoolImplBase {
 public:
-  ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
-               Upstream::ResourcePriority priority,
+  ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
+               Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
 
@@ -82,6 +82,7 @@ protected:
 
   Event::SchedulableCallbackPtr upstream_ready_cb_;
   bool upstream_ready_enabled_{false};
+  Random::RandomGenerator& random_generator_;
 };
 
 /**
@@ -89,19 +90,15 @@ protected:
  */
 class ProdConnPoolImpl : public ConnPoolImpl {
 public:
-  ProdConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
-                   Upstream::ResourcePriority priority,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
-      : ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options) {}
+  using ConnPoolImpl::ConnPoolImpl;
 
   // ConnPoolImpl
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
 };
 
 ConnectionPool::InstancePtr
-allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
-                 Upstream::ResourcePriority priority,
+allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
+                 Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
 
