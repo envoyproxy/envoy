@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -119,7 +120,7 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
 
 Network::ClientConnectionPtr
 DispatcherImpl::createInternalConnection(Network::Address::InstanceConstSharedPtr internal_address,
-                                         Network::Address::InstanceConstSharedPtr) {
+                                         Network::Address::InstanceConstSharedPtr local_address) {
   ASSERT(isThreadSafe());
   if (internal_address == nullptr) {
     return nullptr;
@@ -132,7 +133,7 @@ DispatcherImpl::createInternalConnection(Network::Address::InstanceConstSharedPt
   if (iter == internal_listeners_.end()) {
     ENVOY_LOG_MISC(debug, "lambdai: no valid listener registered for envoy internal address {}",
                    internal_address->asString());
-    return nullptr;
+    return std::make_unique<Network::ClosingClientConnectionImpl>(*this, internal_address, local_address);
   }
   Network::ConnectionPtr server_conn{};
   Network::ClientConnectionPtr client_conn{};
