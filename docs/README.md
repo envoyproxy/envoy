@@ -1,5 +1,9 @@
 # Building documentation locally
 
+There are two methods to build the documentation, described below.
+
+In both cases, the generated output can be found in `generated/docs`.
+
 ## Building in an existing Envoy development environment
 
 If you have an existing Envoy development environment, you should have the necessary dependencies
@@ -8,8 +12,6 @@ and requirements and be able to build the documentation directly.
 ```bash
 ./docs/build.sh
 ```
-
-The output can be found in `generated/docs`.
 
 By default configuration examples are going to be validated during build. To disable validation,
 set `SPHINX_SKIP_CONFIG_VALIDATION` environment variable to `true`:
