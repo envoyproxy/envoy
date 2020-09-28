@@ -32,6 +32,9 @@ def envoy_copts(repository, test = False):
         "-DNOMCX",
         "-DNOIME",
         "-DNOCRYPT",
+        # Ignore unguarded gcc pragmas in quiche (unrecognized by MSVC)
+        # TODO(wrowe): Drop this change when fixed in bazel/external/quiche.genrule_cmd
+        "-wd4068",
         # this is to silence the incorrect MSVC compiler warning when trying to convert between
         # std::optional data types while conversions between primitive types are producing no error
         "-wd4244",
