@@ -30,7 +30,7 @@ SlotPtr InstanceImpl::allocateSlot() {
     slots_.push_back(slot.get());
     return slot;
   }
-  const uint64_t idx = free_slot_indexes_.front();
+  const uint32_t idx = free_slot_indexes_.front();
   free_slot_indexes_.pop_front();
   ASSERT(idx < slots_.size());
   SlotPtr slot(new SlotImpl(*this, idx));
@@ -44,7 +44,7 @@ InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
 Event::PostCb InstanceImpl::SlotImpl::wrapCallback(Event::PostCb cb) {
   // See the header file comments for still_alive_guard_ for the purpose of this capture.
   return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), cb] {
-    if (still_alive_guard.lock()) {
+    if (!still_alive_guard.expired()) {
       cb();
     }
   };
@@ -75,11 +75,11 @@ void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb) {
 }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(Event::PostCb cb) {
-  parent_.runOnAllThreads(wrapCallback([cb]() { cb(); }));
+  parent_.runOnAllThreads(wrapCallback(cb));
 }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) {
-  parent_.runOnAllThreads(wrapCallback([cb, main_callback]() { cb(); }), main_callback);
+  parent_.runOnAllThreads(wrapCallback(cb), main_callback);
 }
 
 void InstanceImpl::SlotImpl::set(InitializeCb cb) {
@@ -123,7 +123,7 @@ void InstanceImpl::removeSlot(uint32_t slot) {
   slots_[slot] = nullptr;
   ASSERT(std::find(free_slot_indexes_.begin(), free_slot_indexes_.end(), slot) ==
              free_slot_indexes_.end(),
-         fmt::format("slot index {} already in free slot set!", index));
+         fmt::format("slot index {} already in free slot set!", slot));
   free_slot_indexes_.push_back(slot);
   runOnAllThreads([slot]() -> void {
     // This runs on each thread and clears the slot, making it available for a new allocations.
