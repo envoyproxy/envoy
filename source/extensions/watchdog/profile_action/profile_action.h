@@ -29,9 +29,11 @@ private:
   const std::string path_;
   const std::chrono::milliseconds duration_;
   const uint64_t max_profiles_;
-  bool running_profile_;
+  bool running_profile_ = false;
   std::string profile_filename_;
-  uint64_t profiles_started_;
+  Stats::Counter& profiles_attempted_;
+  Stats::Counter& profiles_successfully_captured_;
+  uint64_t profiles_started_ = 0;
   Server::Configuration::GuardDogActionFactoryContext& context_;
   Event::TimerPtr timer_cb_;
 };
