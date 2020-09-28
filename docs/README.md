@@ -37,10 +37,13 @@ To use this method you will need a minimum of 4-5GB of disk space available to a
 
 When you create a Pull Request the documentation is rendered by CircleCI.
 
-This can be viewed by clicking "Details" in the "ci/circleci: docs" check. From there click "ARTIFACTS", and then
-"generated/docs/index.html".
+If you are logged in to CircleCI (it is possible to authenticate using your Github account), you can view
+the rendered changes.
 
-You should be able to see your changes.
+To do this:
+- click `Details` in the `ci/circleci: docs` check at the bottom of the Pull Request.
+- click `ARTIFACTS` in the CircleCI dashboard
+- browse to the documentation root at `generated/docs/index.html`.
 
 # How the Envoy website and docs are updated
 
