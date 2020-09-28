@@ -382,6 +382,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     ),
     org_brotli = dict(
         project_name = "brotli",
+        project_desc = "brotli compression library",
         project_url = "https://brotli.org",
         # Use the dev branch of brotli to resolve compilation issues.
         # TODO(rojkov): Remove when brotli > 1.0.9 is released.
