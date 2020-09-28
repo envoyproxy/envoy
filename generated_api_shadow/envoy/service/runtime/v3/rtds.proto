@@ -52,7 +52,7 @@ message Runtime {
 
   // Runtime resource name. This makes the Runtime a self-describing xDS
   // resource.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   google.protobuf.Struct layer = 2;
 }

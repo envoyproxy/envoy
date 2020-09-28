@@ -261,7 +261,7 @@ message FilePerTapSink {
   // Path prefix. The output file will be of the form <path_prefix>_<id>.pb, where <id> is an
   // identifier distinguishing the recorded trace for stream instances (the Envoy
   // connection ID, HTTP stream ID, etc.).
-  string path_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+  string path_prefix = 1 [(validate.rules).string = {min_len: 1}];
 }
 
 // [#not-implemented-hide:] Streaming gRPC sink configuration sends the taps to an external gRPC

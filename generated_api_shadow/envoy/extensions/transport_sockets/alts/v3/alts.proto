@@ -22,7 +22,7 @@ message Alts {
 
   // The location of a handshaker service, this is usually 169.254.169.254:8080
   // on GCE.
-  string handshaker_service = 1 [(validate.rules).string = {min_bytes: 1}];
+  string handshaker_service = 1 [(validate.rules).string = {min_len: 1}];
 
   // The acceptable service accounts from peer, peers not in the list will be rejected in the
   // handshake validation step. If empty, no validation will be performed.
