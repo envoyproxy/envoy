@@ -110,6 +110,7 @@ TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s
 EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
 COMMENT_REGEX = re.compile(r"//|\*")
 DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
+PROTO_VALIDATION_STRING = re.compile(r'\bmin_bytes\b')
 VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
 VERSION_HISTORY_SECTION_NAME = re.compile("^[A-Z][A-Za-z ]*$")
 RELOADABLE_FLAG_REGEX = re.compile(".*(.)(envoy.reloadable_features.[^ ]*)\s.*")
@@ -761,6 +762,13 @@ class FormatChecker:
           "Don't use lua_pushlightuserdata, since it can cause unprotected error in call to" +
           "Lua API (bad light userdata pointer) on ARM64 architecture. See " +
           "https://github.com/LuaJIT/LuaJIT/issues/450#issuecomment-433659873 for details.")
+
+    if file_path.endswith(PROTO_SUFFIX):
+      exclude_path = ['v1', 'v2', 'generated_api_shadow']
+      result = PROTO_VALIDATION_STRING.search(line)
+      if result is not None:
+        if not any(x in file_path for x in exclude_path):
+          reportError("min_bytes is DEPRECATED, Use min_len.")
 
   def checkBuildLine(self, line, file_path, reportError):
     if "@bazel_tools" in line and not (self.isStarlarkFile(file_path) or
