@@ -51,7 +51,9 @@ actions {
 
     }
     grpc_respond {
-
+      grpc_respond_headers {
+        
+      }
     }
   }
 }

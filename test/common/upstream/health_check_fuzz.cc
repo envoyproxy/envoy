@@ -28,19 +28,15 @@ convertToGrpcServingStatus(test::common::upstream::ServingStatus status) {
   switch (status) {
   case test::common::upstream::ServingStatus::UNKNOWN: {
     return grpc::health::v1::HealthCheckResponse::UNKNOWN;
-    break;
   }
   case test::common::upstream::ServingStatus::SERVING: {
     return grpc::health::v1::HealthCheckResponse::SERVING;
-    break;
   }
   case test::common::upstream::ServingStatus::NOT_SERVING: {
     return grpc::health::v1::HealthCheckResponse::NOT_SERVING;
-    break;
   }
   case test::common::upstream::ServingStatus::SERVICE_UNKNOWN: {
     return grpc::health::v1::HealthCheckResponse::SERVICE_UNKNOWN;
-    break;
   }
   default: // shouldn't hit
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -76,9 +72,8 @@ void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
     test_sessions_[0]->interval_timer_->invokeCallback();
   }
-  if (input.health_check_config().has_reuse_connection()) {
-    reuse_connection_ = input.health_check_config().reuse_connection().value();
-  }
+  reuse_connection_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(input.health_check_config(), reuse_connection, true);
 }
 
 void HttpHealthCheckFuzz::respond(const test::fuzz::Headers& headers, uint64_t status) {
@@ -171,9 +166,8 @@ void TcpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase 
   expectSessionCreate();
   expectClientCreate();
   health_checker_->start();
-  if (input.health_check_config().has_reuse_connection()) {
-    reuse_connection_ = input.health_check_config().reuse_connection().value();
-  }
+  reuse_connection_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(input.health_check_config(), reuse_connection, true);
   // The Receive proto message has a validation that if there is a receive field, the text field, a
   // string representing the hex encoded payload has a least one byte.
   if (input.health_check_config().tcp_health_check().receive_size() != 0) {
@@ -281,9 +275,9 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
     test_sessions_[0]->interval_timer_->invokeCallback();
   }
-  if (input.health_check_config().has_reuse_connection()) {
-    reuse_connection_ = input.health_check_config().reuse_connection().value();
-  }
+  
+  reuse_connection_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(input.health_check_config(), reuse_connection, true);
 }
 
 // Logic from respondResponseSpec() in unit tests
@@ -294,10 +288,13 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respo
   }
   // These booleans help figure out when to end the stream
   const bool has_data = grpc_respond.has_grpc_respond_bytes();
-  // TODO: Should I hardcode trailers? Particularly grpc-status = 0?
-  const bool has_trailers = grpc_respond.has_grpc_respond_trailers() &&
-                            grpc_respond.grpc_respond_trailers().has_trailers() &&
-                            grpc_respond.grpc_respond_trailers().trailers().headers_size() != 0;
+  // Didn't hardcode grpc-status to fully explore search space provided by codecs.
+
+  // If the fuzzing engine generates a grpc_respond_trailers message, there is a validation
+  // that trailers (test.fuzz.Headers) must be present. If it is present, that means there is
+  // trailers that will be passed to decodeTrailers(). An empty trailer map counts as having
+  // trailers.
+  const bool has_trailers = grpc_respond.has_grpc_respond_trailers();
 
   ENVOY_LOG_MISC(trace, "Has data: {}. Has trailers: {}.", has_data, has_trailers);
 
@@ -308,8 +305,7 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respo
           Fuzz::fromHeaders<Http::TestResponseHeaderMapImpl>(
               grpc_respond.grpc_respond_headers().headers(), {}, {}));
 
-  response_headers->setStatus(
-      grpc_respond.grpc_respond_headers().status()); // 200 Required for gRPC
+  response_headers->setStatus(grpc_respond.grpc_respond_headers().status());
 
   ENVOY_LOG_MISC(trace, "Responded headers {}", *response_headers.get());
   test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
@@ -378,8 +374,8 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respo
         test_sessions_[0]->stream_response_callbacks_->decodeData(*data, end_stream_on_data);
       }
     }
-    default:
-      break;
+    default: // shouldn't hit
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 
@@ -405,14 +401,8 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respo
   // Once it gets here the health checker will have called onRpcComplete(), logically representing a
   // completed rpc call, which blows away client if reuse connection is set to false or the health
   // checker had a goaway event with no error flag.
-  if (!reuse_connection_ || received_no_error_goaway_) {
-    ENVOY_LOG_MISC(trace, "Creating client and stream after response.");
-    triggerIntervalTimer(true);
-  } else { // Still want to invoke interval timer after every response to not have the fuzzer have
-           // to wait for a triggerIntervalTimer event
-    ENVOY_LOG_MISC(trace, "Creating stream after response.");
-    triggerIntervalTimer(false);
-  }
+  ENVOY_LOG_MISC(trace, "Triggering interval timer after response");
+  triggerIntervalTimer(!reuse_connection_ || received_no_error_goaway_);
 
   received_no_error_goaway_ = false; // from resetState()
 }
@@ -424,8 +414,10 @@ void GrpcHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
   }
   if (expect_client_create) {
     expectClientCreate(0);
+    ENVOY_LOG_MISC(trace, "Created client");
   }
   expectStreamCreate(0);
+  ENVOY_LOG_MISC(trace, "Created stream");
   test_sessions_[0]->interval_timer_->invokeCallback();
 }
 
@@ -439,7 +431,7 @@ void GrpcHealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
                                                        // timeout and enables interval
 
   if ((!reuse_connection_ || received_no_error_goaway_) && !last_action) {
-    ENVOY_LOG_MISC(trace, "Creating client and stream after timeout.");
+    ENVOY_LOG_MISC(trace, "Triggering interval timer after timeout.");
     triggerIntervalTimer(true);
   } else {
     received_no_error_goaway_ = false; // from resetState()
@@ -450,7 +442,7 @@ void GrpcHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type,
   test_sessions_[0]->client_connection_->raiseEvent(event_type);
   if (!last_action && event_type != Network::ConnectionEvent::Connected) {
     // Close events will always blow away the client
-    ENVOY_LOG_MISC(trace, "Creating client and stream from close event");
+    ENVOY_LOG_MISC(trace, "Triggering interval timer after close event");
     // Interval timer is guaranteed to be enabled from a close event - calls
     // onResetStream which handles failure, turning interval timer on and timeout off
     triggerIntervalTimer(true);
@@ -487,46 +479,34 @@ HealthCheckFuzz::getEventTypeFromProto(const test::common::upstream::RaiseEvent&
 }
 
 void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTestCase input) {
-  switch (input.health_check_config().health_checker_case()) {
-  case envoy::config::core::v3::HealthCheck::kHttpHealthCheck: {
-    type_ = HealthCheckFuzz::Type::HTTP;
-    http_fuzz_test_ = std::make_unique<HttpHealthCheckFuzz>();
-    try {
+  try {
+    switch (input.health_check_config().health_checker_case()) {
+    case envoy::config::core::v3::HealthCheck::kHttpHealthCheck: {
+      type_ = HealthCheckFuzz::Type::HTTP;
+      http_fuzz_test_ = std::make_unique<HttpHealthCheckFuzz>();
       http_fuzz_test_->initialize(input);
-    } catch (EnvoyException& e) {
-      ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-      return;
+      break;
     }
-    replay(input);
-    break;
-  }
-  case envoy::config::core::v3::HealthCheck::kTcpHealthCheck: {
-    type_ = HealthCheckFuzz::Type::TCP;
-    tcp_fuzz_test_ = std::make_unique<TcpHealthCheckFuzz>();
-    try {
+    case envoy::config::core::v3::HealthCheck::kTcpHealthCheck: {
+      type_ = HealthCheckFuzz::Type::TCP;
+      tcp_fuzz_test_ = std::make_unique<TcpHealthCheckFuzz>();
       tcp_fuzz_test_->initialize(input);
-    } catch (EnvoyException& e) {
-      ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-      return;
+      break;
     }
-    replay(input);
-    break;
-  }
-  case envoy::config::core::v3::HealthCheck::kGrpcHealthCheck: {
-    type_ = HealthCheckFuzz::Type::GRPC;
-    grpc_fuzz_test_ = std::make_unique<GrpcHealthCheckFuzz>();
-    try {
+    case envoy::config::core::v3::HealthCheck::kGrpcHealthCheck: {
+      type_ = HealthCheckFuzz::Type::GRPC;
+      grpc_fuzz_test_ = std::make_unique<GrpcHealthCheckFuzz>();
       grpc_fuzz_test_->initialize(input);
-    } catch (EnvoyException& e) {
-      ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-      return;
+      break;
     }
-    replay(input);
-    break;
+    default:
+      break;
+    }
+  } catch (EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
+    return;
   }
-  default:
-    break;
-  }
+  replay(input);
 }
 
 void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& input) {

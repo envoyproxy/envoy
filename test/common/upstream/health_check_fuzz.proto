@@ -45,13 +45,13 @@ message GrpcRespondBytes {
 }
 
 message GrpcRespondTrailers {
-  test.fuzz.Headers trailers = 1;
-  uint64 grpc_status = 2;
+  test.fuzz.Headers trailers = 1 [(validate.rules).message.required = true];
 }
 
 message GrpcRespond {
   GrpcRespondHeaders grpc_respond_headers = 1 [(validate.rules).message.required = true];
   GrpcRespondBytes grpc_respond_bytes = 2;
+  //Having this as a message allows the scenario with no trailers
   GrpcRespondTrailers grpc_respond_trailers = 3;
 }
 
