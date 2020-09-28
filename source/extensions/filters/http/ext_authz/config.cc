@@ -98,7 +98,7 @@ Filters::Common::ExtAuthz::AsyncClientCacheSharedPtr
 getAsyncClientCacheSingleton(Server::Configuration::FactoryContext& context) {
   return context.singletonManager().getTyped<Filters::Common::ExtAuthz::AsyncClientCache>(
       SINGLETON_MANAGER_REGISTERED_NAME(google_grpc_async_client_cache), [&context] {
-        return std::make_shared<Filters::Common::ExtAuthz::AsyncClientCacheImpl>(
+        return std::make_shared<Filters::Common::ExtAuthz::AsyncClientCache>(
             context.clusterManager().grpcAsyncClientManager(), context.scope(),
             context.threadLocal());
       });

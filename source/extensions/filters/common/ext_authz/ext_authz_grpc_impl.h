@@ -83,24 +83,16 @@ private:
 using GrpcClientImplPtr = std::unique_ptr<GrpcClientImpl>;
 
 // The client cache for RawAsyncClient for google grpc so channel is not created for each request.
-class AsyncClientCache {
+class AsyncClientCache : public Singleton::Instance {
 public:
-  virtual ~AsyncClientCache() = default;
-
-  virtual const Grpc::RawAsyncClientSharedPtr getOrCreateAsyncClient(
-      const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config) PURE;
-};
-
-class AsyncClientCacheImpl : public Singleton::Instance, public AsyncClientCache {
-public:
-  AsyncClientCacheImpl(Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope,
-                       ThreadLocal::SlotAllocator& tls)
+  AsyncClientCache(Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope,
+                   ThreadLocal::SlotAllocator& tls)
       : async_client_manager_(async_client_manager), scope_(scope), tls_slot_(tls.allocateSlot()) {
     tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCache>(); });
   }
 
   const Grpc::RawAsyncClientSharedPtr getOrCreateAsyncClient(
-      const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config) override;
+      const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config);
 
 private:
   /**

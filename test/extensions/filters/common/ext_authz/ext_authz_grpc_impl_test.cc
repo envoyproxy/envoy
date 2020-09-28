@@ -374,10 +374,10 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
   client_->onSuccess(std::move(check_response), span_);
 }
 
-class AsyncClientCacheImplTest : public testing::Test {
+class AsyncClientCacheTest : public testing::Test {
 public:
-  AsyncClientCacheImplTest() {
-    client_cache_ = std::make_unique<AsyncClientCacheImpl>(async_client_manager_, scope_, tls_);
+  AsyncClientCacheTest() {
+    client_cache_ = std::make_unique<AsyncClientCache>(async_client_manager_, scope_, tls_);
   }
 
   void expectClientCreation() {
@@ -396,11 +396,11 @@ public:
   Grpc::MockAsyncClientManager async_client_manager_;
   Grpc::MockAsyncClient* async_client_ = nullptr;
   Grpc::MockAsyncClientFactory* factory_ = nullptr;
-  std::unique_ptr<AsyncClientCacheImpl> client_cache_;
+  std::unique_ptr<AsyncClientCache> client_cache_;
   NiceMock<Stats::MockIsolatedStatsStore> scope_;
 };
 
-TEST_F(AsyncClientCacheImplTest, Deduplication) {
+TEST_F(AsyncClientCacheTest, Deduplication) {
   Stats::IsolatedStoreImpl scope;
   testing::InSequence s;
 

@@ -138,7 +138,7 @@ void GrpcClientImpl::toAuthzResponseHeader(
   }
 }
 
-const Grpc::RawAsyncClientSharedPtr AsyncClientCacheImpl::getOrCreateAsyncClient(
+const Grpc::RawAsyncClientSharedPtr AsyncClientCache::getOrCreateAsyncClient(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config) {
   // The cache stores google gRPC client, so channel is not created for each request.
   ASSERT(proto_config.has_grpc_service() && proto_config.grpc_service().has_google_grpc());
