@@ -34,7 +34,7 @@ message Action {
     google.protobuf.Empty trigger_interval_timer = 2;
     //TODO: respondBody, respondTrailers
     google.protobuf.Empty trigger_timeout_timer = 3;
-    RaiseEvent raise_event = 4;
+    RaiseEvent raise_event = 4 [(validate.rules).enum.defined_only = true];
   }
 }
 
