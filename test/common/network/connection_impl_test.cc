@@ -997,18 +997,15 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   EXPECT_CALL(*client_write_buffer_, move(_))
       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                             Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
-  bool client_closed = false, server_closed = false;
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .WillOnce(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
         dispatcher_->exit();
+        // Return to default os_sys_calls implementation
+        os_calls.~TestThreadsafeSingletonInjector();
         return {-1, SOCKET_ERROR_AGAIN};
       }));
-  ON_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-      .WillByDefault(Invoke([&](Network::ConnectionEvent) -> void { client_closed = true; }));
-  ON_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
-      .WillByDefault(Invoke([&](Network::ConnectionEvent) -> void { server_closed = true; }));
   // The write() call on the connection will buffer enough data to bring the connection above the
   // high watermark and as the data will not flush it should not return below the watermark.
   EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
@@ -1016,14 +1013,9 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   client_connection_->write(second_buffer_to_write, false);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  // Return to default os_sys_calls implementation
-  os_calls.~TestThreadsafeSingletonInjector();
-
   // Clean up the connection. The close() (called via disconnect) will attempt to flush. The
   // call to write() will succeed, bringing the connection back under the low watermark.
   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
-
-  fprintf(stdout, "client closed %u server closed %u\n", client_closed, server_closed);
 
   disconnect(true);
 }
