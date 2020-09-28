@@ -34,6 +34,7 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/common.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/test_time.h"

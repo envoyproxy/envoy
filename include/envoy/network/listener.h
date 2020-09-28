@@ -324,6 +324,12 @@ public:
    * Enable accepting new connections.
    */
   virtual void enable() PURE;
+
+  /**
+   * Set the fraction of incoming connections that will be closed immediately
+   * after being opened.
+   */
+  virtual void setRejectFraction(float reject_fraction) PURE;
 };
 
 using ListenerPtr = std::unique_ptr<Listener>;

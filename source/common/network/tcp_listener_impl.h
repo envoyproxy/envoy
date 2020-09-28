@@ -1,6 +1,8 @@
 #pragma once
 
 #include "envoy/runtime/runtime.h"
+#include "envoy/common/random_generator.h"
+#include "envoy/server/overload_manager.h"
 
 #include "absl/strings/string_view.h"
 #include "base_listener_impl.h"
@@ -13,10 +15,12 @@ namespace Network {
  */
 class TcpListenerImpl : public BaseListenerImpl {
 public:
-  TcpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
-                  TcpListenerCallbacks& cb, bool bind_to_port, uint32_t backlog_size);
+  TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
+                  SocketSharedPtr socket, TcpListenerCallbacks& cb, bool bind_to_port,
+                  uint32_t backlog_size);
   void disable() override;
   void enable() override;
+  void setRejectFraction(float reject_fraction) override;
 
   static const absl::string_view GlobalMaxCxRuntimeKey;
 
@@ -33,7 +37,9 @@ private:
   // rejected/closed. If the accepted socket is to be admitted, false is returned.
   static bool rejectCxOverGlobalLimit();
 
+  Random::RandomGenerator& random_;
   Event::FileEventPtr file_event_;
+  Server::OverloadActionState reject_fraction_;
 };
 
 } // namespace Network
