@@ -48,7 +48,7 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
         checkEngine(Filters::Common::RBAC::EnforcementMode::Shadow).engine_result_;
     auto result = checkEngine(Filters::Common::RBAC::EnforcementMode::Enforced);
     engine_result_ = result.engine_result_;
-    log_policy_id = result.response_details_;
+    log_policy_id = result.termination_details_;
   } else {
     if (shadow_engine_result_ == Unknown) {
       // TODO(quanlin): Pass the shadow engine results to other filters.
@@ -59,14 +59,14 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
     if (engine_result_ == Unknown) {
       auto result = checkEngine(Filters::Common::RBAC::EnforcementMode::Enforced);
       engine_result_ = result.engine_result_;
-      log_policy_id = result.response_details_;
+      log_policy_id = result.termination_details_;
     }
   }
 
   if (engine_result_ == Allow) {
     return Network::FilterStatus::Continue;
   } else if (engine_result_ == Deny) {
-    callbacks_->connection().streamInfo().setResponseDetails(
+    callbacks_->connection().streamInfo().setTerminationDetails(
         Filters::Common::RBAC::responseDetail(log_policy_id));
     callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;

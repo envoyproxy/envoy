@@ -202,13 +202,15 @@ The following command operators are supported:
   TCP
     Not implemented ("-")
 
-%RESPONSE_DETAILS%
+.. _config_access_log_format_termination_details:
+
+%TERMINATION_DETAILS%
   HTTP
-    Not implemented ("-")
+    Not implemented ("-").
 
   TCP
-    response details provides additional information about the connection, such as why it is closed
-    by Envoy.
+    Termination details provides additional information about why the connection is terminated by
+    Envoy.
 
 %BYTES_SENT%
   HTTP

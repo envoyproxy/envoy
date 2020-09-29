@@ -274,24 +274,26 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    StreamInfoFormatter response_details_format("RESPONSE_DETAILS");
+    StreamInfoFormatter termination_details_format("TERMINATION_DETAILS");
     absl::optional<std::string> details;
-    EXPECT_CALL(stream_info, responseDetails()).WillRepeatedly(ReturnRef(details));
-    EXPECT_EQ(absl::nullopt, response_details_format.format(request_headers, response_headers,
-                                                         response_trailers, stream_info, body));
-    EXPECT_THAT(response_details_format.formatValue(request_headers, response_headers,
-                                                 response_trailers, stream_info, body),
+    EXPECT_CALL(stream_info, terminationDetails()).WillRepeatedly(ReturnRef(details));
+    EXPECT_EQ(absl::nullopt,
+              termination_details_format.format(request_headers, response_headers,
+                                                response_trailers, stream_info, body));
+    EXPECT_THAT(termination_details_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
                 ProtoEq(ValueUtil::nullValue()));
   }
 
   {
-    StreamInfoFormatter response_details_format("RESPONSE_DETAILS");
+    StreamInfoFormatter termination_details_format("TERMINATION_DETAILS");
     absl::optional<std::string> details{"access_denied"};
-    EXPECT_CALL(stream_info, responseDetails()).WillRepeatedly(ReturnRef(details));
-    EXPECT_EQ("access_denied", response_details_format.format(request_headers, response_headers,
-                                                           response_trailers, stream_info, body));
-    EXPECT_THAT(response_details_format.formatValue(request_headers, response_headers,
-                                                 response_trailers, stream_info, body),
+    EXPECT_CALL(stream_info, terminationDetails()).WillRepeatedly(ReturnRef(details));
+    EXPECT_EQ("access_denied",
+              termination_details_format.format(request_headers, response_headers,
+                                                response_trailers, stream_info, body));
+    EXPECT_THAT(termination_details_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
                 ProtoEq(ValueUtil::stringValue("access_denied")));
   }
 

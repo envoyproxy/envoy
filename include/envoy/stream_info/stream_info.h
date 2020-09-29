@@ -237,9 +237,9 @@ public:
   virtual void setResponseCodeDetails(absl::string_view rc_details) PURE;
 
   /**
-   * @param response_details the response details string to set for TCP connection.
+   * @param termination_details the termination details string to set for this connection.
    */
-  virtual void setResponseDetails(std::string response_details) PURE;
+  virtual void setTerminationDetails(std::string termination_details) PURE;
 
   /**
    * @param response_flags the response_flags to intersect with.
@@ -293,9 +293,9 @@ public:
   virtual const absl::optional<std::string>& responseCodeDetails() const PURE;
 
   /**
-   * @return the response details for TCP.
+   * @return the termination details of the connection.
    */
-  virtual const absl::optional<std::string>& responseDetails() const PURE;
+  virtual const absl::optional<std::string>& terminationDetails() const PURE;
 
   /**
    * @return the time that the first byte of the request was received.

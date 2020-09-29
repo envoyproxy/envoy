@@ -19,7 +19,7 @@ enum EngineResult { Unknown, None, Allow, Deny };
 
 struct Result {
   EngineResult engine_result_;
-  std::string response_details_;
+  std::string termination_details_;
 };
 
 /**
