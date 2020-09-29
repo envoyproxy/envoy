@@ -99,7 +99,7 @@ public:
   }
 
   void createUpstreams() override {
-    fake_upstreams_.emplace_back(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
+    addFakeUpstream(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
     load_report_upstream_ = fake_upstreams_.back().get();
     HttpIntegrationTest::createUpstreams();
   }

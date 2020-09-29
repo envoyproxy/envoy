@@ -33,7 +33,7 @@ public:
   HdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
-    fake_upstreams_.emplace_back(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
+    addFakeUpstream(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
     hds_upstream_ = fake_upstreams_.back().get();
     HttpIntegrationTest::createUpstreams();
   }

@@ -38,7 +38,7 @@ public:
   }
 
   void createUpstreams() override {
-    fake_upstreams_.emplace_back(
+    addFakeUpstream(
         createFakeUpstream(createUpstreamSslContext(), FakeHttpConnection::Type::HTTP1));
   }
 

@@ -20,10 +20,10 @@ public:
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(createFakeUpstream(FakeHttpConnection::Type::HTTP1));
-    fake_upstreams_.emplace_back(createFakeUpstream(FakeHttpConnection::Type::HTTP1));
+    addFakeUpstream(createFakeUpstream(FakeHttpConnection::Type::HTTP1));
+    addFakeUpstream(createFakeUpstream(FakeHttpConnection::Type::HTTP1));
     // Create the xDS upstream.
-    fake_upstreams_.emplace_back(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
+    addFakeUpstream(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
   }
 
   void initializeFilter(const std::string& filter_config, const std::string& domain = "*") {

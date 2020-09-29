@@ -314,6 +314,10 @@ public:
     return std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, type, version_,
                                           timeSystem());
   }
+  // Helper to add FakeUpstream.
+  void addFakeUpstream(std::unique_ptr<FakeUpstream> fake_upstream) {
+    fake_upstreams_.emplace_back(std::move(fake_upstream));
+  }
 
 protected:
   bool initialized() const { return initialized_; }

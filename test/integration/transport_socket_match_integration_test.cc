@@ -118,11 +118,11 @@ transport_socket:
     for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
       auto endpoint = upstream_address_fn_(i);
       if (isTLSUpstream(i)) {
-        fake_upstreams_.emplace_back(new AutonomousUpstream(
+        addFakeUpstream(std::make_unique<AutonomousUpstream>(
             HttpIntegrationTest::createUpstreamTlsContext(), endpoint->ip()->port(),
             FakeHttpConnection::Type::HTTP1, endpoint->ip()->version(), timeSystem(), false));
       } else {
-        fake_upstreams_.emplace_back(new AutonomousUpstream(
+        addFakeUpstream(std::make_unique<AutonomousUpstream>(
             Network::Test::createRawBufferSocketFactory(), endpoint->ip()->port(),
             FakeHttpConnection::Type::HTTP1, endpoint->ip()->version(), timeSystem(), false));
       }

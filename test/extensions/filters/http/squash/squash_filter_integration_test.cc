@@ -71,7 +71,7 @@ public:
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
+    addFakeUpstream(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
   }
 
   /**

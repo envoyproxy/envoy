@@ -25,7 +25,7 @@ public:
         abstract_namespace_(std::get<1>(GetParam())) {}
 
   void createUpstreams() override {
-    fake_upstreams_.emplace_back(createFakeUpstream(
+    addFakeUpstream(createFakeUpstream(
         TestEnvironment::unixDomainSocketPath("udstest.1.sock", abstract_namespace_),
         FakeHttpConnection::Type::HTTP1));
 

@@ -34,7 +34,7 @@ public:
 
   void createUpstreams() override {
     BaseIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
+    addFakeUpstream(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
   }
 
   void initialize() override {

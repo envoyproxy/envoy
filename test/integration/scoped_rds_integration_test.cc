@@ -122,9 +122,9 @@ fragments:
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     // Create the SRDS upstream.
-    fake_upstreams_.emplace_back(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
+    addFakeUpstream(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
     // Create the RDS upstream.
-    fake_upstreams_.emplace_back(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
+    addFakeUpstream(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
   }
 
   void resetFakeUpstreamInfo(FakeUpstreamInfo* upstream_info) {
