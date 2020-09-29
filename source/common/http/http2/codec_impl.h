@@ -406,6 +406,23 @@ protected:
   // that is not associated with an existing stream.
   StreamImpl* getStream(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
+
+  /**
+   * Copies any frames pending internally by nghttp2 into outbound buffer.
+   * The `sendPendingFrames()` can be called in 4 different contexts:
+   * 1. dispatching_ == true, aka the dispatching context. The `sendPendingFrames()` is no-op and
+   *    always returns success to avoid reentering nghttp2 library.
+   * 2. dispatching_ == false and ServerConnectionImpl::dispatching_downstream_data_ == true.
+   *    The `sendPendingFrames()` returns the status of the protocol constraint checks. Outbound
+   *    frame accounting is performed. Applies to server codec only.
+   * 3. dispatching_ == false and ServerConnectionImpl::dispatching_downstream_data_ == false.
+   *    The `sendPendingFrames()` always returns success. Outbound frame accounting is performed.
+   *    Applies to server codec only.
+   * 4. dispatching_ == false. The `sendPendingFrames()` always returns success. No outbound
+   *    frame accounting.
+   *
+   * TODO(yanavlasov): harmonize behavior for cases 2, 3 and 4.
+   */
   Status sendPendingFrames();
   void sendSettings(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                     bool disable_push);
@@ -430,6 +447,20 @@ protected:
    * Return nghttp2 callback return code corresponding to `status`.
    */
   int setAndCheckNghttp2CallbackStatus(Status&& status);
+
+  /**
+   * This method checks if a protocol constraint had been violated in the sendPendingFrames() call.
+   * This method is a stop-gap solution for harmonizing sendPendingFrames() behavior in contexts 2
+   * and 3 (see comments for the sendPendingFrames() method). It allows each case where
+   * sendPendingFrames() is called outside of the dispatch context to be fixed in its own PR so it
+   * is easier to review and reason about. Once all error handling is implemented this method will
+   * be removed and the `sendPendingFrames()` will be changed to return error in both contexts 2
+   * and 3. At the same time the RELEASE_ASSERTs will be removed as well. The implementation in the
+   * ClientConnectionImpl is a no-op as client connections do not check protocol constraints. The
+   * implementation in the ServerConnectionImpl schedules callback to terminate connection if the
+   * protocol constraint was violated.
+   */
+  virtual void checkProtocolConstrainViolation() PURE;
 
   /**
    * Callback for terminating connection when protocol constrain has been violated
@@ -536,6 +567,7 @@ private:
     return ProtocolConstraints::ReleasorProc([]() {});
   }
   Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return okStatus(); }
+  void checkProtocolConstrainViolation() override {}
 
   Http::ConnectionCallbacks& callbacks_;
 };
@@ -562,6 +594,12 @@ private:
   trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) override;
   Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
+
+  /**
+   * Check protocol constraint violations outside of the dispatching context.
+   * This method ASSERTs if it is called in the dispatching context.
+   */
+  void checkProtocolConstrainViolation() override;
 
   // Http::Connection
   // The reason for overriding the dispatch method is to do flood mitigation only when

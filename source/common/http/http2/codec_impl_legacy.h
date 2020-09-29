@@ -429,6 +429,23 @@ protected:
   }
 
   /**
+   * This method checks if a protocol constraint had been violated in the sendPendingFrames() call
+   * outside of the dispatch context.
+   * This method is a stop-gap solution for implementing checking of protocol constraint violations
+   * outside of the dispatch context (where at this point the sendPendingFrames() method always
+   * returns success). It allows each case where sendPendingFrames() is called outside of the
+   * dispatch context to be fixed in its own PR so it is easier to review and reason about. Once all
+   * error handling is implemented this method will be removed and the `sendPendingFrames()` will be
+   * changed to return error in both dispatching and non-dispatching contexts. At the same time the
+   * RELEASE_ASSERTs will be removed as well.
+   * The implementation in the ClientConnectionImpl is a no-op as client connections to not check
+   * protocol constraints.
+   * The implementation in the ServerConnectionImpl schedules callback to terminate connection if
+   * the protocol constraint was violated.
+   */
+  virtual void checkProtocolConstrainViolation() PURE;
+
+  /**
    * Callback for terminating connection when protocol constrain has been violated
    * outside of the dispatch context.
    */
@@ -528,6 +545,7 @@ private:
     return Envoy::Http::Http2::ProtocolConstraints::ReleasorProc([]() {});
   }
   bool trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return true; }
+  void checkProtocolConstrainViolation() override {}
 
   Http::ConnectionCallbacks& callbacks_;
 };
@@ -554,6 +572,12 @@ private:
   trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) override;
   bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
+
+  /**
+   * Check protocol constraint violations outside of the dispatching context.
+   * This method ASSERTs if it is called in the dispatching context.
+   */
+  void checkProtocolConstrainViolation() override;
 
   // Http::Connection
   // The reason for overriding the dispatch method is to do flood mitigation only when

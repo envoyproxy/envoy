@@ -488,9 +488,7 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
   auto status = parent_.sendPendingFrames();
   // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
   RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
-  if (!parent_.protocol_constraints_.checkOutboundFrameLimits().ok()) {
-    parent_.scheduleProtocolConstraintViolationCallback();
-  }
+  parent_.checkProtocolConstrainViolation();
 
   if (local_end_stream_ && pending_send_data_.length() > 0) {
     createPendingFlushTimer();
@@ -1435,6 +1433,12 @@ ServerConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_contr
     return protocol_constraints_.status();
   }
   return releasor;
+}
+
+void ServerConnectionImpl::checkProtocolConstrainViolation() {
+  if (!protocol_constraints_.checkOutboundFrameLimits().ok()) {
+    scheduleProtocolConstraintViolationCallback();
+  }
 }
 
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
