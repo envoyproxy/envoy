@@ -1,6 +1,12 @@
 Version history
 ---------------
 
+1.13.6 (September 29, 2020)
+===========================
+Changes
+-------
+* test: fix flaky test.
+
 1.13.5 (September 29, 2020)
 ===========================
 Changes
