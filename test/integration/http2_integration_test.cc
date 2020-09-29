@@ -123,6 +123,34 @@ TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
   response->waitForReset();
 }
 
+TEST_P(Http2IntegrationTest, Http2DownstreamKeepalive) {
+  constexpr uint64_t interval_ms = 1;
+  constexpr uint64_t timeout_ms = 250;
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_http2_protocol_options()
+            ->mutable_connection_keepalive()
+            ->mutable_interval()
+            ->set_nanos(interval_ms * 1000 * 1000);
+        hcm.mutable_http2_protocol_options()
+            ->mutable_connection_keepalive()
+            ->mutable_timeout()
+            ->set_nanos(timeout_ms * 1000 * 1000);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // This call is NOT running the event loop of the client, so downstream PINGs will
+  // not receive a response.
+  test_server_->waitForCounterEq("http2.keepalive_timeout", 1,
+                                 std::chrono::milliseconds(timeout_ms * 2));
+
+  response->waitForReset();
+}
+
 static std::string response_metadata_filter = R"EOF(
 name: response-metadata-filter
 typed_config:
