@@ -90,9 +90,9 @@ protected:
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     // Create the LDS upstream (fake_upstreams_[1]).
-    addFakeUpstream(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
     // Create the RDS upstream (fake_upstreams_[2]).
-    addFakeUpstream(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
   }
 
   void resetFakeUpstreamInfo(FakeUpstreamInfo* upstream_info) {

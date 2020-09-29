@@ -145,8 +145,8 @@ public:
   }
 
   void createUpstreams() override {
-    addFakeUpstream(createFakeUpstream(createUpstreamSslContext(context_manager_, *api_),
-                                       FakeHttpConnection::Type::HTTP1));
+    addFakeUpstream(createUpstreamSslContext(context_manager_, *api_),
+                    FakeHttpConnection::Type::HTTP1);
   }
 
 private:

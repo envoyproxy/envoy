@@ -118,7 +118,7 @@ Network::ClientConnectionPtr XfccIntegrationTest::makeMtlsClientConnection() {
 }
 
 void XfccIntegrationTest::createUpstreams() {
-  addFakeUpstream(createFakeUpstream(createUpstreamSslContext(), FakeHttpConnection::Type::HTTP1));
+  addFakeUpstream(createUpstreamSslContext(), FakeHttpConnection::Type::HTTP1);
 }
 
 void XfccIntegrationTest::initialize() {

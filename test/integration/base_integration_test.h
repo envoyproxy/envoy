@@ -315,8 +315,24 @@ public:
                                           timeSystem());
   }
   // Helper to add FakeUpstream.
-  void addFakeUpstream(std::unique_ptr<FakeUpstream> fake_upstream) {
-    fake_upstreams_.emplace_back(std::move(fake_upstream));
+  // Add a fake upstream bound to the specified unix domain socket path.
+  void addFakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type) {
+    fake_upstreams_.emplace_back(createFakeUpstream(uds_path, type));
+  }
+  // Add a fake upstream bound to the specified |address|.
+  void addFakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
+                       FakeHttpConnection::Type type, bool enable_half_close = false,
+                       bool udp_fake_upstream = false) {
+    fake_upstreams_.emplace_back(
+        createFakeUpstream(address, type, enable_half_close, udp_fake_upstream));
+  }
+  // Add a fake upstream bound to INADDR_ANY and there is no specified port.
+  void addFakeUpstream(FakeHttpConnection::Type type, bool enable_half_close = false) {
+    fake_upstreams_.emplace_back(createFakeUpstream(type, enable_half_close));
+  }
+  void addFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                       FakeHttpConnection::Type type) {
+    fake_upstreams_.emplace_back(createFakeUpstream(std::move(transport_socket_factory), type));
   }
 
 protected:

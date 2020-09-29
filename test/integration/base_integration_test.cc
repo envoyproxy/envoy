@@ -110,11 +110,11 @@ void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
     auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
-      addFakeUpstream(std::make_unique<AutonomousUpstream>(
+      fake_upstreams_.emplace_back(new AutonomousUpstream(
           endpoint, upstream_protocol_, *time_system_, autonomous_allow_incomplete_streams_));
     } else {
-      addFakeUpstream(std::make_unique<FakeUpstream>(endpoint, upstream_protocol_, *time_system_,
-                                                     enable_half_close_, udp_fake_upstream_));
+      fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstream_protocol_, *time_system_,
+                                                    enable_half_close_, udp_fake_upstream_));
     }
   }
 }
@@ -365,7 +365,7 @@ void BaseIntegrationTest::createXdsUpstream() {
     return;
   }
   if (tls_xds_upstream_ == false) {
-    addFakeUpstream(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
   } else {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
@@ -381,7 +381,7 @@ void BaseIntegrationTest::createXdsUpstream() {
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
     auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
         std::move(cfg), context_manager_, *upstream_stats_store_, std::vector<std::string>{});
-    addFakeUpstream(createFakeUpstream(std::move(context), FakeHttpConnection::Type::HTTP2));
+    addFakeUpstream(std::move(context), FakeHttpConnection::Type::HTTP2);
   }
   xds_upstream_ = fake_upstreams_[1].get();
 }

@@ -96,7 +96,7 @@ public:
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     // Create the extension config discovery upstream (fake_upstreams_[1]).
-    addFakeUpstream(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
   }
 
   void waitXdsStream() {

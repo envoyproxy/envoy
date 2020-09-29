@@ -316,8 +316,7 @@ public:
 
   void createUpstreams() override {
     // Fake upstream with SSL/TLS for the first cluster.
-    addFakeUpstream(
-        createFakeUpstream(createUpstreamSslContext(), FakeHttpConnection::Type::HTTP1));
+    addFakeUpstream(createUpstreamSslContext(), FakeHttpConnection::Type::HTTP1);
     create_xds_upstream_ = true;
   }
 
@@ -474,8 +473,8 @@ public:
 
   void createUpstreams() override {
     // This is for backend with ssl
-    addFakeUpstream(createFakeUpstream(createUpstreamSslContext(context_manager_, *api_),
-                                       FakeHttpConnection::Type::HTTP1));
+    addFakeUpstream(createUpstreamSslContext(context_manager_, *api_),
+                    FakeHttpConnection::Type::HTTP1);
     create_xds_upstream_ = true;
   }
 };

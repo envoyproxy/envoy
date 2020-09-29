@@ -80,7 +80,7 @@ require_client_certificate: true
 
   void createUpstreams() override {
     auto endpoint = upstream_address_fn_(0);
-    addFakeUpstream(std::make_unique<FakeUpstream>(
+    fake_upstreams_.emplace_back(new FakeUpstream(
         createUpstreamSslContext(), endpoint->ip()->port(),
         use_h2_ ? FakeHttpConnection::Type::HTTP2 : FakeHttpConnection::Type::HTTP1,
         endpoint->ip()->version(), timeSystem()));

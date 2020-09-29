@@ -359,7 +359,7 @@ public:
     HttpIntegrationTest::createUpstreams();
 
     if (use_eds_) {
-      addFakeUpstream(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
+      addFakeUpstream(FakeHttpConnection::Type::HTTP2);
     }
   }
 

@@ -82,9 +82,9 @@ typed_config:
   }
 
   void createUpstreams() override {
-    addFakeUpstream(createFakeUpstream(
+    addFakeUpstream(
         Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_, factory_context_),
-        FakeHttpConnection::Type::HTTP1));
+        FakeHttpConnection::Type::HTTP1);
   }
 
   Network::ClientConnectionPtr

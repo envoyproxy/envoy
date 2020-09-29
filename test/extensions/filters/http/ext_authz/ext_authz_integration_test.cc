@@ -41,7 +41,7 @@ public:
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(createFakeUpstream(FakeHttpConnection::Type::HTTP2));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
   }
 
   void initializeConfig(bool with_timeout = false) {
@@ -404,7 +404,7 @@ public:
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(createFakeUpstream(FakeHttpConnection::Type::HTTP1));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
   }
 
   // By default, HTTP Service uses case sensitive string matcher.
@@ -666,7 +666,7 @@ public:
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(createFakeUpstream(FakeHttpConnection::Type::HTTP1));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
   }
 
   void cleanup() {

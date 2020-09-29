@@ -38,8 +38,7 @@ public:
   }
 
   void createUpstreams() override {
-    addFakeUpstream(
-        createFakeUpstream(createUpstreamSslContext(), FakeHttpConnection::Type::HTTP1));
+    addFakeUpstream(createUpstreamSslContext(), FakeHttpConnection::Type::HTTP1);
   }
 
   Network::TransportSocketFactoryPtr createUpstreamSslContext() {
