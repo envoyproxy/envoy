@@ -82,6 +82,7 @@ public:
   void stopListeners() override;
   void disableListeners() override;
   void enableListeners() override;
+  void setListenerRejectFraction(float reject_fraction) override;
   const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
 
   /**

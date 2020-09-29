@@ -148,6 +148,14 @@ void ConnectionHandlerImpl::enableListeners() {
   }
 }
 
+void ConnectionHandlerImpl::setListenerRejectFraction(float reject_fraction) {
+  disable_listeners_ = false;
+  for (auto& listener : listeners_) {
+    listener.second.listener_->listener()->setRejectFraction(reject_fraction);
+  }
+}
+
+
 void ConnectionHandlerImpl::ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
   ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
   ActiveConnections& active_connections = connection.active_connections_;

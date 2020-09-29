@@ -413,6 +413,7 @@ public:
   MOCK_METHOD(void, stopListeners, ());
   MOCK_METHOD(void, disableListeners, ());
   MOCK_METHOD(void, enableListeners, ());
+  MOCK_METHOD(void, setListenerRejectFraction, (float), (override));
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
 };
 
