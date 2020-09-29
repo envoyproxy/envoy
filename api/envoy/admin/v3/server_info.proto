@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.admin.v3;
 
+import "envoy/config/core/v3/base.proto";
+
 import "google/protobuf/duration.proto";
 
 import "envoy/annotations/deprecation.proto";
@@ -17,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Proto representation of the value returned by /server_info, containing
 // server version/server status information.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message ServerInfo {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.ServerInfo";
 
@@ -52,6 +54,9 @@ message ServerInfo {
 
   // Command line options the server is currently running with.
   CommandLineOptions command_line_options = 6;
+
+  // Populated node identity of this server.
+  config.core.v3.Node node = 7;
 }
 
 // [#next-free-field: 37]
