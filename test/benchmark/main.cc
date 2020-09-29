@@ -4,6 +4,7 @@
 
 #include "common/common/logger.h"
 
+#include "common/common/thread.h"
 #include "test/test_common/environment.h"
 
 #include "benchmark/benchmark.h"
@@ -34,6 +35,13 @@ int main(int argc, char** argv) {
     // for --help and --version.
     return 0;
   }
+
+  // Reduce logs so benchmark output is readable.
+  TestEnvironment::initializeOptions(argc, argv);
+  static auto* lock = new Thread::MutexBasicLockable();
+  static auto* logging_context =
+      new Logger::Context(spdlog::level::warn, TestEnvironment::getOptions().logFormat(), *lock, false);
+  UNREFERENCED_PARAMETER(logging_context);
 
   skip_expensive_benchmarks = skip_switch.getValue();
 
