@@ -12,6 +12,7 @@ Changes
 
   Targeted fixes have been additionally performed on the following extensions which make them
   consider all duplicate headers by default as a comma concatenated list:
+
     1. Any extension using CEL matching on headers.
     2. The header to metadata filter.
     3. The JWT filter.
