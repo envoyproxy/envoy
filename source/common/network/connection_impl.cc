@@ -707,7 +707,17 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket,
     const Network::ConnectionSocket::OptionsSharedPtr& options)
-    : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address, options),
+    : ClientConnectionImpl(dispatcher, remote_address, source_address, 
+                     std::move(transport_socket), options, std::make_unique<ClientSocketImpl>(remote_address, options)) { 
+}
+
+ClientConnectionImpl::ClientConnectionImpl(
+    Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
+    const Network::Address::InstanceConstSharedPtr& source_address,
+    Network::TransportSocketPtr&& transport_socket,
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    ConnectionSocketPtr conn_socket)
+    : ConnectionImpl(dispatcher, std::move(conn_socket),
                      std::move(transport_socket), stream_info_, false),
       stream_info_(dispatcher.timeSource()) {
   // There are no meaningful socket options or source address semantics for

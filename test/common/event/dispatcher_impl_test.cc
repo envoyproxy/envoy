@@ -8,7 +8,10 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/event/timer_impl.h"
 #include "common/stats/isolated_store_impl.h"
+#include "common/network/address_impl.h"
+#include "common/network/connection_impl.h"
 
+#include "test/mocks/network/connection.h"
 #include "test/mocks/common.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/simulated_time_system.h"
@@ -1145,6 +1148,44 @@ TEST_F(TimerUtilsTest, TimerValueConversion) {
 
   // Some arbitrary tests for good measure.
   checkConversion(std::chrono::milliseconds(600014), 600, 14000);
+}
+
+class InternalConnectionDispatcherTest : public testing::Test {
+protected:
+  InternalConnectionDispatcherTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
+        dispatcher_impl_(static_cast<DispatcherImpl*>(dispatcher_.get())) {}
+
+  Api::ApiPtr api_;
+  DispatcherPtr dispatcher_;
+  DispatcherImpl* dispatcher_impl_;
+  const std::shared_ptr<Network::Address::EnvoyInternalInstance> remote_address_{
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_addr")};
+  const std::shared_ptr<Network::Address::EnvoyInternalInstance> source_address_{
+      std::make_shared<Network::Address::EnvoyInternalInstance>("local_addr")};
+};
+
+TEST_F(InternalConnectionDispatcherTest, CreateInternalClientConnection) {
+  std::unique_ptr<Network::ConnectionSocket> server_conn_socket;
+  auto socket_save_callback =
+      [&server_conn_socket](const Network::Address::InstanceConstSharedPtr&,
+                            std::unique_ptr<Network::ConnectionSocket> internal_socket) {
+        server_conn_socket = std::move(internal_socket);
+      };
+  dispatcher_impl_->registerInternalListener(remote_address_->asString(), socket_save_callback);
+  auto client = dispatcher_->createInternalConnection(remote_address_, source_address_);
+
+  Network::MockConnectionCallbacks client_callbacks;
+  client->addConnectionCallbacks(client_callbacks);
+  EXPECT_EQ(Network::Connection::State::Open, client->state());
+
+  EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::LocalClose)).Times(1);
+  client->close(Network::ConnectionCloseType::NoFlush);
+  EXPECT_EQ(Network::Connection::State::Closed, client->state());
+
+  EXPECT_TRUE(server_conn_socket->ioHandle().isOpen());
+  server_conn_socket->ioHandle().close();
+  EXPECT_FALSE(server_conn_socket->ioHandle().isOpen());
 }
 
 } // namespace

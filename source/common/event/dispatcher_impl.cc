@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "common/network/raw_buffer_socket.h"
 #include "envoy/api/api.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
@@ -137,10 +138,23 @@ DispatcherImpl::createInternalConnection(Network::Address::InstanceConstSharedPt
     return std::make_unique<Network::ClosingClientConnectionImpl>(*this, internal_address,
                                                                   local_address);
   }
-  Network::ClientConnectionPtr client_conn{};
-  auto server_io_handle = std::make_unique<Network::BufferedIoSocketHandleImpl>();
 
-  (iter->second)(internal_address, std::move(server_io_handle));
+  auto client_io_handle_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
+  auto server_io_handle_ = std::make_unique<Network::BufferedIoSocketHandleImpl>();
+  client_io_handle_->setWritablePeer(server_io_handle_.get());
+  server_io_handle_->setWritablePeer(client_io_handle_.get());
+
+  Network::RawBufferSocketFactory client_transport_socket_factory;
+  // ConnectionSocket conn_socket
+  auto client_conn_socket = std::make_unique<Network::InternalConnectionSocketImpl>(
+      std::move(client_io_handle_), local_address, internal_address);
+  auto server_conn_socket = std::make_unique<Network::InternalConnectionSocketImpl>(
+      std::move(server_io_handle_), internal_address, local_address);
+  auto client_conn = std::make_unique<Network::ClientConnectionImpl>(
+      *this, internal_address, local_address,  client_transport_socket_factory.createTransportSocket(nullptr), nullptr,
+      std::move(client_conn_socket));
+
+  (iter->second)(internal_address, std::move(server_conn_socket));
   return client_conn;
 }
 

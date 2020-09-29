@@ -12,6 +12,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection_handler.h"
+#include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
@@ -39,7 +40,7 @@ public:
   ~DispatcherImpl() override;
   using InternalConnectionCallback =
       std::function<void(const Network::Address::InstanceConstSharedPtr& address,
-                         std::unique_ptr<Network::BufferedIoSocketHandleImpl> internal_socket)>;
+                         std::unique_ptr<Network::ConnectionSocket> internal_socket)>;
   /**
    * @return event_base& the libevent base.
    */

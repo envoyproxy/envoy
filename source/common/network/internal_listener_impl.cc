@@ -24,13 +24,9 @@ namespace {
 void InternalListenerImpl::setupInternalListener(Event::DispatcherImpl& dispatcher) {
   dispatcher.registerInternalListener(
       internal_listener_id_,
-      [this](const Address::InstanceConstSharedPtr& client_address,
-             std::unique_ptr<Network::BufferedIoSocketHandleImpl> internal_socket) {
-        auto socket = std::make_unique<Network::InternalConnectionSocketImpl>(
-            std::move(internal_socket),
-            std::make_shared<Network::Address::EnvoyInternalInstance>(internal_listener_id_),
-            client_address);
-        cb_.onNewSocket(std::move(socket));
+      [this](const Address::InstanceConstSharedPtr&,
+             std::unique_ptr<Network::ConnectionSocket> internal_conn_socket) {
+        cb_.onNewSocket(std::move(internal_conn_socket));
       });
 }
 

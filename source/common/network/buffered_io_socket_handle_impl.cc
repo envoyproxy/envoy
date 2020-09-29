@@ -28,7 +28,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::close() {
     write_shutdown_ = true;
   }
   closed_ = true;
-  return IoSocketError::ioResultSocketInvalidAddress();
+  return Api::ioCallUint64ResultNoError();
 }
 
 bool BufferedIoSocketHandleImpl::isOpen() const { return !closed_; }

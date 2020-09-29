@@ -207,6 +207,11 @@ public:
                                const Address::InstanceConstSharedPtr& remote_address)
       : ConnectionSocketImpl(std::move(io_handle), local_address, remote_address) {}
   ~InternalConnectionSocketImpl() override = default;
+
+  // TODO(lambdai): succeed on limited opitons.
+  Api::SysCallIntResult getSocketOption(int, int, void*, socklen_t*) const override {
+    return {0, 0};
+  }
 };
 
 // ConnectionSocket used with client connections.

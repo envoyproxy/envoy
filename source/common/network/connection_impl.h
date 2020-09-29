@@ -209,6 +209,13 @@ public:
                        Network::TransportSocketPtr&& transport_socket,
                        const Network::ConnectionSocket::OptionsSharedPtr& options);
 
+  ClientConnectionImpl(Event::Dispatcher& dispatcher,
+                       const Address::InstanceConstSharedPtr& remote_address,
+                       const Network::Address::InstanceConstSharedPtr& source_address,
+                       Network::TransportSocketPtr&& transport_socket,
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       ConnectionSocketPtr conn_socket);
+
   // Network::ClientConnection
   void connect() override;
 

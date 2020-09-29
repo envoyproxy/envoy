@@ -120,8 +120,8 @@ private:
                          SchedulableCallback& schedulable_cb, int& event_counter)
       : schedulable_(schedulable_cb), cb_([this, cb]() {
           auto all_events = getEventListener().triggeredEvents();
-          auto epheral_events = getEventListener().getAndClearEpheralEvents();
-          cb(all_events | epheral_events);
+          auto ephemeral_events = getEventListener().getAndClearEpheralEvents();
+          cb(all_events | ephemeral_events);
         }),
         event_counter_(event_counter) {
     event_listener_.onEventEnabled(events);

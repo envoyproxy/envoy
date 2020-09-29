@@ -16,9 +16,7 @@
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 
-#include "source/common/network/_virtual_includes/address_lib/common/network/address_impl.h"
-#include "source/common/network/_virtual_includes/connection_lib/common/network/connection_impl.h"
-
+#include "test/mocks/network/connection.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
