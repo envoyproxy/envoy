@@ -6,8 +6,7 @@ In both cases, the generated output can be found in `generated/docs`.
 
 ## Building in an existing Envoy development environment
 
-If you have an existing Envoy development environment, you should have the necessary dependencies
-and requirements and be able to build the documentation directly.
+If you have an [existing Envoy development environment](https://github.com/envoyproxy/envoy/tree/master/bazel#quick-start-bazel-build-for-developers), you should have the necessary dependencies and requirements and be able to build the documentation directly.
 
 ```bash
 ./docs/build.sh
