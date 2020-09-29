@@ -13,6 +13,7 @@
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/query_params.h"
 
+#include "common/common/statusor.h"
 #include "common/http/exception.h"
 #include "common/http/status.h"
 #include "common/json/json_loader.h"
@@ -241,6 +242,8 @@ std::string makeSetCookieValue(const std::string& key, const std::string& value,
  * @return uint64_t the response code or throws an exception if the headers are invalid.
  */
 uint64_t getResponseStatus(const ResponseHeaderMap& headers);
+
+absl::StatusOr<uint64_t> getResponseStatusOr(const ResponseHeaderMap& headers);
 
 /**
  * Determine whether these headers are a valid Upgrade request or response.

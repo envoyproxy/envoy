@@ -296,9 +296,14 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
   readDisable(false);
 }
 
-void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
+Status ConnectionImpl::ClientStreamImpl::decodeHeaders() {
   auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
-  const uint64_t status = Http::Utility::getResponseStatus(*headers);
+
+  auto response_status_or_absl_status = Http::Utility::getResponseStatusOr(*headers);
+  if (!response_status_or_absl_status.ok()) {
+    return codecClientError(response_status_or_absl_status.status().message());
+  }
+  const uint64_t status = response_status_or_absl_status.value();
 
   if (!upgrade_type_.empty() && headers->Status()) {
     Http::Utility::transformUpgradeResponseFromH2toH1(*headers, upgrade_type_);
@@ -315,6 +320,7 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
   } else {
     response_decoder_.decodeHeaders(std::move(headers), remote_end_stream_);
   }
+  return okStatus();
 }
 
 void ConnectionImpl::ClientStreamImpl::decodeTrailers() {
@@ -322,12 +328,13 @@ void ConnectionImpl::ClientStreamImpl::decodeTrailers() {
       std::move(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_)));
 }
 
-void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
+Status ConnectionImpl::ServerStreamImpl::decodeHeaders() {
   auto& headers = absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
   if (Http::Utility::isH2UpgradeRequest(*headers)) {
     Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
   }
   request_decoder_->decodeHeaders(std::move(headers), remote_end_stream_);
+  return okStatus();
 }
 
 void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
@@ -783,7 +790,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     switch (frame->headers.cat) {
     case NGHTTP2_HCAT_RESPONSE:
     case NGHTTP2_HCAT_REQUEST: {
-      stream->decodeHeaders();
+      RETURN_IF_ERROR(stream->decodeHeaders());
       break;
     }
 
@@ -797,7 +804,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
           stream->decodeTrailers();
         } else {
           // We're a client session and still waiting for non-informational headers.
-          stream->decodeHeaders();
+          RETURN_IF_ERROR(stream->decodeHeaders());
         }
       }
       break;
