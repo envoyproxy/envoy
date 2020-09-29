@@ -58,7 +58,7 @@ envoy_cc_benchmark_binary(
 )
 
 envoy_benchmark_test(
-    name = "address_impl_speed_test_benchmark_test",
+    name = "address_impl_benchmark_test",
     benchmark_binary = "address_impl_speed_test",
 )
 
@@ -368,7 +368,7 @@ envoy_cc_benchmark_binary(
 )
 
 envoy_benchmark_test(
-    name = "lc_trie_speed_test_benchmark_test",
+    name = "lc_trie_benchmark_test",
     benchmark_binary = "lc_trie_speed_test",
 )
 

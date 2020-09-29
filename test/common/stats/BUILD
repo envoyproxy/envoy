@@ -269,7 +269,7 @@ envoy_cc_benchmark_binary(
 )
 
 envoy_benchmark_test(
-    name = "thread_local_store_speed_test_benchmark_test",
+    name = "thread_local_store_benchmark_test",
     benchmark_binary = "thread_local_store_speed_test",
 )
 

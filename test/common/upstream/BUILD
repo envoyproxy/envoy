@@ -140,7 +140,7 @@ envoy_cc_benchmark_binary(
 )
 
 envoy_benchmark_test(
-    name = "eds_speed_test_benchmark_test",
+    name = "eds_benchmark_test",
     benchmark_binary = "eds_speed_test",
 )
 
@@ -457,8 +457,8 @@ envoy_cc_test(
 )
 
 envoy_cc_benchmark_binary(
-    name = "load_balancer_benchmark",
-    srcs = ["load_balancer_benchmark.cc"],
+    name = "load_balancer_speed_test",
+    srcs = ["load_balancer_speed_test.cc"],
     external_deps = [
         "benchmark",
     ],
@@ -478,7 +478,7 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "load_balancer_benchmark_test",
     timeout = "long",
-    benchmark_binary = "load_balancer_benchmark",
+    benchmark_binary = "load_balancer_speed_test",
 )
 
 envoy_cc_test(

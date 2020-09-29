@@ -82,6 +82,6 @@ envoy_cc_benchmark_binary(
 )
 
 envoy_benchmark_test(
-    name = "substitution_formatter_speed_test_benchmark_test",
+    name = "substitution_formatter_benchmark_test",
     benchmark_binary = "substitution_formatter_speed_test",
 )

@@ -143,7 +143,7 @@ envoy_cc_benchmark_binary(
 )
 
 envoy_benchmark_test(
-    name = "logger_speed_test_benchmark_test",
+    name = "logger_benchmark_test",
     benchmark_binary = "logger_speed_test",
 )
 
@@ -278,7 +278,7 @@ envoy_cc_benchmark_binary(
 )
 
 envoy_benchmark_test(
-    name = "utility_speed_test_benchmark_test",
+    name = "utility_benchmark_test",
     benchmark_binary = "utility_speed_test",
 )
 

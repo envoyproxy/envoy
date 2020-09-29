@@ -51,8 +51,8 @@ envoy_cc_fuzz_test(
 )
 
 envoy_extension_cc_benchmark_binary(
-    name = "tls_inspector_benchmark",
-    srcs = ["tls_inspector_benchmark.cc"],
+    name = "tls_inspector_speed_test",
+    srcs = ["tls_inspector_speed_test.cc"],
     extension_name = "envoy.filters.listener.tls_inspector",
     external_deps = [
         "benchmark",
@@ -71,7 +71,7 @@ envoy_extension_cc_benchmark_binary(
 
 envoy_extension_benchmark_test(
     name = "tls_inspector_benchmark_test",
-    benchmark_binary = "tls_inspector_benchmark",
+    benchmark_binary = "tls_inspector_speed_test",
     extension_name = "envoy.filters.listener.tls_inspector",
 )
 

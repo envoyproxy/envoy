@@ -427,8 +427,8 @@ envoy_cc_test(
 )
 
 envoy_cc_benchmark_binary(
-    name = "filter_chain_benchmark_test",
-    srcs = ["filter_chain_benchmark_test.cc"],
+    name = "filter_chain_speed_test",
+    srcs = ["filter_chain_speed_test.cc"],
     external_deps = [
         "benchmark",
         "googletest",
@@ -445,7 +445,7 @@ envoy_cc_benchmark_binary(
 )
 
 envoy_benchmark_test(
-    name = "filter_chain_benchmark_test_benchmark_test",
+    name = "filter_chain_benchmark_test",
     timeout = "long",
-    benchmark_binary = "filter_chain_benchmark_test",
+    benchmark_binary = "filter_chain_speed_test",
 )
