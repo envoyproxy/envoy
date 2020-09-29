@@ -5,8 +5,8 @@
 
 #include "test/mocks/server/instance.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/test_common/utility.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
 #include "gmock/gmock.h"
@@ -40,7 +40,7 @@ static void BM_RouteTableSize(benchmark::State& state) {
   // Setup router for benchmarking.
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-    {{"envoy.reloadable_features.preserve_query_string_in_path_redirects", "false"}});
+      {{"envoy.reloadable_features.preserve_query_string_in_path_redirects", "false"}});
   Api::ApiPtr api = Api::createApiForTest();
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -72,7 +72,7 @@ static void BM_RouteTableSize(benchmark::State& state) {
   }
 }
 
-BENCHMARK(BM_RouteTableSize)->RangeMultiplier(2)->Ranges({{1, 1024}});
+BENCHMARK(BM_RouteTableSize)->RangeMultiplier(2)->Ranges({{1, 2 << 14}});
 
 } // namespace
 } // namespace Router
