@@ -1143,40 +1143,50 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
   auto& route = filter_manager_.streamInfo().route_entry_;
 
   auto grpc_timeout = Grpc::Common::getGrpcTimeout(*request_headers_);
-  std::chrono::milliseconds timeout = std::chrono::milliseconds(0);
+  std::chrono::milliseconds timeout;
+  bool disable_timer = false;
 
   if (!grpc_timeout || !route->grpcTimeoutHeaderMax()) {
     // Either there is no grpc-timeout header or special timeouts for it are not
     // configured. Use stream duration.
     if (route->maxStreamDuration()) {
       timeout = route->maxStreamDuration().value();
+      if (timeout == std::chrono::milliseconds(0)) {
+        // Explicitly configured 0 means no timeout.
+        disable_timer = true;
+      }
     } else {
-      // Fall back to HCM config.
+      // Fall back to HCM config. If no HCM duration limit exists, disable
+      // timers set by any prior route configuration.
       const auto max_stream_duration = connection_manager_.config_.maxStreamDuration();
       if (max_stream_duration.has_value() && max_stream_duration.value().count()) {
         timeout = max_stream_duration.value();
+      } else {
+        disable_timer = true;
       }
     }
   } else {
     // Start with the timeout equal to the gRPC timeout header.
     timeout = grpc_timeout.value();
     // If there's a valid cap, apply it.
-    if ((timeout > route->grpcTimeoutHeaderMax().value() ||
-         timeout == std::chrono::milliseconds(0)) &&
+    if (timeout > route->grpcTimeoutHeaderMax().value() &&
         route->grpcTimeoutHeaderMax().value() != std::chrono::milliseconds(0)) {
       timeout = route->grpcTimeoutHeaderMax().value();
     }
 
-    // Use the configured offset iff the timeout will stay positive.
+    // Apply the configured offset.
     if (timeout != std::chrono::milliseconds(0) && route->grpcTimeoutHeaderOffset()) {
       const auto offset = route->grpcTimeoutHeaderOffset().value();
       if (offset < timeout) {
         timeout -= offset;
+      } else {
+        timeout = std::chrono::milliseconds(0);
       }
     }
   }
-  // If the timeout is infinite, unregister any existing max duration timer.
-  if (timeout == std::chrono::milliseconds(0)) {
+
+  // Disable any existing timer if configured to do so.
+  if (disable_timer) {
     if (max_stream_duration_timer_) {
       max_stream_duration_timer_->disableTimer();
     }

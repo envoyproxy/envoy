@@ -2119,6 +2119,18 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
 
+  // With no route timeout, but HCM defaults, the HCM defaults will be used.
+  {
+    max_stream_duration_ = std::chrono::milliseconds(17);
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(17), _));
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
+        .Times(1)
+        .WillRepeatedly(Return(absl::nullopt));
+    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+    max_stream_duration_ = absl::nullopt;
+  }
+
   // Add a gRPC header, but not a gRPC timeout and verify the timer is unchanged.
   latched_headers->setGrpcTimeout("1M");
   {
@@ -2161,26 +2173,17 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
   }
 
   latched_headers->setGrpcTimeout("0m");
-  // With a gRPC header of 0 (infinite), use the cap.
+  // With a gRPC header of 0, use the header
   {
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, grpcTimeoutHeaderMax())
         .Times(AnyNumber())
         .WillRepeatedly(Return(std::chrono::milliseconds(20)));
-    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(20), _));
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(0), _));
     decoder_filters_[0]->callbacks_->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
 
-  // With a gRPC header of 0 (infinite), and no cap, disable the timer.
-  {
-    EXPECT_CALL(*timer, disableTimer());
-    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, grpcTimeoutHeaderMax())
-        .Times(AnyNumber())
-        .WillRepeatedly(Return(std::chrono::milliseconds(0)));
-    decoder_filters_[0]->callbacks_->clearRouteCache();
-    decoder_filters_[0]->callbacks_->clusterInfo();
-  }
-
+  latched_headers->setGrpcTimeout("1M");
   // With a timeout of 20ms and an offset of 10ms, set a timeout for 10ms.
   {
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, grpcTimeoutHeaderMax())
@@ -2191,6 +2194,20 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
         .Times(AnyNumber())
         .WillRepeatedly(Return(std::chrono::milliseconds(10)));
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(10), _));
+    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+  }
+
+  // With a timeout of 20ms and an offset of 30ms, set a timeout for 0ms
+  {
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, grpcTimeoutHeaderMax())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(std::chrono::milliseconds(20)));
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
+                grpcTimeoutHeaderOffset())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(std::chrono::milliseconds(30)));
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(0), _));
     decoder_filters_[0]->callbacks_->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
