@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_binary",
@@ -385,4 +387,24 @@ envoy_proto_library(
         "//test/fuzz:common_proto",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "config_impl_speed_test",
+    srcs = ["config_impl_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/router:config_lib",
+        "//test/mocks/server:instance_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "config_impl_speed_test_benchmark_test",
+    benchmark_binary = "config_impl_speed_test",
 )
