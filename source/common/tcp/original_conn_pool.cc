@@ -15,10 +15,25 @@ namespace Tcp {
 OriginalConnPoolImpl::OriginalConnPoolImpl(
     Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
     Upstream::ResourcePriority priority, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options)
+    Network::TransportSocketOptionsSharedPtr transport_socket_options,
+    absl::optional<std::chrono::milliseconds> pool_idle_timeout)
     : dispatcher_(dispatcher), host_(host), priority_(priority), socket_options_(options),
       transport_socket_options_(transport_socket_options),
-      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })) {}
+      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })),
+      idle_timeout_(pool_idle_timeout) {
+  if (idle_timeout_) {
+    idle_timer_ = dispatcher.createTimer([this]() {
+      for (const Instance::IdlePoolTimeoutCb& cb : idle_pool_callbacks_) {
+        cb();
+      }
+    });
+    addDrainedCallback([this]() {
+      if (idle_timer_ && !idle_timer_->enabled()) {
+        idle_timer_->enableTimer(*idle_timeout_);
+      }
+    });
+  }
+}
 
 OriginalConnPoolImpl::~OriginalConnPoolImpl() {
   while (!ready_conns_.empty()) {
@@ -74,7 +89,7 @@ void OriginalConnPoolImpl::addDrainedCallback(DrainedCb cb) {
 
 void OriginalConnPoolImpl::addIdlePoolTimeoutCallback(IdlePoolTimeoutCb cb) {
   idle_pool_callbacks_.push_back(cb);
-  checkForIdle();
+  checkForDrained();
 }
 
 void OriginalConnPoolImpl::assignConnection(ActiveConn& conn,
@@ -99,15 +114,9 @@ void OriginalConnPoolImpl::checkForDrained() {
   }
 }
 
-void OriginalConnPoolImpl::checkForIdle() {
-  if (idle_pool_callbacks_.empty()) {
-    return;
-  }
-
-  if (pending_requests_.empty() && busy_conns_.empty() && pending_conns_.empty()) {
-    for (const IdlePoolTimeoutCb& cb : idle_pool_callbacks_) {
-      cb();
-    }
+void OriginalConnPoolImpl::disablePoolIdleTimer() {
+  if (idle_timer_ && idle_timer_->enabled()) {
+    idle_timer_->disableTimer();
   }
 }
 
@@ -115,6 +124,7 @@ void OriginalConnPoolImpl::createNewConnection() {
   ENVOY_LOG(debug, "creating a new connection");
   ActiveConnPtr conn(new ActiveConn(*this));
   LinkedList::moveIntoList(std::move(conn), pending_conns_);
+  disablePoolIdleTimer();
 }
 
 ConnectionPool::Cancellable*
@@ -142,6 +152,7 @@ OriginalConnPoolImpl::newConnection(ConnectionPool::Callbacks& callbacks) {
     ENVOY_LOG(debug, "queueing request due to no available connections");
     PendingRequestPtr pending_request(new PendingRequest(*this, callbacks));
     LinkedList::moveIntoList(std::move(pending_request), pending_requests_);
+    disablePoolIdleTimer();
     return pending_requests_.front().get();
   } else {
     ENVOY_LOG(debug, "max pending requests overflow");
@@ -330,7 +341,6 @@ void OriginalConnPoolImpl::processIdleConnection(ActiveConn& conn, bool new_conn
     upstream_ready_cb_->scheduleCallbackCurrentIteration();
   }
 
-  checkForIdle();
   checkForDrained();
 }
 

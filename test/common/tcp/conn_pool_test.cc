@@ -21,6 +21,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
@@ -75,7 +76,10 @@ class ConnPoolBase : public Tcp::ConnectionPool::Instance {
 public:
   ConnPoolBase(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb,
-               bool test_new_connection_pool);
+               bool test_new_connection_pool,
+               absl::optional<std::chrono::milliseconds> pool_idle_timeout);
+
+  void initialize();
 
   void addDrainedCallback(DrainedCb cb) override { conn_pool_->addDrainedCallback(cb); }
   void drainConnections() override { conn_pool_->drainConnections(); }
@@ -123,6 +127,8 @@ public:
   Event::MockDispatcher& mock_dispatcher_;
   NiceMock<Event::MockSchedulableCallback>* mock_upstream_ready_cb_;
   std::vector<TestConnection> test_conns_;
+  Upstream::HostSharedPtr host_;
+  absl::optional<std::chrono::milliseconds> pool_idle_timeout_;
   Network::ConnectionCallbacks* callbacks_ = nullptr;
   bool test_new_connection_pool_;
 
@@ -130,9 +136,10 @@ protected:
   class ConnPoolImplForTest : public ConnPoolImpl {
   public:
     ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
-                        ConnPoolBase& parent)
+                        ConnPoolBase& parent,
+                        absl::optional<std::chrono::milliseconds> pool_idle_timeout)
         : ConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, nullptr, nullptr,
-                       std::chrono::milliseconds(0)),
+                       pool_idle_timeout),
           parent_(parent) {}
 
     void onConnReleased(Envoy::ConnectionPool::ActiveClient& client) override {
@@ -147,9 +154,10 @@ protected:
   class OriginalConnPoolImplForTest : public OriginalConnPoolImpl {
   public:
     OriginalConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
-                                ConnPoolBase& parent)
+                                ConnPoolBase& parent,
+                                absl::optional<std::chrono::milliseconds> pool_idle_timeout)
         : OriginalConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, nullptr,
-                               nullptr),
+                               nullptr, pool_idle_timeout),
           parent_(parent) {}
 
     ~OriginalConnPoolImplForTest() override {
@@ -185,13 +193,18 @@ protected:
 
 ConnPoolBase::ConnPoolBase(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                            NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb,
-                           bool test_new_connection_pool)
-    : mock_dispatcher_(dispatcher), mock_upstream_ready_cb_(upstream_ready_cb),
-      test_new_connection_pool_(test_new_connection_pool) {
+                           bool test_new_connection_pool,
+                           absl::optional<std::chrono::milliseconds> pool_idle_timeout)
+    : mock_dispatcher_(dispatcher), mock_upstream_ready_cb_(upstream_ready_cb), host_(host),
+      pool_idle_timeout_(pool_idle_timeout), test_new_connection_pool_(test_new_connection_pool) {}
+
+void ConnPoolBase::initialize() {
   if (test_new_connection_pool_) {
-    conn_pool_ = std::make_unique<ConnPoolImplForTest>(dispatcher, host, *this);
+    conn_pool_ =
+        std::make_unique<ConnPoolImplForTest>(mock_dispatcher_, host_, *this, pool_idle_timeout_);
   } else {
-    conn_pool_ = std::make_unique<OriginalConnPoolImplForTest>(dispatcher, host, *this);
+    conn_pool_ = std::make_unique<OriginalConnPoolImplForTest>(mock_dispatcher_, host_, *this,
+                                                               pool_idle_timeout_);
   }
 }
 
@@ -214,11 +227,14 @@ void ConnPoolBase::expectEnableUpstreamReady(bool run) {
  */
 class TcpConnPoolImplTest : public testing::TestWithParam<bool> {
 public:
-  TcpConnPoolImplTest()
+  explicit TcpConnPoolImplTest(absl::optional<std::chrono::milliseconds> pool_idle_timeout)
       : test_new_connection_pool_(GetParam()),
         upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
         host_(Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000")),
-        conn_pool_(dispatcher_, host_, upstream_ready_cb_, test_new_connection_pool_) {}
+        conn_pool_(dispatcher_, host_, upstream_ready_cb_, test_new_connection_pool_,
+                   pool_idle_timeout) {}
+
+  TcpConnPoolImplTest() : TcpConnPoolImplTest(absl::nullopt) { conn_pool_.initialize(); }
 
   ~TcpConnPoolImplTest() override {
     EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()))
@@ -234,6 +250,12 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
 };
 
+class TcpConnPoolImplIdleTimeoutTest : public TcpConnPoolImplTest {
+public:
+  static constexpr std::chrono::milliseconds POOL_IDLE_TIMEOUT{1000};
+  TcpConnPoolImplIdleTimeoutTest() : TcpConnPoolImplTest{POOL_IDLE_TIMEOUT} {}
+};
+
 /**
  * Test fixture for connection pool destructor tests.
  */
@@ -244,12 +266,11 @@ public:
         upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)) {
     host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000");
     if (test_new_connection_pool_) {
-      conn_pool_ =
-          std::make_unique<ConnPoolImpl>(dispatcher_, host_, Upstream::ResourcePriority::Default,
-                                         nullptr, nullptr, std::chrono::milliseconds::max());
+      conn_pool_ = std::make_unique<ConnPoolImpl>(
+          dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr, absl::nullopt);
     } else {
       conn_pool_ = std::make_unique<OriginalConnPoolImpl>(
-          dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr);
+          dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr, absl::nullopt);
     }
   }
   ~TcpConnPoolImplDestructorTest() override = default;
@@ -1046,6 +1067,31 @@ TEST_P(TcpConnPoolImplTest, RequestCapacity) {
   conn_pool_.test_conns_[2].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+TEST_P(TcpConnPoolImplIdleTimeoutTest, TestIdleTimeout) {
+  auto* idle_timer = new Event::MockTimer{&dispatcher_};
+  EXPECT_CALL(*idle_timer, enabled).Times(AnyNumber());
+  EXPECT_CALL(*idle_timer, enableTimer(POOL_IDLE_TIMEOUT, _));
+  conn_pool_.initialize();
+
+  testing::MockFunction<void()> idle_callback;
+  conn_pool_.addIdlePoolTimeoutCallback(idle_callback.AsStdFunction());
+
+  EXPECT_CALL(*idle_timer, disableTimer);
+  ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
+
+  EXPECT_CALL(*idle_timer, enableTimer(POOL_IDLE_TIMEOUT, _));
+  EXPECT_CALL(conn_pool_, onConnReleasedForTest());
+  c1.releaseConn();
+
+  conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
+  dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_CALL(idle_callback, Call);
+  idle_timer->invokeCallback();
+}
+
 /**
  * Test that pending connections are closed when the connection pool is destroyed.
  */
@@ -1090,6 +1136,7 @@ TEST_P(TcpConnPoolImplDestructorTest, TestReadyConnectionsAreClosed) {
   conn_pool_.reset();
 }
 INSTANTIATE_TEST_SUITE_P(ConnectionPools, TcpConnPoolImplTest, testing::Bool());
+INSTANTIATE_TEST_SUITE_P(ConnectionPools, TcpConnPoolImplIdleTimeoutTest, testing::Bool());
 INSTANTIATE_TEST_SUITE_P(ConnectionPools, TcpConnPoolImplDestructorTest, testing::Bool());
 
 } // namespace Tcp

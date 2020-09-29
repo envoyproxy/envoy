@@ -24,7 +24,8 @@ public:
   OriginalConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                        Upstream::ResourcePriority priority,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                       Network::TransportSocketOptionsSharedPtr transport_socket_options);
+                       Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                       absl::optional<std::chrono::milliseconds> pool_idle_timeout);
 
   ~OriginalConnPoolImpl() override;
 
@@ -148,7 +149,7 @@ protected:
   void onUpstreamReady();
   void processIdleConnection(ActiveConn& conn, bool new_connection, bool delay);
   void checkForDrained();
-  void checkForIdle();
+  void disablePoolIdleTimer();
 
   Event::Dispatcher& dispatcher_;
   Upstream::HostConstSharedPtr host_;
@@ -164,6 +165,15 @@ protected:
   std::list<IdlePoolTimeoutCb> idle_pool_callbacks_;
   Stats::TimespanPtr conn_connect_ms_;
   Event::SchedulableCallbackPtr upstream_ready_cb_;
+
+  // After the pool enters a state in which it has no active connections, the idle timeout callbacks
+  // will be called after `idle_timeout_` milliseconds. `absl::nullopt` indicates that the idle
+  // timeout callbacks will never be triggered
+  absl::optional<std::chrono::milliseconds> idle_timeout_;
+
+  // The timer that fires to trigger the idle timeout callbacks
+  Event::TimerPtr idle_timer_;
+
   bool upstream_ready_enabled_{false};
 };
 

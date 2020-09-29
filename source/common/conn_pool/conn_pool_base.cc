@@ -18,13 +18,15 @@ ConnPoolImplBase::ConnPoolImplBase(
       transport_socket_options_(transport_socket_options), idle_timeout_(pool_idle_timeout) {
   if (idle_timeout_) {
     idle_timer_ = dispatcher.createTimer([this]() {
-      if (!hasActiveConnectionsImpl()) {
-        for (const Instance::IdlePoolTimeoutCb& cb : idle_pool_callbacks_) {
-          cb();
-        }
+      for (const Instance::IdlePoolTimeoutCb& cb : idle_pool_callbacks_) {
+        cb();
       }
     });
-    addDrainedCallbackImpl([this]() { idle_timer_->enableTimer(*idle_timeout_); });
+    addDrainedCallbackImpl([this]() {
+      if (idle_timer_ && !idle_timer_->enabled()) {
+        idle_timer_->enableTimer(*idle_timeout_);
+      }
+    });
   }
 }
 

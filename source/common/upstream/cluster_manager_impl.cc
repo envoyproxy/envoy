@@ -1403,6 +1403,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   TcpConnPoolsContainer& container = parent_.host_tcp_conn_pool_map_[host];
   auto pool_iter = container.pools_.find(hash_key);
   if (pool_iter == container.pools_.end()) {
+    auto original_size = container.pools_.size();
     std::tie(pool_iter, std::ignore) = container.pools_.emplace(
         hash_key,
         parent_.parent_.factory_.allocateTcpConnPool(
@@ -1410,6 +1411,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
             have_options ? context->downstreamConnection()->socketOptions() : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
             cluster_info_->poolIdleTimeout()));
+    RELEASE_ASSERT(container.pools_.size() == original_size + 1, "Could not insert element");
     pool_iter->second->addIdlePoolTimeoutCallback(
         [&container, &pool_map = parent_.host_tcp_conn_pool_map_, host, hash_key]() {
           container.pools_.erase(hash_key);
@@ -1461,7 +1463,7 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
                                                transport_socket_options, pool_idle_timeout);
   } else {
     return Tcp::ConnectionPool::InstancePtr{new Tcp::OriginalConnPoolImpl(
-        dispatcher, host, priority, options, transport_socket_options)};
+        dispatcher, host, priority, options, transport_socket_options, pool_idle_timeout)};
   }
 }
 
