@@ -275,7 +275,7 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
     test_sessions_[0]->interval_timer_->invokeCallback();
   }
-  
+
   reuse_connection_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(input.health_check_config(), reuse_connection, true);
 }
@@ -335,9 +335,9 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respo
       for (size_t i = 0; i < bufferList[0].size() && !test_sessions_[0]->interval_timer_->enabled_;
            i += chunk_size) {
         bool last_chunk = false;
-        if (i > bufferList[0].size()) {
+        if (i >= bufferList[0].size() - chunk_size) {
           // The length of the last chunk
-          chunk_size = bufferList[0].size() - (i - chunk_size + 1);
+          chunk_size = bufferList[0].size() - i;
           last_chunk = true;
         }
         const auto data = std::make_unique<Buffer::OwnedImpl>(bufferList[0].data() + i, chunk_size);
@@ -373,6 +373,7 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respo
         ENVOY_LOG_MISC(trace, "Responded with arbitrary data");
         test_sessions_[0]->stream_response_callbacks_->decodeData(*data, end_stream_on_data);
       }
+      break;
     }
     default: // shouldn't hit
       NOT_REACHED_GCOVR_EXCL_LINE;
