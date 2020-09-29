@@ -51,6 +51,7 @@ envoy_cc_mock(
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//source/common/http:header_map_lib",
+        "//source/common/http:filter_manager_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/stream_info:stream_info_mocks",

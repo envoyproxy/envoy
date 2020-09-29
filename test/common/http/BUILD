@@ -96,6 +96,18 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_test(
+    name = "filter_manager_test",
+    srcs = ["filter_manager_test.cc"],
+    deps = [
+        "//source/common/http:filter_manager_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_reply:local_reply_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "codec_wrappers_test",
     srcs = ["codec_wrappers_test.cc"],
     deps = [
