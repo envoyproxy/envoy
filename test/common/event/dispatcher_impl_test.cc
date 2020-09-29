@@ -1,5 +1,6 @@
 #include <functional>
 
+#include "common/buffer/buffer_impl.h"
 #include "envoy/thread/thread.h"
 
 #include "common/api/api_impl.h"
@@ -1188,6 +1189,73 @@ TEST_F(InternalConnectionDispatcherTest, CreateInternalClientConnection) {
   EXPECT_FALSE(server_conn_socket->ioHandle().isOpen());
 }
 
+TEST_F(InternalConnectionDispatcherTest, InternalClientConnectionAndConnect) {
+  std::unique_ptr<Network::ConnectionSocket> server_conn_socket;
+  auto socket_save_callback =
+      [&server_conn_socket](const Network::Address::InstanceConstSharedPtr&,
+                            std::unique_ptr<Network::ConnectionSocket> internal_socket) {
+        server_conn_socket = std::move(internal_socket);
+      };
+  dispatcher_impl_->registerInternalListener(remote_address_->asString(), socket_save_callback);
+  auto client = dispatcher_->createInternalConnection(remote_address_, source_address_);
+
+  Network::MockConnectionCallbacks client_callbacks;
+  client->addConnectionCallbacks(client_callbacks);
+  EXPECT_EQ(Network::Connection::State::Open, client->state());
+
+  EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::Connected)).Times(1);
+  dispatcher_impl_->run(Dispatcher::RunType::NonBlock);
+
+  EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::LocalClose)).Times(1);
+  client->close(Network::ConnectionCloseType::NoFlush);
+  EXPECT_EQ(Network::Connection::State::Closed, client->state());
+
+  EXPECT_TRUE(server_conn_socket->ioHandle().isOpen());
+  server_conn_socket->ioHandle().close();
+  EXPECT_FALSE(server_conn_socket->ioHandle().isOpen());
+}
+
+TEST_F(InternalConnectionDispatcherTest, InternalClientConnectionBasicReadWrite) {
+  std::unique_ptr<Network::ConnectionSocket> server_conn_socket;
+  auto socket_save_callback =
+      [&server_conn_socket](const Network::Address::InstanceConstSharedPtr&,
+                            std::unique_ptr<Network::ConnectionSocket> internal_socket) {
+        server_conn_socket = std::move(internal_socket);
+      };
+  dispatcher_impl_->registerInternalListener(remote_address_->asString(), socket_save_callback);
+  auto client = dispatcher_->createInternalConnection(remote_address_, source_address_);
+
+  Network::MockConnectionCallbacks client_callbacks;
+  client->addConnectionCallbacks(client_callbacks);
+  EXPECT_EQ(Network::Connection::State::Open, client->state());
+
+  EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::Connected)).Times(1);
+  dispatcher_impl_->run(Dispatcher::RunType::NonBlock);
+
+  // Client connection write.
+  {
+    Buffer::OwnedImpl buf;
+    buf.add("hello");
+    // Write to client connection write buffer.
+    client->write(buf, false);
+    // Transport socket write from connection write buffer to server connection buffer.
+    dispatcher_impl_->run(Dispatcher::RunType::NonBlock);
+  }
+
+  // Server socket read.
+  {
+    Buffer::OwnedImpl buf;
+    Buffer::RawSlice slice;
+    buf.reserve(1024, &slice, 1);
+    auto res = server_conn_socket->ioHandle().readv(1024, &slice, 1);
+    EXPECT_TRUE(res.ok());
+    EXPECT_EQ("hello", absl::string_view(static_cast<char*>(slice.mem_), res.rc_));
+  }
+
+  EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::LocalClose)).Times(1);
+  client->close(Network::ConnectionCloseType::NoFlush);
+  server_conn_socket->ioHandle().close();
+}
 } // namespace
 } // namespace Event
 } // namespace Envoy

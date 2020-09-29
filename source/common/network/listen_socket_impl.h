@@ -3,7 +3,9 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <cstring>
 
+#include "common/common/logger.h"
 #include "envoy/common/platform.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
@@ -208,9 +210,17 @@ public:
       : ConnectionSocketImpl(std::move(io_handle), local_address, remote_address) {}
   ~InternalConnectionSocketImpl() override = default;
 
-  // TODO(lambdai): succeed on limited opitons.
-  Api::SysCallIntResult getSocketOption(int, int, void*, socklen_t*) const override {
-    return {0, 0};
+  // TODO(lambdai): succeed on limited options.
+  Api::SysCallIntResult getSocketOption(int level, int optname, void* ptr, socklen_t* len) const override {
+    if (level == SOL_SOCKET && optname == SO_ERROR) {
+      memset(ptr, 0, static_cast<size_t>(*len));
+      *(reinterpret_cast<unsigned char*>(ptr)) = 0;
+      return {0, 0};
+    } else {
+      ENVOY_LOG_MISC(warn, "unsupported socket option level={} optname={}", level, optname);
+      return {0, EFAULT};
+    }
+    
   }
 };
 
