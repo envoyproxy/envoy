@@ -99,6 +99,9 @@ public:
     std::string value_;
   };
 
+  // Make client request stream ID out of the given ID in the host byte order
+  static uint32_t makeClientStreamId(uint32_t stream_id) { return (stream_id << 1) | 1; }
+
   // Methods for creating HTTP2 frames
   static Http2Frame makePingFrame(absl::string_view data = {});
   static Http2Frame makeEmptySettingsFrame(SettingsFlags flags = SettingsFlags::None);
