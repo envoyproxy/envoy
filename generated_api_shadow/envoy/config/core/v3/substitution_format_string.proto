@@ -36,7 +36,7 @@ message SubstitutionFormatString {
     //
     //   upstream connect error:503:path=/foo
     //
-    string text_format = 1 [(validate.rules).string = {min_bytes: 1}];
+    string text_format = 1 [(validate.rules).string = {min_len: 1}];
 
     // Specify a format with command operators to form a JSON string.
     // Its details is described in :ref:`format dictionary<config_access_log_format_dictionaries>`.
