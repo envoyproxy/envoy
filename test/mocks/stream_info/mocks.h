@@ -22,6 +22,7 @@ public:
   // StreamInfo::StreamInfo
   MOCK_METHOD(void, setResponseFlag, (ResponseFlag response_flag));
   MOCK_METHOD(void, setResponseCodeDetails, (absl::string_view));
+  MOCK_METHOD(void, setResponseDetails, (std::string));
   MOCK_METHOD(bool, intersectResponseFlags, (uint64_t), (const));
   MOCK_METHOD(void, onUpstreamHostSelected, (Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(SystemTime, startTime, (), (const));
@@ -51,6 +52,7 @@ public:
   MOCK_METHOD(void, protocol, (Http::Protocol protocol));
   MOCK_METHOD(absl::optional<uint32_t>, responseCode, (), (const));
   MOCK_METHOD(const absl::optional<std::string>&, responseCodeDetails, (), (const));
+  MOCK_METHOD(const absl::optional<std::string>&, responseDetails, (), (const));
   MOCK_METHOD(void, addBytesSent, (uint64_t));
   MOCK_METHOD(uint64_t, bytesSent, (), (const));
   MOCK_METHOD(bool, hasResponseFlag, (ResponseFlag), (const));
@@ -112,6 +114,7 @@ public:
   absl::optional<Http::Protocol> protocol_;
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
+  absl::optional<std::string> response_details_;
   uint64_t response_flags_{};
   envoy::config::core::v3::Metadata metadata_;
   FilterStateSharedPtr upstream_filter_state_;

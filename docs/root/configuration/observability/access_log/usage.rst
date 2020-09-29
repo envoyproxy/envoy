@@ -202,6 +202,14 @@ The following command operators are supported:
   TCP
     Not implemented ("-")
 
+%RESPONSE_DETAILS%
+  HTTP
+    Not implemented ("-")
+
+  TCP
+    response details provides additional information about the connection, such as why it is closed
+    by Envoy.
+
 %BYTES_SENT%
   HTTP
     Body bytes sent. For WebSocket connection it will also include response header bytes.

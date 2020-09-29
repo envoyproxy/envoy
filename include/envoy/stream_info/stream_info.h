@@ -237,6 +237,11 @@ public:
   virtual void setResponseCodeDetails(absl::string_view rc_details) PURE;
 
   /**
+   * @param response_details the response details string to set for TCP connection.
+   */
+  virtual void setResponseDetails(std::string response_details) PURE;
+
+  /**
    * @param response_flags the response_flags to intersect with.
    * @return true if the intersection of the response_flags argument and the currently set response
    * flags is non-empty.
@@ -286,6 +291,11 @@ public:
    * @return the response code details.
    */
   virtual const absl::optional<std::string>& responseCodeDetails() const PURE;
+
+  /**
+   * @return the response details for TCP.
+   */
+  virtual const absl::optional<std::string>& responseDetails() const PURE;
 
   /**
    * @return the time that the first byte of the request was received.

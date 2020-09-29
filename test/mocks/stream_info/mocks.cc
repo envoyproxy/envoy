@@ -27,6 +27,9 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, setResponseCodeDetails(_)).WillByDefault(Invoke([this](absl::string_view details) {
     response_code_details_ = std::string(details);
   }));
+  ON_CALL(*this, setResponseDetails(_)).WillByDefault(Invoke([this](std::string details) {
+    response_details_ = details;
+  }));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
   ON_CALL(*this, lastDownstreamRxByteReceived())
@@ -89,6 +92,7 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, protocol()).WillByDefault(ReturnPointee(&protocol_));
   ON_CALL(*this, responseCode()).WillByDefault(ReturnPointee(&response_code_));
   ON_CALL(*this, responseCodeDetails()).WillByDefault(ReturnPointee(&response_code_details_));
+  ON_CALL(*this, responseDetails()).WillByDefault(ReturnPointee(&response_details_));
   ON_CALL(*this, addBytesReceived(_)).WillByDefault(Invoke([this](uint64_t bytes_received) {
     bytes_received_ += bytes_received;
   }));
