@@ -1,8 +1,8 @@
 Version history
 ---------------
 
-1.13.5 (Pending)
-================
+1.13.5 (September 29, 2020)
+===========================
 Changes
 -------
 * http: fixed CVE-2020-25017. Previously header matching did not match on all headers for non-inline headers. This patch
