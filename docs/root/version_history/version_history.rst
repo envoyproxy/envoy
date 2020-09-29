@@ -6,7 +6,7 @@ Version history
 .. toctree::
   :titlesonly:
 
-  current
+  v1.15.1
   v1.15.0
   v1.14.3
   v1.14.2
