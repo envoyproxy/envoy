@@ -86,12 +86,9 @@ TestRequestHeaderMapImpl decodeHeaders(const Buffer::OwnedImpl& payload, bool en
     ssize_t result = nghttp2_hd_inflate_hd2(inflater, &decoded_nv, &inflate_flags,
                                             reinterpret_cast<uint8_t*>(slices[0].mem_),
                                             slices[0].len_, end_headers);
-    if (result < 0 || (result == 0 && slices[0].len_ > 0)) {
-      // Return early if decoding fails or data left in slice that nghttp2 cannot consume.
-      ENVOY_LOG_MISC(trace, "Failed to decode payload");
-      break;
-      ;
-    }
+    // Decoding should not fail and data should not be left in slice.
+    ASSERT(result >= 0 && (slices[0].len_ = 0));
+
     slices[0].mem_ = reinterpret_cast<void*>(reinterpret_cast<uint8_t*>(slices[0].mem_) + result);
     slices[0].len_ -= result;
 
@@ -131,7 +128,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::HpackTestCase& input) {
   ENVOY_LOG_MISC(trace, "Encoding headers {}", headers);
   const absl::optional<Buffer::OwnedImpl> payload = encodeHeaders(input_nv);
   if (!payload.has_value() || payload.value().getRawSlices().size() == 0) {
-    // An empty header map produces no payload.
+    // An empty header map produces no payload, skip decoding.
     return;
   }
 
