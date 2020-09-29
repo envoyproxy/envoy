@@ -1,4 +1,3 @@
-#include "envoy/service/auth/v2alpha/external_auth.pb.h" // for proto link
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
 
@@ -40,9 +39,8 @@ public:
 
   void initialize(const Params& param) {
     api_version_ = std::get<0>(param);
-    use_alpha_ = std::get<1>(param);
     client_ = std::make_unique<GrpcClientImpl>(Grpc::RawAsyncClientPtr{async_client_}, timeout_,
-                                               api_version_, use_alpha_);
+                                               api_version_);
   }
 
   void expectCallSend(envoy::service::auth::v3::CheckRequest& request) {
@@ -53,7 +51,7 @@ public:
                           Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
                           const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(TestUtility::getVersionedServiceFullName(
-                            "envoy.service.auth.{}.Authorization", api_version_, use_alpha_),
+                            "envoy.service.auth.{}.Authorization", api_version_),
                         service_full_name);
               EXPECT_EQ("Check", method_name);
               if (Runtime::runtimeFeatureEnabled(
@@ -73,7 +71,6 @@ public:
   MockRequestCallbacks request_callbacks_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Tracing::MockSpan span_;
-  bool use_alpha_{};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   envoy::config::core::v3::ApiVersion api_version_;
 };
@@ -81,7 +78,6 @@ public:
 INSTANTIATE_TEST_SUITE_P(Parameterized, ExtAuthzGrpcClientTest,
                          Values(Params(envoy::config::core::v3::ApiVersion::AUTO, false),
                                 Params(envoy::config::core::v3::ApiVersion::V2, false),
-                                Params(envoy::config::core::v3::ApiVersion::V2, true),
                                 Params(envoy::config::core::v3::ApiVersion::V3, false)));
 
 // Test the client when an ok response is received.

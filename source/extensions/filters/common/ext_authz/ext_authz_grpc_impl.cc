@@ -1,7 +1,6 @@
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/service/auth/v2alpha/external_auth.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "common/common/assert.h"
@@ -19,13 +18,11 @@ namespace ExtAuthz {
 
 GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout,
-                               envoy::config::core::v3::ApiVersion transport_api_version,
-                               bool use_alpha)
+                               envoy::config::core::v3::ApiVersion transport_api_version)
     : async_client_(std::move(async_client)), timeout_(timeout),
       service_method_(Grpc::VersionedMethods("envoy.service.auth.v3.Authorization.Check",
-                                             "envoy.service.auth.v2.Authorization.Check",
-                                             "envoy.service.auth.v2alpha.Authorization.Check")
-                          .getMethodDescriptorForVersion(transport_api_version, use_alpha)),
+                                             "envoy.service.auth.v2.Authorization.Check")
+                          .getMethodDescriptorForVersion(transport_api_version)),
       transport_api_version_(transport_api_version) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
