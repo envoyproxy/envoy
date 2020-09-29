@@ -1,11 +1,13 @@
+#include "envoy/stream_info/filter_state.h"
+
 #include "common/http/filter_manager.h"
-#include "include/envoy/stream_info/_virtual_includes/filter_state_interface/envoy/stream_info/filter_state.h"
-#include "source/common/stream_info/_virtual_includes/filter_state_lib/common/stream_info/filter_state_impl.h"
-#include "source/common/stream_info/_virtual_includes/stream_info_lib/common/stream_info/stream_info_impl.h"
+#include "common/stream_info/filter_state_impl.h"
+#include "common/stream_info/stream_info_impl.h"
+
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/network/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_reply/mocks.h"
+#include "test/mocks/network/mocks.h"
 
 #include "gtest/gtest.h"
 
@@ -18,8 +20,9 @@ class FilterManagerTest : public testing::Test {
 public:
   void initialize() {
     filter_manager_ = std::make_unique<FilterManager>(
-        filter_manager_callbacks_, dispatcher_, connection_, 0, true, 10000, filter_factory_, local_reply_, protocol_,
-        time_source_, filter_state_, StreamInfo::FilterState::LifeSpan::Connection);
+        filter_manager_callbacks_, dispatcher_, connection_, 0, true, 10000, filter_factory_,
+        local_reply_, protocol_, time_source_, filter_state_,
+        StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   std::unique_ptr<FilterManager> filter_manager_;
@@ -30,20 +33,23 @@ public:
   LocalReply::MockLocalReply local_reply_;
   Protocol protocol_{Protocol::Http2};
   NiceMock<MockTimeSystem> time_source_;
-  StreamInfo::FilterStateSharedPtr filter_state_ = std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  StreamInfo::FilterStateSharedPtr filter_state_ =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
 };
 
-// Verifies that the local reply persists the gRPC classification even if the request headers are modified.
+// Verifies that the local reply persists the gRPC classification even if the request headers are
+// modified.
 TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
-    initialize();
-  
+  initialize();
+
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
 
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](RequestHeaderMap& headers, bool) -> FilterHeadersStatus {
         headers.setContentType("text/plain");
 
-        filter->callbacks_->sendLocalReply(Code::InternalServerError, "", nullptr, absl::nullopt, "");
+        filter->callbacks_->sendLocalReply(Code::InternalServerError, "", nullptr, absl::nullopt,
+                                           "");
 
         return FilterHeadersStatus::StopIteration;
       }));
@@ -84,8 +90,8 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
 // Verifies that the local reply persists the gRPC classification even if the request headers are
 // modified when directly encoding a response.
 TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
-    initialize();
-  
+  initialize();
+
   std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
 
   EXPECT_CALL(*decoder_filter, decodeHeaders(_, true))
@@ -102,8 +108,8 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
 
   EXPECT_CALL(*encoder_filter, encodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](auto&, bool) -> FilterHeadersStatus {
-
-        encoder_filter->decoder_callbacks_->sendLocalReply(Code::InternalServerError, "", nullptr, absl::nullopt, "");
+        encoder_filter->decoder_callbacks_->sendLocalReply(Code::InternalServerError, "", nullptr,
+                                                           absl::nullopt, "");
         return FilterHeadersStatus::StopIteration;
       }));
 

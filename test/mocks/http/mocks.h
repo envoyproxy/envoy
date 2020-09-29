@@ -14,11 +14,10 @@
 #include "envoy/http/filter.h"
 #include "envoy/ssl/connection.h"
 
+#include "common/http/filter_manager.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/utility.h"
-#include "common/http/filter_manager.h"
 
-#include "source/common/http/_virtual_includes/filter_manager_lib/common/http/filter_manager.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/conn_pool.h"
@@ -76,24 +75,24 @@ public:
   MOCK_METHOD(void, endStream, ());
   MOCK_METHOD(void, onDecoderFilterBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, onDecoderFilterAboveWriteBufferHighWatermark, ());
-  MOCK_METHOD(void, upgradeFilterChainCreated,());
-  MOCK_METHOD(void, disarmRequestTimeout,());
-  MOCK_METHOD(void, resetIdleTimer,());
-  MOCK_METHOD(void, recreateStream,(StreamInfo::FilterStateSharedPtr filter_state));
-  MOCK_METHOD(void, resetStream,());
-  MOCK_METHOD(const Router::RouteEntry::UpgradeMap*, upgradeMap,());
-  MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfo,());
-  MOCK_METHOD(Router::RouteConstSharedPtr, route,(const Router::RouteCallback& cb));
-  MOCK_METHOD(void, clearRouteCache,());
-  MOCK_METHOD(absl::optional<Router::ConfigConstSharedPtr>, routeConfig,());
+  MOCK_METHOD(void, upgradeFilterChainCreated, ());
+  MOCK_METHOD(void, disarmRequestTimeout, ());
+  MOCK_METHOD(void, resetIdleTimer, ());
+  MOCK_METHOD(void, recreateStream, (StreamInfo::FilterStateSharedPtr filter_state));
+  MOCK_METHOD(void, resetStream, ());
+  MOCK_METHOD(const Router::RouteEntry::UpgradeMap*, upgradeMap, ());
+  MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfo, ());
+  MOCK_METHOD(Router::RouteConstSharedPtr, route, (const Router::RouteCallback& cb));
+  MOCK_METHOD(void, clearRouteCache, ());
+  MOCK_METHOD(absl::optional<Router::ConfigConstSharedPtr>, routeConfig, ());
   MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
-  MOCK_METHOD(Tracing::Span&, activeSpan,());
-  MOCK_METHOD(void, onResponseDataTooLarge,());
-  MOCK_METHOD(void, onRequestDataTooLarge,());
-  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions,());
-  MOCK_METHOD(void, onLocalReply,(Code code));
-  MOCK_METHOD(Tracing::Config&, tracingConfig,());
-  MOCK_METHOD(const ScopeTrackedObject&, scope,());
+  MOCK_METHOD(Tracing::Span&, activeSpan, ());
+  MOCK_METHOD(void, onResponseDataTooLarge, ());
+  MOCK_METHOD(void, onRequestDataTooLarge, ());
+  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
+  MOCK_METHOD(void, onLocalReply, (Code code));
+  MOCK_METHOD(Tracing::Config&, tracingConfig, ());
+  MOCK_METHOD(const ScopeTrackedObject&, scope, ());
 
   ResponseHeaderMapPtr response_headers_;
 };

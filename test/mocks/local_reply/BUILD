@@ -12,8 +12,5 @@ envoy_cc_mock(
     name = "local_reply_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    deps = [
-        "//source/common/local_reply:local_reply_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
+    deps = ["//source/common/local_reply:local_reply_lib"],
 )

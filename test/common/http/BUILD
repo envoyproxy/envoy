@@ -101,9 +101,9 @@ envoy_cc_test(
     deps = [
         "//source/common/http:filter_manager_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/network:network_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_reply:local_reply_mocks",
+        "//test/mocks/network:network_mocks",
     ],
 )
 
