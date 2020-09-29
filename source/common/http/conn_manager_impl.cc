@@ -711,10 +711,11 @@ void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_response_for_timeout")) {
-    sendLocalReply(
-        request_headers_ != nullptr && Grpc::Common::isGrpcRequestHeaders(*request_headers_),
-        Http::Code::RequestTimeout, "downstream duration timeout", nullptr,
-        4 /* deadline exceeded */, StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
+    sendLocalReply(request_headers_ != nullptr &&
+                       Grpc::Common::isGrpcRequestHeaders(*request_headers_),
+                   Http::Code::RequestTimeout, "downstream duration timeout", nullptr,
+                   Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
+                   StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
   } else {
     filter_manager_.streamInfo().setResponseCodeDetails(
         StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);

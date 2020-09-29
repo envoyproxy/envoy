@@ -759,7 +759,6 @@ message RouteAction {
     ConnectConfig connect_config = 3;
   }
 
-  // [#not-implemented-hide:]
   message MaxStreamDuration {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.route.v3.RouteAction.MaxStreamDuration";
@@ -1023,7 +1022,6 @@ message RouteAction {
   HedgePolicy hedge_policy = 27;
 
   // Specifies the maximum stream duration for this route.
-  // [#not-implemented-hide:]
   MaxStreamDuration max_stream_duration = 36;
 }
 

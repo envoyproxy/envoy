@@ -763,7 +763,6 @@ message RouteAction {
     ConnectConfig connect_config = 3;
   }
 
-  // [#not-implemented-hide:]
   message MaxStreamDuration {
     // Specifies the maximum duration allowed for streams on the route. If not specified, the value
     // from the :ref:`max_stream_duration
@@ -1017,8 +1016,7 @@ message RouteAction {
   // Indicates that the route has a CORS policy.
   CorsPolicy cors = 17;
 
-  // Deprecated by :ref:`grpc_timeout_header_max
-  // <envoy_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_max>`
+  // Deprecated by :ref:`grpc_timeout_header_max <envoy_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_max>`
   // If present, and the request is a gRPC request, use the
   // `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_,
   // or its default value (infinity) instead of
@@ -1040,8 +1038,7 @@ message RouteAction {
   //    :ref:`retry overview <arch_overview_http_routing_retry>`.
   google.protobuf.Duration max_grpc_timeout = 23 [deprecated = true];
 
-  // Deprecated by :ref:`grpc_timeout_header_offset
-  // <envoy_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_offset>`
+  // Deprecated by :ref:`grpc_timeout_header_offset <envoy_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_offset>`.
   // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by subtracting
   // the provided duration from the header. This is useful in allowing Envoy to set its global
   // timeout to be less than that of the deadline imposed by the calling client, which makes it more
@@ -1083,7 +1080,6 @@ message RouteAction {
   HedgePolicy hedge_policy = 27;
 
   // Specifies the maximum stream duration for this route.
-  // [#not-implemented-hide:]
   MaxStreamDuration max_stream_duration = 36;
 }
 

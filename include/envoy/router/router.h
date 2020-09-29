@@ -796,18 +796,18 @@ public:
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
-   *    * @return optional<std::chrono::milliseconds> the route's maximum stream duration.
+   * @return optional<std::chrono::milliseconds> the route's maximum stream duration.
    */
   virtual absl::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
 
   /**
-   *    * @return optional<std::chrono::milliseconds> the max grpc-timeout this route will allow.
+   * @return optional<std::chrono::milliseconds> the max grpc-timeout this route will allow.
    */
   virtual absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const PURE;
 
   /**
-   *    * @return optional<std::chrono::milliseconds> the delta between grpc-timeout and enforced
-   * grpc timeout.
+   * @return optional<std::chrono::milliseconds> the delta between grpc-timeout and enforced grpc
+   *         timeout.
    */
   virtual absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const PURE;
 
