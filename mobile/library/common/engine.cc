@@ -107,8 +107,8 @@ Engine::~Engine() {
 envoy_status_t Engine::recordCounter(const std::string& elements, uint64_t count) {
   if (server_ && client_scope_) {
     server_->dispatcher().post([this, elements, count]() -> void {
-      Stats::Utility::counterFromElements(*client_scope_, {Stats::DynamicName(elements)})
-          .add(count);
+      Stats::DynamicName name{Stats::Utility::sanitizeStatsName(elements)};
+      Stats::Utility::counterFromElements(*client_scope_, {name}).add(count);
     });
     return ENVOY_SUCCESS;
   }
@@ -118,7 +118,8 @@ envoy_status_t Engine::recordCounter(const std::string& elements, uint64_t count
 envoy_status_t Engine::recordGaugeSet(const std::string& elements, uint64_t value) {
   if (server_ && client_scope_) {
     server_->dispatcher().post([this, elements, value]() -> void {
-      Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(elements)},
+      Stats::DynamicName name{Stats::Utility::sanitizeStatsName(elements)};
+      Stats::Utility::gaugeFromElements(*client_scope_, {name},
                                         Stats::Gauge::ImportMode::NeverImport)
           .set(value);
     });
@@ -130,7 +131,8 @@ envoy_status_t Engine::recordGaugeSet(const std::string& elements, uint64_t valu
 envoy_status_t Engine::recordGaugeAdd(const std::string& elements, uint64_t amount) {
   if (server_ && client_scope_) {
     server_->dispatcher().post([this, elements, amount]() -> void {
-      Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(elements)},
+      Stats::DynamicName name{Stats::Utility::sanitizeStatsName(elements)};
+      Stats::Utility::gaugeFromElements(*client_scope_, {name},
                                         Stats::Gauge::ImportMode::NeverImport)
           .add(amount);
     });
@@ -142,7 +144,8 @@ envoy_status_t Engine::recordGaugeAdd(const std::string& elements, uint64_t amou
 envoy_status_t Engine::recordGaugeSub(const std::string& elements, uint64_t amount) {
   if (server_ && client_scope_) {
     server_->dispatcher().post([this, elements, amount]() -> void {
-      Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(elements)},
+      Stats::DynamicName name{Stats::Utility::sanitizeStatsName(elements)};
+      Stats::Utility::gaugeFromElements(*client_scope_, {name},
                                         Stats::Gauge::ImportMode::NeverImport)
           .sub(amount);
     });
