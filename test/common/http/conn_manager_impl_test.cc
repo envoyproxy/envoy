@@ -1607,7 +1607,6 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestFilterCanEnrichAccessLogs) {
-
   setup(false, "");
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
