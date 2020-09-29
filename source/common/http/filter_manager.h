@@ -543,13 +543,13 @@ public:
 
   void preDestroyFilters() {
     for (auto& filter : decoder_filters_) {
-      filter->handle_->onPreDestroy();
+      filter->handle_->onStreamComplete();
     }
 
     for (auto& filter : encoder_filters_) {
-      // Do not call onPreDestroy twice for dual registered filters.
+      // Do not call onStreamComplete twice for dual registered filters.
       if (!filter->dual_filter_) {
-        filter->handle_->onPreDestroy();
+        filter->handle_->onStreamComplete();
       }
     }
   }

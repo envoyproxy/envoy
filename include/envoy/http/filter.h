@@ -530,13 +530,13 @@ public:
 /**
  * Common base class for both decoder and encoder filters. Functions here are related to the
  * lifecycle of a filter. Currently the life cycle is as follows:
- * - All filters receive onPreDestroy()
+ * - All filters receive onStreamComplete()
  * - All log handlers receive log()
  * - All filters receive onDestroy()
  *
  * This means:
- * - onPreDestroy can be used to make state changes that are intended to appear in the access logs
- *   (like streamInfo().dynamicMetadata() or streamInfo().filterState()).
+ * - onStreamComplete can be used to make state changes that are intended to appear in the access
+ * logs (like streamInfo().dynamicMetadata() or streamInfo().filterState()).
  * - onDestroy is used to cleanup all pending filter resources like pending http requests.
  */
 class StreamFilterBase {
@@ -547,7 +547,7 @@ public:
    * This routine is called before the access log handlers' log() is called. Filters can use this
    * callback to enrich the data passed in to the log handlers.
    */
-  virtual void onPreDestroy() {}
+  virtual void onStreamComplete() {}
 
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream

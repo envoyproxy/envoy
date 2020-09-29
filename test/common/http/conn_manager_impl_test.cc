@@ -391,7 +391,7 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
         EXPECT_EQ("absolute_path_rejected",
                   filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
       }));
-  EXPECT_CALL(*filter, onPreDestroy());
+  EXPECT_CALL(*filter, onStreamComplete());
   EXPECT_CALL(*filter, onDestroy());
 
   Buffer::OwnedImpl fake_input("1234");
@@ -432,7 +432,7 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
         EXPECT_EQ("path_normalization_failed",
                   filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
       }));
-  EXPECT_CALL(*filter, onPreDestroy());
+  EXPECT_CALL(*filter, onStreamComplete());
   EXPECT_CALL(*filter, onDestroy());
 
   Buffer::OwnedImpl fake_input("1234");
@@ -475,7 +475,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
-  EXPECT_CALL(*filter, onPreDestroy());
+  EXPECT_CALL(*filter, onStreamComplete());
   EXPECT_CALL(*filter, onDestroy());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
@@ -757,7 +757,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseNormalizedHost) {
   conn_manager_->onData(fake_input, false);
 
   // Clean up.
-  EXPECT_CALL(*filter, onPreDestroy());
+  EXPECT_CALL(*filter, onStreamComplete());
   EXPECT_CALL(*filter, onDestroy());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
@@ -1618,7 +1618,7 @@ TEST_F(HttpConnectionManagerImplTest, TestFilterCanEnrichAccessLogs) {
         callbacks.addAccessLogHandler(handler);
       }));
 
-  EXPECT_CALL(*filter, onPreDestroy()).WillOnce(Invoke([&]() {
+  EXPECT_CALL(*filter, onStreamComplete()).WillOnce(Invoke([&]() {
     ProtobufWkt::Value metadata_value;
     metadata_value.set_string_value("value");
     ProtobufWkt::Struct metadata;
@@ -1828,7 +1828,7 @@ public:
           }
         }));
 
-    EXPECT_CALL(*filter, onPreDestroy());
+    EXPECT_CALL(*filter, onStreamComplete());
     EXPECT_CALL(*filter, onDestroy());
 
     Buffer::OwnedImpl fake_input;
@@ -2059,7 +2059,7 @@ TEST_F(HttpConnectionManagerImplTest, AccessEncoderRouteBeforeHeadersArriveOnIdl
   EXPECT_CALL(*filter, encodeData(_, _));
   EXPECT_CALL(*filter, encodeComplete());
 
-  EXPECT_CALL(*filter, onPreDestroy());
+  EXPECT_CALL(*filter, onStreamComplete());
   EXPECT_CALL(*filter, onDestroy());
 
   EXPECT_CALL(response_encoder_, encodeHeaders(_, _));
@@ -2937,7 +2937,7 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
-  EXPECT_CALL(*filter, onPreDestroy());
+  EXPECT_CALL(*filter, onStreamComplete());
   EXPECT_CALL(*filter, onDestroy());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }

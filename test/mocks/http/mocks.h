@@ -256,7 +256,7 @@ public:
   ~MockStreamDecoderFilter() override;
 
   // Http::StreamFilterBase
-  MOCK_METHOD(void, onPreDestroy, ());
+  MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
 
   // Http::StreamDecoderFilter
@@ -281,7 +281,7 @@ public:
   ~MockStreamEncoderFilter() override;
 
   // Http::StreamFilterBase
-  MOCK_METHOD(void, onPreDestroy, ());
+  MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
 
   // Http::MockStreamEncoderFilter
@@ -302,7 +302,7 @@ public:
   ~MockStreamFilter() override;
 
   // Http::StreamFilterBase
-  MOCK_METHOD(void, onPreDestroy, ());
+  MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
 
   // Http::StreamDecoderFilter

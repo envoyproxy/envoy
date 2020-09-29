@@ -42,7 +42,7 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
         EXPECT_NE(nullptr, headers.Server());
         EXPECT_EQ("envoy-server-test", headers.getServerValue());
       }));
-  EXPECT_CALL(*decoder_filters_[0], onPreDestroy());
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
   EXPECT_CALL(*decoder_filters_[0], onDestroy());
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay));
@@ -78,7 +78,7 @@ TEST_F(HttpConnectionManagerImplTest, DisconnectOnProxyConnectionDisconnect) {
         EXPECT_EQ("close", headers.getConnectionValue());
         EXPECT_EQ(nullptr, headers.ProxyConnection());
       }));
-  EXPECT_CALL(*decoder_filters_[0], onPreDestroy());
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
   EXPECT_CALL(*decoder_filters_[0], onDestroy());
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay));
@@ -3247,7 +3247,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
   }
 
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
-  EXPECT_CALL(*decoder_filters_[0], onPreDestroy());
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
   EXPECT_CALL(*decoder_filters_[0], onDestroy());
   EXPECT_CALL(*decoder_filters_[1], decodeComplete());
   EXPECT_CALL(*decoder_filters_[2], decodeComplete());
@@ -3260,9 +3260,9 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
   // The connection life time data should have been written to the connection filter state.
   EXPECT_TRUE(filter_callbacks_.connection_.stream_info_.filter_state_->hasData<SimpleType>(
       "per_downstream_connection"));
-  EXPECT_CALL(*decoder_filters_[1], onPreDestroy());
+  EXPECT_CALL(*decoder_filters_[1], onStreamComplete());
   EXPECT_CALL(*decoder_filters_[1], onDestroy());
-  EXPECT_CALL(*decoder_filters_[2], onPreDestroy());
+  EXPECT_CALL(*decoder_filters_[2], onStreamComplete());
   EXPECT_CALL(*decoder_filters_[2], onDestroy());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }

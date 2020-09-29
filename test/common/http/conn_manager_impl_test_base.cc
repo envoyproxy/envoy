@@ -205,11 +205,11 @@ HttpConnectionManagerImplTest::sendResponseHeaders(ResponseHeaderMapPtr&& respon
 
 void HttpConnectionManagerImplTest::expectOnDestroy(bool deferred) {
   for (auto filter : decoder_filters_) {
-    EXPECT_CALL(*filter, onPreDestroy());
+    EXPECT_CALL(*filter, onStreamComplete());
   }
   {
     auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
-      EXPECT_CALL(*filter, onPreDestroy());
+      EXPECT_CALL(*filter, onStreamComplete());
     };
     std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
   }
