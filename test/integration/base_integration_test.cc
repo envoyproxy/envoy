@@ -113,7 +113,8 @@ void BaseIntegrationTest::createUpstreams() {
       fake_upstreams_.emplace_back(new AutonomousUpstream(
           endpoint, upstream_protocol_, *time_system_, autonomous_allow_incomplete_streams_));
     } else {
-      fake_upstreams_.emplace_back(createFakeUpstream(endpoint, upstream_protocol_));
+      fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstream_protocol_, *time_system_,
+                                                    enable_half_close_, udp_fake_upstream_));
     }
   }
 }
