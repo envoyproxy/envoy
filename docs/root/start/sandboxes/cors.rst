@@ -29,25 +29,10 @@ The CORS enforcement choices are:
 Running the Sandboxes
 ~~~~~~~~~~~~~~~~~~~~~
 
-The following documentation runs through the setup of both services.
+.. include:: _include/docker-env-setup.rst
 
-**Step 1: Install Docker**
-
-Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
-
-A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
-
-**Step 2: Clone the Envoy repo**
-
-If you have not cloned the Envoy repo, clone it with:
-
-``git clone git@github.com:envoyproxy/envoy``
-
-or
-
-``git clone https://github.com/envoyproxy/envoy.git``
-
-**Step 3: Start all of our containers**
+Step 3: Start all of our containers
+***********************************
 
 Switch to the ``frontend`` directory in the ``cors`` example, and start the containers:
 
@@ -79,7 +64,8 @@ Now, switch to the ``backend`` directory in the ``cors`` example, and start the 
   backend_backend-service_1   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
   backend_front-envoy_1       /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8002->8000/tcp, 0.0.0.0:8003->8001/tcp
 
-**Step 4: Test Envoy's CORS capabilities**
+Step 4: Test Envoy's CORS capabilities
+**************************************
 
 You can now open a browser to view your frontend service at http://localhost:8000.
 
@@ -94,7 +80,8 @@ For example:
   Access to XMLHttpRequest at 'http://192.168.99.100:8002/cors/disabled' from origin 'http://192.168.99.101:8000'
   has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
 
-**Step 5: Check stats of backend via admin**
+Step 5: Check stats of backend via admin
+****************************************
 
 When Envoy runs, it can listen to ``admin`` requests if a port is configured.
 

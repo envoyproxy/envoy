@@ -21,6 +21,7 @@ envoy_cc_test(
         # right now we have a bunch of duplication which is confusing.
         "//test/config/integration/certs",
         "//test/extensions/transport_sockets/tls/test_data:certs",
+        "//test/extensions/transport_sockets/tls/ocsp:gen_ocsp_data",
     ],
     external_deps = ["ssl"],
     shard_count = 4,
@@ -57,6 +58,7 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
@@ -71,12 +73,14 @@ envoy_cc_test(
     ],
     data = [
         "gen_unittest_certs.sh",
+        "//test/extensions/transport_sockets/tls/ocsp:gen_ocsp_data",
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     # Fails intermittantly on local build
     tags = ["flaky_on_windows"],
     deps = [
         ":ssl_test_utils",
+        "//source/common/common:base64_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
@@ -116,6 +120,7 @@ envoy_cc_test(
     ],
     data = [
         "gen_unittest_certs.sh",
+        "//test/extensions/transport_sockets/tls/ocsp:gen_ocsp_data",
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     external_deps = ["ssl"],

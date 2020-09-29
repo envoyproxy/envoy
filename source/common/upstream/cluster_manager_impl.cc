@@ -1457,13 +1457,13 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
   if (protocol == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
-    return Http::Http2::allocateConnPool(dispatcher, host, priority, options,
+    return Http::Http2::allocateConnPool(dispatcher, random_, host, priority, options,
                                          transport_socket_options);
   } else if (protocol == Http::Protocol::Http3) {
     // Quic connection pool is not implemented.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   } else {
-    return Http::Http1::allocateConnPool(dispatcher, host, priority, options,
+    return Http::Http1::allocateConnPool(dispatcher, random_, host, priority, options,
                                          transport_socket_options);
   }
 }

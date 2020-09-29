@@ -67,14 +67,14 @@ InstanceImpl::InstanceImpl(
                                              options.ignoreUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
-      api_(new Api::Impl(thread_factory, store, time_system, file_system,
+      random_generator_(std::move(random_generator)),
+      api_(new Api::Impl(thread_factory, store, time_system, file_system, *random_generator_,
                          process_context ? ProcessContextOptRef(std::ref(*process_context))
                                          : absl::nullopt)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
-      handler_(new ConnectionHandlerImpl(*dispatcher_)),
-      random_generator_(std::move(random_generator)), listener_component_factory_(*this),
-      worker_factory_(thread_local_, *api_, hooks),
+      handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
+      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       terminated_(false),
@@ -216,6 +216,13 @@ void InstanceImpl::updateServerStats() {
                                         parent_stats.parent_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
+
+  auto secs_until_ocsp_response_expires =
+      sslContextManager().secondsUntilFirstOcspResponseExpires();
+  if (secs_until_ocsp_response_expires) {
+    server_stats_->seconds_until_first_ocsp_response_expiring_.set(
+        secs_until_ocsp_response_expires.value());
+  }
   server_stats_->state_.set(
       enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
   server_stats_->stats_recent_lookups_.set(
