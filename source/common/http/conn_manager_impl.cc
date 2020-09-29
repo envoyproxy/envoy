@@ -1399,14 +1399,13 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
   ENVOY_STREAM_LOG(debug, "stream reset", *this);
   connection_manager_.stats_.named_.downstream_rq_rx_reset_.inc();
 
-  // If the codec sets its responseDetails(), impute a
-  // DownstreamProtocolError and propagate the details upwards.
+  // If the codec sets its responseDetails() for a reason other than peer reset, set a
+  // DownstreamProtocolError. Either way, propagate details.
   const absl::string_view encoder_details = response_encoder_->getStream().responseDetails();
+  if (!encoder_details.empty() && reset_reason == StreamResetReason::LocalReset) {
+    filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
+  }
   if (!encoder_details.empty()) {
-    if (reset_reason == StreamResetReason::LocalReset) {
-      filter_manager_.streamInfo().setResponseFlag(
-          StreamInfo::ResponseFlag::DownstreamProtocolError);
-    }
     filter_manager_.streamInfo().setResponseCodeDetails(encoder_details);
   }
 
