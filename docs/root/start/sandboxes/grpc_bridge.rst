@@ -23,25 +23,10 @@ base routing via its route configuration.
 Running the Sandbox
 ~~~~~~~~~~~~~~~~~~~
 
-The following documentation runs through the setup of the services.
+.. include:: _include/docker-env-setup.rst
 
-**Step 1: Install Docker**
-
-Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
-
-A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
-
-**Step 2: Clone the Envoy repo**
-
-If you have not cloned the Envoy repo, clone it with:
-
-``git clone git@github.com:envoyproxy/envoy``
-
-or
-
-``git clone https://github.com/envoyproxy/envoy.git``
-
-**Step 3: Generate the protocol stubs**
+Step 3: Generate the protocol stubs
+***********************************
 
 A docker-compose file is provided that generates the stubs for both ``client`` and ``server`` from the
 specification in the ``protos`` directory.
@@ -81,7 +66,8 @@ respective directories:
 
 These generated ``python`` and ``go`` stubs can be included as external modules.
 
-**Step 4: Start all of our containers**
+Step 4: Start all of our containers
+***********************************
 
 To build this sandbox example and start the example services, run the following commands:
 

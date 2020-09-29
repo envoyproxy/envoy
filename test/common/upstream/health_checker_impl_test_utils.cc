@@ -73,5 +73,19 @@ void HttpHealthCheckerImplTestBase::expectClientCreate(size_t index) {
   expectClientCreate(index, health_checker_map_);
 }
 
+// This is needed to put expectations in LIFO order. The unit tests use inSequence, which makes
+// expectations FIFO.
+void TcpHealthCheckerImplTestBase::expectSessionCreate() {
+  timeout_timer_ = new Event::MockTimer(&dispatcher_);
+  interval_timer_ = new Event::MockTimer(&dispatcher_);
+}
+
+void TcpHealthCheckerImplTestBase::expectClientCreate() {
+  connection_ = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+      .WillOnce(testing::Return(connection_));
+  EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(testing::SaveArg<0>(&read_filter_));
+}
+
 } // namespace Upstream
 } // namespace Envoy
