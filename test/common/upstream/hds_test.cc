@@ -533,8 +533,8 @@ transport_socket_match_criteria:
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
             params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
-            params.dispatcher_, params.random_, params.stats_, params.singleton_manager_,
-            params.tls_, params.validation_visitor_, params.api_);
+            params.dispatcher_, params.api_.randomGenerator(), params.stats_,
+            params.singleton_manager_, params.tls_, params.validation_visitor_, params.api_);
 
         // Create a mock socket_factory for the scope of this unit test.
         std::unique_ptr<Envoy::Network::TransportSocketFactory> socket_factory =
