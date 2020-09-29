@@ -150,6 +150,7 @@ private:
 
 protected:
   const Http::CodecClient::Type codec_client_type_;
+  Random::RandomGenerator& random_generator_;
 };
 
 /**
@@ -374,6 +375,10 @@ private:
     return envoy::data::core::v3::GRPC;
   }
 
+protected:
+  Random::RandomGenerator& random_generator_;
+
+private:
   const Protobuf::MethodDescriptor& service_method_;
   absl::optional<std::string> service_name_;
   absl::optional<std::string> authority_value_;

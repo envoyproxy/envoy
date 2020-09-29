@@ -141,7 +141,8 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
       codec_client_type_(
           codecClientType(config.http_health_check().hidden_envoy_deprecated_use_http2()
                               ? envoy::type::v3::HTTP2
-                              : config.http_health_check().codec_client_type())) {
+                              : config.http_health_check().codec_client_type())),
+      random_generator_(random) {
   // The deprecated service_name field was previously being used to compare with the health checked
   // cluster name using a StartsWith comparison. Since StartsWith is essentially a prefix
   // comparison, representing the intent by using a StringMatcher prefix is a more natural way.
@@ -403,7 +404,7 @@ HttpHealthCheckerImpl::codecClientType(const envoy::type::v3::CodecClientType& t
 Http::CodecClient*
 ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   return new Http::CodecClientProd(codec_client_type_, std::move(data.connection_),
-                                   data.host_description_, dispatcher_);
+                                   data.host_description_, dispatcher_, random_generator_);
 }
 
 TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
@@ -546,6 +547,7 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
                                              Random::RandomGenerator& random,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
+      random_generator_(random),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "grpc.health.v1.Health.Check")) {
   if (!config.grpc_health_check().service_name().empty()) {
@@ -848,9 +850,9 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
 
 Http::CodecClientPtr
 ProdGrpcHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-  return std::make_unique<Http::CodecClientProd>(Http::CodecClient::Type::HTTP2,
-                                                 std::move(data.connection_),
-                                                 data.host_description_, dispatcher_);
+  return std::make_unique<Http::CodecClientProd>(
+      Http::CodecClient::Type::HTTP2, std::move(data.connection_), data.host_description_,
+      dispatcher_, random_generator_);
 }
 
 std::ostream& operator<<(std::ostream& out, HealthState state) {

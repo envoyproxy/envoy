@@ -66,6 +66,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                    const std::string& host, const std::string& content_type) {
 
   NiceMock<Stats::MockIsolatedStatsStore> mock_stats_store;
+  NiceMock<Random::MockRandomGenerator> random;
   Event::GlobalTimeSystem time_system;
   NiceMock<Random::MockRandomGenerator> random_generator;
   Api::Impl api(Thread::threadFactoryForTest(), mock_stats_store, time_system,
@@ -78,7 +79,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       type,
       dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
                                          Network::Test::createRawBufferSocket(), nullptr),
-      host_description, *dispatcher);
+      host_description, *dispatcher, random);
   BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void {
     client.close();
     dispatcher->exit();
