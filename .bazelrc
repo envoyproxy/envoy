@@ -71,12 +71,12 @@ build:clang-asan --linkopt -fuse-ld=lld
 
 # macOS ASAN/UBSAN
 build:macos --cxxopt=-std=c++17
+# Workaround, see https://github.com/bazelbuild/bazel/issues/4341
+build:macos --copt -DGRPC_BAZEL_BUILD
 build:macos-asan --config=asan
 # Workaround, see https://github.com/bazelbuild/bazel/issues/6932
 build:macos-asan --copt -Wno-macro-redefined
 build:macos-asan --copt -D_FORTIFY_SOURCE=0
-# Workaround, see https://github.com/bazelbuild/bazel/issues/4341
-build:macos-asan --copt -DGRPC_BAZEL_BUILD
 # Dynamic link cause issues like: `dyld: malformed mach-o: load commands size (59272) > 32768`
 build:macos-asan --dynamic_mode=off
 
@@ -129,7 +129,6 @@ build:coverage --action_env=GCOV=llvm-profdata
 build:coverage --copt=-DNDEBUG
 # 1.5x original timeout + 300s for trace merger in all categories
 build:coverage --test_timeout=390,750,1500,5700
-build:coverage --define=dynamic_link_tests=true
 build:coverage --define=ENVOY_CONFIG_COVERAGE=1
 build:coverage --cxxopt="-DENVOY_CONFIG_COVERAGE=1"
 build:coverage --coverage_support=@envoy//bazel/coverage:coverage_support

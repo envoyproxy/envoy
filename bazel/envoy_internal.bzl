@@ -91,8 +91,8 @@ def envoy_external_dep_path(dep):
 
 def envoy_linkstatic():
     return select({
-        "@envoy//bazel:dynamic_link_tests": 0,
-        "//conditions:default": 1,
+        "@envoy//bazel:asan_build": 1,
+        "//conditions:default": 0,
     })
 
 def envoy_select_force_libcpp(if_libcpp, default = None):

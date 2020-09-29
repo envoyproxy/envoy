@@ -176,7 +176,7 @@ def envoy_cc_test(
         data = data,
         copts = envoy_copts(repository, test = True) + copts,
         linkopts = _envoy_test_linkopts(),
-        linkstatic = False,
+        linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
         deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps + ["googletest"]] + [
             repository + "//test:main",
