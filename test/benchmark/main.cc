@@ -37,10 +37,9 @@ int main(int argc, char** argv) {
   }
 
   // Reduce logs so benchmark output is readable.
-  TestEnvironment::initializeOptions(argc, argv);
   static auto* lock = new Thread::MutexBasicLockable();
-  static auto* logging_context = new Logger::Context(
-      spdlog::level::warn, TestEnvironment::getOptions().logFormat(), *lock, false);
+  static auto* logging_context =
+      new Logger::Context(spdlog::level::warn, Logger::Context::getFancyLogFormat(), *lock, false);
   UNREFERENCED_PARAMETER(logging_context);
 
   skip_expensive_benchmarks = skip_switch.getValue();

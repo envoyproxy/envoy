@@ -36,7 +36,7 @@ static Http::TestRequestHeaderMapImpl genRequestHeaders(int route_num) {
  *
  * We then time how long it takes for the request to be matched against the last route.
  */
-static void BM_RouteTableSize(benchmark::State& state) {
+static void routeTableSize(benchmark::State& state) {
   // Setup router for benchmarking.
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
@@ -59,20 +59,23 @@ static void BM_RouteTableSize(benchmark::State& state) {
     envoy::type::matcher::v3::RegexMatcher* regex = match->mutable_safe_regex();
     regex->mutable_google_re2();
     regex->set_regex(absl::StrCat("^/shelves/[^\\\\/]+/books/book_id_", i, "$"));
+    envoy::config::route::v3::DirectResponseAction* direct_response =
+        route->mutable_direct_response();
+    direct_response->set_status(200);
   }
 
   // Create router config.
   ConfigImpl config(route_config, factory_context, ProtobufMessage::getNullValidationVisitor(),
                     true);
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     // Do the actual timing here.
     // Single request that will match the last route in the config.
     config.route(genRequestHeaders(state.range(0) - 1), stream_info, 0);
   }
 }
 
-BENCHMARK(BM_RouteTableSize)->RangeMultiplier(2)->Ranges({{1, 2 << 14}});
+BENCHMARK(routeTableSize)->RangeMultiplier(2)->Ranges({{1, 2 << 14}});
 
 } // namespace
 } // namespace Router
