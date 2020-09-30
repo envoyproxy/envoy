@@ -107,6 +107,7 @@ envoy_cc_test(
         ":admin_instance_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )

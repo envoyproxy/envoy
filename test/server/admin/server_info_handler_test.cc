@@ -4,6 +4,7 @@
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 
 using testing::Ge;
 using testing::HasSubstr;
@@ -179,6 +180,8 @@ TEST_P(AdminInstanceTest, GetRequest) {
 }
 
 TEST_P(AdminInstanceTest, PostRequest) {
+  // Load TestScopedRuntime to suppress warnings related to runtime features.
+  TestScopedRuntime scoped_runtime;
   Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
   EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::OK,
