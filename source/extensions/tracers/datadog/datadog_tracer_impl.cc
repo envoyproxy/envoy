@@ -140,7 +140,7 @@ void TraceReporter::onSuccess(const Http::AsyncClient::Request& request,
   } else {
     ENVOY_LOG(debug, "traces successfully submitted to datadog agent");
     driver_.tracerStats().reports_sent_.inc();
-    encoder_->handleResponse(http_response->body()->toString());
+    encoder_->handleResponse(http_response->bodyAsString());
   }
 }
 
