@@ -134,6 +134,7 @@ public:
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
   std::chrono::milliseconds requestTimeout() const override { return {}; }
+  std::chrono::milliseconds requestHeadersTimeout() const override { return {}; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return {}; }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return max_stream_duration_;

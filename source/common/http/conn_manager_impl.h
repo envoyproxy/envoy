@@ -313,6 +313,8 @@ private:
     void onIdleTimeout();
     // Per-stream request timeout callback.
     void onRequestTimeout();
+    // Per-stream request header timeout callback.
+    void onRequestHeaderTimeout();
     // Per-stream alive duration reached.
     void onStreamMaxDurationReached();
     bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
@@ -353,11 +355,18 @@ private:
     Tracing::SpanPtr active_span_;
     ResponseEncoder* response_encoder_{};
     Stats::TimespanPtr request_response_timespan_;
-    // Per-stream idle timeout.
+    // Per-stream idle timeout. This timer gets reset whenever activity occurs on the stream, and,
+    // when triggered, will close the stream.
     Event::TimerPtr stream_idle_timer_;
-    // Per-stream request timeout.
+    // Per-stream request timeout. This timer is enabled when the stream is created and disabled
+    // when the downstream closes the connection. If triggered, it will close the stream.
     Event::TimerPtr request_timer_;
-    // Per-stream alive duration.
+    // Per-stream request header timeout. This timer is enabled when the stream is created and
+    // disabled when the downstream finishes sending headers. If triggered, it will close the
+    // stream.
+    Event::TimerPtr request_header_timer_;
+    // Per-stream alive duration. This timer is enabled once when the stream is created and, if
+    // triggered, will close the stream.
     Event::TimerPtr max_stream_duration_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;

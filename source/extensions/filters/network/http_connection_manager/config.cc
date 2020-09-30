@@ -223,6 +223,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       stream_idle_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, request_timeout, RequestTimeoutMs)),
+      request_headers_timeout_(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, request_headers_timeout, RequestHeaderTimeoutMs)),
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
       preserve_external_request_id_(config.preserve_external_request_id()),

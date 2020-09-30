@@ -202,6 +202,10 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
     stream.stream_idle_timer_ = nullptr;
   }
   stream.filter_manager_.disarmRequestTimeout();
+  if (stream.request_header_timer_ != nullptr) {
+    stream.request_header_timer_->disableTimer();
+    stream.request_header_timer_ = nullptr;
+  }
 
   stream.completeRequest();
   stream.filter_manager_.log();
@@ -610,10 +614,19 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   }
 
   if (connection_manager_.config_.requestTimeout().count()) {
-    std::chrono::milliseconds request_timeout_ms_ = connection_manager_.config_.requestTimeout();
+    std::chrono::milliseconds request_timeout = connection_manager_.config_.requestTimeout();
     request_timer_ = connection_manager.read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onRequestTimeout(); });
-    request_timer_->enableTimer(request_timeout_ms_, this);
+    request_timer_->enableTimer(request_timeout, this);
+  }
+
+  if (connection_manager_.config_.requestHeadersTimeout().count()) {
+    std::chrono::milliseconds request_headers_timeout =
+        connection_manager_.config_.requestHeadersTimeout();
+    request_header_timer_ =
+        connection_manager.read_callbacks_->connection().dispatcher().createTimer(
+            [this]() -> void { onRequestHeaderTimeout(); });
+    request_header_timer_->enableTimer(request_headers_timeout, this);
   }
 
   const auto max_stream_duration = connection_manager_.config_.maxStreamDuration();
@@ -707,6 +720,14 @@ void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
                  StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
 }
 
+void ConnectionManagerImpl::ActiveStream::onRequestHeaderTimeout() {
+  connection_manager_.stats_.named_.downstream_rq_header_timeout_.inc();
+  sendLocalReply(request_headers_ != nullptr &&
+                     Grpc::Common::isGrpcRequestHeaders(*request_headers_),
+                 Http::Code::RequestTimeout, "request header timeout", nullptr, absl::nullopt,
+                 StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
+}
+
 void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
@@ -789,6 +810,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
   filter_manager_.requestHeadersInitialized();
+  if (request_header_timer_ != nullptr) {
+    request_header_timer_->disableTimer();
+    request_header_timer_ = nullptr;
+  }
 
   Upstream::HostDescriptionConstSharedPtr upstream_host =
       connection_manager_.read_callbacks_->upstreamHost();
