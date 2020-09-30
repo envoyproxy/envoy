@@ -7,10 +7,12 @@ export NAME=cache
 
 check_validated() {
     # Get the date header and the response generation timestamp
-    local dates
-    dates=($(grep -oP '\d\d:\d\d:\d\d' <<< "$1"))
+    local _dates dates
+    _dates=$(grep -oP '\d\d:\d\d:\d\d' <<< "$1")
+    while read -r line; do dates+=("$line"); done \
+	<<< "$_dates"
     # Make sure they are different
-    if [[ ${dates[0]} == ${dates[1]} ]]; then
+    if [[ ${dates[0]} == "${dates[1]}" ]]; then
        echo "ERROR: validated responses should have a date AFTER the generation timestamp" >&2
        return 1
     fi
@@ -31,10 +33,12 @@ check_cached() {
 
 check_from_origin() {
     # Get the date header and the response generation timestamp
-    local dates
-    dates=($(grep -oP '\d\d:\d\d:\d\d' <<< "$1"))
+    local _dates dates
+    _dates=$(grep -oP '\d\d:\d\d:\d\d' <<< "$1")
+    while read -r line; do dates+=("$line"); done \
+	<<< "$_dates"
     # Make sure they are equal
-    if [[ ${dates[0]} != ${dates[1]} ]]; then
+    if [[ ${dates[0]} != "${dates[1]}" ]]; then
        echo "ERROR: responses from origin should have a date equal to the generation timestamp" >&2
        return 1
     fi
@@ -65,7 +69,7 @@ response=$(curl -si localhost:8000/service/1/valid-for-minute)
 check_validated "$response"
 
 run_log "Private: Make 4 requests make sure they are all served by the origin"
-for i in {0..3}
+for _ in {0..3}
 do
     response=$(curl -si localhost:8000/service/1/private)
     check_from_origin "$response"
@@ -76,7 +80,7 @@ response=$(curl -si localhost:8000/service/1/no-cache)
 check_from_origin "$response"
 
 run_log "No-cache: Make 4 more requests and make sure they are all validated before being served from cache"
-for i in {0..3}
+for _ in {0..3}
 do
     sleep 1
     response=$(curl -si localhost:8000/service/1/no-cache)

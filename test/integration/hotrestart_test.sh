@@ -78,10 +78,10 @@ echo "Hot restart test using dynamic base id"
 
 TEST_INDEX=0
 function run_testsuite() {
-  local BASE_ID BASE_ID_PATH HOT_RESTART_JSON="$1" FAKE_SYMBOL_TABLE="$2" 
+  local BASE_ID BASE_ID_PATH HOT_RESTART_JSON="$1" FAKE_SYMBOL_TABLE="$2"
   local SOCKET_PATH=@envoy_domain_socket
   local SOCKET_MODE=0
-  if [ ! -z "$3" ] &&  [ ! -z "$4" ]
+  if [ -n "$3" ] &&  [ -n "$4" ]
   then
      SOCKET_PATH="$3"
      SOCKET_MODE="$4"
