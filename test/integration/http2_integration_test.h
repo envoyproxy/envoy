@@ -85,12 +85,8 @@ protected:
   IntegrationTcpClientPtr tcp_client_;
 };
 
-class Http2FloodMitigationTest : public Http2FrameIntegrationTest {
+class SocketInterfaceSwap {
 public:
-  Http2FloodMitigationTest();
-  ~Http2FloodMitigationTest() override;
-
-protected:
   // Object of this class hold the state determining the IoHandle which
   // should return EAGAIN from the `writev` call.
   struct IoHandleMatcher {
@@ -115,6 +111,26 @@ protected:
     bool writev_returns_egain_ ABSL_GUARDED_BY(mutex_) = false;
   };
 
+  SocketInterfaceSwap();
+  ~SocketInterfaceSwap();
+
+protected:
+  Envoy::Network::SocketInterface* const previous_socket_interface_{
+      Envoy::Network::SocketInterfaceSingleton::getExisting()};
+  std::shared_ptr<IoHandleMatcher> writev_matcher_{std::make_shared<IoHandleMatcher>()};
+  std::unique_ptr<Envoy::Network::SocketInterfaceLoader> test_socket_interface_loader_;
+};
+
+// It is important that the new socket interface is installed before any I/O activity starts and
+// the previous one is restored after all I/O activity stops. Since the HttpIntegrationTest
+// destructor stops Envoy the SocketInterfaceSwap destructor needs to run after it. This order of
+// multiple inheritance ensures that SocketInterfaceSwap destructor runs after
+// Http2FrameIntegrationTest destructor completes.
+class Http2FloodMitigationTest : public SocketInterfaceSwap, public Http2FrameIntegrationTest {
+public:
+  Http2FloodMitigationTest();
+
+protected:
   void floodServer(const Http2Frame& frame, const std::string& flood_stat, uint32_t num_frames);
   void floodServer(absl::string_view host, absl::string_view path,
                    Http2Frame::ResponseStatus expected_http_status, const std::string& flood_stat,
@@ -122,10 +138,5 @@ protected:
 
   void setNetworkConnectionBufferSize();
   void beginSession() override;
-
-  Envoy::Network::SocketInterface* const previous_socket_interface_{
-      Envoy::Network::SocketInterfaceSingleton::getExisting()};
-  std::shared_ptr<IoHandleMatcher> writev_matcher_{std::make_shared<IoHandleMatcher>()};
-  std::unique_ptr<Envoy::Network::SocketInterfaceLoader> test_socket_interface_loader_;
 };
 } // namespace Envoy
