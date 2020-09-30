@@ -700,7 +700,8 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
 EdfLoadBalancerBase::EdfLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
     Runtime::Loader& runtime, Random::RandomGenerator& random,
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+    TimeSource& time_source)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                 common_config),
       seed_(random_.random()),
@@ -710,7 +711,8 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
       slow_start_window(common_config.has_slow_start_config()
                             ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.slow_start_config(),
                                                               slow_start_window, 0)
-                            : 0) {
+                            : 0),
+      time_source_(time_source) {
   // We fully recompute the schedulers for a given host set here on membership change, which is
   // consistent with what other LB implementations do (e.g. thread aware).
   // The downside of a full recompute is that time complexity is O(n * log n),
@@ -750,9 +752,9 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // BaseDynamicClusterImpl::updateDynamicHostList about this.
     for (const auto& host : hosts) {
       auto host_weight = hostWeight(*host);
-      // todo(nezdolik) propagate slow_start_config and endpoint_warming_policy to edf lb base, add
+      // todo(nezdolik) use same units for all variables, add
       // abs to formula
-      if (scheduler.edf_->currentTimeMs() - 0 /*host->creationTime()*/ > 60) {
+      if (scheduler.edf_->currentTime() - 0 /*host->creationTime())*/ > slow_start_window) {
         // todo(nezdolik) parametrize this
         host_weight *= 0.1;
       }

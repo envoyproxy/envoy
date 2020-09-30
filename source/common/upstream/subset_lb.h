@@ -32,7 +32,8 @@ public:
       const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>& lb_maglev_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
           least_request_config,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+      TimeSource& time_source);
   ~SubsetLoadBalancer() override;
 
   // Upstream::LoadBalancer
@@ -269,6 +270,8 @@ private:
   const bool locality_weight_aware_;
   const bool scale_locality_weight_;
   const bool list_as_any_;
+
+  TimeSource& time_source_;
 
   friend class SubsetLoadBalancerDescribeMetadataTester;
 };
