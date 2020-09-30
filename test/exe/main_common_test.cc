@@ -33,6 +33,10 @@ namespace Envoy {
 
 namespace {
 
+#if !(defined(__clang_analyzer__) ||                                                               \
+      (defined(__has_feature) &&                                                                   \
+       (__has_feature(thread_sanitizer) || __has_feature(address_sanitizer) ||                     \
+        __has_feature(memory_sanitizer))))
 const std::string& outOfMemoryPattern() {
 #if defined(TCMALLOC)
   CONSTRUCT_ON_FIRST_USE(std::string, ".*Unable to allocate.*");
@@ -40,6 +44,7 @@ const std::string& outOfMemoryPattern() {
   CONSTRUCT_ON_FIRST_USE(std::string, ".*panic: out of memory.*");
 #endif
 }
+#endif
 
 } // namespace
 
