@@ -66,6 +66,9 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
   if (disable_listeners_) {
     details.listener_->pauseListening();
   }
+  if (auto* listener = details.listener_->listener(); listener != nullptr) {
+    listener->setRejectFraction(listener_reject_fraction_);
+  }
   listeners_.emplace_back(config.listenSocketFactory().localAddress(), std::move(details));
 }
 
@@ -149,7 +152,7 @@ void ConnectionHandlerImpl::enableListeners() {
 }
 
 void ConnectionHandlerImpl::setListenerRejectFraction(float reject_fraction) {
-  disable_listeners_ = false;
+  listener_reject_fraction_ = reject_fraction;
   for (auto& listener : listeners_) {
     listener.second.listener_->listener()->setRejectFraction(reject_fraction);
   }

@@ -452,6 +452,38 @@ TEST_F(ConnectionHandlerTest, AddDisabledListener) {
   handler_->addListener(absl::nullopt, *test_listener);
 }
 
+TEST_F(ConnectionHandlerTest, SetListenerRejectFraction) {
+  InSequence s;
+
+  Network::TcpListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(1, false, false, "test_listener", listener, &listener_callbacks);
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *test_listener);
+
+  EXPECT_CALL(*listener, setRejectFraction(0.1234f));
+  EXPECT_CALL(*listener, onDestroy());
+
+  handler_->setListenerRejectFraction(0.1234f);
+}
+
+TEST_F(ConnectionHandlerTest, AddListenerSetRejectFraction) {
+  InSequence s;
+
+  Network::TcpListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(1, false, false, "test_listener", listener, &listener_callbacks);
+  EXPECT_CALL(*listener, setRejectFraction(0.12345f));
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  EXPECT_CALL(*listener, onDestroy());
+
+  handler_->setListenerRejectFraction(0.12345f);
+  handler_->addListener(absl::nullopt, *test_listener);
+}
+
+
 TEST_F(ConnectionHandlerTest, DestroyCloseConnections) {
   InSequence s;
 
