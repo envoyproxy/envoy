@@ -1323,8 +1323,7 @@ Http2RingHashIntegrationTest::~Http2RingHashIntegrationTest() {
 
 void Http2RingHashIntegrationTest::createUpstreams() {
   for (int i = 0; i < num_upstreams_; i++) {
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
   }
 }
 
@@ -1620,7 +1619,7 @@ const uint32_t ControlFrameFloodLimit = 100;
 const uint32_t AllFrameFloodLimit = 1000;
 } // namespace
 
-Http2FloodMitigationTest::Http2FloodMitigationTest() {
+SocketInterfaceSwap::SocketInterfaceSwap() {
   Envoy::Network::SocketInterfaceSingleton::clear();
   test_socket_interface_loader_ = std::make_unique<Envoy::Network::SocketInterfaceLoader>(
       std::make_unique<Envoy::Network::TestSocketInterface>(
@@ -1634,14 +1633,17 @@ Http2FloodMitigationTest::Http2FloodMitigationTest() {
             }
             return absl::nullopt;
           }));
+}
+
+SocketInterfaceSwap::~SocketInterfaceSwap() {
+  test_socket_interface_loader_.reset();
+  Envoy::Network::SocketInterfaceSingleton::initialize(previous_socket_interface_);
+}
+
+Http2FloodMitigationTest::Http2FloodMitigationTest() {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
-}
-
-Http2FloodMitigationTest::~Http2FloodMitigationTest() {
-  test_socket_interface_loader_.reset();
-  Envoy::Network::SocketInterfaceSingleton::initialize(previous_socket_interface_);
 }
 
 void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
@@ -1703,14 +1705,14 @@ void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_
                                            Http2Frame::ResponseStatus expected_http_status,
                                            const std::string& flood_stat, uint32_t num_frames) {
   uint32_t request_idx = 0;
-  auto request = Http2Frame::makeRequest(request_idx, host, path);
+  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx), host, path);
   sendFrame(request);
   auto frame = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
   EXPECT_EQ(expected_http_status, frame.responseStatus());
   writev_matcher_->setWritevReturnsEgain();
   for (uint32_t frame = 0; frame < num_frames; ++frame) {
-    request = Http2Frame::makeRequest(++request_idx, host, path);
+    request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(++request_idx), host, path);
     sendFrame(request);
   }
   tcp_client_->waitForDisconnect();
@@ -1768,8 +1770,8 @@ TEST_P(Http2FloodMitigationTest, Data) {
   // to accumulate in the transport socket buffer.
   writev_matcher_->setWritevReturnsEgain();
 
-  auto request = Http2Frame::makeRequest(0, "host", "/test/long/url",
-                                         {Http2Frame::Header("response_data_blocks", "1000")});
+  const auto request = Http2Frame::makeRequest(
+      1, "host", "/test/long/url", {Http2Frame::Header("response_data_blocks", "1000")});
   sendFrame(request);
 
   // Wait for connection to be flooded with outbound DATA frames and disconnected.
@@ -1862,7 +1864,8 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
   beginSession();
 
   uint32_t stream_index = 0;
-  auto request = Http::Http2::Http2Frame::makeMalformedRequest(stream_index);
+  auto request =
+      Http::Http2::Http2Frame::makeMalformedRequest(Http2Frame::makeClientStreamId(stream_index));
   sendFrame(request);
   auto response = readFrame();
   // Make sure we've got RST_STREAM from the server
@@ -1873,7 +1876,8 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
   writev_matcher_->setWritevReturnsEgain();
 
   for (++stream_index; stream_index < ControlFrameFloodLimit + 2; ++stream_index) {
-    request = Http::Http2::Http2Frame::makeMalformedRequest(stream_index);
+    request =
+        Http::Http2::Http2Frame::makeMalformedRequest(Http2Frame::makeClientStreamId(stream_index));
     sendFrame(request);
   }
   tcp_client_->waitForDisconnect();
@@ -1912,8 +1916,7 @@ TEST_P(Http2FloodMitigationTest, EmptyHeaders) {
       });
   beginSession();
 
-  uint32_t request_idx = 0;
-  auto request = Http2Frame::makeEmptyHeadersFrame(request_idx);
+  const auto request = Http2Frame::makeEmptyHeadersFrame(Http2Frame::makeClientStreamId(0));
   sendFrame(request);
 
   tcp_client_->waitForDisconnect();
@@ -1927,12 +1930,12 @@ TEST_P(Http2FloodMitigationTest, EmptyHeadersContinuation) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   beginSession();
 
-  uint32_t request_idx = 0;
-  auto request = Http2Frame::makeEmptyHeadersFrame(request_idx);
+  const uint32_t request_stream_id = Http2Frame::makeClientStreamId(0);
+  auto request = Http2Frame::makeEmptyHeadersFrame(request_stream_id);
   sendFrame(request);
 
   for (int i = 0; i < 2; i++) {
-    request = Http2Frame::makeEmptyContinuationFrame(request_idx);
+    request = Http2Frame::makeEmptyContinuationFrame(request_stream_id);
     sendFrame(request);
   }
 
@@ -1948,12 +1951,12 @@ TEST_P(Http2FloodMitigationTest, EmptyData) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   beginSession();
 
-  uint32_t request_idx = 0;
-  auto request = Http2Frame::makePostRequest(request_idx, "host", "/");
+  const uint32_t request_stream_id = Http2Frame::makeClientStreamId(0);
+  auto request = Http2Frame::makePostRequest(request_stream_id, "host", "/");
   sendFrame(request);
 
   for (int i = 0; i < 2; i++) {
-    request = Http2Frame::makeEmptyDataFrame(request_idx);
+    request = Http2Frame::makeEmptyDataFrame(request_stream_id);
     sendFrame(request);
   }
 
@@ -1968,7 +1971,9 @@ TEST_P(Http2FloodMitigationTest, EmptyData) {
 TEST_P(Http2FloodMitigationTest, PriorityIdleStream) {
   beginSession();
 
-  floodServer(Http2Frame::makePriorityFrame(0, 1), "http2.inbound_priority_frames_flood",
+  floodServer(Http2Frame::makePriorityFrame(Http2Frame::makeClientStreamId(0),
+                                            Http2Frame::makeClientStreamId(1)),
+              "http2.inbound_priority_frames_flood",
               Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM + 1);
 }
 
@@ -1976,11 +1981,11 @@ TEST_P(Http2FloodMitigationTest, PriorityOpenStream) {
   beginSession();
 
   // Open stream.
-  uint32_t request_idx = 0;
-  auto request = Http2Frame::makeRequest(request_idx, "host", "/");
+  const uint32_t request_stream_id = Http2Frame::makeClientStreamId(0);
+  const auto request = Http2Frame::makeRequest(request_stream_id, "host", "/");
   sendFrame(request);
 
-  floodServer(Http2Frame::makePriorityFrame(request_idx, request_idx + 1),
+  floodServer(Http2Frame::makePriorityFrame(request_stream_id, Http2Frame::makeClientStreamId(1)),
               "http2.inbound_priority_frames_flood",
               Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM * 2 +
                   1);
@@ -1991,14 +1996,14 @@ TEST_P(Http2FloodMitigationTest, PriorityClosedStream) {
   beginSession();
 
   // Open stream.
-  uint32_t request_idx = 0;
-  auto request = Http2Frame::makeRequest(request_idx, "host", "/");
+  const uint32_t request_stream_id = Http2Frame::makeClientStreamId(0);
+  const auto request = Http2Frame::makeRequest(request_stream_id, "host", "/");
   sendFrame(request);
   // Reading response marks this stream as closed in nghttp2.
   auto frame = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
 
-  floodServer(Http2Frame::makePriorityFrame(request_idx, request_idx + 1),
+  floodServer(Http2Frame::makePriorityFrame(request_stream_id, Http2Frame::makeClientStreamId(1)),
               "http2.inbound_priority_frames_flood",
               Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM * 2 +
                   1);
@@ -2008,13 +2013,13 @@ TEST_P(Http2FloodMitigationTest, WindowUpdate) {
   beginSession();
 
   // Open stream.
-  uint32_t request_idx = 0;
-  auto request = Http2Frame::makeRequest(request_idx, "host", "/");
+  const uint32_t request_stream_id = Http2Frame::makeClientStreamId(0);
+  const auto request = Http2Frame::makeRequest(request_stream_id, "host", "/");
   sendFrame(request);
 
   // Since we do not send any DATA frames, only 4 sequential WINDOW_UPDATE frames should
   // trigger flood protection.
-  floodServer(Http2Frame::makeWindowUpdateFrame(request_idx, 1),
+  floodServer(Http2Frame::makeWindowUpdateFrame(request_stream_id, 1),
               "http2.inbound_window_update_frames_flood", 4);
 }
 
@@ -2024,8 +2029,8 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeader) {
   beginSession();
 
   // Send invalid request.
-  uint32_t request_idx = 0;
-  auto request = Http2Frame::makeMalformedRequestWithZerolenHeader(request_idx, "host", "/");
+  const auto request = Http2Frame::makeMalformedRequestWithZerolenHeader(
+      Http2Frame::makeClientStreamId(0), "host", "/");
   sendFrame(request);
 
   tcp_client_->waitForDisconnect();
@@ -2053,7 +2058,8 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
 
   // Send invalid request.
   uint32_t request_idx = 0;
-  auto request = Http2Frame::makeMalformedRequestWithZerolenHeader(request_idx, "host", "/");
+  auto request = Http2Frame::makeMalformedRequestWithZerolenHeader(
+      Http2Frame::makeClientStreamId(request_idx), "host", "/");
   sendFrame(request);
   // Make sure we've got RST_STREAM from the server.
   auto response = readFrame();
@@ -2061,7 +2067,7 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
 
   // Send valid request using the same connection.
   request_idx++;
-  request = Http2Frame::makeRequest(request_idx, "host", "/");
+  request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx), "host", "/");
   sendFrame(request);
   response = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, response.type());

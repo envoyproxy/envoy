@@ -412,6 +412,19 @@ TEST_F(SquashFilterTest, InvalidJsonForGetAttachment) {
   completeRequest("200", "This is not a JSON object");
 }
 
+TEST_F(SquashFilterTest, InvalidResponseWithNoBody) {
+  doDownstreamRequest();
+  // Expect the get attachment request
+  expectAsyncClientSend();
+  completeCreateRequest();
+
+  auto retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
+  EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod(), _));
+  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-length", "0"}}}));
+  popPendingCallback()->onSuccess(request_, std::move(msg));
+}
+
 TEST_F(SquashFilterTest, DestroyedInFlight) {
   doDownstreamRequest();
 

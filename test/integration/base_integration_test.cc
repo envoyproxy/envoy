@@ -365,8 +365,7 @@ void BaseIntegrationTest::createXdsUpstream() {
     return;
   }
   if (tls_xds_upstream_ == false) {
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
   } else {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
@@ -382,8 +381,7 @@ void BaseIntegrationTest::createXdsUpstream() {
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
     auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
         std::move(cfg), context_manager_, *upstream_stats_store_, std::vector<std::string>{});
-    fake_upstreams_.emplace_back(new FakeUpstream(
-        std::move(context), 0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    addFakeUpstream(std::move(context), FakeHttpConnection::Type::HTTP2);
   }
   xds_upstream_ = fake_upstreams_[1].get();
 }
