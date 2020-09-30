@@ -346,8 +346,8 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
 
   // The contract is that client codecs must ensure that :status is present.
   ASSERT(headers.Status() != nullptr);
-  // encodeHeaders() is not supposed to throw any exceptions. This will crash on a release assert if
-  // response status is invalid.
+  // The contract is that client codecs will ensure that the :status value is valid. This will crash
+  // otherwise.
   uint64_t numeric_status = Utility::getResponseStatus(headers);
 
   if (connection_.protocol() == Protocol::Http10 && connection_.supportsHttp10()) {

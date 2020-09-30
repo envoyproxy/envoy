@@ -372,7 +372,7 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
 uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
   absl::StatusOr<uint64_t> response_status_or_absl_status = getResponseStatusOr(headers);
   RELEASE_ASSERT(response_status_or_absl_status.ok(),
-                 ":status must be specified and a valid unsigned long");
+                 response_status_or_absl_status.status().message().data());
   return response_status_or_absl_status.value();
 }
 

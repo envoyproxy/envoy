@@ -169,6 +169,20 @@ TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
   EXPECT_EQ("600", response->headers().getStatusValue());
 }
 
+TEST_P(ProtocolIntegrationTest, OverflowingResponsecode) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "11111111111111111111111111111111111111111111111111111111111"}};
+  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("11111111111111111111111111111111111111111111111111111111111",
+            response->headers().getStatusValue());
+}
+
 // Add a health check filter and verify correct computation of health based on upstream status.
 TEST_P(ProtocolIntegrationTest, ComputedHealthCheck) {
   config_helper_.addFilter(R"EOF(
