@@ -286,7 +286,7 @@ void MessageUtil::onVersionUpgradeWarn(absl::string_view desc) {
   ENVOY_LOG_MISC(trace, warning_str);
   // Log each distinct message at warn level once every 5s. We use a static map here, which is fine
   // as we are always on the main thread.
-  static auto* last_warned = new absl::flat_hash_map<std::string, uint64_t>();
+  static auto* last_warned = new absl::flat_hash_map<std::string, int64_t>();
   const auto now = t_logclock::now().time_since_epoch().count();
   const auto it = last_warned->find(warning_str);
   if (it == last_warned->end() ||
