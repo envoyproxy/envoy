@@ -416,8 +416,8 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   // been setup for cross-thread updates to avoid needless updates during initialization. The order
   // of operations here is important. We start by initializing the thread aware load balancer if
   // needed. This must happen first so cluster updates are heard first by the load balancer.
-  auto cluster_data = active_clusters_.find(cluster.info()->name());
-  if (cluster_data == active_clusters_.end()) {
+  auto cluster_data = warming_clusters_.find(cluster.info()->name());
+  if (cluster_data != warming_clusters_.end()) {
     clusterWarmingToActive(cluster.info()->name());
     updateClusterCounts();
   }
@@ -631,11 +631,9 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
     ENVOY_LOG(debug, "add/update cluster {} starting warming", cluster_name);
     cluster_entry->cluster_->initialize([this, cluster_name] {
       ENVOY_LOG(debug, "warming cluster {} complete", cluster_name);
-      clusterWarmingToActive(cluster_name);
-      auto state_changed_cluster_entry = active_clusters_.find(cluster_name);
+      auto state_changed_cluster_entry = warming_clusters_.find(cluster_name);
       createOrUpdateThreadLocalCluster(*state_changed_cluster_entry->second);
       onClusterInit(*state_changed_cluster_entry->second->cluster_);
-      updateClusterCounts();
     });
   }
 
