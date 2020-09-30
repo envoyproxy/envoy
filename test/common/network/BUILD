@@ -166,6 +166,7 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
+        "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
@@ -377,6 +378,8 @@ envoy_cc_test(
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 

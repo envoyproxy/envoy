@@ -46,7 +46,7 @@ message ClusterLoadAssignment {
           "envoy.api.v2.ClusterLoadAssignment.Policy.DropOverload";
 
       // Identifier for the policy specifying the drop.
-      string category = 1 [(validate.rules).string = {min_bytes: 1}];
+      string category = 1 [(validate.rules).string = {min_len: 1}];
 
       // Percentage of traffic that should be dropped for the category.
       type.v3.FractionalPercent drop_percentage = 2;
@@ -105,7 +105,7 @@ message ClusterLoadAssignment {
   // <envoy_api_field_config.cluster.v3.Cluster.EdsClusterConfig.service_name>` value if specified
   // in the cluster :ref:`EdsClusterConfig
   // <envoy_api_msg_config.cluster.v3.Cluster.EdsClusterConfig>`.
-  string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string cluster_name = 1 [(validate.rules).string = {min_len: 1}];
 
   // List of endpoints to load balance to.
   repeated LocalityLbEndpoints endpoints = 2;
