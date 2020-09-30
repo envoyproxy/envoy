@@ -1651,7 +1651,7 @@ message RateLimit {
       string descriptor_key = 1 [(validate.rules).string = {min_len: 1}];
 
       // Metadata struct that defines the key and path to retrieve the string value. A match will
-      // only happen if the value in the filter metadata is of type string.
+      // only happen if the value in the route entry metadata is of type string.
       type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
 
       // An optional value to use if *metadata_key* is empty. If not set and
