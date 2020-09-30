@@ -277,7 +277,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
-  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
 }
 
 TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
@@ -324,7 +324,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
-  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
 }
 
 TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
@@ -377,7 +377,7 @@ TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
-  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
 }
 
 TEST_F(FaultFilterTest, HeaderAbortWithGrpcStatus) {
@@ -427,7 +427,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithGrpcStatus) {
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
-  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
 }
 
 TEST_F(FaultFilterTest, HeaderAbortWithHttpAndGrpcStatus) {
@@ -477,7 +477,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpAndGrpcStatus) {
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
-  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
 }
 
 TEST_F(FaultFilterTest, FixedDelayZeroDuration) {

@@ -349,7 +349,8 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
 
   // TODO(mattklein123): Avoid double copy here.
   if (response->body() != nullptr) {
-    lua_pushstring(coroutine_.luaState(), response->bodyAsString().c_str());
+    lua_pushlstring(coroutine_.luaState(), response->bodyAsString().data(),
+                    response->body()->length());
   } else {
     lua_pushnil(coroutine_.luaState());
   }
@@ -427,8 +428,9 @@ int StreamHandleWrapper::luaBody(lua_State* state) {
       if (body_wrapper_.get() != nullptr) {
         body_wrapper_.pushStack();
       } else {
-        body_wrapper_.reset(
-            Filters::Common::Lua::BufferWrapper::create(state, *callbacks_.bufferedBody()), true);
+        body_wrapper_.reset(Filters::Common::Lua::BufferWrapper::create(
+                                state, const_cast<Buffer::Instance&>(*callbacks_.bufferedBody())),
+                            true);
       }
       return 1;
     }
@@ -618,9 +620,9 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
 }
 
 int StreamHandleWrapper::luaBase64Escape(lua_State* state) {
-  // Get input string.
-  absl::string_view input = luaL_checkstring(state, 2);
-  auto output = absl::Base64Escape(input);
+  size_t input_size;
+  const char* input = luaL_checklstring(state, 2, &input_size);
+  auto output = absl::Base64Escape(absl::string_view(input, input_size));
   lua_pushlstring(state, output.data(), output.length());
 
   return 1;
@@ -761,8 +763,8 @@ void Filter::scriptLog(spdlog::level::level_enum level, const char* message) {
 
 void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                                        lua_State*) {
-  callbacks_->streamInfo().setResponseCodeDetails(HttpResponseCodeDetails::get().LuaResponse);
-  callbacks_->encodeHeaders(std::move(headers), body == nullptr);
+  callbacks_->encodeHeaders(std::move(headers), body == nullptr,
+                            HttpResponseCodeDetails::get().LuaResponse);
   if (body && !parent_.destroyed_) {
     callbacks_->encodeData(*body, true);
   }

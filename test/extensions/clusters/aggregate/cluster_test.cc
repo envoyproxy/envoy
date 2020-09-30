@@ -176,6 +176,7 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
 
   for (int i = 0; i <= 65; ++i) {
     EXPECT_CALL(random_, random()).WillOnce(Return(i));
+    EXPECT_TRUE(lb_->peekAnotherHost(nullptr) == nullptr);
     Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr);
     EXPECT_EQ(host.get(), target.get());
   }

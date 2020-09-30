@@ -489,7 +489,7 @@ public:
         if (CodeUtility::is1xx(status) && status != enumToInt(Http::Code::SwitchingProtocols)) {
           headers->setReferenceKey(Headers::get().Status, "200");
         }
-        decoder_filter_->callbacks_->encodeHeaders(std::move(headers), end_stream);
+        decoder_filter_->callbacks_->encodeHeaders(std::move(headers), end_stream, "details");
         state = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
       }
       break;

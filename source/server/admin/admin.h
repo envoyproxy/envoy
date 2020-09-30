@@ -345,6 +345,9 @@ private:
     Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }
