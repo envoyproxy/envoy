@@ -1445,6 +1445,13 @@ void ActiveStreamEncoderFilter::modifyEncodingBuffer(
   callback(*parent_.buffered_response_data_.get());
 }
 
+void ActiveStreamEncoderFilter::sendLocalReply(
+    Code code, absl::string_view body,
+    std::function<void(ResponseHeaderMap& headers)> modify_headers,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  parent_.sendLocalReply(parent_.state_.is_grpc_request_, code, body, modify_headers, grpc_status, details);
+}
+
 Http1StreamEncoderOptionsOptRef ActiveStreamEncoderFilter::http1StreamEncoderOptions() {
   // TODO(mattklein123): At some point we might want to actually wrap this interface but for now
   // we give the filter direct access to the encoder options.

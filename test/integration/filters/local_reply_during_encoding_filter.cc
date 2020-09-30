@@ -16,7 +16,7 @@ public:
   constexpr static char name[] = "local-reply-during-encode";
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
-    decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt,
+    encoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt,
                                        "");
     return Http::FilterHeadersStatus::StopIteration;
   }

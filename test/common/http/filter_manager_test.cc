@@ -105,7 +105,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
 
   EXPECT_CALL(*encoder_filter, encodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](auto&, bool) -> FilterHeadersStatus {
-        encoder_filter->decoder_callbacks_->sendLocalReply(Code::InternalServerError, "", nullptr,
+        encoder_filter->encoder_callbacks_->sendLocalReply(Code::InternalServerError, "", nullptr,
                                                            absl::nullopt, "");
         return FilterHeadersStatus::StopIteration;
       }));
