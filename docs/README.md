@@ -27,7 +27,7 @@ image that is used in continuous integration.
 This can be done as follows:
 
 ```
-./ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
+./ci/run_envoy_docker.sh 'docs/build.sh'
 ```
 
 To use this method you will need a minimum of 4-5GB of disk space available to accommodate the build image.
