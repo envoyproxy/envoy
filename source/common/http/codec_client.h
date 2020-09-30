@@ -4,6 +4,7 @@
 #include <list>
 #include <memory>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
@@ -245,7 +246,8 @@ using CodecClientPtr = std::unique_ptr<CodecClient>;
 class CodecClientProd : public CodecClient {
 public:
   CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
+                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
+                  Random::RandomGenerator& random_generator);
 };
 
 } // namespace Http
