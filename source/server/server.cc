@@ -242,9 +242,9 @@ bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
 namespace {
 // Loads a bootstrap object, potentially at a specific version (upgrading if necessary).
-void loadBootsrap(absl::optional<uint32_t> bootstrap_version,
-                  envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                  std::function<void(Protobuf::Message&, bool)> load_function) {
+void loadBootstrap(absl::optional<uint32_t> bootstrap_version,
+                   envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                   std::function<void(Protobuf::Message&, bool)> load_function) {
 
   if (!bootstrap_version.has_value()) {
     load_function(bootstrap, true);
@@ -254,6 +254,7 @@ void loadBootsrap(absl::optional<uint32_t> bootstrap_version,
     envoy::config::bootstrap::v2::Bootstrap bootstrap_v2;
     load_function(bootstrap_v2, false);
     Config::VersionConverter::upgrade(bootstrap_v2, bootstrap);
+    MessageUtil::onVersionUpgradeWarn("v2 bootstrap");
   } else {
     throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
   }
@@ -275,7 +276,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   }
 
   if (!config_path.empty()) {
-    loadBootsrap(
+    loadBootstrap(
         options.bootstrapVersion(), bootstrap,
         [&config_path, &validation_visitor, &api](Protobuf::Message& message, bool do_boosting) {
           MessageUtil::loadFromFile(config_path, message, validation_visitor, api, do_boosting);
@@ -283,10 +284,11 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
-    loadBootsrap(options.bootstrapVersion(), bootstrap_override,
-                 [&config_yaml, &validation_visitor](Protobuf::Message& message, bool do_boosting) {
-                   MessageUtil::loadFromYaml(config_yaml, message, validation_visitor, do_boosting);
-                 });
+    loadBootstrap(
+        options.bootstrapVersion(), bootstrap_override,
+        [&config_yaml, &validation_visitor](Protobuf::Message& message, bool do_boosting) {
+          MessageUtil::loadFromYaml(config_yaml, message, validation_visitor, do_boosting);
+        });
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
   }
