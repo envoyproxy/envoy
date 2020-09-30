@@ -120,12 +120,12 @@ void jsonConvertInternal(const Protobuf::Message& source,
 
 enum class MessageVersion {
   // This is an earlier version of a message, a later one exists.
-  EARLIER_VERSION,
+  EarlierVersion,
   // This is the latest version of a message.
-  LATEST_VERSION,
+  LatestVersion,
   // Validating to see if the latest version will also be accepted; only apply message validators
   // without side effects, validations should be strict.
-  LATEST_VERSION_VALIDATE,
+  LatestVersionValidate,
 };
 
 using MessageXformFn = std::function<void(Protobuf::Message&, MessageVersion)>;
@@ -147,7 +147,7 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
       Config::ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
   // If there is no earlier version of a message, just apply f directly.
   if (earlier_version_desc == nullptr) {
-    f(message, MessageVersion::LATEST_VERSION);
+    f(message, MessageVersion::LatestVersion);
     return;
   }
 
@@ -157,12 +157,12 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
   try {
     // Try apply f with an earlier version of the message, then upgrade the
     // result.
-    f(*earlier_message, MessageVersion::EARLIER_VERSION);
+    f(*earlier_message, MessageVersion::EarlierVersion);
     // If we succeed at the earlier version, we ask the counterfactual, would this have worked at a
     // later version? If not, this is v2 only and we need to warn. This is a waste of CPU cycles but
     // we expect that JSON/YAML fragments will not be in use by any CPU limited use cases.
     try {
-      f(message, MessageVersion::LATEST_VERSION_VALIDATE);
+      f(message, MessageVersion::LatestVersionValidate);
     } catch (EnvoyException& e) {
       MessageUtil::onVersionUpgradeWarn(e.what());
     }
@@ -171,7 +171,7 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
   } catch (ApiBoostRetryException&) {
     // If we fail at the earlier version, try f at the current version of the
     // message.
-    f(message, MessageVersion::LATEST_VERSION);
+    f(message, MessageVersion::LatestVersion);
   }
 }
 
@@ -348,10 +348,10 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
     // We know it's an unknown field at this point. If we're at the latest
     // version, then it's definitely an unknown field, otherwise we try to
     // load again at a later version.
-    if (message_version == MessageVersion::LATEST_VERSION) {
+    if (message_version == MessageVersion::LatestVersion) {
       validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
                                         strict_status.ToString());
-    } else if (message_version == MessageVersion::LATEST_VERSION_VALIDATE) {
+    } else if (message_version == MessageVersion::LatestVersionValidate) {
       throw ProtobufMessage::UnknownProtoFieldException(absl::StrCat("Unknown field in: ", json));
     } else {
       throw ApiBoostRetryException("Unknown field, possibly a rename, try again.");
@@ -361,7 +361,7 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
   if (do_boosting) {
     tryWithApiBoosting(load_json, message);
   } else {
-    load_json(message, MessageVersion::LATEST_VERSION);
+    load_json(message, MessageVersion::LatestVersion);
   }
 }
 
@@ -401,14 +401,14 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
       try {
         if (message.ParseFromString(contents)) {
           MessageUtil::checkForUnexpectedFields(
-              message, message_version == MessageVersion::LATEST_VERSION_VALIDATE
+              message, message_version == MessageVersion::LatestVersionValidate
                            ? ProtobufMessage::getStrictValidationVisitor()
                            : validation_visitor);
         }
         return;
       } catch (EnvoyException& ex) {
-        if (message_version == MessageVersion::LATEST_VERSION ||
-            message_version == MessageVersion::LATEST_VERSION_VALIDATE) {
+        if (message_version == MessageVersion::LatestVersion ||
+            message_version == MessageVersion::LatestVersionValidate) {
           // Failed reading the latest version - pass the same error upwards
           throw ex;
         }
@@ -422,7 +422,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
       // attempts to read as latest version.
       tryWithApiBoosting(read_proto_binary, message);
     } else {
-      read_proto_binary(message, MessageVersion::LATEST_VERSION);
+      read_proto_binary(message, MessageVersion::LatestVersion);
     }
     return;
   }
@@ -434,8 +434,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
       if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
         return;
       }
-      if (message_version == MessageVersion::LATEST_VERSION ||
-          message_version == MessageVersion::LATEST_VERSION_VALIDATE) {
+      if (message_version == MessageVersion::LatestVersion ||
+          message_version == MessageVersion::LatestVersionValidate) {
         throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
                              message.GetTypeName() + ")");
       } else {
@@ -447,7 +447,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     if (do_boosting) {
       tryWithApiBoosting(read_proto_text, message);
     } else {
-      read_proto_text(message, MessageVersion::LATEST_VERSION);
+      read_proto_text(message, MessageVersion::LatestVersion);
     }
     return;
   }
