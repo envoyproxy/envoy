@@ -398,7 +398,7 @@ public:
                                  absl::string_view) const override;
 
 private:
-  std::string key_;
+  absl::optional<std::string> value_;
 };
 
 } // namespace Formatter

@@ -1154,18 +1154,20 @@ ProtobufWkt::Value StartTimeFormatter::formatValue(
       format(request_headers, response_headers, response_trailers, stream_info, local_reply_body));
 }
 
-EnvFormatter::EnvFormatter(const std::string& key) : key_(key) {}
+EnvFormatter::EnvFormatter(const std::string& key) {
+  const char* value = std::getenv(key.c_str());
+  if (value == nullptr) {
+    value_ = absl::nullopt;
+  }
+  value_ = value;
+}
 
 absl::optional<std::string> EnvFormatter::format(const Http::RequestHeaderMap&,
                                                  const Http::ResponseHeaderMap&,
                                                  const Http::ResponseTrailerMap&,
                                                  const StreamInfo::StreamInfo&,
                                                  absl::string_view) const {
-  const char* val = std::getenv(key_.c_str());
-  if (val == nullptr) {
-    return absl::nullopt;
-  }
-  return val;
+  return value_;
 }
 
 ProtobufWkt::Value EnvFormatter::formatValue(const Http::RequestHeaderMap& request_headers,
