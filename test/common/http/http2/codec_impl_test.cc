@@ -333,7 +333,7 @@ protected:
 
     // HTTP/2 codec does not send empty DATA frames with no END_STREAM flag.
     // To make this work, send raw bytes representing empty DATA frames bypassing client codec.
-    Http2Frame emptyDataFrame = Http2Frame::makeEmptyDataFrame(0);
+    Http2Frame emptyDataFrame = Http2Frame::makeEmptyDataFrame(Http2Frame::makeClientStreamId(0));
     constexpr uint32_t max_allowed =
         CommonUtility::OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
     for (uint32_t i = 0; i < max_allowed + 1; ++i) {
