@@ -26,7 +26,7 @@ public:
   }
 
   std::unique_ptr<FilterManager> filter_manager_;
-  MockFilterManagerCallbacks filter_manager_callbacks_;
+  NiceMock<MockFilterManagerCallbacks> filter_manager_callbacks_;
   Event::MockDispatcher dispatcher_;
   NiceMock<Network::MockConnection> connection_;
   Envoy::Http::MockFilterChainFactory filter_factory_;
@@ -60,8 +60,8 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
                                    {":method", "GET"},
                                    {"content-type", "application/grpc"}}};
 
-  EXPECT_CALL(filter_manager_callbacks_, requestHeaders())
-      .WillRepeatedly(Return(absl::make_optional(std::ref(*grpc_headers))));
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(absl::make_optional(std::ref(*grpc_headers))));
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
@@ -71,10 +71,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
   filter_manager_->createFilterChain();
 
   filter_manager_->requestHeadersInitialized();
-  EXPECT_CALL(filter_manager_callbacks_, disarmRequestTimeout()).Times(2);
-  EXPECT_CALL(filter_manager_callbacks_, onLocalReply(_));
   EXPECT_CALL(local_reply_, rewrite(_, _, _, _, _, _));
-  EXPECT_CALL(filter_manager_callbacks_, responseHeaders()).Times(3);
   EXPECT_CALL(filter_manager_callbacks_, setResponseHeaders_(_))
       .WillOnce(Invoke([](auto& response_headers) {
         EXPECT_THAT(response_headers,
@@ -125,22 +122,18 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
                                    {":method", "GET"},
                                    {"content-type", "application/grpc"}}};
 
-  EXPECT_CALL(filter_manager_callbacks_, requestHeaders())
-      .WillRepeatedly(Return(absl::make_optional(std::ref(*grpc_headers))));
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(absl::make_optional(std::ref(*grpc_headers))));
   filter_manager_->createFilterChain();
 
   filter_manager_->requestHeadersInitialized();
-  EXPECT_CALL(filter_manager_callbacks_, disarmRequestTimeout());
-  EXPECT_CALL(filter_manager_callbacks_, onLocalReply(_));
   EXPECT_CALL(local_reply_, rewrite(_, _, _, _, _, _));
-  EXPECT_CALL(filter_manager_callbacks_, responseHeaders()).Times(3);
   EXPECT_CALL(filter_manager_callbacks_, setResponseHeaders_(_))
       .WillOnce(Invoke([](auto&) {}))
       .WillOnce(Invoke([](auto& response_headers) {
         EXPECT_THAT(response_headers,
                     HeaderHasValueRef(Http::Headers::get().ContentType, "application/grpc"));
       }));
-  EXPECT_CALL(filter_manager_callbacks_, resetIdleTimer());
   EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
   EXPECT_CALL(filter_manager_callbacks_, endStream());
   filter_manager_->decodeHeaders(*grpc_headers, true);
