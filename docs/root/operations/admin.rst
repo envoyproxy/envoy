@@ -361,7 +361,23 @@ modify different aspects of the server:
         "cpuset_threads": false
       },
       "uptime_current_epoch": "6s",
-      "uptime_all_epochs": "6s"
+      "uptime_all_epochs": "6s",
+      "node": {
+        "id": "node1",
+        "cluster": "cluster1",
+        "user_agent_name": "envoy",
+        "user_agent_build_version": {
+          "version": {
+            "major_number": 1,
+            "minor_number": 15,
+            "patch": 0
+          }
+        },
+        "metadata": {},
+        "extensions": [],
+        "client_features": [],
+        "listening_addresses": []
+      }
     }
 
   See the :ref:`ServerInfo proto <envoy_v3_api_msg_admin.v3.ServerInfo>` for an

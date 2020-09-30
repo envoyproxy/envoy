@@ -19,7 +19,8 @@ Running the Sandbox
 
 .. include:: _include/docker-env-setup.rst
 
-**Step 3: Start all of our containers**
+Step 3: Start all of our containers
+***********************************
 
 To build this sandbox example and start the example services, run the following commands:
 
@@ -62,7 +63,8 @@ For example, to run Envoy with ext_authz HTTP filter with HTTP service will be:
     $ FRONT_ENVOY_YAML=config/http-service.yaml docker-compose up --build -d
     $ # Or you can update the .env file with the above FRONT_ENVOY_YAML value, so you don't have to specify it when running the "up" command.
 
-**Step 4: Access the upstream-service behind the Front Envoy**
+Step 4: Access the upstream-service behind the Front Envoy
+**********************************************************
 
 You can now try to send a request to upstream-service via the front-envoy as follows:
 
