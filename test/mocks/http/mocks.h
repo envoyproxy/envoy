@@ -61,7 +61,7 @@ public:
   MOCK_METHOD(void, setRequestTrailers, (RequestTrailerMapPtr &&));
   MOCK_METHOD(void, setContinueHeaders, (ResponseHeaderMapPtr &&));
   MOCK_METHOD(void, setResponseHeaders_, (ResponseHeaderMap&));
-  void setResponseHeaders(ResponseHeaderMapPtr&& response_headers) {
+  void setResponseHeaders(ResponseHeaderMapPtr&& response_headers) override {
     // TODO(snowp): Repeat this pattern for all setters.
     response_headers_ = std::move(response_headers);
     setResponseHeaders_(*response_headers_);
