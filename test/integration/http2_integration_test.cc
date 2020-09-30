@@ -1619,7 +1619,7 @@ const uint32_t ControlFrameFloodLimit = 100;
 const uint32_t AllFrameFloodLimit = 1000;
 } // namespace
 
-Http2FloodMitigationTest::Http2FloodMitigationTest() {
+SocketInterfaceSwap::SocketInterfaceSwap() {
   Envoy::Network::SocketInterfaceSingleton::clear();
   test_socket_interface_loader_ = std::make_unique<Envoy::Network::SocketInterfaceLoader>(
       std::make_unique<Envoy::Network::TestSocketInterface>(
@@ -1633,14 +1633,17 @@ Http2FloodMitigationTest::Http2FloodMitigationTest() {
             }
             return absl::nullopt;
           }));
+}
+
+SocketInterfaceSwap::~SocketInterfaceSwap() {
+  test_socket_interface_loader_.reset();
+  Envoy::Network::SocketInterfaceSingleton::initialize(previous_socket_interface_);
+}
+
+Http2FloodMitigationTest::Http2FloodMitigationTest() {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
-}
-
-Http2FloodMitigationTest::~Http2FloodMitigationTest() {
-  test_socket_interface_loader_.reset();
-  Envoy::Network::SocketInterfaceSingleton::initialize(previous_socket_interface_);
 }
 
 void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
