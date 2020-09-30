@@ -698,7 +698,7 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
         if (query->type_ == DNS_RECORD_TYPE_SRV) {
           const DnsSrvRecord* srv_rec = dynamic_cast<DnsSrvRecord*>(answer->second.get());
           const auto& target = srv_rec->targets_.begin();
-          const auto rr = additional_rrs.find(target->first);
+          const auto& rr = additional_rrs.find(target->first);
 
           if (rr != additional_rrs.end()) {
             Buffer::OwnedImpl serialized_rr{};
