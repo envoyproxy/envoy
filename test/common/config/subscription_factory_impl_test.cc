@@ -326,7 +326,7 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedApi) {
   NiceMock<Runtime::MockSnapshot> snapshot;
   EXPECT_CALL(runtime_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
   EXPECT_CALL(snapshot, runtimeFeatureEnabled(_)).WillOnce(Return(true));
-  EXPECT_CALL(snapshot, countDeprecatedFeatureUse());
+  EXPECT_CALL(runtime_, countDeprecatedFeatureUse());
 
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");

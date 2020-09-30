@@ -30,11 +30,15 @@
 namespace Envoy {
 namespace Runtime {
 
-void SnapshotImpl::countDeprecatedFeatureUse() const {
-  stats_.deprecated_feature_use_.inc();
+namespace {
+
+void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
+  stats.deprecated_feature_use_.inc();
   // Similar to the above, but a gauge that isn't imported during a hot restart.
-  stats_.deprecated_feature_seen_since_process_start_.inc();
+  stats.deprecated_feature_seen_since_process_start_.inc();
 }
+
+} // namespace
 
 bool SnapshotImpl::deprecatedFeatureEnabled(absl::string_view key, bool default_value) const {
   // If the value is not explicitly set as a runtime boolean, trust the proto annotations passed as
@@ -46,7 +50,7 @@ bool SnapshotImpl::deprecatedFeatureEnabled(absl::string_view key, bool default_
 
   // The feature is allowed. It is assumed this check is called when the feature
   // is about to be used, so increment the feature use stat.
-  countDeprecatedFeatureUse();
+  countDeprecatedFeatureUseInternal(stats_);
 
 #ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
   return false;
@@ -486,7 +490,8 @@ void LoaderImpl::loadNewSnapshot() {
 }
 
 const Snapshot& LoaderImpl::snapshot() {
-  ASSERT(tls_->currentThreadRegistered(), "snapshot can only be called from a worker thread");
+  ASSERT(tls_->currentThreadRegistered(),
+         "snapshot can only be called from a worker thread or after the main thread is registered");
   return tls_->getTyped<Snapshot>();
 }
 
@@ -510,6 +515,8 @@ void LoaderImpl::mergeValues(const absl::node_hash_map<std::string, std::string>
 }
 
 Stats::Scope& LoaderImpl::getRootScope() { return store_; }
+
+void LoaderImpl::countDeprecatedFeatureUse() const { countDeprecatedFeatureUseInternal(stats_); }
 
 RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   std::string prefix = "runtime.";

@@ -67,7 +67,6 @@ public:
                std::vector<OverrideLayerConstPtr>&& layers);
 
   // Runtime::Snapshot
-  void countDeprecatedFeatureUse() const override;
   bool deprecatedFeatureEnabled(absl::string_view key, bool default_value) const override;
   bool runtimeFeatureEnabled(absl::string_view key) const override;
   bool featureEnabled(absl::string_view key, uint64_t default_value, uint64_t random_value,
@@ -241,6 +240,7 @@ public:
   void mergeValues(const absl::node_hash_map<std::string, std::string>& values) override;
   void startRtdsSubscriptions(ReadyCallback on_done) override;
   Stats::Scope& getRootScope() override;
+  void countDeprecatedFeatureUse() const override;
 
 private:
   friend RtdsSubscription;
