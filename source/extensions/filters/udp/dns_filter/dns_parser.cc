@@ -159,12 +159,6 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
       return false;
     }
 
-    if (offset > buffer->length()) {
-      ENVOY_LOG(debug, "Buffer read offset [{}] is beyond buffer length [{}].", offset,
-                buffer->length());
-      return false;
-    }
-
     // Each aggregate DNS header field is 2 bytes wide.
     data = buffer->peekBEInt<uint16_t>(offset);
     offset += field_size;
@@ -326,14 +320,16 @@ DnsAnswerRecordPtr DnsMessageParser::parseDnsARecord(DnsAnswerCtx& ctx) {
     break;
   }
 
-  if (ip_addr != nullptr) {
-    ENVOY_LOG(trace, "Parsed address [{}] from record type [{}]: offset {}",
-              ip_addr->ip()->addressAsString(), ctx.record_type_, ctx.offset_);
-
-    return std::make_unique<DnsAnswerRecord>(ctx.record_name_, ctx.record_type_, ctx.record_class_,
-                                             std::chrono::seconds(ctx.ttl_), std::move(ip_addr));
+  if (ip_addr == nullptr) {
+    ENVOY_LOG(debug, "No IP parsed from an A or AAAA record");
+    return nullptr;
   }
-  return nullptr;
+
+  ENVOY_LOG(trace, "Parsed address [{}] from record type [{}]: offset {}",
+            ip_addr->ip()->addressAsString(), ctx.record_type_, ctx.offset_);
+
+  return std::make_unique<DnsAnswerRecord>(ctx.record_name_, ctx.record_type_, ctx.record_class_,
+                                           std::chrono::seconds(ctx.ttl_), std::move(ip_addr));
 }
 
 DnsSrvRecordPtr DnsMessageParser::parseDnsSrvRecord(DnsAnswerCtx& ctx) {
@@ -461,7 +457,9 @@ DnsAnswerRecordPtr DnsMessageParser::parseDnsAnswerRecord(const Buffer::Instance
 DnsQueryRecordPtr DnsMessageParser::parseDnsQueryRecord(const Buffer::InstancePtr& buffer,
                                                         uint64_t& offset) {
   uint64_t available_bytes = buffer->length() - offset;
-  if (available_bytes == 0) {
+
+  // This is the minimum data length needed to parse a name [length, value, null byte]
+  if (available_bytes < MIN_QUERY_NAME_LENGTH) {
     ENVOY_LOG(debug, "No available data in buffer to parse a query record");
     return nullptr;
   }
@@ -472,6 +470,7 @@ DnsQueryRecordPtr DnsMessageParser::parseDnsQueryRecord(const Buffer::InstancePt
     return nullptr;
   }
 
+  // After reading the name we should have data for the record type and class
   if (available_bytes < 2 * sizeof(uint16_t)) {
     ENVOY_LOG(debug,
               "Insufficient data in buffer to read query record type and class. "

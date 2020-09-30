@@ -6,6 +6,7 @@ Incompatible Behavior Changes
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
 * build: added visibility rules for upstream. If these cause visibility related breakage, see notes in //BUILD.
+* dns: ``envoy.restart_features.use_apple_api_for_dns_lookups`` is on by default. This flag only affects Apple platforms (macOS, iOS). It is incompatible to have the runtime flag set to true at the same time as specifying the ``use_tcp_for_dns_lookups`` option or custom dns resolvers. Doing so will cause failure.
 * watchdog: added two guarddogs, breaking the aggregated stats for the single guarddog system. The aggregated stats for the guarddogs will have the following prefixes: `main_thread` and `workers`. Concretely, anything monitoring `server.watchdog_miss` and `server.watchdog_mega_miss` will need to be updated.
 
 Minor Behavior Changes
@@ -40,6 +41,7 @@ Minor Behavior Changes
 * logging: nghttp2 log messages no longer appear at trace level unless `ENVOY_NGHTTP2_TRACE` is set
   in the environment.
 * lua: changed the response body returned by `httpCall()` API to raw data. Previously, the returned data was string.
+* postgres: changed log format to tokenize fields of Postgres messages.
 * router: added transport failure reason to response body when upstream reset happens. After this change, the response body will be of the form `upstream connect error or disconnect/reset before headers. reset reason:{}, transport failure reason:{}`.This behavior may be reverted by setting runtime feature `envoy.reloadable_features.http_transport_failure_reason_in_body` to false.
 * router: now consumes all retry related headers to prevent them from being propagated to the upstream. This behavior may be reverted by setting runtime feature `envoy.reloadable_features.consume_all_retry_headers` to false.
 * thrift_proxy: special characters {'\0', '\r', '\n'} will be stripped from thrift headers.
@@ -55,6 +57,7 @@ Bug Fixes
 * fault: made the HeaderNameValues::prefix() method const.
 * grpc-web: fixed an issue with failing HTTP/2 requests on some browsers. Notably, WebKit-based browsers (https://bugs.webkit.org/show_bug.cgi?id=210108), Internet Explorer 11, and Edge (pre-Chromium).
 * http: fixed CVE-2020-25018 by rolling back the ``GURL`` dependency to previous state (reverted: ``2d69e30``, ``d828958``, and ``c9c4709`` commits) due to potential of crashing when Unicode URIs are present in requests.
+* http: fixed bugs in datadog and squash filter's handling of responses with no bodies.
 * http: made the HeaderValues::prefix() method const.
 * jwt_authn: supports jwt payload without "iss" field.
 * listener: fixed crash at listener inplace update when connetion load balancer is set.
@@ -82,10 +85,12 @@ New Features
 * build: enable building envoy :ref:`arm64 images <arm_binaries>` by buildx tool in x86 CI platform.
 * cluster: added new :ref:`connection_pool_per_downstream_connection <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_per_downstream_connection>` flag, which enable creation of a new connection pool for each downstream connection.
 * decompressor filter: reports compressed and uncompressed bytes in trailers.
+* dns: added support for doing DNS resolution using Apple's DnsService APIs in Apple platforms (macOS, iOS). This feature is ON by default, and is only configurable via the ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime key. Note that this value is latched during server startup and changing the runtime key is a no-op during the lifetime of the process.
 * dns_filter: added support for answering :ref:`service record<envoy_v3_api_msg_data.dns.v3.DnsTable.DnsService>` queries.
 * dynamic_forward_proxy: added :ref:`use_tcp_for_dns_lookups<envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.use_tcp_for_dns_lookups>` option to use TCP for DNS lookups in order to match the DNS options for :ref:`Clusters<envoy_v3_api_msg_config.cluster.v3.Cluster>`.
 * ext_authz filter: added support for emitting dynamic metadata for both :ref:`HTTP <config_http_filters_ext_authz_dynamic_metadata>` and :ref:`network <config_network_filters_ext_authz_dynamic_metadata>` filters.
   The emitted dynamic metadata is set by :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` field in a returned :ref:`CheckResponse <envoy_v3_api_msg_service.auth.v3.CheckResponse>`.
+* ext_authz filter: added :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.stat_prefix>` as an optional additional prefix for the statistics emitted from `ext_authz` HTTP filter.
 * ext_authz filter: added support for letting the authorization server instruct Envoy to remove headers from the original request by setting the new field :ref:`headers_to_remove <envoy_v3_api_field_service.auth.v3.OkHttpResponse.headers_to_remove>` before forwarding it to the upstream.
 * ext_authz filter: added support for sending :ref:`raw bytes as request body <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.raw_body>` of a gRPC check request by setting :ref:`pack_as_bytes <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.BufferSettings.pack_as_bytes>` to true.
 * grpc-json: support specifying `response_body` field in for `google.api.HttpBody` message.
@@ -98,6 +103,7 @@ New Features
 * http: added :ref:`CDN Loop filter <envoy_v3_api_msg_extensions.filters.http.cdn_loop.v3alpha.CdnLoopConfig>` and :ref:`documentation <config_http_filters_cdn_loop>`.
 * http: introduced new HTTP/1 and HTTP/2 codec implementations that will remove the use of exceptions for control flow due to high risk factors and instead use error statuses. The old behavior is used by default, but the new codecs can be enabled for testing by setting the runtime feature `envoy.reloadable_features.new_codec_behavior` to true. The new codecs will be in development for one month, and then enabled by default while the old codecs are deprecated.
 * http: added HCM :ref:`timeout config field <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.request_headers_timeout>` to control how long a downstream has to finish sending headers before the stream is cancelled.
+* http: modified the HTTP header-map data-structure to use an underlying dictionary and a list (no change to the header-map API). To conform with previous versions, the use of a dictionary is currently disabled. It can be enabled by setting the `envoy.http.headermap.lazy_map_min_size` runtime feature to a non-negative number which defines the minimal number of headers in a request/response/trailers required for using a dictionary in addition to the list. Our current benchmarks suggest that the value 3 is a good threshold for most workloads.
 * load balancer: added :ref:`RingHashLbConfig<envoy_v3_api_msg_config.cluster.v3.Cluster.MaglevLbConfig>` to configure the table size of Maglev consistent hash.
 * load balancer: added a :ref:`configuration<envoy_v3_api_msg_config.cluster.v3.Cluster.LeastRequestLbConfig>` option to specify the active request bias used by the least request load balancer.
 * load balancer: added an :ref:`option <envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.single_host_per_subset>` to optimize subset load balancing when there is only one host per subset.
