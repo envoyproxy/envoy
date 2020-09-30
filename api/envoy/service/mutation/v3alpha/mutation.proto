@@ -19,6 +19,8 @@ option java_generic_services = true;
 option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
+// [#protodoc-title: External Mutation Service]
+
 // A service that can mutate HTTP requests and responses.
 // The overall mutation protocol works like this:
 //
@@ -83,7 +85,7 @@ message MutationRequest {
 message MutationResponse {
   enum Disposition {
     // The server is done with the request or response -- continue processing
-    // and do not consult the server again for this request or response
+    // and do not consult the server again for this request or response.
     CONTINUE = 0;
 
     // The server is done with the request and response, and no further
@@ -91,17 +93,30 @@ message MutationResponse {
     // "CompleteResponse" field.
     STOP = 1;
 
-    // Send the next chunk of the message body (or an empty body to indicate end-of-stream)
-    SEND_BODY = 2;
+    // If this is returned, Envoy will next send a Body message downstream
+    // containing either the next chunk of the body available, or an end-of-stream.
+    // Once this is returned, it will no longer be possible to modify the
+    // message headers.
+    SEND_BODY_CHUNK = 2;
 
-    // Send the next chunk and all subsequent chunks of the message body without
-    // waiting for an acknowledgment.
-    SEND_BODY_ASYNC = 3;
+    // If this is returned, Envoy will buffer the entire message body in memory
+    // subject to the currently-configured body buffer limit, and send a
+    // single Body message downstream containing the entire message body.
+    // It is still possible for the server to modify the message headers
+    // with the next upstream message.
+    SEND_ENTIRE_BODY = 3;
 
-    // Send the trailers. Note that once trailers have been requested, no more bodies
+    // If this is returned, Envoy will send each chunk of the message body immediately
+    // without buffering, and without waiting for a response until the end of stream
+    // has been reached. Any additional upstream messages from the service will
+    // be ignored.
+    SEND_BODY_ASYNC = 4;
+
+    // If this is returned, Envoy will send the HTTP trailers when they are
+    // available. Once trailers have been requested, no more bodies
     // will be delivered, so this must be sent after all desired body chunks are
     // desired.
-    SEND_TRAILERS = 4;
+    SEND_TRAILERS = 5;
   }
 
   // This indicates how to handle the next step in the processing chain,
@@ -114,22 +129,27 @@ message MutationResponse {
   // to the client with no additional filter processing
   CompleteResponse complete_response = 2;
 
-  // Add or replace HTTP headers
+  // Add or replace HTTP headers. This will be ignored after SEND_BODY_CHUNK
+  // or SEND_BODY_ASYNC have been sent. If SEND_TRAILERS was previously sent, then
+  // modify the trailers instead.
   repeated config.core.v3.HeaderValueOption set_headers = 3;
 
-  // Remove these HTTP headers
+  // Remove these HTTP headers. This will be ignored after SEND_BODY_CHUNK
+  // or SEND_BODY_ASYNC have been sent. If SEND_TRAILERS was previously sent, then
+  // modify the trailers instead.
   repeated string remove_headers = 4;
 
   // Replace some or all of the last message body received with a new
-  // set of bytes. If sent after a non-body request, then nothing will
-  // happen. If NOT sent after receiving a body chunk, then the body
-  // will be unmodified.
+  // set of bytes. This will be ignored unless the previous message sent
+  // by the client is a "*BODY" request.
   BodyMutation body_mutation = 5;
 
   // Add new metadata to the Envoy context
   google.protobuf.Struct new_metadata = 6;
 }
 
+// This message is sent downstream to the server when the HTTP response has been
+// received.
 // [#next-free-field: 6]
 message Response {
   // A unique ID that will match the one sent in the "Request" RPC
@@ -149,7 +169,7 @@ message Response {
   auth.v3.AttributeContext.Peer destination_info = 5;
 }
 
-// This message contains the message body that Envoy sends to the mutation service
+// This message contains the message body that Envoy sends to the mutation service.
 message Body {
   bytes body = 1;
 
@@ -174,10 +194,7 @@ message CompleteResponse {
 }
 
 // Change all or part of the message body by replacing the portion
-// of the original body denoted by offset and length with "body."
-// (The intention here is to do what the WASM API does and allow
-// the service to prepend, append, replace the middle, or replace
-// the whole body, and to use the same parameters that it uses.)
+// of the original body denoted by "offset" and "length" with "body."
 message BodyMutation {
   int32 offset = 1;
 
