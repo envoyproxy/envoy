@@ -241,6 +241,9 @@ protected:
               // Otherwise, find the exact element that is removed from headers_ (entry) in the
               // vector, and remove it. This keeps an invariant that only the element that is
               // currently removed from the headers list will also be removed from the map.
+              // In case the predicate holds for all the vector elements, the size of the vector
+              // will eventually decrease to 1 and the entire vector will be erased by the if
+              // clause above.
               // Note: it is possible to remove all elements in the vector that satisfy the
               // predicate during this iteration, but it will complicate the code by requiring
               // handling of missing values in the lazy map.
