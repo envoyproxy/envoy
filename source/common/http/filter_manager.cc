@@ -835,13 +835,11 @@ void FilterManager::sendLocalReplyViaFilterChain(
             filter_manager_callbacks_.setResponseHeaders(std::move(headers));
             // TODO: Start encoding from the last decoder filter that saw the
             // request instead.
-            puts("headers");
             encodeHeaders(nullptr, filter_manager_callbacks_.responseHeaders()->get(), end_stream);
           },
           [this](Buffer::Instance& data, bool end_stream) -> void {
             // TODO: Start encoding from the last decoder filter that saw the
             // request instead.
-            puts("data");
             encodeData(nullptr, data, end_stream,
                        FilterManager::FilterIterationStartState::CanStartFromCurrent);
           }},
