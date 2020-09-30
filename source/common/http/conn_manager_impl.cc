@@ -204,7 +204,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   stream.filter_manager_.disarmRequestTimeout();
 
   stream.completeRequest();
-  stream.filter_manager_.preDestroyFilters();
+  stream.filter_manager_.onStreamComplete();
   stream.filter_manager_.log();
 
   stream.filter_manager_.destroyFilters();

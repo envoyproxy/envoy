@@ -541,7 +541,7 @@ public:
     }
   }
 
-  void preDestroyFilters() {
+  void onStreamComplete() {
     for (auto& filter : decoder_filters_) {
       filter->handle_->onStreamComplete();
     }

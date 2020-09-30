@@ -537,7 +537,8 @@ public:
  * This means:
  * - onStreamComplete can be used to make state changes that are intended to appear in the access
  * logs (like streamInfo().dynamicMetadata() or streamInfo().filterState()).
- * - onDestroy is used to cleanup all pending filter resources like pending http requests.
+ * - onDestroy is used to cleanup all pending filter resources like pending http requests and
+ * timers.
  */
 class StreamFilterBase {
 public:
