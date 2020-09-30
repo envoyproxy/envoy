@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
@@ -92,6 +93,7 @@ public:
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
 public:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats,
+                 Random::RandomGenerator& random_generator,
                  const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                  const uint32_t max_headers_kb, const uint32_t max_headers_count);
 
@@ -488,10 +490,19 @@ private:
   Status addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
   virtual Status checkOutboundFrameLimits() PURE;
   virtual Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
+  void sendKeepalive();
+  void onKeepaliveResponse();
+  void onKeepaliveResponseTimeout();
 
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
   bool pending_deferred_reset_ : 1;
+  Random::RandomGenerator& random_;
+  Event::TimerPtr keepalive_send_timer_;
+  Event::TimerPtr keepalive_timeout_timer_;
+  std::chrono::milliseconds keepalive_interval_;
+  std::chrono::milliseconds keepalive_timeout_;
+  uint32_t keepalive_interval_jitter_percent_;
 };
 
 /**
@@ -501,7 +512,7 @@ class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   using SessionFactory = Nghttp2SessionFactory;
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       CodecStats& stats,
+                       CodecStats& stats, Random::RandomGenerator& random_generator,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_response_headers_kb,
                        const uint32_t max_response_headers_count,
@@ -535,7 +546,7 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       CodecStats& stats,
+                       CodecStats& stats, Random::RandomGenerator& random_generator,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_request_headers_kb,
                        const uint32_t max_request_headers_count,

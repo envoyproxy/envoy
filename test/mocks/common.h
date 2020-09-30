@@ -6,8 +6,6 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
-#include "envoy/common/token_bucket.h"
-#include "envoy/event/timer.h"
 
 #include "common/common/logger.h"
 
