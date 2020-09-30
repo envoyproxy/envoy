@@ -45,7 +45,6 @@ public:
     object.reset();
     return object_ref;
   }
-  int deferredDeletesMapSize() { return tls_.deferred_deletes_.size(); }
   int freeSlotIndexesListSize() { return tls_.free_slot_indexes_.size(); }
   InstanceImpl tls_;
 
@@ -60,7 +59,6 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
   EXPECT_CALL(thread_dispatcher_, post(_));
   SlotPtr slot1 = tls_.allocateSlot();
   slot1.reset();
-  EXPECT_EQ(deferredDeletesMapSize(), 0);
   EXPECT_EQ(freeSlotIndexesListSize(), 1);
 
   // Create a new slot which should take the place of the old slot. ReturnPointee() is used to
@@ -86,48 +84,67 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
   slot3.reset();
   slot4.reset();
   EXPECT_EQ(freeSlotIndexesListSize(), 0);
-  EXPECT_EQ(deferredDeletesMapSize(), 2);
 
   EXPECT_CALL(object_ref4, onDestroy());
   EXPECT_CALL(object_ref3, onDestroy());
   tls_.shutdownThread();
 }
 
-TEST_F(ThreadLocalInstanceImplTest, DeferredRecycle) {
+struct ThreadStatus {
+  uint64_t thread_local_calls_{0};
+  bool all_threads_complete_ = false;
+};
+
+TEST_F(ThreadLocalInstanceImplTest, CallbackNotInvokedAfterDeletion) {
   InSequence s;
 
-  // Free a slot without ever calling set.
-  EXPECT_CALL(thread_dispatcher_, post(_));
-  SlotPtr slot1 = tls_.allocateSlot();
-  slot1.reset();
-  // Slot destructed directly, as there is no out-going callbacks.
-  EXPECT_EQ(deferredDeletesMapSize(), 0);
+  // Allocate a slot and invoke all callback variants. Hold all callbacks and destroy the slot.
+  // Make sure that recycling happens appropriately.
+  SlotPtr slot = tls_.allocateSlot();
+
+  std::list<Event::PostCb> holder;
+  EXPECT_CALL(thread_dispatcher_, post(_)).Times(4).WillRepeatedly(Invoke([&](Event::PostCb cb) {
+    // Holds the posted callback.
+    holder.push_back(cb);
+  }));
+
+  uint32_t total_callbacks = 0;
+  slot->set([&total_callbacks](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    // Callbacks happen on the main thread but not the workers, so track the total.
+    total_callbacks++;
+    return nullptr;
+  });
+  slot->runOnAllThreads([&total_callbacks](ThreadLocal::ThreadLocalObjectSharedPtr)
+                            -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    // Callbacks happen on the main thread but not the workers, so track the total.
+    total_callbacks++;
+    return nullptr;
+  });
+  ThreadStatus thread_status;
+  slot->runOnAllThreads(
+      [&thread_status](
+          ThreadLocal::ThreadLocalObjectSharedPtr) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        ++thread_status.thread_local_calls_;
+        return nullptr;
+      },
+      [&thread_status]() -> void {
+        // Callbacks happen on the main thread but not the workers.
+        EXPECT_EQ(thread_status.thread_local_calls_, 1);
+        thread_status.all_threads_complete_ = true;
+      });
+  EXPECT_FALSE(thread_status.all_threads_complete_);
+
+  EXPECT_EQ(2, total_callbacks);
+  slot.reset();
   EXPECT_EQ(freeSlotIndexesListSize(), 1);
 
-  // Allocate a slot and set value, hold the posted callback and the slot will only be returned
-  // after the held callback is destructed.
-  {
-    SlotPtr slot2 = tls_.allocateSlot();
-    EXPECT_EQ(freeSlotIndexesListSize(), 0);
-    {
-      Event::PostCb holder;
-      EXPECT_CALL(thread_dispatcher_, post(_)).WillOnce(Invoke([&](Event::PostCb cb) {
-        // Holds the posted callback.
-        holder = cb;
-      }));
-      slot2->set(
-          [](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return nullptr; });
-      slot2.reset();
-      // Not released yet, as holder has a copy of the ref_count_.
-      EXPECT_EQ(freeSlotIndexesListSize(), 0);
-      EXPECT_EQ(deferredDeletesMapSize(), 1);
-      // This post is called when the holder dies.
-      EXPECT_CALL(thread_dispatcher_, post(_));
-    }
-    // Slot is deleted now that there holder destructs.
-    EXPECT_EQ(deferredDeletesMapSize(), 0);
-    EXPECT_EQ(freeSlotIndexesListSize(), 1);
+  EXPECT_CALL(main_dispatcher_, post(_));
+  while (!holder.empty()) {
+    holder.front()();
+    holder.pop_front();
   }
+  EXPECT_EQ(2, total_callbacks);
+  EXPECT_TRUE(thread_status.all_threads_complete_);
 
   tls_.shutdownGlobalThreading();
 }
@@ -172,25 +189,29 @@ TEST_F(ThreadLocalInstanceImplTest, UpdateCallback) {
 // Validate ThreadLocal::runOnAllThreads behavior with all_thread_complete call back.
 TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
   SlotPtr tlsptr = tls_.allocateSlot();
+  TestThreadLocalObject& object_ref = setObject(*tlsptr);
 
   EXPECT_CALL(thread_dispatcher_, post(_));
   EXPECT_CALL(main_dispatcher_, post(_));
 
   // Ensure that the thread local call back and all_thread_complete call back are called.
-  struct {
-    uint64_t thread_local_calls_{0};
-    bool all_threads_complete_ = false;
-  } thread_status;
-
-  tlsptr->runOnAllThreads([&thread_status]() -> void { ++thread_status.thread_local_calls_; },
-                          [&thread_status]() -> void {
-                            EXPECT_EQ(thread_status.thread_local_calls_, 2);
-                            thread_status.all_threads_complete_ = true;
-                          });
-
+  ThreadStatus thread_status;
+  tlsptr->runOnAllThreads(
+      [&thread_status](ThreadLocal::ThreadLocalObjectSharedPtr object)
+          -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        ++thread_status.thread_local_calls_;
+        return object;
+      },
+      [&thread_status]() -> void {
+        EXPECT_EQ(thread_status.thread_local_calls_, 2);
+        thread_status.all_threads_complete_ = true;
+      });
   EXPECT_TRUE(thread_status.all_threads_complete_);
 
   tls_.shutdownGlobalThreading();
+  tlsptr.reset();
+  EXPECT_EQ(freeSlotIndexesListSize(), 0);
+  EXPECT_CALL(object_ref, onDestroy());
   tls_.shutdownThread();
 }
 
