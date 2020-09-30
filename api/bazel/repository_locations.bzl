@@ -7,8 +7,8 @@ OPENCENSUS_PROTO_SHA256 = "b7e13f0b4259e80c3070b583c2f39e53153085a6918718b1c710c
 PGV_GIT_SHA = "278964a8052f96a2f514add0298098f63fb7f47f"  # June 9, 2020
 PGV_SHA256 = "e368733c9fb7f8489591ffaf269170d7658cc0cd1ee322b601512b769446d3c8"
 
-PGJ_GIT_SHA = "800eac78ab6fc7ed4a444fc058dadb0c0d4d46e6"  # Sep 27, 2020
-PGJ_SHA256 = "7466e81059d05d7937d964e7bfeae0e015e0ca2fdf8b6b247c0d4c0da57fd5f3"
+PGJ_GIT_SHA = "1a8fec199ef6d536074071bde2369cf99c38833c"  # Sep 27, 2020
+PGJ_SHA256 = "32150cf144f5f42ccfcf8d294ec18466ba0134a9c4a3af99babeb1bb075007f7"
 
 GOOGLEAPIS_GIT_SHA = "82944da21578a53b74e547774cf62ed31a05b841"  # Dec 2, 2019
 GOOGLEAPIS_SHA = "a45019af4d3290f02eaeb1ce10990166978c807cb33a9692141a076ba46d1405"
@@ -38,7 +38,7 @@ REPOSITORY_LOCATIONS = dict(
     com_github_chrusty_protoc_gen_jsonschema = dict(
         sha256 = PGJ_SHA256,
         strip_prefix = "protoc-gen-jsonschema-" + PGJ_GIT_SHA,
-        urls = ["https://github.com/chrusty/protoc-gen-jsonschema/archive/" + PGJ_GIT_SHA + ".tar.gz"],
+        urls = ["https://github.com/phlax/protoc-gen-jsonschema/archive/" + PGJ_GIT_SHA + ".tar.gz"],
     ),
     com_google_googleapis = dict(
         # TODO(dio): Consider writing a Starlark macro for importing Google API proto.
