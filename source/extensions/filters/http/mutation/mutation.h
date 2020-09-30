@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/extensions/filters/http/mutation/v3/mutation.pb.h"
+#include "envoy/extensions/filters/http/mutation/v3alpha/mutation.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/http/filter.h"
 
@@ -15,7 +15,7 @@ namespace Mutation {
 
 class FilterConfig {
 public:
-  FilterConfig(const envoy::extensions::filters::http::mutation::v3::Mutation& config)
+  FilterConfig(const envoy::extensions::filters::http::mutation::v3alpha::Mutation& config)
       : failure_mode_allow_(config.failure_mode_allow()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }

@@ -16,7 +16,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/http:filter_interface",
-        "@envoy_api//envoy/extensions/filters/http/mutation/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/mutation/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -24,11 +24,11 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "robust_to_untrusted_downstream",
+    security_posture = "unknown",
     deps = [
         ":mutation",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/http/mutation/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/mutation/v3alpha:pkg_cc_proto",
     ],
 )

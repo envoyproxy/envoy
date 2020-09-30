@@ -10,7 +10,7 @@ namespace HttpFilters {
 namespace Mutation {
 
 Http::FilterFactoryCb MutationFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::mutation::v3::Mutation& proto_config,
+    const envoy::extensions::filters::http::mutation::v3alpha::Mutation& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   const auto filter_config = std::make_shared<FilterConfig>(proto_config);
 
