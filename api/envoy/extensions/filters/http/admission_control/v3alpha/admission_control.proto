@@ -23,6 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Admission Control]
 // [#extension: envoy.filters.http.admission_control]
 
+// [#next-free-field: 6]
 message AdmissionControl {
   // Default method of specifying what constitutes a successful request. All status codes that
   // indicate a successful request must be explicitly specified if not relying on the default
@@ -75,16 +76,23 @@ message AdmissionControl {
   }
 
   // The sliding time window over which the success rate is calculated. The window is rounded to the
-  // nearest second. Defaults to 120s.
+  // nearest second. Defaults to 30s.
   google.protobuf.Duration sampling_window = 3;
 
   // Rejection probability is defined by the formula::
   //
-  //     max(0, (rq_count - aggression_coefficient * rq_success_count) / (rq_count + 1))
+  //     max(0, (rq_count -  rq_success_count / sr_threshold) / (rq_count + 1)) ^ (1 / aggression)
   //
-  // The coefficient dictates how aggressively the admission controller will throttle requests as
-  // the success rate drops. Lower values will cause throttling to kick in at higher success rates
-  // and result in more aggressive throttling. Any values less than 1.0, will be set to 1.0. If the
-  // message is unspecified, the coefficient is 2.0.
-  config.core.v3.RuntimeDouble aggression_coefficient = 4;
+  // The aggression dictates how heavily the admission controller will throttle requests upon SR
+  // dropping at or below the threshold. A value of 1 will result in a linear increase in
+  // rejection probability as SR drops. Any values less than 1.0, will be set to 1.0. If the
+  // message is unspecified, the aggression is 1.0. See `the admission control documentation
+  // <https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/admission_control_filter.html>`_
+  // for a diagram illustrating this.
+  config.core.v3.RuntimeDouble aggression = 4;
+
+  // Dictates the success rate at which the rejection probability is non-zero. As success rate drops
+  // below this threshold, rejection probability will increase. Any success rate above the threshold
+  // results in a rejection probability of 0. Defaults to 95%.
+  config.core.v3.RuntimePercent sr_threshold = 5;
 }

@@ -53,7 +53,11 @@ enabled:
   default_value: false
   runtime_key: "foo.enabled"
 sampling_window: 1337s
-aggression_coefficient:
+sr_threshold:
+  default_value:
+    value: 92
+  runtime_key: "foo.sr_threshold"
+aggression:
   default_value: 4.2
   runtime_key: "foo.aggression"
 success_criteria:
@@ -65,6 +69,7 @@ success_criteria:
 
   EXPECT_FALSE(config->filterEnabled());
   EXPECT_EQ(4.2, config->aggression());
+  EXPECT_EQ(0.92, config->successRateThreshold());
 }
 
 // Verify the config defaults when not specified.
@@ -80,7 +85,8 @@ success_criteria:
   auto config = makeConfig(yaml);
 
   EXPECT_TRUE(config->filterEnabled());
-  EXPECT_EQ(2.0, config->aggression());
+  EXPECT_EQ(1.0, config->aggression());
+  EXPECT_EQ(0.95, config->successRateThreshold());
 }
 
 // Ensure runtime fields are honored.
@@ -90,7 +96,11 @@ enabled:
   default_value: false
   runtime_key: "foo.enabled"
 sampling_window: 1337s
-aggression_coefficient:
+sr_threshold:
+  default_value:
+    value: 92
+  runtime_key: "foo.sr_threshold"
+aggression:
   default_value: 4.2
   runtime_key: "foo.aggression"
 success_criteria:
@@ -104,6 +114,14 @@ success_criteria:
   EXPECT_TRUE(config->filterEnabled());
   EXPECT_CALL(runtime_.snapshot_, getDouble("foo.aggression", 4.2)).WillOnce(Return(1.3));
   EXPECT_EQ(1.3, config->aggression());
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.sr_threshold", 92)).WillOnce(Return(24.0));
+  EXPECT_EQ(0.24, config->successRateThreshold());
+
+  // Verify bogus runtime thresholds revert to the default value.
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.sr_threshold", 92)).WillOnce(Return(250.0));
+  EXPECT_EQ(0.92, config->successRateThreshold());
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.sr_threshold", 92)).WillOnce(Return(-1.0));
+  EXPECT_EQ(0.92, config->successRateThreshold());
 }
 
 } // namespace

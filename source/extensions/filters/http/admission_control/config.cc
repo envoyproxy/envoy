@@ -15,7 +15,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AdmissionControl {
 
-static constexpr std::chrono::seconds defaultSamplingWindow{120};
+static constexpr std::chrono::seconds defaultSamplingWindow{30};
 
 Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl& config,
