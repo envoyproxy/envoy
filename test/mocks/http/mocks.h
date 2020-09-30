@@ -51,7 +51,7 @@ public:
 class MockFilterManagerCallbacks : public FilterManagerCallbacks {
 public:
   MockFilterManagerCallbacks();
-  ~MockFilterManagerCallbacks();
+  ~MockFilterManagerCallbacks() override;
 
   MOCK_METHOD(void, encodeHeaders, (ResponseHeaderMap&, bool));
   MOCK_METHOD(void, encode100ContinueHeaders, (ResponseHeaderMap&));

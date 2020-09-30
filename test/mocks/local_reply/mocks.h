@@ -7,7 +7,7 @@ namespace LocalReply {
 class MockLocalReply : public LocalReply {
 public:
   MockLocalReply();
-  ~MockLocalReply();
+  ~MockLocalReply() override;
 
   MOCK_METHOD(void, rewrite,
               (const Http::RequestHeaderMap* request_headers,
