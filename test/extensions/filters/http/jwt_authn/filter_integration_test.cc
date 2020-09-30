@@ -309,8 +309,7 @@ public:
   void createUpstreams() override {
     HttpProtocolIntegrationTest::createUpstreams();
     // for Jwks upstream.
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, GetParam().upstream_protocol, version_, timeSystem()));
+    addFakeUpstream(GetParam().upstream_protocol);
   }
 
   void initializeFilter(bool add_cluster) {

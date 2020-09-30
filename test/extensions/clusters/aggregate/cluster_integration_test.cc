@@ -130,10 +130,8 @@ public:
     defer_listener_finalization_ = true;
     HttpIntegrationTest::initialize();
 
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
-                                                  timeSystem(), enable_half_close_));
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
-                                                  timeSystem(), enable_half_close_));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
     cluster1_ = ConfigHelper::buildStaticCluster(
         FirstClusterName, fake_upstreams_[FirstUpstreamIndex]->localAddress()->ip()->port(),
         Network::Test::getLoopbackAddressString(GetParam()));

@@ -748,8 +748,7 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, RedirectToUnknownServer) {
 
   auto endpoint =
       Network::Utility::parseInternetAddress(Network::Test::getAnyAddressString(version_), 0);
-  FakeUpstreamPtr target_server{
-      new FakeUpstream(endpoint, upstreamProtocol(), timeSystem(), enable_half_close_)};
+  FakeUpstreamPtr target_server{createFakeUpstream(endpoint, upstreamProtocol())};
 
   std::stringstream redirection_error;
   redirection_error << "-MOVED 1111 " << redisAddressAndPort(target_server) << "\r\n";

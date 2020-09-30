@@ -33,8 +33,7 @@ public:
   HdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
     hds_upstream_ = fake_upstreams_.back().get();
     HttpIntegrationTest::createUpstreams();
   }
@@ -60,14 +59,12 @@ public:
     // Endpoint connections
     if (tls_hosts_) {
       host_upstream_ =
-          std::make_unique<FakeUpstream>(HttpIntegrationTest::createUpstreamTlsContext(), 0,
-                                         http_conn_type_, version_, timeSystem());
+          createFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(), http_conn_type_);
       host2_upstream_ =
-          std::make_unique<FakeUpstream>(HttpIntegrationTest::createUpstreamTlsContext(), 0,
-                                         http_conn_type_, version_, timeSystem());
+          createFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(), http_conn_type_);
     } else {
-      host_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type_, version_, timeSystem());
-      host2_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type_, version_, timeSystem());
+      host_upstream_ = createFakeUpstream(http_conn_type_);
+      host2_upstream_ = createFakeUpstream(http_conn_type_);
     }
   }
 

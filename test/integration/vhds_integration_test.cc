@@ -147,7 +147,7 @@ public:
   // Overridden to insert this stuff into the initialize() at the very beginning of
   // HttpIntegrationTest::testRouterRequestAndResponseWithBody().
   void initialize() override {
-    // Controls how many fake_upstreams_.emplace_back(new FakeUpstream) will happen in
+    // Controls how many addFakeUpstream() will happen in
     // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
     // Make sure this number matches the size of the 'clusters' repeated field in the bootstrap
     // config that you use!
@@ -269,7 +269,7 @@ public:
   // Overridden to insert this stuff into the initialize() at the very beginning of
   // HttpIntegrationTest::testRouterRequestAndResponseWithBody().
   void initialize() override {
-    // Controls how many fake_upstreams_.emplace_back(new FakeUpstream) will happen in
+    // Controls how many addFakeUpstream() will happen in
     // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
     // Make sure this number matches the size of the 'clusters' repeated field in the bootstrap
     // config that you use!
