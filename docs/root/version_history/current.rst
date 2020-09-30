@@ -54,6 +54,7 @@ Bug Fixes
 * fault: fixed an issue with `active_faults` gauge not being decremented for when abort faults were injected.
 * fault: made the HeaderNameValues::prefix() method const.
 * grpc-web: fixed an issue with failing HTTP/2 requests on some browsers. Notably, WebKit-based browsers (https://bugs.webkit.org/show_bug.cgi?id=210108), Internet Explorer 11, and Edge (pre-Chromium).
+* http: fixed CVE-2020-25018 by rolling back the ``GURL`` dependency to previous state (reverted: ``2d69e30``, ``d828958``, and ``c9c4709`` commits) due to potential of crashing when Unicode URIs are present in requests.
 * http: made the HeaderValues::prefix() method const.
 * jwt_authn: supports jwt payload without "iss" field.
 * listener: fixed crash at listener inplace update when connetion load balancer is set.
@@ -76,6 +77,7 @@ New Features
 * access log: added support for :ref:`%DOWNSTREAM_PEER_FINGERPRINT_1% <config_access_log_format_response_flags>` as a response flag.
 * access log: added support for nested objects in :ref:`JSON logging mode <config_access_log_format_dictionaries>`.
 * access log: added :ref:`omit_empty_values<envoy_v3_api_field_config.core.v3.SubstitutionFormatString.omit_empty_values>` option to omit unset value from formatted log.
+* admin: added :ref:`node <envoy_v3_api_msg_config.core.v3.Node>` information to GET /server_info :ref:`response object <envoy_v3_api_msg_admin.v3.ServerInfo>`.
 * admin: added the ability to dump init manager unready targets information :ref:`/init_dump <operations_admin_interface_init_dump>` and :ref:`/init_dump?mask={} <operations_admin_interface_init_dump_by_mask>`.
 * build: enable building envoy :ref:`arm64 images <arm_binaries>` by buildx tool in x86 CI platform.
 * cluster: added new :ref:`connection_pool_per_downstream_connection <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_per_downstream_connection>` flag, which enable creation of a new connection pool for each downstream connection.
@@ -85,11 +87,13 @@ New Features
 * ext_authz filter: added support for emitting dynamic metadata for both :ref:`HTTP <config_http_filters_ext_authz_dynamic_metadata>` and :ref:`network <config_network_filters_ext_authz_dynamic_metadata>` filters.
   The emitted dynamic metadata is set by :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` field in a returned :ref:`CheckResponse <envoy_v3_api_msg_service.auth.v3.CheckResponse>`.
 * ext_authz filter: added :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.stat_prefix>` as an optional additional prefix for the statistics emitted from `ext_authz` HTTP filter.
+* ext_authz filter: added support for letting the authorization server instruct Envoy to remove headers from the original request by setting the new field :ref:`headers_to_remove <envoy_v3_api_field_service.auth.v3.OkHttpResponse.headers_to_remove>` before forwarding it to the upstream.
 * ext_authz filter: added support for sending :ref:`raw bytes as request body <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.raw_body>` of a gRPC check request by setting :ref:`pack_as_bytes <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.BufferSettings.pack_as_bytes>` to true.
 * grpc-json: support specifying `response_body` field in for `google.api.HttpBody` message.
 * hds: added :ref:`cluster_endpoints_health <envoy_v3_api_field_service.health.v3.EndpointHealthResponse.cluster_endpoints_health>` to HDS responses, keeping endpoints in the same groupings as they were configured in the HDS specifier by cluster and locality instead of as a flat list.
 * hds: added :ref:`transport_socket_matches <envoy_v3_api_field_service.health.v3.ClusterHealthCheck.transport_socket_matches>` to HDS cluster health check specifier, so the existing match filter :ref:`transport_socket_match_criteria <envoy_v3_api_field_config.core.v3.HealthCheck.transport_socket_match_criteria>` in the repeated field :ref:`health_checks <envoy_v3_api_field_service.health.v3.ClusterHealthCheck.health_checks>` has context to match against. This unblocks support for health checks over HTTPS and HTTP/2.
 * hot restart: added :option:`--socket-path` and :option:`--socket-mode` to configure UDS path in the filesystem and set permission to it.
+* http: added HTTP/2 support for :ref:`connection keepalive <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.connection_keepalive>` via PING.
 * http: added support for :ref:`%DOWNSTREAM_PEER_FINGERPRINT_1% <config_http_conn_man_headers_custom_request_headers>` as custom header.
 * http: added :ref:`allow_chunked_length <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.allow_chunked_length>` configuration option for HTTP/1 codec to allow processing requests/responses with both Content-Length and Transfer-Encoding: chunked headers. If such message is served and option is enabled - per RFC Content-Length is ignored and removed.
 * http: added :ref:`CDN Loop filter <envoy_v3_api_msg_extensions.filters.http.cdn_loop.v3alpha.CdnLoopConfig>` and :ref:`documentation <config_http_filters_cdn_loop>`.

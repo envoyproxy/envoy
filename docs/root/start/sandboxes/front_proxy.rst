@@ -31,7 +31,8 @@ Running the Sandbox
 
 .. include:: _include/docker-env-setup.rst
 
-**Step 3: Start all of our containers**
+Step 3: Start all of our containers
+***********************************
 
 .. code-block:: console
 
@@ -47,7 +48,8 @@ Running the Sandbox
     front-proxy_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
     front-proxy_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
 
-**Step 4: Test Envoy's routing capabilities**
+Step 4: Test Envoy's routing capabilities
+*****************************************
 
 You can now send a request to both services via the ``front-envoy``.
 
@@ -143,7 +145,8 @@ We can also use ``HTTPS`` to call services behind the front Envoy. For example, 
     <
     Hello from behind Envoy (service 1)! hostname: 36418bc3c824 resolvedhostname: 192.168.160.4
 
-**Step 5: Test Envoy's load balancing capabilities**
+Step 5: Test Envoy's load balancing capabilities
+************************************************
 
 Now let's scale up our ``service1`` nodes to demonstrate the load balancing abilities of Envoy:
 
@@ -211,7 +214,8 @@ requests by doing a round robin of the three ``service1`` machines:
     <
     Hello from behind Envoy (service 1)! hostname: 36418bc3c824 resolvedhostname: 192.168.160.4
 
-**Step 6: enter containers and curl services**
+Step 6: enter containers and curl services
+******************************************
 
 In addition of using ``curl`` from your host machine, you can also enter the
 containers themselves and ``curl`` from inside them. To enter a container you
@@ -230,7 +234,8 @@ enter the ``front-envoy`` container, and ``curl`` for services locally:
     root@81288499f9d7:/# curl localhost:8080/service/2
     Hello from behind Envoy (service 2)! hostname: 92f4a3737bbc resolvedhostname: 172.19.0.2
 
-**Step 7: enter container and curl admin**
+Step 7: enter container and curl admin
+**************************************
 
 When Envoy runs it also attaches an ``admin`` to your desired port.
 
