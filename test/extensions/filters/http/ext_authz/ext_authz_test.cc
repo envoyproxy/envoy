@@ -162,6 +162,57 @@ TEST_F(HttpFilterTest, MergeConfig) {
   EXPECT_EQ("value", merged_extensions.at("key"));
 }
 
+// Test that defining stat_prefix appends an additional prefix to the emitted statistics names.
+TEST_F(HttpFilterTest, StatsWithPrefix) {
+  const std::string stat_prefix = "with_stat_prefix";
+  const std::string error_counter_name_with_prefix =
+      absl::StrCat("ext_authz.", stat_prefix, ".error");
+  const std::string error_counter_name_without_prefix = "ext_authz.error";
+
+  InSequence s;
+
+  initialize(fmt::format(R"EOF(
+  stat_prefix: "{}"
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF",
+                         stat_prefix));
+
+  EXPECT_EQ(0U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString(error_counter_name_with_prefix)
+                    .value());
+  EXPECT_EQ(0U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString(error_counter_name_without_prefix)
+                    .value());
+
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(1);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString(error_counter_name_with_prefix)
+                    .value());
+  // The one without an additional prefix is not incremented, since it is not "defined".
+  EXPECT_EQ(0U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString(error_counter_name_without_prefix)
+                    .value());
+}
+
 // Test when failure_mode_allow is NOT set and the response from the authorization service is Error
 // that the request is not allowed to continue.
 TEST_F(HttpFilterTest, ErrorFailClose) {
