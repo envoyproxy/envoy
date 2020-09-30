@@ -177,9 +177,9 @@ TEST_F(AppleDnsImplTest, CallbackException3) {
 // Validate working of cancellation provided by ActiveDnsQuery return.
 TEST_F(AppleDnsImplTest, Cancel) {
   ActiveDnsQuery* query =
-      resolveWithUnreferencedParameters("google.com", DnsLookupFamily::Auto, false);
+      resolveWithUnreferencedParameters("some.domain", DnsLookupFamily::Auto, false);
 
-  EXPECT_NE(nullptr, resolveWithExpectations("some.domain", DnsLookupFamily::Auto,
+  EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::Auto,
                                              DnsResolver::ResolutionStatus::Success, true));
 
   ASSERT_NE(nullptr, query);
