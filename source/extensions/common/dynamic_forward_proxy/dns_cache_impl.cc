@@ -257,8 +257,10 @@ void DnsCacheImpl::updateTlsHostsMap() {
     }
   }
 
-  tls_slot_->runOnAllThreads([this, new_host_map]() {
-    tls_slot_->getTyped<ThreadLocalHostInfo>().updateHostMap(new_host_map);
+  tls_slot_->runOnAllThreads([new_host_map](ThreadLocal::ThreadLocalObjectSharedPtr object)
+                                 -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    object->asType<ThreadLocalHostInfo>().updateHostMap(new_host_map);
+    return object;
   });
 }
 
