@@ -242,7 +242,7 @@ class Validator(object):
     self.ValidateTestOnlyDeps()
     self.ValidateDataPlaneCoreDeps()
     self.ValidateControlPlaneDeps()
-    # Validate the marginal dependenies introduced for each extension.
+    # Validate the marginal dependencies introduced for each extension.
     for name, target in sorted(build_graph.ListExtensions()):
       target_all = EXTENSION_LABEL_RE.match(target).group(1) + '/...'
       self.ValidateExtensionDeps(name, target_all)
