@@ -76,6 +76,8 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.fixed_connection_close",
     "envoy.reloadable_features.hcm_stream_error_on_invalid_message",
     "envoy.reloadable_features.http_default_alpn",
+    "envoy.reloadable_features.http_match_on_all_headers",
+    "envoy.reloadable_features.http_set_copy_replace_all_headers",
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
     "envoy.reloadable_features.listener_in_place_filterchain_update",

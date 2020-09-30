@@ -19,6 +19,7 @@ constexpr uint16_t DNS_RESPONSE_CODE_FORMAT_ERROR = 1;
 constexpr uint16_t DNS_RESPONSE_CODE_NAME_ERROR = 3;
 constexpr uint16_t DNS_RESPONSE_CODE_NOT_IMPLEMENTED = 4;
 
+constexpr size_t MIN_QUERY_NAME_LENGTH = 3;
 constexpr size_t MAX_LABEL_LENGTH = 63;
 constexpr size_t MAX_NAME_LENGTH = 255;
 
