@@ -55,7 +55,7 @@ static Http::ResponseMessagePtr makeSuccessResponse() {
   std::unique_ptr<Protobuf::Message> collector_response =
       lightstep::Transporter::MakeCollectorResponse();
   EXPECT_NE(collector_response, nullptr);
-  msg->body() = Grpc::Common::serializeToGrpcFrame(*collector_response);
+  msg->body().add(*Grpc::Common::serializeToGrpcFrame(*collector_response));
   return msg;
 }
 

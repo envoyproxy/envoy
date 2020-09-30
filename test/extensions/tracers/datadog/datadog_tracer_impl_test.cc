@@ -175,7 +175,6 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
 
   Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  msg->body() = std::make_unique<Buffer::OwnedImpl>("");
 
   callback->onSuccess(request, std::move(msg));
 

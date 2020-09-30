@@ -739,7 +739,7 @@ void Filter::maybeDoShadowing() {
     Http::RequestMessagePtr request(new Http::RequestMessageImpl(
         Http::createHeaderMap<Http::RequestHeaderMapImpl>(*downstream_headers_)));
     if (callbacks_->decodingBuffer()) {
-      request->body() = std::make_unique<Buffer::OwnedImpl>(*callbacks_->decodingBuffer());
+      request->body().add(*callbacks_->decodingBuffer());
     }
     if (downstream_trailers_) {
       request->trailers(Http::createHeaderMap<Http::RequestTrailerMapImpl>(*downstream_trailers_));
