@@ -529,6 +529,10 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
   auto* static_resources = bootstrap_.mutable_static_resources();
   for (int i = 0; i < static_resources->listeners_size(); ++i) {
     auto* listener = static_resources->mutable_listeners(i);
+    // Not need to amend internal address and we need to skip the below implicit address mutation helper.
+    if (listener->mutable_address()->has_envoy_internal_address()) {
+      continue;
+    }
     auto* listener_socket_addr = listener->mutable_address()->mutable_socket_address();
     if (listener_socket_addr->address() == "0.0.0.0" || listener_socket_addr->address() == "::") {
       listener_socket_addr->set_address(Network::Test::getAnyAddressString(version));

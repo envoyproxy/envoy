@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "common/network/address_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "envoy/api/api.h"
 #include "envoy/network/listen_socket.h"
@@ -120,12 +121,23 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
                                                          std::move(transport_socket), options);
 }
 
+namespace {
+Network::Address::InstanceConstSharedPtr
+nextClientAddress(const Network::Address::InstanceConstSharedPtr& server_address) {
+  uint64_t id = 0;
+  return std::make_shared<Network::Address::EnvoyInternalInstance>(absl::StrCat(server_address->asStringView(), "_", ++id));
+}
+} // namespace
+
 Network::ClientConnectionPtr
 DispatcherImpl::createInternalConnection(Network::Address::InstanceConstSharedPtr internal_address,
                                          Network::Address::InstanceConstSharedPtr local_address) {
   ASSERT(isThreadSafe());
   if (internal_address == nullptr) {
     return nullptr;
+  }
+  if (local_address == nullptr) {
+    local_address = nextClientAddress(internal_address);
   }
   // Find the internal listener callback. The listener will setup the server connection.
   auto iter = internal_listeners_.find(internal_address->asString());
@@ -150,8 +162,12 @@ DispatcherImpl::createInternalConnection(Network::Address::InstanceConstSharedPt
       std::move(client_io_handle_), local_address, internal_address);
   auto server_conn_socket = std::make_unique<Network::InternalConnectionSocketImpl>(
       std::move(server_io_handle_), internal_address, local_address);
+  ENVOY_LOG_MISC(debug, "lambdai: internal address {}", internal_address->asString());
+  ENVOY_LOG_MISC(debug, "lambdai: client address {}", local_address->asString());
+
   auto client_conn = std::make_unique<Network::ClientConnectionImpl>(
-      *this, internal_address, local_address,  client_transport_socket_factory.createTransportSocket(nullptr), nullptr,
+      *this, internal_address, local_address,
+      client_transport_socket_factory.createTransportSocket(nullptr), nullptr,
       std::move(client_conn_socket));
 
   (iter->second)(internal_address, std::move(server_conn_socket));

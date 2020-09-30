@@ -43,7 +43,18 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
                                         Network::ListenerConfig& config) {
   ActiveListenerDetails details;
   if (config.isInternalListener()) {
-    // TODO(lambdai): register internal listener here.
+    if (overridden_listener.has_value()) {
+      for (auto& listener : listeners_) {
+        if (listener.second.listener_->listenerTag() == overridden_listener) {
+          listener.second.tcpListener()->get().updateListenerConfig(config);
+          return;
+        }
+      }
+    }
+    auto active_internal_listener = std::make_unique<ActiveInternalListener>(*this, config);
+    active_internal_listener->internal_listener_->setupInternalListener();
+    details.typed_listener_ = *active_internal_listener;
+    details.listener_ = std::move(active_internal_listener);
   } else if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {
     if (overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
@@ -465,6 +476,10 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
   }
 }
+Stats::TimespanPtr ConnectionHandlerImpl::ActiveTcpListener::newTimespan(TimeSource& time_source) {
+  return std::make_unique<Stats::HistogramCompletableTimespanImpl>(stats_.downstream_cx_length_ms_,
+                                                                   time_source);
+}
 
 ConnectionHandlerImpl::ActiveConnections&
 ConnectionHandlerImpl::ActiveTcpListener::getOrCreateActiveConnections(
@@ -534,7 +549,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::post(Network::ConnectionSocketPtr
 }
 
 ConnectionHandlerImpl::ActiveConnections::ActiveConnections(
-    ConnectionHandlerImpl::ActiveTcpListener& listener, const Network::FilterChain& filter_chain)
+    ConnectionHandlerImpl::StreamListener& listener, const Network::FilterChain& filter_chain)
     : listener_(listener), filter_chain_(filter_chain) {}
 
 ConnectionHandlerImpl::ActiveConnections::~ActiveConnections() {
@@ -547,36 +562,17 @@ ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
     TimeSource& time_source, std::unique_ptr<StreamInfo::StreamInfo>&& stream_info)
     : stream_info_(std::move(stream_info)), active_connections_(active_connections),
       connection_(std::move(new_connection)),
-      conn_length_(new Stats::HistogramCompletableTimespanImpl(
-          active_connections_.listener_.stats_.downstream_cx_length_ms_, time_source)) {
+      conn_length_(active_connections_.listener_.newTimespan(time_source)) {
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
   connection_->noDelay(true);
-  auto& listener = active_connections_.listener_;
-  listener.stats_.downstream_cx_total_.inc();
-  listener.stats_.downstream_cx_active_.inc();
-  listener.per_worker_stats_.downstream_cx_total_.inc();
-  listener.per_worker_stats_.downstream_cx_active_.inc();
-
-  // Active connections on the handler (not listener). The per listener connections have already
-  // been incremented at this point either via the connection balancer or in the socket accept
-  // path if there is no configured balancer.
-  ++listener.parent_.num_handler_connections_;
+  active_connections_.listener_.onNewConnection();
 }
 
 ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
-  emitLogs(*active_connections_.listener_.config_, *stream_info_);
-  auto& listener = active_connections_.listener_;
-  listener.stats_.downstream_cx_active_.dec();
-  listener.stats_.downstream_cx_destroy_.inc();
-  listener.per_worker_stats_.downstream_cx_active_.dec();
+  emitLogs(active_connections_.listener_.listenerConfig(), *stream_info_);
   conn_length_->complete();
-
-  // Active listener connections (not handler).
-  listener.decNumConnections();
-
-  // Active handler connections (not listener).
-  listener.parent_.decNumConnections();
+  active_connections_.listener_.onDestroyConnection();
 }
 
 ConnectionHandlerImpl::ActiveTcpListenerOptRef
@@ -816,6 +812,10 @@ void ConnectionHandlerImpl::ActiveInternalSocket::newConnection() {
 ConnectionHandlerImpl::ActiveInternalListener::ActiveInternalListener(
     ConnectionHandlerImpl& parent, Network::ListenerConfig& config)
     : ConnectionHandlerImpl::ActiveListenerImplBase(parent, &config), parent_(parent),
+      internal_listener_(std::make_unique<Network::InternalListenerImpl>(
+          // TODO(lambdai): promote createInternalConnection to dispatcher interface.
+          dynamic_cast<Event::DispatcherImpl&>(parent_.dispatcher_),
+          config.listenSocketFactory().localAddress()->asString(), *this)),
       listener_filters_timeout_(config.listenerFiltersTimeout()),
       continue_on_listener_filters_timeout_(config.continueOnListenerFiltersTimeout()) {}
 
@@ -878,6 +878,12 @@ void ConnectionHandlerImpl::ActiveInternalListener::onNewSocket(
       emitLogs(*config_, *active_socket->stream_info_);
     }
   }
+}
+
+Stats::TimespanPtr
+ConnectionHandlerImpl::ActiveInternalListener::newTimespan(TimeSource& time_source) {
+  return std::make_unique<Stats::HistogramCompletableTimespanImpl>(stats_.downstream_cx_length_ms_,
+                                                                   time_source);
 }
 
 // Copied from newConnection(). Invoked by SetupPipeListener.

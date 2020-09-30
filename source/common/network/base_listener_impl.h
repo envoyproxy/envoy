@@ -15,9 +15,11 @@ class BaseListenerImpl : public virtual Listener {
 public:
   /**
    * @param socket the listening socket for this listener. It might be shared
-   * with other listeners if all listeners use single listen socket.
+   * with other listeners if all listeners use single listen socket. It could be nullptr for
+   * internal listener.
    */
-  BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket);
+  BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
+                   const Address::InstanceConstSharedPtr& local_address = nullptr);
 
 protected:
   Address::InstanceConstSharedPtr local_address_;

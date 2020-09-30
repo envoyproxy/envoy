@@ -105,6 +105,18 @@ public:
 private:
   struct ActiveTcpConnection;
   using ActiveTcpConnectionPtr = std::unique_ptr<ActiveTcpConnection>;
+  class StreamListener {
+  public:
+    virtual ~StreamListener() = default;
+    // virtual ListenerStats& listenerStats() PURE;
+    // virtual PerHandlerListenerStats& per_worker_stats_() PURE;
+    virtual void onNewConnection() PURE;
+    virtual void onDestroyConnection() PURE;
+    virtual Stats::TimespanPtr newTimespan(TimeSource& time_source) PURE;
+    virtual Network::ListenerConfig& listenerConfig() PURE;
+    virtual void removeConnection(ActiveTcpConnection& conn) PURE;
+  };
+
   struct ActiveTcpSocket;
   using ActiveTcpSocketPtr = std::unique_ptr<ActiveTcpSocket>;
   class ActiveConnections;
@@ -117,6 +129,7 @@ private:
    */
   class ActiveTcpListener : public Network::TcpListenerCallbacks,
                             public ActiveListenerImplBase,
+                            public StreamListener,
                             public Network::BalancedConnectionHandler {
   public:
     ActiveTcpListener(ConnectionHandlerImpl& parent, Network::ListenerConfig& config);
@@ -146,6 +159,30 @@ private:
     void resumeListening() override { listener_->enable(); }
     void shutdownListener() override { listener_.reset(); }
 
+    // StreamListener
+    void onNewConnection() override {
+      stats_.downstream_cx_total_.inc();
+      stats_.downstream_cx_active_.inc();
+      per_worker_stats_.downstream_cx_total_.inc();
+      per_worker_stats_.downstream_cx_active_.inc();
+      // Active connections on the handler (not listener). The per listener connections have already
+      // been incremented at this point either via the connection balancer or in the socket accept
+      // path if there is no configured balancer.
+      ++parent_.num_handler_connections_;
+    }
+    void onDestroyConnection() override {
+      stats_.downstream_cx_active_.dec();
+      stats_.downstream_cx_destroy_.inc();
+      per_worker_stats_.downstream_cx_active_.dec();
+      // Active listener connections (not handler).
+      decNumConnections();
+      // Active handler connections (not listener).
+      parent_.decNumConnections();
+    }
+    Network::ListenerConfig& listenerConfig() override { return *config_; }
+
+    Stats::TimespanPtr newTimespan(TimeSource& time_source) override;
+
     // Network::BalancedConnectionHandler
     uint64_t numConnections() const override { return num_listener_connections_; }
     void incNumConnections() override {
@@ -158,7 +195,7 @@ private:
      * Remove and destroy an active connection.
      * @param connection supplies the connection to remove.
      */
-    void removeConnection(ActiveTcpConnection& connection);
+    void removeConnection(ActiveTcpConnection& connection) override;
 
     /**
      * Create a new connection from a socket accepted by the listener.
@@ -201,7 +238,8 @@ private:
    * Wrapper for an active internal listener owned by this handler.
    */
   class ActiveInternalListener : public Network::InternalListenerCallbacks,
-                                 public ActiveListenerImplBase {
+                                 public ActiveListenerImplBase,
+                                 public StreamListener {
   public:
     ActiveInternalListener(ConnectionHandlerImpl& parent, Network::ListenerConfig& config);
 
@@ -223,11 +261,29 @@ private:
     void resumeListening() override { internal_listener_->enable(); }
     void shutdownListener() override;
 
+    // StreamListener
+    void onNewConnection() override {
+      stats_.downstream_cx_total_.inc();
+      stats_.downstream_cx_active_.inc();
+      per_worker_stats_.downstream_cx_total_.inc();
+      per_worker_stats_.downstream_cx_active_.inc();
+      ++parent_.num_handler_connections_;
+    }
+    void onDestroyConnection() override {
+      stats_.downstream_cx_active_.dec();
+      stats_.downstream_cx_destroy_.inc();
+      per_worker_stats_.downstream_cx_active_.dec();
+      decNumConnections();
+      parent_.decNumConnections();
+    }
+    Network::ListenerConfig& listenerConfig() override { return *config_; }
+    Stats::TimespanPtr newTimespan(TimeSource& time_source) override;
+
     /**
      * Remove and destroy an active connection.
      * @param connection supplies the connection to remove.
      */
-    void removeConnection(ActiveTcpConnection& connection);
+    void removeConnection(ActiveTcpConnection& connection) override;
 
     /**
      * Create a new connection from a socket accepted by the listener.
@@ -271,11 +327,11 @@ private:
    */
   class ActiveConnections : public Event::DeferredDeletable {
   public:
-    ActiveConnections(ActiveTcpListener& listener, const Network::FilterChain& filter_chain);
+    ActiveConnections(StreamListener& listener, const Network::FilterChain& filter_chain);
     ~ActiveConnections() override;
 
-    // listener filter chain pair is the owner of the connections
-    ActiveTcpListener& listener_;
+    // Listener filter chain pair is the owner of the connections.
+    StreamListener& listener_;
     const Network::FilterChain& filter_chain_;
     // Owned connections
     std::list<ActiveTcpConnectionPtr> connections_;
@@ -457,18 +513,22 @@ private:
   using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
   using UdpListenerCallbacksOptRef =
       absl::optional<std::reference_wrapper<Network::UdpListenerCallbacks>>;
+  using ActiveInternalListenerOptRef =
+      absl::optional<std::reference_wrapper<ActiveInternalListener>>;
 
   struct ActiveListenerDetails {
     // Strong pointer to the listener, whether TCP, UDP, QUIC, etc.
     Network::ConnectionHandler::ActiveListenerPtr listener_;
 
     absl::variant<absl::monostate, std::reference_wrapper<ActiveTcpListener>,
-                  std::reference_wrapper<Network::UdpListenerCallbacks>>
+                  std::reference_wrapper<Network::UdpListenerCallbacks>,
+                  std::reference_wrapper<ActiveInternalListener>>
         typed_listener_;
 
     // Helpers for accessing the data in the variant for cleaner code.
     ActiveTcpListenerOptRef tcpListener();
     UdpListenerCallbacksOptRef udpListener();
+    ActiveInternalListenerOptRef internalListener();
   };
   using ActiveListenerDetailsOptRef = absl::optional<std::reference_wrapper<ActiveListenerDetails>>;
 

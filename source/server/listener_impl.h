@@ -309,6 +309,9 @@ public:
   Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
     return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
   }
+  bool isInternalListener() override {
+    return is_internal_listener_;
+  }
   Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
     return udp_listener_worker_router_
                ? Network::UdpListenerWorkerRouterOptRef(*udp_listener_worker_router_)
@@ -382,6 +385,7 @@ private:
   const bool workers_started_;
   const uint64_t hash_;
   const uint32_t tcp_backlog_size_;
+  const bool is_internal_listener_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 
   // A target is added to Server's InitManager if workers_started_ is false.

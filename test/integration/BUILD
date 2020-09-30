@@ -1544,3 +1544,34 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "internal_listener_integration_test",
+    srcs = [
+        "internal_listener_integration_test.cc",
+    ],
+    data = [
+    ],
+    tags = ["fails_on_windows"],
+    deps = [
+        ":integration_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:utility_lib",
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+    ],
+)

@@ -146,7 +146,7 @@ void BaseIntegrationTest::createEnvoy() {
   if (use_lds_) {
     // After the config has been finalized, write the final listener config to the lds file.
     const std::string lds_path = config_helper_.bootstrap().dynamic_resources().lds_config().path();
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) lds;
+    envoy::service::discovery::v3::DiscoveryResponse lds;
     lds.set_version_info("0");
     for (auto& listener : config_helper_.bootstrap().static_resources().listeners()) {
       ProtobufWkt::Any* resource = lds.add_resources();

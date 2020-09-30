@@ -21,8 +21,8 @@ namespace Network {
 namespace {
 // uint64_t next_internal_connection_id = 0;
 }
-void InternalListenerImpl::setupInternalListener(Event::DispatcherImpl& dispatcher) {
-  dispatcher.registerInternalListener(
+void InternalListenerImpl::setupInternalListener() {
+  dispatcher_.registerInternalListener(
       internal_listener_id_,
       [this](const Address::InstanceConstSharedPtr&,
              std::unique_ptr<Network::ConnectionSocket> internal_conn_socket) {

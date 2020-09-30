@@ -146,7 +146,10 @@ public:
    */
   virtual UdpPacketWriterFactoryOptRef udpPacketWriterFactory() PURE;
 
-  virtual bool isInternalListener() { return false; }
+  /**
+   * @return true if this listener is internal listener.
+   */
+  virtual bool isInternalListener() PURE;
 
   /**
    * @return the ``UdpListenerWorkerRouter`` for this listener. This will

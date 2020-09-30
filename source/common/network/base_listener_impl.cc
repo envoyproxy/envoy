@@ -15,14 +15,18 @@
 namespace Envoy {
 namespace Network {
 
-BaseListenerImpl::BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket)
-    : local_address_(nullptr), dispatcher_(dispatcher), socket_(std::move(socket)) {
-  const auto ip = socket_->localAddress()->ip();
+BaseListenerImpl::BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
+                                   const Address::InstanceConstSharedPtr& local_address)
+    : local_address_(local_address), dispatcher_(dispatcher), socket_(std::move(socket)) {
+      
+  if (socket_ != nullptr) {
+    const auto ip = socket_->localAddress()->ip();
 
-  // Only use the listen socket's local address for new connections if it is not the all hosts
-  // address (e.g., 0.0.0.0 for IPv4).
-  if (!(ip && ip->isAnyAddress())) {
-    local_address_ = socket_->localAddress();
+    // Only use the listen socket's local address for new connections if it is not the all hosts
+    // address (e.g., 0.0.0.0 for IPv4).
+    if (!(ip && ip->isAnyAddress())) {
+      local_address_ = socket_->localAddress();
+    }
   }
 }
 

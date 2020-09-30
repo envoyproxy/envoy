@@ -345,6 +345,9 @@ private:
     Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    bool isInternalListener() override {
+      return false;
+    }
     Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }

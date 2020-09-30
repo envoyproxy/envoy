@@ -238,6 +238,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       workers_started_(workers_started), hash_(hash),
       tcp_backlog_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
+      is_internal_listener_(config.has_internal_listener()),    
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
@@ -317,6 +318,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       workers_started_(workers_started), hash_(hash),
       tcp_backlog_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
+      is_internal_listener_(config.has_internal_listener()),    
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),

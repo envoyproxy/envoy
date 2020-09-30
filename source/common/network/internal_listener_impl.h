@@ -18,10 +18,8 @@ public:
   void disable() override;
   void enable() override;
 
-protected:
-  void setupInternalListener(Event::DispatcherImpl& dispatcher);
+  void setupInternalListener();
 
-  // TODO(lambdai): make it private
 public:
   std::string internal_listener_id_;
   Event::DispatcherImpl& dispatcher_;

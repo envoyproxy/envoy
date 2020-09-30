@@ -346,11 +346,16 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   } else {
     connection_options = options;
   }
-  ASSERT(!address->envoyInternalAddress());
-  Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, cluster.sourceAddress(),
-      socket_factory.createTransportSocket(std::move(transport_socket_options)),
-      connection_options);
+  Network::ClientConnectionPtr connection;
+  if (address->envoyInternalAddress()) {
+    ASSERT(cluster.sourceAddress() == nullptr || cluster.sourceAddress()->envoyInternalAddress());
+    connection = dispatcher.createInternalConnection(address, cluster.sourceAddress());
+  } else {
+    connection = dispatcher.createClientConnection(
+        address, cluster.sourceAddress(),
+        socket_factory.createTransportSocket(std::move(transport_socket_options)),
+        connection_options);
+  }
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);
   return connection;
