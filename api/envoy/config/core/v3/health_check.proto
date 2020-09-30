@@ -54,7 +54,7 @@ enum HealthStatus {
   DEGRADED = 5;
 }
 
-// [#next-free-field: 24]
+// [#next-free-field: 25]
 message HealthCheck {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HealthCheck";
 
@@ -354,4 +354,15 @@ message HealthCheck {
   // the cluster's :ref:`transport socket <envoy_api_field_config.cluster.v3.Cluster.transport_socket>`
   // will be used for health check socket configuration.
   google.protobuf.Struct transport_socket_match_criteria = 23;
+
+  // The "no traffic healthy interval" is a special health check interval that is used when a cluster has
+  // never had traffic routed to it but is a healthy cluster.
+  // This lower interval allows cluster information to be kept up to
+  // date, without sending a potentially large amount of active health checking traffic for no
+  // reason. Once a cluster has been used for traffic routing, Envoy will shift back to using the
+  // standard health check interval that is defined.
+
+  // If no_traffic_healthy_interval is set, it will default to the
+  // no traffic interval
+  google.protobuf.Duration no_traffic_healthy_interval = 24 [(validate.rules).duration = {gt {}}];
 }
