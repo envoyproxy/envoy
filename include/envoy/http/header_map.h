@@ -512,6 +512,32 @@ public:
    */
   virtual const HeaderEntry* get(const LowerCaseString& key) const PURE;
 
+  /**
+   * This is a wrapper for the return result from getAll(). It avoids a copy when translating from
+   * non-const HeaderEntry to const HeaderEntry and only provides const access to the result.
+   */
+  using NonConstGetResult = absl::InlinedVector<HeaderEntry*, 1>;
+  class GetResult {
+  public:
+    GetResult() = default;
+    explicit GetResult(NonConstGetResult&& result) : result_(std::move(result)) {}
+    void operator=(GetResult&& rhs) noexcept { result_ = std::move(rhs.result_); }
+
+    bool empty() const { return result_.empty(); }
+    size_t size() const { return result_.size(); }
+    const HeaderEntry* operator[](size_t i) const { return result_[i]; }
+
+  private:
+    NonConstGetResult result_;
+  };
+
+  /**
+   * Get a header by key.
+   * @param key supplies the header key.
+   * @return all header entries matching the key.
+   */
+  virtual GetResult getAll(const LowerCaseString& key) const PURE;
+
   // aliases to make iterate() and iterateReverse() callbacks easier to read
   enum class Iterate { Continue, Break };
 
@@ -729,12 +755,14 @@ public:
   INLINE_REQ_HEADERS(DEFINE_INLINE_HEADER)
 };
 using RequestHeaderMapPtr = std::unique_ptr<RequestHeaderMap>;
+using RequestHeaderMapOptRef = absl::optional<std::reference_wrapper<RequestHeaderMap>>;
 
 // Request trailers.
 class RequestTrailerMap
     : public HeaderMap,
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestTrailers> {};
 using RequestTrailerMapPtr = std::unique_ptr<RequestTrailerMap>;
+using RequestTrailerMapOptRef = absl::optional<std::reference_wrapper<RequestTrailerMap>>;
 
 // Base class for both response headers and trailers.
 class ResponseHeaderOrTrailerMap {
@@ -753,6 +781,7 @@ public:
   INLINE_RESP_HEADERS(DEFINE_INLINE_HEADER)
 };
 using ResponseHeaderMapPtr = std::unique_ptr<ResponseHeaderMap>;
+using ResponseHeaderMapOptRef = absl::optional<std::reference_wrapper<ResponseHeaderMap>>;
 
 // Response trailers.
 class ResponseTrailerMap
@@ -760,6 +789,7 @@ class ResponseTrailerMap
       public HeaderMap,
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::ResponseTrailers> {};
 using ResponseTrailerMapPtr = std::unique_ptr<ResponseTrailerMap>;
+using ResponseTrailerMapOptRef = absl::optional<std::reference_wrapper<ResponseTrailerMap>>;
 
 /**
  * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.

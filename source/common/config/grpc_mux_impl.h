@@ -20,6 +20,7 @@
 #include "common/config/api_version.h"
 #include "common/config/grpc_stream.h"
 #include "common/config/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -47,7 +48,12 @@ public:
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
-                           OpaqueResourceDecoder& resource_decoder) override;
+                           OpaqueResourceDecoder& resource_decoder,
+                           const bool use_namespace_matching = false) override;
+
+  void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
   void handleDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message);
@@ -55,6 +61,7 @@ public:
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override;
   void onEstablishmentFailure() override;
+  void registerVersionedTypeUrl(const std::string& type_url);
   void
   onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
                       ControlPlaneStats& control_plane_stats) override;
@@ -142,6 +149,7 @@ private:
   // This string is a type URL.
   std::unique_ptr<std::queue<std::string>> request_queue_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
+  bool enable_type_url_downgrade_and_upgrade_;
 };
 
 using GrpcMuxImplPtr = std::unique_ptr<GrpcMuxImpl>;
@@ -159,8 +167,12 @@ public:
   }
 
   GrpcMuxWatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
-                           OpaqueResourceDecoder&) override {
+                           OpaqueResourceDecoder&, const bool) override {
     ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
+  }
+
+  void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   void onWriteable() override {}

@@ -123,11 +123,12 @@ jobs:
 
   - job: docker
     displayName: "Linux multi-arch docker"
-    dependsOn: ["release","release_arm64"]
-    condition: and(succeeded(), eq(variables['PostSubmit'], 'true'), ne(variables['Build.Reason'], 'PullRequest'))
+    dependsOn: ["release", "release_arm64"]
     pool:
       vmImage: "ubuntu-18.04"
     steps:
+      - bash: .azure-pipelines/cleanup.sh
+        displayName: "Removing tools from agent"
       - task: DownloadBuildArtifacts@0
         inputs:
           buildType: current
@@ -153,6 +154,29 @@ jobs:
           AZP_SHA1: $(Build.SourceVersion)
           DOCKERHUB_USERNAME: $(DockerUsername)
           DOCKERHUB_PASSWORD: $(DockerPassword)
+      - task: PublishBuildArtifacts@1
+        inputs:
+          pathtoPublish: "$(Build.StagingDirectory)/build_images"
+          artifactName: docker
+        condition: always()
+
+  - job: examples
+    dependsOn: ["docker"]
+    displayName: "Verify examples run as documented"
+    pool:
+      vmImage: "ubuntu-18.04"
+    steps:
+      - task: DownloadBuildArtifacts@0
+        inputs:
+          buildType: current
+          artifactName: "docker"
+          itemPattern: "docker/envoy-docker-images.tar.xz"
+          downloadType: single
+          targetPath: $(Build.StagingDirectory)
+      - bash: ./ci/do_ci.sh verify_examples
+        env:
+          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+          NO_BUILD_SETUP: 1
 
   - job: macOS
     dependsOn: ["format"]
@@ -166,7 +190,7 @@ jobs:
       - script: ./ci/mac_ci_steps.sh
         displayName: "Run Mac CI"
         env:
-          BAZEL_BUILD_EXTRA_OPTIONS: --remote_download_toplevel
+          BAZEL_BUILD_EXTRA_OPTIONS: "--remote_download_toplevel --flaky_test_attempts=2"
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
@@ -177,17 +201,32 @@ jobs:
           testRunTitle: "macOS"
         condition: always()
 
+      - script: ./ci/flaky_test/run_process_xml_mac.sh
+        displayName: "Process Test Results"
+        env:
+          TEST_TMPDIR: $(Build.SourcesDirectory)
+          SLACK_TOKEN: $(SLACK_TOKEN)
+          CI_TARGET: "MacOS"
+          REPO_URI: $(Build.Repository.Uri)
+          BUILD_URI: $(Build.BuildUri)
+
   - job: Windows
     dependsOn: ["format"]
     timeoutInMinutes: 360
     pool:
       vmImage: "windows-latest"
     steps:
-      - bash: ci/run_envoy_docker_windows.sh ci/windows_ci_steps.sh
+      - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
         displayName: "Run Windows CI"
         env:
+          ENVOY_DOCKER_BUILD_DIR: "$(Build.StagingDirectory)"
           ENVOY_RBE: "true"
           BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs)"
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+      - task: PublishBuildArtifacts@1
+        inputs:
+          pathtoPublish: "$(Build.StagingDirectory)/envoy"
+          artifactName: windows.release
+        condition: always()

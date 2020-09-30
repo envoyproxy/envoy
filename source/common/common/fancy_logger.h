@@ -13,6 +13,7 @@ namespace Envoy {
 using SpdLoggerSharedPtr = std::shared_ptr<spdlog::logger>;
 using FancyMap = absl::flat_hash_map<std::string, SpdLoggerSharedPtr>;
 using FancyMapPtr = std::shared_ptr<FancyMap>;
+using FancyLogLevelMap = absl::flat_hash_map<std::string, spdlog::level::level_enum>;
 
 /**
  * Stores the lock and functions used by Fancy Logger's macro so that we don't need to declare
@@ -38,10 +39,28 @@ public:
       ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
   /**
-   * Sets the default logger level and format when updating context.
+   * Sets the default logger level and format when updating context. It should only be used in
+   * Context, otherwise the fancy_default_level will possibly be inconsistent with the actual
+   * logger level.
    */
   void setDefaultFancyLevelFormat(spdlog::level::level_enum level, std::string format)
       ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
+
+  /**
+   * Lists keys and levels of all loggers in a string for admin page usage.
+   */
+  std::string listFancyLoggers() ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
+
+  /**
+   * Sets the levels of all loggers.
+   */
+  void setAllFancyLoggers(spdlog::level::level_enum level) ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
+
+  /**
+   * Obtain a map from logger key to log level. Useful for testing, e.g. in macros such as
+   * EXPECT_LOG_CONTAINS_ALL_OF_HELPER.
+   */
+  FancyLogLevelMap getAllFancyLogLevelsForTest() ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
 private:
   /**
@@ -82,11 +101,13 @@ FancyContext& getFancyContext();
     static std::atomic<spdlog::logger*> flogger{0};                                                \
     spdlog::logger* local_flogger = flogger.load(std::memory_order_relaxed);                       \
     if (!local_flogger) {                                                                          \
-      getFancyContext().initFancyLogger(FANCY_KEY, flogger);                                       \
+      ::Envoy::getFancyContext().initFancyLogger(FANCY_KEY, flogger);                              \
       local_flogger = flogger.load(std::memory_order_relaxed);                                     \
     }                                                                                              \
-    local_flogger->log(spdlog::source_loc{__FILE__, __LINE__, __func__},                           \
-                       ENVOY_SPDLOG_LEVEL(LEVEL), __VA_ARGS__);                                    \
+    if (ENVOY_LOG_COMP_LEVEL(*local_flogger, LEVEL)) {                                             \
+      local_flogger->log(spdlog::source_loc{__FILE__, __LINE__, __func__},                         \
+                         ENVOY_SPDLOG_LEVEL(LEVEL), __VA_ARGS__);                                  \
+    }                                                                                              \
   } while (0)
 
 /**
@@ -107,7 +128,7 @@ FancyContext& getFancyContext();
  */
 #define FANCY_FLUSH_LOG()                                                                          \
   do {                                                                                             \
-    SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(FANCY_KEY);                          \
+    SpdLoggerSharedPtr p = ::Envoy::getFancyContext().getFancyLogEntry(FANCY_KEY);                 \
     if (p) {                                                                                       \
       p->flush();                                                                                  \
     }                                                                                              \

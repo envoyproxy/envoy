@@ -23,6 +23,19 @@ absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header) {
   return CelValue::CreateStringView(header->value().getStringView());
 }
 
+absl::optional<CelValue>
+convertHeaderEntry(Protobuf::Arena& arena,
+                   Http::HeaderUtility::GetAllOfHeaderAsStringResult&& result) {
+  if (!result.result().has_value()) {
+    return {};
+  } else if (!result.backingString().empty()) {
+    return CelValue::CreateString(
+        Protobuf::Arena::Create<std::string>(&arena, result.backingString()));
+  } else {
+    return CelValue::CreateStringView(result.result().value());
+  }
+}
+
 namespace {
 
 absl::optional<CelValue> extractSslInfo(const Ssl::ConnectionInfo& ssl_info,
@@ -129,6 +142,7 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
     if (code.has_value()) {
       return CelValue::CreateInt64(code.value());
     }
+    return {};
   } else if (value == Size) {
     return CelValue::CreateInt64(info_.bytesSent());
   } else if (value == Headers) {
@@ -150,6 +164,12 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
     return CelValue::CreateInt64(info_.bytesSent() +
                                  (headers_.value_ ? headers_.value_->byteSize() : 0) +
                                  (trailers_.value_ ? trailers_.value_->byteSize() : 0));
+  } else if (value == CodeDetails) {
+    const absl::optional<std::string>& details = info_.responseCodeDetails();
+    if (details.has_value()) {
+      return CelValue::CreateString(&details.value());
+    }
+    return {};
   }
   return {};
 }
@@ -230,6 +250,22 @@ absl::optional<CelValue> PeerWrapper::operator[](CelValue key) const {
     }
   }
 
+  return {};
+}
+
+absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
+  if (!key.IsString()) {
+    return {};
+  }
+  auto value = key.StringOrDie().value();
+  if (filter_state_.hasDataWithName(value)) {
+    const StreamInfo::FilterState::Object* object = filter_state_.getDataReadOnlyGeneric(value);
+    absl::optional<std::string> serialized = object->serializeAsString();
+    if (serialized.has_value()) {
+      std::string* out = ProtobufWkt::Arena::Create<std::string>(arena_, serialized.value());
+      return CelValue::CreateBytes(out);
+    }
+  }
   return {};
 }
 

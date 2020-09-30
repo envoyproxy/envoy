@@ -316,8 +316,7 @@ public:
 
   void createUpstreams() override {
     // Fake upstream with SSL/TLS for the first cluster.
-    fake_upstreams_.emplace_back(new FakeUpstream(
-        createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+    addFakeUpstream(createUpstreamSslContext(), FakeHttpConnection::Type::HTTP1);
     create_xds_upstream_ = true;
   }
 
@@ -474,9 +473,8 @@ public:
 
   void createUpstreams() override {
     // This is for backend with ssl
-    fake_upstreams_.emplace_back(new FakeUpstream(createUpstreamSslContext(context_manager_, *api_),
-                                                  0, FakeHttpConnection::Type::HTTP1, version_,
-                                                  timeSystem()));
+    addFakeUpstream(createUpstreamSslContext(context_manager_, *api_),
+                    FakeHttpConnection::Type::HTTP1);
     create_xds_upstream_ = true;
   }
 };
@@ -493,7 +491,6 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, BasicSuccess) {
   };
 
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // There is a race condition here; there are two static clusters:
   // backend cluster_0 with sds and sds_cluster. cluster_0 is created first, its init_manager
@@ -517,7 +514,6 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
     sendSdsResponse(getWrongSecret(client_cert_));
   };
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // Make a simple request, should get 503
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(

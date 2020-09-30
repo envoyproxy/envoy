@@ -10,6 +10,7 @@ HTTP filters
   aws_lambda_filter
   aws_request_signing_filter
   buffer_filter
+  cdn_loop_filter
   compressor_filter
   cors_filter
   csrf_filter
@@ -29,6 +30,7 @@ HTTP filters
   ip_tagging_filter
   jwt_authn_filter
   lua_filter
+  oauth2_filter
   on_demand_updates_filter
   original_src_filter
   rate_limit_filter
@@ -42,4 +44,6 @@ HTTP filters
   :hidden:
 
   ../../../api-v3/extensions/filters/http/admission_control/v3alpha/admission_control.proto
+  ../../../api-v3/extensions/filters/http/oauth2/v3alpha/oauth.proto
   ../../../api-v3/extensions/filters/http/cache/v3alpha/cache.proto
+  ../../../api-v3/extensions/filters/http/cdn_loop/v3alpha/cdn_loop.proto

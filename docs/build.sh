@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# set SPHINX_SKIP_CONFIG_VALIDATION environment variable to true to skip 
+# set SPHINX_SKIP_CONFIG_VALIDATION environment variable to true to skip
 # validation of configuration examples
 
 . tools/shell_utils.sh
@@ -35,7 +35,7 @@ else
 fi
 
 SCRIPT_DIR="$(dirname "$0")"
-SRC_DIR="$(dirname "$dir")"
+SRC_DIR="$(dirname "$SCRIPT_DIR")"
 API_DIR="${SRC_DIR}"/api
 CONFIGS_DIR="${SRC_DIR}"/configs
 BUILD_DIR=build_docs
@@ -55,11 +55,16 @@ pip3 install -r "${SCRIPT_DIR}"/requirements.txt
 # files still.
 rm -rf bazel-bin/external/envoy_api_canonical
 
-export EXTENSION_DB_PATH="$(realpath "${BUILD_DIR}/extension_db.json")"
+EXTENSION_DB_PATH="$(realpath "${BUILD_DIR}/extension_db.json")"
+export EXTENSION_DB_PATH
 
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
-BAZEL_BUILD_OPTIONS+=" --remote_download_outputs=all --strategy=protodoc=sandboxed,local
-    --action_env=ENVOY_BLOB_SHA --action_env=EXTENSION_DB_PATH"
+IFS=" " read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
+BAZEL_BUILD_OPTIONS+=(
+    "--remote_download_outputs=all"
+    "--strategy=protodoc=sandboxed,local"
+    "--action_env=ENVOY_BLOB_SHA"
+    "--action_env=EXTENSION_DB_PATH")
 
 # Generate extension database. This maps from extension name to extension
 # metadata, based on the envoy_cc_extension() Bazel target attributes.
@@ -70,28 +75,33 @@ BAZEL_BUILD_OPTIONS+=" --remote_download_outputs=all --strategy=protodoc=sandbox
 mkdir -p "${GENERATED_RST_DIR}"/intro/arch_overview/security
 ./docs/generate_extension_rst.py "${EXTENSION_DB_PATH}" "${GENERATED_RST_DIR}"/intro/arch_overview/security
 
+# Generate RST for external dependency docs in intro/arch_overview/security.
+./docs/generate_external_dep_rst.py "${GENERATED_RST_DIR}"/intro/arch_overview/security
+
 function generate_api_rst() {
+  local proto_target
   declare -r API_VERSION=$1
   echo "Generating ${API_VERSION} API RST..."
 
   # Generate the extensions docs
-  bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api_canonical//:"${API_VERSION}"_protos --aspects \
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" @envoy_api_canonical//:"${API_VERSION}"_protos --aspects \
     tools/protodoc/protodoc.bzl%protodoc_aspect --output_groups=rst
 
   # Fill in boiler plate for extensions that have google.protobuf.Empty as their
   # config.
-  bazel run ${BAZEL_BUILD_OPTIONS} //tools/protodoc:generate_empty \
-    "${PWD}"/docs/empty_extensions.json "${PWD}/${GENERATED_RST_DIR}"/api-"${API_VERSION}"/config
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/protodoc:generate_empty \
+    "${PWD}"/docs/empty_extensions.json "${PWD}/${GENERATED_RST_DIR}/api-${API_VERSION}"/config
 
   # We do ** matching below to deal with Bazel cache blah (source proto artifacts
   # are nested inside source package targets).
   shopt -s globstar
 
   # Find all source protos.
-  declare -r PROTO_TARGET=$(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//:${API_VERSION}_protos))")
+  proto_target=$(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//:${API_VERSION}_protos))")
+  declare -r proto_target
 
   # Only copy in the protos we care about and know how to deal with in protodoc.
-  for p in ${PROTO_TARGET}
+  for p in ${proto_target}
   do
     declare PROTO_FILE_WITHOUT_PREFIX="${p#@envoy_api_canonical//}"
     declare PROTO_FILE_CANONICAL="${PROTO_FILE_WITHOUT_PREFIX/://}"
@@ -127,11 +137,11 @@ cp -f "${API_DIR}"/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.
 mkdir -p "${GENERATED_RST_DIR}"/configuration/best_practices
 cp -f "${CONFIGS_DIR}"/google-vrp/envoy-edge.yaml "${GENERATED_RST_DIR}"/configuration/best_practices
 
-rsync -rav  $API_DIR/diagrams "${GENERATED_RST_DIR}/api-docs"
+rsync -rav  "${API_DIR}/diagrams" "${GENERATED_RST_DIR}/api-docs"
 
 rsync -av "${SCRIPT_DIR}"/root/ "${SCRIPT_DIR}"/conf.py "${SCRIPT_DIR}"/_ext "${GENERATED_RST_DIR}"
 
-# To speed up validate_fragment invocations in validating_code_block 
-bazel build ${BAZEL_BUILD_OPTIONS} //tools/config_validation:validate_fragment
+# To speed up validate_fragment invocations in validating_code_block
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/config_validation:validate_fragment
 
 sphinx-build -W --keep-going -b html "${GENERATED_RST_DIR}" "${DOCS_OUTPUT_DIR}"

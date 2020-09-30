@@ -32,6 +32,9 @@ def envoy_copts(repository, test = False):
         "-DNOMCX",
         "-DNOIME",
         "-DNOCRYPT",
+        # Ignore unguarded gcc pragmas in quiche (unrecognized by MSVC)
+        # TODO(wrowe): Drop this change when fixed in bazel/external/quiche.genrule_cmd
+        "-wd4068",
         # this is to silence the incorrect MSVC compiler warning when trying to convert between
         # std::optional data types while conversions between primitive types are producing no error
         "-wd4244",
@@ -42,9 +45,9 @@ def envoy_copts(repository, test = False):
                "//conditions:default": posix_options,
            }) + select({
                # Bazel adds an implicit -DNDEBUG for opt.
-               repository + "//bazel:opt_build": [] if test else ["-ggdb3"],
+               repository + "//bazel:opt_build": [] if test else ["-ggdb3", "-gsplit-dwarf"],
                repository + "//bazel:fastbuild_build": [],
-               repository + "//bazel:dbg_build": ["-ggdb3"],
+               repository + "//bazel:dbg_build": ["-ggdb3", "-gsplit-dwarf"],
                repository + "//bazel:windows_opt_build": [],
                repository + "//bazel:windows_fastbuild_build": [],
                repository + "//bazel:windows_dbg_build": [],

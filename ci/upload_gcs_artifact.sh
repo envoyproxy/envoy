@@ -22,5 +22,5 @@ BRANCH=${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}
 GCS_LOCATION="${GCS_ARTIFACT_BUCKET}/${BRANCH}/${TARGET_SUFFIX}"
 
 echo "Uploading to gs://${GCS_LOCATION} ..."
-gsutil -mq rsync -dr ${SOURCE_DIRECTORY} gs://${GCS_LOCATION}
+gsutil -mq rsync -dr "${SOURCE_DIRECTORY}" "gs://${GCS_LOCATION}"
 echo "Artifacts uploaded to: https://storage.googleapis.com/${GCS_LOCATION}/index.html"

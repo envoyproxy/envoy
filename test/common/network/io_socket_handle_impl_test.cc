@@ -2,8 +2,19 @@
 #include "common/network/io_socket_error_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 
+#include "test/mocks/api/mocks.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::_;
+using testing::DoAll;
+using testing::Eq;
+using testing::Invoke;
+using testing::NiceMock;
+using testing::Return;
+using testing::WithArg;
 
 namespace Envoy {
 namespace Network {
@@ -49,6 +60,45 @@ TEST(IoSocketHandleImplTest, TestIoSocketError) {
   EXPECT_EQ(IoSocketError::IoErrorCode::UnknownError, error9.getErrorCode());
   EXPECT_EQ(errorDetails(123), error9.getErrorDetails());
 }
+
+#ifdef TCP_INFO
+
+TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsEmptyOptionalIfGetSocketFails) {
+  NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
+  auto os_calls =
+      std::make_unique<Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl>>(
+          &os_sys_calls);
+  EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _)).WillOnce(Return(-1));
+
+  IoSocketHandleImpl io_handle;
+  EXPECT_THAT(io_handle.lastRoundTripTime(), Eq(absl::optional<std::chrono::milliseconds>{}));
+}
+
+TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
+  NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
+  auto os_calls =
+      std::make_unique<Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl>>(
+          &os_sys_calls);
+  EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
+      .WillOnce(DoAll(WithArg<3>(Invoke([](void* optval) {
+                        static_cast<struct tcp_info*>(optval)->tcpi_rtt = 35;
+                      })),
+                      Return(0)));
+
+  IoSocketHandleImpl io_handle;
+  EXPECT_THAT(io_handle.lastRoundTripTime(), Eq(absl::optional<std::chrono::milliseconds>{35}));
+}
+
+#endif
+
+#ifndef TCP_INFO
+
+TEST(IoSocketHandleImpl, LastRoundTripTimeAlwaysReturnsEmptyOptional) {
+  IoSocketHandleImpl io_handle;
+  EXPECT_THAT(io_handle.lastRoundTripTime(), Eq(absl::optional<std::chrono::milliseconds>{}));
+}
+
+#endif
 
 } // namespace
 } // namespace Network

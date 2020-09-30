@@ -115,7 +115,7 @@ message ExtAuthz {
   // Specifies if the peer certificate is sent to the external service.
   //
   // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
-  // :ref:`certificate<envoy_api_field_service.auth.v3.AttributeContext.Peer.certificate>`.
+  // :ref:`certificate<envoy_api_field_service.auth.v4alpha.AttributeContext.Peer.certificate>`.
   bool include_peer_certificate = 10;
 }
 
@@ -134,6 +134,13 @@ message BufferSettings {
   // The authorization request will be dispatched and no 413 HTTP error will be returned by the
   // filter.
   bool allow_partial_message = 2;
+
+  // If true, the body sent to the external authorization service is set with raw bytes, it sets
+  // the :ref:`raw_body<envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.raw_body>`
+  // field of HTTP request attribute context. Otherwise, :ref:`
+  // body<envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.body>` will be filled
+  // with UTF-8 string request body.
+  bool pack_as_bytes = 3;
 }
 
 // HttpService is used for raw HTTP communication between the filter and the authorization service.
@@ -253,7 +260,7 @@ message CheckSettings {
       "envoy.extensions.filters.http.ext_authz.v3.CheckSettings";
 
   // Context extensions to set on the CheckRequest's
-  // :ref:`AttributeContext.context_extensions<envoy_api_field_service.auth.v3.AttributeContext.context_extensions>`
+  // :ref:`AttributeContext.context_extensions<envoy_api_field_service.auth.v4alpha.AttributeContext.context_extensions>`
   //
   // Merge semantics for this field are such that keys from more specific configs override.
   //

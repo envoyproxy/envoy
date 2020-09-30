@@ -123,8 +123,10 @@ private:
  */
 class ResponseEncoderImpl : public StreamEncoderImpl, public ResponseEncoder {
 public:
-  ResponseEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
-      : StreamEncoderImpl(connection, header_key_formatter) {}
+  ResponseEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
+                      bool stream_error_on_invalid_http_message)
+      : StreamEncoderImpl(connection, header_key_formatter),
+        stream_error_on_invalid_http_message_(stream_error_on_invalid_http_message) {}
 
   bool startedResponse() { return started_response_; }
 
@@ -133,8 +135,13 @@ public:
   void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const ResponseTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
+  bool streamErrorOnInvalidHttpMessage() const override {
+    return stream_error_on_invalid_http_message_;
+  }
+
 private:
   bool started_response_{};
+  const bool stream_error_on_invalid_http_message_;
 };
 
 /**
@@ -204,7 +211,7 @@ public:
   bool maybeDirectDispatch(Buffer::Instance& data);
   virtual void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer&) {}
   CodecStats& stats() { return stats_; }
-  bool enableTrailers() const { return enable_trailers_; }
+  bool enableTrailers() const { return codec_settings_.enable_trailers_; }
 
   // Http::Connection
   Http::Status dispatch(Buffer::Instance& data) override;
@@ -225,9 +232,9 @@ public:
   Envoy::Http::Status codec_status_;
 
 protected:
-  ConnectionImpl(Network::Connection& connection, CodecStats& stats, http_parser_type type,
-                 uint32_t max_headers_kb, const uint32_t max_headers_count,
-                 HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers);
+  ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,
+                 http_parser_type type, uint32_t max_headers_kb, const uint32_t max_headers_count,
+                 HeaderKeyFormatterPtr&& header_key_formatter);
 
   // The following define special return values for http_parser callbacks. See:
   // https://github.com/nodejs/http-parser/blob/5c5b3ac62662736de9e71640a8dc16da45b32503/http_parser.h#L72
@@ -266,6 +273,7 @@ protected:
 
   Network::Connection& connection_;
   CodecStats& stats_;
+  const Http1Settings codec_settings_;
   http_parser parser_;
   Http::Code error_code_{Http::Code::BadRequest};
   const HeaderKeyFormatterPtr header_key_formatter_;
@@ -278,8 +286,6 @@ protected:
   // HTTP/1 message has been flushed from the parser. This allows raising an HTTP/2 style headers
   // block with end stream set to true with no further protocol data remaining.
   bool deferred_end_stream_headers_ : 1;
-  const bool connection_header_sanitization_ : 1;
-  const bool enable_trailers_ : 1;
   const bool strict_1xx_and_204_headers_ : 1;
   bool dispatching_ : 1;
 
@@ -463,8 +469,9 @@ protected:
    * An active HTTP/1.1 request.
    */
   struct ActiveRequest {
-    ActiveRequest(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
-        : response_encoder_(connection, header_key_formatter) {}
+    ActiveRequest(ServerConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+        : response_encoder_(connection, header_key_formatter,
+                            connection.codec_settings_.stream_error_on_invalid_http_message_) {}
 
     HeaderString request_url_;
     RequestDecoder* request_decoder_{};
@@ -532,7 +539,6 @@ private:
 
   ServerConnectionCallbacks& callbacks_;
   absl::optional<ActiveRequest> active_request_;
-  Http1Settings codec_settings_;
   const Buffer::OwnedBufferFragmentImpl::Releasor response_buffer_releasor_;
   uint32_t outbound_responses_{};
   // This defaults to 2, which functionally disables pipelining. If any users
@@ -559,7 +565,6 @@ public:
   ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                        ConnectionCallbacks& callbacks, const Http1Settings& settings,
                        const uint32_t max_response_headers_count);
-
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
 

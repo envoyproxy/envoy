@@ -207,7 +207,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       http2_options_(Http2::Utility::initializeAndValidateOptions(
           config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
-      http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
+      http1_settings_(Http::Utility::parseHttp1Settings(
+          config.http_protocol_options(), config.stream_error_on_invalid_http_message())),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
       max_request_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -580,13 +581,15 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
             "envoy.reloadable_features.new_codec_behavior")) {
       return std::make_unique<Http::Http2::ServerConnectionImpl>(
           connection, callbacks,
-          Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()), http2_options_,
-          maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+          Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
+          context_.random(), http2_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
+          headersWithUnderscoresAction());
     } else {
       return std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
           connection, callbacks,
-          Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()), http2_options_,
-          maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+          Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
+          context_.random(), http2_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
+          headersWithUnderscoresAction());
     }
   }
   case CodecType::HTTP3:
@@ -600,9 +603,9 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
             .createQuicServerConnection(connection, callbacks));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, context_.scope(), http1_codec_stats_, http2_codec_stats_,
-        http1_settings_, http2_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-        headersWithUnderscoresAction());
+        connection, data, callbacks, context_.scope(), context_.random(), http1_codec_stats_,
+        http2_codec_stats_, http1_settings_, http2_options_, maxRequestHeadersKb(),
+        maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }

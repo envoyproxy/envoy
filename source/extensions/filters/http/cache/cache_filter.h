@@ -22,7 +22,8 @@ namespace Cache {
  * A filter that caches responses and attempts to satisfy requests from cache.
  */
 class CacheFilter : public Http::PassThroughFilter,
-                    public Logger::Loggable<Logger::Id::cache_filter> {
+                    public Logger::Loggable<Logger::Id::cache_filter>,
+                    public std::enable_shared_from_this<CacheFilter> {
 public:
   CacheFilter(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config,
               const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source,
@@ -38,7 +39,8 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
 
 private:
-  // Utility functions: make any necessary checks and call the corresponding lookup_ functions.
+  // Utility functions; make any necessary checks and call the corresponding lookup_ functions
+  void getHeaders(Http::RequestHeaderMap& request_headers);
   void getBody();
   void getTrailers();
 
@@ -64,7 +66,6 @@ private:
   void injectValidationHeaders(Http::RequestHeaderMap& request_headers);
 
   // Precondition: lookup_result_ points to a fresh or validated cache look up result.
-  //               filter_state_ is ValidatingCachedResponse.
   // Adds a cache lookup result to the response encoding stream.
   // Can be called during decoding if a valid cache hit is found,
   // or during encoding if a cache entry was validated successfully.
@@ -80,9 +81,16 @@ private:
   InsertContextPtr insert_;
   LookupResultPtr lookup_result_;
 
-  // Tracks what body bytes still need to be read from the cache. This is currently only one Range,
-  // but will expand when full range support is added. Initialized by encodeCachedResponse.
-  std::vector<AdjustedByteRange> remaining_body_;
+  // Tracks what body bytes still need to be read from the cache. This is
+  // currently only one Range, but will expand when full range support is added. Initialized by
+  // onHeaders for Range Responses, otherwise initialized by encodeCachedResponse.
+  std::vector<AdjustedByteRange> remaining_ranges_;
+
+  // TODO(#12901): The allow list could be constructed only once directly from the config, instead
+  // of doing it per-request. A good example of such config is found in the gzip filter:
+  // source/extensions/filters/http/gzip/gzip_filter.h.
+  // Stores the allow list rules that decide if a header can be varied upon.
+  VaryHeader vary_allow_list_;
 
   // True if the response has trailers.
   // TODO(toddmgreer): cache trailers.
@@ -95,30 +103,29 @@ private:
   enum class FilterState {
     Initial,
 
-    // CacheFilter::decodeHeaders called lookup->getHeaders() but onHeaders was not called yet
-    // (lookup result not ready) -- the decoding stream should be stopped until the cache lookup
-    // result is ready.
-    WaitingForCacheLookup,
-
-    // CacheFilter::encodeHeaders called encodeCachedResponse() but encoding the cached response is
-    // not finished yet -- the encoding stream should be stopped until it is finished.
-    WaitingForCacheBody,
-
-    // Cache lookup did not find a cached response for this request.
-    NoCachedResponseFound,
-
-    // Cache lookup found a cached response that requires validation.
+    // Cache lookup found a cached response that requires validation
     ValidatingCachedResponse,
 
     // Cache lookup found a fresh cached response and it is being added to the encoding stream.
     DecodeServingFromCache,
 
+    // A cached response was successfully validated and it is being added to the encoding stream
+    EncodeServingFromCache,
+
     // The cached response was successfully added to the encoding stream (either during decoding or
     // encoding).
-    ResponseServedFromCache
+    ResponseServedFromCache,
+
+    // CacheFilter::onDestroy has been called, the filter will be destroyed soon. Any triggered
+    // callbacks should be ignored.
+    Destroyed
   };
+
   FilterState filter_state_ = FilterState::Initial;
 };
+
+using CacheFilterSharedPtr = std::shared_ptr<CacheFilter>;
+using CacheFilterWeakPtr = std::weak_ptr<CacheFilter>;
 
 } // namespace Cache
 } // namespace HttpFilters

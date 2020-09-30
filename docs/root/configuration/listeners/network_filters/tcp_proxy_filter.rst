@@ -34,6 +34,9 @@ To define metadata that a suitable upstream host must match, use one of the foll
    and :ref:`ClusterWeight.metadata_match<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.WeightedCluster.ClusterWeight.metadata_match>`
    to define required metadata for a weighted upstream cluster (metadata from the latter will be merged on top of the former).
 
+In addition, dynamic metadata can be set by earlier network filters on the `StreamInfo`. Setting the dynamic metadata
+must happen before `onNewConnection()` is called on the `TcpProxy` filter to affect load balancing.
+
 .. _config_network_filters_tcp_proxy_stats:
 
 Statistics
@@ -56,5 +59,6 @@ statistics are rooted at *tcp.<stat_prefix>.* with the following statistics:
   downstream_flow_control_paused_reading_total, Counter, Total number of times flow control paused reading from downstream
   downstream_flow_control_resumed_reading_total, Counter, Total number of times flow control resumed reading from downstream
   idle_timeout, Counter, Total number of connections closed due to idle timeout
+  max_downstream_connection_duration, Counter, Total number of connections closed due to max_downstream_connection_duration timeout
   upstream_flush_total, Counter, Total number of connections that continued to flush upstream data after the downstream connection was closed
   upstream_flush_active, Gauge, Total connections currently continuing to flush upstream data after the downstream connection was closed

@@ -184,6 +184,29 @@ following are the command line options that Envoy supports.
   The :ref:`hot restart wrapper <operations_hot_restarter>` sets the *RESTART_EPOCH* environment
   variable which should be passed to this option in most cases.
 
+.. option:: --enable-fine-grain-logging
+
+  *(optional)* Enables fine-grain logger with file level log control and runtime update at administration
+  interface. If enabled, main log macros including `ENVOY_LOG`, `ENVOY_CONN_LOG`, `ENVOY_STREAM_LOG` and
+  `ENVOY_FLUSH_LOG` will use a per-file logger, and the usage doesn't need `Envoy::Logger::Loggable` any 
+  more. The administration interface usage is similar. Please see `Administration interface 
+  <https://www.envoyproxy.io/docs/envoy/latest/operations/admin>`_ for more detail.
+
+.. option:: --socket-path <path string>
+
+  *(optional)* The output file path to the socket address for :ref:`hot restart <arch_overview_hot_restart>`.
+  Default to "@envoy_domain_socket" which will be created in the abstract namespace. Suffix _{role}_{id}
+  is appended to provide name. All envoy processes wanting to participate in hot-restart together must
+  use the same value for this option.
+
+  **NOTE**: The path started with "@" will be created in the abstract namespace.
+
+.. option:: --socket-mode <string>
+
+  *(optional)* The socket file permission for :ref:`hot restart <arch_overview_hot_restart>`.
+  This must be a valid octal file permission, such as 644. The default value is 600.
+  This flag may not be used when :option:`--socket-path` is start with "@" or not set.
+
 .. option:: --hot-restart-version
 
   *(optional)* Outputs an opaque hot restart compatibility version for the binary. This can be

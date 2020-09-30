@@ -14,7 +14,7 @@ namespace NetworkFilters {
 namespace MySQLProxy {
 
 MySQLFilterConfig::MySQLFilterConfig(const std::string& stat_prefix, Stats::Scope& scope)
-    : scope_(scope), stat_prefix_(stat_prefix), stats_(generateStats(stat_prefix, scope)) {}
+    : scope_(scope), stats_(generateStats(stat_prefix, scope)) {}
 
 MySQLFilter::MySQLFilter(MySQLFilterConfigSharedPtr config) : config_(std::move(config)) {}
 

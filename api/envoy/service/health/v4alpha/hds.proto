@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.service.health.v4alpha;
 
+import "envoy/config/cluster/v4alpha/cluster.proto";
 import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/health_check.proto";
 import "envoy/config/endpoint/v3/endpoint_components.proto";
@@ -132,11 +133,10 @@ message EndpointHealthResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.health.v3.EndpointHealthResponse";
 
-  // [#comment:TODO(drewsortega): add deprecate annotation once cluster_endpoints_health is implemented]
-  // Deprecated - Flat list of endpoint health information.
-  repeated EndpointHealth endpoints_health = 1;
+  reserved 1;
 
-  // [#not-implemented-hide:]
+  reserved "endpoints_health";
+
   // Organize Endpoint health information by cluster.
   repeated ClusterEndpointsHealth cluster_endpoints_health = 2;
 }
@@ -174,6 +174,11 @@ message ClusterHealthCheck {
   repeated config.core.v4alpha.HealthCheck health_checks = 2;
 
   repeated LocalityEndpoints locality_endpoints = 3;
+
+  // Optional map that gets filtered by :ref:`health_checks.transport_socket_match_criteria <envoy_api_field_config.core.v4alpha.HealthCheck.transport_socket_match_criteria>`
+  // on connection when health checking. For more details, see
+  // :ref:`config.cluster.v3.Cluster.transport_socket_matches <envoy_api_field_config.cluster.v4alpha.Cluster.transport_socket_matches>`.
+  repeated config.cluster.v4alpha.Cluster.TransportSocketMatch transport_socket_matches = 4;
 }
 
 message HealthCheckSpecifier {

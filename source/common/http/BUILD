@@ -158,6 +158,25 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "filter_manager_lib",
+    srcs = [
+        "filter_manager.cc",
+    ],
+    hdrs = [
+        "filter_manager.h",
+    ],
+    deps = [
+        ":headers_lib",
+        "//include/envoy/http:filter_interface",
+        "//source/common/buffer:watermark_buffer_lib",
+        "//source/common/common:linked_object",
+        "//source/common/common:scope_tracker",
+        "//source/common/grpc:common_lib",
+        "//source/common/local_reply:local_reply_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_manager_lib",
     srcs = [
         "conn_manager_impl.cc",
@@ -171,6 +190,7 @@ envoy_cc_library(
         ":codes_lib",
         ":conn_manager_config_interface",
         ":exception_lib",
+        ":filter_manager_lib",
         ":header_map_lib",
         ":header_utility_lib",
         ":headers_lib",
@@ -220,6 +240,7 @@ envoy_cc_library(
         "//source/common/http/http3:well_known_names",
         "//source/common/network:utility_lib",
         "//source/common/router:config_lib",
+        "//source/common/router:scoped_rds_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
@@ -285,6 +306,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:non_copyable",
         "//source/common/common:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/singleton:const_singleton",
     ],
 )
@@ -349,6 +371,7 @@ envoy_cc_library(
     external_deps = [
         "abseil_node_hash_set",
         "abseil_optional",
+        "http_parser",
         "nghttp2",
     ],
     deps = [
@@ -400,12 +423,10 @@ envoy_cc_library(
     name = "path_utility_lib",
     srcs = ["path_utility.cc"],
     hdrs = ["path_utility.h"],
-    external_deps = [
-        "abseil_optional",
-        "googleurl",
-    ],
+    external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/http:header_map_interface",
+        "//source/common/chromium_url",
         "//source/common/common:logger_lib",
     ],
 )
@@ -423,6 +444,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/server:request_id_extension_config_interface",
+        "//source/common/common:random_generator_lib",
         "//source/common/config:utility_lib",
         "//source/common/runtime:runtime_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -439,19 +461,5 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:codes_interface",
         "//source/common/common:assert_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "url_utility_lib",
-    srcs = ["url_utility.cc"],
-    hdrs = ["url_utility.h"],
-    external_deps = [
-        "googleurl",
-    ],
-    deps = [
-        "//source/common/common:assert_lib",
-        "//source/common/common:empty_string",
-        "//source/common/common:utility_lib",
     ],
 )

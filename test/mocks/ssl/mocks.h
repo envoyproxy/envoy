@@ -29,6 +29,7 @@ public:
               (Stats::Scope & stats, const ServerContextConfig& config,
                const std::vector<std::string>& server_names));
   MOCK_METHOD(size_t, daysUntilFirstCertExpires, (), (const));
+  MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(void, iterateContexts, (std::function<void(const Context&)> callback));
   MOCK_METHOD(Ssl::PrivateKeyMethodManager&, privateKeyMethodManager, ());
 };
@@ -58,7 +59,6 @@ public:
   MOCK_METHOD(uint16_t, ciphersuiteId, (), (const));
   MOCK_METHOD(std::string, ciphersuiteString, (), (const));
   MOCK_METHOD(const std::string&, tlsVersion, (), (const));
-  MOCK_METHOD(absl::optional<std::string>, x509Extension, (absl::string_view), (const));
 };
 
 class MockClientContext : public ClientContext {
@@ -67,6 +67,7 @@ public:
   ~MockClientContext() override;
 
   MOCK_METHOD(size_t, daysUntilFirstCertExpires, (), (const));
+  MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(CertificateDetailsPtr, getCaCertInformation, (), (const));
   MOCK_METHOD(std::vector<CertificateDetailsPtr>, getCertChainInformation, (), (const));
 };
@@ -86,6 +87,9 @@ public:
   MOCK_METHOD(unsigned, maxProtocolVersion, (), (const));
   MOCK_METHOD(bool, isReady, (), (const));
   MOCK_METHOD(void, setSecretUpdateCallback, (std::function<void()> callback));
+
+  MOCK_METHOD(Ssl::HandshakerFactoryCb, createHandshaker, (), (const, override));
+  MOCK_METHOD(Ssl::HandshakerCapabilities, capabilities, (), (const, override));
 
   MOCK_METHOD(const std::string&, serverNameIndication, (), (const));
   MOCK_METHOD(bool, allowRenegotiation, (), (const));
@@ -110,7 +114,11 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::seconds>, sessionTimeout, (), (const));
   MOCK_METHOD(void, setSecretUpdateCallback, (std::function<void()> callback));
 
+  MOCK_METHOD(Ssl::HandshakerFactoryCb, createHandshaker, (), (const, override));
+  MOCK_METHOD(Ssl::HandshakerCapabilities, capabilities, (), (const, override));
+
   MOCK_METHOD(bool, requireClientCertificate, (), (const));
+  MOCK_METHOD(OcspStaplePolicy, ocspStaplePolicy, (), (const));
   MOCK_METHOD(const std::vector<SessionTicketKey>&, sessionTicketKeys, (), (const));
   MOCK_METHOD(bool, disableStatelessSessionResumption, (), (const));
 };
@@ -124,6 +132,8 @@ public:
   MOCK_METHOD(const std::string&, certificateChainPath, (), (const));
   MOCK_METHOD(const std::string&, privateKey, (), (const));
   MOCK_METHOD(const std::string&, privateKeyPath, (), (const));
+  MOCK_METHOD(const std::vector<uint8_t>&, ocspStaple, (), (const));
+  MOCK_METHOD(const std::string&, ocspStaplePath, (), (const));
   MOCK_METHOD(const std::string&, password, (), (const));
   MOCK_METHOD(const std::string&, passwordPath, (), (const));
   MOCK_METHOD(Envoy::Ssl::PrivateKeyMethodProviderSharedPtr, privateKeyMethod, (), (const));

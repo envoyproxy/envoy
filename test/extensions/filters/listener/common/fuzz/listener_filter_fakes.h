@@ -49,6 +49,8 @@ public:
 
   Api::SysCallIntResult getSocketOption(int level, int, void* optval, socklen_t*) const override;
 
+  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
+
 private:
   const Network::IoHandlePtr io_handle_;
   Network::Address::InstanceConstSharedPtr local_address_;
@@ -63,6 +65,7 @@ private:
 class FakeOsSysCalls : public Api::OsSysCallsImpl {
 public:
   MOCK_METHOD(Api::SysCallSizeResult, recv, (os_fd_t, void*, size_t, int));
+  MOCK_METHOD(Api::SysCallIntResult, ioctl, (os_fd_t, unsigned long int, void*));
 };
 
 } // namespace ListenerFilters

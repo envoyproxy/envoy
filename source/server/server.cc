@@ -32,9 +32,9 @@
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
-#include "common/network/listener_impl.h"
 #include "common/network/socket_interface.h"
 #include "common/network/socket_interface_impl.h"
+#include "common/network/tcp_listener_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
@@ -67,14 +67,14 @@ InstanceImpl::InstanceImpl(
                                              options.ignoreUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
-      api_(new Api::Impl(thread_factory, store, time_system, file_system,
+      random_generator_(std::move(random_generator)),
+      api_(new Api::Impl(thread_factory, store, time_system, file_system, *random_generator_,
                          process_context ? ProcessContextOptRef(std::ref(*process_context))
                                          : absl::nullopt)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
-      handler_(new ConnectionHandlerImpl(*dispatcher_)),
-      random_generator_(std::move(random_generator)), listener_component_factory_(*this),
-      worker_factory_(thread_local_, *api_, hooks),
+      handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
+      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       terminated_(false),
@@ -216,6 +216,13 @@ void InstanceImpl::updateServerStats() {
                                         parent_stats.parent_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
+
+  auto secs_until_ocsp_response_expires =
+      sslContextManager().secondsUntilFirstOcspResponseExpires();
+  if (secs_until_ocsp_response_expires) {
+    server_stats_->seconds_until_first_ocsp_response_expiring_.set(
+        secs_until_ocsp_response_expires.value());
+  }
   server_stats_->state_.set(
       enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
   server_stats_->stats_recent_lookups_.set(
@@ -491,8 +498,12 @@ void InstanceImpl::initialize(const Options& options,
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
-  if (bootstrap_.dynamic_resources().has_lds_config()) {
-    listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config());
+  if (bootstrap_.dynamic_resources().has_lds_config() ||
+      bootstrap_.dynamic_resources().has_lds_resources_locator()) {
+    listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config(),
+                                    bootstrap_.dynamic_resources().has_lds_resources_locator()
+                                        ? &bootstrap_.dynamic_resources().lds_resources_locator()
+                                        : nullptr);
   }
 
   // We have to defer RTDS initialization until after the cluster manager is
@@ -513,7 +524,10 @@ void InstanceImpl::initialize(const Options& options,
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, *api_);
+  main_thread_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
+      stats_store_, config_.mainThreadWatchdogConfig(), *api_, "main_thread");
+  worker_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
+      stats_store_, config_.workerWatchdogConfig(), *api_, "workers");
 }
 
 void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
@@ -542,16 +556,16 @@ void InstanceImpl::onRuntimeReady() {
 
   // If there is no global limit to the number of active connections, warn on startup.
   // TODO (tonya11en): Move this functionality into the overload manager.
-  if (!runtime().snapshot().get(Network::ListenerImpl::GlobalMaxCxRuntimeKey)) {
+  if (!runtime().snapshot().get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
     ENVOY_LOG(warn,
               "there is no configured limit to the number of allowed active connections. Set a "
               "limit via the runtime key {}",
-              Network::ListenerImpl::GlobalMaxCxRuntimeKey);
+              Network::TcpListenerImpl::GlobalMaxCxRuntimeKey);
   }
 }
 
 void InstanceImpl::startWorkers() {
-  listener_manager_->startWorkers(*guard_dog_);
+  listener_manager_->startWorkers(*worker_guard_dog_);
   initialization_timer_->complete();
   // Update server stats as soon as initialization is done.
   updateServerStats();
@@ -661,13 +675,13 @@ void InstanceImpl::run() {
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
-  auto watchdog =
-      guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "main_thread");
+  auto watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
+                                                         "main_thread");
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");
-  guard_dog_->stopWatching(watchdog);
+  main_thread_guard_dog_->stopWatching(watchdog);
   watchdog.reset();
 
   terminate();

@@ -95,6 +95,8 @@ public:
   const std::string RATELIMIT_PREFIX = "envoy.ratelimit_prefix";
   // Stats prefix for the TCP Proxy network filter
   const std::string TCP_PREFIX = "envoy.tcp_prefix";
+  // Stats prefix for the UDP Proxy network filter
+  const std::string UDP_PREFIX = "envoy.udp_prefix";
   // Downstream cluster for the Fault http filter
   const std::string FAULT_DOWNSTREAM_CLUSTER = "envoy.fault_downstream_cluster";
   // Operation name for the Dynamo http filter

@@ -18,7 +18,8 @@ namespace Envoy {
  */
 class IntegrationCodecClient : public Http::CodecClientProd {
 public:
-  IntegrationCodecClient(Event::Dispatcher& dispatcher, Network::ClientConnectionPtr&& conn,
+  IntegrationCodecClient(Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
+                         Network::ClientConnectionPtr&& conn,
                          Upstream::HostDescriptionConstSharedPtr host_description,
                          Http::CodecClient::Type type);
 
@@ -104,6 +105,7 @@ public:
 protected:
   void useAccessLog(absl::string_view format = "");
 
+  Network::TransportSocketFactoryPtr createUpstreamTlsContext();
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   // Makes a http connection object without checking its connected state.
   virtual IntegrationCodecClientPtr makeRawHttpConnection(
@@ -249,5 +251,6 @@ protected:
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   std::string access_log_name_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 } // namespace Envoy

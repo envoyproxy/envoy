@@ -40,7 +40,8 @@ TEST_F(QuicIoHandleWrapperTest, Close) {
 }
 
 TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
-  os_fd_t fd = socket_.ioHandle().fd();
+  // TODO(fcoras): seems we could do without the fd in the tests lower. Can we remove it?
+  os_fd_t fd = socket_.ioHandle().fdDoNotUse();
   char data[5];
   Buffer::RawSlice slice{data, 5};
   EXPECT_CALL(os_sys_calls_, readv(fd, _, 1)).WillOnce(Return(Api::SysCallSizeResult{5u, 0}));
@@ -57,7 +58,6 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   EXPECT_CALL(os_sys_calls_, sendmsg(fd, _, 0)).WillOnce(Return(Api::SysCallSizeResult{5u, 0}));
   wrapper_->sendmsg(&slice, 1, 0, /*self_ip=*/nullptr, *addr);
 
-  EXPECT_CALL(os_sys_calls_, getsockname(_, _, _)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   wrapper_->domain();
 
   EXPECT_CALL(os_sys_calls_, getsockname(_, _, _))

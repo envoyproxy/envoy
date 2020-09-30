@@ -22,9 +22,9 @@ envoy_cc_test(
         "example_configs_test_setup.sh",
         "//configs:example_configs",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         ":config_test_lib",
+        "//source/common/filesystem:filesystem_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
