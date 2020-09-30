@@ -39,8 +39,8 @@ extension EnvoyHTTPFilter {
           return [kEnvoyFilterDataStatusStopIterationAndBuffer, data]
         case .stopIterationNoBuffer:
           return [kEnvoyFilterDataStatusStopIterationNoBuffer, data]
-        case .resumeIteration(_, let data):
-          return [kEnvoyFilterDataStatusContinue, data]
+        case .resumeIteration(let headers, let data):
+          return [kEnvoyFilterDataStatusResumeIteration, headers?.headers as Any, data]
         }
       }
 
@@ -51,8 +51,13 @@ extension EnvoyHTTPFilter {
           return [kEnvoyFilterTrailersStatusContinue, trailers.headers]
         case .stopIteration:
           return [kEnvoyFilterTrailersStatusStopIteration, envoyTrailers]
-        case .resumeIteration(_, _, let trailers):
-          return [kEnvoyFilterTrailersStatusContinue, trailers.headers]
+        case .resumeIteration(let headers, let data, let trailers):
+          return [
+            kEnvoyFilterTrailersStatusResumeIteration,
+            headers?.headers as Any,
+            data as Any,
+            trailers.headers,
+          ]
         }
       }
     }
@@ -78,8 +83,8 @@ extension EnvoyHTTPFilter {
           return [kEnvoyFilterDataStatusStopIterationAndBuffer, data]
         case .stopIterationNoBuffer:
           return [kEnvoyFilterDataStatusStopIterationNoBuffer, data]
-        case .resumeIteration(_, let data):
-          return [kEnvoyFilterDataStatusContinue, data]
+        case .resumeIteration(let headers, let data):
+          return [kEnvoyFilterDataStatusResumeIteration, headers?.headers as Any, data]
         }
       }
 
@@ -90,8 +95,13 @@ extension EnvoyHTTPFilter {
           return [kEnvoyFilterTrailersStatusContinue, trailers.headers]
         case .stopIteration:
           return [kEnvoyFilterTrailersStatusStopIteration, envoyTrailers]
-        case .resumeIteration(_, _, let trailers):
-          return [kEnvoyFilterTrailersStatusContinue, trailers.headers]
+        case .resumeIteration(let headers, let data, let trailers):
+          return [
+            kEnvoyFilterTrailersStatusResumeIteration,
+            headers?.headers as Any,
+            data as Any,
+            trailers.headers,
+          ]
         }
       }
     }

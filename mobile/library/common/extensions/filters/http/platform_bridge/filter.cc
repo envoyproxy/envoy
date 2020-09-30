@@ -8,6 +8,7 @@
 #include "library/common/api/external.h"
 #include "library/common/buffer/bridge_fragment.h"
 #include "library/common/buffer/utility.h"
+#include "library/common/extensions/filters/http/platform_bridge/c_type_definitions.h"
 #include "library/common/http/header_utility.h"
 
 namespace Envoy {
@@ -56,6 +57,16 @@ void PlatformBridgeFilter::onDestroy() {
   platform_filter_.instance_context = nullptr;
 }
 
+void PlatformBridgeFilter::replaceHeaders(Http::HeaderMap& headers, envoy_headers c_headers) {
+  headers.clear();
+  for (envoy_header_size_t i = 0; i < c_headers.length; i++) {
+    headers.addCopy(Http::LowerCaseString(Http::Utility::convertToString(c_headers.headers[i].key)),
+                    Http::Utility::convertToString(c_headers.headers[i].value));
+  }
+  // The C envoy_headers struct can be released now because the headers have been copied.
+  release_envoy_headers(c_headers);
+}
+
 Http::FilterHeadersStatus PlatformBridgeFilter::onHeaders(Http::HeaderMap& headers, bool end_stream,
                                                           envoy_filter_on_headers_f on_headers) {
   // Allow nullptr to act as no-op.
@@ -66,23 +77,26 @@ Http::FilterHeadersStatus PlatformBridgeFilter::onHeaders(Http::HeaderMap& heade
   envoy_headers in_headers = Http::Utility::toBridgeHeaders(headers);
   envoy_filter_headers_status result =
       on_headers(in_headers, end_stream, platform_filter_.instance_context);
-  Http::FilterHeadersStatus status = static_cast<Http::FilterHeadersStatus>(result.status);
-  // TODO(goaway): Current platform implementations expose immutable headers, thus any modification
-  // necessitates a full copy. Add 'modified' bit to determine when we can elide the copy. See also
-  // https://github.com/lyft/envoy-mobile/issues/949 for potential future optimization.
-  headers.clear();
-  for (envoy_header_size_t i = 0; i < result.headers.length; i++) {
-    headers.addCopy(
-        Http::LowerCaseString(Http::Utility::convertToString(result.headers.headers[i].key)),
-        Http::Utility::convertToString(result.headers.headers[i].value));
+
+  switch (result.status) {
+  case kEnvoyFilterHeadersStatusContinue:
+    PlatformBridgeFilter::replaceHeaders(headers, result.headers);
+    return Http::FilterHeadersStatus::Continue;
+
+  case kEnvoyFilterHeadersStatusStopIteration:
+    iteration_state_ = IterationState::Stopped;
+    return Http::FilterHeadersStatus::StopIteration;
+
+  default:
+    PANIC("invalid filter state: unsupported status for platform filters");
   }
-  // The C envoy_headers struct can be released now because the headers have been copied.
-  release_envoy_headers(result.headers);
-  return status;
+
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Http::FilterDataStatus PlatformBridgeFilter::onData(Buffer::Instance& data, bool end_stream,
                                                     Buffer::Instance* internal_buffer,
+                                                    Http::HeaderMap** pending_headers,
                                                     envoy_filter_on_data_f on_data) {
   // Allow nullptr to act as no-op.
   if (on_data == nullptr) {
@@ -90,9 +104,10 @@ Http::FilterDataStatus PlatformBridgeFilter::onData(Buffer::Instance& data, bool
   }
 
   envoy_data in_data;
+  bool already_buffering = iteration_state_ == IterationState::Stopped && internal_buffer &&
+                           internal_buffer->length() > 0;
 
-  if (iteration_state_ == IterationState::Stopped && internal_buffer &&
-      internal_buffer->length() > 0) {
+  if (already_buffering) {
     // Pre-emptively buffer data to present aggregate to platform.
     internal_buffer->move(data);
     in_data = Buffer::Utility::copyToBridgeData(*internal_buffer);
@@ -101,27 +116,25 @@ Http::FilterDataStatus PlatformBridgeFilter::onData(Buffer::Instance& data, bool
   }
 
   envoy_filter_data_status result = on_data(in_data, end_stream, platform_filter_.instance_context);
-  Http::FilterDataStatus status = static_cast<Http::FilterDataStatus>(result.status);
-  switch (status) {
-  case Http::FilterDataStatus::Continue:
-    if (iteration_state_ == IterationState::Stopped) {
-      // When platform filter iteration is Stopped, Resume must be used to start iterating again.
-      // TODO(goaway): decide on the means to surface/handle errors here. Options include:
-      // - crashing
-      // - creating an error response for this stream
-      // - letting Envoy handle any invalid resulting state via its own guards
+
+  switch (result.status) {
+  case kEnvoyFilterDataStatusContinue:
+    RELEASE_ASSERT(iteration_state_ != IterationState::Stopped,
+                   "invalid filter state: filter iteration must be resumed with ResumeIteration");
+    data.drain(data.length());
+    data.addBufferFragment(*Buffer::BridgeFragment::createBridgeFragment(result.data));
+    return Http::FilterDataStatus::Continue;
+
+  case kEnvoyFilterDataStatusStopIterationAndBuffer:
+    if (already_buffering) {
+      // Data will already have been added to the internal buffer (above).
+      return Http::FilterDataStatus::StopIterationNoBuffer;
     }
-    break;
-  case Http::FilterDataStatus::StopIterationAndBuffer:
-    if (iteration_state_ == IterationState::Stopped) {
-      // Data will already have been buffered (above).
-      status = Http::FilterDataStatus::StopIterationNoBuffer;
-    } else {
-      // Data will be buffered on return.
-      iteration_state_ = IterationState::Stopped;
-    }
-    break;
-  case Http::FilterDataStatus::StopIterationNoBuffer:
+    // Data will be buffered on return.
+    iteration_state_ = IterationState::Stopped;
+    return Http::FilterDataStatus::StopIterationAndBuffer;
+
+  case kEnvoyFilterDataStatusStopIterationNoBuffer:
     // In this context all previously buffered data can/should be dropped. If no data has been
     // buffered, this is a no-op. If data was previously buffered, the most likely case is
     // that a filter has decided to handle generating a response itself and no longer needs it.
@@ -133,24 +146,43 @@ Http::FilterDataStatus PlatformBridgeFilter::onData(Buffer::Instance& data, bool
       internal_buffer->drain(internal_buffer->length());
     }
     iteration_state_ = IterationState::Stopped;
-    break;
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+
+  // Resume previously-stopped iteration, possibly forwarding headers if iteration was stopped
+  // during an on*Headers invocation.
+  case kEnvoyFilterDataStatusResumeIteration:
+    RELEASE_ASSERT(iteration_state_ == IterationState::Stopped,
+                   "invalid filter state: ResumeIteration may only be used when filter iteration "
+                   "is stopped");
+    // Update pending henders before resuming iteration, if needed.
+    if (result.pending_headers) {
+      PlatformBridgeFilter::replaceHeaders(**pending_headers, *result.pending_headers);
+      *pending_headers = nullptr;
+      free(result.pending_headers);
+    }
+    // We've already moved data into the internal buffer and presented it to the platform. Replace
+    // the internal buffer with any modifications returned by the platform filter prior to
+    // resumption.
+    if (internal_buffer) {
+      internal_buffer->drain(internal_buffer->length());
+      internal_buffer->addBufferFragment(
+          *Buffer::BridgeFragment::createBridgeFragment(result.data));
+    } else {
+      data.drain(data.length());
+      data.addBufferFragment(*Buffer::BridgeFragment::createBridgeFragment(result.data));
+    }
+    return Http::FilterDataStatus::Continue;
+
   default:
-    PANIC("unsupported status for platform filters");
+    PANIC("invalid filter state: unsupported status for platform filters");
   }
 
-  // TODO(goaway): Current platform implementations expose immutable data, thus any modification
-  // necessitates a full copy. Add 'modified' bit to determine when we can elide the copy. See also
-  // https://github.com/lyft/envoy-mobile/issues/949 for potential future optimization.
-  if (iteration_state_ == IterationState::Ongoing) {
-    data.drain(data.length());
-    data.addBufferFragment(*Buffer::BridgeFragment::createBridgeFragment(result.data));
-  }
-
-  return status;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Http::FilterTrailersStatus
-PlatformBridgeFilter::onTrailers(Http::HeaderMap& trailers,
+PlatformBridgeFilter::onTrailers(Http::HeaderMap& trailers, Buffer::Instance* internal_buffer,
+                                 Http::HeaderMap** pending_headers,
                                  envoy_filter_on_trailers_f on_trailers) {
   // Allow nullptr to act as no-op.
   if (on_trailers == nullptr) {
@@ -159,25 +191,68 @@ PlatformBridgeFilter::onTrailers(Http::HeaderMap& trailers,
 
   envoy_headers in_trailers = Http::Utility::toBridgeHeaders(trailers);
   envoy_filter_trailers_status result = on_trailers(in_trailers, platform_filter_.instance_context);
-  Http::FilterTrailersStatus status = static_cast<Http::FilterTrailersStatus>(result.status);
-  // TODO(goaway): Current platform implementations expose immutable trailers, thus any modification
-  // necessitates a full copy. Add 'modified' bit to determine when we can elide the copy. See also
-  // https://github.com/lyft/envoy-mobile/issues/949 for potential future optimization.
-  trailers.clear();
-  for (envoy_header_size_t i = 0; i < result.trailers.length; i++) {
-    trailers.addCopy(
-        Http::LowerCaseString(Http::Utility::convertToString(result.trailers.headers[i].key)),
-        Http::Utility::convertToString(result.trailers.headers[i].value));
+
+  switch (result.status) {
+  case kEnvoyFilterTrailersStatusContinue:
+    RELEASE_ASSERT(iteration_state_ != IterationState::Stopped,
+                   "invalid filter state: ResumeIteration may only be used when filter iteration "
+                   "is stopped");
+    PlatformBridgeFilter::replaceHeaders(trailers, result.trailers);
+    return Http::FilterTrailersStatus::Continue;
+
+  case kEnvoyFilterTrailersStatusStopIteration:
+    iteration_state_ = IterationState::Stopped;
+    return Http::FilterTrailersStatus::StopIteration;
+
+  // Resume previously-stopped iteration, possibly forwarding headers and data if iteration was
+  // stopped during an on*Headers or on*Data invocation.
+  case kEnvoyFilterTrailersStatusResumeIteration:
+    RELEASE_ASSERT(iteration_state_ == IterationState::Stopped,
+                   "invalid filter state: ResumeIteration may only be used when filter iteration "
+                   "is stopped");
+    // Update pending henders before resuming iteration, if needed.
+    if (result.pending_headers) {
+      PlatformBridgeFilter::replaceHeaders(**pending_headers, *result.pending_headers);
+      *pending_headers = nullptr;
+      free(result.pending_headers);
+    }
+    // We've already moved data into the internal buffer and presented it to the platform. Replace
+    // the internal buffer with any modifications returned by the platform filter prior to
+    // resumption.
+    if (result.pending_data) {
+      internal_buffer->drain(internal_buffer->length());
+      internal_buffer->addBufferFragment(
+          *Buffer::BridgeFragment::createBridgeFragment(*result.pending_data));
+      free(result.pending_data);
+    }
+    PlatformBridgeFilter::replaceHeaders(trailers, result.trailers);
+    return Http::FilterTrailersStatus::Continue;
+
+  default:
+    PANIC("invalid filter state: unsupported status for platform filters");
   }
-  // The C envoy_trailers struct can be released now because the trailers have been copied.
-  release_envoy_headers(result.trailers);
-  return status;
+
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Http::FilterHeadersStatus PlatformBridgeFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool end_stream) {
   // Delegate to shared implementation for request and response path.
-  return onHeaders(headers, end_stream, platform_filter_.on_request_headers);
+  auto status = onHeaders(headers, end_stream, platform_filter_.on_request_headers);
+  if (status == Http::FilterHeadersStatus::StopIteration) {
+    pending_request_headers_ = &headers;
+  }
+  return status;
+}
+
+Http::FilterHeadersStatus PlatformBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
+                                                              bool end_stream) {
+  // Delegate to shared implementation for request and response path.
+  auto status = onHeaders(headers, end_stream, platform_filter_.on_response_headers);
+  if (status == Http::FilterHeadersStatus::StopIteration) {
+    pending_response_headers_ = &headers;
+  }
+  return status;
 }
 
 Http::FilterDataStatus PlatformBridgeFilter::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -189,18 +264,8 @@ Http::FilterDataStatus PlatformBridgeFilter::decodeData(Buffer::Instance& data, 
     });
   }
 
-  return onData(data, end_stream, internal_buffer, platform_filter_.on_request_data);
-}
-
-Http::FilterTrailersStatus PlatformBridgeFilter::decodeTrailers(Http::RequestTrailerMap& trailers) {
-  // Delegate to shared implementation for request and response path.
-  return onTrailers(trailers, platform_filter_.on_request_trailers);
-}
-
-Http::FilterHeadersStatus PlatformBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
-                                                              bool end_stream) {
-  // Delegate to shared implementation for request and response path.
-  return onHeaders(headers, end_stream, platform_filter_.on_response_headers);
+  return onData(data, end_stream, internal_buffer, &pending_request_headers_,
+                platform_filter_.on_request_data);
 }
 
 Http::FilterDataStatus PlatformBridgeFilter::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -212,13 +277,43 @@ Http::FilterDataStatus PlatformBridgeFilter::encodeData(Buffer::Instance& data, 
     });
   }
 
-  return onData(data, end_stream, internal_buffer, platform_filter_.on_response_data);
+  return onData(data, end_stream, internal_buffer, &pending_response_headers_,
+                platform_filter_.on_response_data);
+}
+
+Http::FilterTrailersStatus PlatformBridgeFilter::decodeTrailers(Http::RequestTrailerMap& trailers) {
+  // Delegate to shared implementation for request and response path.
+  Buffer::Instance* internal_buffer = nullptr;
+  if (decoder_callbacks_->decodingBuffer()) {
+    decoder_callbacks_->modifyDecodingBuffer([&internal_buffer](Buffer::Instance& mutable_buffer) {
+      internal_buffer = &mutable_buffer;
+    });
+  }
+
+  auto status = onTrailers(trailers, internal_buffer, &pending_request_headers_,
+                           platform_filter_.on_request_trailers);
+  if (status == Http::FilterTrailersStatus::StopIteration) {
+    pending_request_trailers_ = &trailers;
+  }
+  return status;
 }
 
 Http::FilterTrailersStatus
 PlatformBridgeFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   // Delegate to shared implementation for request and response path.
-  return onTrailers(trailers, platform_filter_.on_response_trailers);
+  Buffer::Instance* internal_buffer = nullptr;
+  if (encoder_callbacks_->encodingBuffer()) {
+    encoder_callbacks_->modifyEncodingBuffer([&internal_buffer](Buffer::Instance& mutable_buffer) {
+      internal_buffer = &mutable_buffer;
+    });
+  }
+
+  auto status = onTrailers(trailers, internal_buffer, &pending_response_headers_,
+                           platform_filter_.on_response_trailers);
+  if (status == Http::FilterTrailersStatus::StopIteration) {
+    pending_response_trailers_ = &trailers;
+  }
+  return status;
 }
 
 } // namespace PlatformBridge

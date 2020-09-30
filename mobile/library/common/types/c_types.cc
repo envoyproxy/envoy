@@ -58,3 +58,5 @@ envoy_data copy_envoy_data(size_t length, const uint8_t* src_bytes) {
 }
 
 const envoy_data envoy_nodata = {0, NULL, envoy_noop_release, NULL};
+
+const envoy_headers envoy_noheaders = {0, NULL};

@@ -67,10 +67,12 @@ extern const int kEnvoyFilterHeadersStatusStopAllIterationAndBuffer;
 extern const int kEnvoyFilterDataStatusContinue;
 extern const int kEnvoyFilterDataStatusStopIterationAndBuffer;
 extern const int kEnvoyFilterDataStatusStopIterationNoBuffer;
+extern const int kEnvoyFilterDataStatusResumeIteration;
 
 /// Return codes for on-trailers filter invocations. @see envoy/http/filter.h
 extern const int kEnvoyFilterTrailersStatusContinue;
 extern const int kEnvoyFilterTrailersStatusStopIteration;
+extern const int kEnvoyFilterTrailersStatusResumeIteration;
 
 @interface EnvoyHTTPFilter : NSObject
 
