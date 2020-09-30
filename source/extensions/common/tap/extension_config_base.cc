@@ -63,15 +63,22 @@ const absl::string_view ExtensionConfigBase::adminId() {
 }
 
 void ExtensionConfigBase::clearTapConfig() {
-  tls_slot_->runOnAllThreads([this] { tls_slot_->getTyped<TlsFilterConfig>().config_ = nullptr; });
+  tls_slot_->runOnAllThreads([](ThreadLocal::ThreadLocalObjectSharedPtr object)
+                                 -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    object->asType<TlsFilterConfig>().config_ = nullptr;
+    return object;
+  });
 }
 
 void ExtensionConfigBase::installNewTap(envoy::config::tap::v3::TapConfig&& proto_config,
                                         Sink* admin_streamer) {
   TapConfigSharedPtr new_config =
       config_factory_->createConfigFromProto(std::move(proto_config), admin_streamer);
-  tls_slot_->runOnAllThreads(
-      [this, new_config] { tls_slot_->getTyped<TlsFilterConfig>().config_ = new_config; });
+  tls_slot_->runOnAllThreads([new_config](ThreadLocal::ThreadLocalObjectSharedPtr object)
+                                 -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    object->asType<TlsFilterConfig>().config_ = new_config;
+    return object;
+  });
 }
 
 void ExtensionConfigBase::newTapConfig(envoy::config::tap::v3::TapConfig&& proto_config,

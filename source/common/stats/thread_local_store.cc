@@ -206,11 +206,13 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
     ASSERT(!merge_in_progress_);
     merge_in_progress_ = true;
     tls_->runOnAllThreads(
-        [this]() -> void {
-          for (const auto& id_hist : tls_->getTyped<TlsCache>().tls_histogram_cache_) {
+        [](ThreadLocal::ThreadLocalObjectSharedPtr object)
+            -> ThreadLocal::ThreadLocalObjectSharedPtr {
+          for (const auto& id_hist : object->asType<TlsCache>().tls_histogram_cache_) {
             const TlsHistogramSharedPtr& tls_hist = id_hist.second;
             tls_hist->beginMerge();
           }
+          return object;
         },
         [this, merge_complete_cb]() -> void { mergeInternal(merge_complete_cb); });
   } else {
@@ -304,7 +306,11 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
   if (!shutting_down_) {
     // Perform a cache flush on all threads.
     tls_->runOnAllThreads(
-        [this, scope_id]() { tls_->getTyped<TlsCache>().eraseScope(scope_id); },
+        [scope_id](ThreadLocal::ThreadLocalObjectSharedPtr object)
+            -> ThreadLocal::ThreadLocalObjectSharedPtr {
+          object->asType<TlsCache>().eraseScope(scope_id);
+          return object;
+        },
         [central_cache]() { /* Holds onto central_cache until all tls caches are clear */ });
   }
 }
@@ -320,8 +326,11 @@ void ThreadLocalStoreImpl::clearHistogramFromCaches(uint64_t histogram_id) {
     // https://gist.github.com/jmarantz/838cb6de7e74c0970ea6b63eded0139a
     // contains a patch that will implement batching together to clear multiple
     // histograms.
-    tls_->runOnAllThreads(
-        [this, histogram_id]() { tls_->getTyped<TlsCache>().eraseHistogram(histogram_id); });
+    tls_->runOnAllThreads([histogram_id](ThreadLocal::ThreadLocalObjectSharedPtr object)
+                              -> ThreadLocal::ThreadLocalObjectSharedPtr {
+      object->asType<TlsCache>().eraseHistogram(histogram_id);
+      return object;
+    });
   }
 }
 
