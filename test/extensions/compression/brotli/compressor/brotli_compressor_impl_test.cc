@@ -114,7 +114,7 @@ TEST_P(ConfigTest, LoadConfig) {
 
   std::string json{fmt::format(R"EOF({{
   "disable_literal_context_modeling": true,
-  "quality": 12,
+  "quality": 11,
   "encoder_mode": "{}",
   "window_bits": 22,
   "input_block_bits": 24,
