@@ -46,7 +46,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/listener/tls_inspector:92.4"
 "source/extensions/filters/listener/http_inspector:93.3"
 "source/extensions/filters/udp:91.1"
-"source/extensions/filters/udp/dns_filter:97.0"
+"source/extensions/filters/udp/dns_filter:96.9"
 "source/extensions/filters/common:94.7"
 "source/extensions/filters/common/expr:92.2"
 "source/extensions/filters/common/rbac:87.1"
