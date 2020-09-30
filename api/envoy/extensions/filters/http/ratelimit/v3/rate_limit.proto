@@ -101,6 +101,7 @@ message RateLimit {
 
   // Disables emitting the :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` header
   // in case of rate limiting (i.e. 429 responses).
+  // Having this header not present potentially makes the request retriable.
   bool disable_x_envoy_ratelimited_header = 9;
 }
 
