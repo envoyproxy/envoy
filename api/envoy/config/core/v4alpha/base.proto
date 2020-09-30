@@ -241,7 +241,7 @@ message RuntimePercent {
   type.v3.Percent default_value = 1;
 
   // Runtime key to get value for comparison. This value is used if defined.
-  string runtime_key = 2 [(validate.rules).string = {min_bytes: 1}];
+  string runtime_key = 2 [(validate.rules).string = {min_len: 1}];
 }
 
 // Runtime derived double with a default when not specified.
