@@ -133,10 +133,13 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
     RELEASE_ASSERT(
         resolvers.empty(),
         "defining custom resolvers is not possible when using Apple APIs for DNS resolution. "
-        "Apple's API only allows overriding DNS resolvers via system settings.");
+        "Apple's API only allows overriding DNS resolvers via system settings. Delete resolvers "
+        "config or disable the envoy.restart_features.use_apple_api_for_dns_lookups runtime "
+        "feature.");
     RELEASE_ASSERT(!use_tcp_for_dns_lookups,
                    "using TCP for DNS lookups is not possible when using Apple APIs for DNS "
-                   "resolution. Apple' API only uses UDP for DNS resolution");
+                   "resolution. Apple' API only uses UDP for DNS resolution. Use UDP or disable "
+                   "the envoy.restart_features.use_apple_api_for_dns_lookups runtime feature.");
     return Network::DnsResolverSharedPtr{new Network::AppleDnsResolverImpl(*this)};
   }
 #endif
