@@ -17,7 +17,6 @@
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
-#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 

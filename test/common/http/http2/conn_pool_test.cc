@@ -65,7 +65,7 @@ public:
   Http2ConnPoolImplTest()
       : api_(Api::createApiForTest(stats_store_)),
         pool_(std::make_unique<TestConnPoolImpl>(
-            dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr)) {
+            dispatcher_, random_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr)) {
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
@@ -196,6 +196,7 @@ public:
   std::unique_ptr<TestConnPoolImpl> pool_;
   std::vector<TestCodecClient> test_clients_;
   NiceMock<Runtime::MockLoader> runtime_;
+  Random::MockRandomGenerator random_;
 };
 
 class ActiveTestRequest {
@@ -315,7 +316,7 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
   // Recreate the conn pool so that the host re-evaluates the transport socket match, arriving at
   // our test transport socket factory.
   host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80");
-  pool_ = std::make_unique<TestConnPoolImpl>(dispatcher_, host_,
+  pool_ = std::make_unique<TestConnPoolImpl>(dispatcher_, random_, host_,
                                              Upstream::ResourcePriority::Default, nullptr, nullptr);
 
   // This requires some careful set up of expectations ordering: the call to createTransportSocket
