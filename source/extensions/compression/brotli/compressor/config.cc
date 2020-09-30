@@ -14,12 +14,7 @@ const uint32_t DefaultInputBlockBits = 24;
 const uint32_t DefaultWindowBits = 22;
 
 // Default quality.
-// Since protobuf numeric objects default to zero values if not present in a
-// message and zero is a legitimate value for quality in the brotli library
-// we cannot have default quality other than zero without additional tweaks.
-// So instead of the 0-11 range we use 1-12 in the config and decrement the actual
-// value passed to the compressor by one.
-const uint32_t DefaultQuality = 12;
+const uint32_t DefaultQuality = 11;
 
 // Default zlib chunk size.
 const uint32_t DefaultChunkSize = 4096;
@@ -32,7 +27,7 @@ BrotliCompressorFactory::BrotliCompressorFactory(
       encoder_mode_(encoderModeEnum(brotli.encoder_mode())),
       input_block_bits_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(brotli, input_block_bits, DefaultInputBlockBits)),
-      quality_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(brotli, quality, DefaultQuality) - 1),
+      quality_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(brotli, quality, DefaultQuality)),
       window_bits_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(brotli, window_bits, DefaultWindowBits)) {}
 
 Envoy::Compression::Compressor::CompressorPtr BrotliCompressorFactory::createCompressor() {

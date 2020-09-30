@@ -24,9 +24,9 @@ message Brotli {
     FONT = 3;
   }
 
-  // Value from 1 to 12 that controls the main compression speed-density lever.
-  // The higher quality, the slower compression. The default value is 12.
-  google.protobuf.UInt32Value quality = 1 [(validate.rules).uint32 = {lte: 12 gte: 1}];
+  // Value from 0 to 11 that controls the main compression speed-density lever.
+  // The higher quality, the slower compression. The default value is 11.
+  google.protobuf.UInt32Value quality = 1 [(validate.rules).uint32 = {lte: 11}];
 
   // A value used to tune encoder for specific input. For more information about modes,
   // please refer to brotli manual: https://brotli.org/encode.html#aa6f
