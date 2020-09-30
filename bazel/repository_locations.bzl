@@ -752,18 +752,6 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         last_updated = "2020-08-26",
         use_category = ["test"],
     ),
-    org_unicode_icuuc = dict(
-        project_name = "International Components for Unicode",
-        project_desc = "International Components for Unicode",
-        project_url = "https://github.com/unicode-org/icu",
-        version = "67.1",
-        strip_prefix = "icu",
-        sha256 = "94a80cd6f251a53bd2a997f6f1b5ac6653fe791dfab66e1eb0227740fb86d5dc",
-        urls = ["https://github.com/unicode-org/icu/releases/download/release-{dash_version}/icu4c-{underscore_version}-src.tgz"],
-        use_category = ["dataplane"],
-        last_updated = "2020-04-22",
-        cpe = "cpe:2.3:a:icu-project:international_components_for_unicode:*",
-    ),
     proxy_wasm_cpp_sdk = dict(
         project_name = "WebAssembly for Proxies (C++ SDK)",
         project_desc = "WebAssembly for Proxies (C++ SDK)",
