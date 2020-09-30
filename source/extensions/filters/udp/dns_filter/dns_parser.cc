@@ -147,10 +147,11 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
   size_t available_bytes = buffer->length();
   uint64_t offset = 0;
   uint16_t data;
+  bool done = false;
   DnsQueryParseState state{DnsQueryParseState::Init};
 
   header_ = {};
-  while (state != DnsQueryParseState::Finish) {
+  do {
     // Ensure that we have enough data remaining in the buffer to parse the query
     if (available_bytes < field_size) {
       context->counters_.underflow_counter.inc();
@@ -187,12 +188,10 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
       break;
     case DnsQueryParseState::Authority2:
       header_.additional_rrs = data;
-      state = DnsQueryParseState::Finish;
+      done = true;
       break;
-    case DnsQueryParseState::Finish:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
-  }
+  } while (!done);
 
   if (!header_.flags.qr && header_.answers) {
     ENVOY_LOG(debug, "Answer records present in query");
@@ -373,11 +372,6 @@ DnsSrvRecordPtr DnsMessageParser::parseDnsSrvRecord(DnsAnswerCtx& ctx) {
 
 DnsAnswerRecordPtr DnsMessageParser::parseDnsAnswerRecord(const Buffer::InstancePtr& buffer,
                                                           uint64_t& offset) {
-  if (offset >= buffer->length()) {
-    ENVOY_LOG(debug, "Invalid offset for parsing answer record");
-    return nullptr;
-  }
-
   uint64_t available_bytes = buffer->length() - offset;
   const std::string record_name = parseDnsNameRecord(buffer, available_bytes, offset);
   if (record_name.empty()) {
@@ -655,6 +649,7 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
 
   Buffer::OwnedImpl query_buffer{};
   Buffer::OwnedImpl answer_buffer{};
+  Buffer::OwnedImpl addl_rec_buffer{};
 
   ENVOY_LOG(trace, "Building response for query ID [{}]", query_context->id_);
 
@@ -672,6 +667,11 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
     if (answers.empty()) {
       continue;
     }
+
+    // Serialize the additional records in parallel with the answers to ensure consistent
+    // records
+    const auto& additional_rrs = query_context->additional_;
+
     const size_t num_answers = answers.size();
 
     // Randomize the starting index if we have more than 8 records
@@ -685,10 +685,37 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
       //
       // See Section 2.3.4 of https://tools.ietf.org/html/rfc1035
       RELEASE_ASSERT(query->name_.size() < MAX_NAME_LENGTH,
-                     "Unable to serialize invalid query name");
+                     "Query name is too large for serialization");
 
       // Serialize answer records whose names and types match the query
       if (answer->first == query->name_ && answer->second->type_ == query->type_) {
+        // Ensure that we can serialize the answer and the corresponding SRV additional
+        // record together.
+
+        // It is still possible that there may be more additional records than those referenced
+        // by the answers. However, each serialized answer will have an accompanying additional
+        // record for the host.
+        if (query->type_ == DNS_RECORD_TYPE_SRV) {
+          const DnsSrvRecord* srv_rec = dynamic_cast<DnsSrvRecord*>(answer->second.get());
+          const auto& target = srv_rec->targets_.begin();
+          const auto rr = additional_rrs.find(target->first);
+
+          if (rr != additional_rrs.end()) {
+            Buffer::OwnedImpl serialized_rr{};
+
+            // If serializing the additional record fails, skip serializing the answer record
+            if (!rr->second->serialize(serialized_rr)) {
+              ENVOY_LOG(debug, "Unable to serialize answer record for {}", query->name_);
+              continue;
+            }
+            total_buffer_size += serialized_rr.length();
+            addl_rec_buffer.add(serialized_rr);
+            ++serialized_additional_rrs;
+          }
+        }
+
+        // Now we serialize the answer record. We check the length of the serialized
+        // data to ensure we don't exceed the DNS response limit
         Buffer::OwnedImpl serialized_answer;
         if (!answer->second->serialize(serialized_answer)) {
           ENVOY_LOG(debug, "Unable to serialize answer record for {}", query->name_);
@@ -702,29 +729,6 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
         if (++serialized_answers == MAX_RETURNED_RECORDS) {
           break;
         }
-      }
-    }
-
-    // Serialize Additional Resource Records
-    const auto& additional_rrs = query_context->additional_;
-    if (!additional_rrs.empty()) {
-      const size_t num_rrs = additional_rrs.size();
-      auto rr = additional_rrs.begin();
-      while (serialized_additional_rrs < num_rrs) {
-        Buffer::OwnedImpl serialized_rr;
-        if (!rr->second->serialize(serialized_rr)) {
-          ENVOY_LOG(debug, "Unable to serialize answer record for {}", query->name_);
-          continue;
-        }
-        total_buffer_size += serialized_rr.length();
-        if (total_buffer_size > MAX_DNS_RESPONSE_SIZE) {
-          break;
-        }
-        answer_buffer.add(serialized_rr);
-        if (++serialized_additional_rrs == MAX_RETURNED_RECORDS) {
-          break;
-        }
-        ++rr;
       }
     }
   }
@@ -748,6 +752,7 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
   // write the queries and answers
   buffer.move(query_buffer);
   buffer.move(answer_buffer);
+  buffer.move(addl_rec_buffer);
 }
 
 } // namespace DnsFilter
