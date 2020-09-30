@@ -204,7 +204,9 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteBadContentType) {
   Http::TestResponseHeaderMapImpl response_headers;
   response_headers.setStatus(200);
   response_headers.setContentType("application/x-not-protobuf");
-  upstream_request_->encodeHeaders(response_headers, true);
+  upstream_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl buffer;
+  upstream_request_->encodeData(buffer, true);
 
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
