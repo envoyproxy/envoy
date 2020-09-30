@@ -21,7 +21,7 @@ TEST(EqualityMetadataFrame, Http2FrameTest) {
   ASSERT_EQ(static_cast<int>(http2FrameFromUtility.type()), 0x4D); // type
   ASSERT_EQ(payloadFromHttp2Frame[4], 4);                          // flags
   ASSERT_EQ(std::to_string(payloadFromHttp2Frame[8]),
-            std::to_string(3)); // stream_id (extra bit at the end)
+            std::to_string(1)); // stream_id
 }
 } // namespace Http2
 } // namespace Http
