@@ -36,6 +36,9 @@ void BrotliDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
     }
   }
 
+  // Even though the input has been fully consumed by the decoder it still can
+  // be unfolded into output not fitting the output chunk. Thus keep processing
+  // until the decoder's output is fully depleted.
   bool success;
   do {
     success = process(ctx, output_buffer);

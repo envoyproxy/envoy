@@ -56,6 +56,11 @@ void BrotliCompressorImpl::compress(Buffer::Instance& buffer,
   ASSERT(buffer.length() == 0);
   buffer.move(accumulation_buffer);
 
+  // The encoder's internal buffer can still hold data not flushed to the
+  // output chunk which in turn can be almost full and not fit to accommodate
+  // the flushed data. And in case of the `Finish` operation the encoder may add
+  // `ISLAST` and `ISLASTEMPTY` headers to the output. Thus keep processing
+  // until the encoder's output is fully depleted.
   do {
     process(ctx, buffer,
             state == Envoy::Compression::Compressor::State::Finish ? BROTLI_OPERATION_FINISH
