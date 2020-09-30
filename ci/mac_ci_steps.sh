@@ -36,10 +36,13 @@ BAZEL_BUILD_OPTIONS=(
 if [[ $# -gt 0 ]]; then
   TEST_TARGETS=$*
 else
-  TEST_TARGETS=//test/integration/...
+  TEST_TARGETS='//test/integration/...'
 fi
 
 if [[ "$TEST_TARGETS" == "//test/..." || "$TEST_TARGETS" == "//test/integration/..." ]]; then
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" //source/exe:envoy-static
 fi
-bazel test "${BAZEL_BUILD_OPTIONS[@]}" ${TEST_TARGETS}
+bazel test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS}"
+
+# Additionally run macOS specific test suites
+bazel test "${BAZEL_BUILD_OPTIONS[@]}" //test/common/network:apple_dns_impl_test
