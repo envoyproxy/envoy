@@ -378,15 +378,11 @@ uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
 
 absl::StatusOr<uint64_t> Utility::getResponseStatusOr(const ResponseHeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
-  absl::StatusOr<uint64_t> response_status_or_absl_status;
   uint64_t response_code;
   if (!header || !absl::SimpleAtoi(headers.getStatusValue(), &response_code)) {
-    response_status_or_absl_status =
-        absl::InvalidArgumentError(":status must be specified and a valid unsigned long");
-    return response_status_or_absl_status;
+    return absl::InvalidArgumentError(":status must be specified and a valid unsigned long");
   }
-  response_status_or_absl_status = response_code;
-  return response_status_or_absl_status;
+  return response_code;
 }
 
 bool Utility::isUpgrade(const RequestOrResponseHeaderMap& headers) {
