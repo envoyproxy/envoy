@@ -40,6 +40,6 @@ sealed class FilterTrailersStatus<T : Headers, U : Trailers>(
   class ResumeIteration<T : Headers, U : Trailers>(
     val headers: T?,
     val data: ByteBuffer?,
-    val trailers: U?
+    val trailers: U
   ) : FilterTrailersStatus<T, U>(-1)
 }

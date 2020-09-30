@@ -3,9 +3,23 @@
 #import "library/common/types/c_types.h"
 
 static inline envoy_data toNativeData(NSData *data) {
+  if (data == nil) {
+    return envoy_nodata;
+  }
+
   uint8_t *native_bytes = (uint8_t *)safe_malloc(sizeof(uint8_t) * data.length);
   memcpy(native_bytes, data.bytes, data.length);
   envoy_data ret = {data.length, native_bytes, free, native_bytes};
+  return ret;
+}
+
+static inline envoy_data *toNativeDataPtr(NSData *data) {
+  if (data == nil) {
+    return NULL;
+  }
+
+  envoy_data *ret = (envoy_data *)safe_malloc(sizeof(envoy_data));
+  *ret = toNativeData(data);
   return ret;
 }
 
@@ -18,6 +32,10 @@ static inline envoy_data toManagedNativeString(NSString *s) {
 }
 
 static inline envoy_headers toNativeHeaders(EnvoyHeaders *headers) {
+  if (headers == nil) {
+    return envoy_noheaders;
+  }
+
   envoy_header_size_t length = 0;
   for (NSString *headerKey in headers) {
     length += [headers[headerKey] count];
@@ -34,6 +52,16 @@ static inline envoy_headers toNativeHeaders(EnvoyHeaders *headers) {
   }
   // TODO: ASSERT(header_index == length);
   envoy_headers ret = {length, header_array};
+  return ret;
+}
+
+static inline envoy_headers *toNativeHeadersPtr(EnvoyHeaders *headers) {
+  if (headers == nil) {
+    return NULL;
+  }
+
+  envoy_headers *ret = (envoy_headers *)safe_malloc(sizeof(envoy_headers));
+  *ret = toNativeHeaders(headers);
   return ret;
 }
 

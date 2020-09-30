@@ -149,7 +149,10 @@ envoy_data copy_envoy_data(size_t length, const uint8_t* src_bytes);
 // For example when sending a headers-only request.
 extern const envoy_data envoy_nodata;
 
-/**
+// Convenience constant to pass to function calls with no headers.
+extern const envoy_headers envoy_noheaders;
+
+/*
  * Error struct.
  */
 typedef struct {
