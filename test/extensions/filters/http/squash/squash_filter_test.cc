@@ -222,7 +222,7 @@ protected:
   void completeRequest(const std::string& status, const std::string& body) {
     Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
         Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", status}}}));
-    msg->body() = std::make_unique<Buffer::OwnedImpl>(body);
+    msg->body().add(body);
     popPendingCallback()->onSuccess(request_, std::move(msg));
   }
 
