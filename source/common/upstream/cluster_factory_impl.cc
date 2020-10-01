@@ -26,12 +26,11 @@ Stats::ScopePtr generateStatsScope(const envoy::config::cluster::v3::Cluster& co
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::create(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
     Stats::Store& stats, ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-    Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-    Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
-    AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
-    Server::Admin& admin, Singleton::Manager& singleton_manager,
-    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
-    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
+    Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime, Random::RandomGenerator&,
+    Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
+    const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
+    Singleton::Manager& singleton_manager, Outlier::EventLoggerSharedPtr outlier_event_logger,
+    bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   std::string cluster_type;
 
   if (!cluster.has_cluster_type()) {
@@ -73,7 +72,7 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
   }
 
   ClusterFactoryContextImpl context(
-      cluster_manager, stats, tls, std::move(dns_resolver), ssl_context_manager, runtime, random,
+      cluster_manager, stats, tls, std::move(dns_resolver), ssl_context_manager, runtime,
       dispatcher, log_manager, local_info, admin, singleton_manager,
       std::move(outlier_event_logger), added_via_api, validation_visitor, api);
   return factory->create(cluster, context);
@@ -120,7 +119,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
       throw EnvoyException("Multiple health checks not supported");
     } else {
       new_cluster_pair.first->setHealthChecker(HealthCheckerFactory::create(
-          cluster.health_checks()[0], *new_cluster_pair.first, context.runtime(), context.random(),
+          cluster.health_checks()[0], *new_cluster_pair.first, context.runtime(),
           context.dispatcher(), context.logManager(), context.messageValidationVisitor(),
           context.api()));
     }

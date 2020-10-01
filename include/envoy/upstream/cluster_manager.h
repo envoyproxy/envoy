@@ -370,7 +370,6 @@ public:
     ClusterManager& cm_;
     const LocalInfo::LocalInfo& local_info_;
     Event::Dispatcher& dispatcher_;
-    Random::RandomGenerator& random_;
     Singleton::Manager& singleton_manager_;
     ThreadLocal::SlotAllocator& tls_;
     ProtobufMessage::ValidationVisitor& validation_visitor_;

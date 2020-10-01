@@ -47,8 +47,7 @@ public:
              Ssl::ContextManager& ssl_context_manager, bool added_via_api,
              ClusterInfoFactory& info_factory, ClusterManager& cm,
              const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-             Random::RandomGenerator& random, Singleton::Manager& singleton_manager,
-             ThreadLocal::SlotAllocator& tls,
+             Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Upstream::Cluster
@@ -64,8 +63,7 @@ public:
 
   // Creates and starts healthcheckers to its endpoints
   void startHealthchecks(AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime,
-                         Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                         Api::Api& api);
+                         Event::Dispatcher& dispatcher, Api::Api& api);
 
   std::vector<Upstream::HealthCheckerSharedPtr> healthCheckers() { return health_checkers_; };
 
@@ -121,9 +119,9 @@ public:
   HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
               envoy::config::core::v3::ApiVersion transport_api_version,
               Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Envoy::Stats::Store& stats,
-              Ssl::ContextManager& ssl_context_manager, Random::RandomGenerator& random,
-              ClusterInfoFactory& info_factory, AccessLog::AccessLogManager& access_log_manager,
-              ClusterManager& cm, const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
+              Ssl::ContextManager& ssl_context_manager, ClusterInfoFactory& info_factory,
+              AccessLog::AccessLogManager& access_log_manager, ClusterManager& cm,
+              const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
               Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
               ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
@@ -161,7 +159,6 @@ private:
   Runtime::Loader& runtime_;
   Envoy::Stats::Store& store_stats_;
   Ssl::ContextManager& ssl_context_manager_;
-  Random::RandomGenerator& random_;
   ClusterInfoFactory& info_factory_;
   AccessLog::AccessLogManager& access_log_manager_;
   ClusterManager& cm_;

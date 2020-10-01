@@ -16,7 +16,6 @@ public:
   Init::Manager& initManager() override { return init_manager_; }
   ServerLifecycleNotifier& lifecycleNotifier() override { return lifecycle_notifier_; }
   const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
-  Envoy::Random::RandomGenerator& random() override { return random_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_loader_; }
   Stats::Scope& scope() override { return scope_; }
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }

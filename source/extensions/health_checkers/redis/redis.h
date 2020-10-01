@@ -28,7 +28,7 @@ public:
   RedisHealthChecker(
       const Upstream::Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
       const envoy::config::health_checker::redis::v2::Redis& redis_config,
-      Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Random::RandomGenerator& random,
+      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
       Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
       Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
 

@@ -40,7 +40,7 @@ class DnsFilterTest : public testing::Test, public Event::TestUsingSimulatedTime
 public:
   DnsFilterTest()
       : listener_address_(Network::Utility::parseInternetAddressAndPort("127.0.2.1:5353")),
-        api_(Api::createApiForTest()),
+        api_(Api::createApiForTest(random_)),
         counters_(mock_query_buffer_underflow_, mock_record_name_overflow_,
                   query_parsing_failure_) {
     udp_response_.addresses_.local_ = listener_address_;
@@ -93,6 +93,7 @@ public:
   }
 
   const Network::Address::InstanceConstSharedPtr listener_address_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
   DnsFilterEnvoyConfigSharedPtr config_;
   NiceMock<Stats::MockCounter> mock_query_buffer_underflow_;
@@ -105,7 +106,6 @@ public:
   Network::UdpRecvData udp_response_;
   NiceMock<Filesystem::MockInstance> file_system_;
   NiceMock<Stats::MockHistogram> histogram_;
-  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Server::Configuration::MockListenerFactoryContext> listener_factory_;
   Stats::IsolatedStoreImpl stats_store_;
   std::shared_ptr<Network::MockDnsResolver> resolver_;

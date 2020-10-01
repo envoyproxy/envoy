@@ -14,10 +14,11 @@ namespace RedisHealthChecker {
 RedisHealthChecker::RedisHealthChecker(
     const Upstream::Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
     const envoy::config::health_checker::redis::v2::Redis& redis_config,
-    Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Random::RandomGenerator& random,
+    Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
     Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
     Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
-    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
+    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, api.randomGenerator(),
+                            std::move(event_logger)),
       client_factory_(client_factory), key_(redis_config.key()),
       auth_username_(
           NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authUsername(cluster.info(), api)),

@@ -61,7 +61,7 @@ namespace Upstream {
 // the expectations when needed.
 class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
-  TestClusterManagerFactory() : api_(Api::createApiForTest(stats_)) {
+  TestClusterManagerFactory() : api_(Api::createApiForTest(stats_, random_)) {
     ON_CALL(*this, clusterFromProto_(_, _, _, _))
         .WillByDefault(Invoke(
             [&](const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,

@@ -167,8 +167,8 @@ TEST(HealthCheckerFactoryTest, CreateRedisViaUpstreamHealthCheckerFactory) {
   EXPECT_NE(nullptr,
             dynamic_cast<CustomRedisHealthChecker*>(
                 Upstream::HealthCheckerFactory::create(
-                    Upstream::parseHealthCheckFromV3Yaml(yaml), cluster, runtime, random,
-                    dispatcher, log_manager, ProtobufMessage::getStrictValidationVisitor(), api)
+                    Upstream::parseHealthCheckFromV3Yaml(yaml), cluster, runtime, dispatcher,
+                    log_manager, ProtobufMessage::getStrictValidationVisitor(), api)
                     .get()));
 }
 } // namespace
