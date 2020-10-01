@@ -82,16 +82,10 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         }
         const std::chrono::seconds ttl = std::chrono::seconds(dns_service.ttl().seconds());
 
-        // Generate the full name for the DNS service.
+        // Generate the full name for the DNS service. All input parameters are populated
+        // strings enforced by the message definition
         const std::string full_service_name =
             Utils::buildServiceName(dns_service.service_name(), proto, virtual_domain.name());
-        if (full_service_name.empty()) {
-          ENVOY_LOG(
-              trace,
-              "Unable to construct the full service name using name [{}], protocol[{}], domain[{}]",
-              dns_service.service_name(), proto, virtual_domain.name());
-          continue;
-        }
 
         DnsSrvRecordPtr service_record_ptr =
             std::make_unique<DnsSrvRecord>(full_service_name, proto, ttl);

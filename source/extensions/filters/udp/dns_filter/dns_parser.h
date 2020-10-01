@@ -169,12 +169,11 @@ class DnsMessageParser : public Logger::Loggable<Logger::Id::filter> {
 public:
   enum class DnsQueryParseState {
     Init,
-    Flags,      // 2 bytes
-    Questions,  // 2 bytes
-    Answers,    // 2 bytes
-    Authority,  // 2 bytes
-    Authority2, // 2 bytes
-    Finish
+    Flags,     // 2 bytes
+    Questions, // 2 bytes
+    Answers,   // 2 bytes
+    Authority, // 2 bytes
+    Authority2 // 2 bytes
   };
 
   // The flags have been verified with dig and this structure should not be modified. The flag
