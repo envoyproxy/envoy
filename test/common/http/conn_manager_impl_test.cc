@@ -2120,6 +2120,192 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamIdleAccessLog) {
   EXPECT_EQ(1U, stats_.named_.downstream_rq_idle_timeout_.value());
 }
 
+// Test timeout variants.
+TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
+  stream_idle_timeout_ = std::chrono::milliseconds(10);
+  setup(false, "");
+  setupFilterChain(1, 0);
+  RequestHeaderMap* latched_headers = nullptr;
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  // Create the stream.
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        Event::MockTimer* idle_timer = setUpTimer();
+        EXPECT_CALL(*idle_timer, enableTimer(_, _));
+        RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+        EXPECT_CALL(*idle_timer, enableTimer(_, _));
+        EXPECT_CALL(*idle_timer, disableTimer());
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+        latched_headers = headers.get();
+        decoder->decodeHeaders(std::move(headers), false);
+
+        data.drain(4);
+        return Http::okStatus();
+      }));
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  // Clear and refresh the route cache (checking clusterInfo refreshes the route cache)
+  decoder_filters_[0]->callbacks_->clearRouteCache();
+  decoder_filters_[0]->callbacks_->clusterInfo();
+
+  Event::MockTimer* timer = setUpTimer();
+
+  // Set a max duration of 30ms and make sure a 30ms timer is set.
+  {
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(30), _));
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
+        .Times(2)
+        .WillRepeatedly(Return(std::chrono::milliseconds(30)));
+    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+  }
+
+  // Clear the timeout and make sure the timer is disabled.
+  {
+    EXPECT_CALL(*timer, disableTimer());
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
+        .Times(1)
+        .WillRepeatedly(Return(absl::nullopt));
+    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+  }
+
+  // With no route timeout, but HCM defaults, the HCM defaults will be used.
+  {
+    max_stream_duration_ = std::chrono::milliseconds(17);
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(17), _));
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
+        .Times(1)
+        .WillRepeatedly(Return(absl::nullopt));
+    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+    max_stream_duration_ = absl::nullopt;
+  }
+
+  // Add a gRPC header, but not a gRPC timeout and verify the timer is unchanged.
+  latched_headers->setGrpcTimeout("1M");
+  {
+    EXPECT_CALL(*timer, disableTimer());
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
+        .Times(1)
+        .WillRepeatedly(Return(absl::nullopt));
+    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+  }
+
+  // With a gRPC header of 1M and a gRPC header max of 0, respect the gRPC header.
+  {
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, grpcTimeoutHeaderMax())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(std::chrono::milliseconds(0)));
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(60000), _));
+    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+  }
+
+  // With a gRPC header and a larger gRPC header cap, respect the gRPC header.
+  {
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, grpcTimeoutHeaderMax())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(std::chrono::milliseconds(20000000)));
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(60000), _));
+    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+  }
+
+  // With a gRPC header and a small gRPC header cap, use the cap.
+  {
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, grpcTimeoutHeaderMax())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(std::chrono::milliseconds(20)));
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(20), _));
+    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+  }
+
+  latched_headers->setGrpcTimeout("0m");
+  // With a gRPC header of 0, use the header
+  {
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, grpcTimeoutHeaderMax())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(std::chrono::milliseconds(20)));
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(0), _));
+    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+  }
+
+  latched_headers->setGrpcTimeout("1M");
+  // With a timeout of 20ms and an offset of 10ms, set a timeout for 10ms.
+  {
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, grpcTimeoutHeaderMax())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(std::chrono::milliseconds(20)));
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
+                grpcTimeoutHeaderOffset())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(std::chrono::milliseconds(10)));
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(10), _));
+    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+  }
+
+  // With a timeout of 20ms and an offset of 30ms, set a timeout for 0ms
+  {
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, grpcTimeoutHeaderMax())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(std::chrono::milliseconds(20)));
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
+                grpcTimeoutHeaderOffset())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(std::chrono::milliseconds(30)));
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(0), _));
+    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+  }
+
+  // With a gRPC timeout of 20ms, and 5ms used already when the route was
+  // refreshed, set a timer for 15ms.
+  {
+    test_time_.timeSystem().setMonotonicTime(MonotonicTime(std::chrono::milliseconds(5)));
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, grpcTimeoutHeaderMax())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(std::chrono::milliseconds(20)));
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
+                grpcTimeoutHeaderOffset())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(absl::nullopt));
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(15), _));
+    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+  }
+
+  // With a gRPC timeout of 20ms, and 25ms used already when the route was
+  // refreshed, set a timer for now (0ms)
+  {
+    test_time_.timeSystem().setMonotonicTime(MonotonicTime(std::chrono::milliseconds(25)));
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, grpcTimeoutHeaderMax())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(std::chrono::milliseconds(20)));
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
+                grpcTimeoutHeaderOffset())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(absl::nullopt));
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(0), _));
+    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+  }
+
+  // Cleanup.
+  EXPECT_CALL(*timer, disableTimer());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // Per-route timeouts override the global stream idle timeout.
 TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutRouteOverride) {
   stream_idle_timeout_ = std::chrono::milliseconds(10);
