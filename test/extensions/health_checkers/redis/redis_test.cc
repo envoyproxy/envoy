@@ -10,9 +10,14 @@
 #include "test/common/upstream/utility.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/mocks/upstream/health_check_event_logger.h"
+#include "test/mocks/upstream/host.h"
+#include "test/mocks/upstream/host_set.h"
+#include "test/mocks/upstream/priority_set.h"
 
 using testing::_;
 using testing::DoAll;
@@ -54,7 +59,7 @@ public:
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
-        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
@@ -90,7 +95,7 @@ public:
     EXPECT_CALL(*cluster_->info_, extensionProtocolOptions(_)).WillRepeatedly(Return(options));
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
-        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
@@ -114,7 +119,7 @@ public:
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
-        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
@@ -138,7 +143,7 @@ public:
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
-        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
@@ -175,7 +180,7 @@ public:
     EXPECT_CALL(*cluster_->info_, extensionProtocolOptions(_)).WillRepeatedly(Return(options));
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
-        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
@@ -198,7 +203,7 @@ public:
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
-        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
@@ -222,7 +227,7 @@ public:
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
-        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
@@ -281,7 +286,6 @@ public:
   std::shared_ptr<Upstream::MockClusterMockPrioritySet> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Random::MockRandomGenerator> random_;
   Upstream::MockHealthCheckEventLogger* event_logger_{};
   Event::MockTimer* timeout_timer_{};
   Event::MockTimer* interval_timer_{};

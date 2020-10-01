@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.config.core.v3;
 
+import "envoy/type/v3/percent.proto";
+
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -100,7 +102,7 @@ message HttpProtocolOptions {
   HeadersWithUnderscoresAction headers_with_underscores_action = 5;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message Http1ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http1ProtocolOptions";
@@ -157,9 +159,47 @@ message Http1ProtocolOptions {
   //   - Not a response to a HEAD request.
   //   - The content length header is not present.
   bool enable_trailers = 5;
+
+  // Allows Envoy to process requests/responses with both `Content-Length` and `Transfer-Encoding`
+  // headers set. By default such messages are rejected, but if option is enabled - Envoy will
+  // remove Content-Length header and process message.
+  // See `RFC7230, sec. 3.3.3 <https://tools.ietf.org/html/rfc7230#section-3.3.3>` for details.
+  //
+  // .. attention::
+  //   Enabling this option might lead to request smuggling vulnerability, especially if traffic
+  //   is proxied via multiple layers of proxies.
+  bool allow_chunked_length = 6;
+
+  // Allows invalid HTTP messaging. When this option is false, then Envoy will terminate
+  // HTTP/1.1 connections upon receiving an invalid HTTP message. However,
+  // when this option is true, then Envoy will leave the HTTP/1.1 connection
+  // open where possible.
+  // If set, this overrides any HCM :ref:`stream_error_on_invalid_http_messaging
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`.
+  google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 7;
 }
 
-// [#next-free-field: 15]
+message KeepaliveSettings {
+  // Send HTTP/2 PING frames at this period, in order to test that the connection is still alive.
+  google.protobuf.Duration interval = 1 [(validate.rules).duration = {
+    required: true
+    gte {nanos: 1000000}
+  }];
+
+  // How long to wait for a response to a keepalive PING. If a response is not received within this
+  // time period, the connection will be aborted.
+  google.protobuf.Duration timeout = 2 [(validate.rules).duration = {
+    required: true
+    gte {nanos: 1000000}
+  }];
+
+  // A random jitter amount as a percentage of interval that will be added to each interval.
+  // A value of zero means there will be no jitter.
+  // The default value is 15%.
+  type.v3.Percent interval_jitter = 3;
+}
+
+// [#next-free-field: 16]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http2ProtocolOptions";
@@ -327,6 +367,10 @@ message Http2ProtocolOptions {
   // <https://www.iana.org/assignments/http2-parameters/http2-parameters.xhtml#settings>`_ for
   // standardized identifiers.
   repeated SettingsParameter custom_settings_parameters = 13;
+
+  // Send HTTP/2 PING frames to verify that the connection is still healthy. If the remote peer
+  // does not respond within the configured timeout, the connection will be aborted.
+  KeepaliveSettings connection_keepalive = 15;
 }
 
 // [#not-implemented-hide:]

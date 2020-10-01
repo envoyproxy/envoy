@@ -1,15 +1,17 @@
 #pragma once
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 #pragma GCC diagnostic ignored "-Wtype-limits"
+#endif
 
 #include "quiche/quic/core/http/quic_spdy_client_session.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "extensions/quic_listeners/quiche/envoy_quic_client_stream.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_client_connection.h"
@@ -55,7 +57,8 @@ public:
   void Initialize() override;
   void OnCanWrite() override;
   void OnGoAway(const quic::QuicGoAwayFrame& frame) override;
-  void OnOneRttKeysAvailable() override;
+  void OnHttp3GoAway(uint64_t stream_id) override;
+  void OnTlsHandshakeComplete() override;
   // quic::QuicSpdyClientSessionBase
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
 

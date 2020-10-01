@@ -9,6 +9,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/socket.h"
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
@@ -57,9 +58,6 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       write_buffer_above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false) {
-  // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
-  // condition and just crash.
-  RELEASE_ASSERT(SOCKET_VALID(ConnectionImpl::ioHandle().fd()), "");
 
   if (!connected) {
     connecting_ = true;
@@ -69,9 +67,9 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 
   // We never ask for both early close and read at the same time. If we are reading, we want to
   // consume all available data.
-  file_event_ = dispatcher_.createFileEvent(
-      ConnectionImpl::ioHandle().fd(), [this](uint32_t events) -> void { onFileEvent(events); },
-      trigger, Event::FileReadyType::Read | Event::FileReadyType::Write);
+  file_event_ = socket_->ioHandle().createFileEvent(
+      dispatcher_, [this](uint32_t events) -> void { onFileEvent(events); }, trigger,
+      Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   transport_socket_->setTransportSocketCallbacks(*this);
 }
@@ -260,7 +258,8 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 #endif
 
-  RELEASE_ASSERT(result.rc_ == 0, "");
+  RELEASE_ASSERT(result.rc_ == 0, fmt::format("Failed to set TCP_NODELAY with error {}, {}",
+                                              result.errno_, errorDetails(result.errno_)));
 }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
@@ -696,6 +695,10 @@ bool ConnectionImpl::bothSidesHalfClosed() {
 absl::string_view ConnectionImpl::transportFailureReason() const {
   return transport_socket_->failureReason();
 }
+
+absl::optional<std::chrono::milliseconds> ConnectionImpl::lastRoundTripTime() const {
+  return socket_->lastRoundTripTime();
+};
 
 void ConnectionImpl::flushWriteBuffer() {
   if (state() == State::Open && write_buffer_->length() > 0) {

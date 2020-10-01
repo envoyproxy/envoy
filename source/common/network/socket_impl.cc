@@ -1,12 +1,10 @@
 #include "common/network/socket_impl.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/network/socket_interface.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/io_socket_handle_impl.h"
-#include "common/network/socket_interface_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -25,12 +23,11 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
   }
 
   // Should not happen but some tests inject -1 fds
-  if (SOCKET_INVALID(io_handle_->fd())) {
+  if (!io_handle_->isOpen()) {
     return;
   }
 
   auto domain = io_handle_->domain();
-
   // This should never happen in practice but too many tests inject fake fds ...
   if (!domain.has_value()) {
     return;

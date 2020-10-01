@@ -7,14 +7,11 @@
 
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/filter.h"
-#include "envoy/server/configuration.h"
-#include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -26,18 +23,18 @@
 #include "common/common/thread.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
-#include "common/http/exception.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/udp_default_writer_config.h"
+#include "common/network/udp_listener_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "server/active_raw_udp_listener_config.h"
 
-#include "test/test_common/printers.h"
+#include "test/mocks/common.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -108,7 +105,7 @@ public:
     Http::Utility::sendLocalReply(
         false,
         Http::Utility::EncodeFunctions(
-            {nullptr,
+            {nullptr, nullptr,
              [&](Http::ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
                encoder_.encodeHeaders(*headers, end_stream);
              },
@@ -256,18 +253,8 @@ class SharedConnectionWrapper : public Network::ConnectionCallbacks,
 public:
   using DisconnectCallback = std::function<void()>;
 
-  SharedConnectionWrapper(Network::Connection& connection, bool allow_unexpected_disconnects)
-      : connection_(connection), allow_unexpected_disconnects_(allow_unexpected_disconnects) {
+  SharedConnectionWrapper(Network::Connection& connection) : connection_(connection) {
     connection_.addConnectionCallbacks(*this);
-    addDisconnectCallback([this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
-      RELEASE_ASSERT(parented_ || allow_unexpected_disconnects_,
-                     "An queued upstream connection was torn down without being associated "
-                     "with a fake connection. Either manage the connection via "
-                     "waitForRawConnection() or waitForHttpConnection(), or "
-                     "set_allow_unexpected_disconnects(true).\n See "
-                     "https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md#"
-                     "unparented-upstream-connections");
-    });
   }
 
   Common::CallbackHandle* addDisconnectCallback(DisconnectCallback callback) {
@@ -318,12 +305,12 @@ public:
 
   // Execute some function on the connection's dispatcher. This involves a cross-thread post and
   // wait-for-completion. If the connection is disconnected, either prior to post or when the
-  // dispatcher schedules the callback, we silently ignore if allow_unexpected_disconnects_
-  // is set.
+  // dispatcher schedules the callback, we silently ignore.
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   executeOnDispatcher(std::function<void(Network::Connection&)> f,
-                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
+                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
+                      bool allow_disconnects = true) {
     absl::MutexLock lock(&lock_);
     if (disconnected_) {
       return testing::AssertionSuccess();
@@ -348,13 +335,8 @@ public:
     if (!time_system.waitFor(lock_, absl::Condition(&callback_ready_event), timeout)) {
       return testing::AssertionFailure() << "Timed out while executing on dispatcher.";
     }
-    if (unexpected_disconnect && !allow_unexpected_disconnects_) {
-      return testing::AssertionFailure()
-             << "The connection disconnected unexpectedly, and allow_unexpected_disconnects_ is "
-                "false."
-                "\n See "
-                "https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md#"
-                "unexpected-disconnects";
+    if (unexpected_disconnect && !allow_disconnects) {
+      ENVOY_LOG_MISC(warn, "executeOnDispatcher failed due to disconnect\n");
     }
     return testing::AssertionSuccess();
   }
@@ -372,7 +354,6 @@ private:
   Common::CallbackManager<> disconnect_callback_manager_ ABSL_GUARDED_BY(lock_);
   bool parented_ ABSL_GUARDED_BY(lock_){};
   bool disconnected_ ABSL_GUARDED_BY(lock_){};
-  const bool allow_unexpected_disconnects_;
 };
 
 using SharedConnectionWrapperPtr = std::unique_ptr<SharedConnectionWrapper>;
@@ -444,7 +425,8 @@ public:
 
   // Http::ServerConnectionCallbacks
   Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder, bool) override;
-  void onGoAway(Http::GoAwayErrorCode) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  // Should only be called for HTTP2
+  void onGoAway(Http::GoAwayErrorCode code) override;
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
@@ -473,8 +455,10 @@ private:
     FakeHttpConnection& parent_;
   };
 
+  const Type type_;
   Http::ServerConnectionPtr codec_;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
 using FakeHttpConnectionPtr = std::unique_ptr<FakeHttpConnection>;
@@ -616,7 +600,6 @@ public:
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
 
-  void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
   void setReadDisableOnNewConnection(bool value) { read_disable_on_new_connection_ = value; }
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
@@ -675,8 +658,9 @@ private:
   public:
     FakeListener(FakeUpstream& parent)
         : parent_(parent), name_("fake_upstream"),
-          udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>()),
-          udp_writer_factory_(std::make_unique<Network::UdpDefaultWriterFactory>()) {}
+          udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>(1)),
+          udp_writer_factory_(std::make_unique<Network::UdpDefaultWriterFactory>()),
+          udp_listener_worker_router_(1), init_manager_(nullptr) {}
 
   private:
     // Network::ListenerConfig
@@ -699,6 +683,9 @@ private:
     Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
       return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
     }
+    Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
+      return udp_listener_worker_router_;
+    }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
@@ -708,6 +695,7 @@ private:
     }
     ResourceLimit& openConnections() override { return connection_resource_; }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+    Init::Manager& initManager() override { return *init_manager_; }
 
     void setMaxConnections(const uint32_t num_connections) {
       connection_resource_.setMax(num_connections);
@@ -719,8 +707,10 @@ private:
     Network::NopConnectionBalancerImpl connection_balancer_;
     const Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
     const Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
+    Network::UdpListenerWorkerRouterImpl udp_listener_worker_router_;
     BasicResourceLimitImpl connection_resource_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+    std::unique_ptr<Init::Manager> init_manager_;
   };
 
   void threadRoutine();
@@ -743,7 +733,6 @@ private:
   // consumed_connections_. This allows later the Connection destruction (when the FakeUpstream is
   // deleted) on the same thread that allocated the connection.
   std::list<SharedConnectionWrapperPtr> consumed_connections_ ABSL_GUARDED_BY(lock_);
-  bool allow_unexpected_disconnects_;
   bool read_disable_on_new_connection_;
   const bool enable_half_close_;
   FakeListener listener_;

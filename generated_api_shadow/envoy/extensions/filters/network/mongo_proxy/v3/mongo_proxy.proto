@@ -23,7 +23,7 @@ message MongoProxy {
 
   // The human readable prefix to use when emitting :ref:`statistics
   // <config_network_filters_mongo_proxy_stats>`.
-  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // The optional path to use for writing Mongo access logs. If not access log
   // path is specified no access logs will be written. Note that access log is

@@ -68,7 +68,8 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                                         log_lock, options_.logFormatEscaped());
+                                                         log_lock, options_.logFormatEscaped(),
+                                                         options_.enableFineGrainLogging());
 
     configureComponentLogLevels();
 
@@ -119,7 +120,8 @@ void MainCommonBase::configureHotRestarter(Random::RandomGenerator& random_gener
         base_id = static_cast<uint32_t>(random_generator.random()) & 0x0FFFFFFF;
 
         try {
-          restarter = std::make_unique<Server::HotRestartImpl>(base_id, 0);
+          restarter = std::make_unique<Server::HotRestartImpl>(base_id, 0, options_.socketPath(),
+                                                               options_.socketMode());
         } catch (Server::HotRestartDomainSocketInUseException& ex) {
           // No luck, try again.
           ENVOY_LOG_MISC(debug, "dynamic base id: {}", ex.what());
@@ -132,7 +134,8 @@ void MainCommonBase::configureHotRestarter(Random::RandomGenerator& random_gener
 
       restarter_.swap(restarter);
     } else {
-      restarter_ = std::make_unique<Server::HotRestartImpl>(base_id, options_.restartEpoch());
+      restarter_ = std::make_unique<Server::HotRestartImpl>(
+          base_id, options_.restartEpoch(), options_.socketPath(), options_.socketMode());
     }
 
     // Write the base-id to the requested path whether we selected it

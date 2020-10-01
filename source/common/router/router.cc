@@ -26,7 +26,6 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
-#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
@@ -1300,9 +1299,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
     onUpstreamComplete(upstream_request);
   }
 
-  callbacks_->streamInfo().setResponseCodeDetails(
-      StreamInfo::ResponseCodeDetails::get().ViaUpstream);
-  callbacks_->encodeHeaders(std::move(headers), end_stream);
+  callbacks_->encodeHeaders(std::move(headers), end_stream,
+                            StreamInfo::ResponseCodeDetails::get().ViaUpstream);
 }
 
 void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,

@@ -78,9 +78,9 @@ uint64_t EnvoyQuicClientConnection::maxPacketSize() const {
 
 void EnvoyQuicClientConnection::setUpConnectionSocket() {
   if (connectionSocket()->ioHandle().isOpen()) {
-    file_event_ = dispatcher_.createFileEvent(
-        connectionSocket()->ioHandle().fd(),
-        [this](uint32_t events) -> void { onFileEvent(events); }, Event::FileTriggerType::Edge,
+    file_event_ = connectionSocket()->ioHandle().createFileEvent(
+        dispatcher_, [this](uint32_t events) -> void { onFileEvent(events); },
+        Event::PlatformDefaultTriggerType,
         Event::FileReadyType::Read | Event::FileReadyType::Write);
 
     if (!Network::Socket::applyOptions(connectionSocket()->options(), *connectionSocket(),

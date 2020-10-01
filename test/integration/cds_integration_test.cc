@@ -49,7 +49,7 @@ public:
   void initialize() override {
     use_lds_ = false;
     test_skipped_ = false;
-    // Controls how many fake_upstreams_.emplace_back(new FakeUpstream) will happen in
+    // Controls how many addFakeUpstream() will happen in
     // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
     // Make sure this number matches the size of the 'clusters' repeated field in the bootstrap
     // config that you use!
@@ -71,12 +71,8 @@ public:
     // Create the regular (i.e. not an xDS server) upstreams. We create them manually here after
     // initialize() because finalize() expects all fake_upstreams_ to correspond to a static
     // cluster in the bootstrap config - which we don't want since we're testing dynamic CDS!
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
-                                                  timeSystem(), enable_half_close_));
-    fake_upstreams_[UpstreamIndex1]->set_allow_unexpected_disconnects(false);
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
-                                                  timeSystem(), enable_half_close_));
-    fake_upstreams_[UpstreamIndex2]->set_allow_unexpected_disconnects(false);
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
     cluster1_ = ConfigHelper::buildStaticCluster(
         ClusterName1, fake_upstreams_[UpstreamIndex1]->localAddress()->ip()->port(),
         Network::Test::getLoopbackAddressString(ipVersion()));
@@ -122,7 +118,6 @@ public:
     RELEASE_ASSERT(result, result.message());
     xds_stream_->startGrpcStream();
     verifyGrpcServiceMethod();
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   }
 
   envoy::config::cluster::v3::Cluster cluster1_;

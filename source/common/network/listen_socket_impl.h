@@ -8,10 +8,10 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/socket.h"
+#include "envoy/network/socket_interface.h"
 
 #include "common/common/assert.h"
 #include "common/network/socket_impl.h"
-#include "common/network/socket_interface_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -44,7 +44,7 @@ public:
   NetworkListenSocket(const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
       : ListenSocketImpl(Network::ioHandleForAddr(T::type, address), address) {
-    RELEASE_ASSERT(SOCKET_VALID(io_handle_->fd()), "");
+    RELEASE_ASSERT(io_handle_->isOpen(), "");
 
     setPrebindSocketOptions();
 
@@ -127,6 +127,10 @@ public:
     server_name_ = std::string(server_name);
   }
   absl::string_view requestedServerName() const override { return server_name_; }
+
+  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {
+    return ioHandle().lastRoundTripTime();
+  }
 
 protected:
   Address::InstanceConstSharedPtr remote_address_;

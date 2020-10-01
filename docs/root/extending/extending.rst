@@ -23,6 +23,7 @@ types including:
 * BoringSSL private key methods
 * :ref:`Watchdog action <envoy_v3_api_msg_config.bootstrap.v3.Watchdog.WatchdogAction>`
 * :ref:`Internal redirect policy <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>`
+* :ref:`Compression libraries <arch_overview_compression_libraries>`
 
 As of this writing there is no high level extension developer documentation. The
 :repo:`existing extensions <source/extensions>` are a good way to learn what is possible.

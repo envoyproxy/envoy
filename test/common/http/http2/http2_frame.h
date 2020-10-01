@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/http/metadata_interface.h"
+
 #include "common/common/assert.h"
 
 #include "absl/strings/string_view.h"
@@ -35,7 +37,8 @@ public:
     Ping,
     GoAway,
     WindowUpdate,
-    Continuation
+    Continuation,
+    Metadata = 77,
   };
 
   enum class SettingsFlags : uint8_t {
@@ -52,6 +55,11 @@ public:
   enum class DataFlags : uint8_t {
     None = 0,
     EndStream = 1,
+  };
+
+  enum class MetadataFlags : uint8_t {
+    None = 0,
+    EndMetadata = 4,
   };
 
   // See https://tools.ietf.org/html/rfc7541#appendix-A for static header indexes
@@ -85,6 +93,21 @@ public:
 
   enum class ResponseStatus { Unknown, Ok, NotFound };
 
+  struct Header {
+    Header(absl::string_view key, absl::string_view value) : key_(key), value_(value) {}
+    std::string key_;
+    std::string value_;
+  };
+
+  /**
+   * Make client stream ID out of the given ID in the host byte order, ensuring that the stream id
+   * is odd as required by https://tools.ietf.org/html/rfc7540#section-5.1.1
+   * Use this function to create client stream ids for methods creating HTTP/2 frames.
+   * @param stream_id some stream id that will be used to create the client stream id.
+   * @return an odd number client stream id.
+   */
+  static uint32_t makeClientStreamId(uint32_t stream_id) { return (stream_id << 1) | 1; }
+
   // Methods for creating HTTP2 frames
   static Http2Frame makePingFrame(absl::string_view data = {});
   static Http2Frame makeEmptySettingsFrame(SettingsFlags flags = SettingsFlags::None);
@@ -101,12 +124,18 @@ public:
   static Http2Frame makeEmptyGoAwayFrame(uint32_t last_stream_index, ErrorCode error_code);
 
   static Http2Frame makeWindowUpdateFrame(uint32_t stream_index, uint32_t increment);
+  static Http2Frame makeMetadataFrameFromMetadataMap(uint32_t stream_index,
+                                                     MetadataMap& metadata_map,
+                                                     MetadataFlags flags);
+
   static Http2Frame makeMalformedRequest(uint32_t stream_index);
   static Http2Frame makeMalformedRequestWithZerolenHeader(uint32_t stream_index,
                                                           absl::string_view host,
                                                           absl::string_view path);
   static Http2Frame makeRequest(uint32_t stream_index, absl::string_view host,
                                 absl::string_view path);
+  static Http2Frame makeRequest(uint32_t stream_index, absl::string_view host,
+                                absl::string_view path, const std::vector<Header> extra_headers);
   static Http2Frame makePostRequest(uint32_t stream_index, absl::string_view host,
                                     absl::string_view path);
   /**
@@ -159,10 +188,14 @@ private:
   void appendData(std::vector<uint8_t> data) {
     data_.insert(data_.end(), data.begin(), data.end());
   }
+  void appendDataAfterHeaders(std::vector<uint8_t> data) {
+    std::copy(data.begin(), data.end(), data_.begin() + 9);
+  }
 
   // Headers are directly encoded
   void appendStaticHeader(StaticHeaderIndex index);
   void appendHeaderWithoutIndexing(StaticHeaderIndex index, absl::string_view value);
+  void appendHeaderWithoutIndexing(const Header& header);
   void appendEmptyHeader();
 
   // This method updates payload length in the HTTP2 header based on the size of the data_

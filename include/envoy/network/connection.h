@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -126,6 +127,12 @@ public:
    * @return uint64_t the unique local ID of this connection.
    */
   virtual uint64_t id() const PURE;
+
+  /**
+   * @param vector of bytes to which the connection should append hash key data. Any data already in
+   * the key vector must not be modified.
+   */
+  virtual void hashKey(std::vector<uint8_t>& hash) const PURE;
 
   /**
    * @return std::string the next protocol to use as selected by network level negotiation. (E.g.,
@@ -301,6 +308,13 @@ public:
    *         occurred an empty string is returned.
    */
   virtual absl::string_view transportFailureReason() const PURE;
+
+  /**
+   *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip
+   *  time of the connection. If the platform does not support this, then an empty optional is
+   *  returned.
+   */
+  virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() const PURE;
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;

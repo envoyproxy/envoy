@@ -11,6 +11,8 @@
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/upstream/load_balancer.h"
+#include "test/mocks/upstream/load_balancer_context.h"
 #include "test/test_common/environment.h"
 
 using testing::Eq;
@@ -174,6 +176,7 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
 
   for (int i = 0; i <= 65; ++i) {
     EXPECT_CALL(random_, random()).WillOnce(Return(i));
+    EXPECT_TRUE(lb_->peekAnotherHost(nullptr) == nullptr);
     Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr);
     EXPECT_EQ(host.get(), target.get());
   }

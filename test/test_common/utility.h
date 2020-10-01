@@ -652,6 +652,19 @@ public:
   }
 
   template <class MessageType>
+  static Config::DecodedResourcesWrapper decodeResources(std::vector<MessageType> resources,
+                                                         const std::string& name_field = "name") {
+    Config::DecodedResourcesWrapper decoded_resources;
+    for (const auto& resource : resources) {
+      auto owned_resource = std::make_unique<MessageType>(resource);
+      decoded_resources.owned_resources_.emplace_back(new Config::DecodedResourceImpl(
+          std::move(owned_resource), MessageUtil::getStringField(resource, name_field), {}, ""));
+      decoded_resources.refvec_.emplace_back(*decoded_resources.owned_resources_.back());
+    }
+    return decoded_resources;
+  }
+
+  template <class MessageType>
   static Config::DecodedResourcesWrapper
   decodeResources(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                   const std::string& version, const std::string& name_field = "name") {
@@ -924,6 +937,9 @@ public:
   const HeaderEntry* get(const LowerCaseString& key) const override {
     return header_map_->get(key);
   }
+  HeaderMap::GetResult getAll(const LowerCaseString& key) const override {
+    return header_map_->getAll(key);
+  }
   void iterate(HeaderMap::ConstIterateCb cb) const override { header_map_->iterate(cb); }
   void iterateReverse(HeaderMap::ConstIterateCb cb) const override {
     header_map_->iterateReverse(cb);
@@ -1027,7 +1043,9 @@ makeHeaderMap(const std::initializer_list<std::pair<std::string, std::string>>& 
 
 namespace Api {
 ApiPtr createApiForTest();
+ApiPtr createApiForTest(Random::RandomGenerator& random);
 ApiPtr createApiForTest(Stats::Store& stat_store);
+ApiPtr createApiForTest(Stats::Store& stat_store, Random::RandomGenerator& random);
 ApiPtr createApiForTest(Event::TimeSystem& time_system);
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
 } // namespace Api

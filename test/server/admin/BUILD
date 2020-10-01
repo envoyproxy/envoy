@@ -42,10 +42,6 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -91,6 +87,7 @@ envoy_cc_test(
     srcs = ["logs_handler_test.cc"],
     deps = [
         ":admin_instance_lib",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 
@@ -110,7 +107,33 @@ envoy_cc_test(
         ":admin_instance_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "clusters_handler_test",
+    srcs = ["clusters_handler_test.cc"],
+    deps = [
+        ":admin_instance_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "config_dump_handler_test",
+    srcs = ["config_dump_handler_test.cc"],
+    deps = [
+        ":admin_instance_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "init_dump_handler_test",
+    srcs = ["init_dump_handler_test.cc"],
+    deps = [
+        ":admin_instance_lib",
     ],
 )
 

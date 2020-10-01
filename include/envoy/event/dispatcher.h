@@ -152,7 +152,7 @@ public:
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
   virtual Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                              Network::ListenerCallbacks& cb, bool bind_to_port,
+                                              Network::TcpListenerCallbacks& cb, bool bind_to_port,
                                               uint32_t backlog_size) PURE;
 
   /**
@@ -161,7 +161,7 @@ public:
    * @param cb supplies the udp listener callbacks to invoke for listener events.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
-  virtual Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
+  virtual Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
                                                     Network::UdpListenerCallbacks& cb) PURE;
   /**
    * Allocates a timer. @see Timer for docs on how to use the timer.

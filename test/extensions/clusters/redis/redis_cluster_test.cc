@@ -19,11 +19,16 @@
 #include "test/common/upstream/utility.h"
 #include "test/extensions/clusters/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/mocks/upstream/health_check_event_logger.h"
+#include "test/mocks/upstream/health_checker.h"
 
 using testing::_;
 using testing::ContainerEq;
@@ -141,7 +146,7 @@ protected:
     NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;
     NiceMock<Envoy::Api::MockApi> api;
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
-        cm, stats_store_, tls_, std::move(dns_resolver_), ssl_context_manager_, runtime_, random_,
+        cm, stats_store_, tls_, std::move(dns_resolver_), ssl_context_manager_, runtime_,
         dispatcher_, log_manager, local_info_, admin_, singleton_manager_,
         std::move(outlier_event_logger), false, validation_visitor_, api);
 

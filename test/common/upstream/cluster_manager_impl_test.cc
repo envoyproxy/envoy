@@ -6,6 +6,13 @@
 #include "envoy/secret/secret_manager.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
+#include "test/mocks/upstream/cds_api.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/mocks/upstream/cluster_real_priority_set.h"
+#include "test/mocks/upstream/cluster_update_callbacks.h"
+#include "test/mocks/upstream/health_checker.h"
+#include "test/mocks/upstream/load_balancer_context.h"
+#include "test/mocks/upstream/thread_aware_load_balancer.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -20,6 +27,7 @@ using ::testing::Mock;
 using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::ReturnNew;
+using ::testing::ReturnRef;
 using ::testing::SaveArg;
 
 envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml,
@@ -3909,6 +3917,138 @@ cluster_manager:
   const auto cluster = cluster_manager_->get("new_cluster");
   EXPECT_EQ(1, cluster->prioritySet().hostSetsPerPriority().size());
 }
+
+TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      connection_pool_per_downstream_connection: true
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  create(parseBootstrapFromV3Yaml(yaml));
+  NiceMock<MockLoadBalancerContext> lb_context;
+  NiceMock<Network::MockConnection> downstream_connection;
+  Network::Socket::OptionsSharedPtr options_to_return = nullptr;
+  ON_CALL(lb_context, downstreamConnection()).WillByDefault(Return(&downstream_connection));
+  ON_CALL(downstream_connection, socketOptions()).WillByDefault(ReturnRef(options_to_return));
+
+  std::vector<Http::ConnectionPool::MockInstance*> conn_pool_vector;
+  for (size_t i = 0; i < 3; ++i) {
+    conn_pool_vector.push_back(new Http::ConnectionPool::MockInstance());
+    EXPECT_CALL(factory_, allocateConnPool_(_, _, _)).WillOnce(Return(conn_pool_vector.back()));
+    EXPECT_CALL(downstream_connection, hashKey)
+        .WillOnce(Invoke([i](std::vector<uint8_t>& hash_key) { hash_key.push_back(i); }));
+    EXPECT_EQ(conn_pool_vector.back(),
+              cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,
+                                                       Http::Protocol::Http11, &lb_context));
+  }
+
+  // Check that the first entry is still in the pool map
+  EXPECT_CALL(downstream_connection, hashKey).WillOnce(Invoke([](std::vector<uint8_t>& hash_key) {
+    hash_key.push_back(0);
+  }));
+  EXPECT_EQ(conn_pool_vector.front(),
+            cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,
+                                                     Http::Protocol::Http11, &lb_context));
+}
+
+class PrefetchTest : public ClusterManagerImplTest {
+public:
+  void initialize(float ratio) {
+    const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+  )EOF";
+
+    ReadyWatcher initialized;
+    EXPECT_CALL(initialized, ready());
+    envoy::config::bootstrap::v3::Bootstrap config = parseBootstrapFromV3Yaml(yaml);
+    if (ratio != 0) {
+      config.mutable_static_resources()
+          ->mutable_clusters(0)
+          ->mutable_prefetch_policy()
+          ->mutable_predictive_prefetch_ratio()
+          ->set_value(ratio);
+    }
+    create(config);
+
+    // Set up for an initialize callback.
+    cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+    std::unique_ptr<MockClusterUpdateCallbacks> callbacks(
+        new NiceMock<MockClusterUpdateCallbacks>());
+    ClusterUpdateCallbacksHandlePtr cb =
+        cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
+
+    cluster_ = &cluster_manager_->activeClusters().begin()->second.get();
+
+    // Set up the HostSet.
+    host1_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80");
+    host2_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80");
+
+    HostVector hosts{host1_, host2_};
+    auto hosts_ptr = std::make_shared<HostVector>(hosts);
+
+    // Sending non-mergeable updates.
+    cluster_->prioritySet().updateHosts(
+        0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts,
+        {}, 100);
+  }
+
+  Cluster* cluster_{};
+  HostSharedPtr host1_;
+  HostSharedPtr host2_;
+};
+
+TEST_F(PrefetchTest, PrefetchOff) {
+  // With prefetch set to 0, each request for a connection pool will only
+  // allocate that conn pool.
+  initialize(0);
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
+      .Times(1)
+      .WillRepeatedly(ReturnNew<Http::ConnectionPool::MockInstance>());
+  cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,
+                                           Http::Protocol::Http11, nullptr);
+
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
+      .Times(1)
+      .WillRepeatedly(ReturnNew<Tcp::ConnectionPool::MockInstance>());
+  cluster_manager_->tcpConnPoolForCluster("cluster_1", ResourcePriority::Default, nullptr);
+}
+
+TEST_F(PrefetchTest, PrefetchOn) {
+  // With prefetch set to 1.1, each request for a connection pool will kick off
+  // prefetching, so create the pool for both the current connection and the
+  // anticipated one.
+  initialize(1.1);
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
+      .Times(2)
+      .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
+  cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,
+                                           Http::Protocol::Http11, nullptr);
+
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
+      .Times(2)
+      .WillRepeatedly(ReturnNew<NiceMock<Tcp::ConnectionPool::MockInstance>>());
+  cluster_manager_->tcpConnPoolForCluster("cluster_1", ResourcePriority::Default, nullptr);
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

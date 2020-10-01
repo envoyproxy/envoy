@@ -24,9 +24,15 @@ BSON
 BPF
 CAS
 CB
+CDN
 CDS
 CEL
+DSR
+HEXDIG
+HEXDIGIT
 LTT
+OWS
+TIDs
 ceil
 CHACHA
 CHLO
@@ -65,11 +71,13 @@ DFATAL
 DGRAM
 DLOG
 DNS
+DNSSEC
 DQUOTE
 DRYs
 DS
 DST
 DW
+DWORD
 EADDRINUSE
 EADDRNOTAVAIL
 EAGAIN
@@ -212,7 +220,9 @@ NS
 NUL
 Nilsson
 Nonhashable
+Oauth
 OCSP
+OID
 OK
 OOM
 OOMs
@@ -351,6 +361,8 @@ WRONGPASS
 WRR
 WS
 WSA
+WSABUF
+WSAEINVAL
 WSS
 Welford's
 Wi
@@ -462,6 +474,7 @@ canonicalizing
 cardinality
 casted
 charset
+checkin
 checksum
 chrono
 chroot
@@ -623,6 +636,7 @@ func
 functor
 functors
 gRPC
+gateway
 gcov
 genrule
 getaddrinfo
@@ -814,6 +828,7 @@ nullopt
 nullptr
 num
 numkeys
+oauth
 observability
 ocagent
 offsetof
@@ -854,6 +869,7 @@ pausable
 pcall
 pcap
 pclose
+performant
 pfctl
 pipelined
 pipelining
@@ -928,6 +944,7 @@ realloc
 rebalanced
 rebalancing
 rebuffer
+rebuilder
 reconnection
 recurse
 recv
@@ -953,11 +970,13 @@ rele
 releasor
 reloadable
 remoting
+renderers
 reparse
 repeatability
 reperform
 repicked
 repo
+reproducibility
 requirepass
 reselecting
 reserialize
@@ -971,6 +990,7 @@ resolvers
 responder
 restarter
 resync
+retransmitting
 retriable
 retriggers
 revalidated
@@ -999,6 +1019,7 @@ sched
 schedulable
 schemas
 scopekey
+sd
 secp
 sendmsg
 sendmmsg
@@ -1011,6 +1032,7 @@ setsockopt
 sig
 sigaction
 sigactions
+siginfo
 signalstack
 siloed
 sim

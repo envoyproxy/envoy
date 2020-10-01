@@ -59,9 +59,9 @@ protected:
     EXPECT_CALL(Const(connection_), ssl()).WillOnce(Return(secure ? ssl_ : nullptr));
 
     ConnectionWrapper::create(coroutine_->luaState(), &connection_);
-    EXPECT_CALL(*this, testPrint(secure ? "secure" : "plain"));
+    EXPECT_CALL(printer_, testPrint(secure ? "secure" : "plain"));
     EXPECT_CALL(Const(connection_), ssl()).WillOnce(Return(secure ? ssl_ : nullptr));
-    EXPECT_CALL(*this, testPrint(secure ? "userdata" : "nil"));
+    EXPECT_CALL(printer_, testPrint(secure ? "userdata" : "nil"));
     start("callMe");
   }
 
@@ -76,15 +76,19 @@ TEST_F(LuaBufferWrapperTest, Methods) {
       testPrint(object:length())
       testPrint(object:getBytes(0, 2))
       testPrint(object:getBytes(6, 5))
+      testPrint(object:setBytes("neverland"))
+      testPrint(object:getBytes(0, 5))
     end
   )EOF"};
 
   setup(SCRIPT);
   Buffer::OwnedImpl data("hello world");
   BufferWrapper::create(coroutine_->luaState(), data);
-  EXPECT_CALL(*this, testPrint("11"));
-  EXPECT_CALL(*this, testPrint("he"));
-  EXPECT_CALL(*this, testPrint("world"));
+  EXPECT_CALL(printer_, testPrint("11"));
+  EXPECT_CALL(printer_, testPrint("he"));
+  EXPECT_CALL(printer_, testPrint("world"));
+  EXPECT_CALL(printer_, testPrint("9"));
+  EXPECT_CALL(printer_, testPrint("never"));
   start("callMe");
 }
 
@@ -169,23 +173,23 @@ TEST_F(LuaMetadataMapWrapperTest, Methods) {
   const auto filter_metadata = metadata.filter_metadata().at("envoy.filters.http.lua");
   MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
 
-  EXPECT_CALL(*this, testPrint("pulla"));
-  EXPECT_CALL(*this, testPrint("finland"));
+  EXPECT_CALL(printer_, testPrint("pulla"));
+  EXPECT_CALL(printer_, testPrint("finland"));
 
-  EXPECT_CALL(*this, testPrint("true"));
-  EXPECT_CALL(*this, testPrint("false"));
+  EXPECT_CALL(printer_, testPrint("true"));
+  EXPECT_CALL(printer_, testPrint("false"));
 
-  EXPECT_CALL(*this, testPrint("5"));
-  EXPECT_CALL(*this, testPrint("30.5"));
+  EXPECT_CALL(printer_, testPrint("5"));
+  EXPECT_CALL(printer_, testPrint("30.5"));
 
-  EXPECT_CALL(*this, testPrint("grass_fed"));
-  EXPECT_CALL(*this, testPrint("false"));
+  EXPECT_CALL(printer_, testPrint("grass_fed"));
+  EXPECT_CALL(printer_, testPrint("false"));
 
-  EXPECT_CALL(*this, testPrint("flour"));
-  EXPECT_CALL(*this, testPrint("milk"));
+  EXPECT_CALL(printer_, testPrint("flour"));
+  EXPECT_CALL(printer_, testPrint("milk"));
 
-  EXPECT_CALL(*this, testPrint("nil"));
-  EXPECT_CALL(*this, testPrint("0"));
+  EXPECT_CALL(printer_, testPrint("nil"));
+  EXPECT_CALL(printer_, testPrint("0"));
 
   start("callMe");
 }
@@ -225,11 +229,11 @@ TEST_F(LuaMetadataMapWrapperTest, Iterators) {
   const auto filter_metadata = metadata.filter_metadata().at("envoy.filters.http.lua");
   MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
 
-  EXPECT_CALL(*this, testPrint("'make.delicious.bread' 'pulla'"));
-  EXPECT_CALL(*this, testPrint("'make.delicious.cookie' 'chewy'"));
-  EXPECT_CALL(*this, testPrint("'make.nothing0' 'nothing'"));
-  EXPECT_CALL(*this, testPrint("'make.nothing1' 'nothing'"));
-  EXPECT_CALL(*this, testPrint("'make.nothing2' 'nothing'"));
+  EXPECT_CALL(printer_, testPrint("'make.delicious.bread' 'pulla'"));
+  EXPECT_CALL(printer_, testPrint("'make.delicious.cookie' 'chewy'"));
+  EXPECT_CALL(printer_, testPrint("'make.nothing0' 'nothing'"));
+  EXPECT_CALL(printer_, testPrint("'make.nothing1' 'nothing'"));
+  EXPECT_CALL(printer_, testPrint("'make.nothing2' 'nothing'"));
 
   start("callMe");
 }

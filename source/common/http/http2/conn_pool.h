@@ -18,8 +18,8 @@ namespace Http2 {
  */
 class ConnPoolImpl : public Envoy::Http::HttpConnPoolImplBase {
 public:
-  ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
-               Upstream::ResourcePriority priority,
+  ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
+               Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
 
@@ -42,7 +42,7 @@ protected:
     ConnPoolImpl& parent() { return static_cast<ConnPoolImpl&>(parent_); }
 
     // ConnPoolImpl::ActiveClient
-    bool closingWithIncompleteRequest() const override;
+    bool closingWithIncompleteStream() const override;
     RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
 
     // CodecClientCallbacks
@@ -59,7 +59,7 @@ protected:
     bool closed_with_active_rq_{};
   };
 
-  uint64_t maxRequestsPerConnection();
+  uint64_t maxStreamsPerConnection();
   void movePrimaryClientToDraining();
   void onGoAway(ActiveClient& client, Http::GoAwayErrorCode error_code);
   void onStreamDestroy(ActiveClient& client);
@@ -68,6 +68,8 @@ protected:
   // All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
   // side we do 2^29.
   static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
+
+  Random::RandomGenerator& random_generator_;
 };
 
 /**
@@ -82,8 +84,8 @@ private:
 };
 
 ConnectionPool::InstancePtr
-allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
-                 Upstream::ResourcePriority priority,
+allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
+                 Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
 
