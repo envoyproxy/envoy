@@ -334,7 +334,7 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respo
   }
   // These booleans help figure out when to end the stream
   const bool has_data = grpc_respond.has_grpc_respond_bytes();
-  // Didn't hardcode grpc-status to fully explore search space provided by codecs.
+  // Didn't hard code grpc-status to fully explore search space provided by codecs.
 
   // If the fuzzing engine generates a grpc_respond_trailers message, there is a validation
   // that trailers (test.fuzz.Headers) must be present. If it is present, that means there is
