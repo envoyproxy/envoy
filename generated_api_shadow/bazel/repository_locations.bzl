@@ -1,4 +1,4 @@
-REPOSITORY_LOCATIONS = dict(
+DEPENDENCY_REPOSITORIES_SPEC = dict(
     bazel_skylib = dict(
         project_name = "bazel-skylib",
         project_desc = "Common useful functions and rules for Bazel",
@@ -13,23 +13,11 @@ REPOSITORY_LOCATIONS = dict(
         project_name = "protoc-gen-validate (PGV)",
         project_desc = "protoc plugin to generate polyglot message validators",
         project_url = "https://github.com/envoyproxy/protoc-gen-validate",
-        version = "538267e6e8c985a678e03c42c02b801e9eef8d3c",
-        sha256 = "93d1dde178c6ef91c16b2bf4f604aa0363a52ef021ce749da448e1ca2f977ccc",
+        version = "278964a8052f96a2f514add0298098f63fb7f47f",
+        sha256 = "e368733c9fb7f8489591ffaf269170d7658cc0cd1ee322b601512b769446d3c8",
         strip_prefix = "protoc-gen-validate-{version}",
         urls = ["https://github.com/envoyproxy/protoc-gen-validate/archive/{version}.tar.gz"],
-        last_updated = "2020-09-23",
-        use_category = ["api"],
-    ),
-    com_google_googleapis = dict(
-        # TODO(dio): Consider writing a Starlark macro for importing Google API proto.
-        project_name = "Google APIs",
-        project_desc = "Public interface definitions of Google APIs",
-        project_url = "https://github.com/googleapis/googleapis",
-        version = "82944da21578a53b74e547774cf62ed31a05b841",
-        sha256 = "a45019af4d3290f02eaeb1ce10990166978c807cb33a9692141a076ba46d1405",
-        strip_prefix = "googleapis-{version}",
-        urls = ["https://github.com/googleapis/googleapis/archive/{version}.tar.gz"],
-        last_updated = "2019-12-02",
+        last_updated = "2020-06-09",
         use_category = ["api"],
     ),
     com_github_cncf_udpa = dict(
@@ -52,6 +40,18 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "zipkin-api-{version}",
         urls = ["https://github.com/openzipkin/zipkin-api/archive/{version}.tar.gz"],
         last_updated = "2020-09-23",
+        use_category = ["api"],
+    ),
+    com_google_googleapis = dict(
+        # TODO(dio): Consider writing a Starlark macro for importing Google API proto.
+        project_name = "Google APIs",
+        project_desc = "Public interface definitions of Google APIs",
+        project_url = "https://github.com/googleapis/googleapis",
+        version = "82944da21578a53b74e547774cf62ed31a05b841",
+        sha256 = "a45019af4d3290f02eaeb1ce10990166978c807cb33a9692141a076ba46d1405",
+        strip_prefix = "googleapis-{version}",
+        urls = ["https://github.com/googleapis/googleapis/archive/{version}.tar.gz"],
+        last_updated = "2019-12-02",
         use_category = ["api"],
     ),
     opencensus_proto = dict(
@@ -88,3 +88,23 @@ REPOSITORY_LOCATIONS = dict(
         use_category = ["api"],
     ),
 )
+
+def _format_version(s, version):
+    return s.format(version = version, dash_version = version.replace(".", "-"), underscore_version = version.replace(".", "_"))
+
+# Interpolate {version} in the above dependency specs. This code should be capable of running in both Python
+# and Starlark.
+def _dependency_repositories():
+    locations = {}
+    for key, location in DEPENDENCY_REPOSITORIES_SPEC.items():
+        mutable_location = dict(location)
+        locations[key] = mutable_location
+
+        # Fixup with version information.
+        if "version" in location:
+            if "strip_prefix" in location:
+                mutable_location["strip_prefix"] = _format_version(location["strip_prefix"], location["version"])
+            mutable_location["urls"] = [_format_version(url, location["version"]) for url in location["urls"]]
+    return locations
+
+REPOSITORY_LOCATIONS = _dependency_repositories()
