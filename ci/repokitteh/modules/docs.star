@@ -5,8 +5,26 @@ def docs_have_been_rebuilt(context, state):
     context == "circleci: docs"
     and state == "success")
 
+def docs_have_changed_in_this_pr():
+  return bool([
+    f["filename"]
+    for f
+    in github.pr_list_files()
+    if (f["filename"].startswith("docs/")
+        or f["filename"].startswith("api/"))])
+
+def docs_have_changed_between_commits(commit1, commit2):
+  author = "phlax"
+  return bool([
+    f["filename"]
+    for f
+    in github.call("/repos/%s/envoy/compare/%s...%s" % (author, commit1, commit2))
+    if (f["filename"].startswith("docs/")
+        or f["filename"].startswith("api/"))])
+
 def docs_have_changed_since_last_rebuild(pull_request, commit):
-  # check if there are any changes to docs in this PR
+  if not docs_have_changed_in_this_pr():
+    return False
 
   # check if there is a stored commit hash for last rendered docs on this PR
 
