@@ -98,10 +98,11 @@ public:
    * @param request_headers the header map from which to extract the value of 'grpc-timeout' header.
    *        If this header is missing the timeout corresponds to infinity. The header is encoded in
    *        maximum of 8 decimal digits and a char for the unit.
-   * @return std::chrono::milliseconds the duration in milliseconds. A zero value corresponding to
-   *         infinity is returned if 'grpc-timeout' is missing or malformed.
+   * @return absl::optional<std::chrono::milliseconds> the duration in milliseconds. absl::nullopt
+   *         is returned if 'grpc-timeout' is missing or malformed.
    */
-  static std::chrono::milliseconds getGrpcTimeout(const Http::RequestHeaderMap& request_headers);
+  static absl::optional<std::chrono::milliseconds>
+  getGrpcTimeout(const Http::RequestHeaderMap& request_headers);
 
   /**
    * Encode 'timeout' into 'grpc-timeout' format in the grpc-timeout header.
