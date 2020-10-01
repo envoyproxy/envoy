@@ -859,7 +859,7 @@ TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughAdsViaEdsFails) {
 
 TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(InvalidLegacyBootstrapRuntime)) {
   EXPECT_THROW_WITH_MESSAGE(
-      initialize("test/server/test_data/server/invalid_runtime_bootstrap.yaml"), EnvoyException,
+      initialize("test/server/test_data/server/invalid_legacy_runtime_bootstrap.yaml"), EnvoyException,
       "Invalid runtime entry value for foo");
 }
 
