@@ -52,7 +52,7 @@ public:
     scope_ = nullptr;
   }
 
-  void enableTimer(const std::chrono::milliseconds& min_ms, const std::chrono::milliseconds& max_ms,
+  void enableTimer(const std::chrono::milliseconds min_ms, const std::chrono::milliseconds max_ms,
                    const ScopeTrackedObject* scope) override {
     disableTimer();
     scope_ = scope;

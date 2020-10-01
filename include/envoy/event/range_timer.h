@@ -32,8 +32,7 @@ public:
    * @param max_ms supplies the maximum duration of the alarm in milliseconds.
    * @param object supplies an optional scope for the duration of the alarm.
    */
-  virtual void enableTimer(const std::chrono::milliseconds& min_ms,
-                           const std::chrono::milliseconds& max_ms,
+  virtual void enableTimer(std::chrono::milliseconds min_ms, std::chrono::milliseconds max_ms,
                            const ScopeTrackedObject* object = nullptr) PURE;
 
   /**
