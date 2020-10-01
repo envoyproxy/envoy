@@ -52,7 +52,7 @@ class MatchTree {
 public:
   virtual ~MatchTree() = default;
 
-  // Attempts to match agains the matching data (which should contain all the data requested via
+  // Attempts to match against the matching data (which should contain all the data requested via
   // matching requirements). If no match is found, absl::nullopt will be returned.
   virtual absl::optional<MatchAction> match(const MatchingData& data) PURE;
 };
