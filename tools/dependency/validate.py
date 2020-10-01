@@ -219,8 +219,8 @@ class Validator(object):
       metadata = self._dep_info.GetMetadata(d)
       if metadata:
         use_category = metadata['use_category']
-        valid_use_category = ('dataplane_ext' in use_category or
-                              'observability_ext' in use_category or 'other' in use_category)
+        valid_use_category = any(
+            c in use_category for c in ['dataplane_ext', 'observability_ext', 'other'])
         if not valid_use_category:
           raise DependencyError(
               f'Extensions {name} depends on {d} with "use_category" not including '
