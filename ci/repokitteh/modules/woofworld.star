@@ -95,7 +95,7 @@ def woof_author_and_commits(issue_user, sha, issue_number):
   base_sha = get_pr_base_commit_sha(issue_number)
   github.issue_create_comment(
     "Docs have changed between commits (%s...%s): %s"
-    % (base_sha, sha, docs_have_changed_between_commits(base_sha, sha)))
+    % (base_sha, sha, docs_have_changed_between_commits(issue_user, base_sha, sha)))
 
 handlers.command(name='woof', func=woof_author_and_commits)
 # handlers.command(name='woof', func=woof_docs_have_changed_in_this_pr)
