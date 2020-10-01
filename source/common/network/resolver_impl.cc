@@ -59,8 +59,8 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Addres
         ADDRESS_NAME_SPECIFIER_NOT_SET:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
-    default:
-      FALLTHRU;
+  default:
+    FALLTHRU;
   default:
     throw EnvoyException("Address must be set: " + address.DebugString());
   }
