@@ -1828,7 +1828,7 @@ typed_config:
 
   // Wait for some data to arrive and then wait for the upstream_rq_active to flip to 0 to indicate
   // that the first request has completed.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 10000);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 5000);
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
 
   // At this point the outbound downstream frame queue should be 2 away from overflowing.
