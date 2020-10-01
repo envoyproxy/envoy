@@ -45,7 +45,7 @@ sealed class FilterDataStatus<T : Headers>(
    * This may be called by filters which must parse a larger block of the incoming data before
    * continuing processing, and will handle their own buffering.
    */
-  class StopIterationNoBuffer<T : Headers> : FilterDataStatus<T>(2)
+  class StopIterationNoBuffer<T : Headers> : FilterDataStatus<T>(3)
 
   /**
    * Resume previously-stopped iteration, possibly forwarding headers if iteration was stopped
