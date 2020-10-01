@@ -529,7 +529,8 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
   auto* static_resources = bootstrap_.mutable_static_resources();
   for (int i = 0; i < static_resources->listeners_size(); ++i) {
     auto* listener = static_resources->mutable_listeners(i);
-    // Not need to amend internal address and we need to skip the below implicit address mutation helper.
+    // Not need to amend internal address and we need to skip the below implicit address mutation
+    // helper.
     if (listener->mutable_address()->has_envoy_internal_address()) {
       continue;
     }
@@ -784,10 +785,10 @@ void ConfigHelper::setDefaultHostAndRoute(const std::string& domains, const std:
 void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
                                    uint32_t downstream_buffer_limit) {
   RELEASE_ASSERT(!finalized_, "");
-  RELEASE_ASSERT(bootstrap_.mutable_static_resources()->listeners_size() == 1, "");
-  auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
-  listener->mutable_per_connection_buffer_limit_bytes()->set_value(downstream_buffer_limit);
-
+  for (int i = 0; i < bootstrap_.mutable_static_resources()->listeners_size(); ++i) {
+    auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_per_connection_buffer_limit_bytes()->set_value(downstream_buffer_limit);
+  }
   auto* static_resources = bootstrap_.mutable_static_resources();
   for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);

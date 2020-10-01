@@ -258,7 +258,7 @@ TEST_P(InternalListenerIntegrationTest, TestIdletimeoutWithNoData) {
   tcp_client->waitForDisconnect(true);
 }
 
-TEST_P(InternalListenerIntegrationTest, DISABLED_TcpProxyLargeWrite) {
+TEST_P(InternalListenerIntegrationTest, TcpProxyLargeWrite) {
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -296,7 +296,7 @@ TEST_P(InternalListenerIntegrationTest, DISABLED_TcpProxyLargeWrite) {
 }
 
 // Test that a downstream flush works correctly (all data is flushed)
-TEST_P(InternalListenerIntegrationTest, DISABLED_TcpProxyDownstreamFlush) {
+TEST_P(InternalListenerIntegrationTest, TcpProxyDownstreamFlush) {
   // Use a very large size to make sure it is larger than the kernel socket read buffer.
   const uint32_t size = 50 * 1024 * 1024;
   config_helper_.setBufferLimits(size / 4, size / 4);
@@ -316,9 +316,7 @@ TEST_P(InternalListenerIntegrationTest, DISABLED_TcpProxyDownstreamFlush) {
   ASSERT_TRUE(fake_upstream_connection->write(data, true));
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_flow_control_resumed_reading_total")
-                ->value(),
-            0);
+
   tcp_client->readDisable(false);
   tcp_client->waitForData(data);
   tcp_client->waitForHalfClose();
@@ -339,7 +337,7 @@ TEST_P(InternalListenerIntegrationTest, DISABLED_TcpProxyDownstreamFlush) {
 }
 
 // Test that an upstream flush works correctly (all data is flushed)
-TEST_P(InternalListenerIntegrationTest, DISABLED_TcpProxyUpstreamFlush) {
+TEST_P(InternalListenerIntegrationTest, TcpProxyUpstreamFlush) {
   // Use a very large size to make sure it is larger than the kernel socket read buffer.
   const uint32_t size = 50 * 1024 * 1024;
   config_helper_.setBufferLimits(size, size);
@@ -364,13 +362,13 @@ TEST_P(InternalListenerIntegrationTest, DISABLED_TcpProxyUpstreamFlush) {
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForHalfClose();
-
-  EXPECT_EQ(test_server_->counter("tcp.tcp_stats.upstream_flush_total")->value(), 1);
+  // We have 2 tcp proxy. Each contribute 1.
+  EXPECT_EQ(test_server_->counter("tcp.tcp_stats.upstream_flush_total")->value(), 2);
   test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 0);
 }
 
 // Test that Envoy doesn't crash or assert when shutting down with an upstream flush active
-TEST_P(InternalListenerIntegrationTest, DISABLED_TcpProxyUpstreamFlushEnvoyExit) {
+TEST_P(InternalListenerIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
   // Use a very large size to make sure it is larger than the kernel socket read buffer.
   const uint32_t size = 50 * 1024 * 1024;
   config_helper_.setBufferLimits(size, size);

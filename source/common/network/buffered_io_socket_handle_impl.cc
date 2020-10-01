@@ -38,7 +38,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
                                                           uint64_t num_slice) {
   if (owned_buffer_.length() == 0) {
     if (read_end_stream_) {
-      return sysCallResultToIoCallResult(Api::SysCallSizeResult{-1, SOCKET_ERROR_INTR});
+      return Api::ioCallUint64ResultNoError();
     } else {
       return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                  IoSocketError::deleteIoError)};
