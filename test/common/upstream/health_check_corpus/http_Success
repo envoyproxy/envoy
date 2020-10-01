@@ -6,7 +6,7 @@ health_check_config {
         seconds: 1
     }
     no_traffic_interval {
-        seconds: 5
+        seconds: 1
     }
     interval_jitter {
         seconds: 1
@@ -38,6 +38,10 @@ actions {
         tcp_respond {
             
         }
+        grpc_respond {
+            grpc_respond_headers {
+                
+            }
+        }
     }
 }
-start_failed: true
