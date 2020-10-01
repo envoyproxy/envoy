@@ -98,8 +98,7 @@ private:
   Decoder decoder_;
   // This is a member to avoid reallocation on every onData().
   std::vector<Frame> decoded_frames_;
-
-  Router::HeaderParserPtr request_headers_parser_;
+  Router::HeaderParserPtr metadata_parser_;
 
   friend class AsyncClientImpl;
 };

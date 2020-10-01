@@ -65,7 +65,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
     : parent_(parent), service_full_name_(service_full_name), method_name_(method_name),
       callbacks_(callbacks), options_(options) {
   if (options_.parent_context.stream_info != nullptr) {
-    request_headers_parser_ = Router::HeaderParser::configure(parent_.initial_metadata_, false);
+    metadata_parser_ = Router::HeaderParser::configure(parent_.initial_metadata_, false);
   }
 }
 
@@ -93,9 +93,9 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
       service_full_name_, method_name_, options_.timeout);
   // Fill service-wide initial metadata.
   if (options_.parent_context.stream_info != nullptr) {
-    ASSERT(request_headers_parser_ != nullptr);
-    request_headers_parser_->evaluateHeaders(headers_message_->headers(),
-                                             *options_.parent_context.stream_info);
+    ASSERT(metadata_parser_ != nullptr);
+    metadata_parser_->evaluateHeaders(headers_message_->headers(),
+                                      *options_.parent_context.stream_info);
   } else {
     for (const auto& header_value : parent_.initial_metadata_) {
       headers_message_->headers().addCopy(Http::LowerCaseString(header_value.key()),

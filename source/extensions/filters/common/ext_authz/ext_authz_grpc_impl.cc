@@ -44,11 +44,10 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& dispa
   callbacks_ = &callbacks;
 
   Http::AsyncClient::RequestOptions options;
-  options.setParentContext(Http::AsyncClient::ParentContext{&stream_info});
   if (timeout_.has_value()) {
     if (timeoutStartsAtCheckCreation()) {
       // TODO(yuval-k): We currently use dispatcher based timeout even if the underlying client is
-      // google gRPC client, which has it's own timeout mechanism. We may want to change that in
+      // Google gRPC client, which has it's own timeout mechanism. We may want to change that in
       // the future if the implementations converge.
       timeout_timer_ = dispatcher.createTimer([this]() -> void { onTimeout(); });
       timeout_timer_->enableTimer(timeout_.value());
@@ -57,6 +56,8 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& dispa
       options.setTimeout(timeout_);
     }
   }
+
+  options.setParentContext(Http::AsyncClient::ParentContext{&stream_info});
 
   ENVOY_LOG(trace, "Sending CheckRequest: {}", request.DebugString());
   request_ = async_client_->send(service_method_, request, *this, parent_span, options,
