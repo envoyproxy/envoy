@@ -76,11 +76,8 @@ if __name__ == '__main__':
     last_updated = v['last_updated']
     dep = Dep(name, project_name.lower(), version, cpe, last_updated)
     for category in v['use_category']:
-      if 'extensions' in v:
-        for ext in v['extensions']:
-          use_categories[category][ext].append(dep)
-      else:
-        use_categories[category]['core'].append(dep)
+      for ext in v.get('extensions', ['core']):
+        use_categories[category][ext].append(dep)
 
   def CsvRow(dep):
     return [dep.name, dep.version, dep.last_updated, dep.cpe]

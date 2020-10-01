@@ -16,7 +16,7 @@ class FakeDependencyInfo(object):
     return set(n for n, m in self._deps.items() if use_category in m['use_category'])
 
   def GetMetadata(self, dependency):
-    return self._deps.get(dependency, None)
+    return self._deps.get(dependency)
 
 
 class FakeBuildGraph(object):

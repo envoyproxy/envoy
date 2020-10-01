@@ -9,8 +9,8 @@ import re
 import subprocess
 import sys
 
-from importlib.util import spec_from_loader, module_from_spec
 from importlib.machinery import SourceFileLoader
+from importlib.util import spec_from_loader, module_from_spec
 
 # bazel/repository_locations.bzl must have a .bzl suffix for Starlark import, so
 # we are forced to do this workaround.
@@ -59,11 +59,8 @@ class DependencyInfo(object):
     Returns:
       Set of dependency identifiers that match use_category.
     """
-    deps = set([])
-    for name, metadata in repository_locations.DEPENDENCY_REPOSITORIES.items():
-      if use_category in metadata['use_category']:
-        deps.add(name)
-    return deps
+    return set(name for name, metadata in repository_locations.DEPENDENCY_REPOSITORIES.items()
+               if use_category in metadata['use_category'])
 
   def GetMetadata(self, dependency):
     """Obtain repository metadata for a dependency.
@@ -75,7 +72,7 @@ class DependencyInfo(object):
       A dictionary with the repository metadata as defined in
       bazel/repository_locations.bzl.
     """
-    return repository_locations.DEPENDENCY_REPOSITORIES.get(dependency, None)
+    return repository_locations.DEPENDENCY_REPOSITORIES.get(dependency)
 
 
 class BuildGraph(object):
@@ -93,7 +90,7 @@ class BuildGraph(object):
     deps_query = ' union '.join(f'deps({l})' for l in targets)
     deps = subprocess.check_output(['bazel', 'query', deps_query],
                                    stderr=subprocess.PIPE).decode().splitlines()
-    ext_deps = set([])
+    ext_deps = set()
     for d in deps:
       match = BAZEL_QUERY_EXTERNAL_DEP_RE.match(d)
       if match:
@@ -131,7 +128,7 @@ class Validator(object):
         '//source/exe:envoy_main_common_with_core_extensions_lib', '//source/extensions/...')
     queried_all_deps = self._build_graph.QueryExternalDeps('//source/...')
     if queried_all_deps != queried_core_ext_deps:
-      raise DependencyError(f'Invalid build graph structure. deps(//source/...) != '
+      raise DependencyError('Invalid build graph structure. deps(//source/...) != '
                             'deps(//source/exe:envoy_main_common_with_core_extensions_lib) '
                             'union deps(//source/extensions/...)')
 
@@ -178,7 +175,8 @@ class Validator(object):
   def ValidateControlPlaneDeps(self):
     """Validate controlplane dependencies.
 
-    Check that we at least tag as controlplane dependencies that match some well-known targets for
+    Check that we at least tag as controlplane dependencies that match some
+    well-known targets for
     the control-plane.
 
     Raises:
@@ -221,8 +219,9 @@ class Validator(object):
       metadata = self._dep_info.GetMetadata(d)
       if metadata:
         use_category = metadata['use_category']
-        if ('dataplane_ext' not in use_category and 'observability_ext' not in use_category and
-            'other' not in use_category):
+        valid_use_category = ('dataplane_ext' in use_category or
+                              'observability_ext' in use_category or 'other' in use_category)
+        if not valid_use_category:
           raise DependencyError(
               f'Extensions {name} depends on {d} with "use_category" not including '
               '["dataplane_ext", "observability_ext", "other"]')
