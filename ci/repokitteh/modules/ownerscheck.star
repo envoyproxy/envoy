@@ -8,7 +8,8 @@
 #       "path": "api/",
 #       "label": "api",
 #       "allow_global_approval": True,
-#       "github_status_label" = "any API change",
+#       "github_status_label": "any API change",
+#       "auto_assign": True,
 #     },
 #   ],
 # )
@@ -27,8 +28,13 @@
 #
 # 'label' refers to a GitHub label applied to any matching PR. The GitHub check status
 # can be customized with `github_status_label`.
+#
+# If 'auto_assign' is set True, a randomly selected reviwer from the owner team will
+# be selected and set as a reviewer on the PR if there is not already a member of the
+# owner team set as reviewer or assignee for the PR.
 
 load("text", "match")
+load("time", "now")
 load("github.com/repokitteh/modules/lib/utils.star", "react")
 
 def _store_partial_approval(who, files):
@@ -64,7 +70,8 @@ def _get_relevant_specs(specs, changed_files):
                              label=spec.get("label", None),
                              path_match=path_match,
                              allow_global_approval=allow_global_approval,
-                             status_label=status_label))
+                             status_label=status_label,
+                             auto_assign=spec.get("auto_assign", False)))
 
   print("specs: %s" % relevant)
 
@@ -152,20 +159,19 @@ def _reconcile(config, specs=None):
   return results
 
 
-def _comment(config, results, force=False):
+def _comment(config, results, assignees, requested_reviewers, force=False):
   lines = []
 
   for spec, approved in results:
     if approved:
       continue
 
-    mention = spec.owner
+    owner = spec.owner
 
-    if mention[0] != '@':
-      mention = '@' + mention
+    if owner[-1] == '!':
+      owner = owner[:-1]
 
-    if mention[-1] == '!':
-      mention = mention[:-1]
+    mention = '@' + owner
 
     match_description = spec.path_match
     if match_description:
@@ -185,21 +191,46 @@ def _comment(config, results, force=False):
     elif mode == 'fyi':
       lines.append('CC %s: FYI only%s.' % (mention, match_description))
 
+    if spec.auto_assign:
+      api_assignee = None
+      # Find owners via github.team_get_by_name, github.team_list_members
+      team = github.team_get_by_name(owner)
+      members = [m['login'] for m in github.team_list_members(team['id'])]
+      # Is a team member already assigned? The first assigned team member is picked. Bad O(n^2) as
+      # Starlark doesn't have sets, n is small.
+      for assignee in assignees:
+        user = assignee['login']
+        if user in members:
+          api_assignee = user
+          break
+      # Otherwise we need to see if there is a reviewer picked from the team? If so, first wins.
+      if not api_assignee:
+        for reviewer in requested_reviewers:
+          user = reviewer['login']
+          if user in members:
+            api_assignee = user
+            break
+      # Otherwise, pick at "random" (we just use timestamp).
+      if not api_assignee:
+        api_assignee = members[now().second % len(members)]
+      lines.append('API shepherd assignee is %s' % api_assignee)
+      github.issue_assign([api_assignee])
+
   if lines:
     github.issue_create_comment('\n'.join(lines))
 
 
-def _reconcile_and_comment(config):
-  _comment(config, _reconcile(config))
+def _reconcile_and_comment(config, assignees, requested_reviewers):
+  _comment(config, _reconcile(config), assignees, requested_reviewers)
 
 
-def _force_reconcile_and_comment(config):
-  _comment(config, _reconcile(config), force=True)
+def _force_reconcile_and_comment(config, assignees, requested_reviewers):
+  _comment(config, _reconcile(config), assignees, requested_reviewers, force=True)
 
 
-def _pr(action, config):
+def _pr(action, config, assignees, requested_reviewers):
   if action in ['synchronize', 'opened']:
-    _reconcile_and_comment(config)
+    _reconcile_and_comment(config, assignees, requested_reviewers)
 
 
 def _pr_review(action, review_state, config):
@@ -230,7 +261,7 @@ def _lgtm_by_comment(config, comment_id, command, sender, sha):
 
   react(comment_id, None)
 
-  _reconcile(config, specs)
+  _reconcile(config, assignee, requested_reviewers, specs)
 
 
 handlers.pull_request(func=_pr)
