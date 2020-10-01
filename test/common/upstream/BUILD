@@ -242,6 +242,50 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "load_balancer_impl_test_lib",
+    srcs = [
+        "load_balancer_impl_test_utils.cc",
+    ],
+    hdrs = [
+        "load_balancer_impl_test_utils.h",
+    ],
+    deps = [
+
+    ],
+)
+
+envoy_cc_test_library(
+    name = "load_balancer_fuzz_lib",
+    srcs = ["load_balancer_fuzz.cc"],
+    hdrs = ["load_balancer_fuzz.h"],
+    deps = [
+        ":health_check_fuzz_proto_cc_proto",
+        ":load_balancer_impl_test_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "load_balancer_fuzz_proto",
+    srcs = ["load_balancer_fuzz.proto"],
+    deps = [
+        "//test/fuzz:common_proto",
+        "@envoy_api//envoy/config/core/v3:pkg",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "health_check_fuzz_test",
+    srcs = ["health_check_fuzz_test.cc"],
+    corpus = "//test/common/upstream:health_check_corpus",
+    deps = [
+        ":health_check_fuzz_lib",
+        ":health_check_fuzz_proto_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+
 envoy_cc_test(
     name = "load_balancer_simulation_test",
     srcs = ["load_balancer_simulation_test.cc"],

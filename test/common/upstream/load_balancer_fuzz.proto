@@ -1,0 +1,29 @@
+
+
+
+message ChooseHost {
+
+}
+
+message PreFetch {
+
+}
+
+message Action {
+    oneof action_selector {
+        option (validate.required) = true;
+        AddHostSet = 1;
+        UpdateHealthFlags = 2;
+        Prefetch = 3;
+        ChooseHost = 4;
+    }
+}
+
+message LoadBalancerTestCase {
+    //Link in proto config for load balancing here
+    envoy.config.core.v3.HealthCheck health_check_config = 1
+      [(validate.rules).message.required = true];
+    //Repeated actions here
+    repeated Action actions = 2;
+
+}
