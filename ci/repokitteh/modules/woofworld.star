@@ -16,6 +16,12 @@ def get_pr_author_association(issue_number):
     method="GET",
     path="repos/envoyproxy/envoy/pulls/%s" % issue_number)["json"]["author_association"]
 
+def get_pr_base_commit_sha(issue_number):
+  return github.call(
+    method="GET",
+    path="repos/envoyproxy/envoy/pulls/%s" % issue_number)["json"]["base"]["sha"]
+
+
 def woof_dco(sender, issue_number):
   github.issue_create_comment("""
 hi @%s
@@ -62,10 +68,31 @@ In the meantime, please take a look at the [contribution guidelines](https://git
 def _status():
   github.issue_create_comment("GOT STATUS EVENT!")
 
-def woof_docs_have_changed_in_this_pr(issue_number):
-  files = github.pr_list_files()
-  github.issue_create_comment([f["filename"] for f in files if f["filename"].startswith("/docs") or f["filename"].startswith("/api")])
+def docs_have_changed_in_this_pr():
+  return bool([
+    f["filename"]
+    for f
+    in github.pr_list_files()
+    if (f["filename"].startswith("docs/")
+        or f["filename"].startswith("api/"))])
 
+def docs_have_changed_between_commits(author, commit1, commit2):
+  return bool([
+    f["filename"]
+    for f
+    in github.call("/repos/%s/envoy/compare/%s...%s" % (author, commit1, commit2))
+    if (f["filename"].startswith("docs/")
+        or f["filename"].startswith("api/"))])
 
-handlers.command(name='woof', func=woof_docs_have_changed_in_this_pr)
+def woof_docs_have_changed_in_this_pr():
+  github.issue_create_comment("Docs changed?: %s" % docs_have_changed_in_this_pr())
+
+def woof_author_and_commits(issue_user, sha, issue_number):
+  github.issue_create_comment("Author: %s" % issue_user)
+  github.issue_create_comment("SHA: %s" % sha)
+  github.issue_create_comment("PR issue: %s" % issue_number)
+  github.issue_create_comment("Base SHA: %s" % get_pr_base_commit_sha(issue_number))
+
+handlers.command(name='woof', func=woof_author_and_commits)
+# handlers.command(name='woof', func=woof_docs_have_changed_in_this_pr)
 handlers.status(func=_status)
