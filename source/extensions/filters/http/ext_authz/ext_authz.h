@@ -7,7 +7,6 @@
 
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/http/filter.h"
-#include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/stats/scope.h"
@@ -54,8 +53,8 @@ struct ExtAuthzFilterStats {
 class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-               const LocalInfo::LocalInfo&, Stats::Scope& scope, Runtime::Loader& runtime,
-               Http::Context& http_context, const std::string& stats_prefix)
+               Stats::Scope& scope, Runtime::Loader& runtime, Http::Context& http_context,
+               const std::string& stats_prefix)
       : allow_partial_message_(config.with_request_body().allow_partial_message()),
         failure_mode_allow_(config.failure_mode_allow()),
         clear_route_cache_(config.clear_route_cache()),
@@ -75,11 +74,13 @@ public:
         metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
                                      config.metadata_context_namespaces().end()),
         include_peer_certificate_(config.include_peer_certificate()),
-        stats_(generateStats(stats_prefix, scope)), ext_authz_ok_(pool_.add("ext_authz.ok")),
-        ext_authz_denied_(pool_.add("ext_authz.denied")),
-        ext_authz_error_(pool_.add("ext_authz.error")),
-        ext_authz_timeout_(pool_.add("ext_authz.timeout")),
-        ext_authz_failure_mode_allowed_(pool_.add("ext_authz.failure_mode_allowed")) {}
+        stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
+        ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
+        ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
+        ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),
+        ext_authz_timeout_(pool_.add(createPoolStatName(config.stat_prefix(), "timeout"))),
+        ext_authz_failure_mode_allowed_(
+            pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))) {}
 
   bool allowPartialMessage() const { return allow_partial_message_; }
 
@@ -126,9 +127,20 @@ private:
     return Http::Code::Forbidden;
   }
 
-  ExtAuthzFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    const std::string final_prefix = prefix + "ext_authz.";
+  ExtAuthzFilterStats generateStats(const std::string& prefix,
+                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
+    const std::string final_prefix = absl::StrCat(prefix, "ext_authz.", filter_stats_prefix);
     return {ALL_EXT_AUTHZ_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  }
+
+  // This generates ext_authz.<optional filter_stats_prefix>.name, for example: ext_authz.waf.ok
+  // when filter_stats_prefix is "waf", and ext_authz.ok when filter_stats_prefix is empty.
+  const std::string createPoolStatName(const std::string& filter_stats_prefix,
+                                       const std::string& name) {
+    return absl::StrCat("ext_authz",
+                        filter_stats_prefix.empty() ? EMPTY_STRING
+                                                    : absl::StrCat(".", filter_stats_prefix),
+                        ".", name);
   }
 
   const bool allow_partial_message_;

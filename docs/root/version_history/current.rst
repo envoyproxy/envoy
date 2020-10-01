@@ -6,6 +6,10 @@ Incompatible Behavior Changes
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
 * build: added visibility rules for upstream. If these cause visibility related breakage, see notes in //BUILD.
+* config: additional warnings have been added for the use of v2 APIs. These appear as log messages
+  and are also captured in the :ref:`deprecated_feature_use <runtime_stats>` counter after server
+  initialization.
+* dns: ``envoy.restart_features.use_apple_api_for_dns_lookups`` is on by default. This flag only affects Apple platforms (macOS, iOS). It is incompatible to have the runtime flag set to true at the same time as specifying the ``use_tcp_for_dns_lookups`` option or custom dns resolvers. Doing so will cause failure.
 * watchdog: added two guarddogs, breaking the aggregated stats for the single guarddog system. The aggregated stats for the guarddogs will have the following prefixes: `main_thread` and `workers`. Concretely, anything monitoring `server.watchdog_miss` and `server.watchdog_mega_miss` will need to be updated.
 
 Minor Behavior Changes
@@ -13,6 +17,7 @@ Minor Behavior Changes
 *Changes that may cause incompatibilities for some users, but should not for most*
 
 * adaptive concurrency: added a response body / grpc-message header for rejected requests.
+* async_client: minor change to handling header only responses more similar to header-with-empty-body responses.
 * build: an :ref:`Ubuntu based debug image <install_binaries>` is built and published in DockerHub.
 * build: the debug information will be generated separately to reduce target size and reduce compilation time when build in compilation mode `dbg` and `opt`. Users will need to build dwp file to debug with gdb.
 * compressor: always insert `Vary` headers for compressible resources even if it's decided not to compress a response due to incompatible `Accept-Encoding` value. The `Vary` header needs to be inserted to let a caching proxy in front of Envoy know that the requested resource still can be served with compression applied.
@@ -40,6 +45,7 @@ Minor Behavior Changes
 * logging: nghttp2 log messages no longer appear at trace level unless `ENVOY_NGHTTP2_TRACE` is set
   in the environment.
 * lua: changed the response body returned by `httpCall()` API to raw data. Previously, the returned data was string.
+* postgres: changed log format to tokenize fields of Postgres messages.
 * router: added transport failure reason to response body when upstream reset happens. After this change, the response body will be of the form `upstream connect error or disconnect/reset before headers. reset reason:{}, transport failure reason:{}`.This behavior may be reverted by setting runtime feature `envoy.reloadable_features.http_transport_failure_reason_in_body` to false.
 * router: now consumes all retry related headers to prevent them from being propagated to the upstream. This behavior may be reverted by setting runtime feature `envoy.reloadable_features.consume_all_retry_headers` to false.
 * thrift_proxy: special characters {'\0', '\r', '\n'} will be stripped from thrift headers.
@@ -54,6 +60,8 @@ Bug Fixes
 * fault: fixed an issue with `active_faults` gauge not being decremented for when abort faults were injected.
 * fault: made the HeaderNameValues::prefix() method const.
 * grpc-web: fixed an issue with failing HTTP/2 requests on some browsers. Notably, WebKit-based browsers (https://bugs.webkit.org/show_bug.cgi?id=210108), Internet Explorer 11, and Edge (pre-Chromium).
+* http: fixed CVE-2020-25018 by rolling back the ``GURL`` dependency to previous state (reverted: ``2d69e30``, ``d828958``, and ``c9c4709`` commits) due to potential of crashing when Unicode URIs are present in requests.
+* http: fixed bugs in datadog and squash filter's handling of responses with no bodies.
 * http: made the HeaderValues::prefix() method const.
 * jwt_authn: supports jwt payload without "iss" field.
 * listener: fixed crash at listener inplace update when connetion load balancer is set.
@@ -76,22 +84,32 @@ New Features
 * access log: added support for :ref:`%DOWNSTREAM_PEER_FINGERPRINT_1% <config_access_log_format_response_flags>` as a response flag.
 * access log: added support for nested objects in :ref:`JSON logging mode <config_access_log_format_dictionaries>`.
 * access log: added :ref:`omit_empty_values<envoy_v3_api_field_config.core.v3.SubstitutionFormatString.omit_empty_values>` option to omit unset value from formatted log.
+* admin: added :ref:`circuit breakers settings <envoy_v3_api_msg_config.cluster.v3.CircuitBreakers>` information to GET /clusters?format=json :ref:`cluster status <envoy_v3_api_msg_admin.v3.ClusterStatus>`.
+* admin: added :ref:`node <envoy_v3_api_msg_config.core.v3.Node>` information to GET /server_info :ref:`response object <envoy_v3_api_msg_admin.v3.ServerInfo>`.
 * admin: added the ability to dump init manager unready targets information :ref:`/init_dump <operations_admin_interface_init_dump>` and :ref:`/init_dump?mask={} <operations_admin_interface_init_dump_by_mask>`.
+* admission control: added the :ref:`admission control <envoy_v3_api_msg_extensions.filters.http.admission_control.v3alpha.AdmissionControl>` filter for client-side request throttling.
 * build: enable building envoy :ref:`arm64 images <arm_binaries>` by buildx tool in x86 CI platform.
 * cluster: added new :ref:`connection_pool_per_downstream_connection <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_per_downstream_connection>` flag, which enable creation of a new connection pool for each downstream connection.
 * decompressor filter: reports compressed and uncompressed bytes in trailers.
+* dns: added support for doing DNS resolution using Apple's DnsService APIs in Apple platforms (macOS, iOS). This feature is ON by default, and is only configurable via the ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime key. Note that this value is latched during server startup and changing the runtime key is a no-op during the lifetime of the process.
 * dns_filter: added support for answering :ref:`service record<envoy_v3_api_msg_data.dns.v3.DnsTable.DnsService>` queries.
 * dynamic_forward_proxy: added :ref:`use_tcp_for_dns_lookups<envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.use_tcp_for_dns_lookups>` option to use TCP for DNS lookups in order to match the DNS options for :ref:`Clusters<envoy_v3_api_msg_config.cluster.v3.Cluster>`.
 * ext_authz filter: added support for emitting dynamic metadata for both :ref:`HTTP <config_http_filters_ext_authz_dynamic_metadata>` and :ref:`network <config_network_filters_ext_authz_dynamic_metadata>` filters.
   The emitted dynamic metadata is set by :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` field in a returned :ref:`CheckResponse <envoy_v3_api_msg_service.auth.v3.CheckResponse>`.
+* ext_authz filter: added :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.stat_prefix>` as an optional additional prefix for the statistics emitted from `ext_authz` HTTP filter.
+* ext_authz filter: added support for letting the authorization server instruct Envoy to remove headers from the original request by setting the new field :ref:`headers_to_remove <envoy_v3_api_field_service.auth.v3.OkHttpResponse.headers_to_remove>` before forwarding it to the upstream.
 * ext_authz filter: added support for sending :ref:`raw bytes as request body <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.raw_body>` of a gRPC check request by setting :ref:`pack_as_bytes <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.BufferSettings.pack_as_bytes>` to true.
 * grpc-json: support specifying `response_body` field in for `google.api.HttpBody` message.
 * hds: added :ref:`cluster_endpoints_health <envoy_v3_api_field_service.health.v3.EndpointHealthResponse.cluster_endpoints_health>` to HDS responses, keeping endpoints in the same groupings as they were configured in the HDS specifier by cluster and locality instead of as a flat list.
 * hds: added :ref:`transport_socket_matches <envoy_v3_api_field_service.health.v3.ClusterHealthCheck.transport_socket_matches>` to HDS cluster health check specifier, so the existing match filter :ref:`transport_socket_match_criteria <envoy_v3_api_field_config.core.v3.HealthCheck.transport_socket_match_criteria>` in the repeated field :ref:`health_checks <envoy_v3_api_field_service.health.v3.ClusterHealthCheck.health_checks>` has context to match against. This unblocks support for health checks over HTTPS and HTTP/2.
 * hot restart: added :option:`--socket-path` and :option:`--socket-mode` to configure UDS path in the filesystem and set permission to it.
+* http: added HTTP/2 support for :ref:`connection keepalive <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.connection_keepalive>` via PING.
 * http: added support for :ref:`%DOWNSTREAM_PEER_FINGERPRINT_1% <config_http_conn_man_headers_custom_request_headers>` as custom header.
 * http: added :ref:`allow_chunked_length <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.allow_chunked_length>` configuration option for HTTP/1 codec to allow processing requests/responses with both Content-Length and Transfer-Encoding: chunked headers. If such message is served and option is enabled - per RFC Content-Length is ignored and removed.
+* http: added :ref:`CDN Loop filter <envoy_v3_api_msg_extensions.filters.http.cdn_loop.v3alpha.CdnLoopConfig>` and :ref:`documentation <config_http_filters_cdn_loop>`.
+* http: added :ref:`MaxStreamDuration proto <envoy_v3_api_msg_config.route.v3.RouteAction.MaxStreamDuration>` for configuring per-route downstream duration timeouts.
 * http: introduced new HTTP/1 and HTTP/2 codec implementations that will remove the use of exceptions for control flow due to high risk factors and instead use error statuses. The old behavior is used by default, but the new codecs can be enabled for testing by setting the runtime feature `envoy.reloadable_features.new_codec_behavior` to true. The new codecs will be in development for one month, and then enabled by default while the old codecs are deprecated.
+* http: modified the HTTP header-map data-structure to use an underlying dictionary and a list (no change to the header-map API). To conform with previous versions, the use of a dictionary is currently disabled. It can be enabled by setting the `envoy.http.headermap.lazy_map_min_size` runtime feature to a non-negative number which defines the minimal number of headers in a request/response/trailers required for using a dictionary in addition to the list. Our current benchmarks suggest that the value 3 is a good threshold for most workloads.
 * load balancer: added :ref:`RingHashLbConfig<envoy_v3_api_msg_config.cluster.v3.Cluster.MaglevLbConfig>` to configure the table size of Maglev consistent hash.
 * load balancer: added a :ref:`configuration<envoy_v3_api_msg_config.cluster.v3.Cluster.LeastRequestLbConfig>` option to specify the active request bias used by the least request load balancer.
 * load balancer: added an :ref:`option <envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.single_host_per_subset>` to optimize subset load balancing when there is only one host per subset.
@@ -125,6 +143,7 @@ New Features
 * tcp: switched the TCP connection pool to the new "shared" connection pool, sharing a common code base with HTTP and HTTP/2. Any unexpected behavioral changes can be temporarily reverted by setting `envoy.reloadable_features.new_tcp_connection_pool` to false.
 * tcp_proxy: added :ref:`max_downstream_connection_duration<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_downstream_connection_duration>` for downstream connection. When max duration is reached the connection will be closed.
 * tcp_proxy: allow earlier network filters to set metadataMatchCriteria on the connection StreamInfo to influence load balancing.
+* tls: added OCSP stapling support through the :ref:`ocsp_staple <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsCertificate>` and :ref:`ocsp_staple_policy <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` configuration options. See :ref:`OCSP Stapling <arch_overview_ssl_ocsp_stapling>` for usage and runtime flags.
 * tls: introduce new :ref:`extension point<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_handshaker>` for overriding :ref:`TLS handshaker <arch_overview_ssl>` behavior.
 * tls: switched from using socket BIOs to using custom BIOs that know how to interact with IoHandles. The feature can be disabled by setting runtime feature `envoy.reloadable_features.tls_use_io_handle_bio` to false.
 * tracing: added ability to set some :ref:`optional segment fields<envoy_v3_api_field_config.trace.v3.XRayConfig.segment_fields>` in the AWS  X-Ray tracer.
@@ -148,6 +167,8 @@ Deprecated
   field has been deprecated in favor of :ref:`cluster_endpoints_health <envoy_v3_api_field_service.health.v3.EndpointHealthResponse.cluster_endpoints_health>` to maintain
   grouping by cluster and locality.
 * router: the :ref:`include_vh_rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.include_vh_rate_limits>` field has been deprecated in favor of :ref:`vh_rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits>`.
+* router: the :ref:`max_grpc_timeout <envoy_v3_api_field_config.route.v3.RouteAction.max_grpc_timeout>` field has been deprecated in favor of :ref:`grpc_timeout_header_max <envoy_v3_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_max>`.
+* router: the :ref:`grpc_timeout_offset <envoy_v3_api_field_config.route.v3.RouteAction.grpc_timeout_offset>` field has been deprecated in favor of :ref:`grpc_timeout_header_offset <envoy_v3_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_offset>`.
 * tap: the :ref:`match_config <envoy_v3_api_field_config.tap.v3.TapConfig.match_config>` field has been deprecated in favor of
   :ref:`match <envoy_v3_api_field_config.tap.v3.TapConfig.match>` field.
 * ext_authz: the :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.OkHttpResponse.dynamic_metadata>` field in :ref:`OkHttpResponse <envoy_v3_api_msg_service.auth.v3.OkHttpResponse>`
