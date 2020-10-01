@@ -503,7 +503,7 @@ HeaderMap::NonConstGetResult HeaderMapImpl::getExisting(const LowerCaseString& k
     if (iter != headers_.mapEnd()) {
       const HeaderList::HeaderNodeVector& v = iter->second;
       ASSERT(!v.empty()); // It's impossible to have a map entry with an empty vector as its value.
-      for (const auto values_it : v) {
+      for (const auto& values_it : v) {
         // Convert the iterated value to a HeaderEntry*.
         ret.push_back(&(*values_it));
       }
