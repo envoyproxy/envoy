@@ -82,7 +82,7 @@ private:
 
 using GrpcClientImplPtr = std::unique_ptr<GrpcClientImpl>;
 
-// The client cache for RawAsyncClient for google grpc so channel is not created for each request.
+// The client cache for RawAsyncClient for Google grpc so channel is not created for each request.
 class AsyncClientCache : public Singleton::Instance {
 public:
   AsyncClientCache(Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope,
@@ -101,7 +101,7 @@ private:
   struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
     ThreadLocalCache() = default;
     // The client cache stored with key as hash of
-    // envoy::config::core::v3::GrpcService::GoogleGrpc config
+    // envoy::config::core::v3::GrpcService::GoogleGrpc config.
     absl::flat_hash_map<std::size_t, Grpc::RawAsyncClientSharedPtr> async_clients_;
   };
 
