@@ -244,7 +244,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessIncorrectSha256) {
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
     Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
         Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-    response->body() = std::make_unique<Buffer::OwnedImpl>(body);
+    response->body().add(body);
 
     callbacks.onSuccess(request_, std::move(response));
     return nullptr;
@@ -289,7 +289,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccess) {
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
     Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
         Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-    response->body() = std::make_unique<Buffer::OwnedImpl>(body);
+    response->body().add(body);
 
     callbacks.onSuccess(request_, std::move(response));
     return nullptr;
@@ -371,7 +371,7 @@ TEST_F(AsyncDataSourceTest, DatasourceReleasedBeforeFetchingData) {
                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
       Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
           Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-      response->body() = std::make_unique<Buffer::OwnedImpl>(body);
+      response->body().add(body);
 
       callbacks.onSuccess(request_, std::move(response));
       return nullptr;
@@ -446,7 +446,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
                     Http::ResponseMessagePtr response(
                         new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
                             new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-                    response->body() = std::make_unique<Buffer::OwnedImpl>(body);
+                    response->body().add(body);
 
                     callbacks.onSuccess(request_, std::move(response));
                     return nullptr;
