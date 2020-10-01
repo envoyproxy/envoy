@@ -1861,6 +1861,7 @@ TEST_P(ProtocolIntegrationTest, MultipleSetCookies) {
 
 // Resets the downstream stream immediately and verifies that we clean up everything.
 TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.setDownstreamHttpIdleTimeout(std::chrono::milliseconds(100));
 
   initialize();
@@ -1889,6 +1890,7 @@ TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
   }
 
   ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), Not(HasSubstr("DPE")));
 }
 
 // Test connection is closed after single request processed.
