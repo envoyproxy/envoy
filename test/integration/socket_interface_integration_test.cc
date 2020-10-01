@@ -89,8 +89,7 @@ TEST_P(SocketInterfaceIntegrationTest, AddressWithSocketInterface) {
   client_->close(Network::ConnectionCloseType::FlushWrite);
 }
 
-// Test that connecting to internal address will crash.
-// TODO(lambdai): Add internal connection implementation to enable the connection creation.
+// Test that connection to internal address which is not bind by listener will be closed.
 TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   BaseIntegrationTest::initialize();
 
@@ -101,8 +100,8 @@ TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
 
-  client_ = dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                                Network::Test::createRawBufferSocket(), nullptr);
+  client_ =
+      dispatcher_->createInternalConnection(address, Network::Address::InstanceConstSharedPtr());
 
   client_->addConnectionCallbacks(connect_callbacks_);
   client_->connect();
