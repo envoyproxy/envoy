@@ -48,6 +48,7 @@ build:asan-dev --copt -fno-omit-frame-pointer
 build:asan-dev --copt -fno-optimize-sibling-calls
 build:asan-dev --copt -fsanitize=address
 build:asan-dev --linkopt -fsanitize=address
+build:asan-dev --platform_suffix=-asan
 
 # Exclude debug info from the release binary since it makes it too large to fit
 # into a zip file. This shouldn't affect crash reports.
