@@ -1544,3 +1544,14 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "health_check_integration_test",
+    srcs = ["health_check_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        ":integration_lib",
+        "//test/common/http/http2:http2_frame",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
