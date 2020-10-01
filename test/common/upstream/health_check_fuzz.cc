@@ -365,7 +365,7 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respo
         makeBufferListToRespondWith(grpc_respond.grpc_respond_bytes());
     // If the interval timer is enabled, that means that the rpc is complete, as decodeData hit a
     // certain branch that called onRpcComplete(), logically representing a completed rpc call.
-    // Thus, skip the next responses until explicility invoking interval timer as cleanup.
+    // Thus, skip the next responses until explicitly invoking interval timer as cleanup.
     for (size_t i = 0; i < bufferList.size() && !test_sessions_[0]->interval_timer_->enabled_;
          ++i) {
       const bool end_stream_on_data = !has_trailers && i == bufferList.size() - 1;
@@ -378,7 +378,7 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respo
 
   // If the interval timer is enabled, that means that the rpc is complete, as decodeData hit a
   // certain branch that called onRpcComplete(), logically representing a completed rpc call. Thus,
-  // skip responding with trailers until explicility invoking interval timer as cleanup.
+  // skip responding with trailers until explicitly invoking interval timer as cleanup.
   if (has_trailers && !test_sessions_[0]->interval_timer_->enabled_) {
     std::unique_ptr<Http::TestResponseTrailerMapImpl> response_trailers =
         std::make_unique<Http::TestResponseTrailerMapImpl>(
