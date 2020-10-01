@@ -374,6 +374,9 @@ protected:
 
   virtual void refresh(uint32_t priority);
 
+  virtual void recalculateHostsInSlowStart(const HostVector& hosts_added,
+                                           const HostVector& hosts_removed);
+
   // Seed to allow us to desynchronize load balancers across a fleet. If we don't
   // do this, multiple Envoys that receive an update at the same time (or even
   // multiple load balancers on the same host) will send requests to

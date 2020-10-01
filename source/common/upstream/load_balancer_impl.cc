@@ -719,7 +719,14 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
   // so we will need to do better at delta tracking to scale (see
   // https://github.com/envoyproxy/envoy/issues/2874).
   priority_set.addPriorityUpdateCb(
-      [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
+      [this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
+        recalculateHostsInSlowStart(hosts_added, hosts_removed);
+        refresh(priority);
+      });
+  priority_set.addMemberUpdateCb(
+      [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
+        recalculateHostsInSlowStart(hosts_added, hosts_removed);
+      });
 }
 
 void EdfLoadBalancerBase::initialize() {
@@ -727,6 +734,9 @@ void EdfLoadBalancerBase::initialize() {
     refresh(priority);
   }
 }
+
+void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts_added,
+                                                      const HostVector& hosts_removed) {}
 
 void EdfLoadBalancerBase::refresh(uint32_t priority) {
   const auto add_hosts_source = [this](HostsSource source, const HostVector& hosts) {
@@ -753,12 +763,14 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     for (const auto& host : hosts) {
       auto host_weight = hostWeight(*host);
       auto current_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-      time_source_.systemTime().time_since_epoch());
-      //translate `slow_start_window`(seconds) into milliseconds
-      auto slow_start_window_ms = std::chrono::milliseconds(slow_start_window*1000);
-      //add math.abs anywhere?
+          time_source_.systemTime().time_since_epoch());
+      // translate `slow_start_window`(seconds) into milliseconds
+      auto slow_start_window_ms = std::chrono::milliseconds(slow_start_window * 1000);
+      // add math.abs anywhere?
+      // todo(nezdolik) Store a collection of hosts that adhere to EP warming policy and check if
+      // host is there.
       if (current_time - host->creationTime() > slow_start_window_ms) {
-        // todo(nezdolik) parametrize this, default should be 1
+        // todo(nezdolik) parametrize this, default should be 1.
         host_weight *= 0.1;
       }
 
