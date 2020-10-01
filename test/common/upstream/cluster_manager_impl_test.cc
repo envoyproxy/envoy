@@ -2346,7 +2346,7 @@ TEST_F(ClusterManagerImplTest,
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   cluster1->initialize_callback_();
 
-  // Check to be keet warming fake_cluster after callback invoked.
+  // Check to be keep warming fake_cluster after callback invoked.
   EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
@@ -2391,7 +2391,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddedAndKeepWarmingWithoutTlsCertificateEn
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   cluster1->initialize_callback_();
 
-  // Check to be keet warming fake_cluster after callback invoked.
+  // Check to be keep warming fake_cluster after callback invoked.
   EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
