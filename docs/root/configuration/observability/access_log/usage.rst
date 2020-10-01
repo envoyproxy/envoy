@@ -205,12 +205,9 @@ The following command operators are supported:
 .. _config_access_log_format_termination_details:
 
 %TERMINATION_DETAILS%
-  HTTP
-    Not implemented ("-").
-
-  TCP
-    Termination details provides additional information about why the connection is terminated by
-    Envoy.
+  HTTP and TCP
+    Termination details may provide additional information about why the connection was terminated
+    by Envoy for L4 reasons.
 
 %BYTES_SENT%
   HTTP

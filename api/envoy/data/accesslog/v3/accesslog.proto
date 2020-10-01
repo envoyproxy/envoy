@@ -77,7 +77,7 @@ message ConnectionProperties {
   // Number of bytes sent to downstream.
   uint64 sent_bytes = 2;
 
-  // Details about why the connection is terminated.
+  // Details about why the connection was terminated.
   string termination_details = 3;
 }
 
