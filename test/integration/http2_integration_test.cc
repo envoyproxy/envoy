@@ -1776,26 +1776,84 @@ TEST_P(Http2FloodMitigationTest, Data) {
       1, "host", "/test/long/url", {Http2Frame::Header("response_data_blocks", "1000")});
   sendFrame(request);
 
-  // Wait for 19077 bytes to arrive from upstream (1K DATA frames of size 10 + HEADERS frame)
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 19077);
+  // Wait for connection to be flooded with outbound DATA frames and disconnected.
+  tcp_client_->waitForDisconnect();
 
-  // If the server codec incorrectly thrown an exception on flood detection it would cause
+  // If the server codec had incorrectly thrown an exception on flood detection it would cause
   // the entire upstream to be disconnected. Verify it is still active, and there are no destroyed
   // connections.
   ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
   ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
-
-  // Server codec should be flooded. However it is not disconnected until client sends it
-  // some bytes. Verify that it is still connected and send 1 byte. Flood detection
-  // happens before data is parsed so it does not matter what is being sent.
-  ASSERT_TRUE(tcp_client_->connected());
-  ASSERT_TRUE(tcp_client_->write(std::string("a"), false, false));
-  // Now wait for client to be disconnected and verify it is due to flood checks.
-  tcp_client_->waitForDisconnect();
+  // Verify that the flood check was triggered
   EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
-  EXPECT_EQ(1,
-            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
+
+// Verify that the server can detect flood triggered by a DATA frame from a decoder filter call
+// to sendLocalReply().
+// This test also verifies that RELEASE_ASSERT in the ConnectionImpl::StreamImpl::encodeDataHelper()
+// is not fired when it is called by the sendLocalReply() in the dispatching context.
+TEST_P(Http2FloodMitigationTest, DataOverflowFromDecoderFilterSendLocalReply) {
+  // Set large buffer limits so the test is not affected by the flow control.
+  config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        const std::string yaml_string = R"EOF(
+name: send_local_reply_filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+  prefix: "/call_send_local_reply"
+  code: 404
+  body: "something"
+  )EOF";
+        TestUtility::loadFromYaml(yaml_string, *hcm.add_http_filters());
+        // keep router the last
+        auto size = hcm.http_filters_size();
+        hcm.mutable_http_filters()->SwapElements(size - 2, size - 1);
+      });
+
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  beginSession();
+
+  // Do not read from the socket and send request that causes autonomous upstream
+  // to respond with 1000 DATA frames. The Http2FloodMitigationTest::beginSession()
+  // sets 1000 flood limit for all frame types. Including 1 HEADERS response frame
+  // 997 DATA frames should make just 2 frames under the flood limit.
+  // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames start
+  // to accumulate in the transport socket buffer.
+  writev_matcher_->setWritevReturnsEgain();
+
+  auto request =
+      Http2Frame::makeRequest(Http2Frame::makeClientStreamId(0), "host", "/test/long/url",
+                              {Http2Frame::Header("response_data_blocks", "997")});
+  sendFrame(request);
+
+  // Wait for some data to arrive and then wait for the upstream_rq_active to flip to 0 to indicate
+  // that the first request has completed.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 1000);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
+
+  // At this point the outbound downstream frame queue should be 2 away from overflowing.
+  // Make the SetResponseCodeFilterConfig decoder filter call sendLocalReply with body.
+  // HEADERS + DATA frames should overflow the queue.
+  // Verify that connection was disconnected and appropriate counters were set.
+  auto request2 =
+      Http2Frame::makeRequest(Http2Frame::makeClientStreamId(1), "host", "/call_send_local_reply");
+  sendFrame(request2);
+
+  // Wait for connection to be flooded with outbound DATA frame and disconnected.
+  tcp_client_->waitForDisconnect();
+
+  // Verify that the upstream connection is still alive.
+  ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+  ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  // Verify that the flood check was triggered
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+}
+
+// TODO(yanavlasov): add the same tests as above for the encoder filters.
+// This is currently blocked by the https://github.com/envoyproxy/envoy/pull/13256
 
 // Verify that the server can detect flood of RST_STREAM frames.
 TEST_P(Http2FloodMitigationTest, RST_STREAM) {
