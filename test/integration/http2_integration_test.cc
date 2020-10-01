@@ -1822,20 +1822,22 @@ typed_config:
   // to accumulate in the transport socket buffer.
   writev_matcher_->setWritevReturnsEgain();
 
-  auto request = Http2Frame::makeRequest(0, "host", "/test/long/url",
-                                         {Http2Frame::Header("response_data_blocks", "997")});
+  auto request =
+      Http2Frame::makeRequest(Http2Frame::makeClientStreamId(0), "host", "/test/long/url",
+                              {Http2Frame::Header("response_data_blocks", "997")});
   sendFrame(request);
 
   // Wait for some data to arrive and then wait for the upstream_rq_active to flip to 0 to indicate
   // that the first request has completed.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 5000);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 1000);
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
 
   // At this point the outbound downstream frame queue should be 2 away from overflowing.
   // Make the SetResponseCodeFilterConfig decoder filter call sendLocalReply with body.
   // HEADERS + DATA frames should overflow the queue.
   // Verify that connection was disconnected and appropriate counters were set.
-  auto request2 = Http2Frame::makeRequest(1, "host", "/call_send_local_reply");
+  auto request2 =
+      Http2Frame::makeRequest(Http2Frame::makeClientStreamId(1), "host", "/call_send_local_reply");
   sendFrame(request2);
 
   // Wait for connection to be flooded with outbound DATA frame and disconnected.
