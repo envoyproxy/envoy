@@ -29,10 +29,15 @@ actions {
 actions {
     respond {
         http_respond {
-            status: "1"
+            status: 1
         }
         tcp_respond {
             data: "\x03"
+        }
+        grpc_respond {
+            grpc_respond_headers {
+                
+            }
         }
     }
 }

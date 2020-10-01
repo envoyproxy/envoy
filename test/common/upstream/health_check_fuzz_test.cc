@@ -17,12 +17,6 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::HealthCheckTestCase input) {
 
   HealthCheckFuzz health_check_fuzz;
 
-  if (input.health_check_config().health_checker_case() ==
-      envoy::config::core::v3::HealthCheck::kGrpcHealthCheck) {
-    ENVOY_LOG_MISC(trace, "Fuzz engine created GRPC Health Checker");
-    return;
-  }
-
   health_check_fuzz.initializeAndReplay(input);
 }
 
