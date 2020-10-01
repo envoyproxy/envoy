@@ -6,10 +6,13 @@ health_check_config {
         seconds: 1
     }
     unhealthy_threshold {
-        value: 1
+        value: 2
     }
     healthy_threshold: {
         value: 2
+    }
+    reuse_connection {
+        value: false
     }
     tcp_health_check {
         send {
@@ -21,7 +24,22 @@ health_check_config {
     }
 }
 actions {
-    raise_event: CONNECTED
+    respond {
+        http_respond {
+            status: "1"
+        }
+        tcp_respond {
+            data: "\x02"
+        }
+        grpc_respond {
+            grpc_respond_headers {
+
+            }
+        }
+    }
+}
+actions {
+    raise_event: REMOTE_CLOSE
 }
 actions {
     respond {
@@ -29,7 +47,7 @@ actions {
             status: 1
         }
         tcp_respond {
-            data: "\x01"
+            data: "\x02"
         }
         grpc_respond {
             grpc_respond_headers {
@@ -39,5 +57,7 @@ actions {
     }
 }
 actions {
-    raise_event: REMOTE_CLOSE
+    trigger_interval_timer {
+        
+    }
 }
