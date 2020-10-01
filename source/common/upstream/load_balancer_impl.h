@@ -356,7 +356,8 @@ public:
   EdfLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                       ClusterStats& stats, Runtime::Loader& runtime,
                       Random::RandomGenerator& random,
-                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config, TimeSource& time_source);
+                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+                      TimeSource& time_source);
 
   // Upstream::LoadBalancerBase
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
@@ -405,8 +406,8 @@ public:
                          Random::RandomGenerator& random,
                          const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
                          TimeSource& time_source)
-      : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                            common_config, time_source) {
+      : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random, common_config,
+                            time_source) {
     initialize();
   }
 
@@ -450,15 +451,15 @@ private:
 class LeastRequestLoadBalancer : public EdfLoadBalancerBase,
                                  Logger::Loggable<Logger::Id::upstream> {
 public:
-//modified constructor
   LeastRequestLoadBalancer(
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
       Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
-          least_request_config, TimeSource& time_source)
-      : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                            common_config, time_source),
+          least_request_config,
+      TimeSource& time_source)
+      : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random, common_config,
+                            time_source),
         choice_count_(
             least_request_config.has_value()
                 ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.value(), choice_count, 2)

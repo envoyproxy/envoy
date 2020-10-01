@@ -752,10 +752,13 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // BaseDynamicClusterImpl::updateDynamicHostList about this.
     for (const auto& host : hosts) {
       auto host_weight = hostWeight(*host);
-      // todo(nezdolik) use same units for all variables, add
-      // abs to formula
-      if (scheduler.edf_->currentTime() - 0 /*host->creationTime())*/ > slow_start_window) {
-        // todo(nezdolik) parametrize this
+      auto current_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+      time_source_.systemTime().time_since_epoch());
+      //translate `slow_start_window`(seconds) into milliseconds
+      auto slow_start_window_ms = std::chrono::milliseconds(slow_start_window*1000);
+      //add math.abs anywhere?
+      if (current_time - host->creationTime() > slow_start_window_ms) {
+        // todo(nezdolik) parametrize this, default should be 1
         host_weight *= 0.1;
       }
 

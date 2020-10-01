@@ -756,9 +756,9 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     break;
 
   case LoadBalancerType::RoundRobin:
-    lb_ = std::make_unique<RoundRobinLoadBalancer>(*this, subset_lb.original_local_priority_set_,
-                                                   subset_lb.stats_, subset_lb.runtime_,
-                                                   subset_lb.random_, subset_lb.common_config_, subset_lb.time_source_);
+    lb_ = std::make_unique<RoundRobinLoadBalancer>(
+        *this, subset_lb.original_local_priority_set_, subset_lb.stats_, subset_lb.runtime_,
+        subset_lb.random_, subset_lb.common_config_, subset_lb.time_source_);
     break;
 
   case LoadBalancerType::RingHash:
