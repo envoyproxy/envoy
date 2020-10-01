@@ -80,7 +80,7 @@ def docs_have_changed_between_commits(author, commit1, commit2):
   return bool([
     f["filename"]
     for f
-    in github.call("/repos/%s/envoy/compare/%s...%s" % (author, commit1, commit2))
+    in github.call(method="GET", "/repos/%s/envoy/compare/%s...%s" % (author, commit1, commit2))
     if (f["filename"].startswith("docs/")
         or f["filename"].startswith("api/"))])
 
