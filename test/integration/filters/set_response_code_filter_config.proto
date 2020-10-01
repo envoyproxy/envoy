@@ -7,4 +7,5 @@ import "validate/validate.proto";
 message SetResponseCodeFilterConfig {
   string prefix = 1;
   uint32 code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
+  string body = 3;
 }

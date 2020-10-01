@@ -148,7 +148,7 @@ Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::RequestHeaderMap& he
   request->headers().setReferencePath(POST_ATTACHMENT_PATH);
   request->headers().setReferenceHost(SERVER_AUTHORITY);
   request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
-  request->body() = std::make_unique<Buffer::OwnedImpl>(config_->attachmentJson());
+  request->body().add(config_->attachmentJson());
 
   is_squashing_ = true;
   in_flight_request_ =
