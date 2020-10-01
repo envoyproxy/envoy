@@ -48,6 +48,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     // long deprecated and should not be used anymore.
     if (proto_config.hidden_envoy_deprecated_use_alpha()) {
       throw EnvoyException("The use_alpha field is deprecated and is no longer supported.");
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
     const uint32_t timeout_ms =
