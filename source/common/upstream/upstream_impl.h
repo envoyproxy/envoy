@@ -547,6 +547,9 @@ public:
   const envoy::config::core::v3::HttpProtocolOptions& commonHttpProtocolOptions() const override {
     return common_http_protocol_options_;
   }
+  const envoy::config::core::v3::TransportSocket& transportSocket() const override {
+    return transport_socket_;
+  }
   ProtocolOptionsConfigConstSharedPtr
   extensionProtocolOptions(const std::string& name) const override;
   LoadBalancerType lbType() const override { return lb_type_; }
@@ -667,6 +670,7 @@ private:
   const Http::Http1Settings http1_settings_;
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const envoy::config::core::v3::HttpProtocolOptions common_http_protocol_options_;
+  const envoy::config::core::v3::TransportSocket transport_socket_;
   const std::map<std::string, ProtocolOptionsConfigConstSharedPtr> extension_protocol_options_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;

@@ -95,6 +95,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, upstreamHttpProtocolOptions())
       .WillByDefault(ReturnRef(upstream_http_protocol_options_));
+  ON_CALL(*this, transportSocket()).WillByDefault(ReturnRef(transport_socket_));
   // Delayed construction of typed_metadata_, to allow for injection of metadata
   ON_CALL(*this, typedMetadata())
       .WillByDefault(Invoke([this]() -> const Envoy::Config::TypedMetadata& {

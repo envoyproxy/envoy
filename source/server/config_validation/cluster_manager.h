@@ -62,7 +62,7 @@ public:
                            Server::Admin& admin,
                            ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                            Http::Context& http_context, Grpc::Context& grpc_context,
-                           Event::TimeSystem& time_system);
+                           Event::TimeSystem& time_system, Secret::SecretManager& secret_manager);
 
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string&, ResourcePriority,
                                                          absl::optional<Http::Protocol>,

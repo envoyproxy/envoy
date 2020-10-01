@@ -96,6 +96,7 @@ public:
   MOCK_METHOD(const envoy::config::core::v3::Http2ProtocolOptions&, http2Options, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::HttpProtocolOptions&, commonHttpProtocolOptions, (),
               (const));
+  MOCK_METHOD(const envoy::config::core::v3::TransportSocket&, transportSocket, (), (const));
   MOCK_METHOD(ProtocolOptionsConfigConstSharedPtr, extensionProtocolOptions, (const std::string&),
               (const));
   MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
@@ -144,6 +145,7 @@ public:
   Http::Http1Settings http1_settings_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   envoy::config::core::v3::HttpProtocolOptions common_http_protocol_options_;
+  envoy::config::core::v3::TransportSocket transport_socket_;
   ProtocolOptionsConfigConstSharedPtr extension_protocol_options_;
   uint64_t max_requests_per_connection_{};
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};

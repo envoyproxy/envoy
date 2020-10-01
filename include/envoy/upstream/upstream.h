@@ -828,6 +828,12 @@ public:
   upstreamConfig() const PURE;
 
   /**
+   * @return const envoy::config::core::v3::TransportSocket& the transport socket config for
+   * upstream connection.
+   */
+  virtual const envoy::config::core::v3::TransportSocket& transportSocket() const PURE;
+
+  /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.
    *         Different filters may handle this situation in different ways. The implementation
    *         of this routine is typically based on randomness and may not return the same answer

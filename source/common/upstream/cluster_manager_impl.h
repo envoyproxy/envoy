@@ -28,6 +28,7 @@
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/subscription_factory_impl.h"
 #include "common/http/async_client_impl.h"
+#include "common/secret/secret_manager_impl.h"
 #include "common/upstream/load_stats_reporter.h"
 #include "common/upstream/priority_conn_pool_map.h"
 #include "common/upstream/upstream_impl.h"
@@ -197,7 +198,8 @@ public:
                      AccessLog::AccessLogManager& log_manager,
                      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                     Http::Context& http_context, Grpc::Context& grpc_context);
+                     Http::Context& http_context, Grpc::Context& grpc_context,
+                     Secret::SecretManager& secret_manager);
 
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 
@@ -516,6 +518,7 @@ private:
   Http::Context& http_context_;
   Config::SubscriptionFactoryImpl subscription_factory_;
   ClusterSet primary_clusters_;
+  Secret::SecretManager& secret_manager_;
 };
 
 } // namespace Upstream

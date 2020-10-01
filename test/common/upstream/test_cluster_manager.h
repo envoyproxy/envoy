@@ -165,10 +165,11 @@ public:
                          AccessLog::AccessLogManager& log_manager,
                          Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
                          ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                         Http::Context& http_context, Grpc::Context& grpc_context)
+                         Http::Context& http_context, Grpc::Context& grpc_context,
+                         Secret::SecretManager& secret_manager)
       : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
                            main_thread_dispatcher, admin, validation_context, api, http_context,
-                           grpc_context) {}
+                           grpc_context, secret_manager) {}
 
   std::map<std::string, std::reference_wrapper<Cluster>> activeClusters() {
     std::map<std::string, std::reference_wrapper<Cluster>> clusters;
@@ -190,10 +191,11 @@ public:
       AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
       Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
       MockLocalClusterUpdate& local_cluster_update, MockLocalHostsRemoved& local_hosts_removed,
-      Http::Context& http_context, Grpc::Context& grpc_context)
+      Http::Context& http_context, Grpc::Context& grpc_context,
+      Secret::SecretManager& secret_manager)
       : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info,
                                log_manager, main_thread_dispatcher, admin, validation_context, api,
-                               http_context, grpc_context),
+                               http_context, grpc_context, secret_manager),
         local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
 
 protected:

@@ -54,10 +54,17 @@ public:
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
+  bool checkTlsCertificateEntityExists(const envoy::config::core::v3::ConfigSource& config_source,
+                                       const std::string& config_name) override;
+
   CertificateValidationContextConfigProviderSharedPtr
   findOrCreateCertificateValidationContextProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
+
+  bool checkCertificateValidationContextEntityExists(
+      const envoy::config::core::v3::ConfigSource& config_source,
+      const std::string& config_name) override;
 
   TlsSessionTicketKeysConfigProviderSharedPtr findOrCreateTlsSessionTicketKeysContextProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
@@ -93,6 +100,17 @@ private:
         dynamic_secret_providers_[map_key] = secret_provider;
       }
       return secret_provider;
+    }
+
+    bool checkSecretEntityExists(const envoy::config::core::v3::ConfigSource& sds_config_source,
+                                 const std::string& config_name) {
+      const std::string map_key =
+          absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name);
+      std::shared_ptr<SecretType> secret_provider = dynamic_secret_providers_[map_key].lock();
+      if (!secret_provider) {
+        return false;
+      }
+      return secret_provider->secret() != nullptr;
     }
 
     std::vector<std::shared_ptr<SecretType>> allSecretProviders() {

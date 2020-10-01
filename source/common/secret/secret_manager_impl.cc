@@ -128,12 +128,22 @@ TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertific
                                              secret_provider_context);
 }
 
+bool SecretManagerImpl::checkTlsCertificateEntityExists(
+    const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name) {
+  return certificate_providers_.checkSecretEntityExists(config_source, config_name);
+}
+
 CertificateValidationContextConfigProviderSharedPtr
 SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
     const envoy::config::core::v3::ConfigSource& sds_config_source, const std::string& config_name,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
   return validation_context_providers_.findOrCreate(sds_config_source, config_name,
                                                     secret_provider_context);
+}
+
+bool SecretManagerImpl::checkCertificateValidationContextEntityExists(
+    const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name) {
+  return validation_context_providers_.checkSecretEntityExists(config_source, config_name);
 }
 
 TlsSessionTicketKeysConfigProviderSharedPtr

@@ -110,6 +110,16 @@ public:
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
 
   /**
+   * Check whether TLS Certificate entity was being extracted from SDS server.
+   *
+   * @param config_source a protobuf message object containing a SDS config source.
+   * @param config_name a name that uniquely refers to the SDS config source.
+   */
+  virtual bool
+  checkTlsCertificateEntityExists(const envoy::config::core::v3::ConfigSource& config_source,
+                                  const std::string& config_name) PURE;
+
+  /**
    * Finds and returns a dynamic secret provider associated to SDS config. Create
    * a new one if such provider does not exist.
    *
@@ -124,6 +134,16 @@ public:
   findOrCreateCertificateValidationContextProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
+
+  /**
+   * Check whether certificate validation context entity was being extracted from SDS server.
+   *
+   * @param config_source a protobuf message object containing a SDS config source.
+   * @param config_name a name that uniquely refers to the SDS config source.
+   */
+  virtual bool checkCertificateValidationContextEntityExists(
+      const envoy::config::core::v3::ConfigSource& config_source,
+      const std::string& config_name) PURE;
 
   /**
    * Finds and returns a dynamic secret provider associated to SDS config. Create

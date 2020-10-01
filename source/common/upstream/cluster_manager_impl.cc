@@ -16,6 +16,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
@@ -237,7 +238,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     Random::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
     Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-    Http::Context& http_context, Grpc::Context& grpc_context)
+    Http::Context& http_context, Grpc::Context& grpc_context, Secret::SecretManager& secret_manager)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
       local_info_(local_info), cm_stats_(generateStats(stats)),
@@ -247,7 +248,8 @@ ClusterManagerImpl::ClusterManagerImpl(
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
       http_context_(http_context),
       subscription_factory_(local_info, main_thread_dispatcher, *this, random,
-                            validation_context.dynamicValidationVisitor(), api, runtime_) {
+                            validation_context.dynamicValidationVisitor(), api, runtime_),
+      secret_manager_(secret_manager) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
       *this, tls, time_source_, api, grpc_context.statNames());
   const auto& cm_config = bootstrap.cluster_manager();
@@ -418,6 +420,35 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   // needed. This must happen first so cluster updates are heard first by the load balancer.
   auto cluster_data = warming_clusters_.find(cluster.info()->name());
   if (cluster_data != warming_clusters_.end()) {
+    if (cluster.info()->transportSocket().has_typed_config()) {
+      auto upstream_tls_context = MessageUtil::anyConvert<
+          envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext>(
+          cluster.info()->transportSocket().typed_config());
+      const auto& common_tls_context = upstream_tls_context.common_tls_context();
+
+      for (const auto& sds_secret_config :
+           common_tls_context.tls_certificate_sds_secret_configs()) {
+        auto& config_name = sds_secret_config.name();
+        auto& config_source = sds_secret_config.sds_config();
+        if (!secret_manager_.checkTlsCertificateEntityExists(config_source, config_name)) {
+          ENVOY_LOG(info, "Failed to activate {} on {}", config_name, cluster.info()->name());
+          return;
+        }
+      }
+
+      if (common_tls_context.has_validation_context_sds_secret_config()) {
+        const auto& validation_context_sds_secret_config =
+            common_tls_context.validation_context_sds_secret_config();
+        auto& config_name = validation_context_sds_secret_config.name();
+        auto& config_source = validation_context_sds_secret_config.sds_config();
+        if (!secret_manager_.checkCertificateValidationContextEntityExists(config_source,
+                                                                           config_name)) {
+          ENVOY_LOG(info, "Failed to activate {} on {}", config_name, cluster.info()->name());
+          return;
+        }
+      }
+    }
+
     clusterWarmingToActive(cluster.info()->name());
     updateClusterCounts();
   }
@@ -1399,9 +1430,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-  return ClusterManagerPtr{new ClusterManagerImpl(
-      bootstrap, *this, stats_, tls_, runtime_, random_, local_info_, log_manager_,
-      main_thread_dispatcher_, admin_, validation_context_, api_, http_context_, grpc_context_)};
+  return ClusterManagerPtr{
+      new ClusterManagerImpl(bootstrap, *this, stats_, tls_, runtime_, random_, local_info_,
+                             log_manager_, main_thread_dispatcher_, admin_, validation_context_,
+                             api_, http_context_, grpc_context_, secret_manager_)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(

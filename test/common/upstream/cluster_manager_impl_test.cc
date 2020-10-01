@@ -3,6 +3,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/secret/secret_manager.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
 
@@ -42,7 +43,7 @@ public:
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *api_, http_context_, grpc_context_);
+        *api_, http_context_, grpc_context_, secret_manager_);
     cluster_manager_->setPrimaryClustersInitializedCb(
         [this, bootstrap]() { cluster_manager_->initializeSecondaryClusters(bootstrap); });
   }
@@ -86,7 +87,8 @@ public:
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_);
+        *api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_,
+        secret_manager_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -133,6 +135,7 @@ public:
   std::unique_ptr<TestClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;
+  NiceMock<Secret::MockSecretManager> secret_manager_;
   MockLocalClusterUpdate local_cluster_update_;
   MockLocalHostsRemoved local_hosts_removed_;
   Http::ContextImpl http_context_;

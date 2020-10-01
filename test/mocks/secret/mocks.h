@@ -43,18 +43,26 @@ public:
   MOCK_METHOD(TlsCertificateConfigProviderSharedPtr, findOrCreateTlsCertificateProvider,
               (const envoy::config::core::v3::ConfigSource&, const std::string&,
                Server::Configuration::TransportSocketFactoryContext&));
+  MOCK_METHOD(bool, checkTlsCertificateEntityExists,
+              (const envoy::config::core::v3::ConfigSource&, const std::string&));
   MOCK_METHOD(CertificateValidationContextConfigProviderSharedPtr,
               findOrCreateCertificateValidationContextProvider,
               (const envoy::config::core::v3::ConfigSource& config_source,
                const std::string& config_name,
                Server::Configuration::TransportSocketFactoryContext& secret_provider_context));
+  MOCK_METHOD(bool, checkCertificateValidationContextEntityExists,
+              (const envoy::config::core::v3::ConfigSource&, const std::string&));
   MOCK_METHOD(TlsSessionTicketKeysConfigProviderSharedPtr,
               findOrCreateTlsSessionTicketKeysContextProvider,
               (const envoy::config::core::v3::ConfigSource&, const std::string&,
                Server::Configuration::TransportSocketFactoryContext&));
+  MOCK_METHOD(bool, checkTlsSessionTicketKeysEntityExists,
+              (const envoy::config::core::v3::ConfigSource&, const std::string&));
   MOCK_METHOD(GenericSecretConfigProviderSharedPtr, findOrCreateGenericSecretProvider,
               (const envoy::config::core::v3::ConfigSource&, const std::string&,
                Server::Configuration::TransportSocketFactoryContext&));
+  MOCK_METHOD(bool, checkGenericSecretEntityExists,
+              (const envoy::config::core::v3::ConfigSource&, const std::string&));
 };
 
 class MockSecretCallbacks : public SecretCallbacks {
