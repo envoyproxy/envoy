@@ -142,7 +142,6 @@ envoy_cc_library(
         "abseil_node_hash_map",
         "abseil_node_hash_set",
         "abseil_optional",
-        "googletest",
     ],
     tags = ["nofips"],
     visibility = ["//visibility:public"],

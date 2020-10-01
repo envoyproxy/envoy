@@ -5,7 +5,6 @@
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
-#include "envoy/json/json_object.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
