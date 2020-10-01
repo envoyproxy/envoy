@@ -22,7 +22,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig& config)
     : root_scope_(context.scope()), cluster_manager_(context.clusterManager()), api_(context.api()),
       stats_(generateStats(config.stat_prefix(), root_scope_)),
-      resolver_timeout_(DEFAULT_RESOLVER_TIMEOUT), random_(context.random()) {
+      resolver_timeout_(DEFAULT_RESOLVER_TIMEOUT), random_(context.api().randomGenerator()) {
   using envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig;
 
   const auto& server_config = config.server_config();
@@ -82,16 +82,10 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         }
         const std::chrono::seconds ttl = std::chrono::seconds(dns_service.ttl().seconds());
 
-        // Generate the full name for the DNS service.
+        // Generate the full name for the DNS service. All input parameters are populated
+        // strings enforced by the message definition
         const std::string full_service_name =
             Utils::buildServiceName(dns_service.service_name(), proto, virtual_domain.name());
-        if (full_service_name.empty()) {
-          ENVOY_LOG(
-              trace,
-              "Unable to construct the full service name using name [{}], protocol[{}], domain[{}]",
-              dns_service.service_name(), proto, virtual_domain.name());
-          continue;
-        }
 
         DnsSrvRecordPtr service_record_ptr =
             std::make_unique<DnsSrvRecord>(full_service_name, proto, ttl);
