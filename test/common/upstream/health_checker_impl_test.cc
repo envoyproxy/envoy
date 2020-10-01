@@ -1507,7 +1507,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessNoTraffic) {
 }
 
 // First start with an unhealthy cluster that moves to
-// no_traffic_healthy_interval
+// no_traffic_healthy_interval.
 TEST_F(HttpHealthCheckerImplTest, UnhealthyTransitionNoTrafficHealthy) {
   setupNoTrafficHealthyValidationHC();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1519,7 +1519,7 @@ TEST_F(HttpHealthCheckerImplTest, UnhealthyTransitionNoTrafficHealthy) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  // successful health check should now trigger the no_traffic_healthy_interval 10000ms
+  // Successful health check should now trigger the no_traffic_healthy_interval 10000ms.
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(event_logger_, logAddHealthy(_, _, _));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
