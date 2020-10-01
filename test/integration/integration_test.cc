@@ -549,6 +549,21 @@ TEST_P(IntegrationTest, TestClientAllowChunkedLength) {
   tcp_client->close();
 }
 
+TEST_P(IntegrationTest, OverflowingResponseCode) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  ASSERT_TRUE(fake_upstream_connection->write(
+      "HTTP/1.1 11111111111111111111111111111111111111111111111111111111111111111 OK\r\n", false));
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
 TEST_P(IntegrationTest, BadFirstline) {
   initialize();
   std::string response;
