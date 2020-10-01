@@ -12,7 +12,17 @@ namespace Event {
 
 /**
  * Class for creating RangeTimer objects that can be adjusted towards either the minimum or maximum
- * of their range by the owner of the manager object.
+ * of their range by the owner of the manager object. Users of this class can call createTimer() to
+ * receive a new RangeTimer object that they can then enable or disable at will (but only on the
+ * same dispatcher), and setScaleFactor() to change the scaling factor. The current scale factor is
+ * applied to all timers, including those that are created later.
+ *
+ * Internally, the manager uses a set of queues to track timers. When an enabled timer reaches its
+ * min duration, it adds a tracker object to the queue corresponding to the duration (max - min).
+ * Each queue tracks timers of only a single duration, and uses a real Timer object to schedule the
+ * expiration of the first timer in the queue. The expectation is that the number of (max - min)
+ * values used to enable timers is small, so the number of queues is tightly bounded. The
+ * queue-based implementation depends on that expectation for efficient operation.
  */
 class ScaledRangeTimerManager {
 public:
@@ -28,12 +38,18 @@ public:
 
   /**
    * Sets the scale factor for all timers created through this manager. The value should be between
-   * 0 and 1, inclusive.
+   * 0 and 1, inclusive. The scale factor affects the amount of time timers spend in their target
+   * range. The RangeTimers returned by createTimer will fire after (min + (max - min) *
+   * scale_factor). This means that a scale factor of 0 causes timers to fire immediately at the min
+   * duration, a factor of 0.5 causes firing halfway between min and max, and a factor of 1 causes
+   * firing at max.
    */
   void setScaleFactor(double scale_factor);
 
 private:
   class RangeTimerImpl;
+  
+  // A queue object that maintains a list of timers with the same (max - min) values.
   struct Queue {
     struct Item {
       Item(RangeTimerImpl& timer, MonotonicTime active_time);
@@ -43,21 +59,32 @@ private:
       MonotonicTime active_time_;
     };
 
+    // Typedef for convenience.
     using Iterator = std::list<Item>::iterator;
 
     Queue(std::chrono::milliseconds duration, ScaledRangeTimerManager& manager,
           Dispatcher& dispatcher);
 
+    // The (max - min) value for all timers in range_timers_.
     const std::chrono::milliseconds duration_;
+
     // The list of active timers in this queue. This is implemented as a
     // std::list so that the iterators held in ScalingTimerHandle instances are
     // not invalidated by removal or insertion of other timers. The timers in
     // the list are in sorted order by active_time_ because they are only
     // inserted at the end of the list, and the time is monotonically increasing.
     std::list<Item> range_timers_;
+
+    // A real Timer that tracks the expiration time of the first timer in the queue. This gets adjusted
+    //   1) at queue creation time
+    //   2) on expiration
+    //   3) when the scale factor changes
     const TimerPtr timer_;
   };
 
+  /**
+   * An object passed back to RangeTimerImpl that can be used to remove it from its queue.
+   */
   struct ScalingTimerHandle {
     ScalingTimerHandle(Queue& queue, Queue::Iterator iterator);
     Queue& queue_;
@@ -83,7 +110,7 @@ private:
     }
     size_t operator()(const Queue& queue) const { return (*this)(queue.duration_); }
     size_t operator()(const std::unique_ptr<Queue>& queue) const { return (*this)(*queue); }
-    std::hash<std::chrono::milliseconds::rep> hash_;
+    const std::hash<std::chrono::milliseconds::rep> hash_;
   };
 
   struct Eq {

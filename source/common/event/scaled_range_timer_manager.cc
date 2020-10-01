@@ -59,6 +59,8 @@ public:
     ENVOY_LOG_MISC(trace, "enableTimer called on {} for ({}ms, {}ms)", static_cast<void*>(this),
                    min_ms.count(), max_ms.count());
     if (min_ms <= std::chrono::milliseconds::zero()) {
+      // If the duration spread (max - min) is zero, skip over the waiting-for-min and straight to
+      // the scaling-max state.
       auto handle = manager_.activateTimer(max_ms, *this);
       state_.emplace<ScalingMax>(handle);
     } else {
@@ -70,6 +72,7 @@ public:
   bool enabled() override { return !absl::holds_alternative<Inactive>(state_); }
 
   void trigger() {
+    ASSERT(dispatcher_.isThreadSafe());
     ASSERT(!absl::holds_alternative<Inactive>(state_));
     ENVOY_LOG_MISC(trace, "RangeTimerImpl triggered: {}", static_cast<void*>(this));
     state_.emplace<Inactive>();
@@ -101,11 +104,18 @@ private:
     ScaledRangeTimerManager::ScalingTimerHandle handle_;
   };
 
+  /**
+   * This is called when the min timer expires, on the dispatcher for the manager. It registers with
+   * the manager so the duration can be scaled, unless the duration is zero in which case it just
+   * triggers the callback right away.
+   */
   void onMinTimerComplete() {
+    ASSERT(dispatcher_.isThreadSafe());
     ENVOY_LOG_MISC(info, "min timer complete for {}", static_cast<void*>(this));
     ASSERT(absl::holds_alternative<WaitingForMin>(state_));
-    WaitingForMin& waiting = absl::get<WaitingForMin>(state_);
+    const WaitingForMin& waiting = absl::get<WaitingForMin>(state_);
 
+    // This
     if (waiting.scalable_duration_ < std::chrono::milliseconds::zero()) {
       trigger();
     } else {
@@ -167,7 +177,11 @@ MonotonicTime ScaledRangeTimerManager::computeTriggerTime(const Queue::Item& ite
 ScaledRangeTimerManager::ScalingTimerHandle
 ScaledRangeTimerManager::activateTimer(std::chrono::milliseconds duration,
                                        RangeTimerImpl& range_timer) {
+  // Ensure this is being called on the same dispatcher.
   ASSERT(dispatcher_.isThreadSafe());
+
+  // Find the matching queue for the (max - min) duration of the range timer; if there isn't one,
+  // create it.
   auto it = queues_.find(duration);
   if (it == queues_.end()) {
     auto queue = std::make_unique<Queue>(duration, *this, dispatcher_);
@@ -175,6 +189,9 @@ ScaledRangeTimerManager::activateTimer(std::chrono::milliseconds duration,
   }
   Queue& queue = **it;
 
+  // Put the timer at the back of the queue. Since the timer has the same maximum duration as all
+  // the other timers in the queue, and since the activation times are monotonic, the queue stays in
+  // sorted order.
   queue.range_timers_.emplace_back(range_timer, dispatcher_.approximateMonotonicTime());
   if (queue.range_timers_.size() == 1) {
     resetQueueTimer(queue, dispatcher_.approximateMonotonicTime());
@@ -184,15 +201,21 @@ ScaledRangeTimerManager::activateTimer(std::chrono::milliseconds duration,
 }
 
 void ScaledRangeTimerManager::removeTimer(ScalingTimerHandle handle) {
+  // Ensure this is being called on the same dispatcher.
   ASSERT(dispatcher_.isThreadSafe());
+
   const bool was_front = handle.queue_.range_timers_.begin() == handle.iterator_;
   handle.queue_.range_timers_.erase(handle.iterator_);
+  // Don't keep around empty queues
   if (handle.queue_.range_timers_.empty()) {
     queues_.erase(handle.queue_);
-  } else {
-    if (was_front) {
-      resetQueueTimer(handle.queue_, dispatcher_.approximateMonotonicTime());
-    }
+    return
+  }
+
+  // The queue's timer tracks the expiration time of the first range timer, so it only needs
+  // adjusting if the first timer is the one that was removed.
+  if (was_front) {
+    resetQueueTimer(handle.queue_, dispatcher_.approximateMonotonicTime());
   }
 }
 
@@ -213,6 +236,8 @@ void ScaledRangeTimerManager::onQueueTimerFired(Queue& queue) {
   ASSERT(!timers.empty());
   const MonotonicTime now = dispatcher_.approximateMonotonicTime();
 
+  // Pop and trigger timers until the one at the front isn't supposed to have expired yet (given the
+  // current scale factor).
   while (!timers.empty() &&
          computeTriggerTime(timers.front(), queue.duration_, scale_factor_) <= now) {
     auto item = std::move(queue.range_timers_.front());
@@ -221,6 +246,7 @@ void ScaledRangeTimerManager::onQueueTimerFired(Queue& queue) {
   }
 
   if (queue.range_timers_.empty()) {
+    // Maintain the invariant that queues are never empty.
     queues_.erase(queue);
   } else {
     resetQueueTimer(queue, now);
