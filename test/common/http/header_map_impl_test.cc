@@ -540,20 +540,42 @@ TEST(HeaderMapImplTest, RemoveIf) {
   LowerCaseString key2 = LowerCaseString("X-postfix-");
   LowerCaseString key3 = LowerCaseString("x-postfix-eep");
 
-  TestRequestHeaderMapImpl headers;
-  headers.addReference(key1, "value");
-  headers.addReference(key2, "value");
-  headers.addReference(key3, "value");
+  {
+    TestRequestHeaderMapImpl headers;
+    headers.addReference(key1, "value");
+    headers.addReference(key2, "value");
+    headers.addReference(key3, "value");
 
-  EXPECT_EQ(0UL, headers.removeIf([](const HeaderEntry&) -> bool { return false; }));
+    EXPECT_EQ(0UL, headers.removeIf([](const HeaderEntry&) -> bool { return false; }));
 
-  EXPECT_EQ(2UL, headers.removeIf([](const HeaderEntry& entry) -> bool {
-    return absl::EndsWith(entry.key().getStringView(), "foo") ||
-           absl::EndsWith(entry.key().getStringView(), "eep");
-  }));
+    EXPECT_EQ(2UL, headers.removeIf([](const HeaderEntry& entry) -> bool {
+      return absl::EndsWith(entry.key().getStringView(), "foo") ||
+             absl::EndsWith(entry.key().getStringView(), "eep");
+    }));
 
-  TestRequestHeaderMapImpl expected{{"X-postfix-", "value"}};
-  EXPECT_EQ(expected, headers);
+    TestRequestHeaderMapImpl expected{{"X-postfix-", "value"}};
+    EXPECT_EQ(expected, headers);
+  }
+
+  // Test multiple entries with same key but different value.
+  {
+    TestRequestHeaderMapImpl headers;
+    headers.addReference(key1, "valueA");
+    headers.addReference(key1, "valueB");
+    headers.addReference(key1, "valueC");
+    headers.addReference(key2, "valueB");
+    headers.addReference(key3, "valueC");
+
+    EXPECT_EQ(5UL, headers.size());
+    EXPECT_EQ(2UL, headers.removeIf([](const HeaderEntry& entry) -> bool {
+      return absl::EndsWith(entry.value().getStringView(), "B");
+    }));
+
+    // Make sure key1 other values still exist.
+    TestRequestHeaderMapImpl expected{
+        {key1.get(), "valueA"}, {key1.get(), "valueC"}, {key3.get(), "valueC"}};
+    EXPECT_EQ(expected, headers);
+  }
 }
 
 TEST(HeaderMapImplTest, RemovePrefix) {
@@ -1213,7 +1235,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
 // Validate that TestRequestHeaderMapImpl copy construction and assignment works. This is a
 // regression for where we were missing a valid copy constructor and had the
 // default (dangerous) move semantics takeover.
-TEST(HeaderMapImplTest, TestRequestHeaderMapImplyCopy) {
+TEST(HeaderMapImplTest, TestRequestHeaderMapImplCopy) {
   TestRequestHeaderMapImpl foo;
   foo.addCopy(LowerCaseString("foo"), "bar");
   auto headers = std::make_unique<TestRequestHeaderMapImpl>(foo);

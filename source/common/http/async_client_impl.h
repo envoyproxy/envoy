@@ -255,6 +255,15 @@ private:
       }
     }
     absl::optional<std::chrono::milliseconds> idleTimeout() const override { return absl::nullopt; }
+    absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+      return absl::nullopt;
+    }
+    absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
+      return absl::nullopt;
+    }
+    absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
+      return absl::nullopt;
+    }
     absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
       return absl::nullopt;
     }
@@ -459,7 +468,7 @@ private:
     // The request is already fully buffered. Note that this is only called via the async client's
     // internal use of the router filter which uses this function for buffering.
   }
-  const Buffer::Instance* decodingBuffer() override { return request_->body().get(); }
+  const Buffer::Instance* decodingBuffer() override { return &request_->body(); }
   void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
