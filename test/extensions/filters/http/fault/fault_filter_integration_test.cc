@@ -57,6 +57,29 @@ typed_config:
     percentage:
       numerator: 100
 )EOF";
+
+  const std::string abort_all_with_filter_ =
+      R"EOF(
+name: fault
+typed_config:
+  "@type": type.googleapis.com/envoy.config.common.matcher.v3.MatchingFilterConfig
+  match_tree:
+    matcher:
+      multimap_matcher:
+        namespace: request_headers
+        key: x-disable-faults
+        exact_matches:
+          disable:
+            leaf:
+              action:
+                skip: true
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+    abort:
+      http_status: 503
+      percentage:
+        numerator: 100
+)EOF";
 };
 
 // Fault integration tests that should run with all protocols, useful for testing various
@@ -165,6 +188,51 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfig) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("429"));
+
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
+}
+
+// Faults are skipped when header matching matches specific header.
+TEST_P(FaultIntegrationTestAllProtocols, MatchTree) {
+  initializeFilter(abort_all_with_filter_);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  {
+
+    // First request should have a fault injected.
+    auto response = codec_client_->makeHeaderOnlyRequest(
+        Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                       {":path", "/test/long/url"},
+                                       {":scheme", "http"},
+                                       {":authority", "host"}});
+    response->waitForEndStream();
+
+    EXPECT_TRUE(response->complete());
+    EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("503"));
+  }
+
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
+
+  // The second should not inject a fault since the match tree should cause the fault filter to be
+  // skipped.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {"x-disable-faults", "disable"},
+                                     {":authority", "host"}});
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("200"));
 
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());

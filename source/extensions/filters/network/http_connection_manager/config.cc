@@ -5,10 +5,12 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/common/matcher/v3/matcher.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
 #include "envoy/tracing/http_tracer.h"
@@ -488,28 +490,42 @@ void HttpConnectionManagerConfig::processFilter(
     return;
   }
 
+  auto config_copy = proto_config;
+
+  MatchTreeSharedPtr match_tree;
+  // See if the config is wrapped in a match tree proto.
+  if (proto_config.typed_config().Is<envoy::config::common::matcher::v3::MatchingFilterConfig>()) {
+    envoy::config::common::matcher::v3::MatchingFilterConfig matching_filter;
+    MessageUtil::unpackTo(proto_config.typed_config(), matching_filter);
+
+    match_tree = MatchTreeFactory::create(matching_filter.match_tree(),
+                                          std::make_unique<HttpKeyNamespaceMapper>());
+    config_copy.clear_typed_config();
+    config_copy.mutable_typed_config()->MergeFrom(matching_filter.typed_config());
+  }
+
   // Now see if there is a factory that will accept the config.
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-          proto_config);
+          config_copy);
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      proto_config, context_.messageValidationVisitor(), factory);
+      config_copy, context_.messageValidationVisitor(), factory);
   Http::FilterFactoryCb callback =
       factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
   bool is_terminal = factory.isTerminalFilter();
-  Config::Utility::validateTerminalFilters(proto_config.name(), factory.name(), filter_chain_type,
+  Config::Utility::validateTerminalFilters(config_copy.name(), factory.name(), filter_chain_type,
                                            is_terminal, last_filter_in_current_config);
   auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
-      callback, proto_config.name());
+      callback, config_copy.name());
   ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
   ENVOY_LOG(debug, "    config: {}",
             MessageUtil::getJsonStringFromMessage(
-                proto_config.has_typed_config()
-                    ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
+                config_copy.has_typed_config()
+                    ? static_cast<const Protobuf::Message&>(config_copy.typed_config())
                     : static_cast<const Protobuf::Message&>(
                           proto_config.hidden_envoy_deprecated_config()),
                 true));
-  filter_factories.push_back(std::move(filter_config_provider));
+  filter_factories.push_back({std::move(filter_config_provider), std::move(match_tree)});
 }
 
 void HttpConnectionManagerConfig::processDynamicFilterConfig(
@@ -555,7 +571,8 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
         default_factory->createFilterFactoryFromProto(*message, stats_prefix_, context_);
     filter_config_provider->onConfigUpdate(default_config, "", nullptr);
   }
-  filter_factories.push_back(std::move(filter_config_provider));
+  // TODO(snowp): Extract match tree.
+  filter_factories.push_back({std::move(filter_config_provider), nullptr});
 }
 
 Http::ServerConnectionPtr
@@ -611,24 +628,64 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
+struct MatchTreeDecoratingFactoryCallbacks : public Http::FilterChainFactoryCallbacks {
+  MatchTreeDecoratingFactoryCallbacks(Http::FilterChainFactoryCallbacks& delegated_callbacks,
+                                      MatchTreeSharedPtr match_tree)
+      : callbacks_(delegated_callbacks), match_tree_(std::move(match_tree)) {}
+
+  void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
+    callbacks_.addStreamDecoderFilter(filter, match_tree_);
+  }
+
+  void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter,
+                              MatchTreeSharedPtr match_tree) override {
+    callbacks_.addStreamDecoderFilter(filter, std::move(match_tree));
+  }
+  void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
+    callbacks_.addStreamEncoderFilter(filter, match_tree_);
+  }
+
+  void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter,
+                              MatchTreeSharedPtr match_tree) override {
+    callbacks_.addStreamEncoderFilter(filter, std::move(match_tree));
+  }
+  void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
+    callbacks_.addStreamFilter(filter, match_tree_);
+  }
+
+  void addStreamFilter(Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr match_tree) override {
+    callbacks_.addStreamFilter(filter, std::move(match_tree));
+  }
+  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {
+    callbacks_.addAccessLogHandler(handler);
+  }
+
+  Http::FilterChainFactoryCallbacks& callbacks_;
+  MatchTreeSharedPtr match_tree_;
+};
+
 void HttpConnectionManagerConfig::createFilterChainForFactories(
     Http::FilterChainFactoryCallbacks& callbacks, const FilterFactoriesList& filter_factories) {
   bool added_missing_config_filter = false;
-  for (const auto& filter_config_provider : filter_factories) {
-    auto config = filter_config_provider->config();
+  for (auto& filter_config_provider : filter_factories) {
+    auto config = filter_config_provider.first->config();
+
+    MatchTreeDecoratingFactoryCallbacks decorated_callbacks(callbacks,
+                                                            filter_config_provider.second);
     if (config.has_value()) {
-      config.value()(callbacks);
+      config.value()(decorated_callbacks);
       continue;
     }
 
     // If a filter config is missing after warming, inject a local reply with status 500.
     if (!added_missing_config_filter) {
-      ENVOY_LOG(trace, "Missing filter config for a provider {}", filter_config_provider->name());
+      ENVOY_LOG(trace, "Missing filter config for a provider {}",
+                filter_config_provider.first->name());
       callbacks.addStreamDecoderFilter(
           Http::StreamDecoderFilterSharedPtr{std::make_shared<MissingConfigFilter>()});
       added_missing_config_filter = true;
     } else {
-      ENVOY_LOG(trace, "Provider {} missing a filter config", filter_config_provider->name());
+      ENVOY_LOG(trace, "Provider {} missing a filter config", filter_config_provider.first->name());
     }
   }
 }
@@ -698,7 +755,6 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
     Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks) {
-
   Utility::Singletons singletons = Utility::createSingletons(context);
 
   auto filter_config = Utility::createConfig(
@@ -708,8 +764,8 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.
-  // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
-  // as these captured objects are also global singletons.
+  // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's
+  // fine as these captured objects are also global singletons.
   return [singletons, filter_config, &context, &read_callbacks]() -> Http::ApiListenerPtr {
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),

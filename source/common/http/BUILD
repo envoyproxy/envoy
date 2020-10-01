@@ -173,6 +173,7 @@ envoy_cc_library(
         "//source/common/common:scope_tracker",
         "//source/common/grpc:common_lib",
         "//source/common/local_reply:local_reply_lib",
+        "//source/common/matcher:matcher_lib",
     ],
 )
 

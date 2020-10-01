@@ -2,7 +2,10 @@ syntax = "proto3";
 
 package envoy.config.common.matcher.v4alpha;
 
+import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/config/route/v4alpha/route_components.proto";
+
+import "google/protobuf/any.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -14,6 +17,101 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Unified Matcher API]
+
+message MatchTree {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.common.matcher.v3.MatchTree";
+
+  message MatchAction {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.common.matcher.v3.MatchTree.MatchAction";
+
+    oneof action {
+      bool skip = 1;
+
+      string callback = 2;
+    }
+  }
+
+  message MatchLeaf {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.common.matcher.v3.MatchTree.MatchLeaf";
+
+    message LeafMatcher {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.config.common.matcher.v3.MatchTree.MatchLeaf.LeafMatcher";
+
+      // The predicate to evaluate.
+      oneof matcher {
+        MatchPredicate predicate = 1;
+
+        core.v4alpha.TypedExtensionConfig typed_config = 2;
+      }
+    }
+
+    // A linear set of match conditions that will be evaluated in order.
+    // The action of the first matcher that evaluates to true
+    // decides the action that will be performed. If no match
+    // criteria is matched, the no_match_action action will be performed.
+    repeated LeafMatcher matchers = 1;
+
+    // The action to perform if the predicate evaluates to true.
+    MatchAction action = 2;
+
+    MatchAction no_match_action = 3;
+  }
+
+  message SublinearMatcher {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.common.matcher.v3.MatchTree.SublinearMatcher";
+
+    message MultimapMatcher {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.config.common.matcher.v3.MatchTree.SublinearMatcher.MultimapMatcher";
+
+      // The header to apply this match to.
+      // The key to apply this matcher for.
+      string key = 1;
+
+      // The namespace of this key. This is used to distinguish multiple maps
+      // that could be consulted during matching.
+      string namespace = 2;
+
+      // Mapping from exact value matches to the matching subtree to use when
+      // the match applies.
+      // If a header value matches both a prefix and an exact match, the exact
+      // match path will be taken.
+      map<string, MatchTree> exact_matches = 3;
+    }
+
+    oneof matcher {
+      MultimapMatcher multimap_matcher = 1;
+
+      core.v4alpha.TypedExtensionConfig typed_config = 2;
+    }
+
+    // If none of the above matchers match, attempt to match against this subtree.
+    MatchTree no_match_tree = 3;
+  }
+
+  oneof kind {
+    // The children of this node is defined by the matching rules of this matcher.
+    SublinearMatcher matcher = 1;
+
+    // If this is a terminating node, then the leaf match criteria will be evaluated.
+    MatchLeaf leaf = 2;
+  }
+}
+
+message MatchingFilterConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.common.matcher.v3.MatchingFilterConfig";
+
+  MatchTree match_tree = 1;
+
+  // The filter config.
+  google.protobuf.Any typed_config = 3;
+}
 
 // Match configuration. This is a recursive structure which allows complex nested match
 // configurations to be built using various logical operators.

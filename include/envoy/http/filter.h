@@ -11,6 +11,7 @@
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
+#include "envoy/matcher/matcher.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
@@ -847,17 +848,26 @@ public:
    */
   virtual void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) PURE;
 
+  virtual void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter,
+                                      MatchTreeSharedPtr match_tree) PURE;
+
   /**
    * Add an encoder filter that is used when writing stream data.
    * @param filter supplies the filter to add.
    */
   virtual void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) PURE;
 
+  virtual void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter,
+                                      MatchTreeSharedPtr match_tree) PURE;
+
   /**
    * Add a decoder/encoder filter that is used both when reading and writing stream data.
    * @param filter supplies the filter to add.
    */
   virtual void addStreamFilter(Http::StreamFilterSharedPtr filter) PURE;
+
+  virtual void addStreamFilter(Http::StreamFilterSharedPtr filter,
+                               MatchTreeSharedPtr match_tree) PURE;
 
   /**
    * Add an access log handler that is called when the stream is destroyed.

@@ -24,6 +24,7 @@
 #include "common/http/http2/codec_stats.h"
 #include "common/json/json_loader.h"
 #include "common/local_reply/local_reply.h"
+#include "common/matcher/matcher.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -95,7 +96,8 @@ public:
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
-  using FilterFactoriesList = std::list<Filter::Http::FilterConfigProviderPtr>;
+  using FilterFactoriesList =
+      std::list<std::pair<Filter::Http::FilterConfigProviderPtr, MatchTreeSharedPtr>>;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
     bool allow_upgrade;

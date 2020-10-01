@@ -78,6 +78,7 @@ envoy_cc_library(
         "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:status",
+        "//include/envoy/matcher:matcher_interface",
         "//include/envoy/router:router_interface",
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/stream_info:stream_info_interface",

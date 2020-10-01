@@ -391,8 +391,9 @@ void ActiveStreamDecoderFilter::requestDataTooLarge() {
 }
 
 void FilterManager::addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter,
-                                                 bool dual_filter) {
-  ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
+                                                 MatchTreeSharedPtr match_tree, bool dual_filter) {
+  ActiveStreamDecoderFilterPtr wrapper(
+      new ActiveStreamDecoderFilter(*this, filter, dual_filter, std::move(match_tree)));
   filter->setDecoderFilterCallbacks(*wrapper);
   // Note: configured decoder filters are appended to decoder_filters_.
   // This means that if filters are configured in the following order (assume all three filters are
@@ -406,8 +407,9 @@ void FilterManager::addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr fi
 }
 
 void FilterManager::addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter,
-                                                 bool dual_filter) {
-  ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
+                                                 MatchTreeSharedPtr match_tree, bool dual_filter) {
+  ActiveStreamEncoderFilterPtr wrapper(
+      new ActiveStreamEncoderFilter(*this, filter, std::move(match_tree), dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
   // Note: configured encoder filters are prepended to encoder_filters_.
   // This means that if filters are configured in the following order (assume all three filters are
@@ -445,6 +447,15 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
   std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
 
   for (; entry != decoder_filters_.end(); entry++) {
+    if ((*entry)->match_data_) {
+      (*entry)->match_data_->request_headers_ = &headers;
+      auto match = (*entry)->match_tree_->match(*(*entry)->match_data_);
+      if (match && match->isSkip()) {
+        (*entry)->skip_ = true;
+        continue;
+      }
+    }
+
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
     (*entry)->end_stream_ = state_.decoding_headers_only_ ||
@@ -571,6 +582,9 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     }
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeData));
 
+    if ((*entry)->skip_) {
+      continue;
+    }
     // We check the request_trailers_ pointer here in case addDecodedTrailers
     // is called in decodeData during a previous filter invocation, at which point we communicate to
     // the current and future filters that the stream has not yet ended.
