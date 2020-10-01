@@ -411,13 +411,13 @@ TEST_F(AsyncClientCacheTest, Deduplication) {
 
   expectClientCreation();
   Grpc::RawAsyncClientSharedPtr test_client_01 = client_cache_->getOrCreateAsyncClient(config);
-  // Fetches the existing client
+  // Fetches the existing client.
   EXPECT_EQ(test_client_01, client_cache_->getOrCreateAsyncClient(config));
 
   config.mutable_grpc_service()->mutable_google_grpc()->set_credentials_factory_name(
       "test_credential02");
   expectClientCreation();
-  // Different credentials use different clients
+  // Different credentials use different clients.
   EXPECT_NE(test_client_01, client_cache_->getOrCreateAsyncClient(config));
   Grpc::RawAsyncClientSharedPtr test_client_02 = client_cache_->getOrCreateAsyncClient(config);
 
@@ -426,7 +426,7 @@ TEST_F(AsyncClientCacheTest, Deduplication) {
   // No creation, fetching the existing one.
   EXPECT_EQ(test_client_02, client_cache_->getOrCreateAsyncClient(config));
 
-  // Different targets use different clients
+  // Different targets use different clients.
   config.mutable_grpc_service()->mutable_google_grpc()->set_target_uri("dns://test02");
   expectClientCreation();
   EXPECT_NE(test_client_01, client_cache_->getOrCreateAsyncClient(config));
