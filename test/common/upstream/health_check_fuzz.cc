@@ -452,7 +452,7 @@ void GrpcHealthCheckFuzz::raiseGoAway(bool no_error) {
     // Will cause other events to blow away client, because this is a "graceful" go away
     received_no_error_goaway_ = true;
   } else {
-    // go away events without noerror flag explicitly blow away client
+    // go away events without no error flag explicitly blow away client
     test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
     triggerIntervalTimer(true);
   }
