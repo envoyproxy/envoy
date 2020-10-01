@@ -308,9 +308,7 @@ void SquashFilter::cleanup() {
 }
 
 Json::ObjectSharedPtr SquashFilter::getJsonBody(Http::ResponseMessagePtr&& m) {
-  Buffer::InstancePtr& data = m->body();
-  std::string jsonbody = data->toString();
-  return Json::Factory::loadFromString(jsonbody);
+  return Json::Factory::loadFromString(m->bodyAsString());
 }
 
 } // namespace Squash
