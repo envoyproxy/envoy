@@ -22,7 +22,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig& config)
     : root_scope_(context.scope()), cluster_manager_(context.clusterManager()), api_(context.api()),
       stats_(generateStats(config.stat_prefix(), root_scope_)),
-      resolver_timeout_(DEFAULT_RESOLVER_TIMEOUT), random_(context.random()) {
+      resolver_timeout_(DEFAULT_RESOLVER_TIMEOUT), random_(context.api().randomGenerator()) {
   using envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig;
 
   const auto& server_config = config.server_config();
