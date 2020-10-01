@@ -285,7 +285,7 @@ message HealthCheck {
   google.protobuf.Duration no_traffic_interval = 12 [(validate.rules).duration = {gt {}}];
 
   // The "no traffic healthy interval" is a special health check interval that
-  // is used for hosts that are currently failing active health checking
+  // is used for hosts that are currently passing active health checking
   // (including new hosts) when the cluster has received no traffic.
   //
   // This is useful for when we want to send frequent health checks with
