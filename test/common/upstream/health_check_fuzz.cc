@@ -359,7 +359,7 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respo
 
   // If the interval timer is enabled, that means that the rpc is complete, as decodeHeaders hit a
   // certain branch that called onRpcComplete(), logically representing a completed rpc call. Thus,
-  // skip the next responses until explicility invoking interval timer as cleanup.
+  // skip the next responses until explicitly invoking interval timer as cleanup.
   if (has_data && !test_sessions_[0]->interval_timer_->enabled_) {
     std::vector<std::vector<uint8_t>> bufferList =
         makeBufferListToRespondWith(grpc_respond.grpc_respond_bytes());
