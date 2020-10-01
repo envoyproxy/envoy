@@ -4730,7 +4730,7 @@ TEST_F(RouterTest, Shadow) {
   EXPECT_CALL(*shadow_writer_, shadow_("foo", _, _))
       .WillOnce(Invoke([](const std::string&, Http::RequestMessagePtr& request,
                           const Http::AsyncClient::RequestOptions& options) -> void {
-        EXPECT_NE(nullptr, request->body());
+        EXPECT_NE(request->body().length(), 0);
         EXPECT_NE(nullptr, request->trailers());
         EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
         EXPECT_TRUE(options.sampled_);
@@ -4738,7 +4738,7 @@ TEST_F(RouterTest, Shadow) {
   EXPECT_CALL(*shadow_writer_, shadow_("fizz", _, _))
       .WillOnce(Invoke([](const std::string&, Http::RequestMessagePtr& request,
                           const Http::AsyncClient::RequestOptions& options) -> void {
-        EXPECT_NE(nullptr, request->body());
+        EXPECT_NE(request->body().length(), 0);
         EXPECT_NE(nullptr, request->trailers());
         EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
         EXPECT_FALSE(options.sampled_);

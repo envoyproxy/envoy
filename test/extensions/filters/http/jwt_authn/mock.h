@@ -72,7 +72,7 @@ public:
               Http::ResponseMessagePtr response_message(
                   new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
                       new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-              response_message->body() = std::make_unique<Buffer::OwnedImpl>(response_body_);
+              response_message->body().add(response_body_);
               cb.onSuccess(request_, std::move(response_message));
               called_count_++;
               return &request_;

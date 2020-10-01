@@ -70,10 +70,9 @@ void HttpSubscriptionImpl::createRequest(Http::RequestMessage& request) {
   stats_.update_attempt_.inc();
   request.headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
   request.headers().setPath(path_);
-  request.body() = std::make_unique<Buffer::OwnedImpl>(
-      VersionConverter::getJsonStringFromMessage(request_, transport_api_version_));
+  request.body().add(VersionConverter::getJsonStringFromMessage(request_, transport_api_version_));
   request.headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  request.headers().setContentLength(request.body()->length());
+  request.headers().setContentLength(request.body().length());
 }
 
 void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) {

@@ -258,8 +258,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& di
   Http::RequestMessagePtr message =
       std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
   if (request_length > 0) {
-    message->body() =
-        std::make_unique<Buffer::OwnedImpl>(request.attributes().request().http().body());
+    message->body().add(request.attributes().request().http().body());
   }
 
   const std::string& cluster = config_->cluster();

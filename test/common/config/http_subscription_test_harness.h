@@ -139,7 +139,7 @@ public:
     Http::ResponseHeaderMapPtr response_headers{
         new Http::TestResponseHeaderMapImpl{{":status", response_code}}};
     Http::ResponseMessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
-    message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
+    message->body().add(response_json);
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
             response_pb, "cluster_name");

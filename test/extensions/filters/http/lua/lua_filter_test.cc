@@ -832,7 +832,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
   const char response[8] = {'r', 'e', 's', 'p', '\0', 'n', 's', 'e'};
-  response_message->body() = std::make_unique<Buffer::OwnedImpl>(response, 8);
+  response_message->body().add(response, 8);
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("8")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("resp")));
@@ -899,7 +899,7 @@ TEST_F(LuaHttpFilterTest, HttpCallAsyncFalse) {
 
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  response_message->body() = std::make_unique<Buffer::OwnedImpl>("response");
+  response_message->body().add("response");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
@@ -1018,7 +1018,7 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
 
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  response_message->body() = std::make_unique<Buffer::OwnedImpl>("response");
+  response_message->body().add("response");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
   EXPECT_CALL(cluster_manager_, get(Eq("cluster2")));

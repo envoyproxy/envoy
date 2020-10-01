@@ -155,8 +155,8 @@ TEST_F(AsyncClientImplTest, BasicStream) {
 }
 
 TEST_F(AsyncClientImplTest, Basic) {
-  message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
-  Buffer::Instance& data = *message_->body();
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseDecoder& decoder,
@@ -193,8 +193,8 @@ TEST_F(AsyncClientImplTest, Basic) {
 
 TEST_F(AsyncClientImplTracingTest, Basic) {
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
-  message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
-  Buffer::Instance& data = *message_->body();
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseDecoder& decoder,
@@ -238,8 +238,8 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
 
 TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
-  message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
-  Buffer::Instance& data = *message_->body();
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseDecoder& decoder,
@@ -284,8 +284,8 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
 }
 
 TEST_F(AsyncClientImplTest, BasicHashPolicy) {
-  message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
-  Buffer::Instance& data = *message_->body();
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseDecoder& decoder,
@@ -331,8 +331,8 @@ TEST_F(AsyncClientImplTest, Retry) {
       .WillByDefault(Return(true));
   RequestMessage* message_copy = message_.get();
 
-  message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
-  Buffer::Instance& data = *message_->body();
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseDecoder& decoder,
@@ -484,8 +484,8 @@ TEST_F(AsyncClientImplTest, MultipleStreams) {
 
 TEST_F(AsyncClientImplTest, MultipleRequests) {
   // Send request 1
-  message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
-  Buffer::Instance& data = *message_->body();
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseDecoder& decoder,
@@ -572,8 +572,8 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
 
 TEST_F(AsyncClientImplTest, StreamAndRequest) {
   // Send request
-  message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
-  Buffer::Instance& data = *message_->body();
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseDecoder& decoder,
@@ -664,8 +664,8 @@ TEST_F(AsyncClientImplTest, StreamWithTrailers) {
 }
 
 TEST_F(AsyncClientImplTest, Trailers) {
-  message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
-  Buffer::Instance& data = *message_->body();
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseDecoder& decoder,
@@ -1116,7 +1116,7 @@ TEST_F(AsyncClientImplTest, PoolFailureWithBody) {
         EXPECT_NE(nullptr, &request);
         EXPECT_EQ(503, Utility::getResponseStatus(response->headers()));
       }));
-  message_->body() = std::make_unique<Buffer::OwnedImpl>("hello");
+  message_->body().add("hello");
   EXPECT_EQ(nullptr, client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions()));
 
   EXPECT_EQ(

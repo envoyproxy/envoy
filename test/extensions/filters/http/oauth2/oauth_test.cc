@@ -73,7 +73,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
   }};
   Http::ResponseMessagePtr mock_response(
       new Http::ResponseMessageImpl(std::move(mock_response_headers)));
-  mock_response->body() = std::make_unique<Buffer::OwnedImpl>(json);
+  mock_response->body().add(json);
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillRepeatedly(
@@ -104,7 +104,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenIncompleteResponse) {
   }};
   Http::ResponseMessagePtr mock_response(
       new Http::ResponseMessageImpl(std::move(mock_response_headers)));
-  mock_response->body() = std::make_unique<Buffer::OwnedImpl>(json);
+  mock_response->body().add(json);
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillRepeatedly(
@@ -160,7 +160,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenInvalidResponse) {
   }};
   Http::ResponseMessagePtr mock_response(
       new Http::ResponseMessageImpl(std::move(mock_response_headers)));
-  mock_response->body() = std::make_unique<Buffer::OwnedImpl>(json);
+  mock_response->body().add(json);
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillRepeatedly(

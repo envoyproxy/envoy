@@ -69,9 +69,8 @@ public:
     const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
     if (status_code == enumToInt(Http::Code::OK)) {
       ENVOY_LOG(debug, "{}: fetch pubkey [uri = {}]: success", __func__, uri_->uri());
-      if (response->body()) {
-        const auto len = response->body()->length();
-        const auto body = std::string(static_cast<char*>(response->body()->linearize(len)), len);
+      if (response->body().length() != 0) {
+        const auto body = response->bodyAsString();
         auto jwks =
             google::jwt_verify::Jwks::createFrom(body, google::jwt_verify::Jwks::Type::JWKS);
         if (jwks->getStatus() == google::jwt_verify::Status::Ok) {
