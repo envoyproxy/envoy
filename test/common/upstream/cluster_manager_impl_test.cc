@@ -3,6 +3,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
 #include "envoy/secret/secret_manager.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
@@ -2308,6 +2309,94 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
 
   factory_.tls_.shutdownThread();
+}
+
+TEST_F(ClusterManagerImplTest,
+       DynamicAddedAndKeepWarmingWithoutCertificateValidationContextEntity) {
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  auto* validation_context_sds_secret_config =
+      tls_context.mutable_common_tls_context()->mutable_validation_context_sds_secret_config();
+  validation_context_sds_secret_config->set_name("sds_validation_context");
+  auto* config_source = validation_context_sds_secret_config->mutable_sds_config();
+  auto* api_config_source = config_source->mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+
+  envoy::config::core::v3::TransportSocket transport_socket;
+  transport_socket.set_name("envoy.transport_sockets.tls");
+  transport_socket.mutable_typed_config()->PackFrom(tls_context);
+
+  create(defaultConfig());
+
+  InSequence s;
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  cluster1->info_->name_ = "fake_cluster";
+  cluster1->info_->transport_socket_ = transport_socket;
+
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  EXPECT_CALL(*cluster1, initializePhase()).Times(0);
+  EXPECT_CALL(*cluster1, initialize(_));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+  EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
+  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
+  cluster1->initialize_callback_();
+
+  // Check to be keet warming fake_cluster after callback invoked.
+  EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+  EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+}
+
+TEST_F(ClusterManagerImplTest, DynamicAddedAndKeepWarmingWithoutTlsCertificateEntity) {
+  envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig secret_config;
+  secret_config.set_name("sds_tls_certificate");
+  auto* config_source = secret_config.mutable_sds_config();
+  auto* api_config_source = config_source->mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  auto tls_certificate_sds_secret_configs =
+      tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs();
+  *tls_certificate_sds_secret_configs->Add() = secret_config;
+
+  envoy::config::core::v3::TransportSocket transport_socket;
+  transport_socket.set_name("envoy.transport_sockets.tls");
+  transport_socket.mutable_typed_config()->PackFrom(tls_context);
+
+  create(defaultConfig());
+
+  InSequence s;
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  cluster1->info_->name_ = "fake_cluster";
+  cluster1->info_->transport_socket_ = transport_socket;
+
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  EXPECT_CALL(*cluster1, initializePhase()).Times(0);
+  EXPECT_CALL(*cluster1, initialize(_));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+  EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
+  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
+  cluster1->initialize_callback_();
+
+  // Check to be keet warming fake_cluster after callback invoked.
+  EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+  EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
 class MockConnPoolWithDestroy : public Http::ConnectionPool::MockInstance {
