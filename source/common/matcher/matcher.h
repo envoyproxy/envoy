@@ -191,7 +191,7 @@ private:
   static MatchTreeSharedPtr
   createSublinerMatcher(envoy::config::common::matcher::v3::MatchTree::SublinearMatcher matcher,
                         KeyNamespaceMapperSharedPtr key_namespace_mapper) {
-    // TODO(snowp): Suppor extensions, we only support multi map right now.
+    // TODO(snowp): Support extensions, we only support multi map right now.
 
     auto multimap_matcher = std::make_shared<MultimapMatcher>(
         matcher.multimap_matcher().key(), matcher.multimap_matcher().namespace_(),
