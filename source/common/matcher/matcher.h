@@ -16,13 +16,6 @@
 
 namespace Envoy {
 
-// Protocol specific matching requirements. For example, this may return an object that indicates
-// that both request headers and the response body is necessary for matching.
-class MatchingRequirements {
-  virtual ~MatchingRequirements() = default;
-};
-using MatchingRequirementsPtr = std::unique_ptr<MatchingRequirements>;
-
 class HttpMatchingData : public MatchingData {
 public:
   Http::RequestHeaderMap* request_headers_;
@@ -32,7 +25,6 @@ using HttpMatchingDataPtr = std::unique_ptr<HttpMatchingData>;
 class KeyNamespaceMapper {
 public:
   virtual ~KeyNamespaceMapper() = default;
-  virtual std::string requirement(absl::string_view ns, absl::string_view key) PURE;
   virtual void forEachValue(absl::string_view ns, absl::string_view key,
                             const MatchingData& matching_data,
                             std::function<void(absl::string_view)> value_cb) PURE;
@@ -40,14 +32,6 @@ public:
 
 class HttpKeyNamespaceMapper : public KeyNamespaceMapper {
 public:
-  std::string requirement(absl::string_view ns, absl::string_view) override {
-    if (ns == "request_headers") {
-      return "request_headers";
-    }
-
-    return "";
-  }
-
   void forEachValue(absl::string_view ns, absl::string_view key, const MatchingData& matching_data,
                     std::function<void(absl::string_view)> value_cb) override {
     const HttpMatchingData& http_data = dynamic_cast<const HttpMatchingData&>(matching_data);
@@ -70,18 +54,6 @@ public:
       : key_(key), namespace_(ns), key_namespace_mapper_(std::move(namespace_mapper)),
         no_match_tree_(std::move(no_match_tree)) {}
 
-  absl::flat_hash_set<std::string> matchingRequirements() override {
-    absl::flat_hash_set<std::string> requirements;
-
-    requirements.insert(key_namespace_mapper_->requirement(namespace_, key_));
-    for (const auto& child : children_) {
-      const auto child_requirements = child.second->matchingRequirements();
-      requirements.insert(child_requirements.begin(), child_requirements.end());
-    }
-
-    return requirements;
-  }
-
   absl::optional<MatchAction> match(const MatchingData& data) override {
     bool first_value_evaluated = false;
     absl::optional<std::reference_wrapper<MatchTree>> selected_subtree = absl::nullopt;
@@ -89,18 +61,15 @@ public:
       if (first_value_evaluated) {
         return;
       }
-      // TODO(snowp): We only support matching on the first header for now for the sake of
-      // simplicity.
+      // TODO(snowp): Only match on the first header for now.
       first_value_evaluated = true;
 
-      ENVOY_LOG_MISC(info, "LOOKING UP HEADER {}", value);
       const auto itr = children_.find(value);
       if (itr != children_.end()) {
         selected_subtree = absl::make_optional(std::ref(*itr->second));
       }
     });
 
-    ENVOY_LOG_MISC(info, "FOUND SOMETHING", selected_subtree.has_value());
     if (selected_subtree) {
       return selected_subtree->get().match(data);
     }
@@ -126,16 +95,12 @@ private:
 
 class AlwaysSkipMatcher : public MatchTree {
 public:
-  absl::flat_hash_set<std::string> matchingRequirements() override { return {}; }
-
   absl::optional<MatchAction> match(const MatchingData&) override { return MatchAction::skip(); }
 };
 
 class AlwaysCallbackMatcher : public MatchTree {
 public:
   explicit AlwaysCallbackMatcher(std::string callback) : callback_(callback) {}
-
-  absl::flat_hash_set<std::string> matchingRequirements() override { return {}; }
 
   absl::optional<MatchAction> match(const MatchingData&) override {
     return MatchAction::callback(callback_);
@@ -150,15 +115,12 @@ public:
   virtual ~Matcher() = default;
 
   virtual bool match(const MatchingData& data) PURE;
-  virtual absl::flat_hash_set<std::string> matchingRequirements() PURE;
 };
 
 class RequestHeaderMatcher : public Matcher {
 public:
   explicit RequestHeaderMatcher(Http::HeaderUtility::HeaderDataPtr header_data)
       : header_data_(std::move(header_data)) {}
-
-  absl::flat_hash_set<std::string> matchingRequirements() override { return {"request_headers"}; }
 
   bool match(const MatchingData& matching_data) override {
     const HttpMatchingData& http_data = dynamic_cast<const HttpMatchingData&>(matching_data);
@@ -175,17 +137,6 @@ class LeafNode : public MatchTree {
 public:
   LeafNode(MatchAction match_action, absl::optional<MatchAction> no_match_action)
       : match_action_(match_action), no_match_action_(no_match_action) {}
-
-  absl::flat_hash_set<std::string> matchingRequirements() override {
-    absl::flat_hash_set<std::string> requirements;
-
-    for (const auto& matcher : matchers_) {
-      const auto requirements_for_matcher = matcher->matchingRequirements();
-      requirements.insert(requirements_for_matcher.begin(), requirements_for_matcher.end());
-    }
-
-    return requirements;
-  }
 
   absl::optional<MatchAction> match(const MatchingData& matching_data) override {
     for (const auto& matcher : matchers_) {

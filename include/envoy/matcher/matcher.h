@@ -52,16 +52,11 @@ class MatchTree {
 public:
   virtual ~MatchTree() = default;
 
-  // This can be called to understand what data is required to perform matching, allowing the caller
-  // to change its behavior (e.g. around buffering) to accomodate the matching criteria.
-  virtual absl::flat_hash_set<std::string> matchingRequirements() PURE;
-
   // Attempts to match agains the matching data (which should contain all the data requested via
   // matching requirements). If no match is found, absl::nullopt will be returned.
   virtual absl::optional<MatchAction> match(const MatchingData& data) PURE;
 };
 
-// TODO update this
 using MatchTreeSharedPtr = std::shared_ptr<MatchTree>;
 
 } // namespace Envoy
