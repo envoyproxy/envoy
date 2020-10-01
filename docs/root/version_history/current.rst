@@ -17,6 +17,7 @@ Minor Behavior Changes
 *Changes that may cause incompatibilities for some users, but should not for most*
 
 * adaptive concurrency: added a response body / grpc-message header for rejected requests.
+* async_client: minor change to handling header only responses more similar to header-with-empty-body responses.
 * build: an :ref:`Ubuntu based debug image <install_binaries>` is built and published in DockerHub.
 * build: the debug information will be generated separately to reduce target size and reduce compilation time when build in compilation mode `dbg` and `opt`. Users will need to build dwp file to debug with gdb.
 * compressor: always insert `Vary` headers for compressible resources even if it's decided not to compress a response due to incompatible `Accept-Encoding` value. The `Vary` header needs to be inserted to let a caching proxy in front of Envoy know that the requested resource still can be served with compression applied.
@@ -106,6 +107,7 @@ New Features
 * http: added support for :ref:`%DOWNSTREAM_PEER_FINGERPRINT_1% <config_http_conn_man_headers_custom_request_headers>` as custom header.
 * http: added :ref:`allow_chunked_length <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.allow_chunked_length>` configuration option for HTTP/1 codec to allow processing requests/responses with both Content-Length and Transfer-Encoding: chunked headers. If such message is served and option is enabled - per RFC Content-Length is ignored and removed.
 * http: added :ref:`CDN Loop filter <envoy_v3_api_msg_extensions.filters.http.cdn_loop.v3alpha.CdnLoopConfig>` and :ref:`documentation <config_http_filters_cdn_loop>`.
+* http: added :ref:`MaxStreamDuration proto <envoy_v3_api_msg_config.route.v3.RouteAction.MaxStreamDuration>` for configuring per-route downstream duration timeouts.
 * http: introduced new HTTP/1 and HTTP/2 codec implementations that will remove the use of exceptions for control flow due to high risk factors and instead use error statuses. The old behavior is used by default, but the new codecs can be enabled for testing by setting the runtime feature `envoy.reloadable_features.new_codec_behavior` to true. The new codecs will be in development for one month, and then enabled by default while the old codecs are deprecated.
 * http: modified the HTTP header-map data-structure to use an underlying dictionary and a list (no change to the header-map API). To conform with previous versions, the use of a dictionary is currently disabled. It can be enabled by setting the `envoy.http.headermap.lazy_map_min_size` runtime feature to a non-negative number which defines the minimal number of headers in a request/response/trailers required for using a dictionary in addition to the list. Our current benchmarks suggest that the value 3 is a good threshold for most workloads.
 * load balancer: added :ref:`RingHashLbConfig<envoy_v3_api_msg_config.cluster.v3.Cluster.MaglevLbConfig>` to configure the table size of Maglev consistent hash.
@@ -165,6 +167,8 @@ Deprecated
   field has been deprecated in favor of :ref:`cluster_endpoints_health <envoy_v3_api_field_service.health.v3.EndpointHealthResponse.cluster_endpoints_health>` to maintain
   grouping by cluster and locality.
 * router: the :ref:`include_vh_rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.include_vh_rate_limits>` field has been deprecated in favor of :ref:`vh_rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits>`.
+* router: the :ref:`max_grpc_timeout <envoy_v3_api_field_config.route.v3.RouteAction.max_grpc_timeout>` field has been deprecated in favor of :ref:`grpc_timeout_header_max <envoy_v3_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_max>`.
+* router: the :ref:`grpc_timeout_offset <envoy_v3_api_field_config.route.v3.RouteAction.grpc_timeout_offset>` field has been deprecated in favor of :ref:`grpc_timeout_header_offset <envoy_v3_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_offset>`.
 * tap: the :ref:`match_config <envoy_v3_api_field_config.tap.v3.TapConfig.match_config>` field has been deprecated in favor of
   :ref:`match <envoy_v3_api_field_config.tap.v3.TapConfig.match>` field.
 * ext_authz: the :ref:`dynamic metadata <envoy_v3_api_field_service.auth.v3.OkHttpResponse.dynamic_metadata>` field in :ref:`OkHttpResponse <envoy_v3_api_msg_service.auth.v3.OkHttpResponse>`
