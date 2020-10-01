@@ -55,6 +55,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
     }
     ASSERT(num_bytes_to_read <= max_length);
     owned_buffer_.drain(num_bytes_to_read);
+    ENVOY_LOG_MISC(debug, "lambdai: readv {} on {}", num_bytes_to_read, static_cast<void*>(this));
     return {num_bytes_to_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
   }
 }
@@ -77,6 +78,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
     }
   }
   writable_peer_->maybeSetNewData();
+  ENVOY_LOG_MISC(debug, "lambdai: writev {} on {}", num_bytes_to_write, static_cast<void*>(this));
   return {num_bytes_to_write, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
@@ -135,7 +137,9 @@ IoHandlePtr BufferedIoSocketHandleImpl::accept(struct sockaddr*, socklen_t*) {
 }
 
 Api::SysCallIntResult BufferedIoSocketHandleImpl::connect(Address::InstanceConstSharedPtr) {
-  return makeInvalidSyscall();
+  // Buffered Io handle should always be considered as connected. Use write to determine if peer is
+  // closed.
+  return {0, 0};
 }
 
 Api::SysCallIntResult BufferedIoSocketHandleImpl::setOption(int, int, const void*, socklen_t) {

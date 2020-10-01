@@ -788,7 +788,6 @@ void ConnectionHandlerImpl::ActiveInternalSocket::setDynamicMetadata(
 
 void ConnectionHandlerImpl::ActiveInternalSocket::newConnection() {
   connected_ = true;
-
   // Set default transport protocol if none of the listener filters did it.
   if (!socket_->detectedTransportProtocol().empty() &&
       socket_->detectedTransportProtocol() !=
@@ -853,6 +852,26 @@ ConnectionHandlerImpl::ActiveInternalListener::~ActiveInternalListener() {
   ASSERT(num_listener_connections_ == 0);
 }
 
+void ConnectionHandlerImpl::ActiveInternalListener::removeConnection(
+    ActiveTcpConnection& connection) {
+  ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
+  ActiveConnections& active_connections = connection.active_connections_;
+  ActiveTcpConnectionPtr removed = connection.removeFromList(active_connections.connections_);
+  parent_.dispatcher_.deferredDelete(std::move(removed));
+  // Delete map entry only iff connections becomes empty.
+  if (active_connections.connections_.empty()) {
+    auto iter = connections_by_context_.find(&active_connections.filter_chain_);
+    ASSERT(iter != connections_by_context_.end());
+    // To cover the lifetime of every single connection, Connections need to be deferred deleted
+    // because the previously contained connection is deferred deleted.
+    parent_.dispatcher_.deferredDelete(std::move(iter->second));
+    // The erase will break the iteration over the connections_by_context_ during the deletion.
+    if (!is_deleting_) {
+      connections_by_context_.erase(iter);
+    }
+  }
+}
+
 void ConnectionHandlerImpl::ActiveInternalListener::shutdownListener() {
   internal_listener_->dispatcher_.registerInternalListener(
       internal_listener_->internal_listener_id_,
@@ -889,7 +908,7 @@ ConnectionHandlerImpl::ActiveInternalListener::newTimespan(TimeSource& time_sour
 // Copied from newConnection(). Invoked by SetupPipeListener.
 void ConnectionHandlerImpl::ActiveInternalListener::setupNewConnection(
     Network::ConnectionPtr server_conn, Network::ConnectionSocketPtr socket) {
-
+  incNumConnections();
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(parent_.dispatcher_.timeSource());
   stream_info->setDownstreamLocalAddress(socket->localAddress());
   stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
@@ -992,12 +1011,10 @@ void ConnectionHandlerImpl::ActiveInternalListener::newConnection(
 ConnectionHandlerImpl::ActiveConnections&
 ConnectionHandlerImpl::ActiveInternalListener::getOrCreateActiveConnections(
     const Network::FilterChain& filter_chain) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   ActiveConnectionsPtr& connections = connections_by_context_[&filter_chain];
-  // if (connections == nullptr) {
-  //   connections = std::make_unique<ConnectionHandlerImpl::ActiveConnections>(*this,
-  //   filter_chain);
-  // }
+  if (connections == nullptr) {
+    connections = std::make_unique<ConnectionHandlerImpl::ActiveConnections>(*this, filter_chain);
+  }
   return *connections;
 }
 

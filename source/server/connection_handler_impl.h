@@ -143,6 +143,7 @@ private:
     }
     void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
                         bool hand_off_restored_destination_connections, bool rebalanced);
+
     void decNumConnections() {
       ASSERT(num_listener_connections_ > 0);
       --num_listener_connections_;
@@ -245,6 +246,11 @@ private:
 
     ~ActiveInternalListener() override;
 
+    void incNumConnections() {
+      ++num_listener_connections_;
+      config_->openConnections().inc();
+    }
+
     void decNumConnections() {
       ASSERT(num_listener_connections_ > 0);
       --num_listener_connections_;
@@ -263,6 +269,8 @@ private:
 
     // StreamListener
     void onNewConnection() override {
+      // TODO(lambdai): FIX ME.
+      incNumConnections();
       stats_.downstream_cx_total_.inc();
       stats_.downstream_cx_active_.inc();
       per_worker_stats_.downstream_cx_total_.inc();

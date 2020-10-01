@@ -9,7 +9,8 @@ namespace Event {
 
 SchedulableCallbackImpl::SchedulableCallbackImpl(Libevent::BasePtr& libevent,
                                                  std::function<void()> cb)
-    : cb_(cb) {
+    : cb_(cb) {   
+  ENVOY_LOG_MISC(debug, "lambdai: construct SchedulableCallbackImpl {}", static_cast<void*>(this));
   ASSERT(cb_);
   evtimer_assign(
       &raw_event_, libevent.get(),
@@ -31,8 +32,10 @@ void SchedulableCallbackImpl::scheduleCallbackCurrentIteration() {
 
 void SchedulableCallbackImpl::scheduleCallbackNextIteration() {
   if (enabled()) {
+    ENVOY_LOG_MISC(debug, "lambdai: SchedulableCallbackImpl {} scheduleCallbackNextIteration is enabled. won't reschedule", static_cast<void*>(this));
     return;
   }
+  ENVOY_LOG_MISC(debug, "lambdai: SchedulableCallbackImpl {} scheduleCallbackNextIteration is not schedule enabled. Will reschedule. ", static_cast<void*>(this));
   // libevent computes the list of timers to move to the work list after polling for fd events, but
   // iteration through the work list starts. Zero delay timers added while iterating through the
   // work list execute on the next iteration of the event loop.

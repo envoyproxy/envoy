@@ -66,8 +66,13 @@ public:
 class DefaultEventListener : public EventListener {
 public:
   ~DefaultEventListener() override = default;
-  uint32_t triggeredEvents() override { return pending_events_ & (~Event::FileReadyType::Closed); }
-  void onEventEnabled(uint32_t enabled_events) override { pending_events_ = enabled_events; }
+  uint32_t triggeredEvents() override {
+          ENVOY_LOG_MISC(debug, "lambdai: user file event listener triggered events {} on {} and schedule next", pending_events_, static_cast<void*>(this));
+
+    return pending_events_ & (~Event::FileReadyType::Closed); }
+  void onEventEnabled(uint32_t enabled_events) override { 
+    ENVOY_LOG_MISC(debug, "lambdai: user file event listener set enabled events {} on {} and schedule next", pending_events_, static_cast<void*>(this));
+    pending_events_ = enabled_events; }
   void onEventActivated(uint32_t activated_events) override {
     ephermal_events_ |= activated_events;
   }
@@ -97,7 +102,7 @@ public:
 
   // Event::FileEvent
   void activate(uint32_t events) override {
-    event_listener_.onEventEnabled(events);
+    event_listener_.onEventActivated(events);
     if (!schedulable_.enabled()) {
       schedulable_.scheduleCallbackNextIteration();
     }
@@ -107,7 +112,10 @@ public:
     event_listener_.onEventEnabled(events);
     if (!schedulable_.enabled()) {
       schedulable_.scheduleCallbackNextIteration();
+      ENVOY_LOG_MISC(debug, "lambdai: user file event setEnabled {} on {} and schedule next", events, static_cast<void*>(this));
+      return;
     }
+    ENVOY_LOG_MISC(debug, "lambdai: user file event setEnabled {} on {} and but not schedule next", events, static_cast<void*>(this));
   }
 
   EventListener& getEventListener() { return event_listener_; }
@@ -121,6 +129,7 @@ private:
       : schedulable_(schedulable_cb), cb_([this, cb]() {
           auto all_events = getEventListener().triggeredEvents();
           auto ephemeral_events = getEventListener().getAndClearEpheralEvents();
+          ENVOY_LOG_MISC(debug, "lambdai: us event {} cb allevents = {}, ephermal events = {}", static_cast<void*>(this), all_events, ephemeral_events);
           cb(all_events | ephemeral_events);
         }),
         event_counter_(event_counter) {

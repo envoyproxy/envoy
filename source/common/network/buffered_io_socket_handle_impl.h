@@ -93,8 +93,11 @@ public:
   void scheduleNextEvent() {
     // It's possible there is no pending file event so as no io_callback.
     if (io_callback_) {
+      ENVOY_LOG_MISC(debug, "lambdai: has io_callback {} on {}", __FUNCTION__, static_cast<void*>(this));
       io_callback_->scheduleCallbackNextIteration();
-    }
+      return;
+    } 
+    ENVOY_LOG_MISC(debug, "lambdai: no io_callback {} on {}", __FUNCTION__, static_cast<void*>(this));
   }
 
   void setWritablePeer(WritablePeer* writable_peer) {
@@ -108,6 +111,7 @@ public:
   void setWriteEnd() override { read_end_stream_ = true; }
   bool isWriteEndSet() override { return read_end_stream_; }
   void maybeSetNewData() override {
+    ENVOY_LOG_MISC(debug, "lambdai: {} on {}", __FUNCTION__, static_cast<void*>(this));
     scheduleReadEvent();
     scheduleNextEvent();
   }

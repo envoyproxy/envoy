@@ -210,8 +210,9 @@ public:
       : ConnectionSocketImpl(std::move(io_handle), local_address, remote_address) {}
   ~InternalConnectionSocketImpl() override = default;
 
-  // TODO(lambdai): succeed on limited options.
-  Api::SysCallIntResult getSocketOption(int level, int optname, void* ptr, socklen_t* len) const override {
+  // TODO(lambdai): sockopt: track and report on limited options.
+  Api::SysCallIntResult getSocketOption(int level, int optname, void* ptr,
+                                        socklen_t* len) const override {
     if (level == SOL_SOCKET && optname == SO_ERROR) {
       memset(ptr, 0, static_cast<size_t>(*len));
       *(reinterpret_cast<unsigned char*>(ptr)) = 0;
@@ -220,7 +221,14 @@ public:
       ENVOY_LOG_MISC(warn, "unsupported socket option level={} optname={}", level, optname);
       return {0, EFAULT};
     }
-    
+  }
+  Api::SysCallIntResult setSocketOption(int level, int optname, const void*, socklen_t) override {
+    if (level == IPPROTO_TCP && optname == TCP_NODELAY) {
+      return {0, 0};
+    } else {
+      ENVOY_LOG_MISC(warn, "unsupported socket option level={} optname={}", level, optname);
+      return {0, EFAULT};
+    }
   }
 };
 

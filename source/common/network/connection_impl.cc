@@ -70,7 +70,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
   file_event_ = socket_->ioHandle().createFileEvent(
       dispatcher_, [this](uint32_t events) -> void { onFileEvent(events); }, trigger,
       Event::FileReadyType::Read | Event::FileReadyType::Write);
-
+  ENVOY_LOG_MISC(debug, "lambdai: create file event {} on connection {}", static_cast<void *>(file_event_.get()), id());
   transport_socket_->setTransportSocketCallbacks(*this);
 }
 
