@@ -39,11 +39,12 @@ void GrpcClientImpl::cancel() {
 
 void GrpcClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& dispatcher,
                            const envoy::service::auth::v3::CheckRequest& request,
-                           Tracing::Span& parent_span, const StreamInfo::StreamInfo&) {
+                           Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
   Http::AsyncClient::RequestOptions options;
+  options.setParentContext(Http::AsyncClient::ParentContext{&stream_info});
   if (timeout_.has_value()) {
     if (timeoutStartsAtCheckCreation()) {
       // TODO(yuval-k): We currently use dispatcher based timeout even if the underlying client is

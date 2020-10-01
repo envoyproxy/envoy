@@ -10,6 +10,7 @@
 #include "common/grpc/codec.h"
 #include "common/grpc/typed_async_client.h"
 #include "common/http/async_client_impl.h"
+#include "common/router/header_parser.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -97,6 +98,8 @@ private:
   Decoder decoder_;
   // This is a member to avoid reallocation on every onData().
   std::vector<Frame> decoded_frames_;
+
+  Router::HeaderParserPtr request_headers_parser_;
 
   friend class AsyncClientImpl;
 };

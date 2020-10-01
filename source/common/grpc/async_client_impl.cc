@@ -63,7 +63,11 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
                                  absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
                                  const Http::AsyncClient::StreamOptions& options)
     : parent_(parent), service_full_name_(service_full_name), method_name_(method_name),
-      callbacks_(callbacks), options_(options) {}
+      callbacks_(callbacks), options_(options) {
+  if (options_.parent_context.stream_info != nullptr) {
+    request_headers_parser_ = Router::HeaderParser::configure(parent_.initial_metadata_, false);
+  }
+}
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   if (parent_.cm_.get(parent_.remote_cluster_name_) == nullptr) {
@@ -88,10 +92,17 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
       parent_.host_name_.empty() ? parent_.remote_cluster_name_ : parent_.host_name_,
       service_full_name_, method_name_, options_.timeout);
   // Fill service-wide initial metadata.
-  for (const auto& header_value : parent_.initial_metadata_) {
-    headers_message_->headers().addCopy(Http::LowerCaseString(header_value.key()),
-                                        header_value.value());
+  if (options_.parent_context.stream_info != nullptr) {
+    ASSERT(request_headers_parser_ != nullptr);
+    request_headers_parser_->evaluateHeaders(headers_message_->headers(),
+                                             *options_.parent_context.stream_info);
+  } else {
+    for (const auto& header_value : parent_.initial_metadata_) {
+      headers_message_->headers().addCopy(Http::LowerCaseString(header_value.key()),
+                                          header_value.value());
+    }
   }
+
   callbacks_.onCreateInitialMetadata(headers_message_->headers());
   stream_->sendHeaders(headers_message_->headers(), false);
 }
