@@ -1687,28 +1687,28 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, LeastRequestLoadBalancerTest,
                          ::testing::Values(true, false));
 
-//Literally all this class does is make a load balancer
+// Literally all this class does is make a load balancer
 class RandomLoadBalancerTest : public LoadBalancerTestBase {
 public:
   void init() {
     lb_ = std::make_shared<RandomLoadBalancer>(priority_set_, nullptr, stats_, runtime_, random_,
-                                               common_config_); //Priority set gets added here
+                                               common_config_); // Priority set gets added here
   }
   std::shared_ptr<LoadBalancer> lb_;
 };
 
 TEST_P(RandomLoadBalancerTest, NoHosts) {
-  init(); //Create the load balancer
+  init(); // Create the load balancer
 
-  EXPECT_EQ(nullptr, lb_->peekAnotherHost(nullptr)); //Peek into a host
-  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr)); //Chooose a host into a host
+  EXPECT_EQ(nullptr, lb_->peekAnotherHost(nullptr)); // Peek into a host
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));      // Chooose a host into a host
 }
 
 TEST_P(RandomLoadBalancerTest, Normal) {
-  init(); //Create the load balancer
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"), //These are healthy hosts
+  init();                                                                // Create the load balancer
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"), // These are healthy hosts
                               makeTestHost(info_, "tcp://127.0.0.1:81")};
-  hostSet().hosts_ = hostSet().healthy_hosts_;  //Sets the healthy hosts to this
+  hostSet().hosts_ = hostSet().healthy_hosts_; // Sets the healthy hosts to this
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
   EXPECT_CALL(random_, random()).WillOnce(Return(2));

@@ -8,35 +8,33 @@ import "envoy/config/cluster/v3/cluster.proto";
 import "google/protobuf/empty.proto";
 
 message UpdateHealthFlags {
-    bool failover_host_set = 1;
-    uint32 num_healthy_hosts = 2;
-    uint32 num_degraded_hosts = 3;
-    uint32 num_excluded_hosts = 4;
+  bool failover_host_set = 1;
+  uint32 num_healthy_hosts = 2;
+  uint32 num_degraded_hosts = 3;
+  uint32 num_excluded_hosts = 4;
 }
 
 message ChooseHost {
-
 }
 
 message Prefetch {
-
 }
 
 message LbAction {
-    oneof action_selector {
-        option (validate.required) = true;
-        UpdateHealthFlags update_health_flags = 1;
-        Prefetch prefetch = 2;
-        ChooseHost choose_host = 3;
-    }
+  oneof action_selector {
+    option (validate.required) = true;
+    UpdateHealthFlags update_health_flags = 1;
+    Prefetch prefetch = 2;
+    ChooseHost choose_host = 3;
+  }
 }
 
 message LoadBalancerTestCase {
-    //Link in proto config for load balancing here
-    envoy.config.cluster.v3.Cluster.CommonLbConfig common_lb_config = 1
+  //Link in proto config for load balancing here
+  envoy.config.cluster.v3.Cluster.CommonLbConfig common_lb_config = 1
       [(validate.rules).message.required = true];
-    //Repeated actions here
-    repeated LbAction actions = 2;
-    int64 num_hosts_in_priority_set = 3; //Require this and cap it at something
-    int64 num_hosts_in_failover_set = 4;
+  //Repeated actions here
+  repeated LbAction actions = 2;
+  int64 num_hosts_in_priority_set = 3; //Require this and cap it at something
+  int64 num_hosts_in_failover_set = 4;
 }

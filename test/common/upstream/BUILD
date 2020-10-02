@@ -273,9 +273,9 @@ envoy_cc_test_library(
     srcs = ["load_balancer_fuzz.cc"],
     hdrs = ["load_balancer_fuzz.h"],
     deps = [
-        "//source/common/upstream:load_balancer_lib",
         ":load_balancer_fuzz_proto_cc_proto",
         ":load_balancer_impl_test_lib",
+        "//source/common/upstream:load_balancer_lib",
     ],
 )
 
@@ -295,9 +295,10 @@ envoy_cc_fuzz_test(
     deps = [
         ":load_balancer_fuzz_lib",
         ":load_balancer_fuzz_proto_cc_proto",
+        ":utility_lib",
+        "//test/fuzz:utility_lib",
     ],
 )
-
 
 envoy_cc_test(
     name = "load_balancer_simulation_test",
