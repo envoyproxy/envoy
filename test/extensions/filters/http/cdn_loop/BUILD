@@ -64,8 +64,8 @@ envoy_cc_fuzz_test(
     srcs = ["parser_fuzz_test.cc"],
     corpus = "parser_corpus",
     deps = [
+        "//source/common/common:statusor_lib",
         "//source/extensions/filters/http/cdn_loop:parser_lib",
-        "//test/test_common:status_utility_lib",
     ],
 )
 
