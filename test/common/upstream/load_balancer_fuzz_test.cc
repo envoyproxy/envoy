@@ -17,10 +17,10 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::LoadBalancerTestCase input) {
         ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
         return;
     }
-    LoadBalancerFuzzBase load_balancer_fuzz;
+    RandomLoadBalancerFuzzTest load_balancer_fuzz;
 
     //TODO: Switch across type, etc.?
-    load_balancer_fuzz = RandomLoadBalancerFuzzTest;
+    //load_balancer_fuzz = RandomLoadBalancerFuzzTest();
 
     load_balancer_fuzz.initializeAndReplay(input);
 }

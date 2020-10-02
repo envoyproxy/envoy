@@ -35,6 +35,9 @@ protected:
   // Run all tests against both priority 0 and priority 1 host sets, to ensure
   // all the load balancers have equivalent functionality for failover host sets.
   //MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
+  LoadBalancerFuzzTestBase() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {
+    
+  }
 
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;

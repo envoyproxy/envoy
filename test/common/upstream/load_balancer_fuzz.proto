@@ -9,10 +9,9 @@ import "google/protobuf/empty.proto";
 
 message UpdateHealthFlags {
     bool failover_host_set = 1;
-    uint32 num_hosts = 2;
-    uint32 num_healthy_hosts = 3;
-    uint32 num_degraded_hosts = 4;
-    uint32 num_excluded_hosts = 5;
+    uint32 num_healthy_hosts = 2;
+    uint32 num_degraded_hosts = 3;
+    uint32 num_excluded_hosts = 4;
 }
 
 message ChooseHost {
@@ -38,5 +37,6 @@ message LoadBalancerTestCase {
       [(validate.rules).message.required = true];
     //Repeated actions here
     repeated LbAction actions = 2;
-
+    int64 num_hosts_in_priority_set = 3; //Require this and cap it at something
+    int64 num_hosts_in_failover_set = 4;
 }

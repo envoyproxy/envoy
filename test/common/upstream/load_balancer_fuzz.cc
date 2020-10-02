@@ -1,13 +1,32 @@
-#include "load_balancer_fuzz.h"
+#include "test/common/upstream/load_balancer_fuzz.h"
 
 
 namespace Envoy {
 namespace Upstream {
 
+LoadBalancerFuzzBase::LoadBalancerFuzzBase() : LoadBalancerFuzzTestBase() {
+
+}
+
+void LoadBalancerFuzzBase::initializeFixedHostSets(uint32_t num_hosts_in_priority_set, uint32_t num_hosts_in_failover_set) {
+    //TODO: Cap on ports?
+    int port = 80;
+    for (uint32_t i = 0; i < num_hosts_in_priority_set; ++i) {
+        host_set_.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:" + std::to_string(port)));
+        ++port;
+    }
+    for (uint32_t i = 0; i < num_hosts_in_failover_set; ++i) {
+        failover_host_set_.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:" + std::to_string(port)));
+        ++port;
+    }
+    //TODO: More than two hosts?
+}
+
 void LoadBalancerFuzzBase::initializeAndReplay(test::common::upstream::LoadBalancerTestCase input) {
     //will call initialize, which will all be specific to that
-    initialize(input);
-    replay(input);
+    initialize(input); //Initializes specific load balancers
+    initializeFixedHostSets(input.num_hosts_in_priority_set(), input.num_hosts_in_failover_set());
+    replay(input); //Action stream
 }
 
 //So, these should be shared amongst all of the types. Since logically, we're just setting the mock priority set to have certain values, we're
@@ -15,20 +34,9 @@ void LoadBalancerFuzzBase::initializeAndReplay(test::common::upstream::LoadBalan
 /*void LoadBalancerFuzzBase::addHostSet() { //TODO: Do I even need this? It only seems to get to tertiary, 0, 1 in most of the cases
     
 }*/
-
-//Perhaps change host set to a vector of vectors
-//This clears the host set and starts fresh
-void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(bool failover_host_set, uint32_t num_hosts, uint32_t num_healthy_hosts, uint32_t num_degraded_hosts, uint32_t num_excluded_hosts) {
-    //if total hosts doesn't work perhaps make total hosts = to all 3 put together
+void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(bool failover_host_set, uint32_t num_healthy_hosts, uint32_t num_degraded_hosts, uint32_t num_excluded_hosts) {
+    //TODO: add logic here for how to calculate those three numbers, perhaps a proportion?
     MockHostSet& host_set = *priority_set_.getMockHostSet(int(failover_host_set));
-    host_set.hosts_.clear();
-    host_set.healthy_hosts_.clear();
-    host_set.degraded_hosts_.clear();
-    host_set.excluded_hosts_.clear();
-    for (uint32_t i = 0; i < num_hosts; ++i) {
-        int port = 80 + i;
-        host_set.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:" + std::to_string(port)));
-    }
     uint32_t i = 0;
     for (; i < num_healthy_hosts; ++i) {
       host_set.healthy_hosts_.push_back(host_set.hosts_[i]);
@@ -45,17 +53,6 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(bool failover_host_set, 
     host_set.runCallbacks({}, {});
 }
 
-//These two have a lot of logic attached to them such as mocks, so you need to delegate these to specific logic per each specific load balancer.
-//What needs to be taken as an argument here?
-/*void LoadBalancerFuzzBase::prefetch() {
-    //TODO: specifics to each one?
-    load_balancer_->peekAnotherHost(nullptr);
-}
-
-void LoadBalancerFuzzBase::chooseHost() {
-    load_balancer_->chooseHost(nullptr);
-}*/
-
 void LoadBalancerFuzzBase::replay(test::common::upstream::LoadBalancerTestCase input) {
     constexpr auto max_actions = 64;
   for (int i = 0; i < std::min(max_actions, input.actions().size()); ++i) {
@@ -63,7 +60,7 @@ void LoadBalancerFuzzBase::replay(test::common::upstream::LoadBalancerTestCase i
     ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
     switch (event.action_selector_case()) {
         case test::common::upstream::LbAction::kUpdateHealthFlags: {
-            updateHealthFlagsForAHostSet(event.update_health_flags().failover_host_set(), event.update_health_flags().num_healthy_hosts(), event.update_health_flags().num_degraded_hosts(), event.update_health_flags().num_excluded_hosts());
+            updateHealthFlagsForAHostSet(event.update_health_flags().failover_host_set(), event.update_health_flags().num_degraded_hosts(), event.update_health_flags().num_excluded_hosts());
             break;
         }
         case test::common::upstream::LbAction::kPrefetch: {
@@ -80,12 +77,18 @@ void LoadBalancerFuzzBase::replay(test::common::upstream::LoadBalancerTestCase i
 }
 }
 
+RandomLoadBalancerFuzzTest::RandomLoadBalancerFuzzTest() : LoadBalancerFuzzBase() {
+
+}
+
 void RandomLoadBalancerFuzzTest::initialize(test::common::upstream::LoadBalancerTestCase input) {
-    load_balancer_ = RandomLoadBalancer(priority_set_, nullptr, stats_, runtime_, random_,
+    load_balancer_ = std::make_unique<RandomLoadBalancer>(priority_set_, nullptr, stats_, runtime_, random_,
                                                input.common_lb_config());
 }
 
+//Logic specific for random load balancers
 void RandomLoadBalancerFuzzTest::prefetch() {
+    //TODO: For random calls, persist state in a mock class
     load_balancer_->peekAnotherHost(nullptr);
 }
 
