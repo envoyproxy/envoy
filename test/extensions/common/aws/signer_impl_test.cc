@@ -37,9 +37,7 @@ public:
     message_->headers().addCopy(Http::LowerCaseString(key), value);
   }
 
-  void setBody(const std::string& body) {
-    message_->body() = std::make_unique<Buffer::OwnedImpl>(body);
-  }
+  void setBody(const std::string& body) { message_->body().add(body); }
 
   void expectSignHeaders(absl::string_view service_name, absl::string_view signature,
                          absl::string_view payload) {

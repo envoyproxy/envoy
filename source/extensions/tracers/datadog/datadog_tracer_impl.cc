@@ -95,9 +95,7 @@ void TraceReporter::flushTraces() {
       message->headers().setReferenceKey(lower_case_headers_.at(h.first), h.second);
     }
 
-    Buffer::InstancePtr body(new Buffer::OwnedImpl());
-    body->add(encoder_->payload());
-    message->body() = std::move(body);
+    message->body().add(encoder_->payload());
     ENVOY_LOG(debug, "submitting {} trace(s) to {} with payload size {}", pendingTraces,
               encoder_->path(), encoder_->payload().size());
 
@@ -138,7 +136,7 @@ void TraceReporter::onSuccess(const Http::AsyncClient::Request& request,
   } else {
     ENVOY_LOG(debug, "traces successfully submitted to datadog agent");
     driver_.tracerStats().reports_sent_.inc();
-    encoder_->handleResponse(http_response->body()->toString());
+    encoder_->handleResponse(http_response->bodyAsString());
   }
 }
 

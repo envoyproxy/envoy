@@ -14,7 +14,7 @@ TEST_NAME="${RAW_TEST_NAME//./_}"
 
 EXEC_ARGS="\"$1\""
 shift
-for a in $@
+for a in "$@"
 do
   EXEC_ARGS="${EXEC_ARGS}, \"$a\""
 done

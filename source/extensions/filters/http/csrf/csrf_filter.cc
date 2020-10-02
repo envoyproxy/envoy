@@ -6,7 +6,6 @@
 #include "common/common/empty_string.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 
 #include "extensions/filters/http/well_known_names.h"
