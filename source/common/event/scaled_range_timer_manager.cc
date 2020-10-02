@@ -72,7 +72,7 @@ public:
   bool enabled() override { return !absl::holds_alternative<Inactive>(state_); }
 
   void trigger() {
-    ASSERT(dispatcher_.isThreadSafe());
+    ASSERT(manager_.dispatcher_.isThreadSafe());
     ASSERT(!absl::holds_alternative<Inactive>(state_));
     ENVOY_LOG_MISC(trace, "RangeTimerImpl triggered: {}", static_cast<void*>(this));
     state_.emplace<Inactive>();
@@ -110,7 +110,7 @@ private:
    * triggers the callback right away.
    */
   void onMinTimerComplete() {
-    ASSERT(dispatcher_.isThreadSafe());
+    ASSERT(manager_.dispatcher_.isThreadSafe());
     ENVOY_LOG_MISC(info, "min timer complete for {}", static_cast<void*>(this));
     ASSERT(absl::holds_alternative<WaitingForMin>(state_));
     const WaitingForMin& waiting = absl::get<WaitingForMin>(state_);
@@ -209,7 +209,7 @@ void ScaledRangeTimerManager::removeTimer(ScalingTimerHandle handle) {
   // Don't keep around empty queues
   if (handle.queue_.range_timers_.empty()) {
     queues_.erase(handle.queue_);
-    return
+    return;
   }
 
   // The queue's timer tracks the expiration time of the first range timer, so it only needs
