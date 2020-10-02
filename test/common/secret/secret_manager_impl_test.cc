@@ -360,6 +360,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
 
   auto secret_provider =
       secret_manager->findOrCreateTlsCertificateProvider(config_source, "abc.com", secret_context);
+  EXPECT_FALSE(secret_manager->checkTlsCertificateEntityExists(config_source, "abc.com"));
   const std::string yaml =
       R"EOF(
 name: "abc.com"
@@ -384,6 +385,7 @@ tls_certificate:
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
             tls_config.privateKey());
+  EXPECT_TRUE(secret_manager->checkTlsCertificateEntityExists(config_source, "abc.com"));
 }
 
 TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
@@ -504,6 +506,8 @@ dynamic_active_secrets:
   time_system_.setSystemTime(std::chrono::milliseconds(1234567899000));
   auto context_secret_provider = secret_manager->findOrCreateCertificateValidationContextProvider(
       config_source, "abc.com.validation", secret_context);
+  EXPECT_FALSE(secret_manager->checkCertificateValidationContextEntityExists(config_source,
+                                                                             "abc.com.validation"));
   const std::string validation_yaml = R"EOF(
 name: "abc.com.validation"
 validation_context:
@@ -518,6 +522,8 @@ validation_context:
       decoded_resources_2.refvec_, "validation-context-v1");
   Ssl::CertificateValidationContextConfigImpl cert_validation_context(
       *context_secret_provider->secret(), *api_);
+  EXPECT_TRUE(secret_manager->checkCertificateValidationContextEntityExists(config_source,
+                                                                            "abc.com.validation"));
   EXPECT_EQ("DUMMY_INLINE_STRING_TRUSTED_CA", cert_validation_context.caCert());
   const std::string updated_config_dump = R"EOF(
 dynamic_active_secrets:
