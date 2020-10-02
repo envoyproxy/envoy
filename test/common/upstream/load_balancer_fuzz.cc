@@ -60,21 +60,24 @@ void LoadBalancerFuzzBase::replay(test::common::upstream::LoadBalancerTestCase i
     constexpr auto max_actions = 64;
   for (int i = 0; i < std::min(max_actions, input.actions().size()); ++i) {
     const auto& event = input.actions(i);
-    const bool last_action = i == std::min(max_actions, input.actions().size()) - 1;
     ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
     switch (event.action_selector_case()) {
-        case test::common::upstream::Action::kUpdateHealthFlags: {
+        case test::common::upstream::LbAction::kUpdateHealthFlags: {
             updateHealthFlagsForAHostSet(event.update_health_flags().failover_host_set(), event.update_health_flags().num_healthy_hosts(), event.update_health_flags().num_degraded_hosts(), event.update_health_flags().num_excluded_hosts());
             break;
         }
-        case test::common::upstream::Action::kPrefetch: {
+        case test::common::upstream::LbAction::kPrefetch: {
             prefetch();
             break;
         }
-        case test::common::upstream::Action::ChooseHost: {
+        case test::common::upstream::LbAction::kChooseHost: {
             chooseHost();
             break;
         }
+        default:
+            break;
+    }
+}
 }
 
 void RandomLoadBalancerFuzzTest::initialize(test::common::upstream::LoadBalancerTestCase input) {

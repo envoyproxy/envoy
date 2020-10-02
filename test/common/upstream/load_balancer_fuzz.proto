@@ -1,4 +1,11 @@
+syntax = "proto3";
 
+package test.common.upstream;
+
+import "validate/validate.proto";
+import "test/fuzz/common.proto";
+import "envoy/config/cluster/v3/cluster.proto";
+import "google/protobuf/empty.proto";
 
 message UpdateHealthFlags {
     bool failover_host_set = 1;
@@ -12,16 +19,16 @@ message ChooseHost {
 
 }
 
-message PreFetch {
+message Prefetch {
 
 }
 
-message Action {
+message LbAction {
     oneof action_selector {
         option (validate.required) = true;
         UpdateHealthFlags update_health_flags = 1;
-        Prefetch = 2;
-        ChooseHost = 3;
+        Prefetch prefetch = 2;
+        ChooseHost choose_host = 3;
     }
 }
 
@@ -30,6 +37,6 @@ message LoadBalancerTestCase {
     envoy.config.cluster.v3.Cluster.CommonLbConfig common_lb_config = 1
       [(validate.rules).message.required = true];
     //Repeated actions here
-    repeated Action actions = 2;
+    repeated LbAction actions = 2;
 
 }

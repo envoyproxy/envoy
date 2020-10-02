@@ -1,8 +1,28 @@
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
 
+#include "common/network/utility.h"
+#include "common/upstream/load_balancer_impl.h"
+#include "common/upstream/upstream_impl.h"
 
+#include "test/common/upstream/utility.h"
+#include "test/mocks/common.h"
+#include "test/mocks/runtime/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/host_set.h"
+#include "test/mocks/upstream/load_balancer_context.h"
+#include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 
-
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+//TODO: ^^ get rid of unused headers
 
 
 

@@ -26,7 +26,7 @@
 namespace Envoy {
 namespace Upstream {
 namespace {
-
+/*
 class LoadBalancerTestBase : public testing::TestWithParam<bool> {
 protected:
   // Run all tests against both priority 0 and priority 1 host sets, to ensure
@@ -121,6 +121,7 @@ public:
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   TestLb lb_{priority_set_, stats_, runtime_, random_, common_config_};
 };
+*/
 
 } // namespace
 } // namespace Upstream
