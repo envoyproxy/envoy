@@ -290,6 +290,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/08/10  12275    44949       46000   Re-organize tls histogram maps to improve continuity.
   // 2020/08/11  12202    44949       46500   router: add new retry back-off strategy
   // 2020/09/11  12973                47500   upstream: predictive prefetch
+  // 2020/10/02  13251    47602       47700   switch to the latest tcmalloc for x86_64 builds
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -310,7 +311,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
     // https://github.com/envoyproxy/envoy/issues/12209
     // EXPECT_MEMORY_EQ(m_per_cluster, 44949);
   }
-  EXPECT_MEMORY_LE(m_per_cluster, 47500); // Round up to allow platform variations.
+  EXPECT_MEMORY_LE(m_per_cluster, 47700); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
@@ -370,7 +371,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/08/10  12275    37061       38000   Re-organize tls histogram maps to improve continuity.
   // 2020/08/11  12202    37061       38500   router: add new retry back-off strategy
   // 2020/09/11  12973                38993   upstream: predictive prefetch
-  // 2020/09/23  13251                39244   switch to google tcmalloc
+  // 2020/10/02  13251                39326   switch to google tcmalloc
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -391,7 +392,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
     // https://github.com/envoyproxy/envoy/issues/12209
     // EXPECT_MEMORY_EQ(m_per_cluster, 37061);
   }
-  EXPECT_MEMORY_LE(m_per_cluster, 39250); // Round up to allow platform variations.
+  EXPECT_MEMORY_LE(m_per_cluster, 39350); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
