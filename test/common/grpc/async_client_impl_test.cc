@@ -100,7 +100,8 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
-// Validate that the metadata header is the initial metadata in gRPC service config.
+// Validate that the metadata header is the initial metadata in gRPC service config and the value is
+// interpolated.
 TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
@@ -123,12 +124,17 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
               })));
   EXPECT_CALL(http_stream, sendHeaders(_, _))
       .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+
+  // Prepare the parent context of this call.
   StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem()};
   stream_info.setDownstreamLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address));
-  Http::AsyncClient::StreamOptions options;
-  options.setParentContext(Http::AsyncClient::ParentContext{&stream_info});
-  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks, options);
+  Http::AsyncClient::ParentContext parent_context{&stream_info};
+
+  Http::AsyncClient::StreamOptions stream_options;
+  stream_options.setParentContext(parent_context);
+
+  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks, stream_options);
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
