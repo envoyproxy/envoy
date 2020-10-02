@@ -49,12 +49,11 @@ message MatchPredicate {
 
     // HTTP response headers match configuration.
     HttpHeadersMatch http_headers_match = 5;
-
   }
 }
 
 // HTTP headers match configuration.
 message HttpHeadersMatch {
   // HTTP headers to match.
-  repeated type.matcher.v3.HeaderMatcher headers = 1;
+  repeated HeaderMatcher headers = 1;
 }

@@ -8,7 +8,7 @@ import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.config.common.matcher.v4alpha";
+option java_package = "io.envoyproxy.envoy.type.matcher.v4alpha";
 option java_outer_classname = "MatcherProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
@@ -54,7 +54,6 @@ message MatchPredicate {
 
     // HTTP response headers match configuration.
     HttpHeadersMatch http_headers_match = 5;
-
   }
 }
 
@@ -64,5 +63,5 @@ message HttpHeadersMatch {
       "envoy.type.matcher.v3.HttpHeadersMatch";
 
   // HTTP headers to match.
-  repeated type.matcher.v4alpha.HeaderMatcher headers = 1;
+  repeated HeaderMatcher headers = 1;
 }
