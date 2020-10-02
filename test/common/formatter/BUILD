@@ -40,6 +40,7 @@ envoy_cc_test(
         "//source/common/common:utility_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/router:string_accessor_lib",
         "//test/mocks/api:api_mocks",

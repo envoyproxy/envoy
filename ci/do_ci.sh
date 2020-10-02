@@ -402,6 +402,10 @@ elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."
+  # Validate dependency relationships between core/extensions and external deps.
+  tools/dependency/validate_test.py
+  tools/dependency/validate.py
+  # Build docs.
   docs/build.sh
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
