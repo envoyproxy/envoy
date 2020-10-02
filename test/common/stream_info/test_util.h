@@ -233,6 +233,10 @@ public:
     return upstream_cluster_info_;
   }
 
+  void setConnectionID(uint64_t id) override { connection_id_ = id; }
+
+  absl::optional<uint64_t> connectionID() const override { return connection_id_; }
+
   Random::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -273,6 +277,7 @@ public:
   Envoy::Event::SimulatedTimeSystem test_time_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_{};
   Http::RequestIDExtensionSharedPtr request_id_extension_;
+  absl::optional<uint64_t> connection_id_;
 };
 
 } // namespace Envoy

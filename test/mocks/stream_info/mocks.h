@@ -97,6 +97,8 @@ public:
               (const));
   MOCK_METHOD(Http::RequestIDExtensionSharedPtr, getRequestIDExtension, (), (const));
   MOCK_METHOD(void, setRequestIDExtension, (Http::RequestIDExtensionSharedPtr));
+  MOCK_METHOD(absl::optional<uint64_t>, connectionID, (), (const));
+  MOCK_METHOD(void, setConnectionID, (uint64_t));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
@@ -107,6 +109,7 @@ public:
   absl::optional<std::chrono::nanoseconds> first_upstream_tx_byte_sent_;
   absl::optional<std::chrono::nanoseconds> last_upstream_tx_byte_sent_;
   absl::optional<std::chrono::nanoseconds> first_upstream_rx_byte_received_;
+  absl::optional<uint64_t> connection_id_;
   absl::optional<std::chrono::nanoseconds> last_upstream_rx_byte_received_;
   absl::optional<std::chrono::nanoseconds> first_downstream_tx_byte_sent_;
   absl::optional<std::chrono::nanoseconds> last_downstream_tx_byte_sent_;

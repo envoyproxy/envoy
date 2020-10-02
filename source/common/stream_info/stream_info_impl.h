@@ -276,6 +276,10 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_cluster_info_;
   }
 
+  void setConnectionID(uint64_t id) override { connection_id_ = id; }
+
+  absl::optional<uint64_t> connectionID() const override { return connection_id_; }
+
   TimeSource& time_source_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
@@ -320,6 +324,7 @@ private:
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
+  absl::optional<uint64_t> connection_id_;
 };
 
 } // namespace StreamInfo

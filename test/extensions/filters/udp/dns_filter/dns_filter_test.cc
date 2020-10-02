@@ -40,7 +40,7 @@ class DnsFilterTest : public testing::Test, public Event::TestUsingSimulatedTime
 public:
   DnsFilterTest()
       : listener_address_(Network::Utility::parseInternetAddressAndPort("127.0.2.1:5353")),
-        api_(Api::createApiForTest()),
+        api_(Api::createApiForTest(random_)),
         counters_(mock_query_buffer_underflow_, mock_record_name_overflow_,
                   query_parsing_failure_) {
     udp_response_.addresses_.local_ = listener_address_;
@@ -93,6 +93,7 @@ public:
   }
 
   const Network::Address::InstanceConstSharedPtr listener_address_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
   DnsFilterEnvoyConfigSharedPtr config_;
   NiceMock<Stats::MockCounter> mock_query_buffer_underflow_;
@@ -105,7 +106,6 @@ public:
   Network::UdpRecvData udp_response_;
   NiceMock<Filesystem::MockInstance> file_system_;
   NiceMock<Stats::MockHistogram> histogram_;
-  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Server::Configuration::MockListenerFactoryContext> listener_factory_;
   Stats::IsolatedStoreImpl stats_store_;
   std::shared_ptr<Network::MockDnsResolver> resolver_;
@@ -250,6 +250,10 @@ virtual_domains:
       address_list:
         address:
         - "10.0.0.1"
+  - name: "www.external_foo1.com"
+    endpoint:
+      address_list:
+        address:
         - "10.0.0.2"
   - name: "www.external_foo2.com"
     endpoint:
@@ -261,6 +265,70 @@ virtual_domains:
       address_list:
         address:
         - "10.0.3.1"
+)EOF";
+
+  const std::string max_records_table_yaml = R"EOF(
+external_retry_count: 3
+known_suffixes:
+  - suffix: "ermac.com"
+virtual_domains:
+  - name: "one.web.ermac.com"
+    endpoint:
+      address_list: { address: [ "10.0.17.1" ] }
+  - name: "two.web.ermac.com"
+    endpoint:
+      address_list: { address: [ "10.0.17.2" ] }
+  - name: "three.web.ermac.com"
+    endpoint:
+      address_list: { address: [ "10.0.17.3" ] }
+  - name: "four.web.ermac.com"
+    endpoint:
+      address_list: { address: [ "10.0.17.4" ] }
+  - name: "five.web.ermac.com"
+    endpoint:
+      address_list: { address: [ "10.0.17.5" ] }
+  - name: "six.web.ermac.com"
+    endpoint:
+      address_list: { address: [ "10.0.17.6" ] }
+  - name: "seven.web.ermac.com"
+    endpoint:
+      address_list: { address: [ "10.0.17.7" ] }
+  - name: "eight.web.ermac.com"
+    endpoint:
+      address_list: { address: [ "10.0.17.8" ] }
+  - name: "nine.web.ermac.com"
+    endpoint:
+      address_list: { address: [ "10.0.17.9" ] }
+  - name: "ten.web.ermac.com"
+    endpoint:
+      address_list: { address: [ "10.0.17.10" ] }
+  - name: "eleven.web.ermac.com"
+    endpoint:
+      address_list: { address: [ "10.0.17.11" ] }
+  - name: "twelve.web.ermac.com"
+    endpoint:
+      address_list: { address: [ "10.0.17.12" ] }
+  - name: "web.ermac.com"
+    endpoint:
+      service_list:
+        services:
+        - service_name: "http"
+          protocol: { number: 6 }
+          ttl: 86400s
+          targets: [
+            { host_name: "one.web.ermac.com" , weight: 120, priority: 10, port: 80 },
+            { host_name: "two.web.ermac.com", weight: 110, priority: 10, port: 80 },
+            { host_name: "three.web.ermac.com", weight: 100, priority: 10, port: 80 },
+            { host_name: "four.web.ermac.com", weight: 90, priority: 10, port: 80 },
+            { host_name: "five.web.ermac.com" , weight: 80, priority: 10, port: 80 },
+            { host_name: "six.web.ermac.com", weight: 70, priority: 10, port: 80 },
+            { host_name: "seven.web.ermac.com", weight: 60, priority: 10, port: 80 },
+            { host_name: "eight.web.ermac.com", weight: 50, priority: 10, port: 80 },
+            { host_name: "nine.web.ermac.com" , weight: 40, priority: 10, port: 80 },
+            { host_name: "ten.web.ermac.com", weight: 30, priority: 10, port: 80 },
+            { host_name: "eleven.web.ermac.com", weight: 20, priority: 10, port: 80 },
+            { host_name: "twelve.web.ermac.com", weight: 10, priority: 10, port: 80 }
+          ]
 )EOF";
 
   const std::string external_dns_table_services_yaml = R"EOF(
@@ -277,6 +345,9 @@ virtual_domains:
   - name: "backup.voip.subzero.com"
     endpoint:
       address_list: { address: [ "10.0.3.3" ] }
+  - name: "emergency.voip.subzero.com"
+    endpoint:
+      address_list: { address: [ "2200:823f::cafe:beef" ] }
   - name: "voip.subzero.com"
     endpoint:
       service_list:
@@ -287,7 +358,8 @@ virtual_domains:
           targets: [
             { host_name: "primary.voip.subzero.com" , weight: 30, priority: 10, port: 5060 },
             { host_name: "secondary.voip.subzero.com", weight: 20, priority: 10, port: 5061 },
-            { host_name: "backup.voip.subzero.com", weight: 10, priority: 10, port: 5062 }
+            { host_name: "backup.voip.subzero.com", weight: 10, priority: 10, port: 5062 },
+            { host_name: "emergency.voip.subzero.com", weight: 40, priority: 10, port: 5063 }
           ]
   - name: "web.subzero.com"
     endpoint:
@@ -1111,9 +1183,262 @@ TEST_F(DnsFilterTest, InvalidAnswerNameTest) {
       0x00, 0x00, 0x01, 0x19,                   // Answer TTL
       0x00, 0x04,                               // Answer Data Length
       0x42, 0xdc, 0x02, 0x4b,                   // Answer IP Address
+      0x00,                                     // Additional RR
+      0x00, 0x29, 0x10, 0x00,                   // UDP Payload Size (4096)
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  };
+
+  constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
+
+  Network::UdpRecvData data{};
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.local_ = listener_address_;
+  data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
+  data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
+
+  query_ctx_ = response_parser_->createQueryContext(data, counters_);
+  EXPECT_FALSE(query_ctx_->parse_status_);
+
+  // We should have zero parsed answers
+  EXPECT_TRUE(query_ctx_->answers_.empty());
+}
+
+TEST_F(DnsFilterTest, InvalidAnswerTypeTest) {
+  InSequence s;
+
+  // In this buffer the answer type is incorrect for the given query. The answer is a NS
+  // type when an A record was requested. This should not happen on the wire.
+  constexpr unsigned char dns_request[] = {
+      0x36, 0x6b,                               // Transaction ID
+      0x81, 0x80,                               // Flags
+      0x00, 0x01,                               // Questions
+      0x00, 0x01,                               // Answers
+      0x00, 0x00,                               // Authority RRs
+      0x00, 0x01,                               // Additional RRs
+      0x04, 0x69, 0x70, 0x76, 0x36, 0x02, 0x68, // Query record for
+      0x65, 0x03, 0x6e, 0x65, 0x74, 0x00,       // ipv6.he.net
+      0x00, 0x01,                               // Record Type
+      0x00, 0x01,                               // Record Class
+      0x04, 0x69, 0x70, 0x76, 0x36, 0x02, 0x68, // Answer record for
+      0x65, 0x03, 0x6e, 0x65, 0x74, 0x00,       // ipv6.he.net
+      0x00, 0x02,                               // Answer Record Type
+      0x00, 0x01,                               // Answer Record Class
+      0x00, 0x00, 0x01, 0x19,                   // Answer TTL
+      0x00, 0x04,                               // Answer Data Length
+      0x42, 0xdc, 0x02, 0x4b,                   // Answer IP Address
+      0x00,                                     // Additional RR
+      0x00, 0x29, 0x10, 0x00,                   // UDP Payload Size (4096)
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  };
+
+  constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
+
+  Network::UdpRecvData data{};
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.local_ = listener_address_;
+  data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
+  data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
+
+  query_ctx_ = response_parser_->createQueryContext(data, counters_);
+  EXPECT_FALSE(query_ctx_->parse_status_);
+
+  // We should have zero parsed answers
+  EXPECT_TRUE(query_ctx_->answers_.empty());
+}
+
+TEST_F(DnsFilterTest, InvalidAnswerClassTest) {
+  InSequence s;
+
+  // In this buffer the answer class is incorrect for the given query. The answer is a CH
+  // class when an IN class was requested. This should not happen on the wire.
+  constexpr unsigned char dns_request[] = {
+      0x36, 0x6b,                               // Transaction ID
+      0x81, 0x80,                               // Flags
+      0x00, 0x01,                               // Questions
+      0x00, 0x01,                               // Answers
+      0x00, 0x00,                               // Authority RRs
+      0x00, 0x01,                               // Additional RRs
+      0x04, 0x69, 0x70, 0x76, 0x36, 0x02, 0x68, // Query record for
+      0x65, 0x03, 0x6e, 0x65, 0x74, 0x00,       // ipv6.he.net
+      0x00, 0x01,                               // Record Type
+      0x00, 0x01,                               // Record Class
+      0x04, 0x69, 0x70, 0x76, 0x36, 0x02, 0x68, // Answer record for
+      0x65, 0x03, 0x6e, 0x65, 0x74, 0x00,       // ipv6.he.net
+      0x00, 0x01,                               // Answer Record Type
+      0x00, 0x03,                               // Answer Record Class
+      0x00, 0x00, 0x01, 0x19,                   // Answer TTL
+      0x00, 0x04,                               // Answer Data Length
+      0x42, 0xdc, 0x02, 0x4b,                   // Answer IP Address
+      0x00,                                     // Additional RR
+      0x00, 0x29, 0x10, 0x00,                   // UDP Payload Size (4096)
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  };
+
+  constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
+
+  Network::UdpRecvData data{};
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.local_ = listener_address_;
+  data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
+  data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
+
+  query_ctx_ = response_parser_->createQueryContext(data, counters_);
+  EXPECT_FALSE(query_ctx_->parse_status_);
+
+  // We should have zero parsed answers
+  EXPECT_TRUE(query_ctx_->answers_.empty());
+}
+
+TEST_F(DnsFilterTest, InvalidAnswerAddressTest) {
+  InSequence s;
+
+  // In this buffer the address in the answer record is invalid. The IP should
+  // fail to parse. The class suggests it's an IPv6 address but there are only 4
+  // bytes available.
+  constexpr unsigned char dns_request[] = {
+      0x36, 0x6b,                               // Transaction ID
+      0x81, 0x80,                               // Flags
+      0x00, 0x01,                               // Questions
+      0x00, 0x01,                               // Answers
+      0x00, 0x00,                               // Authority RRs
+      0x00, 0x01,                               // Additional RRs
+      0x04, 0x69, 0x70, 0x76, 0x36, 0x02, 0x68, // Query record for
+      0x65, 0x03, 0x6e, 0x65, 0x74, 0x00,       // ipv6.he.net
+      0x00, 0x01,                               // Record Type
+      0x00, 0x01,                               // Record Class
+      0x04, 0x69, 0x70, 0x76, 0x36, 0x02, 0x68, // Answer record for
+      0x65, 0x03, 0x6e, 0x65, 0x74, 0x00,       // ipv6.he.net
+      0x00, 0x1c,                               // Answer Record Type
+      0x00, 0x01,                               // Answer Record Class
+      0x00, 0x00, 0x01, 0x19,                   // Answer TTL
+      0x00, 0x10,                               // Answer Data Length
+      0x42, 0xdc, 0x02, 0x4b,                   // Answer IP Address
+      0x00,                                     // Additional RR
+      0x00, 0x29, 0x10, 0x00,                   // UDP Payload Size (4096)
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  };
+
+  constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
+
+  Network::UdpRecvData data{};
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.local_ = listener_address_;
+  data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
+  data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
+
+  setup(forward_query_off_config);
+  query_ctx_ = response_parser_->createQueryContext(data, counters_);
+  EXPECT_FALSE(query_ctx_->parse_status_);
+
+  // We should have one parsed query
+  EXPECT_FALSE(query_ctx_->queries_.empty());
+
+  // We should have zero parsed answers due to the IP parsing failure
+  EXPECT_TRUE(query_ctx_->answers_.empty());
+}
+
+TEST_F(DnsFilterTest, InvalidAnswerDataLengthTest) {
+  InSequence s;
+
+  // In this buffer the answer data length is invalid (zero). This should not
+  // occur in data on the wire.
+  constexpr unsigned char dns_request[] = {
+      0x36, 0x6b,                               // Transaction ID
+      0x81, 0x80,                               // Flags
+      0x00, 0x01,                               // Questions
+      0x00, 0x01,                               // Answers
+      0x00, 0x00,                               // Authority RRs
+      0x00, 0x01,                               // Additional RRs
+      0x04, 0x69, 0x70, 0x76, 0x36, 0x02, 0x68, // Query record for
+      0x65, 0x03, 0x6e, 0x65, 0x74, 0x00,       // ipv6.he.net
+      0x00, 0x01,                               // Record Type
+      0x00, 0x01,                               // Record Class
+      0x04, 0x69, 0x70, 0x76, 0x36, 0x02, 0x68, // Answer record for
+      0x65, 0x03, 0x6e, 0x65, 0x74, 0x00,       // ipv6.he.net
+      0x00, 0x01,                               // Answer Record Type
+      0x00, 0x01,                               // Answer Record Class
+      0x00, 0x00, 0x01, 0x19,                   // Answer TTL
+      0x00, 0x00,                               // Answer Data Length
+      0x42, 0xdc, 0x02, 0x4b,                   // Answer IP Address
       0x00,                                     // Additional RR (we do not parse this)
       0x00, 0x29, 0x10, 0x00,                   // UDP Payload Size (4096)
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  };
+
+  constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
+
+  Network::UdpRecvData data{};
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.local_ = listener_address_;
+  data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
+  data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
+
+  query_ctx_ = response_parser_->createQueryContext(data, counters_);
+  EXPECT_FALSE(query_ctx_->parse_status_);
+
+  // We should have zero parsed answers
+  EXPECT_TRUE(query_ctx_->answers_.empty());
+}
+
+TEST_F(DnsFilterTest, TruncatedAnswerRecordTest) {
+  InSequence s;
+
+  // In this buffer the answer record is truncated. The filter should indicate
+  // a parsing failure
+  constexpr unsigned char dns_request[] = {
+      0x36, 0x6b,                               // Transaction ID
+      0x81, 0x80,                               // Flags
+      0x00, 0x01,                               // Questions
+      0x00, 0x01,                               // Answers
+      0x00, 0x00,                               // Authority RRs
+      0x00, 0x00,                               // Additional RRs
+      0x04, 0x69, 0x70, 0x76, 0x36, 0x02, 0x68, // Query record for
+      0x65, 0x03, 0x6e, 0x65, 0x74, 0x00,       // ipv6.he.net
+      0x00, 0x01,                               // Record Type
+      0x00, 0x01,                               // Record Class
+      0x04, 0x69, 0x70, 0x76, 0x36, 0x02, 0x68, // Answer record for
+      0x65, 0x03, 0x6e, 0x65, 0x74, 0x00,       // ipv6.he.net
+      0x00, 0x01,                               // Answer Record Type
+      0x00, 0x01,                               // Answer Record Class
+      0x00, 0x00, 0x01, 0x19,                   // Answer TTL
+                                                // Remaining data is truncated
+  };
+
+  constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
+
+  Network::UdpRecvData data{};
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.local_ = listener_address_;
+  data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
+  data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
+
+  setup(forward_query_off_config);
+  query_ctx_ = response_parser_->createQueryContext(data, counters_);
+  EXPECT_FALSE(query_ctx_->parse_status_);
+
+  // We should have one parsed query
+  EXPECT_FALSE(query_ctx_->queries_.empty());
+
+  // We should have zero parsed answers due to the IP parsing failure
+  EXPECT_TRUE(query_ctx_->answers_.empty());
+}
+
+TEST_F(DnsFilterTest, TruncatedQueryBufferTest) {
+  InSequence s;
+
+  // In this buffer the query record is truncated. The filter should indicate
+  // a parsing failure
+  constexpr unsigned char dns_request[] = {
+      0x36, 0x6b,                               // Transaction ID
+      0x01, 0x20,                               // Flags
+      0x00, 0x01,                               // Questions
+      0x00, 0x00,                               // Answers
+      0x00, 0x00,                               // Authority RRs
+      0x00, 0x01,                               // Additional RRs
+      0x04, 0x69, 0x70, 0x76, 0x36, 0x02, 0x68, // Query record for
+      0x65, 0x03, 0x6e, 0x65, 0x74, 0x00,       // ipv6.he.net
+      0x00, 0x01                                // Record Type
+                                                // Truncated bytes here
   };
 
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
@@ -1471,12 +1796,14 @@ TEST_F(DnsFilterTest, ConsumeExternalTableWithServicesTest) {
       {10, "backup.voip.subzero.com"},
       {20, "secondary.voip.subzero.com"},
       {30, "primary.voip.subzero.com"},
+      {40, "emergency.voip.subzero.com"},
   };
 
   std::map<uint16_t, std::string> validation_port_map = {
       {5062, "backup.voip.subzero.com"},
       {5061, "secondary.voip.subzero.com"},
       {5060, "primary.voip.subzero.com"},
+      {5063, "emergency.voip.subzero.com"},
   };
 
   // Validate the weight for each SRV record. The TTL and priority are the same value for each
@@ -1503,25 +1830,31 @@ TEST_F(DnsFilterTest, ConsumeExternalTableWithServicesTest) {
     EXPECT_EQ(expected_target, port_entry);
   }
 
-  // Validate additional records from the SRV query
-  const std::map<std::string, std::string> target_map = {
+  // Validate additional records from the SRV query. Remove a matching
+  // entry to ensure that we are getting unique addresses in the additional
+  // records
+  std::map<std::string, std::string> target_map = {
       {"primary.voip.subzero.com", "10.0.3.1"},
       {"secondary.voip.subzero.com", "10.0.3.2"},
       {"backup.voip.subzero.com", "10.0.3.3"},
+      {"emergency.voip.subzero.com", "2200:823f::cafe:beef"},
   };
+  const size_t target_size = target_map.size();
 
-  EXPECT_EQ(3, query_ctx_->additional_.size());
-  for (const auto& answer : query_ctx_->additional_) {
-    const auto& entry = target_map.find(answer.first);
+  EXPECT_EQ(target_map.size(), query_ctx_->additional_.size());
+  for (const auto& [hostname, address] : query_ctx_->additional_) {
+    const auto& entry = target_map.find(hostname);
     EXPECT_NE(entry, target_map.end());
-    Utils::verifyAddress({entry->second}, answer.second);
+    Utils::verifyAddress({entry->second}, address);
+    target_map.erase(hostname);
   }
 
   // Validate stats
   EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
   EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
-  EXPECT_EQ(3, config_->stats().local_srv_record_answers_.value());
-  EXPECT_EQ(3, config_->stats().local_a_record_answers_.value());
+  EXPECT_EQ(target_size, config_->stats().local_srv_record_answers_.value());
+  EXPECT_EQ(target_size - 1, config_->stats().local_a_record_answers_.value());
+  EXPECT_EQ(1, config_->stats().local_aaaa_record_answers_.value());
   EXPECT_EQ(1, config_->stats().srv_record_queries_.value());
 }
 
@@ -1533,18 +1866,23 @@ TEST_F(DnsFilterTest, SrvTargetResolution) {
   std::string config_to_use = fmt::format(external_dns_table_config, temp_path);
   setup(config_to_use);
 
-  const std::map<std::string, std::string> target_map = {
-      {"primary.voip.subzero.com", "10.0.3.1"},
-      {"secondary.voip.subzero.com", "10.0.3.2"},
-      {"backup.voip.subzero.com", "10.0.3.3"},
+  struct RecordProperties {
+    uint16_t type;
+    std::string address;
   };
 
-  for (const auto& target : target_map) {
-    const std::string& domain = target.first;
-    const std::string& ip = target.second;
+  const std::map<std::string, struct RecordProperties> target_map = {
+      {"primary.voip.subzero.com", {DNS_RECORD_TYPE_A, "10.0.3.1"}},
+      {"secondary.voip.subzero.com", {DNS_RECORD_TYPE_A, "10.0.3.2"}},
+      {"backup.voip.subzero.com", {DNS_RECORD_TYPE_A, "10.0.3.3"}},
+      {"emergency.voip.subzero.com", {DNS_RECORD_TYPE_AAAA, "2200:823f::cafe:beef"}},
+  };
 
-    const std::string query =
-        Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  for (const auto& [domain, properties] : target_map) {
+    const uint16_t address_type = properties.type;
+    const std::string& ip = properties.address;
+
+    const std::string query = Utils::buildQueryForDomain(domain, address_type, DNS_RECORD_CLASS_IN);
     ASSERT_FALSE(query.empty());
     sendQueryFromClient("10.0.0.1:1000", query);
 
@@ -1560,8 +1898,10 @@ TEST_F(DnsFilterTest, SrvTargetResolution) {
   // Validate stats
   EXPECT_EQ(target_map.size(), config_->stats().downstream_rx_queries_.value());
   EXPECT_EQ(target_map.size(), config_->stats().known_domain_queries_.value());
-  EXPECT_EQ(target_map.size(), config_->stats().local_a_record_answers_.value());
-  EXPECT_EQ(target_map.size(), config_->stats().a_record_queries_.value());
+  EXPECT_EQ(target_map.size() - 1, config_->stats().local_a_record_answers_.value());
+  EXPECT_EQ(1, config_->stats().local_aaaa_record_answers_.value());
+  EXPECT_EQ(target_map.size() - 1, config_->stats().a_record_queries_.value());
+  EXPECT_EQ(1, config_->stats().aaaa_record_queries_.value());
 }
 
 TEST_F(DnsFilterTest, NonExistentClusterServiceLookup) {
@@ -1632,6 +1972,57 @@ TEST_F(DnsFilterTest, SrvRecordQuery) {
   EXPECT_EQ(0, config_->stats().known_domain_queries_.value());
   EXPECT_EQ(0, config_->stats().local_srv_record_answers_.value());
   EXPECT_EQ(1, config_->stats().srv_record_queries_.value());
+}
+
+TEST_F(DnsFilterTest, SrvQueryMaxRecords) {
+  InSequence s;
+
+  std::string temp_path =
+      TestEnvironment::writeStringToFileForTest("dns_table.yaml", max_records_table_yaml);
+  std::string config_to_use = fmt::format(external_dns_table_config, temp_path);
+  setup(config_to_use);
+
+  const std::string service{"_http._tcp.web.ermac.com"};
+  const std::string query =
+      Utils::buildQueryForDomain(service, DNS_RECORD_TYPE_SRV, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
+  EXPECT_TRUE(query_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode());
+
+  // We can only serialize 7 records before reaching the 512 byte limit
+  EXPECT_LT(query_ctx_->answers_.size(), MAX_RETURNED_RECORDS);
+  EXPECT_LT(query_ctx_->additional_.size(), MAX_RETURNED_RECORDS);
+
+  const std::list<std::string> hosts{
+      "one.web.ermac.com",  "two.web.ermac.com", "three.web.ermac.com", "four.web.ermac.com",
+      "five.web.ermac.com", "six.web.ermac.com", "seven.web.ermac.com",
+  };
+
+  // Verify the service name and targets are sufficiently randomized
+  size_t exact_matches = 0;
+  auto host = hosts.begin();
+  for (const auto& answer : query_ctx_->answers_) {
+    EXPECT_EQ(answer.second->type_, DNS_RECORD_TYPE_SRV);
+    DnsSrvRecord* srv_rec = dynamic_cast<DnsSrvRecord*>(answer.second.get());
+
+    EXPECT_STREQ(service.c_str(), srv_rec->name_.c_str());
+
+    const auto target = srv_rec->targets_.begin();
+    const auto target_name = target->first;
+    exact_matches += (target_name.compare(*host++) == 0);
+  }
+  EXPECT_LT(exact_matches, hosts.size());
+
+  // Verify that the additional records are not in the same order as the configuration
+  exact_matches = 0;
+  host = hosts.begin();
+  for (const auto& answer : query_ctx_->additional_) {
+    exact_matches += (answer.first.compare(*host++) == 0);
+  }
+  EXPECT_LT(exact_matches, hosts.size());
 }
 
 } // namespace

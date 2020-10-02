@@ -24,22 +24,16 @@ public:
 
   // Http::Message
   HeadersInterfaceType& headers() override { return *headers_; }
-  Buffer::InstancePtr& body() override { return body_; }
+  Buffer::Instance& body() override { return body_; }
   TrailersInterfaceType* trailers() override { return trailers_.get(); }
   void trailers(std::unique_ptr<TrailersInterfaceType>&& trailers) override {
     trailers_ = std::move(trailers);
   }
-  std::string bodyAsString() const override {
-    if (body_) {
-      return body_->toString();
-    } else {
-      return "";
-    }
-  }
+  std::string bodyAsString() const override { return body_.toString(); }
 
 private:
   std::unique_ptr<HeadersInterfaceType> headers_;
-  Buffer::InstancePtr body_;
+  Buffer::OwnedImpl body_;
   std::unique_ptr<TrailersInterfaceType> trailers_;
 };
 

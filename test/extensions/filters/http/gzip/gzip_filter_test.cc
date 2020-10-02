@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/http/gzip/v3/gzip.pb.h"
 
 #include "common/common/hex.h"
+#include "common/json/json_loader.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
