@@ -1,8 +1,9 @@
 // Fuzzer for HPACK encoding and decoding.
 
+#include <algorithm>
+
 #include "test/common/http/http2/hpack_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
-#include "test/fuzz/utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/container/fixed_array.h"
@@ -16,33 +17,26 @@ namespace {
 // Dynamic Header Table Size
 constexpr int kHeaderTableSize = 4096;
 
-absl::FixedArray<nghttp2_nv> createNameValueArray(const TestRequestHeaderMapImpl& input) {
-  const size_t nvlen = input.size();
-  absl::FixedArray<nghttp2_nv> nva(nvlen);
+std::vector<nghttp2_nv> createNameValueArray(const test::fuzz::Headers& input) {
+  const size_t nvlen = input.headers().size();
+  std::vector<nghttp2_nv> nva(nvlen);
   int i = 0;
-  input.iterate([&nva, &i](const HeaderEntry& header) -> HeaderMap::Iterate {
+  for (const auto& header : input.headers()) {
     // TODO(asraa): Consider adding flags in fuzzed input.
     uint8_t flags = 0;
-    nva[i] = {
-        const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(header.key().getStringView().data())),
-        const_cast<uint8_t*>(
-            reinterpret_cast<const uint8_t*>(header.value().getStringView().data())),
-        header.key().size(), header.value().size(), flags};
-    i++;
-    return HeaderMap::Iterate::Continue;
-  });
+    std::string key = LowerCaseString(header.key()).get();
+    nva[i++] = {const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(header.key().data())),
+                const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(header.value().data())),
+                header.key().size(), header.value().size(), flags};
+  }
 
   return nva;
 }
 
-absl::optional<Buffer::OwnedImpl> encodeHeaders(const absl::FixedArray<nghttp2_nv>& input_nv) {
-  // Create Deflater
-  nghttp2_hd_deflater* deflater;
-  const int rv = nghttp2_hd_deflate_new(&deflater, kHeaderTableSize);
-  ASSERT(rv == 0);
-
+Buffer::OwnedImpl encodeHeaders(nghttp2_hd_deflater* deflater,
+                                const std::vector<nghttp2_nv>& input_nv) {
   // Estimate the upper bound
-  const size_t buflen = nghttp2_hd_deflate_bound(deflater, input_nv.begin(), input_nv.size());
+  const size_t buflen = nghttp2_hd_deflate_bound(deflater, input_nv.data(), input_nv.size());
 
   Buffer::RawSlice iovec;
   Buffer::OwnedImpl payload;
@@ -51,52 +45,40 @@ absl::optional<Buffer::OwnedImpl> encodeHeaders(const absl::FixedArray<nghttp2_n
 
   // Encode using nghttp2
   uint8_t* buf = reinterpret_cast<uint8_t*>(iovec.mem_);
+  ASSERT(input_nv.data() != nullptr);
   const ssize_t result =
-      nghttp2_hd_deflate_hd(deflater, buf, buflen, input_nv.begin(), input_nv.size());
-  if (result < 0) {
-    ENVOY_LOG_MISC(trace, "Failed to decode with result {}", result);
-    nghttp2_hd_deflate_del(deflater);
-    return absl::nullopt;
-  }
+      nghttp2_hd_deflate_hd(deflater, buf, buflen, input_nv.data(), input_nv.size());
+  ASSERT(result >= 0, absl::StrCat("Failed to decode with result ", result));
 
   iovec.len_ = result;
   payload.commit(&iovec, 1);
 
-  // Delete deflater.
-  nghttp2_hd_deflate_del(deflater);
-
   return payload;
 }
 
-TestRequestHeaderMapImpl decodeHeaders(const Buffer::OwnedImpl& payload, bool end_headers) {
-  // Create inflater
-  nghttp2_hd_inflater* inflater;
-  const int rv = nghttp2_hd_inflate_new(&inflater);
-  ASSERT(rv == 0);
-
+std::vector<nghttp2_nv> decodeHeaders(nghttp2_hd_inflater* inflater,
+                                      const Buffer::OwnedImpl& payload, bool end_headers) {
   // Decode using nghttp2
   Buffer::RawSliceVector slices = payload.getRawSlices();
   const int num_slices = slices.size();
   ASSERT(num_slices == 1, absl::StrCat("number of slices ", num_slices));
 
-  nghttp2_nv decoded_nv;
-  TestRequestHeaderMapImpl decoded_headers;
+  std::vector<nghttp2_nv> decoded_headers;
   int inflate_flags = 0;
+  nghttp2_nv decoded_nv;
   while (slices[0].len_ > 0) {
     ssize_t result = nghttp2_hd_inflate_hd2(inflater, &decoded_nv, &inflate_flags,
                                             reinterpret_cast<uint8_t*>(slices[0].mem_),
                                             slices[0].len_, end_headers);
     // Decoding should not fail and data should not be left in slice.
-    ASSERT(result >= 0 && (slices[0].len_ = 0));
+    ASSERT(result >= 0);
 
     slices[0].mem_ = reinterpret_cast<void*>(reinterpret_cast<uint8_t*>(slices[0].mem_) + result);
     slices[0].len_ -= result;
 
     if (inflate_flags & NGHTTP2_HD_INFLATE_EMIT) {
       // One header key value pair has been successfully decoded.
-      decoded_headers.addCopy(
-          std::string(reinterpret_cast<char*>(decoded_nv.name), decoded_nv.namelen),
-          std::string(reinterpret_cast<char*>(decoded_nv.value), decoded_nv.valuelen));
+      decoded_headers.push_back(decoded_nv);
     }
   }
 
@@ -104,10 +86,18 @@ TestRequestHeaderMapImpl decodeHeaders(const Buffer::OwnedImpl& payload, bool en
     nghttp2_hd_inflate_end_headers(inflater);
   }
 
-  // Delete inflater
-  nghttp2_hd_inflate_del(inflater);
-
   return decoded_headers;
+}
+
+int nv_compare(const void* a_in, const void* b_in) {
+  const nghttp2_nv* a = reinterpret_cast<const nghttp2_nv*>(a_in);
+  const nghttp2_nv* b = reinterpret_cast<const nghttp2_nv*>(b_in);
+
+  absl::string_view a_str(reinterpret_cast<char*>(a->name), a->namelen);
+  absl::string_view b_str(reinterpret_cast<char*>(b->name), b->namelen);
+  // if (a_str > b_str) return 1;
+  // if (a_str < b_str) return -1;
+  return 0;
 }
 
 DEFINE_PROTO_FUZZER(const test::common::http::http2::HpackTestCase& input) {
@@ -120,25 +110,44 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::HpackTestCase& input) {
   }
 
   // Create name value pairs from headers.
-  const TestRequestHeaderMapImpl headers =
-      Fuzz::fromHeaders<TestRequestHeaderMapImpl>(input.headers());
-  const absl::FixedArray<nghttp2_nv> input_nv = createNameValueArray(headers);
-
-  // Encode headers with nghttp2.
-  ENVOY_LOG_MISC(trace, "Encoding headers {}", headers);
-  const absl::optional<Buffer::OwnedImpl> payload = encodeHeaders(input_nv);
-  if (!payload.has_value() || payload.value().getRawSlices().size() == 0) {
-    // An empty header map produces no payload, skip decoding.
+  std::vector<nghttp2_nv> input_nv = createNameValueArray(input.headers());
+  // Skip encoding empty headers. nghttp2 will throw a nullptr error on runtime if it receieves a
+  // nullptr with input_nv.data().
+  if (!input_nv.data()) {
     return;
   }
 
+  // Create Deflater and Inflater
+  nghttp2_hd_deflater* deflater;
+  ASSERT(nghttp2_hd_deflate_new(&deflater, kHeaderTableSize) == 0);
+  nghttp2_hd_inflater* inflater;
+  ASSERT(nghttp2_hd_inflate_new(&inflater) == 0);
+
+  // Encode headers with nghttp2.
+  const Buffer::OwnedImpl payload = encodeHeaders(deflater, input_nv);
+  ASSERT(payload.getRawSlices().size() != 0);
+
   // Decode headers with nghttp2
-  const TestRequestHeaderMapImpl decoded_headers =
-      decodeHeaders(payload.value(), input.end_headers());
-  ENVOY_LOG_MISC(trace, "Decoded headers {}", decoded_headers);
+  std::vector<nghttp2_nv> output_nv = decodeHeaders(inflater, payload, input.end_headers());
 
   // Verify that decoded == encoded.
-  FUZZ_ASSERT(headers == decoded_headers);
+  ASSERT(input_nv.size() == output_nv.size());
+  std::qsort(input_nv.data(), input_nv.size(), sizeof(nghttp2_nv), nv_compare);
+  std::qsort(output_nv.data(), output_nv.size(), sizeof(nghttp2_nv), nv_compare);
+  for (size_t i = 0; i < input_nv.size(); i++) {
+    absl::string_view in_name = {reinterpret_cast<char*>(input_nv[i].name), input_nv[i].namelen};
+    absl::string_view out_name = {reinterpret_cast<char*>(output_nv[i].name), output_nv[i].namelen};
+    absl::string_view in_val = {reinterpret_cast<char*>(input_nv[i].value), input_nv[i].valuelen};
+    absl::string_view out_val = {reinterpret_cast<char*>(output_nv[i].value),
+                                 output_nv[i].valuelen};
+    ASSERT(in_name == out_name);
+    ASSERT(in_val == out_val);
+  }
+
+  // Delete inflater
+  nghttp2_hd_inflate_del(inflater);
+  // Delete deflater.
+  nghttp2_hd_deflate_del(deflater);
 }
 
 } // namespace

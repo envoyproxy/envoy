@@ -211,7 +211,6 @@ envoy_cc_fuzz_test(
     ],
     deps = [
         ":hpack_fuzz_proto_cc_proto",
-        "//test/fuzz:utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
