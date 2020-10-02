@@ -185,30 +185,12 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteBadContentType) {
                                                   {":path", "/testing.ExampleService/Print"},
                                                   {"content-type", "application/grpc"}});
 
-  auto response = codec_client_->makeRequestWithBody(request_headers, "abcdef");
-
-  // Wait for upstream to finish the request.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-
-  // Ensure that we stripped the length prefix and set the appropriate headers.
-  EXPECT_EQ("f", upstream_request_->body().toString());
-
-  EXPECT_THAT(upstream_request_->headers(),
-              HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
-  EXPECT_THAT(upstream_request_->headers(),
-              HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
-
-  // Respond to the request with an invalid content-type.
   Http::TestResponseHeaderMapImpl response_headers;
   response_headers.setStatus(200);
   response_headers.setContentType("application/x-not-protobuf");
-  upstream_request_->encodeHeaders(response_headers, false);
-  Buffer::OwnedImpl buffer;
-  upstream_request_->encodeData(buffer, true);
 
-  response->waitForEndStream();
+  auto response = sendRequestAndWaitForResponse(request_headers, 5, response_headers, 5);
+
   EXPECT_TRUE(response->complete());
 
   // The response should indicate an error.

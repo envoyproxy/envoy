@@ -881,22 +881,13 @@ void FilterManager::sendDirectLocalReply(
             filter_manager_callbacks_.encodeHeaders(*filter_manager_callbacks_.responseHeaders(),
                                                     end_stream);
 
-            // state_.local_complete_ is set once we start processing the last encoding callback
-            // (e.g. encodeHeaders). If we've already started encoding the response, this will be
-            // true, so avoid calling endEncode here as we call it at the end of
-            // sendDirectLocalReply.
-            maybeEndEncode(end_stream && !state_.local_complete_);
+            maybeEndEncode(end_stream);
           },
           [&](Buffer::Instance& data, bool end_stream) -> void {
             filter_manager_callbacks_.encodeData(data, end_stream);
-            // state_.local_complete_ is set once we start processing the last encoding callback
-            // (e.g. encodeHeaders). If we've already started encoding the response, this will be
-            // true, so avoid calling endEncode here as we call it at the end of
-            // sendDirectLocalReply.
-            maybeEndEncode(end_stream && !state_.local_complete_);
+            maybeEndEncode(end_stream);
           }},
       Utility::LocalReplyData{state_.is_grpc_request_, code, body, grpc_status, is_head_request});
-  maybeEndEncode(state_.local_complete_);
 }
 
 void FilterManager::encode100ContinueHeaders(ActiveStreamEncoderFilter* filter,
