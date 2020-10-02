@@ -39,12 +39,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //        }
 //     }
 //
-// .. attention::
-//   In the absence of any header match specifier, match will default to :ref:`present_match
-//   <envoy_api_field_type.matcher.v3.HeaderMatcher.present_match>`. i.e, a request that has the :ref:`name
-//   <envoy_api_field_type.matcher.v3.HeaderMatcher.name>` header will match, regardless of the header's
-//   value.
-//
 message HeaderMatcher {
   // Specifies the name of the header in the request.
   string name = 1
