@@ -111,7 +111,7 @@ private:
     }
     size_t operator()(const Queue& queue) const { return (*this)(queue.duration_); }
     size_t operator()(const std::unique_ptr<Queue>& queue) const { return (*this)(*queue); }
-    const std::hash<std::chrono::milliseconds::rep> hash_;
+    std::hash<std::chrono::milliseconds::rep> hash_;
   };
 
   struct Eq {
