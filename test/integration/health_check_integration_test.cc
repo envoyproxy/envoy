@@ -19,8 +19,7 @@ class HealthCheckIntegrationTest : public testing::TestWithParam<Network::Addres
 public:
   HealthCheckIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam(),
-                            ConfigHelper::discoveredClustersBootstrap("GRPC")),
-        codec_client_type_(envoy::type::v3::HTTP2) {}
+                            ConfigHelper::discoveredClustersBootstrap("GRPC")) {}
 
   enum HealthCheckType { HTTP, TCP, GRPC };
 
@@ -155,7 +154,7 @@ public:
 
   // Tests that a healthy endpoint returns a valid HTTP health check response.
   // HTTP tests are defined here to check both HTTP1 and HTTP2.
-  void SingleEndpointHealthyHttp(envoy::type::v3::CodecClientType codec_client_type) {
+  void singleEndpointHealthyHttp(envoy::type::v3::CodecClientType codec_client_type) {
     codec_client_type_ = codec_client_type;
 
     const uint32_t cluster_idx = 0;
@@ -178,7 +177,7 @@ public:
 
   // Tests that an unhealthy endpoint returns a valid HTTP health check response.
   // HTTP tests are defined here to check both HTTP1 and HTTP2.
-  void SingleEndpointUnhealthyHttp(envoy::type::v3::CodecClientType codec_client_type) {
+  void singleEndpointUnhealthyHttp(envoy::type::v3::CodecClientType codec_client_type) {
     codec_client_type_ = codec_client_type;
 
     const uint32_t cluster_idx = 0;
@@ -200,7 +199,7 @@ public:
 
   // Tests that no HTTP health check response results in timeout and unhealthy endpoint.
   // HTTP tests are defined here to check both HTTP1 and HTTP2.
-  void SingleEndpointTimeoutHttp(envoy::type::v3::CodecClientType codec_client_type) {
+  void singleEndpointTimeoutHttp(envoy::type::v3::CodecClientType codec_client_type) {
     codec_client_type_ = codec_client_type;
 
     const uint32_t cluster_idx = 0;
@@ -221,7 +220,7 @@ public:
   // configuration.
   static constexpr size_t clusters_num_ = 2;
   std::array<ClusterData, clusters_num_> clusters_{{{"cluster_1"}, {"cluster_2"}}};
-  envoy::type::v3::CodecClientType codec_client_type_;
+  envoy::type::v3::CodecClientType codec_client_type_{envoy::type::v3::HTTP2};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, HealthCheckIntegrationTest,
@@ -230,32 +229,32 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, HealthCheckIntegrationTest,
 
 // Tests that a healthy endpoint returns a valid HTTP1 health check response.
 TEST_P(HealthCheckIntegrationTest, SingleEndpointHealthyHttp1) {
-  SingleEndpointHealthyHttp(envoy::type::v3::CodecClientType::HTTP1);
+  singleEndpointHealthyHttp(envoy::type::v3::CodecClientType::HTTP1);
 }
 
 // Tests that a healthy endpoint returns a valid HTTP2 health check response.
 TEST_P(HealthCheckIntegrationTest, SingleEndpointHealthyHttp2) {
-  SingleEndpointHealthyHttp(envoy::type::v3::CodecClientType::HTTP2);
+  singleEndpointHealthyHttp(envoy::type::v3::CodecClientType::HTTP2);
 }
 
 // Tests that an unhealthy endpoint returns a valid HTTP1 health check response.
 TEST_P(HealthCheckIntegrationTest, SingleEndpointUnhealthyHttp1) {
-  SingleEndpointUnhealthyHttp(envoy::type::v3::CodecClientType::HTTP1);
+  singleEndpointUnhealthyHttp(envoy::type::v3::CodecClientType::HTTP1);
 }
 
 // Tests that an unhealthy endpoint returns a valid HTTP2 health check response.
 TEST_P(HealthCheckIntegrationTest, SingleEndpointUnhealthyHttp2) {
-  SingleEndpointUnhealthyHttp(envoy::type::v3::CodecClientType::HTTP2);
+  singleEndpointUnhealthyHttp(envoy::type::v3::CodecClientType::HTTP2);
 }
 
 // Tests that no HTTP1 health check response results in timeout and unhealthy endpoint.
 TEST_P(HealthCheckIntegrationTest, SingleEndpointTimeoutHttp1) {
-  SingleEndpointTimeoutHttp(envoy::type::v3::CodecClientType::HTTP1);
+  singleEndpointTimeoutHttp(envoy::type::v3::CodecClientType::HTTP1);
 }
 
 // Tests that no HTTP2 health check response results in timeout and unhealthy endpoint.
 TEST_P(HealthCheckIntegrationTest, SingleEndpointTimeoutHttp2) {
-  SingleEndpointTimeoutHttp(envoy::type::v3::CodecClientType::HTTP2);
+  singleEndpointTimeoutHttp(envoy::type::v3::CodecClientType::HTTP2);
 }
 
 } // namespace
