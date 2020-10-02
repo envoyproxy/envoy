@@ -24,7 +24,8 @@ public:
                         Upstream::LoadBalancerContext* ctx) const override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::upstreams::http::http::v3::HttpConnectionPool>();
+    return std::make_unique<
+        envoy::extensions::upstreams::http::http::v3::HttpConnectionPoolProto>();
   }
 };
 
