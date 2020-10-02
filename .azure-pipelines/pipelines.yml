@@ -248,6 +248,7 @@ jobs:
       - bash: |
           set -e
           # Convert to Unix-style path so tar doesn't think drive letter is a hostname
+          echo $(Build.StagingDirectory)
           STAGING_DIR="/$(echo $(Build.StagingDirectory) | tr -d ':' | tr '\\' '/')"
           mkdir -p windows/amd64 && tar zxf "${STAGING_DIR}/windows.release/envoy_binary.tar.gz" -C ./windows/amd64
           ci/docker_ci.sh
