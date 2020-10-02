@@ -6,7 +6,6 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
-#include "envoy/json/json_object.h"
 #include "envoy/type/v3/range.pb.h"
 
 #include "common/protobuf/protobuf.h"
