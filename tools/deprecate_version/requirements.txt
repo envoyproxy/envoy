@@ -1,2 +1,6 @@
-GitPython==3.1.7
-PyGithub==1.43.8
+GitPython==3.1.8 \
+    --hash=sha256:080bf8e2cf1a2b907634761c2eaefbe83b69930c94c66ad11b65a8252959f912 \
+    --hash=sha256:1858f4fd089abe92ae465f01d5aaaf55e937eca565fb2c1fce35a51b5f85c910
+PyGithub==1.53 \
+    --hash=sha256:776befaddab9d8fddd525d52a6ca1ac228cf62b5b1e271836d766f4925e1452e \
+    --hash=sha256:8ad656bf79958e775ec59f7f5a3dbcbadac12147ae3dc42708b951064096af15
