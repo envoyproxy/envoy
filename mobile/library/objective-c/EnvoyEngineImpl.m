@@ -67,9 +67,12 @@ static envoy_filter_data_status ios_http_filter_on_request_data(envoy_data data,
 
   NSData *platformData = to_ios_data(data);
   NSArray *result = filter.onRequestData(platformData, end_stream);
+  // Result is typically a pair of status and entity, but uniquely in the case of
+  // ResumeIteration it will (optionally) contain additional pending elements.
+  envoy_headers *pending_headers = toNativeHeadersPtr(result.count == 3 ? result[2] : nil);
   return (envoy_filter_data_status){/*status*/ [result[0] intValue],
                                     /*data*/ toNativeData(result[1]),
-                                    /*pending_headers*/ toNativeHeadersPtr(result[2])};
+                                    /*pending_headers*/ pending_headers};
 }
 
 static envoy_filter_data_status ios_http_filter_on_response_data(envoy_data data, bool end_stream,
@@ -83,9 +86,12 @@ static envoy_filter_data_status ios_http_filter_on_response_data(envoy_data data
 
   NSData *platformData = to_ios_data(data);
   NSArray *result = filter.onResponseData(platformData, end_stream);
+  // Result is typically a pair of status and entity, but uniquely in the case of
+  // ResumeIteration it will (optionally) contain additional pending elements.
+  envoy_headers *pending_headers = toNativeHeadersPtr(result.count == 3 ? result[2] : nil);
   return (envoy_filter_data_status){/*status*/ [result[0] intValue],
                                     /*data*/ toNativeData(result[1]),
-                                    /*pending_headers*/ toNativeHeadersPtr(result[2])};
+                                    /*pending_headers*/ pending_headers};
 }
 
 static envoy_filter_trailers_status ios_http_filter_on_request_trailers(envoy_headers trailers,
@@ -100,10 +106,18 @@ static envoy_filter_trailers_status ios_http_filter_on_request_trailers(envoy_he
 
   EnvoyHeaders *platformTrailers = to_ios_headers(trailers);
   NSArray *result = filter.onRequestTrailers(platformTrailers);
+  envoy_headers *pending_headers = NULL;
+  envoy_data *pending_data = NULL;
+  // Result is typically a pair of status and entity, but uniquely in the case of
+  // ResumeIteration it will (optionally) contain additional pending elements.
+  if (result.count == 4) {
+    pending_headers = toNativeHeadersPtr(result[2]);
+    pending_data = toNativeDataPtr(result[3]);
+  }
   return (envoy_filter_trailers_status){/*status*/ [result[0] intValue],
                                         /*trailers*/ toNativeHeaders(result[1]),
-                                        /*pending_headers*/ toNativeHeadersPtr(result[2]),
-                                        /*pending_data*/ toNativeDataPtr(result[3])};
+                                        /*pending_headers*/ pending_headers,
+                                        /*pending_data*/ pending_data};
 }
 
 static envoy_filter_trailers_status ios_http_filter_on_response_trailers(envoy_headers trailers,
@@ -118,10 +132,18 @@ static envoy_filter_trailers_status ios_http_filter_on_response_trailers(envoy_h
 
   EnvoyHeaders *platformTrailers = to_ios_headers(trailers);
   NSArray *result = filter.onResponseTrailers(platformTrailers);
+  envoy_headers *pending_headers = NULL;
+  envoy_data *pending_data = NULL;
+  // Result is typically a pair of status and entity, but uniquely in the case of
+  // ResumeIteration it will (optionally) contain additional pending elements.
+  if (result.count == 4) {
+    pending_headers = toNativeHeadersPtr(result[2]);
+    pending_data = toNativeDataPtr(result[3]);
+  }
   return (envoy_filter_trailers_status){/*status*/ [result[0] intValue],
                                         /*trailers*/ toNativeHeaders(result[1]),
-                                        /*pending_headers*/ toNativeHeadersPtr(result[2]),
-                                        /*pending_data*/ toNativeDataPtr(result[3])};
+                                        /*pending_headers*/ pending_headers,
+                                        /*pending_data*/ pending_data};
 }
 
 static void ios_http_filter_release(const void *context) {
