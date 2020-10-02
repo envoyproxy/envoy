@@ -13,5 +13,5 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // A connection pool which forwards downstream HTTP as TCP to upstream,
 // [#extension: envoy.upstreams.http.tcp]
-message TcpConnectionPoolProto {
+message TcpConnectionPool {
 }

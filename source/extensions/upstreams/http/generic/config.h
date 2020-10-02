@@ -25,7 +25,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto>();
+        envoy::extensions::upstreams::http::generic::v3::GenericConnectionPool>();
   }
 };
 

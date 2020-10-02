@@ -116,6 +116,7 @@ RELOADABLE_FLAG_REGEX = re.compile(".*(.)(envoy.reloadable_features.[^ ]*)\s.*")
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
 REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
 DOT_MULTI_SPACE_REGEX = re.compile("\\. +")
+PROTO_OUTER_CLASSNAME_REGEX = re.compile(r"^option java_outer_classname = \"(.+?)\"")
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -767,6 +768,15 @@ class FormatChecker:
       if result is not None:
         if not any(x in file_path for x in exclude_path):
           reportError("min_bytes is DEPRECATED, Use min_len.")
+      result = PROTO_OUTER_CLASSNAME_REGEX.search(line)
+      if result is not None:
+        # || true prevents grep from exiting with code 1 if there is no match.
+        command = "grep \"message %s {\" %s || true" % (result.group(1), file_path)
+        error_messages = self.executeCommand(command, "", file_path)
+        if error_messages:
+          reportError("Don't use a java_outer_classname equal to one of the type names declared " +
+                      "within the proto file or the protos won't be compilable to Java.")
+
 
   def checkBuildLine(self, line, file_path, reportError):
     if "@bazel_tools" in line and not (self.isStarlarkFile(file_path) or

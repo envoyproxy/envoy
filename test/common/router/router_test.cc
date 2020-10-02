@@ -5979,7 +5979,7 @@ TEST_F(RouterTest, ConnectPauseNoResume) {
   // Explicitly configure an HTTP upstream, to test factory creation.
   cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
       absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
-  envoy::extensions::upstreams::http::http::v3::HttpConnectionPoolProto http_config;
+  envoy::extensions::upstreams::http::http::v3::HttpConnectionPool http_config;
   cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value()
       .mutable_typed_config()
       ->PackFrom(http_config);
@@ -6018,7 +6018,7 @@ TEST_F(RouterTest, ConnectExplicitTcpUpstream) {
   // Explicitly configure an TCP upstream, to test factory creation.
   cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
       absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
-  envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPoolProto tcp_config;
+  envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPool tcp_config;
   cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value()
       .mutable_typed_config()
       ->PackFrom(tcp_config);
