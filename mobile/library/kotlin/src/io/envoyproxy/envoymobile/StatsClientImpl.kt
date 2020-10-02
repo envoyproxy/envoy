@@ -12,4 +12,8 @@ internal class StatsClientImpl constructor(
   override fun counter(vararg elements: Element): Counter {
     return CounterImpl(engine, elements.asList())
   }
+
+  override fun gauge(vararg elements: Element): Gauge {
+    return GaugeImpl(engine, elements.asList())
+  }
 }

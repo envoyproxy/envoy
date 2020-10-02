@@ -253,6 +253,33 @@ extern const int kEnvoyFailure;
  */
 - (int)recordCounter:(NSString *)elements count:(NSUInteger)count;
 
+/**
+ Set a gauge of a given string of elements with the given value.
+
+ @param elements Elements of the gauge stat.
+ @param value Value to set to the gauge.
+ @return A status indicating if the action was successful.
+ */
+- (int)recordGaugeSet:(NSString *)elements value:(NSUInteger)value;
+
+/**
+ Add the gauge with the given string of elements and by the given amount.
+
+ @param elements Elements of the counter stat.
+ @param amount Amount to add to the gauge.
+ @return A status indicating if the action was successful.
+ */
+- (int)recordGaugeAdd:(NSString *)elements amount:(NSUInteger)amount;
+
+/**
+ Subtract from the gauge with the given string of elements and by the given amount.
+
+ @param elements Elements of the gauge stat.
+ @param amount Amount to subtract from the gauge.
+ @return A status indicating if the action was successful.
+ */
+- (int)recordGaugeSub:(NSString *)elements amount:(NSUInteger)amount;
+
 @end
 
 #pragma mark - EnvoyEngineImpl

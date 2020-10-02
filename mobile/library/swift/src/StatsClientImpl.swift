@@ -15,4 +15,8 @@ extension StatsClientImpl: StatsClient {
   func counter(elements: [Element]) -> Counter {
     return CounterImpl(elements: elements, engine: self.engine)
   }
+
+  func gauge(elements: [Element]) -> Gauge {
+    return GaugeImpl(elements: elements, engine: self.engine)
+  }
 }

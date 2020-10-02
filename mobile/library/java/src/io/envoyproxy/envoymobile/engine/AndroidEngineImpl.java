@@ -43,4 +43,19 @@ public class AndroidEngineImpl implements EnvoyEngine {
   public int recordCounter(String elements, int count) {
     return envoyEngine.recordCounter(elements, count);
   }
+
+  @Override
+  public int recordGaugeSet(String elements, int value) {
+    return envoyEngine.recordGaugeSet(elements, value);
+  }
+
+  @Override
+  public int recordGaugeAdd(String elements, int amount) {
+    return envoyEngine.recordGaugeAdd(elements, amount);
+  }
+
+  @Override
+  public int recordGaugeSub(String elements, int amount) {
+    return envoyEngine.recordGaugeSub(elements, amount);
+  }
 }

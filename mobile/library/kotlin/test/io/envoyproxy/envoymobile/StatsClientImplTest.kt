@@ -33,4 +33,41 @@ class StatsClientImplTest {
     assertThat(elementsCaptor.getValue()).isEqualTo("test.stat")
     assertThat(countCaptor.getValue()).isEqualTo(5)
   }
+
+  @Test
+  fun `gauge delegates to engine with value for set`() {
+    val statsClient = StatsClientImpl(envoyEngine)
+    val gauge = statsClient.gauge(Element("test"), Element("stat"))
+    gauge.set(5)
+    val elementsCaptor = ArgumentCaptor.forClass(String::class.java)
+    val valueCaptor = ArgumentCaptor.forClass(Int::class.java)
+    verify(envoyEngine).recordGaugeSet(elementsCaptor.capture(), valueCaptor.capture())
+    assertThat(elementsCaptor.getValue()).isEqualTo("test.stat")
+    assertThat(valueCaptor.getValue()).isEqualTo(5)
+  }
+
+  @Test
+  fun `gauge delegates to engine with amount for add`() {
+    val statsClient = StatsClientImpl(envoyEngine)
+    val gauge = statsClient.gauge(Element("test"), Element("stat"))
+    gauge.add(5)
+    val elementsCaptor = ArgumentCaptor.forClass(String::class.java)
+    val amountCaptor = ArgumentCaptor.forClass(Int::class.java)
+    verify(envoyEngine).recordGaugeAdd(elementsCaptor.capture(), amountCaptor.capture())
+    assertThat(elementsCaptor.getValue()).isEqualTo("test.stat")
+    assertThat(amountCaptor.getValue()).isEqualTo(5)
+  }
+
+  @Test
+  fun `gauge delegates to engine with amount for sub`() {
+    val statsClient = StatsClientImpl(envoyEngine)
+    val gauge = statsClient.gauge(Element("test"), Element("stat"))
+    gauge.add(5)
+    gauge.sub(5)
+    val elementsCaptor = ArgumentCaptor.forClass(String::class.java)
+    val amountCaptor = ArgumentCaptor.forClass(Int::class.java)
+    verify(envoyEngine).recordGaugeSub(elementsCaptor.capture(), amountCaptor.capture())
+    assertThat(elementsCaptor.getValue()).isEqualTo("test.stat")
+    assertThat(amountCaptor.getValue()).isEqualTo(5)
+  }
 }

@@ -212,6 +212,18 @@ static void ios_http_filter_release(const void *context) {
   return record_counter(_engineHandle, elements.UTF8String, count);
 }
 
+- (int)recordGaugeSet:(NSString *)elements value:(NSUInteger)value {
+  return record_gauge_set(_engineHandle, elements.UTF8String, value);
+}
+
+- (int)recordGaugeAdd:(NSString *)elements amount:(NSUInteger)amount {
+  return record_gauge_add(_engineHandle, elements.UTF8String, amount);
+}
+
+- (int)recordGaugeSub:(NSString *)elements amount:(NSUInteger)amount {
+  return record_gauge_sub(_engineHandle, elements.UTF8String, amount);
+}
+
 #pragma mark - Private
 
 - (void)startObservingLifecycleNotifications {

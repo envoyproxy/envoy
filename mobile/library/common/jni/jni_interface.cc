@@ -86,6 +86,27 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   return record_counter(engine, env->GetStringUTFChars(elements, nullptr), count);
 }
 
+extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordGaugeSet(
+    JNIEnv* env,
+    jclass, // class
+    jlong engine, jstring elements, jint value) {
+  return record_gauge_set(engine, env->GetStringUTFChars(elements, nullptr), value);
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordGaugeAdd(
+    JNIEnv* env,
+    jclass, // class
+    jlong engine, jstring elements, jint amount) {
+  return record_gauge_add(engine, env->GetStringUTFChars(elements, nullptr), amount);
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordGaugeSub(
+    JNIEnv* env,
+    jclass, // class
+    jlong engine, jstring elements, jint amount) {
+  return record_gauge_sub(engine, env->GetStringUTFChars(elements, nullptr), amount);
+}
+
 // JvmCallbackContext
 
 static void pass_headers(JNIEnv* env, envoy_headers headers, jobject j_context) {
