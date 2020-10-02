@@ -1,4 +1,5 @@
 // Fuzzer for HPACK encoding and decoding.
+// TODO(asraa): Speed up by using raw byte input and seperators rather than protobuf input.
 
 #include <algorithm>
 
@@ -95,8 +96,10 @@ int nv_compare(const void* a_in, const void* b_in) {
 
   absl::string_view a_str(reinterpret_cast<char*>(a->name), a->namelen);
   absl::string_view b_str(reinterpret_cast<char*>(b->name), b->namelen);
-  // if (a_str > b_str) return 1;
-  // if (a_str < b_str) return -1;
+  if (a_str > b_str)
+    return 1;
+  if (a_str < b_str)
+    return -1;
   return 0;
 }
 

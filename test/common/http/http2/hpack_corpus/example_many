@@ -1,0 +1,30 @@
+headers {
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":path"
+    value: "/"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: ":host"
+    value: "foo"
+  }
+  headers {
+    key: "x-envoy"
+    value: "one_value"
+  }
+  headers {
+    key: "x-envoy"
+    value: "another"
+  }
+  headers {
+    key: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    value: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  }
+}
