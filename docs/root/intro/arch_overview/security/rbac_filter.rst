@@ -101,6 +101,7 @@ The following attributes are exposed to the language runtime:
    connection.dns_san_peer_certificate, string, The first DNS entry in the SAN field of the peer certificate in the downstream TLS connection
    connection.uri_san_local_certificate, string, The first URI entry in the SAN field of the local certificate in the downstream TLS connection
    connection.uri_san_peer_certificate, string, The first URI entry in the SAN field of the peer certificate in the downstream TLS connection
+   connection.id, uint, Downstream connection ID
    upstream.address, string, Upstream connection remote address
    upstream.port, int, Upstream connection remote port
    upstream.tls_version, string, TLS version of the upstream TLS connection
