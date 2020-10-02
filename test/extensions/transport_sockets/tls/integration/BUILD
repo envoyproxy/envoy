@@ -14,6 +14,7 @@ envoy_cc_test(
         "ssl_integration_test.cc",
         "ssl_integration_test.h",
     ],
+    shard_count = 3,
     data = [
         "//test/config/integration/certs",
     ],
