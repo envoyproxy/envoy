@@ -2852,7 +2852,38 @@ virtual_hosts:
   }
 }
 
-TEST_F(RouteMatcherTest, GrpcTimeoutOffset) {
+TEST_F(RouteMatcherTest, DurationTimeouts) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: local_service_grpc
+  - match:
+      prefix: "/"
+    route:
+      max_stream_duration:
+        max_stream_duration: 0.01s
+        grpc_timeout_header_max: 0.02s
+        grpc_timeout_header_offset: 0.03s
+      cluster: local_service_grpc
+      )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  {
+    auto entry = config.route(genHeaders("www.lyft.com", "/", "GET"), 0)->routeEntry();
+    EXPECT_EQ(std::chrono::milliseconds(10), entry->maxStreamDuration());
+    EXPECT_EQ(std::chrono::milliseconds(20), entry->grpcTimeoutHeaderMax());
+    EXPECT_EQ(std::chrono::milliseconds(30), entry->grpcTimeoutHeaderOffset());
+  }
+}
+
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(GrpcTimeoutOffset)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
@@ -2882,7 +2913,7 @@ virtual_hosts:
                                ->grpcTimeoutOffset());
 }
 
-TEST_F(RouteMatcherTest, GrpcTimeoutOffsetOfDynamicRoute) {
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(GrpcTimeoutOffsetOfDynamicRoute)) {
   // A DynamicRouteEntry will be created when 'cluster_header' is set.
   const std::string yaml = R"EOF(
 virtual_hosts:

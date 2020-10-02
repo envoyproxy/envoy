@@ -581,6 +581,16 @@ public:
    * @return A shared pointer to the request ID utils for this stream
    */
   virtual Http::RequestIDExtensionSharedPtr getRequestIDExtension() const PURE;
+
+  /**
+   * @return Connection ID of the downstream connection, or unset if not available.
+   **/
+  virtual absl::optional<uint64_t> connectionID() const PURE;
+
+  /**
+   * @param id Connection ID of the downstream connection.
+   **/
+  virtual void setConnectionID(uint64_t id) PURE;
 };
 
 } // namespace StreamInfo
