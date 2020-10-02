@@ -14,10 +14,10 @@ envoy_cc_test(
         "ssl_integration_test.cc",
         "ssl_integration_test.h",
     ],
-    shard_count = 3,
     data = [
         "//test/config/integration/certs",
     ],
+    shard_count = 3,
     deps = [
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
