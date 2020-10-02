@@ -124,14 +124,14 @@ DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
 if is_windows; then
   BUILD_TYPES=("-windows")
   # BuildKit is not available for Windows images, use standard build command
-  BUILD_COMMAND="build"
+  BUILD_COMMAND=("build")
 else
   # "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
   BUILD_TYPES=("" "-debug" "-alpine" "-alpine-debug" "-google-vrp")
 
   # Configure docker-buildx tools
+  BUILD_COMMAND=("buildx" "build")
   config_env
-  BUILD_COMMAND="buildx build"
 
   # VRP base image is only for Linux amd64
   VRP_BASE_IMAGE="${DOCKER_IMAGE_PREFIX}${IMAGE_POSTFIX}:${IMAGE_NAME}"
