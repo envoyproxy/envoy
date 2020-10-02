@@ -306,6 +306,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:non_copyable",
         "//source/common/common:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/singleton:const_singleton",
     ],
 )
@@ -370,6 +371,7 @@ envoy_cc_library(
     external_deps = [
         "abseil_node_hash_set",
         "abseil_optional",
+        "http_parser",
         "nghttp2",
     ],
     deps = [
@@ -387,7 +389,6 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
         "//source/common/grpc:status_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
@@ -407,7 +408,6 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/common:regex_interface",
         "//include/envoy/http:header_map_interface",
-        "//include/envoy/json:json_object_interface",
         "//source/common/common:regex_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf:utility_lib",
@@ -421,12 +421,10 @@ envoy_cc_library(
     name = "path_utility_lib",
     srcs = ["path_utility.cc"],
     hdrs = ["path_utility.h"],
-    external_deps = [
-        "abseil_optional",
-        "googleurl",
-    ],
+    external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/http:header_map_interface",
+        "//source/common/chromium_url",
         "//source/common/common:logger_lib",
     ],
 )
@@ -461,19 +459,5 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:codes_interface",
         "//source/common/common:assert_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "url_utility_lib",
-    srcs = ["url_utility.cc"],
-    hdrs = ["url_utility.h"],
-    external_deps = [
-        "googleurl",
-    ],
-    deps = [
-        "//source/common/common:assert_lib",
-        "//source/common/common:empty_string",
-        "//source/common/common:utility_lib",
     ],
 )

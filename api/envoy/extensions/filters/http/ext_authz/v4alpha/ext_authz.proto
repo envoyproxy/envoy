@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.ext_authz.v3.ExtAuthz";
@@ -117,6 +117,23 @@ message ExtAuthz {
   // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
   // :ref:`certificate<envoy_api_field_service.auth.v4alpha.AttributeContext.Peer.certificate>`.
   bool include_peer_certificate = 10;
+
+  // Optional additional prefix to use when emitting statistics. This allows to distinguish
+  // emitted statistics between configured *ext_authz* filters in an HTTP filter chain. For example:
+  //
+  // .. code-block:: yaml
+  //
+  //   http_filters:
+  //     - name: envoy.filters.http.ext_authz
+  //       typed_config:
+  //         "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+  //         stat_prefix: waf # This emits ext_authz.waf.ok, ext_authz.waf.denied, etc.
+  //     - name: envoy.filters.http.ext_authz
+  //       typed_config:
+  //         "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+  //         stat_prefix: blocker # This emits ext_authz.blocker.ok, ext_authz.blocker.denied, etc.
+  //
+  string stat_prefix = 13;
 }
 
 // Configuration for buffering the request data.
