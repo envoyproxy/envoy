@@ -55,7 +55,7 @@ void QuicHttpServerConnectionImpl::shutdownNotice() {
   if (quic::VersionUsesHttp3(quic_server_session_.transport_version())) {
     quic_server_session_.SendHttp3Shutdown();
   } else {
-    ENVOY_CONN_LOG(error, "Shutdown notice is not propagated to QUIC.", quic_server_session_);
+    ENVOY_CONN_LOG(debug, "Shutdown notice is not propagated to QUIC.", quic_server_session_);
   }
 }
 
