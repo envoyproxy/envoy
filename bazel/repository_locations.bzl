@@ -249,7 +249,7 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
         sha256 = "e22444b6544edd81f11c987dd5e482a2e00bbff717badb388779ca57525dad50",
         strip_prefix = "tcmalloc-{version}",
         urls = ["https://github.com/google/tcmalloc/archive/{version}.tar.gz"],
-        use_category = ["dataplane_core"],
+        use_category = ["dataplane_core", "controlplane"],
         last_updated = "2020-09-16",
         cpe = "N/A",
     ),
