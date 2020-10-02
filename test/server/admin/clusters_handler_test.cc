@@ -113,6 +113,23 @@ TEST_P(AdminInstanceTest, ClustersJson) {
     "value": 9
    },
    "added_via_api": true,
+   "circuit_breakers": {
+    "thresholds": [
+     {
+      "max_connections": 1,
+      "max_pending_requests": 1024,
+      "max_requests": 1024,
+      "max_retries": 1
+     },
+     {
+      "priority": "HIGH",
+      "max_connections": 1,
+      "max_pending_requests": 1024,
+      "max_requests": 1024,
+      "max_retries": 1
+     }
+    ]
+   },
    "host_statuses": [
     {
      "address": {
@@ -147,7 +164,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
        "name": "test_gauge",
        "value": "11",
        "type": "GAUGE"
-      },
+      }
      ],
      "health_status": {
       "eds_health_status": "DEGRADED",

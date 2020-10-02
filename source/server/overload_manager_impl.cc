@@ -323,11 +323,14 @@ void OverloadManagerImpl::flushResourceUpdates() {
     auto shared_updates = std::make_shared<absl::flat_hash_map<std::string, OverloadActionState>>();
     std::swap(*shared_updates, state_updates_to_flush_);
 
-    tls_->runOnAllThreads([this, updates = std::move(shared_updates)] {
-      for (const auto& [action, state] : *updates) {
-        tls_->getTyped<ThreadLocalOverloadStateImpl>().setState(action, state);
-      }
-    });
+    tls_->runOnAllThreads(
+        [updates = std::move(shared_updates)](ThreadLocal::ThreadLocalObjectSharedPtr object)
+            -> ThreadLocal::ThreadLocalObjectSharedPtr {
+          for (const auto& [action, state] : *updates) {
+            object->asType<ThreadLocalOverloadStateImpl>().setState(action, state);
+          }
+          return object;
+        });
   }
 
   for (const auto& [cb, state] : callbacks_to_flush_) {

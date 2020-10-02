@@ -215,7 +215,7 @@ TEST(Context, RequestFallbackAttributes) {
   Http::TestRequestHeaderMapImpl header_map{
       {":method", "POST"},
       {":scheme", "http"},
-      {":path", "/meow?yes=1"},
+      {":path", "/meow"},
   };
   Protobuf::Arena arena;
   RequestWrapper request(arena, &header_map, info);
@@ -392,6 +392,31 @@ TEST(Context, ResponseAttributes) {
   }
 }
 
+TEST(Context, ConnectionFallbackAttributes) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  ConnectionWrapper connection(info);
+  UpstreamWrapper upstream(info);
+  {
+    auto value = connection[CelValue::CreateStringView(Undefined)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = connection[CelValue::CreateStringView(ID)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateStringView(Undefined)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateInt64(1)];
+    EXPECT_FALSE(value.has_value());
+  }
+}
+
 TEST(Context, ConnectionAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> upstream_host(
@@ -422,6 +447,8 @@ TEST(Context, ConnectionAttributes) {
   const std::string upstream_transport_failure_reason = "ConnectionTermination";
   EXPECT_CALL(info, upstreamTransportFailureReason())
       .WillRepeatedly(ReturnRef(upstream_transport_failure_reason));
+  EXPECT_CALL(info, connectionID()).WillRepeatedly(Return(123));
+
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
 
@@ -575,6 +602,13 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(subject_peer, value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = connection[CelValue::CreateStringView(ID)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsUint64());
+    EXPECT_EQ(123, value.value().Uint64OrDie());
   }
 
   {
