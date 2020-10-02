@@ -1,4 +1,5 @@
-
+# Validation of content in this file is done on the bazel/repositories.bzl file to make it free of bazel
+# constructs. This is to allow this file to be loaded into Python based build and maintenance tools.
 
 # Envoy dependencies may be annotated with the following attributes:
 DEPENDENCY_ANNOTATIONS = [
@@ -883,7 +884,7 @@ def _dependency_repositories():
     locations = {}
     for key, location in DEPENDENCY_REPOSITORIES_SPEC.items():
         mutable_location = dict(location)
-f        locations[key] = mutable_location
+        locations[key] = mutable_location
 
         # Fixup with version information.
         if "version" in location:
