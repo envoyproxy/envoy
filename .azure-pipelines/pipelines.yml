@@ -230,3 +230,33 @@ jobs:
           pathtoPublish: "$(Build.StagingDirectory)/envoy"
           artifactName: windows.release
         condition: always()
+
+  - job: docker_windows
+    displayName: "Windows docker"
+    dependsOn: ["Windows"]
+    timeoutInMinutes: 360
+    pool:
+      vmImage: "windows-latest"
+    steps:
+      - task: DownloadBuildArtifacts@0
+        inputs:
+          buildType: current
+          artifactName: "windows.release"
+          itemPattern: "windows.release/envoy_binary.tar.gz"
+          downloadType: single
+          targetPath: $(Build.StagingDirectory)
+      - bash: |
+          set -e
+          mkdir -p windows/amd64 && tar zxf $(Build.StagingDirectory)/windows.release/envoy_binary.tar.gz -C ./windows/amd64
+          ci/docker_ci.sh
+        workingDirectory: $(Build.SourcesDirectory)
+        env:
+          AZP_BRANCH: $(Build.SourceBranch)
+          AZP_SHA1: $(Build.SourceVersion)
+          DOCKERHUB_USERNAME: $(DockerUsername)
+          DOCKERHUB_PASSWORD: $(DockerPassword)
+      - task: PublishBuildArtifacts@1
+        inputs:
+          pathtoPublish: "$(Build.StagingDirectory)/build_images"
+          artifactName: docker_windows
+        condition: always()
