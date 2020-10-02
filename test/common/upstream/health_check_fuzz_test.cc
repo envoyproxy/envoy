@@ -15,6 +15,12 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::HealthCheckTestCase input) {
     return;
   }
 
+  if (input.health_check_config().health_checker_case() ==
+      envoy::config::core::v3::HealthCheck::kCustomHealthCheck) {
+    ENVOY_LOG_MISC(trace, "Fuzz engine created Custom Health Checker");
+    return;
+  }
+
   HealthCheckFuzz health_check_fuzz;
 
   health_check_fuzz.initializeAndReplay(input);
