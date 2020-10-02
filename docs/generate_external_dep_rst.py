@@ -52,11 +52,16 @@ def RenderVersion(version):
   return version
 
 
+def RenderTitle(title):
+  underline = '~' * len(title)
+  return f'\n{title}\n{underline}\n\n'
+
+
 if __name__ == '__main__':
   security_rst_root = sys.argv[1]
 
-  Dep = namedtuple('Dep', ['name', 'sort_name', 'version', 'cpe'])
-  use_categories = defaultdict(list)
+  Dep = namedtuple('Dep', ['name', 'sort_name', 'version', 'cpe', 'last_updated'])
+  use_categories = defaultdict(lambda: defaultdict(list))
   # Bin rendered dependencies into per-use category lists.
   for k, v in repository_locations.DEPENDENCY_REPOSITORIES.items():
     cpe = v.get('cpe', '')
@@ -68,16 +73,22 @@ if __name__ == '__main__':
     project_url = v['project_url']
     name = RstLink(project_name, project_url)
     version = RstLink(RenderVersion(v['version']), v['urls'][0])
-    dep = Dep(name, project_name.lower(), version, cpe)
+    last_updated = v['last_updated']
+    dep = Dep(name, project_name.lower(), version, cpe, last_updated)
     for category in v['use_category']:
-      use_categories[category].append(dep)
+      for ext in v.get('extensions', ['core']):
+        use_categories[category][ext].append(dep)
 
   def CsvRow(dep):
-    return [dep.name, dep.version, dep.cpe]
+    return [dep.name, dep.version, dep.last_updated, dep.cpe]
 
   # Generate per-use category RST with CSV tables.
-  for category, deps in use_categories.items():
-    output_path = pathlib.Path(security_rst_root, f'external_dep_{category}.rst')
-    content = CsvTable(['Name', 'Version', 'CPE'], [2, 1, 2],
-                       [CsvRow(dep) for dep in sorted(deps, key=lambda d: d.sort_name)])
+  for category, exts in use_categories.items():
+    content = ''
+    for ext_name, deps in sorted(exts.items()):
+      if ext_name != 'core':
+        content += RenderTitle(ext_name)
+      output_path = pathlib.Path(security_rst_root, f'external_dep_{category}.rst')
+      content += CsvTable(['Name', 'Version', 'Last updated', 'CPE'], [2, 1, 1, 2],
+                          [CsvRow(dep) for dep in sorted(deps, key=lambda d: d.sort_name)])
     output_path.write_text(content)

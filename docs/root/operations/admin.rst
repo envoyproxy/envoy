@@ -35,6 +35,33 @@ modify different aspects of the server:
   All mutations must be sent as HTTP POST operations. When a mutation is requested via GET,
   the request has no effect, and an HTTP 400 (Invalid Request) response is returned.
 
+.. note::
+
+  For an endpoint with *?format=json*, it dumps data as a JSON-serialized proto. Fields with default
+  values are not rendered. For example for */clusters?format=json*, the circuit breakers thresholds
+  priority field is omitted when its value is :ref:`DEFAULT priority
+  <envoy_v3_api_enum_value_config.core.v3.RoutingPriority.DEFAULT>` as shown below:
+
+  .. code-block:: json
+
+    {
+     "thresholds": [
+      {
+       "max_connections": 1,
+       "max_pending_requests": 1024,
+       "max_requests": 1024,
+       "max_retries": 1
+      },
+      {
+       "priority": "HIGH",
+       "max_connections": 1,
+       "max_pending_requests": 1024,
+       "max_requests": 1024,
+       "max_retries": 1
+      }
+     ]
+    }
+
 .. http:get:: /
 
   Render an HTML home page with a table of links to all available options.
@@ -257,7 +284,7 @@ modify different aspects of the server:
 
     Generally only used during development. With `--enable-fine-grain-logging` being set, the logger is represented
     by the path of the file it belongs to (to be specific, the path determined by `__FILE__`), so the logger list
-    will show a list of file paths, and the specific path should be used as <logger_name> to change the log level. 
+    will show a list of file paths, and the specific path should be used as <logger_name> to change the log level.
 
 .. http:get:: /memory
 
@@ -276,19 +303,19 @@ modify different aspects of the server:
 .. _operations_admin_interface_drain:
 
 .. http:post:: /drain_listeners
-   
+
    :ref:`Drains <arch_overview_draining>` all listeners.
 
    .. http:post:: /drain_listeners?inboundonly
 
-   :ref:`Drains <arch_overview_draining>` all inbound listeners. `traffic_direction` field in 
-   :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` is used to determine whether a listener 
+   :ref:`Drains <arch_overview_draining>` all inbound listeners. `traffic_direction` field in
+   :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` is used to determine whether a listener
    is inbound or outbound.
 
    .. http:post:: /drain_listeners?graceful
 
-   When draining listeners, enter a graceful drain period prior to closing listeners. 
-   This behaviour and duration is configurable via server options or CLI 
+   When draining listeners, enter a graceful drain period prior to closing listeners.
+   This behaviour and duration is configurable via server options or CLI
    (:option:`--drain-time-s` and :option:`--drain-strategy`).
 
 .. attention::
@@ -334,7 +361,23 @@ modify different aspects of the server:
         "cpuset_threads": false
       },
       "uptime_current_epoch": "6s",
-      "uptime_all_epochs": "6s"
+      "uptime_all_epochs": "6s",
+      "node": {
+        "id": "node1",
+        "cluster": "cluster1",
+        "user_agent_name": "envoy",
+        "user_agent_build_version": {
+          "version": {
+            "major_number": 1,
+            "minor_number": 15,
+            "patch": 0
+          }
+        },
+        "metadata": {},
+        "extensions": [],
+        "client_features": [],
+        "listening_addresses": []
+      }
     }
 
   See the :ref:`ServerInfo proto <envoy_v3_api_msg_admin.v3.ServerInfo>` for an

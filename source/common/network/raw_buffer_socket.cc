@@ -19,7 +19,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   bool end_stream = false;
   do {
     // 16K read is arbitrary. TODO(mattklein123) PERF: Tune the read size.
-    Api::IoCallUint64Result result = buffer.read(callbacks_->ioHandle(), 16384);
+    Api::IoCallUint64Result result = callbacks_->ioHandle().read(buffer, 16384);
 
     if (result.ok()) {
       ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), result.rc_);

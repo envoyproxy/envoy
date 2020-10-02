@@ -35,7 +35,6 @@ static_resources:
     lb_policy: CLUSTER_PROVIDED
     dns_lookup_family: V4_ONLY
 cluster_manager: {}
-watchdog: {}
 admin:
   access_log_path: /tmp/admin_access.log
   address:
