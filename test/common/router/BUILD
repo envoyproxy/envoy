@@ -396,6 +396,7 @@ envoy_cc_benchmark_binary(
         "benchmark",
     ],
     deps = [
+        "//source/common/common:assert_lib",
         "//source/common/router:config_lib",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
@@ -406,6 +407,6 @@ envoy_cc_benchmark_binary(
 )
 
 envoy_benchmark_test(
-    name = "config_impl_speed_test_benchmark_test",
+    name = "config_impl_benchmark_test",
     benchmark_binary = "config_impl_speed_test",
 )
