@@ -247,7 +247,9 @@ jobs:
           targetPath: $(Build.StagingDirectory)
       - bash: |
           set -e
-          mkdir -p windows/amd64 && tar zxf $(Build.StagingDirectory)/windows.release/envoy_binary.tar.gz -C ./windows/amd64
+          # Convert to Unix-style path so tar doesn't think drive letter is a hostname
+          STAGING_DIR="/$(echo $(Build.StagingDirectory) | tr -d ':' | tr '\\' '/')"
+          mkdir -p windows/amd64 && tar zxf "${STAGING_DIR}/windows.release/envoy_binary.tar.gz" -C ./windows/amd64
           ci/docker_ci.sh
         workingDirectory: $(Build.SourcesDirectory)
         env:
