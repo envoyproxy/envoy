@@ -156,8 +156,6 @@ private:
   }
 };
 
-using RawAsyncClientSharedPtr = std::shared_ptr<RawAsyncClient>;
-
 template <typename Request, typename Response> class AsyncClient /* : public RawAsyncClient )*/ {
 public:
   AsyncClient() = default;

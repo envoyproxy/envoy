@@ -83,6 +83,8 @@ private:
 using GrpcClientImplPtr = std::unique_ptr<GrpcClientImpl>;
 
 // The client cache for RawAsyncClient for Google grpc so channel is not created for each request.
+// TODO(fpliu233): The cache will cause resource leak that a new channel is created every time a new
+// config is pushed. Improve gRPC channel cache with better solution.
 class AsyncClientCache : public Singleton::Instance {
 public:
   AsyncClientCache(Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope,
