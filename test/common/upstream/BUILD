@@ -252,18 +252,13 @@ envoy_cc_test_library(
     ],
     deps = [
         ":utility_lib",
-        "//source/common/network:utility_lib",
         "//source/common/upstream:load_balancer_lib",
-        "//source/common/upstream:upstream_includes",
-        "//source/common/upstream:upstream_lib",
         "//test/mocks:common_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:host_set_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:priority_set_mocks",
-        "//test/test_common:logging_lib",
-        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
