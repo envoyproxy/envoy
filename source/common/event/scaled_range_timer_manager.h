@@ -48,7 +48,7 @@ public:
 
 private:
   class RangeTimerImpl;
-  
+
   // A queue object that maintains a list of timers with the same (max - min) values.
   struct Queue {
     struct Item {
@@ -75,7 +75,8 @@ private:
     // inserted at the end of the list, and the time is monotonically increasing.
     std::list<Item> range_timers_;
 
-    // A real Timer that tracks the expiration time of the first timer in the queue. This gets adjusted
+    // A real Timer that tracks the expiration time of the first timer in the queue. This gets
+    // adjusted
     //   1) at queue creation time
     //   2) on expiration
     //   3) when the scale factor changes
