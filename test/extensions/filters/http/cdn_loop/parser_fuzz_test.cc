@@ -3,9 +3,9 @@
 #include "extensions/filters/http/cdn_loop/parser.h"
 
 #include "test/fuzz/fuzz_runner.h"
+#include "test/fuzz/utility.h"
 
 #include "absl/strings/string_view.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Fuzz {
@@ -23,8 +23,8 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     size_t start = 0;
     for (const absl::string_view cdn_id : list->cdnIds()) {
       size_t pos = input.find(cdn_id, start);
-      EXPECT_NE(pos, absl::string_view::npos);
-      EXPECT_GE(pos, start);
+      FUZZ_ASSERT(pos != absl::string_view::npos);
+      FUZZ_ASSERT(pos >= start);
       start = pos + cdn_id.length();
     }
   }

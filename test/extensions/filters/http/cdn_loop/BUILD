@@ -66,6 +66,7 @@ envoy_cc_fuzz_test(
     deps = [
         "//source/common/common:statusor_lib",
         "//source/extensions/filters/http/cdn_loop:parser_lib",
+        "//test/fuzz:utility_lib",
     ],
 )
 
