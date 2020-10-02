@@ -56,22 +56,14 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsClusterNameByDefault) {
             return &http_stream;
           }));
 
-  const std::string expected_downstream_local_address = "5.5.5.5";
   EXPECT_CALL(grpc_callbacks,
-              onCreateInitialMetadata(testing::Truly([&expected_downstream_local_address](
-                                                         Http::RequestHeaderMap& headers) {
-                return headers.Host()->value() == "test_cluster" &&
-                       headers.get(Http::LowerCaseString("downstream-local-address"))->value() ==
-                           expected_downstream_local_address;
+              onCreateInitialMetadata(testing::Truly([](Http::RequestHeaderMap& headers) {
+                return headers.Host()->value() == "test_cluster";
               })));
   EXPECT_CALL(http_stream, sendHeaders(_, _))
       .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem()};
-  stream_info.setDownstreamLocalAddress(
-      std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address));
-  Http::AsyncClient::StreamOptions options;
-  options.setParentContext(Http::AsyncClient::ParentContext{&stream_info});
-  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks, options);
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
@@ -105,6 +97,39 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
       .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
+// Validate that the metadata header is the initial metadata in grpc config.
+TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+
+  const std::string expected_downstream_local_address = "5.5.5.5";
+  EXPECT_CALL(grpc_callbacks,
+              onCreateInitialMetadata(testing::Truly([&expected_downstream_local_address](
+                                                         Http::RequestHeaderMap& headers) {
+                return headers.Host()->value() == "test_cluster" &&
+                       headers.get(Http::LowerCaseString("downstream-local-address"))->value() ==
+                           expected_downstream_local_address;
+              })));
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem()};
+  stream_info.setDownstreamLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address));
+  Http::AsyncClient::StreamOptions options;
+  options.setParentContext(Http::AsyncClient::ParentContext{&stream_info});
+  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks, options);
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
