@@ -100,7 +100,7 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
-// Validate that the metadata header is the initial metadata in grpc config.
+// Validate that the metadata header is the initial metadata in gRPC service config.
 TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
@@ -118,9 +118,8 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
   EXPECT_CALL(grpc_callbacks,
               onCreateInitialMetadata(testing::Truly([&expected_downstream_local_address](
                                                          Http::RequestHeaderMap& headers) {
-                return headers.Host()->value() == "test_cluster" &&
-                       headers.get(Http::LowerCaseString("downstream-local-address"))->value() ==
-                           expected_downstream_local_address;
+                return headers.get(Http::LowerCaseString("downstream-local-address"))->value() ==
+                       expected_downstream_local_address;
               })));
   EXPECT_CALL(http_stream, sendHeaders(_, _))
       .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
