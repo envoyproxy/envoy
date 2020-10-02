@@ -10,4 +10,9 @@ public protocol StatsClient: AnyObject {
   ///
   /// - returns: A Counter based on the joined elements.
   func counter(elements: [Element]) -> Counter
+
+  /// - parameter elements: Elements to identify a gauge
+  ///
+  /// - returns: A Gauge based on the joined elements.
+  func gauge(elements: [Element]) -> Gauge
 }

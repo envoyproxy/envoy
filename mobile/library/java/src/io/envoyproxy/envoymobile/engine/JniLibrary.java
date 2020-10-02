@@ -164,6 +164,36 @@ class JniLibrary {
   protected static native int recordCounter(long engine, String elements, int count);
 
   /**
+   * Set a gauge of a given string of elements with the given value.
+   *
+   * @param engine,  handle to the engine that owns the gauge.
+   * @param elements Elements of the gauge stat.
+   * @param value Value to set to the gauge.
+   * @return A status indicating if the action was successful.
+   */
+  protected static native int recordGaugeSet(long engine, String elements, int value);
+
+  /**
+   * Add the gauge with the given string of elements and by the given amount.
+   *
+   * @param engine,  handle to the engine that owns the gauge.
+   * @param elements Elements of the gauge stat.
+   * @param amount Amount to add to the gauge.
+   * @return A status indicating if the action was successful.
+   */
+  protected static native int recordGaugeAdd(long engine, String elements, int amount);
+
+  /**
+   * Subtract from the gauge with the given string of elements and by the given amount.
+   *
+   * @param engine,  handle to the engine that owns the gauge.
+   * @param elements Elements of the gauge stat.
+   * @param amount Amount to subtract from the gauge.
+   * @return A status indicating if the action was successful.
+   */
+  protected static native int recordGaugeSub(long engine, String elements, int amount);
+
+  /**
    * Provides a configuration template that may be used for building platform
    * filter config chains.
    *

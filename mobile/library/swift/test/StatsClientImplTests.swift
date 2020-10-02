@@ -50,4 +50,49 @@ final class StatsClientImplTests: XCTestCase {
       XCTAssertNil(weakEngine) // weakEngine is nil (and so Counter didn't keep it alive).
     }
   }
+
+  func testGaugeSetDelegatesToEngineWithValue() {
+    var actualSeries: String?
+    var actualValue: UInt?
+    MockEnvoyEngine.onRecordGaugeSet = { series, value in
+      actualSeries = series
+      actualValue = value
+    }
+    let mockEngine = MockEnvoyEngine()
+    let statsClient = StatsClientImpl(engine: mockEngine)
+    let gauge = statsClient.gauge(elements: ["test", "stat"])
+    gauge.set(value: 5)
+    XCTAssertEqual(actualSeries, "test.stat")
+    XCTAssertEqual(actualValue, 5)
+  }
+
+  func testGaugeAddDelegatesToEngineWithAmount() {
+    var actualSeries: String?
+    var actualAmount: UInt?
+    MockEnvoyEngine.onRecordGaugeAdd = { series, amount in
+      actualSeries = series
+      actualAmount = amount
+    }
+    let mockEngine = MockEnvoyEngine()
+    let statsClient = StatsClientImpl(engine: mockEngine)
+    let gauge = statsClient.gauge(elements: ["test", "stat"])
+    gauge.add(amount: 5)
+    XCTAssertEqual(actualSeries, "test.stat")
+    XCTAssertEqual(actualAmount, 5)
+  }
+
+  func testGaugeSubDelegatesToEngineWithAmount() {
+    var actualSeries: String?
+    var actualAmount: UInt?
+    MockEnvoyEngine.onRecordGaugeSub = { series, amount in
+      actualSeries = series
+      actualAmount = amount
+    }
+    let mockEngine = MockEnvoyEngine()
+    let statsClient = StatsClientImpl(engine: mockEngine)
+    let gauge = statsClient.gauge(elements: ["test", "stat"])
+    gauge.sub(amount: 5)
+    XCTAssertEqual(actualSeries, "test.stat")
+    XCTAssertEqual(actualAmount, 5)
+  }
 }
