@@ -12,12 +12,14 @@ class LoadBalancerFuzzBase {
 public:
     //Intialize lb here?
     LoadBalancerFuzzBase() = default;
-    virtual void initialize();
+    virtual void initialize(test::common::upstream::LoadBalancerTestCase input);
     void initializeAndReplay(test::common::upstream::LoadBalancerTestCase input);
-    void addHostSet(uint64_t number_of_hosts_in_host_set);
-    void updateHealthFlags(Hostset host_set, ); //Hostset or int, or mod the int with number of host sets
-    void prefetch();
-    void chooseHost();
+    //void addHostSet(uint64_t number_of_hosts_in_host_set);
+    void updateHealthFlags(bool failover_host_set, uint32_t num_hosts, uint32_t num_healthy_hosts, uint32_t num_degraded_hosts = 0, uint32_t num_excluded_hosts = 0); //Hostset or int, or mod the int with number of host sets
+    //These two actions have a lot of logic attached to them such as mocks, so you need to delegate these to specific logic per each specific load balancer.
+    //This makes sense, as the load balancing algorithms sometimes use other components which are coupled into the algorithm logically.
+    virtual void prefetch();
+    virtual void chooseHost();
 
 private:
     void replay(test::common::upstream::LoadBalancerTestCase input);
@@ -25,7 +27,10 @@ private:
 }
 
 class RandomLoadBalancerFuzzTest : public LoadBalancerFuzzBase {
-    void initialize() override;
+    void initialize(test::common::upstream::LoadBalancerTestCase input) override;
+    //Has interesting mock logic
+    void prefetch() override;
+    void chooseHost() override;
 }
 
 
