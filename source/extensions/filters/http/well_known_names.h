@@ -80,6 +80,8 @@ public:
   const std::string AwsLambda = "envoy.filters.http.aws_lambda";
   // OAuth filter
   const std::string OAuth = "envoy.filters.http.oauth";
+  // Local Rate limit filter
+  const std::string LocalRateLimit = "envoy.filters.http.local_ratelimit";
 };
 
 using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;

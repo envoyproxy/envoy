@@ -190,6 +190,7 @@ proto_library(
         "//envoy/extensions/filters/http/health_check/v3:pkg",
         "//envoy/extensions/filters/http/ip_tagging/v3:pkg",
         "//envoy/extensions/filters/http/jwt_authn/v3:pkg",
+        "//envoy/extensions/filters/http/local_ratelimit/v3:pkg",
         "//envoy/extensions/filters/http/lua/v3:pkg",
         "//envoy/extensions/filters/http/oauth2/v3alpha:pkg",
         "//envoy/extensions/filters/http/on_demand/v3:pkg",

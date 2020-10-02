@@ -140,3 +140,5 @@ extensions/upstreams/http/tcp @alyssawilk @mattklein123
 extensions/upstreams/http/default @alyssawilk @snowp @mattklein123
 # OAuth2
 extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
+# HTTP Local Rate Limit
+/*/extensions/filters/http/local_ratelimit @rgs1 @mattklein123
