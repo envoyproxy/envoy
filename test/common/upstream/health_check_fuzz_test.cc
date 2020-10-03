@@ -15,27 +15,31 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::HealthCheckTestCase input) {
     return;
   }
 
-  std::unique_ptr<HealthCheckFuzz> health_check_fuzz;
   switch (input.health_check_config().health_checker_case()) {
-    case envoy::config::core::v3::HealthCheck::kHttpHealthCheck: {
-      health_check_fuzz = std::make_unique<HttpHealthCheckFuzz>();
-      health_check_fuzz_>type_ = HealthCheckFuzz::Type::HTTP;
-      break;
-    }
-    case envoy::config::core::v3::HealthCheck::kTcpHealthCheck: {
-      health_check_fuzz = std::make_unique<TcpHealthCheckFuzz>();
-      health_check_fuzz_>type_ = HealthCheckFuzz::Type::TCP;
-      break;
-    }
-    case envoy::config::core::v3::HealthCheck::kGrpcHealthCheck: {
-      health_check_fuzz = std::make_unique<GrpcHealthCheckFuzz>();
-      health_check_fuzz_>type_ = HealthCheckFuzz::Type::GRPC;
-      break;
-    }
-    default:
-      break;
-
-  health_check_fuzz->initializeAndReplay(input);
+  case envoy::config::core::v3::HealthCheck::kHttpHealthCheck: {
+    std::unique_ptr<HttpHealthCheckFuzz> http_health_check_fuzz =
+        std::make_unique<HttpHealthCheckFuzz>();
+    http_health_check_fuzz->type_ = HealthCheckFuzz::Type::HTTP;
+    http_health_check_fuzz->initializeAndReplay(input);
+    break;
+  }
+  case envoy::config::core::v3::HealthCheck::kTcpHealthCheck: {
+    std::unique_ptr<TcpHealthCheckFuzz> tcp_health_check_fuzz =
+        std::make_unique<TcpHealthCheckFuzz>();
+    tcp_health_check_fuzz->type_ = HealthCheckFuzz::Type::TCP;
+    tcp_health_check_fuzz->initializeAndReplay(input);
+    break;
+  }
+  case envoy::config::core::v3::HealthCheck::kGrpcHealthCheck: {
+    std::unique_ptr<GrpcHealthCheckFuzz> grpc_health_check_fuzz =
+        std::make_unique<GrpcHealthCheckFuzz>();
+    grpc_health_check_fuzz->type_ = HealthCheckFuzz::Type::GRPC;
+    grpc_health_check_fuzz->initializeAndReplay(input);
+    break;
+  }
+  default:
+    break;
+  }
 }
 
 } // namespace Upstream

@@ -229,11 +229,11 @@ void TcpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase 
   // test class directly uses the unit test class that has been in master for a long time, this is
   // likely a false positive.
   if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
-    interval_timer_->invokeCallback(false);
+    interval_timer_->invokeCallback();
   }
 } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
-void TcpHealthCheckFuzz::respondTcp(std::string data) { //TODO: Switch this to use triggerIntervalTimer with expectClientCreate
+void TcpHealthCheckFuzz::respondTcp(std::string data) {
   if (!timeout_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping response.");
     return;
@@ -517,7 +517,7 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
       break;
     }
     case test::common::upstream::Action::kRaiseEvent: {
-      raiseEvent(getEventTypeFromProto(event.raise_event(), last_action));
+      raiseEvent(getEventTypeFromProto(event.raise_event()), last_action);
       break;
     }
     default:

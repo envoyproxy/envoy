@@ -20,28 +20,25 @@ public:
     GRPC,
   };
 
-  //The specific implementations of this look into this proto to their type to get the data
-  virtual respond(test::common::upstream::Respond respond) PURE;
+  // The specific implementations of respond look into the respond proto, which has all three types
+  // of response
+  virtual void respond(test::common::upstream::Respond respond) PURE;
 
   virtual void initialize(test::common::upstream::HealthCheckTestCase input) PURE;
-  virtual void triggerIntervalTimer() PURE; //TODO: Tcp doesn't use expect client create?
+  virtual void triggerIntervalTimer(bool expect_client_create) PURE;
   virtual void triggerTimeoutTimer(bool last_action) PURE;
   virtual void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) PURE;
+
+  virtual ~HealthCheckFuzz() = default;
+  Type type_;
 
 private:
   Network::ConnectionEvent getEventTypeFromProto(const test::common::upstream::RaiseEvent& event);
 
   void replay(const test::common::upstream::HealthCheckTestCase& input);
-
-  Type type_;
-  std::unique_ptr<HttpHealthCheckFuzz> http_fuzz_test_;
-  std::unique_ptr<TcpHealthCheckFuzz> tcp_fuzz_test_;
-  std::unique_ptr<GrpcHealthCheckFuzz> grpc_fuzz_test_;
 };
 
-//Have a single base class with all of the methods shared across the three health check fuzz tests as virtuals, then implement those specifically
-
-class HttpHealthCheckFuzz : HealthCheckFuzz, HttpHealthCheckerImplTestBase {
+class HttpHealthCheckFuzz : public HealthCheckFuzz, HttpHealthCheckerImplTestBase {
 public:
   void allocHttpHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input) override;
@@ -50,20 +47,22 @@ public:
   void triggerIntervalTimer(bool expect_client_create) override;
   void triggerTimeoutTimer(bool last_action) override;
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
+  virtual ~HttpHealthCheckFuzz() = default;
 
   // Determines whether the client gets reused or not after response
   bool reuse_connection_ = true;
 };
 
-class TcpHealthCheckFuzz : HealthCheckFuzz, TcpHealthCheckerImplTestBase {
+class TcpHealthCheckFuzz : public HealthCheckFuzz, TcpHealthCheckerImplTestBase {
 public:
   void allocTcpHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input) override;
-  void respondTcp(std::string data, bool last_action);
+  void respondTcp(std::string data);
   void respond(test::common::upstream::Respond respond) override;
   void triggerIntervalTimer(bool expect_client_create) override;
-  void triggerTimeoutTimer(bool last_action);
-  void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action);
+  void triggerTimeoutTimer(bool last_action) override;
+  void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
+  virtual ~TcpHealthCheckFuzz() = default;
 
   // Determines whether the client gets reused or not after response
   bool reuse_connection_ = true;
@@ -73,7 +72,7 @@ public:
   bool empty_response_ = true;
 };
 
-class GrpcHealthCheckFuzz : HealthCheckFuzz, GrpcHealthCheckerImplTestBaseUtils {
+class GrpcHealthCheckFuzz : public HealthCheckFuzz, GrpcHealthCheckerImplTestBaseUtils {
 public:
   void allocGrpcHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input) override;
@@ -84,6 +83,7 @@ public:
   void triggerTimeoutTimer(bool last_action) override;
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
   void raiseGoAway(bool no_error);
+  virtual ~GrpcHealthCheckFuzz() = default;
 
   // Determines whether the client gets reused or not after response
   bool reuse_connection_ = true;
