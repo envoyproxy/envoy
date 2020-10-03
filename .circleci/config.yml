@@ -5,7 +5,7 @@ executors:
     description: "A regular build executor based on ubuntu image"
     docker:
       # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8
-      - image: envoyproxy/envoy-build-ubuntu:1526786b8f5cfce7a40829a0c527b5a27570889c
+      - image: envoyproxy/envoy-build-ubuntu:325803575903766a631b6e2fde79c6cbedb92985
     resource_class: xlarge
     working_directory: /source
 
