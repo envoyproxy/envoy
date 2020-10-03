@@ -87,7 +87,6 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   headers_message_ = Common::prepareHeaders(
       parent_.host_name_.empty() ? parent_.remote_cluster_name_ : parent_.host_name_,
       service_full_name_, method_name_, options_.timeout);
-
   // Fill service-wide initial metadata.
   parent_.metadata_parser_->evaluateHeaders(headers_message_->headers(),
                                             options_.parent_context.stream_info);
