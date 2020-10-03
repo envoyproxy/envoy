@@ -122,7 +122,7 @@ void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(input.health_check_config(), reuse_connection, true);
 }
 
-void HttpHealthCheckFuzz::respond(const test::fuzz::Headers& headers, uint64_t status) {
+void HttpHealthCheckFuzz::respondHttp(const test::fuzz::Headers& headers, uint64_t status) {
   // Timeout timer needs to be explicitly enabled, usually by onIntervalBase() (Callback on interval
   // timer).
   if (!test_sessions_[0]->timeout_timer_->enabled_) {
@@ -156,6 +156,10 @@ void HttpHealthCheckFuzz::respond(const test::fuzz::Headers& headers, uint64_t s
     ENVOY_LOG_MISC(trace, "Creating client and stream because shouldClose() is true");
     triggerIntervalTimer(true);
   }
+}
+
+void HttpHealthCheckFuzz::respond(test::common::upstream::Respond respond) {
+  respondHttp(respond.http_respond().headers(), respond.http_respond().status());
 }
 
 void HttpHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
@@ -225,11 +229,11 @@ void TcpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase 
   // test class directly uses the unit test class that has been in master for a long time, this is
   // likely a false positive.
   if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
-    interval_timer_->invokeCallback();
+    interval_timer_->invokeCallback(false);
   }
 } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
-void TcpHealthCheckFuzz::respond(std::string data, bool last_action) {
+void TcpHealthCheckFuzz::respondTcp(std::string data) { //TODO: Switch this to use triggerIntervalTimer with expectClientCreate
   if (!timeout_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping response.");
     return;
@@ -245,16 +249,23 @@ void TcpHealthCheckFuzz::respond(std::string data, bool last_action) {
   // turn on interval and turn off timeout, but for tcp it doesn't if the data doesn't match. If the
   // response doesn't match, it only sets the host to unhealthy. If it does match, it will turn
   // timeout off and interval on.
-  if (!reuse_connection_ && !last_action && interval_timer_->enabled_) {
-    expectClientCreate();
-    interval_timer_->invokeCallback();
+  if (!reuse_connection_ && interval_timer_->enabled_) {
+    triggerIntervalTimer(true);
   }
 }
 
-void TcpHealthCheckFuzz::triggerIntervalTimer() {
+void TcpHealthCheckFuzz::respond(test::common::upstream::Respond respond) {
+  respondTcp(respond.tcp_respond().data());
+}
+
+void TcpHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
   if (!interval_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Interval timer is disabled. Skipping trigger interval timer.");
     return;
+  }
+  if (expect_client_create) {
+    ENVOY_LOG_MISC(trace, "Creating client");
+    expectClientCreate();
   }
   ENVOY_LOG_MISC(trace, "Triggered interval timer");
   interval_timer_->invokeCallback();
@@ -269,9 +280,8 @@ void TcpHealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
   timeout_timer_->invokeCallback(); // This closes the client, turns off timeout
                                     // and enables interval
   if (!last_action) {
-    ENVOY_LOG_MISC(trace, "Creating client and stream from network timeout");
-    expectClientCreate();
-    interval_timer_->invokeCallback();
+    ENVOY_LOG_MISC(trace, "Will create client and stream from network timeout");
+    triggerIntervalTimer(true);
   }
 }
 
@@ -285,18 +295,16 @@ void TcpHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, 
     if (!interval_timer_->enabled_) {
       return;
     }
-    ENVOY_LOG_MISC(trace, "Creating client from close event");
-    expectClientCreate();
-    interval_timer_->invokeCallback();
+    ENVOY_LOG_MISC(trace, "Will create client from close event");
+    triggerIntervalTimer(true);
   }
 
   // In the specific case of:
   // https://github.com/envoyproxy/envoy/blob/master/source/common/upstream/health_checker_impl.cc#L489
   // This blows away client, should create a new one
   if (event_type == Network::ConnectionEvent::Connected && empty_response_) {
-    ENVOY_LOG_MISC(trace, "Creating client from connected event and empty response.");
-    expectClientCreate();
-    interval_timer_->invokeCallback();
+    ENVOY_LOG_MISC(trace, "Will create client from connected event and empty response.");
+    triggerIntervalTimer(true);
   }
 }
 
@@ -327,7 +335,7 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
 }
 
 // Logic from respondResponseSpec() in unit tests
-void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respond) {
+void GrpcHealthCheckFuzz::respondGrpc(test::common::upstream::GrpcRespond grpc_respond) {
   if (!test_sessions_[0]->timeout_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping response.");
     return;
@@ -402,6 +410,10 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::GrpcRespond grpc_respo
   triggerIntervalTimer(!reuse_connection_ || received_no_error_goaway_);
 
   received_no_error_goaway_ = false; // from resetState()
+}
+
+void GrpcHealthCheckFuzz::respond(test::common::upstream::Respond respond) {
+  respondGrpc(respond.grpc_respond());
 }
 
 void GrpcHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
@@ -540,7 +552,7 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
         break;
       }
       case HealthCheckFuzz::Type::TCP: {
-        tcp_fuzz_test_->triggerIntervalTimer();
+        tcp_fuzz_test_->triggerIntervalTimer(false);
         break;
       }
       case HealthCheckFuzz::Type::GRPC: {
@@ -553,22 +565,7 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
       break;
     }
     case test::common::upstream::Action::kTriggerTimeoutTimer: {
-      switch (type_) {
-      case HealthCheckFuzz::Type::HTTP: {
-        http_fuzz_test_->triggerTimeoutTimer(last_action);
-        break;
-      }
-      case HealthCheckFuzz::Type::TCP: {
-        tcp_fuzz_test_->triggerTimeoutTimer(last_action);
-        break;
-      }
-      case HealthCheckFuzz::Type::GRPC: {
-        grpc_fuzz_test_->triggerTimeoutTimer(last_action);
-        break;
-      }
-      default:
-        break;
-      }
+      triggerTimeoutTimer(last_action);
       break;
     }
     case test::common::upstream::Action::kRaiseEvent: {
