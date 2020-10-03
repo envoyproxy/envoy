@@ -222,6 +222,7 @@ AsyncRequestImpl::AsyncRequestImpl(AsyncClientImpl& parent, absl::string_view se
                                    const Http::AsyncClient::RequestOptions& options)
     : AsyncStreamImpl(parent, service_full_name, method_name, *this, options),
       request_(std::move(request)), callbacks_(callbacks) {
+
   current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
                                          "async " + parent.remote_cluster_name_ + " egress",
                                          parent.time_source_.systemTime());
