@@ -86,7 +86,9 @@ export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
 
 [[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=("--nocache_test_results")
 
-export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
+# TODO(phlax): deprecate/remove this - i believe it was made redundant here:
+#   https://github.com/envoyproxy/envoy/commit/3ebedeb708a23062332a6fcdf33b462b7070adba#diff-2fa22a1337effee365a51e6844be0ab3
+export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS[*]}"
 # Use https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_repository_cache_hardlinks
 # to save disk space.
 BAZEL_BUILD_OPTIONS=(

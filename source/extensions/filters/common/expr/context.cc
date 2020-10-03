@@ -23,6 +23,19 @@ absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header) {
   return CelValue::CreateStringView(header->value().getStringView());
 }
 
+absl::optional<CelValue>
+convertHeaderEntry(Protobuf::Arena& arena,
+                   Http::HeaderUtility::GetAllOfHeaderAsStringResult&& result) {
+  if (!result.result().has_value()) {
+    return {};
+  } else if (!result.backingString().empty()) {
+    return CelValue::CreateString(
+        Protobuf::Arena::Create<std::string>(&arena, result.backingString()));
+  } else {
+    return CelValue::CreateStringView(result.result().value());
+  }
+}
+
 namespace {
 
 absl::optional<CelValue> extractSslInfo(const Ssl::ConnectionInfo& ssl_info,
@@ -171,6 +184,12 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
                                 info_.downstreamSslConnection()->peerCertificatePresented());
   } else if (value == RequestedServerName) {
     return CelValue::CreateString(&info_.requestedServerName());
+  } else if (value == ID) {
+    auto id = info_.connectionID();
+    if (id.has_value()) {
+      return CelValue::CreateUint64(id.value());
+    }
+    return {};
   }
 
   auto ssl_info = info_.downstreamSslConnection();

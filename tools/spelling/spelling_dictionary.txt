@@ -71,6 +71,7 @@ DFATAL
 DGRAM
 DLOG
 DNS
+DNSSEC
 DQUOTE
 DRYs
 DS
@@ -1018,6 +1019,7 @@ sched
 schedulable
 schemas
 scopekey
+sd
 secp
 sendmsg
 sendmmsg

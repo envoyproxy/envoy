@@ -11,8 +11,6 @@
 #include "common/common/logger.h"
 #include "common/common/non_copyable.h"
 
-#include "absl/container/flat_hash_map.h"
-
 namespace Envoy {
 namespace ThreadLocal {
 
@@ -32,45 +30,38 @@ public:
   Event::Dispatcher& dispatcher() override;
 
 private:
+  // On destruction returns the slot index to the deferred delete queue (detaches it). This allows
+  // a slot to be destructed on the main thread while controlling the lifetime of the underlying
+  // slot as callbacks drain from workers.
   struct SlotImpl : public Slot {
-    SlotImpl(InstanceImpl& parent, uint64_t index) : parent_(parent), index_(index) {}
-    ~SlotImpl() override { parent_.removeSlot(*this); }
-
-    // ThreadLocal::Slot
-    ThreadLocalObjectSharedPtr get() override;
-    bool currentThreadRegistered() override;
-    void runOnAllThreads(const UpdateCb& cb) override;
-    void runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) override;
-    void runOnAllThreads(Event::PostCb cb) override { parent_.runOnAllThreads(cb); }
-    void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) override {
-      parent_.runOnAllThreads(cb, main_callback);
-    }
-    void set(InitializeCb cb) override;
-
-    InstanceImpl& parent_;
-    const uint64_t index_;
-  };
-
-  using SlotImplPtr = std::unique_ptr<SlotImpl>;
-
-  // A Wrapper of SlotImpl which on destruction returns the SlotImpl to the deferred delete queue
-  // (detaches it).
-  struct Bookkeeper : public Slot {
-    Bookkeeper(InstanceImpl& parent, SlotImplPtr&& slot);
-    ~Bookkeeper() override { parent_.recycle(std::move(slot_)); }
+    SlotImpl(InstanceImpl& parent, uint32_t index);
+    ~SlotImpl() override { parent_.removeSlot(index_); }
+    Event::PostCb wrapCallback(Event::PostCb&& cb);
+    static bool currentThreadRegisteredWorker(uint32_t index);
+    static ThreadLocalObjectSharedPtr getWorker(uint32_t index);
 
     // ThreadLocal::Slot
     ThreadLocalObjectSharedPtr get() override;
     void runOnAllThreads(const UpdateCb& cb) override;
     void runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) override;
     bool currentThreadRegistered() override;
-    void runOnAllThreads(Event::PostCb cb) override;
-    void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) override;
     void set(InitializeCb cb) override;
 
     InstanceImpl& parent_;
-    SlotImplPtr slot_;
-    std::shared_ptr<uint32_t> ref_count_;
+    const uint32_t index_;
+    // The following is used to safely verify via weak_ptr that this slot is still alive. This
+    // does not prevent all races if a callback does not capture appropriately, but it does fix
+    // the common case of a slot destroyed immediately before anything is posted to a worker.
+    // NOTE: The general safety model of a slot is that it is destroyed immediately on the main
+    //       thread. This means that *all* captures must not reference the slot object directly.
+    //       this is why index_ is captured manually in callbacks that require it.
+    // NOTE: When the slot is destroyed, the index is immediately recycled. This is safe because
+    //       any new posts for a recycled index must come after any previous callbacks for the
+    //       previous owner of the index.
+    // TODO(mattklein123): Add clang-tidy analysis rule to check that "this" is not captured by
+    // a TLS function call. This check will not prevent all bad captures, but it will at least
+    // make the programmer more aware of potential issues.
+    std::shared_ptr<bool> still_alive_guard_;
   };
 
   struct ThreadLocalData {
@@ -78,26 +69,16 @@ private:
     std::vector<ThreadLocalObjectSharedPtr> data_;
   };
 
-  void recycle(SlotImplPtr&& slot);
-  // Cleanup the deferred deletes queue.
-  void scheduleCleanup(SlotImpl* slot);
-
-  void removeSlot(SlotImpl& slot);
+  void removeSlot(uint32_t slot);
   void runOnAllThreads(Event::PostCb cb);
   void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback);
   static void setThreadLocal(uint32_t index, ThreadLocalObjectSharedPtr object);
 
   static thread_local ThreadLocalData thread_local_data_;
 
-  // A indexed container for Slots that has to be deferred to delete due to out-going callbacks
-  // pointing to the Slot. To let the ref_count_ deleter find the SlotImpl by address, the container
-  // is defined as a map of SlotImpl address to the unique_ptr<SlotImpl>.
-  absl::flat_hash_map<SlotImpl*, SlotImplPtr> deferred_deletes_;
-
-  std::vector<SlotImpl*> slots_;
+  std::vector<Slot*> slots_;
   // A list of index of freed slots.
   std::list<uint32_t> free_slot_indexes_;
-
   std::list<std::reference_wrapper<Event::Dispatcher>> registered_threads_;
   std::thread::id main_thread_id_;
   Event::Dispatcher* main_thread_dispatcher_{};
