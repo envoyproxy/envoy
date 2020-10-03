@@ -489,28 +489,7 @@ HealthCheckFuzz::getEventTypeFromProto(const test::common::upstream::RaiseEvent&
 
 void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTestCase input) {
   try {
-    switch (input.health_check_config().health_checker_case()) {
-    case envoy::config::core::v3::HealthCheck::kHttpHealthCheck: {
-      type_ = HealthCheckFuzz::Type::HTTP;
-      http_fuzz_test_ = std::make_unique<HttpHealthCheckFuzz>();
-      http_fuzz_test_->initialize(input);
-      break;
-    }
-    case envoy::config::core::v3::HealthCheck::kTcpHealthCheck: {
-      type_ = HealthCheckFuzz::Type::TCP;
-      tcp_fuzz_test_ = std::make_unique<TcpHealthCheckFuzz>();
-      tcp_fuzz_test_->initialize(input);
-      break;
-    }
-    case envoy::config::core::v3::HealthCheck::kGrpcHealthCheck: {
-      type_ = HealthCheckFuzz::Type::GRPC;
-      grpc_fuzz_test_ = std::make_unique<GrpcHealthCheckFuzz>();
-      grpc_fuzz_test_->initialize(input);
-      break;
-    }
-    default:
-      break;
-    }
+    initialize(input);
   } catch (EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     return;
@@ -526,42 +505,11 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
     ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
     switch (event.action_selector_case()) {
     case test::common::upstream::Action::kRespond: {
-      switch (type_) {
-      case HealthCheckFuzz::Type::HTTP: {
-        http_fuzz_test_->respond(event.respond().http_respond().headers(),
-                                 event.respond().http_respond().status());
-        break;
-      }
-      case HealthCheckFuzz::Type::TCP: {
-        tcp_fuzz_test_->respond(event.respond().tcp_respond().data(), last_action);
-        break;
-      }
-      case HealthCheckFuzz::Type::GRPC: {
-        grpc_fuzz_test_->respond(event.respond().grpc_respond());
-        break;
-      }
-      default:
-        break;
-      }
+      respond(event.respond());
       break;
     }
     case test::common::upstream::Action::kTriggerIntervalTimer: {
-      switch (type_) {
-      case HealthCheckFuzz::Type::HTTP: {
-        http_fuzz_test_->triggerIntervalTimer(false);
-        break;
-      }
-      case HealthCheckFuzz::Type::TCP: {
-        tcp_fuzz_test_->triggerIntervalTimer(false);
-        break;
-      }
-      case HealthCheckFuzz::Type::GRPC: {
-        grpc_fuzz_test_->triggerIntervalTimer(false);
-        break;
-      }
-      default:
-        break;
-      }
+      triggerIntervalTimer(false);
       break;
     }
     case test::common::upstream::Action::kTriggerTimeoutTimer: {
@@ -569,22 +517,7 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
       break;
     }
     case test::common::upstream::Action::kRaiseEvent: {
-      switch (type_) {
-      case HealthCheckFuzz::Type::HTTP: {
-        http_fuzz_test_->raiseEvent(getEventTypeFromProto(event.raise_event()), last_action);
-        break;
-      }
-      case HealthCheckFuzz::Type::TCP: {
-        tcp_fuzz_test_->raiseEvent(getEventTypeFromProto(event.raise_event()), last_action);
-        break;
-      }
-      case HealthCheckFuzz::Type::GRPC: {
-        grpc_fuzz_test_->raiseEvent(getEventTypeFromProto(event.raise_event()), last_action);
-        break;
-      }
-      default:
-        break;
-      }
+      raiseEvent(getEventTypeFromProto(event.raise_event(), last_action));
       break;
     }
     default:
