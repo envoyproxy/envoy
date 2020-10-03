@@ -2,6 +2,7 @@
 
 #include "common/upstream/health_checker_impl.h"
 
+#include "test/common/http/common.h"
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -85,6 +86,48 @@ public:
   Event::MockTimer* timeout_timer_{};
   Event::MockTimer* interval_timer_{};
   Network::ReadFilterSharedPtr read_filter_;
+};
+
+class TestGrpcHealthCheckerImpl : public GrpcHealthCheckerImpl {
+public:
+  using GrpcHealthCheckerImpl::GrpcHealthCheckerImpl;
+
+  Http::CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& conn_data) override {
+    auto codec_client = createCodecClient_(conn_data);
+    return Http::CodecClientPtr(codec_client);
+  };
+
+  // GrpcHealthCheckerImpl
+  MOCK_METHOD(Http::CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData&));
+};
+
+class GrpcHealthCheckerImplTestBaseUtils : public HealthCheckerTestBase {
+public:
+  struct TestSession {
+    TestSession() = default;
+
+    Event::MockTimer* interval_timer_{};
+    Event::MockTimer* timeout_timer_{};
+    Http::MockClientConnection* codec_{};
+    Stats::IsolatedStoreImpl stats_store_;
+    Network::MockClientConnection* client_connection_{};
+    NiceMock<Http::MockRequestEncoder> request_encoder_;
+    Http::ResponseDecoder* stream_response_callbacks_{};
+    CodecClientForTest* codec_client_{};
+  };
+
+  using TestSessionPtr = std::unique_ptr<TestSession>;
+
+  GrpcHealthCheckerImplTestBaseUtils();
+
+  void expectSessionCreate();
+  void expectClientCreate(size_t index);
+  void expectStreamCreate(size_t index);
+
+  std::vector<TestSessionPtr> test_sessions_;
+  std::shared_ptr<TestGrpcHealthCheckerImpl> health_checker_;
+  std::list<uint32_t> connection_index_{};
+  std::list<uint32_t> codec_index_{};
 };
 
 } // namespace Upstream
