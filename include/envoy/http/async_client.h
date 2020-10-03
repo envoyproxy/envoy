@@ -228,6 +228,7 @@ public:
     // Provides the hash policy for hashing load balancing strategies.
     Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy> hash_policy;
 
+    // Provides parent context. Currently, this holds stream info from the caller.
     ParentContext parent_context;
   };
 

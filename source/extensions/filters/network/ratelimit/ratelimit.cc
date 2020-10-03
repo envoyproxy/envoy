@@ -49,7 +49,8 @@ Network::FilterStatus Filter::onNewConnection() {
     config_->stats().active_.inc();
     config_->stats().total_.inc();
     calling_limit_ = true;
-    client_->limit(*this, config_->domain(), config_->descriptors(), Tracing::NullSpan::instance());
+    client_->limit(*this, config_->domain(), config_->descriptors(), Tracing::NullSpan::instance(),
+                   filter_callbacks_->connection().streamInfo());
     calling_limit_ = false;
   }
 
