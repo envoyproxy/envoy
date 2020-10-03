@@ -1,0 +1,19 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: envoy-front-proxy
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+      - image: turbinelabs/envoy-simple:0.17.2
+        imagePullPolicy: Always
+        name: envoy-simple
+        ports:
+          - containerPort: 80
+        env:
+          - name: ENVOY_XDS_HOST
+            value: "control-plane.svc.cluster.local" # Wherever your xDS implementation lives
+          - name: ENVOY_XDS_PORT
+            value: "50000"
