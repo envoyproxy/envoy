@@ -30,7 +30,6 @@ public:
   virtual void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) PURE;
 
   virtual ~HealthCheckFuzz() = default;
-  Type type_;
 
 private:
   Network::ConnectionEvent getEventTypeFromProto(const test::common::upstream::RaiseEvent& event);
