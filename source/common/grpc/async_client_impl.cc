@@ -16,8 +16,8 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
                                  const envoy::config::core::v3::GrpcService& config,
                                  TimeSource& time_source)
     : cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
-      host_name_(config.envoy_grpc().authority()), initial_metadata_(config.initial_metadata()),
-      time_source_(time_source) {}
+      host_name_(config.envoy_grpc().authority()), time_source_(time_source),
+      metadata_parser_(Router::HeaderParser::configure(config.initial_metadata(), false)) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
@@ -63,11 +63,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
                                  absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
                                  const Http::AsyncClient::StreamOptions& options)
     : parent_(parent), service_full_name_(service_full_name), method_name_(method_name),
-      callbacks_(callbacks), options_(options) {
-  if (options_.parent_context.stream_info != nullptr) {
-    metadata_parser_ = Router::HeaderParser::configure(parent_.initial_metadata_, false);
-  }
-}
+      callbacks_(callbacks), options_(options) {}
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   if (parent_.cm_.get(parent_.remote_cluster_name_) == nullptr) {
@@ -91,17 +87,10 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   headers_message_ = Common::prepareHeaders(
       parent_.host_name_.empty() ? parent_.remote_cluster_name_ : parent_.host_name_,
       service_full_name_, method_name_, options_.timeout);
+
   // Fill service-wide initial metadata.
-  if (options_.parent_context.stream_info != nullptr) {
-    ASSERT(metadata_parser_ != nullptr);
-    metadata_parser_->evaluateHeaders(headers_message_->headers(),
-                                      *options_.parent_context.stream_info);
-  } else {
-    for (const auto& header_value : parent_.initial_metadata_) {
-      headers_message_->headers().addCopy(Http::LowerCaseString(header_value.key()),
-                                          header_value.value());
-    }
-  }
+  parent_.metadata_parser_->evaluateHeaders(headers_message_->headers(),
+                                            options_.parent_context.stream_info);
 
   callbacks_.onCreateInitialMetadata(headers_message_->headers());
   stream_->sendHeaders(headers_message_->headers(), false);
@@ -233,7 +222,6 @@ AsyncRequestImpl::AsyncRequestImpl(AsyncClientImpl& parent, absl::string_view se
                                    const Http::AsyncClient::RequestOptions& options)
     : AsyncStreamImpl(parent, service_full_name, method_name, *this, options),
       request_(std::move(request)), callbacks_(callbacks) {
-
   current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
                                          "async " + parent.remote_cluster_name_ + " egress",
                                          parent.time_source_.systemTime());

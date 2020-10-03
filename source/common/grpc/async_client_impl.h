@@ -40,9 +40,9 @@ private:
   const std::string remote_cluster_name_;
   // The host header value in the http transport.
   const std::string host_name_;
-  const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> initial_metadata_;
   std::list<AsyncStreamImplPtr> active_streams_;
   TimeSource& time_source_;
+  Router::HeaderParserPtr metadata_parser_;
 
   friend class AsyncRequestImpl;
   friend class AsyncStreamImpl;
@@ -98,7 +98,6 @@ private:
   Decoder decoder_;
   // This is a member to avoid reallocation on every onData().
   std::vector<Frame> decoded_frames_;
-  Router::HeaderParserPtr metadata_parser_;
 
   friend class AsyncClientImpl;
 };

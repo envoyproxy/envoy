@@ -170,7 +170,7 @@ public:
   virtual ~AsyncClient() = default;
 
   /**
-   * A context from a caller of this async client.
+   * A context from the caller of an async client.
    */
   struct ParentContext {
     const StreamInfo::StreamInfo* stream_info;

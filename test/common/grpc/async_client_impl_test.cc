@@ -28,9 +28,11 @@ public:
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
     envoy::config::core::v3::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
-    auto& entry = *config.mutable_initial_metadata()->Add();
-    entry.set_key("downstream-local-address");
-    entry.set_value("%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%");
+
+    auto& initial_metadata_entry = *config.mutable_initial_metadata()->Add();
+    initial_metadata_entry.set_key("downstream-local-address");
+    initial_metadata_entry.set_value("%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%");
+
     grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
     ON_CALL(cm_, httpAsyncClientForCluster("test_cluster")).WillByDefault(ReturnRef(http_client_));
   }

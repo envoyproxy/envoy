@@ -58,7 +58,7 @@ public:
   void cancel() override;
   void limit(RequestCallbacks& callbacks, const std::string& domain,
              const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-             Tracing::Span& parent_span) override;
+             Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) override;
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}

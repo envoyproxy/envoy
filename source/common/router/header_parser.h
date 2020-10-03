@@ -49,6 +49,7 @@ public:
       const Protobuf::RepeatedPtrField<std::string>& headers_to_remove);
 
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const;
+  void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo* stream_info) const;
 
 protected:
   HeaderParser() = default;
@@ -56,6 +57,7 @@ protected:
 private:
   std::vector<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> headers_to_add_;
   std::vector<Http::LowerCaseString> headers_to_remove_;
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> headers_to_add_copy_;
 };
 
 } // namespace Router

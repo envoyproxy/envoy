@@ -982,6 +982,57 @@ request_headers_to_add:
   EXPECT_TRUE(header_map.has("x-client-ip-port"));
 }
 
+TEST(HeaderParserTest, EvaluateHeadersWithNullStreamInfo) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: "www2"
+  prefix_rewrite: "/api/new_endpoint"
+request_headers_to_add:
+  - header:
+      key: "x-client-ip"
+      value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    append: true
+  - header:
+      key: "x-client-ip-port"
+      value: "%DOWNSTREAM_REMOTE_ADDRESS%"
+    append: true
+)EOF";
+
+  HeaderParserPtr req_header_parser =
+      HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add());
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
+  req_header_parser->evaluateHeaders(header_map, nullptr);
+  EXPECT_TRUE(header_map.has("x-client-ip"));
+  EXPECT_TRUE(header_map.has("x-client-ip-port"));
+  EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", header_map.get_("x-client-ip"));
+  EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS%", header_map.get_("x-client-ip-port"));
+}
+
+TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> headers_values;
+
+  auto& first_entry = *headers_values.Add();
+  first_entry.set_key("key");
+  first_entry.set_value("ok");
+
+  HeaderParserPtr req_header_parser_add = HeaderParser::configure(headers_values, /*append=*/true);
+  req_header_parser_add->evaluateHeaders(header_map, nullptr);
+  EXPECT_TRUE(header_map.has("key"));
+  EXPECT_EQ("ok", header_map.get_("key"));
+
+  headers_values.Clear();
+  auto& set_entry = *headers_values.Add();
+  set_entry.set_key("key");
+  set_entry.set_value("great");
+
+  HeaderParserPtr req_header_parser_set = HeaderParser::configure(headers_values, /*append=*/false);
+  req_header_parser_set->evaluateHeaders(header_map, nullptr);
+  EXPECT_TRUE(header_map.has("key"));
+  EXPECT_EQ("great", header_map.get_("key"));
+}
+
 TEST(HeaderParserTest, EvaluateEmptyHeaders) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
