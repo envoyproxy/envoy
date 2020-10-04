@@ -2,8 +2,6 @@
 
 #include <chrono>
 
-#include "common/http/url_utility.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
