@@ -39,11 +39,12 @@ genrule(
     srcs = [
         ":configs",
         "//examples:configs",
+        "//docs:configs",
         "//test/config/integration/certs",
     ],
     outs = ["example_configs.tar"],
     cmd = "$(location configgen.sh) $(location configgen) $(@D) $(locations :configs) " +
-          "$(locations //examples:configs) $(locations //test/config/integration/certs)",
+          "$(locations //examples:configs) $(locations //docs:configs) $(locations //test/config/integration/certs)",
     tools = [
         "configgen.sh",
         ":configgen",
