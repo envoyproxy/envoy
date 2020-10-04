@@ -31,7 +31,7 @@ message FileAccessLog {
   reserved "format", "json_format", "typed_json_format";
 
   // A path to a local file to which to write the access log entries.
-  string path = 1 [(validate.rules).string = {min_bytes: 1}];
+  string path = 1 [(validate.rules).string = {min_len: 1}];
 
   oneof access_log_format {
     // Configuration to form access log data and format.

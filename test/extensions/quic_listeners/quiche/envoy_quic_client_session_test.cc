@@ -1,14 +1,16 @@
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
 
 #include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "extensions/quic_listeners/quiche/envoy_quic_client_session.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_client_connection.h"
@@ -97,7 +99,6 @@ public:
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
           SetQuicReloadableFlag(quic_disable_version_draft_27, !GetParam());
-          SetQuicReloadableFlag(quic_disable_version_draft_25, !GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -215,9 +216,13 @@ TEST_P(EnvoyQuicClientSessionTest, OnGoAwayFrame) {
   Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;
 
-  quic::QuicGoAwayFrame goaway;
   EXPECT_CALL(http_connection_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
-  quic_connection_->OnGoAwayFrame(goaway);
+  if (quic::VersionUsesHttp3(quic_version_[0].transport_version)) {
+    envoy_quic_session_.OnHttp3GoAway(4u);
+  } else {
+    quic::QuicGoAwayFrame goaway;
+    quic_connection_->OnGoAwayFrame(goaway);
+  }
 }
 
 TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {

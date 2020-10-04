@@ -1,5 +1,7 @@
 #include "common/http/utility.h"
 
+#include <http_parser.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -224,6 +226,43 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 
 namespace Http {
 
+static const char kDefaultPath[] = "/";
+
+bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
+  struct http_parser_url u;
+  http_parser_url_init(&u);
+  const int result =
+      http_parser_parse_url(absolute_url.data(), absolute_url.length(), is_connect, &u);
+
+  if (result != 0) {
+    return false;
+  }
+  if ((u.field_set & (1 << UF_HOST)) != (1 << UF_HOST) &&
+      (u.field_set & (1 << UF_SCHEMA)) != (1 << UF_SCHEMA)) {
+    return false;
+  }
+  scheme_ = absl::string_view(absolute_url.data() + u.field_data[UF_SCHEMA].off,
+                              u.field_data[UF_SCHEMA].len);
+
+  uint16_t authority_len = u.field_data[UF_HOST].len;
+  if ((u.field_set & (1 << UF_PORT)) == (1 << UF_PORT)) {
+    authority_len = authority_len + u.field_data[UF_PORT].len + 1;
+  }
+  host_and_port_ =
+      absl::string_view(absolute_url.data() + u.field_data[UF_HOST].off, authority_len);
+
+  // RFC allows the absolute-uri to not end in /, but the absolute path form
+  // must start with
+  uint64_t path_len = absolute_url.length() - (u.field_data[UF_HOST].off + hostAndPort().length());
+  if (path_len > 0) {
+    uint64_t path_beginning = u.field_data[UF_HOST].off + hostAndPort().length();
+    path_and_query_params_ = absl::string_view(absolute_url.data() + path_beginning, path_len);
+  } else if (!is_connect) {
+    path_and_query_params_ = absl::string_view(kDefaultPath, 1);
+  }
+  return true;
+}
+
 void Utility::appendXff(RequestHeaderMap& headers,
                         const Network::Address::Instance& remote_address) {
   if (remote_address.type() != Network::Address::Type::Ip) {
@@ -318,7 +357,7 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
     if (header.key() == Http::Headers::get().Cookie.get()) {
 
       // Split the cookie header into individual cookies.
-      for (const auto s : StringUtil::splitToken(header.value().getStringView(), ";")) {
+      for (const auto& s : StringUtil::splitToken(header.value().getStringView(), ";")) {
         // Find the key part of the cookie (i.e. the name of the cookie).
         size_t first_non_space = s.find_first_not_of(" ");
         size_t equals_index = s.find('=');
@@ -435,11 +474,16 @@ Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions&
 
 void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
                              const LocalReplyData& local_reply_data) {
+  absl::string_view details;
+  if (callbacks.streamInfo().responseCodeDetails().has_value()) {
+    details = callbacks.streamInfo().responseCodeDetails().value();
+  };
+
   sendLocalReply(
       is_reset,
       Utility::EncodeFunctions{nullptr, nullptr,
                                [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-                                 callbacks.encodeHeaders(std::move(headers), end_stream);
+                                 callbacks.encodeHeaders(std::move(headers), end_stream, details);
                                },
                                [&](Buffer::Instance& data, bool end_stream) -> void {
                                  callbacks.encodeData(data, end_stream);

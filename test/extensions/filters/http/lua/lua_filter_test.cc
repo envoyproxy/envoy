@@ -790,7 +790,10 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
       for key, value in pairs(headers) do
         request_handle:logTrace(key .. " " .. value)
       end
+      request_handle:logTrace(string.len(body))
       request_handle:logTrace(body)
+      request_handle:logTrace(string.byte(body, 5))
+      request_handle:logTrace(string.sub(body, 6, 8))
     end
   )EOF"};
 
@@ -828,9 +831,13 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
 
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  response_message->body() = std::make_unique<Buffer::OwnedImpl>("response");
+  const char response[8] = {'r', 'e', 's', 'p', '\0', 'n', 's', 'e'};
+  response_message->body().add(response, 8);
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("8")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("resp")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("0")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("nse")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers());
   callbacks->onSuccess(request, std::move(response_message));
@@ -892,7 +899,7 @@ TEST_F(LuaHttpFilterTest, HttpCallAsyncFalse) {
 
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  response_message->body() = std::make_unique<Buffer::OwnedImpl>("response");
+  response_message->body().add("response");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
@@ -1011,7 +1018,7 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
 
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  response_message->body() = std::make_unique<Buffer::OwnedImpl>("response");
+  response_message->body().add("response");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
   EXPECT_CALL(cluster_manager_, get(Eq("cluster2")));
@@ -1864,6 +1871,8 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():tlsVersion())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():urlEncodedPemEncodedPeerCertificate())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():urlEncodedPemEncodedPeerCertificateChain())
+
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():sessionId())
       end
     end
   )EOF"};
@@ -1951,6 +1960,10 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
   EXPECT_CALL(*connection_info, urlEncodedPemEncodedPeerCertificateChain())
       .WillOnce(ReturnRef(peer_cert_chain));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(peer_cert_chain)));
+
+  const std::string id = "12345";
+  EXPECT_CALL(*connection_info, sessionId()).WillRepeatedly(ReturnRef(id));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(id)));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
@@ -2204,6 +2217,11 @@ TEST_F(LuaHttpFilterTest, LuaFilterBase64Escape) {
     function envoy_on_response(response_handle)
       local base64Encoded = response_handle:base64Escape("barfoo")
       response_handle:logTrace(base64Encoded)
+
+      local resp_body_buf = response_handle:body()
+      local resp_body = resp_body_buf:getBytes(0, resp_body_buf:length())
+      local b64_resp_body = response_handle:base64Escape(resp_body)
+      response_handle:logTrace(b64_resp_body)
     end
   )EOF"};
 
@@ -2216,9 +2234,69 @@ TEST_F(LuaHttpFilterTest, LuaFilterBase64Escape) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("YmFyZm9v")));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers, false));
+
+  // Base64 encoding should also work for binary data.
+  uint8_t buffer[34] = {31, 139, 8,  0, 0, 0, 0, 0,   0,   255, 202, 72,  205, 201, 201, 47, 207,
+                        47, 202, 73, 1, 4, 0, 0, 255, 255, 173, 32,  235, 249, 10,  0,   0,  0};
+  Buffer::OwnedImpl response_body(buffer, 34);
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace,
+                                  StrEq("H4sIAAAAAAAA/8pIzcnJL88vykkBBAAA//+tIOv5CgAAAA==")));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
+}
+
+TEST_F(LuaHttpFilterTest, LuaFilterSetResponseBuffer) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local content_length = response_handle:body():setBytes("1234")
+      response_handle:logTrace(content_length)
+
+      -- It is possible to replace an entry in headers after overridding encoding buffer.
+      response_handle:headers():replace("content-length", content_length)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl response_body("1234567890");
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("4")));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
+  EXPECT_EQ(4, encoder_callbacks_.buffer_->length());
+}
+
+TEST_F(LuaHttpFilterTest, LuaFilterSetResponseBufferChunked) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local last
+      for chunk in response_handle:bodyChunks() do
+        chunk:setBytes("")
+        last = chunk
+      end
+      response_handle:logTrace(last:setBytes("1234"))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+
+  Buffer::OwnedImpl response_body("1234567890");
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("4")));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, true));
 }
 
 } // namespace

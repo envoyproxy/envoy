@@ -34,7 +34,7 @@ ParsingResult<absl::optional<CBS>> Asn1Utility::getOptional(CBS& cbs, unsigned t
     return "Failed to parse ASN.1 element tag";
   }
 
-  return is_present ? absl::optional(data) : absl::nullopt;
+  return is_present ? absl::optional<CBS>(data) : absl::nullopt;
 }
 
 ParsingResult<std::string> Asn1Utility::parseOid(CBS& cbs) {

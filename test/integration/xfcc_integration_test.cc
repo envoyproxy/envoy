@@ -118,8 +118,7 @@ Network::ClientConnectionPtr XfccIntegrationTest::makeMtlsClientConnection() {
 }
 
 void XfccIntegrationTest::createUpstreams() {
-  fake_upstreams_.emplace_back(new FakeUpstream(
-      createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+  addFakeUpstream(createUpstreamSslContext(), FakeHttpConnection::Type::HTTP1);
 }
 
 void XfccIntegrationTest::initialize() {
@@ -745,6 +744,8 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"server.parent_connections", "server.parent_connections"},
       {"server.total_connections", "server.total_connections"},
       {"server.days_until_first_cert_expiring", "server.days_until_first_cert_expiring"},
+      {"server.seconds_until_first_ocsp_response_expiring",
+       "server.seconds_until_first_ocsp_response_expiring"},
       {"server.version", "server.version"}};
 
   auto test_name_against_mapping =

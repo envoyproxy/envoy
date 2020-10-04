@@ -648,10 +648,12 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
 }
 
 void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) {
-  tls_->runOnAllThreads([this, new_cluster = cluster.cluster_->info(),
-                         thread_aware_lb_factory = cluster.loadBalancerFactory()]() -> void {
+  tls_->runOnAllThreads([new_cluster = cluster.cluster_->info(),
+                         thread_aware_lb_factory = cluster.loadBalancerFactory()](
+                            ThreadLocal::ThreadLocalObjectSharedPtr object)
+                            -> ThreadLocal::ThreadLocalObjectSharedPtr {
     ThreadLocalClusterManagerImpl& cluster_manager =
-        tls_->getTyped<ThreadLocalClusterManagerImpl>();
+        object->asType<ThreadLocalClusterManagerImpl>();
 
     if (cluster_manager.thread_local_clusters_.count(new_cluster->name()) > 0) {
       ENVOY_LOG(debug, "updating TLS cluster {}", new_cluster->name());
@@ -665,6 +667,8 @@ void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) 
     for (auto& cb : cluster_manager.update_callbacks_) {
       cb->onClusterAddOrUpdate(*thread_local_cluster);
     }
+
+    return object;
   });
 }
 
@@ -678,9 +682,10 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
     active_clusters_.erase(existing_active_cluster);
 
     ENVOY_LOG(info, "removing cluster {}", cluster_name);
-    tls_->runOnAllThreads([this, cluster_name]() -> void {
+    tls_->runOnAllThreads([cluster_name](ThreadLocal::ThreadLocalObjectSharedPtr object)
+                              -> ThreadLocal::ThreadLocalObjectSharedPtr {
       ThreadLocalClusterManagerImpl& cluster_manager =
-          tls_->getTyped<ThreadLocalClusterManagerImpl>();
+          object->asType<ThreadLocalClusterManagerImpl>();
 
       ASSERT(cluster_manager.thread_local_clusters_.count(cluster_name) == 1);
       ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
@@ -688,6 +693,7 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
         cb->onClusterRemoval(cluster_name);
       }
       cluster_manager.thread_local_clusters_.erase(cluster_name);
+      return object;
     });
   }
 
@@ -822,6 +828,31 @@ ThreadLocalCluster* ClusterManagerImpl::get(absl::string_view cluster) {
   }
 }
 
+void ClusterManagerImpl::maybePrefetch(
+    ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry,
+    std::function<ConnectionPool::Instance*()> pick_prefetch_pool) {
+  // TODO(alyssawilk) As currently implemented, this will always just prefetch
+  // one connection ahead of actually needed connections.
+  //
+  // Instead we want to track the following metrics across the entire connection
+  // pool and use the same algorithm we do for per-upstream prefetch:
+  // ((pending_streams_ + num_active_streams_) * global_prefetch_ratio >
+  //  (connecting_stream_capacity_ + num_active_streams_)))
+  //  and allow multiple prefetches per pick.
+  //  Also cap prefetches such that
+  //  num_unused_prefetch < num hosts
+  //  since if we have more prefetches than hosts, we should consider kicking into
+  //  per-upstream prefetch.
+  //
+  //  Once we do this, this should loop capped number of times while shouldPrefetch is true.
+  if (cluster_entry->cluster_info_->peekaheadRatio() > 1.0) {
+    ConnectionPool::Instance* prefetch_pool = pick_prefetch_pool();
+    if (prefetch_pool) {
+      prefetch_pool->maybePrefetch(cluster_entry->cluster_info_->peekaheadRatio());
+    }
+  }
+}
+
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
                                            absl::optional<Http::Protocol> protocol,
@@ -834,7 +865,19 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
   }
 
   // Select a host and create a connection pool for it if it does not already exist.
-  return entry->second->connPool(priority, protocol, context);
+  auto ret = entry->second->connPool(priority, protocol, context, false);
+
+  // Now see if another host should be prefetched.
+  // httpConnPoolForCluster is called immediately before a call for newStream. newStream doesn't
+  // have the load balancer context needed to make selection decisions so prefetching must be
+  // performed here in anticipation of the new stream.
+  // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
+  // code-enforced.
+  maybePrefetch(entry->second, [&entry, &priority, &protocol, &context]() {
+    return entry->second->connPool(priority, protocol, context, true);
+  });
+
+  return ret;
 }
 
 Tcp::ConnectionPool::Instance*
@@ -848,14 +891,29 @@ ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePr
   }
 
   // Select a host and create a connection pool for it if it does not already exist.
-  return entry->second->tcpConnPool(priority, context);
+  auto ret = entry->second->tcpConnPool(priority, context, false);
+
+  // tcpConnPoolForCluster is called immediately before a call for newConnection. newConnection
+  // doesn't have the load balancer context needed to make selection decisions so prefetching must
+  // be performed here in anticipation of the new connection.
+  // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
+  // code-enforced.
+  // Now see if another host should be prefetched.
+  maybePrefetch(entry->second, [&entry, &priority, &context]() {
+    return entry->second->tcpConnPool(priority, context, true);
+  });
+
+  return ret;
 }
 
 void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
                                                          const HostVector& hosts_removed) {
-  tls_->runOnAllThreads([this, name = cluster.info()->name(), hosts_removed]() {
-    ThreadLocalClusterManagerImpl::removeHosts(name, hosts_removed, *tls_);
-  });
+  tls_->runOnAllThreads(
+      [name = cluster.info()->name(), hosts_removed](ThreadLocal::ThreadLocalObjectSharedPtr object)
+          -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        object->asType<ThreadLocalClusterManagerImpl>().removeHosts(name, hosts_removed);
+        return object;
+      });
 }
 
 void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
@@ -863,19 +921,25 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
                                                       const HostVector& hosts_removed) {
   const auto& host_set = cluster.prioritySet().hostSetsPerPriority()[priority];
 
-  tls_->runOnAllThreads([this, name = cluster.info()->name(), priority,
+  tls_->runOnAllThreads([name = cluster.info()->name(), priority,
                          update_params = HostSetImpl::updateHostsParams(*host_set),
                          locality_weights = host_set->localityWeights(), hosts_added, hosts_removed,
-                         overprovisioning_factor = host_set->overprovisioningFactor()]() {
-    ThreadLocalClusterManagerImpl::updateClusterMembership(
-        name, priority, update_params, locality_weights, hosts_added, hosts_removed, *tls_,
+                         overprovisioning_factor = host_set->overprovisioningFactor()](
+                            ThreadLocal::ThreadLocalObjectSharedPtr object)
+                            -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    object->asType<ThreadLocalClusterManagerImpl>().updateClusterMembership(
+        name, priority, update_params, locality_weights, hosts_added, hosts_removed,
         overprovisioning_factor);
+    return object;
   });
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
-  tls_->runOnAllThreads(
-      [this, host] { ThreadLocalClusterManagerImpl::onHostHealthFailure(host, *tls_); });
+  tls_->runOnAllThreads([host](ThreadLocal::ThreadLocalObjectSharedPtr object)
+                            -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    object->asType<ThreadLocalClusterManagerImpl>().onHostHealthFailure(host);
+    return object;
+  });
 }
 
 Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::string& cluster,
@@ -1111,13 +1175,10 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeTcpConn(
   }
 }
 
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeHosts(const std::string& name,
-                                                                    const HostVector& hosts_removed,
-                                                                    ThreadLocal::Slot& tls) {
-  ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
-
-  ASSERT(config.thread_local_clusters_.find(name) != config.thread_local_clusters_.end());
-  const auto& cluster_entry = config.thread_local_clusters_[name];
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeHosts(
+    const std::string& name, const HostVector& hosts_removed) {
+  ASSERT(thread_local_clusters_.find(name) != thread_local_clusters_.end());
+  const auto& cluster_entry = thread_local_clusters_[name];
   ENVOY_LOG(debug, "removing hosts for TLS cluster {} removed {}", name, hosts_removed.size());
 
   // We need to go through and purge any connection pools for hosts that got deleted.
@@ -1129,11 +1190,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeHosts(const std::s
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, uint32_t priority, PrioritySet::UpdateHostsParams update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-    const HostVector& hosts_removed, ThreadLocal::Slot& tls, uint64_t overprovisioning_factor) {
-  ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
-
-  ASSERT(config.thread_local_clusters_.find(name) != config.thread_local_clusters_.end());
-  const auto& cluster_entry = config.thread_local_clusters_[name];
+    const HostVector& hosts_removed, uint64_t overprovisioning_factor) {
+  ASSERT(thread_local_clusters_.find(name) != thread_local_clusters_.end());
+  const auto& cluster_entry = thread_local_clusters_[name];
   ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
             hosts_added.size(), hosts_removed.size());
   cluster_entry->priority_set_.updateHosts(priority, std::move(update_hosts_params),
@@ -1148,7 +1207,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
-    const HostSharedPtr& host, ThreadLocal::Slot& tls) {
+    const HostSharedPtr& host) {
 
   // Drain all HTTP connection pool connections in the case of a host health failure. If outlier/
   // health is due to ECMP flow hashing issues for example, a new set of connections might do
@@ -1156,9 +1215,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
   // TODO(mattklein123): This function is currently very specific, but in the future when we do
   // more granular host set changes, we should be able to capture single host changes and make them
   // more targeted.
-  ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
   {
-    const auto container = config.getHttpConnPoolsContainer(host);
+    const auto container = getHttpConnPoolsContainer(host);
     if (container != nullptr) {
       container->pools_->drainConnections();
     }
@@ -1168,8 +1226,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     // connections being closed, it only prevents new connections through the pool. The
     // CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE can be used to make the pool close any
     // active connections.
-    const auto& container = config.host_tcp_conn_pool_map_.find(host);
-    if (container != config.host_tcp_conn_pool_map_.end()) {
+    const auto& container = host_tcp_conn_pool_map_.find(host);
+    if (container != host_tcp_conn_pool_map_.end()) {
       for (const auto& pair : container->second.pools_) {
         const Tcp::ConnectionPool::InstancePtr& pool = pair.second;
         if (host->cluster().features() &
@@ -1198,8 +1256,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     // in the configuration documentation in cluster setting
     // "close_connections_on_host_health_failure". Update the docs if this if this changes.
     while (true) {
-      const auto& it = config.host_tcp_conn_map_.find(host);
-      if (it == config.host_tcp_conn_map_.end()) {
+      const auto& it = host_tcp_conn_map_.find(host);
+      if (it == host_tcp_conn_map_.end()) {
         break;
       }
       TcpConnectionsMap& container = it->second;
@@ -1292,8 +1350,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
-    LoadBalancerContext* context) {
-  HostConstSharedPtr host = lb_->chooseHost(context);
+    LoadBalancerContext* context, bool peek) {
+  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
     ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
     cluster_info_->stats().upstream_cx_none_healthy_.inc();
@@ -1352,8 +1410,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
-    ResourcePriority priority, LoadBalancerContext* context) {
-  HostConstSharedPtr host = lb_->chooseHost(context);
+    ResourcePriority priority, LoadBalancerContext* context, bool peek) {
+  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
     ENVOY_LOG(debug, "no healthy host for TCP connection pool");
     cluster_info_->stats().upstream_cx_none_healthy_.inc();
@@ -1408,13 +1466,13 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
   if (protocol == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
-    return Http::Http2::allocateConnPool(dispatcher, host, priority, options,
+    return Http::Http2::allocateConnPool(dispatcher, random_, host, priority, options,
                                          transport_socket_options);
   } else if (protocol == Http::Protocol::Http3) {
     // Quic connection pool is not implemented.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   } else {
-    return Http::Http1::allocateConnPool(dispatcher, host, priority, options,
+    return Http::Http1::allocateConnPool(dispatcher, random_, host, priority, options,
                                          transport_socket_options);
   }
 }

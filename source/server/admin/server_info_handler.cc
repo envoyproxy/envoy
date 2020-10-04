@@ -88,6 +88,7 @@ Http::Code ServerInfoHandler::handlerServerInfo(absl::string_view, Http::Respons
   envoy::admin::v3::CommandLineOptions* command_line_options =
       server_info.mutable_command_line_options();
   *command_line_options = *server_.options().toCommandLineOptions();
+  server_info.mutable_node()->MergeFrom(server_.localInfo().node());
   response.add(MessageUtil::getJsonStringFromMessage(server_info, true, true));
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   return Http::Code::OK;

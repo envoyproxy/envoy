@@ -236,7 +236,19 @@ message RuntimeUInt32 {
   uint32 default_value = 2;
 
   // Runtime key to get value for comparison. This value is used if defined.
-  string runtime_key = 3 [(validate.rules).string = {min_bytes: 1}];
+  string runtime_key = 3 [(validate.rules).string = {min_len: 1}];
+}
+
+// Runtime derived percentage with a default when not specified.
+message RuntimePercent {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.core.v3.RuntimePercent";
+
+  // Default value if runtime value is not available.
+  type.v3.Percent default_value = 1;
+
+  // Runtime key to get value for comparison. This value is used if defined.
+  string runtime_key = 2 [(validate.rules).string = {min_len: 1}];
 }
 
 // Runtime derived double with a default when not specified.
@@ -247,7 +259,7 @@ message RuntimeDouble {
   double default_value = 1;
 
   // Runtime key to get value for comparison. This value is used if defined.
-  string runtime_key = 2 [(validate.rules).string = {min_bytes: 1}];
+  string runtime_key = 2 [(validate.rules).string = {min_len: 1}];
 }
 
 // Runtime derived bool with a default when not specified.
@@ -261,7 +273,7 @@ message RuntimeFeatureFlag {
   // Runtime key to get value for comparison. This value is used if defined. The boolean value must
   // be represented via its
   // `canonical JSON encoding <https://developers.google.com/protocol-buffers/docs/proto3#json>`_.
-  string runtime_key = 2 [(validate.rules).string = {min_bytes: 1}];
+  string runtime_key = 2 [(validate.rules).string = {min_len: 1}];
 }
 
 // Header name/value pair.
@@ -271,7 +283,7 @@ message HeaderValue {
   // Header name.
   string key = 1
       [(validate.rules).string =
-           {min_bytes: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
+           {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // Header value.
   //
@@ -311,13 +323,13 @@ message DataSource {
     option (validate.required) = true;
 
     // Local filesystem data source.
-    string filename = 1 [(validate.rules).string = {min_bytes: 1}];
+    string filename = 1 [(validate.rules).string = {min_len: 1}];
 
     // Bytes inlined in the configuration.
     bytes inline_bytes = 2 [(validate.rules).bytes = {min_len: 1}];
 
     // String inlined in the configuration.
-    string inline_string = 3 [(validate.rules).string = {min_bytes: 1}];
+    string inline_string = 3 [(validate.rules).string = {min_len: 1}];
   }
 }
 
@@ -344,7 +356,7 @@ message RemoteDataSource {
   HttpUri http_uri = 1 [(validate.rules).message = {required: true}];
 
   // SHA256 string for verifying data.
-  string sha256 = 2 [(validate.rules).string = {min_bytes: 1}];
+  string sha256 = 2 [(validate.rules).string = {min_len: 1}];
 
   // Retry policy for fetching remote data.
   RetryPolicy retry_policy = 3;
@@ -380,7 +392,7 @@ message TransportSocket {
 
   // The name of the transport socket to instantiate. The name must match a supported transport
   // socket implementation.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Implementation specific configuration which depends on the implementation being instantiated.
   // See the supported transport socket implementations for further documentation.

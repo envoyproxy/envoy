@@ -14,4 +14,4 @@ RUN echo "4a7d17d4724ee890490bcd6cfdedb12a02316a3d33214348d30979abd201f1ca /usr/
          && sha256sum -c /tmp/checksum \
          && rm /tmp/checksum \
 	 && chmod go+r /etc/front-envoy.yaml
-CMD /usr/local/bin/envoy -c /etc/front-envoy.yaml --service-cluster front-proxy
+CMD ["/usr/local/bin/envoy", "-c", "/etc/front-envoy.yaml", "--service-cluster", "front-proxy"]

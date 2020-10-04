@@ -22,11 +22,16 @@
 #include "common/network/dns_impl.h"
 #include "common/network/tcp_listener_impl.h"
 #include "common/network/udp_listener_impl.h"
+#include "common/runtime/runtime_features.h"
 
 #include "event2/event.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "common/signal/signal_action.h"
+#endif
+
+#ifdef __APPLE__
+#include "common/network/apple_dns_impl.h"
 #endif
 
 namespace Envoy {
@@ -121,6 +126,23 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
     const bool use_tcp_for_dns_lookups) {
   ASSERT(isThreadSafe());
+#ifdef __APPLE__
+  static bool use_apple_api_for_dns_lookups =
+      Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups");
+  if (use_apple_api_for_dns_lookups) {
+    RELEASE_ASSERT(
+        resolvers.empty(),
+        "defining custom resolvers is not possible when using Apple APIs for DNS resolution. "
+        "Apple's API only allows overriding DNS resolvers via system settings. Delete resolvers "
+        "config or disable the envoy.restart_features.use_apple_api_for_dns_lookups runtime "
+        "feature.");
+    RELEASE_ASSERT(!use_tcp_for_dns_lookups,
+                   "using TCP for DNS lookups is not possible when using Apple APIs for DNS "
+                   "resolution. Apple' API only uses UDP for DNS resolution. Use UDP or disable "
+                   "the envoy.restart_features.use_apple_api_for_dns_lookups runtime feature.");
+    return Network::DnsResolverSharedPtr{new Network::AppleDnsResolverImpl(*this)};
+  }
+#endif
   return Network::DnsResolverSharedPtr{
       new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
 }
@@ -144,7 +166,7 @@ Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& s
                                                     backlog_size);
 }
 
-Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr&& socket,
+Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr socket,
                                                           Network::UdpListenerCallbacks& cb) {
   ASSERT(isThreadSafe());
   return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource());
@@ -168,7 +190,7 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   ASSERT(isThreadSafe());
   current_to_delete_->emplace_back(std::move(to_delete));
   ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
-  if (1 == current_to_delete_->size()) {
+  if (current_to_delete_->size() == 1) {
     deferred_delete_cb_->scheduleCallbackCurrentIteration();
   }
 }

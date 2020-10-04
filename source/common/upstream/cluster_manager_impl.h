@@ -336,10 +336,10 @@ private:
 
       Http::ConnectionPool::Instance* connPool(ResourcePriority priority,
                                                absl::optional<Http::Protocol> downstream_protocol,
-                                               LoadBalancerContext* context);
+                                               LoadBalancerContext* context, bool peek);
 
       Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
-                                                 LoadBalancerContext* context);
+                                                 LoadBalancerContext* context, bool peek);
 
       // Upstream::ThreadLocalCluster
       const PrioritySet& prioritySet() override { return priority_set_; }
@@ -368,15 +368,13 @@ private:
     void clearContainer(HostSharedPtr old_host, ConnPoolsContainer& container);
     void drainTcpConnPools(HostSharedPtr old_host, TcpConnPoolsContainer& container);
     void removeTcpConn(const HostConstSharedPtr& host, Network::ClientConnection& connection);
-    static void removeHosts(const std::string& name, const HostVector& hosts_removed,
-                            ThreadLocal::Slot& tls);
-    static void updateClusterMembership(const std::string& name, uint32_t priority,
-                                        PrioritySet::UpdateHostsParams update_hosts_params,
-                                        LocalityWeightsConstSharedPtr locality_weights,
-                                        const HostVector& hosts_added,
-                                        const HostVector& hosts_removed, ThreadLocal::Slot& tls,
-                                        uint64_t overprovisioning_factor);
-    static void onHostHealthFailure(const HostSharedPtr& host, ThreadLocal::Slot& tls);
+    void removeHosts(const std::string& name, const HostVector& hosts_removed);
+    void updateClusterMembership(const std::string& name, uint32_t priority,
+                                 PrioritySet::UpdateHostsParams update_hosts_params,
+                                 LocalityWeightsConstSharedPtr locality_weights,
+                                 const HostVector& hosts_added, const HostVector& hosts_removed,
+                                 uint64_t overprovisioning_factor);
+    void onHostHealthFailure(const HostSharedPtr& host);
 
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,
                                                   bool allocate = false);
@@ -483,6 +481,8 @@ private:
   void onClusterInit(Cluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();
+  void maybePrefetch(ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry,
+                     std::function<ConnectionPool::Instance*()> prefetch_pool);
 
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
