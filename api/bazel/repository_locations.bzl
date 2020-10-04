@@ -89,10 +89,10 @@ DEPENDENCY_REPOSITORIES_SPEC = dict(
     ),
     com_github_apache_skywalking_data_collect_protocol = dict(
         project_name = "SkyWalking API",
-        project_desc = "SkyWalking's language independent model and GRPC Api Definitions"
+        project_desc = "SkyWalking's language independent model and GRPC Api Definitions",
         project_url = "https://github.com/apache/skywalking-data-collect-protocol",
         version = "8.1.0",
-        sha256 = ebea8a6968722524d1bcc4426fb6a29907ddc2902aac7de1559012d3eee90cf9,
+        sha256 = "ebea8a6968722524d1bcc4426fb6a29907ddc2902aac7de1559012d3eee90cf9",
         strip_prefix = "skywalking-data-collect-protocol-{version}",
         urls = ["https://github.com/apache/skywalking-data-collect-protocol/archive/v{version}.tar.gz"],
         last_updated = "2020-07-29",
