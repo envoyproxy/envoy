@@ -30,7 +30,9 @@ TraceSegmentPtr toSegmentObject(const SegmentContext& segment_context) {
 
     span->set_spanlayer(SpanLayer::Http);
     span->set_spantype(span_store->isEntrySpan() ? SpanType::Entry : SpanType::Exit);
-    span->set_componentid(6000);
+    // TODO(wbpcode): This is temporary component id for Envoy and Please check
+    // https://github.com/apache/skywalking/pull/5629 for more information.
+    span->set_componentid(9000);
 
     if (!span_store->peerAddress().empty()) {
       span->set_peer(span_store->peerAddress());
