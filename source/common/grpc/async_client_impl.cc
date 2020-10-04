@@ -17,7 +17,8 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
                                  TimeSource& time_source)
     : cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
       host_name_(config.envoy_grpc().authority()), time_source_(time_source),
-      metadata_parser_(Router::HeaderParser::configure(config.initial_metadata(), false)) {}
+      metadata_parser_(
+          Router::HeaderParser::configure(config.initial_metadata(), /*append=*/false)) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
