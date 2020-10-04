@@ -8,6 +8,10 @@ namespace SkyWalking {
 namespace {
 static constexpr uint32_t DEFAULT_DELAYED_SEGMENTS_CACHE_SIZE = 1024;
 
+const Http::LowerCaseString& authenticationTokenKey() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "Authentication");
+}
+
 // Convert SegmentContext to SegmentObject.
 TraceSegmentPtr toSegmentObject(const SegmentContext& segment_context) {
   auto new_segment = std::make_unique<SegmentObject>();
@@ -64,10 +68,6 @@ TraceSegmentPtr toSegmentObject(const SegmentContext& segment_context) {
     ref->set_networkaddressusedatpeer(previous_span_context->target_address_);
   }
   return new_segment;
-}
-
-const Http::LowerCaseString& authenticationTokenKey() {
-  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "Authentication");
 }
 
 } // namespace

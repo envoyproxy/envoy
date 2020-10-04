@@ -26,7 +26,7 @@ std::string generateId(Random::RandomGenerator& random_generator) {
                       Hex::uint64ToHex(random_generator.random()));
 }
 
-std::string base64Encode(absl::string_view input) {
+std::string base64Encode(const absl::string_view input) {
   return Base64::encode(input.data(), input.length());
 }
 
