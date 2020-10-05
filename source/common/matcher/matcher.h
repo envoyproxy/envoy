@@ -171,7 +171,7 @@ public:
   bool match(const MatchingData&) override {
     const auto& status = matcher_->rootMatcher().matchStatus(matcher_->status_);
 
-    // TODO(snowp): For now we only support things we can know just by lookinag the the request
+    // TODO(snowp): For now we only support things we can know just by looking at the the request
     // headers.
     ASSERT(!status.might_change_status_);
 
