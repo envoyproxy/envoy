@@ -16,7 +16,6 @@ filegroup(
     srcs = glob(
         ["root/**/*.yaml"],
         exclude = [
-            "root/intro/*",
             "root/intro/_include/life-of-a-request.yaml",
             "root/intro/arch_overview/security/_include/ssl.yaml",
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
