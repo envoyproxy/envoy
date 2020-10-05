@@ -17,7 +17,6 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    shard_count = 2,
     deps = [
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
