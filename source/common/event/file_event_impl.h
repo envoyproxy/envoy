@@ -51,32 +51,45 @@ private:
 // Forward declare for friend class.
 class UserSpaceFileEventFactory;
 
+// The interface of populating event watcher and obtaining the active events. The events includes
+// Read, Write and Closed.
 class EventListener {
 public:
   virtual ~EventListener() = default;
+
+  // Provide the activated events.
   virtual uint32_t triggeredEvents() PURE;
+  virtual uint32_t getAndClearEphemeralEvents() PURE;
+
+  // Callbacks of the event operation.
   virtual void onEventEnabled(uint32_t enabled_events) PURE;
-  virtual void onEventActivated(uint32_t enabled_events) PURE;
-  virtual uint32_t getAndClearEpheralEvents() PURE;
+  virtual void onEventActivated(uint32_t activated_events) PURE;
 };
 
 // Return the enabled events except EV_CLOSED. This implementation is generally good since only
-// epoll supports EV_CLOSED. The event owner must assume EV_CLOSED is not reliable. Also event owner
-// must assume OS could notify events which are not actually triggered.
+// epoll supports EV_CLOSED but the entire envoy code base supports other pollers. The event owner
+// must assume EV_CLOSED is never activated. Also event owner must tolerat that OS could notify events
+// which are not actually triggered.
 class DefaultEventListener : public EventListener {
 public:
   ~DefaultEventListener() override = default;
   uint32_t triggeredEvents() override {
-          ENVOY_LOG_MISC(debug, "lambdai: user file event listener triggered events {} on {} and schedule next", pending_events_, static_cast<void*>(this));
+    ENVOY_LOG_MISC(debug,
+                   "lambdai: user file event listener triggered events {} on {} and schedule next",
+                   pending_events_, static_cast<void*>(this));
 
-    return pending_events_ & (~Event::FileReadyType::Closed); }
-  void onEventEnabled(uint32_t enabled_events) override { 
-    ENVOY_LOG_MISC(debug, "lambdai: user file event listener set enabled events {} on {} and schedule next", pending_events_, static_cast<void*>(this));
-    pending_events_ = enabled_events; }
+    return pending_events_ & (~Event::FileReadyType::Closed);
+  }
+  void onEventEnabled(uint32_t enabled_events) override {
+    ENVOY_LOG_MISC(
+        debug, "lambdai: user file event listener set enabled events {} on {} and schedule next",
+        pending_events_, static_cast<void*>(this));
+    pending_events_ = enabled_events;
+  }
   void onEventActivated(uint32_t activated_events) override {
     ephermal_events_ |= activated_events;
   }
-  uint32_t getAndClearEpheralEvents() override {
+  uint32_t getAndClearEphemeralEvents() override {
     auto res = ephermal_events_;
     ephermal_events_ = 0;
     return res;
@@ -112,10 +125,12 @@ public:
     event_listener_.onEventEnabled(events);
     if (!schedulable_.enabled()) {
       schedulable_.scheduleCallbackNextIteration();
-      ENVOY_LOG_MISC(debug, "lambdai: user file event setEnabled {} on {} and schedule next", events, static_cast<void*>(this));
+      ENVOY_LOG_MISC(debug, "lambdai: user file event setEnabled {} on {} and schedule next",
+                     events, static_cast<void*>(this));
       return;
     }
-    ENVOY_LOG_MISC(debug, "lambdai: user file event setEnabled {} on {} and but not schedule next", events, static_cast<void*>(this));
+    ENVOY_LOG_MISC(debug, "lambdai: user file event setEnabled {} on {} and but not schedule next",
+                   events, static_cast<void*>(this));
   }
 
   EventListener& getEventListener() { return event_listener_; }
@@ -128,8 +143,9 @@ private:
                          SchedulableCallback& schedulable_cb, int& event_counter)
       : schedulable_(schedulable_cb), cb_([this, cb]() {
           auto all_events = getEventListener().triggeredEvents();
-          auto ephemeral_events = getEventListener().getAndClearEpheralEvents();
-          ENVOY_LOG_MISC(debug, "lambdai: us event {} cb allevents = {}, ephermal events = {}", static_cast<void*>(this), all_events, ephemeral_events);
+          auto ephemeral_events = getEventListener().getAndClearEphemeralEvents();
+          ENVOY_LOG_MISC(debug, "lambdai: us event {} cb allevents = {}, ephermal events = {}",
+                         static_cast<void*>(this), all_events, ephemeral_events);
           cb(all_events | ephemeral_events);
         }),
         event_counter_(event_counter) {

@@ -215,8 +215,11 @@ class InternalListenerCallbacks {
 public:
   virtual ~InternalListenerCallbacks() = default;
 
-  virtual void setupNewConnection(Network::ConnectionPtr server_conn,
-                                  Network::ConnectionSocketPtr socket) PURE;
+  /**
+   * Called when a new internal connection is created.
+   * @param socket supplies the socket. Note that the underlying IoHandle has no file descriptor
+   * although the interface provides fd.
+   */
   virtual void onNewSocket(Network::ConnectionSocketPtr socket) PURE;
 };
 

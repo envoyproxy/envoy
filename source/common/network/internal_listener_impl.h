@@ -18,7 +18,7 @@ public:
   void disable() override;
   void enable() override;
 
-  void setupInternalListener();
+  void setUpInternalListener();
 
 public:
   std::string internal_listener_id_;

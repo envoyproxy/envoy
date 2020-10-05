@@ -117,7 +117,9 @@ public:
    * Creates an client internal connection. Does NOT initiate the connection;
    * the caller must then call connect() on the returned Network::ClientConnection.
    * @param internal_address supplies the internal address to connect to.
-   * @param local_address supplies an address to bind to or nullptr if no bind is necessary.
+   * @param local_address supplies an address to bind to or nullptr. If nullptr is provided, an
+   * internal local_address is automatically generated. This address is accessible by the server
+   * connection as source address.
    * @return Network::ClientConnectionPtr a client connection that is owned by the caller.
    */
   virtual Network::ClientConnectionPtr

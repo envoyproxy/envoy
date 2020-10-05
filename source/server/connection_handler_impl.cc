@@ -52,7 +52,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       }
     }
     auto active_internal_listener = std::make_unique<ActiveInternalListener>(*this, config);
-    active_internal_listener->internal_listener_->setupInternalListener();
+    active_internal_listener->internal_listener_->setUpInternalListener();
     details.typed_listener_ = *active_internal_listener;
     details.listener_ = std::move(active_internal_listener);
   } else if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {
@@ -905,59 +905,10 @@ ConnectionHandlerImpl::ActiveInternalListener::newTimespan(TimeSource& time_sour
                                                                    time_source);
 }
 
-// Copied from newConnection(). Invoked by SetupPipeListener.
-void ConnectionHandlerImpl::ActiveInternalListener::setupNewConnection(
-    Network::ConnectionPtr server_conn, Network::ConnectionSocketPtr socket) {
-  incNumConnections();
-  auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(parent_.dispatcher_.timeSource());
-  stream_info->setDownstreamLocalAddress(socket->localAddress());
-  stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
-  stream_info->setDownstreamDirectRemoteAddress(socket->directRemoteAddress());
-
-  // TODO(lambdai): refactor
-  // auto p = dynamic_cast<Network::ServerPipeImpl*>(server_conn.get());
-  // ASSERT(p);
-  // p->setStreamInfo(stream_info.get());
-
-  // Find matching filter chain.
-  const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
-  if (filter_chain == nullptr) {
-    ENVOY_LOG(debug, "closing connection: no matching filter chain found");
-    stats_.no_filter_chain_match_.inc();
-    stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
-    stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
-    emitLogs(*config_, *stream_info);
-    socket->close();
-    return;
-  }
-
-  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
-  stream_info->setDownstreamSslConnection(transport_socket->ssl());
-  auto& active_connections = getOrCreateActiveConnections(*filter_chain);
-  // TODO(lambdai): set stream_info
-  ActiveTcpConnectionPtr active_connection(
-      new ActiveTcpConnection(active_connections, std::move(server_conn),
-                              parent_.dispatcher_.timeSource(), std::move(stream_info)));
-  active_connection->connection_->setBufferLimits(config_->perConnectionBufferLimitBytes());
-
-  const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
-      *active_connection->connection_, filter_chain->networkFilterFactories());
-  if (empty_filter_chain) {
-    ENVOY_CONN_LOG(debug, "closing connection: no filters", *active_connection->connection_);
-    active_connection->connection_->close(Network::ConnectionCloseType::NoFlush);
-  }
-
-  // If the connection is already closed, we can just let this connection immediately die.
-  if (active_connection->connection_->state() != Network::Connection::State::Closed) {
-    ENVOY_CONN_LOG(debug, "new connection", *active_connection->connection_);
-    active_connection->connection_->addConnectionCallbacks(*active_connection);
-    LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
-  }
-}
-
 void ConnectionHandlerImpl::ActiveInternalListener::newConnection(
     Network::ConnectionSocketPtr&& socket,
     const envoy::config::core::v3::Metadata& dynamic_metadata) {
+  incNumConnections();    
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
       parent_.dispatcher_.timeSource(), StreamInfo::FilterState::LifeSpan::Connection);
   stream_info->setDownstreamLocalAddress(socket->localAddress());

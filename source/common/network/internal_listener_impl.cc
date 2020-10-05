@@ -21,7 +21,7 @@ namespace Network {
 namespace {
 // uint64_t next_internal_connection_id = 0;
 }
-void InternalListenerImpl::setupInternalListener() {
+void InternalListenerImpl::setUpInternalListener() {
   dispatcher_.registerInternalListener(
       internal_listener_id_,
       [this](const Address::InstanceConstSharedPtr&,

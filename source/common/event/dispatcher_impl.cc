@@ -124,7 +124,7 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
 namespace {
 Network::Address::InstanceConstSharedPtr
 nextClientAddress(const Network::Address::InstanceConstSharedPtr& server_address) {
-  uint64_t id = 0;
+  static uint64_t id = 0;
   return std::make_shared<Network::Address::EnvoyInternalInstance>(absl::StrCat(server_address->asStringView(), "_", ++id));
 }
 } // namespace
@@ -139,7 +139,7 @@ DispatcherImpl::createInternalConnection(Network::Address::InstanceConstSharedPt
   if (local_address == nullptr) {
     local_address = nextClientAddress(internal_address);
   }
-  // Find the internal listener callback. The listener will setup the server connection.
+  // Find the internal listener callback. The listener will set up the server connection.
   auto iter = internal_listeners_.find(internal_address->asString());
   for (const auto& [name, _] : internal_listeners_) {
     ENVOY_LOG_MISC(debug, "lambdai: p listener {}", name);
