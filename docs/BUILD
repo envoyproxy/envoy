@@ -9,7 +9,9 @@ exports_files(["protodoc_manifest.yaml"])
 
 envoy_package()
 
-# dns-cache-circuit-breaker fails on windows: "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
+# TODO(phlax): fix failing/excluded configs
+# the following config only fails on windows:
+#       dns-cache-circuit-breaker: "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
 
 filegroup(
     name = "configs",
