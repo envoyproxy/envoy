@@ -66,13 +66,16 @@ typed_config:
   match_tree:
     matcher:
       multimap_matcher:
-        namespace: request_headers
+        key_namespace: request_headers
         key: x-disable-faults
         exact_matches:
           disable:
             leaf:
-              action:
-                skip: true
+              matchers:
+                predicate:
+                  any_match: {}
+                action:
+                  skip: true
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
     abort:

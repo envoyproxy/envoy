@@ -1,5 +1,7 @@
 #include "common/http/filter_manager.h"
 
+#include <memory>
+
 #include "common/common/enum_to_int.h"
 #include "common/common/scope_tracker.h"
 #include "common/http/codes.h"
@@ -391,9 +393,11 @@ void ActiveStreamDecoderFilter::requestDataTooLarge() {
 }
 
 void FilterManager::addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter,
-                                                 MatchTreeSharedPtr match_tree, bool dual_filter) {
-  ActiveStreamDecoderFilterPtr wrapper(
-      new ActiveStreamDecoderFilter(*this, filter, dual_filter, std::move(match_tree)));
+                                                 MatchTreeSharedPtr match_tree,
+                                                 MatchingDataPtr&& matching_data,
+                                                 bool dual_filter) {
+  ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(
+      *this, filter, dual_filter, std::move(match_tree), std::move(matching_data)));
   filter->setDecoderFilterCallbacks(*wrapper);
   // Note: configured decoder filters are appended to decoder_filters_.
   // This means that if filters are configured in the following order (assume all three filters are
@@ -407,9 +411,11 @@ void FilterManager::addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr fi
 }
 
 void FilterManager::addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter,
-                                                 MatchTreeSharedPtr match_tree, bool dual_filter) {
-  ActiveStreamEncoderFilterPtr wrapper(
-      new ActiveStreamEncoderFilter(*this, filter, std::move(match_tree), dual_filter));
+                                                 MatchTreeSharedPtr match_tree,
+                                                 MatchingDataPtr&& matching_data,
+                                                 bool dual_filter) {
+  ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(
+      *this, filter, std::move(match_tree), std::move(matching_data), dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
   // Note: configured encoder filters are prepended to encoder_filters_.
   // This means that if filters are configured in the following order (assume all three filters are
@@ -447,8 +453,8 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
   std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
 
   for (; entry != decoder_filters_.end(); entry++) {
-    if ((*entry)->match_data_) {
-      (*entry)->match_data_->request_headers_ = &headers;
+    if ((*entry)->matchingData()) {
+      (*entry)->matchingData()->get().onRequestHeaders(headers);
       auto match = (*entry)->match_tree_->match(*(*entry)->match_data_);
       if (match && match->isSkip()) {
         (*entry)->skip_ = true;

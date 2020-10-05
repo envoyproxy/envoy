@@ -492,14 +492,16 @@ void HttpConnectionManagerConfig::processFilter(
 
   auto config_copy = proto_config;
 
-  MatchTreeSharedPtr match_tree;
+  std::function<MatchTreeSharedPtr(HttpMatchingData&)> match_tree;
   // See if the config is wrapped in a match tree proto.
   if (proto_config.typed_config().Is<envoy::config::common::matcher::v3::MatchingFilterConfig>()) {
     envoy::config::common::matcher::v3::MatchingFilterConfig matching_filter;
     MessageUtil::unpackTo(proto_config.typed_config(), matching_filter);
 
-    match_tree = MatchTreeFactory::create(matching_filter.match_tree(),
-                                          std::make_unique<HttpKeyNamespaceMapper>());
+    match_tree = [matching_filter](HttpMatchingData& matching_data) {
+      return MatchTreeFactory::create(matching_filter.match_tree(),
+                                      std::make_unique<HttpKeyNamespaceMapper>(), matching_data);
+    };
     config_copy.clear_typed_config();
     config_copy.mutable_typed_config()->MergeFrom(matching_filter.typed_config());
   }
@@ -525,7 +527,7 @@ void HttpConnectionManagerConfig::processFilter(
                     : static_cast<const Protobuf::Message&>(
                           proto_config.hidden_envoy_deprecated_config()),
                 true));
-  filter_factories.push_back({std::move(filter_config_provider), std::move(match_tree)});
+  filter_factories.push_back({std::move(filter_config_provider), match_tree});
 }
 
 void HttpConnectionManagerConfig::processDynamicFilterConfig(
@@ -629,39 +631,49 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
 }
 
 struct MatchTreeDecoratingFactoryCallbacks : public Http::FilterChainFactoryCallbacks {
-  MatchTreeDecoratingFactoryCallbacks(Http::FilterChainFactoryCallbacks& delegated_callbacks,
-                                      MatchTreeSharedPtr match_tree)
+  MatchTreeDecoratingFactoryCallbacks(
+      Http::FilterChainFactoryCallbacks& delegated_callbacks,
+      std::function<MatchTreeSharedPtr(HttpMatchingData&)> match_tree)
       : callbacks_(delegated_callbacks), match_tree_(std::move(match_tree)) {}
 
   void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
-    callbacks_.addStreamDecoderFilter(filter, match_tree_);
+    auto data = std::make_unique<HttpMatchingData>();
+    auto matcher = match_tree_(*data);
+    callbacks_.addStreamDecoderFilter(filter, matcher, std::move(data));
   }
 
   void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter,
-                              MatchTreeSharedPtr match_tree) override {
-    callbacks_.addStreamDecoderFilter(filter, std::move(match_tree));
+                              MatchTreeSharedPtr match_tree,
+                              MatchingDataPtr matching_data) override {
+    callbacks_.addStreamDecoderFilter(filter, std::move(match_tree), std::move(matching_data));
   }
   void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
-    callbacks_.addStreamEncoderFilter(filter, match_tree_);
+    auto data = std::make_unique<HttpMatchingData>();
+    auto matcher = match_tree_(*data);
+    callbacks_.addStreamEncoderFilter(filter, matcher, std::move(data));
   }
 
   void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter,
-                              MatchTreeSharedPtr match_tree) override {
-    callbacks_.addStreamEncoderFilter(filter, std::move(match_tree));
+                              MatchTreeSharedPtr match_tree,
+                              MatchingDataPtr matching_data) override {
+    callbacks_.addStreamEncoderFilter(filter, std::move(match_tree), std::move(matching_data));
   }
   void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
-    callbacks_.addStreamFilter(filter, match_tree_);
+    auto data = std::make_unique<HttpMatchingData>();
+    auto matcher = match_tree_(*data);
+    callbacks_.addStreamFilter(filter, matcher, std::move(data));
   }
 
-  void addStreamFilter(Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr match_tree) override {
-    callbacks_.addStreamFilter(filter, std::move(match_tree));
+  void addStreamFilter(Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr match_tree,
+                       MatchingDataPtr matching_data) override {
+    callbacks_.addStreamFilter(filter, std::move(match_tree), std::move(matching_data));
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {
     callbacks_.addAccessLogHandler(handler);
   }
 
   Http::FilterChainFactoryCallbacks& callbacks_;
-  MatchTreeSharedPtr match_tree_;
+  std::function<MatchTreeSharedPtr(HttpMatchingData&)> match_tree_;
 };
 
 void HttpConnectionManagerConfig::createFilterChainForFactories(
@@ -673,7 +685,7 @@ void HttpConnectionManagerConfig::createFilterChainForFactories(
     MatchTreeDecoratingFactoryCallbacks decorated_callbacks(callbacks,
                                                             filter_config_provider.second);
     if (config.has_value()) {
-      config.value()(decorated_callbacks);
+      config.value()(filter_config_provider.second ? decorated_callbacks : callbacks);
       continue;
     }
 

@@ -11,13 +11,58 @@
 #include "common/common/assert.h"
 #include "common/http/header_utility.h"
 
+#include "extensions/common/matcher/matcher.h"
+
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
 
-class HttpMatchingData : public MatchingData {
+class MatchWrapper {
 public:
+  explicit MatchWrapper(const envoy::config::common::matcher::v3::MatchPredicate match_config) {
+    Extensions::Common::Matcher::buildMatcher(match_config, matchers_);
+    status_.resize(matchers_.size());
+  }
+
+  Extensions::Common::Matcher::Matcher& rootMatcher() { return *matchers_[0]; }
+
+  std::vector<Extensions::Common::Matcher::Matcher::MatchStatus> status_;
+
+private:
+  std::vector<Extensions::Common::Matcher::MatcherPtr> matchers_;
+};
+
+using MatchWrapperSharedPtr = std::shared_ptr<MatchWrapper>;
+
+class MatchTreeFactoryCallbacks {
+public:
+  virtual ~MatchTreeFactoryCallbacks() = default;
+
+  virtual void addPredicateMatcher(MatchWrapperSharedPtr matcher) PURE;
+};
+
+struct HttpMatchingData : public MatchingData, public MatchTreeFactoryCallbacks {
+public:
+  // MatchTreeFactoryCallbacks
+  void addPredicateMatcher(MatchWrapperSharedPtr matcher) {
+    matchers_.push_back(std::move(matcher));
+  }
+
+  void onNewStream() {
+    for (const auto& matcher : matchers_) {
+      matcher->rootMatcher().onNewStream(matcher->status_);
+    }
+  }
+
+  void onRequestHeaders(Http::RequestHeaderMap& request_headers) {
+    request_headers_ = &request_headers;
+    for (const auto& matcher : matchers_) {
+      matcher->rootMatcher().onHttpRequestHeaders(request_headers, matcher->status_);
+    }
+  }
+
+  std::vector<MatchWrapperSharedPtr> matchers_;
   Http::RequestHeaderMap* request_headers_;
 };
 using HttpMatchingDataPtr = std::unique_ptr<HttpMatchingData>;
@@ -117,52 +162,57 @@ public:
   virtual bool match(const MatchingData& data) PURE;
 };
 
-class RequestHeaderMatcher : public Matcher {
+using MatcherPtr = std::unique_ptr<Matcher>;
+
+class HttpPredicateMatcher : public Matcher {
 public:
-  explicit RequestHeaderMatcher(Http::HeaderUtility::HeaderDataPtr header_data)
-      : header_data_(std::move(header_data)) {}
+  explicit HttpPredicateMatcher(MatchWrapperSharedPtr matcher) : matcher_(std::move(matcher)) {}
 
-  bool match(const MatchingData& matching_data) override {
-    const HttpMatchingData& http_data = dynamic_cast<const HttpMatchingData&>(matching_data);
+  bool match(const MatchingData&) override {
+    const auto& status = matcher_->rootMatcher().matchStatus(matcher_->status_);
 
-    return header_data_->matchesHeaders(*http_data.request_headers_);
+    // TODO(snowp): For now we only support things we can know just by lookinag the the request
+    // headers.
+    ASSERT(!status_.might_change_status_);
+
+    return status.matches_;
   }
 
-  Http::HeaderUtility::HeaderDataPtr header_data_;
+  MatchWrapperSharedPtr matcher_;
 };
-
-using MatcherPtr = std::unique_ptr<Matcher>;
 
 class LeafNode : public MatchTree {
 public:
-  LeafNode(MatchAction match_action, absl::optional<MatchAction> no_match_action)
-      : match_action_(match_action), no_match_action_(no_match_action) {}
+  LeafNode(absl::optional<MatchAction> no_match_action) : no_match_action_(no_match_action) {}
 
   absl::optional<MatchAction> match(const MatchingData& matching_data) override {
     for (const auto& matcher : matchers_) {
-      if (!matcher->match(matching_data)) {
-        return no_match_action_;
+      if (matcher.first->match(matching_data)) {
+        return matcher.second;
       }
     }
 
-    return match_action_;
+    return no_match_action_;
   }
 
-  void addMatcher(MatcherPtr&& matcher) { matchers_.push_back(std::move(matcher)); }
+  void addMatcher(MatcherPtr&& matcher, MatchAction action) {
+    matchers_.push_back({std::move(matcher), action});
+  }
 
 private:
-  MatchAction match_action_;
   absl::optional<MatchAction> no_match_action_;
-  std::vector<MatcherPtr> matchers_;
+  std::vector<std::pair<MatcherPtr, MatchAction>> matchers_;
 };
+
 class MatchTreeFactory {
 public:
   static MatchTreeSharedPtr create(envoy::config::common::matcher::v3::MatchTree config,
-                                   KeyNamespaceMapperSharedPtr key_namespace_mapper) {
+                                   KeyNamespaceMapperSharedPtr key_namespace_mapper,
+                                   MatchTreeFactoryCallbacks& callbacks) {
     if (config.has_matcher()) {
-      return createSublinerMatcher(config.matcher(), key_namespace_mapper);
+      return createSublinerMatcher(config.matcher(), key_namespace_mapper, callbacks);
     } else if (config.has_leaf()) {
-      return createLinearMatcher(config.leaf(), key_namespace_mapper);
+      return createLinearMatcher(config.leaf(), key_namespace_mapper, callbacks);
     } else {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
@@ -171,18 +221,17 @@ public:
 private:
   static MatchTreeSharedPtr
   createLinearMatcher(envoy::config::common::matcher::v3::MatchTree::MatchLeaf config,
-                      KeyNamespaceMapperSharedPtr) {
+                      KeyNamespaceMapperSharedPtr, MatchTreeFactoryCallbacks& callbacks) {
     auto leaf = std::make_shared<LeafNode>(
-        MatchAction::fromProto(config.action()),
         config.has_no_match_action()
             ? absl::make_optional(MatchAction::fromProto(config.no_match_action()))
             : absl::nullopt);
 
     for (const auto matcher : config.matchers()) {
-      for (const auto& header : matcher.predicate().http_request_headers_match().headers()) {
-        leaf->addMatcher(std::make_unique<RequestHeaderMatcher>(
-            std::make_unique<Http::HeaderUtility::HeaderData>(header)));
-      }
+      auto predicate_matcher = std::make_shared<MatchWrapper>(matcher.predicate());
+      callbacks.addPredicateMatcher(predicate_matcher);
+      leaf->addMatcher(std::make_unique<HttpPredicateMatcher>(predicate_matcher),
+                       MatchAction::fromProto(matcher.action()));
     }
 
     return leaf;
@@ -190,19 +239,19 @@ private:
 
   static MatchTreeSharedPtr
   createSublinerMatcher(envoy::config::common::matcher::v3::MatchTree::SublinearMatcher matcher,
-                        KeyNamespaceMapperSharedPtr key_namespace_mapper) {
-    // TODO(snowp): Support extensions, we only support multi map right now.
-
+                        KeyNamespaceMapperSharedPtr key_namespace_mapper,
+                        MatchTreeFactoryCallbacks& callbacks) {
     auto multimap_matcher = std::make_shared<MultimapMatcher>(
-        matcher.multimap_matcher().key(), matcher.multimap_matcher().namespace_(),
+        matcher.multimap_matcher().key(), matcher.multimap_matcher().key_namespace(),
         key_namespace_mapper,
         matcher.has_no_match_tree()
-            ? MatchTreeFactory::create(matcher.no_match_tree(), key_namespace_mapper)
+            ? MatchTreeFactory::create(matcher.no_match_tree(), key_namespace_mapper, callbacks)
             : nullptr);
 
     for (const auto& children : matcher.multimap_matcher().exact_matches()) {
-      multimap_matcher->addChild(children.first,
-                                 MatchTreeFactory::create(children.second, key_namespace_mapper));
+      multimap_matcher->addChild(
+          children.first,
+          MatchTreeFactory::create(children.second, key_namespace_mapper, callbacks));
     }
 
     return multimap_matcher;

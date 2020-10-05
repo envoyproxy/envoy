@@ -47,6 +47,7 @@ class MatchingData {
 public:
   virtual ~MatchingData() = default;
 };
+using MatchingDataPtr = std::unique_ptr<MatchingData>;
 
 class MatchTree {
 public:

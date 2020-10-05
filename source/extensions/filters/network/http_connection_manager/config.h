@@ -97,7 +97,8 @@ public:
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
   using FilterFactoriesList =
-      std::list<std::pair<Filter::Http::FilterConfigProviderPtr, MatchTreeSharedPtr>>;
+      std::list<std::pair<Filter::Http::FilterConfigProviderPtr,
+                          std::function<MatchTreeSharedPtr(HttpMatchingData&)>>>;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
     bool allow_upgrade;

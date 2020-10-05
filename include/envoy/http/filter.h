@@ -849,7 +849,8 @@ public:
   virtual void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) PURE;
 
   virtual void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter,
-                                      MatchTreeSharedPtr match_tree) PURE;
+                                      MatchTreeSharedPtr match_tree,
+                                      MatchingDataPtr matching_data) PURE;
 
   /**
    * Add an encoder filter that is used when writing stream data.
@@ -858,7 +859,8 @@ public:
   virtual void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) PURE;
 
   virtual void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter,
-                                      MatchTreeSharedPtr match_tree) PURE;
+                                      MatchTreeSharedPtr match_tree,
+                                      MatchingDataPtr matching_data) PURE;
 
   /**
    * Add a decoder/encoder filter that is used both when reading and writing stream data.
@@ -866,8 +868,8 @@ public:
    */
   virtual void addStreamFilter(Http::StreamFilterSharedPtr filter) PURE;
 
-  virtual void addStreamFilter(Http::StreamFilterSharedPtr filter,
-                               MatchTreeSharedPtr match_tree) PURE;
+  virtual void addStreamFilter(Http::StreamFilterSharedPtr filter, MatchTreeSharedPtr match_tree,
+                               MatchingDataPtr matching_data) PURE;
 
   /**
    * Add an access log handler that is called when the stream is destroyed.

@@ -12,6 +12,8 @@ envoy_cc_library(
     name = "matcher_lib",
     srcs = ["matcher.cc"],
     hdrs = ["matcher.h"],
+    # TODO(snowp): Clean up file structure
+    visibility = ["//visibility:public"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:minimal_logger_lib",

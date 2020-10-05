@@ -22,14 +22,16 @@ class FilterManager;
  */
 struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
                                 Logger::Loggable<Logger::Id::http> {
-  ActiveStreamFilterBase(FilterManager& parent, bool dual_filter, MatchTreeSharedPtr&& match_tree)
+  ActiveStreamFilterBase(FilterManager& parent, bool dual_filter, MatchTreeSharedPtr&& match_tree,
+                         MatchingDataPtr&& matching_data)
       : parent_(parent), iteration_state_(IterationState::Continue),
         iterate_from_current_filter_(false), headers_continued_(false),
         continue_headers_continued_(false), end_stream_(false), skip_(false),
         dual_filter_(dual_filter), decode_headers_called_(false), encode_headers_called_(false),
-        match_tree_(std::move(match_tree)) {
-    if (match_tree_) {
-      match_data_ = std::make_unique<HttpMatchingData>();
+        match_tree_(std::move(match_tree)), match_data_(std::move(matching_data)) {
+    ASSERT((match_tree_ == nullptr) == (match_data_ == nullptr));
+    if (match_data_) {
+      matchingData()->get().onNewStream();
     }
   }
 
@@ -102,6 +104,14 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
     return saved_response_metadata_.get();
   }
 
+  absl::optional<std::reference_wrapper<HttpMatchingData>> matchingData() {
+    if (match_data_) {
+      return std::ref(dynamic_cast<HttpMatchingData&>(*match_data_));
+    }
+
+    return absl::nullopt;
+  }
+
   // A vector to save metadata when the current filter's [de|en]codeMetadata() can not be called,
   // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because
   // [de|en]codeHeaders() adds new metadata to [de|en]code, but we don't know
@@ -134,7 +144,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   bool encode_headers_called_ : 1;
 
   MatchTreeSharedPtr match_tree_;
-  HttpMatchingDataPtr match_data_;
+  MatchingDataPtr match_data_;
 };
 
 /**
@@ -144,8 +154,11 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                                    public StreamDecoderFilterCallbacks,
                                    LinkedObject<ActiveStreamDecoderFilter> {
   ActiveStreamDecoderFilter(FilterManager& parent, StreamDecoderFilterSharedPtr filter,
-                            bool dual_filter, MatchTreeSharedPtr&& match_tree)
-      : ActiveStreamFilterBase(parent, dual_filter, std::move(match_tree)), handle_(filter) {}
+                            bool dual_filter, MatchTreeSharedPtr&& match_tree,
+                            MatchingDataPtr&& matching_data)
+      : ActiveStreamFilterBase(parent, dual_filter, std::move(match_tree),
+                               std::move(matching_data)),
+        handle_(filter) {}
 
   // ActiveStreamFilterBase
   bool canContinue() override;
@@ -230,8 +243,11 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
                                    public StreamEncoderFilterCallbacks,
                                    LinkedObject<ActiveStreamEncoderFilter> {
   ActiveStreamEncoderFilter(FilterManager& parent, StreamEncoderFilterSharedPtr filter,
-                            MatchTreeSharedPtr&& match_tree, bool dual_filter)
-      : ActiveStreamFilterBase(parent, dual_filter, std::move(match_tree)), handle_(filter) {}
+                            MatchTreeSharedPtr&& match_tree, MatchingDataPtr&& matching_data,
+                            bool dual_filter)
+      : ActiveStreamFilterBase(parent, dual_filter, std::move(match_tree),
+                               std::move(matching_data)),
+        handle_(filter) {}
 
   // ActiveStreamFilterBase
   bool canContinue() override { return true; }
@@ -521,26 +537,27 @@ public:
 
   // Http::FilterChainFactoryCallbacks
   void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
-    addStreamDecoderFilterWorker(filter, nullptr, false);
+    addStreamDecoderFilterWorker(filter, nullptr, nullptr, false);
   }
-  void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter,
-                              MatchTreeSharedPtr match_tree) override {
-    addStreamDecoderFilterWorker(filter, std::move(match_tree), false);
+  void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter, MatchTreeSharedPtr match_tree,
+                              MatchingDataPtr matching_data) override {
+    addStreamDecoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), false);
   }
   void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override {
-    addStreamEncoderFilterWorker(filter, nullptr, false);
+    addStreamEncoderFilterWorker(filter, nullptr, nullptr, false);
   }
-  void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter,
-                              MatchTreeSharedPtr match_tree) override {
-    addStreamEncoderFilterWorker(filter, std::move(match_tree), false);
+  void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter, MatchTreeSharedPtr match_tree,
+                              MatchingDataPtr matching_data) override {
+    addStreamEncoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), false);
   }
   void addStreamFilter(StreamFilterSharedPtr filter) override {
-    addStreamDecoderFilterWorker(filter, nullptr, true);
-    addStreamEncoderFilterWorker(filter, nullptr, true);
+    addStreamDecoderFilterWorker(filter, nullptr, nullptr, true);
+    addStreamEncoderFilterWorker(filter, nullptr, nullptr, true);
   }
-  void addStreamFilter(StreamFilterSharedPtr filter, MatchTreeSharedPtr match_tree) override {
-    addStreamDecoderFilterWorker(filter, std::move(match_tree), true);
-    addStreamEncoderFilterWorker(filter, std::move(match_tree), true);
+  void addStreamFilter(StreamFilterSharedPtr filter, MatchTreeSharedPtr match_tree,
+                       MatchingDataPtr matching_data) override {
+    addStreamDecoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), true);
+    addStreamEncoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), true);
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
@@ -623,9 +640,11 @@ public:
 
   // TODO(snowp): Make private as filter chain construction is moved into FM.
   void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter,
-                                    MatchTreeSharedPtr match_tree, bool dual_filter);
+                                    MatchTreeSharedPtr match_tree, MatchingDataPtr&& matching_data,
+                                    bool dual_filter);
   void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter,
-                                    MatchTreeSharedPtr match_tree, bool dual_filter);
+                                    MatchTreeSharedPtr match_tree, MatchingDataPtr&& matching_data,
+                                    bool dual_filter);
 
   void disarmRequestTimeout();
 

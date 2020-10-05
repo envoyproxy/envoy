@@ -27,8 +27,12 @@ message MatchTree {
         "envoy.config.common.matcher.v3.MatchTree.MatchAction";
 
     oneof action {
+      option (validate.required) = true;
+
+      // The associated operation should be skipped.
       bool skip = 1;
 
+      // The specified callback value should be passed to the associated operation.
       string callback = 2;
     }
   }
@@ -37,27 +41,29 @@ message MatchTree {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.common.matcher.v3.MatchTree.MatchLeaf";
 
+    // A single match attempt. If this entry matches, the specified action will be performed.
     message LeafMatcher {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.common.matcher.v3.MatchTree.MatchLeaf.LeafMatcher";
 
-      // The predicate to evaluate.
       oneof matcher {
+        option (validate.required) = true;
+
         MatchPredicate predicate = 1;
 
         core.v4alpha.TypedExtensionConfig typed_config = 2;
       }
+
+      // The action to perform if the predicate evaluates to true.
+      MatchAction action = 3 [(validate.rules).message = {required: true}];
     }
 
     // A linear set of match conditions that will be evaluated in order.
-    // The action of the first matcher that evaluates to true
-    // decides the action that will be performed. If no match
-    // criteria is matched, the no_match_action action will be performed.
-    repeated LeafMatcher matchers = 1;
+    // Each matcher will be attempted in order until one succeeds.
+    // If none of the matchers match, the no_match_action will be performed if specified.
+    repeated LeafMatcher matchers = 1 [(validate.rules).repeated = {min_items: 1}];
 
-    // The action to perform if the predicate evaluates to true.
-    MatchAction action = 2;
-
+    // Action to perform if none of the above matchers match.
     MatchAction no_match_action = 3;
   }
 
@@ -71,20 +77,27 @@ message MatchTree {
 
       // The header to apply this match to.
       // The key to apply this matcher for.
-      string key = 1;
+      string key = 1 [(validate.rules).string = {min_len: 1}];
 
       // The namespace of this key. This is used to distinguish multiple maps
       // that could be consulted during matching.
-      string namespace = 2;
+      string key_namespace = 2 [(validate.rules).string = {min_len: 1}];
 
       // Mapping from exact value matches to the matching subtree to use when
       // the match applies.
       // If a header value matches both a prefix and an exact match, the exact
       // match path will be taken.
       map<string, MatchTree> exact_matches = 3;
+
+      // Mapping from prefix matches to the matching subtree to use when the match applies.
+      // If a header value matches both a prefix and an exact match, the exact match path will be taken.
+      // If multiple prefixes match, the longest prefix path will be taken.
+      map<string, MatchTree> prefix_matches = 4;
     }
 
     oneof matcher {
+      option (validate.required) = true;
+
       MultimapMatcher multimap_matcher = 1;
 
       core.v4alpha.TypedExtensionConfig typed_config = 2;
@@ -107,10 +120,10 @@ message MatchingFilterConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.common.matcher.v3.MatchingFilterConfig";
 
-  MatchTree match_tree = 1;
+  MatchTree match_tree = 1 [(validate.rules).message = {required: true}];
 
   // The filter config.
-  google.protobuf.Any typed_config = 3;
+  google.protobuf.Any typed_config = 3 [(validate.rules).any = {required: true}];
 }
 
 // Match configuration. This is a recursive structure which allows complex nested match
