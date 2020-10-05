@@ -99,10 +99,10 @@ def woof_author_and_commits(issue_user, sha, issue_number):
     "Docs have changed between commits (%s...%s): %s"
     % (base_sha, sha, docs_have_changed_between_commits(issue_user, base_sha, sha)))
 
-
-def woof_circle_artifacts(owner, build_id):
-  github.issue_create_comment("Checking artifacts for %s/%s" % (owner, build_id))
-
+def woof_circle_artifacts(repo_owner):
+  combined = github.get_combined_statuses()
+  github.issue_create_comment("Checking artifacts for %s/%s" % (repo_owner, "build_id"))
+  github.issue_create_comment(combined["statuses"])
 
 handlers.command(name='woof', func=woof_circle_artifacts)
 # handlers.command(name='woof', func=woof_docs_have_changed_in_this_pr)
