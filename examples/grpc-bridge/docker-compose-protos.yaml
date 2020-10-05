@@ -1,4 +1,4 @@
-version: "3"
+version: "3.7"
 
 # This is the conversion from a script to a dockerized version of the script
 # https://github.com/envoyproxy/envoy/blob/master/examples/grpc-bridge/service/script/gen
