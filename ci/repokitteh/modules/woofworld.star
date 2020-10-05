@@ -135,9 +135,15 @@ def woof_circle_artifacts(config, repo_owner, sha, comment_id):
     github.issue_create_comment(
       "The docs have not been rendered yet, please try again when the `ci/circleci: docs` task has completed")
     return
-  github.issue_create_comment(status)
-  if not status:
-    github.issue_create_comment("couldnt find status...")
+  elif status["state"] == "failed":
+    github.issue_create_comment_reaction(comment_id, "-1")
+    github.issue_create_comment(
+      "The docs did not successfully render, check the `ci/circleci: docs` task below to track problems")
+    return
+  elif not status:
+    github.issue_create_comment_reaction(comment_id, "confused")
+    github.issue_create_comment(
+      "Unable to get status of `ci/circleci: docs` task")
     return
   m = match(text=status["target_url"], pattern='/([0-9]+)\?')
   build_id = (
@@ -145,7 +151,9 @@ def woof_circle_artifacts(config, repo_owner, sha, comment_id):
     if m and len(m) == 2
     else None)
   if not build_id:
-    github.issue_create_comment("couldnt find build id...")
+    github.issue_create_comment_reaction(comment_id, "confused")
+    github.issue_create_comment(
+      "Unable to find build id")
     return
   artifacts = circleci_call(
     repo_owner,
@@ -160,8 +168,9 @@ def woof_circle_artifacts(config, repo_owner, sha, comment_id):
     in artifacts or []
     if arti["path"] == "generated/docs/index.html"]
   if not index:
-    github.issue_create_comment_reaction(comment_id, "eyes")
-    github.issue_create_comment("couldnt find generated index page...")
+    github.issue_create_comment_reaction(comment_id, "confused")
+    github.issue_create_comment(
+      "Unable to find index page for docs in generated artefacts")
     return
   github.issue_create_comment(
     "You can view the docs for #%s here: \n\n%s" % (sha[:10], index[0]["url"]))
