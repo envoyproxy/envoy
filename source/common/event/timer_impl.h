@@ -57,9 +57,8 @@ public:
   // Timer
   void disableTimer() override;
 
-  void enableTimer(const std::chrono::milliseconds& d, const ScopeTrackedObject* scope) override;
-  void enableHRTimer(const std::chrono::microseconds& us,
-                     const ScopeTrackedObject* object) override;
+  void enableTimer(std::chrono::milliseconds d, const ScopeTrackedObject* scope) override;
+  void enableHRTimer(std::chrono::microseconds us, const ScopeTrackedObject* object) override;
 
   bool enabled() override;
 

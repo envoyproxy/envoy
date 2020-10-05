@@ -161,10 +161,8 @@ public:
 
   // Timer
   MOCK_METHOD(void, disableTimer, ());
-  MOCK_METHOD(void, enableTimer,
-              (const std::chrono::milliseconds&, const ScopeTrackedObject* scope));
-  MOCK_METHOD(void, enableHRTimer,
-              (const std::chrono::microseconds&, const ScopeTrackedObject* scope));
+  MOCK_METHOD(void, enableTimer, (std::chrono::milliseconds, const ScopeTrackedObject* scope));
+  MOCK_METHOD(void, enableHRTimer, (std::chrono::microseconds, const ScopeTrackedObject* scope));
   MOCK_METHOD(bool, enabled, ());
 
   MockDispatcher* dispatcher_{};

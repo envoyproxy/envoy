@@ -41,3 +41,13 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "scaled_range_timer_manager_test",
+    srcs = ["scaled_range_timer_manager_test.cc"],
+    deps = [
+        "//source/common/event:scaled_range_timer_manager",
+        "//test/mocks/event:wrapped_dispatcher",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
