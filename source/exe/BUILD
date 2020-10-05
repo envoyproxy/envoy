@@ -104,9 +104,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "envoy_main_common_with_core_extensions_lib",
+    srcs = ["main_common.cc"],
+    hdrs = ["main_common.h"],
     deps = [
         ":envoy_common_with_core_extensions_lib",
-        ":main_common_lib",
         ":platform_impl_lib",
         ":process_wide_lib",
         "//source/common/api:os_sys_calls_lib",
