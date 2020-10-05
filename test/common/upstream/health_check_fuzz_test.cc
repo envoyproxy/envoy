@@ -31,6 +31,7 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::HealthCheckTestCase input) {
     break;
   }
   default: // Handles custom health checker
+    ENVOY_LOG_MISC(trace, "Custom Health Checker currently unsupported, skipping");
     return;
   }
 
