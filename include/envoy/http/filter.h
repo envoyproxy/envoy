@@ -552,6 +552,15 @@ public:
   virtual void onStreamComplete() {}
 
   /**
+   * This is called for a filter when the associated match tree matches and results in an action
+   * that specifies a callback value.
+   *
+   * This will be called prior to the filter seeing the last bit of headers/data/trailers that
+   * resulted in a match.
+   */
+  virtual void onMatchCallback(absl::string_view) {}
+
+  /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
    * finish (both downstream and upstream) or due to reset. Every filter is responsible for making
    * sure that any async events are cleaned up in the context of this routine. This includes timers,

@@ -173,7 +173,7 @@ public:
 
     // TODO(snowp): For now we only support things we can know just by lookinag the the request
     // headers.
-    ASSERT(!status_.might_change_status_);
+    ASSERT(!status.might_change_status_);
 
     return status.matches_;
   }

@@ -66,6 +66,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual void doMetadata() PURE;
   // TODO(soya3129): make this pure when adding impl to encoder filter.
   virtual void handleMetadataAfterHeadersCallback() PURE;
+  void doMatchCallback(absl::string_view value) { invokeMatchCallback(value, dual_filter_); }
+  virtual void invokeMatchCallback(absl::string_view value, bool dual_filter) PURE;
 
   // Http::StreamFilterCallbacks
   const Network::Connection* connection() override;
@@ -180,6 +182,13 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void drainSavedRequestMetadata();
   // This function is called after the filter calls decodeHeaders() to drain accumulated metadata.
   void handleMetadataAfterHeadersCallback() override;
+  void invokeMatchCallback(absl::string_view value, bool dual_filter) override {
+    // For dual filters we arbitrarly choose not to trigger the callback here to avoid calling it
+    // twice.
+    if (!dual_filter) {
+      handle_->onMatchCallback(value);
+    }
+  }
 
   // Http::StreamDecoderFilterCallbacks
   void addDecodedData(Buffer::Instance& data, bool streaming) override;
@@ -260,6 +269,9 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   void doData(bool end_stream) override;
   void drainSavedResponseMetadata();
   void handleMetadataAfterHeadersCallback() override;
+  void invokeMatchCallback(absl::string_view value, bool) override {
+    handle_->onMatchCallback(value);
+  }
 
   void doMetadata() override {
     if (saved_response_metadata_ != nullptr) {

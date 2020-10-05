@@ -456,9 +456,13 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     if ((*entry)->matchingData()) {
       (*entry)->matchingData()->get().onRequestHeaders(headers);
       auto match = (*entry)->match_tree_->match(*(*entry)->match_data_);
-      if (match && match->isSkip()) {
-        (*entry)->skip_ = true;
-        continue;
+      if (match) {
+        if (match->isSkip()) {
+          (*entry)->skip_ = true;
+          continue;
+        } else {
+          (*entry)->doMatchCallback(*match->callback());
+        }
       }
     }
 
