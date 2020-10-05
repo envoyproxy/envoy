@@ -66,11 +66,6 @@ bool hostWeightsAreEqual(const HostVector& hosts) {
   return true;
 }
 
-bool noHostsAreInSlowStart() {
-  // todo(nezdolik) fix this
-  return true;
-}
-
 } // namespace
 
 std::pair<uint32_t, LoadBalancerBase::HostAvailability>
@@ -736,7 +731,44 @@ void EdfLoadBalancerBase::initialize() {
 }
 
 void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts_added,
-                                                      const HostVector& hosts_removed) {}
+                                                      const HostVector& hosts_removed) {
+  // Host exits slow start mode when it leaves the cluster.
+  for (const auto& host : hosts_removed) {
+    hosts_in_slow_start_.erase(host);
+  }
+  for (const auto& host : hosts_added) {
+    auto current_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+        time_source_.systemTime().time_since_epoch());
+    // Translate `slow_start_window`(seconds) into milliseconds.
+    auto slow_start_window_ms = std::chrono::milliseconds(slow_start_window * 1000);
+    // Check if host existence time is within slow start window.
+    if (current_time - host->creationTime() <= slow_start_window_ms) {
+      // If it is, then we need to verify that hosts adheres to endpoint warming policy.
+      switch (endpoint_warming_policy) {
+      case envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT:
+        // Host enters slow start immediately
+        hosts_in_slow_start_.insert(host);
+        if (host->creationTime() > latest_host_added_time) {
+          latest_host_added_time = host->creationTime();
+        }
+        break;
+      case envoy::config::cluster::v3::Cluster::CommonLbConfig::WAIT_FOR_FIRST_PASSING_HC:
+        // Check health status of host. It should be marked as healthy and have first passed
+        // healthcheck. todo(nezdolik) is this equivalent to "host has passed first HC" ?
+        if (host->health() == Upstream::Host::Health::Healthy &&
+            !host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
+          hosts_in_slow_start_.insert(host);
+          if (host->creationTime() > latest_host_added_time) {
+            latest_host_added_time = host->creationTime();
+          }
+        }
+        break;
+      default:
+        NOT_REACHED_GCOVR_EXCL_LINE;
+      }
+    }
+  }
+}
 
 void EdfLoadBalancerBase::refresh(uint32_t priority) {
   const auto add_hosts_source = [this](HostsSource source, const HostVector& hosts) {
@@ -767,8 +799,8 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       // translate `slow_start_window`(seconds) into milliseconds
       auto slow_start_window_ms = std::chrono::milliseconds(slow_start_window * 1000);
       // add math.abs anywhere?
-      // todo(nezdolik) Store a collection of hosts that adhere to EP warming policy and check if
-      // host is there.
+      // todo(nezdolik) Store a collection of hosts that adhere to EP warming policy and are in slow
+      // start window and check if host is there.
       if (current_time - host->creationTime() > slow_start_window_ms) {
         // todo(nezdolik) parametrize this, default should be 1.
         host_weight *= 0.1;
@@ -810,6 +842,24 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     add_hosts_source(
         HostsSource(priority, HostsSource::SourceType::LocalityDegradedHosts, locality_index),
         host_set->degradedHostsPerLocality().get()[locality_index]);
+  }
+}
+
+bool EdfLoadBalancerBase::noHostsAreInSlowStart() {
+  auto current_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+      time_source_.systemTime().time_since_epoch());
+  // todo(nezdolik) extract this as a field
+  auto slow_start_window_ms = std::chrono::milliseconds(slow_start_window * 1000);
+  // First check if any host is within slow start window. This condition holds if at least latest
+  // added host is within slow start window.
+  // If all hosts are out of the window, we no longer need to track them and therefore we erase
+  // tracked hosts set.
+  if (current_time - latest_host_added_time > slow_start_window_ms) {
+    hosts_in_slow_start_.erase(hosts_in_slow_start_.begin(), hosts_in_slow_start_.end());
+    return true;
+  } else {
+    // Second, check if there is any hosts in tracked hosts set.
+    return hosts_in_slow_start_.size() == 0;
   }
 }
 

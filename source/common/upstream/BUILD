@@ -173,6 +173,7 @@ envoy_cc_library(
     name = "load_balancer_lib",
     srcs = ["load_balancer_impl.cc"],
     hdrs = ["load_balancer_impl.h"],
+    external_deps = ["abseil_node_hash_set"],
     deps = [
         ":edf_scheduler_lib",
         "//include/envoy/common:random_generator_interface",
