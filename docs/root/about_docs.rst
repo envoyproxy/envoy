@@ -7,6 +7,7 @@ The Envoy documentation is composed of a few major sections:
   architecture overview, how it is typically deployed, etc.
 * :ref:`Getting Started <start>`: Quickly get started with Envoy using Docker.
 * :ref:`Installation <install>`: How to build/install Envoy using Docker.
+* :ref:`Version history <version_history>`: Per-version release notes.
 * :ref:`Configuration <config>`: Detailed configuration instructions for Envoy.
   Where relevant, the configuration guide also contains information on statistics, runtime
   configuration, and APIs.
