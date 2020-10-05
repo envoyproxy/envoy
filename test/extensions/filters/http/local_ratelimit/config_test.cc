@@ -1,7 +1,7 @@
-#include "test/mocks/server/mocks.h"
-
 #include "extensions/filters/http/local_ratelimit/config.h"
 #include "extensions/filters/http/local_ratelimit/local_ratelimit.h"
+
+#include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

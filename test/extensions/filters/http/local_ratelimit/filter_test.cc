@@ -3,11 +3,11 @@
 
 #include "common/http/header_utility.h"
 
+#include "extensions/filters/http/local_ratelimit/local_ratelimit.h"
+
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"
-
-#include "extensions/filters/http/local_ratelimit/local_ratelimit.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/extensions/filters/http/local_ratelimit/v3/local_rate_limit.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -16,7 +17,6 @@
 #include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
-#include "envoy/extensions/filters/http/local_ratelimit/v3/local_rate_limit.pb.h"
 
 namespace Envoy {
 namespace Extensions {
