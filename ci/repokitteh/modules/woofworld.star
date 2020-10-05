@@ -174,7 +174,7 @@ def woof_circle_artifacts(config, repo_owner, sha, comment_id):
     return
   github.issue_create_comment_reaction(comment_id, "+1")
   github.issue_create_comment(
-    "You can view the docs for %s here: \n\n%s" % (sha[:10], index[0]["url"]))
+    ":page_with_curl: You can view the docs for %s here: \n\n%s" % (sha[:10], index[0]["url"]))
 
 handlers.command(name='woof', func=woof_circle_artifacts)
 # handlers.command(name='woof', func=woof_docs_have_changed_in_this_pr)
