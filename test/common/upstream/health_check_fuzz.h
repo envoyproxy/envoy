@@ -22,7 +22,7 @@ public:
 
   // The specific implementations of respond look into the respond proto, which has all three types
   // of response
-  virtual void respond(test::common::upstream::Respond respond) PURE;
+  virtual void respond(test::common::upstream::Respond respond, bool last_action) PURE;
 
   virtual void initialize(test::common::upstream::HealthCheckTestCase input) PURE;
   virtual void triggerIntervalTimer(bool expect_client_create) PURE;
@@ -41,8 +41,8 @@ class HttpHealthCheckFuzz : public HealthCheckFuzz, HttpHealthCheckerImplTestBas
 public:
   void allocHttpHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input) override;
-  void respondHttp(const test::fuzz::Headers& headers, uint64_t status);
-  void respond(test::common::upstream::Respond respond) override;
+  void respondHttp(const test::fuzz::Headers& headers, uint64_t status, bool last_action);
+  void respond(test::common::upstream::Respond respond, bool last_action) override;
   void triggerIntervalTimer(bool expect_client_create) override;
   void triggerTimeoutTimer(bool last_action) override;
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
@@ -56,8 +56,8 @@ class TcpHealthCheckFuzz : public HealthCheckFuzz, TcpHealthCheckerImplTestBase 
 public:
   void allocTcpHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input) override;
-  void respondTcp(std::string data);
-  void respond(test::common::upstream::Respond respond) override;
+  void respondTcp(std::string data, bool last_action);
+  void respond(test::common::upstream::Respond respond, bool last_action) override;
   void triggerIntervalTimer(bool expect_client_create) override;
   void triggerTimeoutTimer(bool last_action) override;
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
@@ -76,8 +76,8 @@ public:
   void allocGrpcHealthCheckerFromProto(const envoy::config::core::v3::HealthCheck& config);
   void initialize(test::common::upstream::HealthCheckTestCase input) override;
   // This has three components, headers, raw bytes, and trailers
-  void respondGrpc(test::common::upstream::GrpcRespond grpc_respond);
-  void respond(test::common::upstream::Respond respond) override;
+  void respondGrpc(test::common::upstream::GrpcRespond grpc_respond, bool last_action);
+  void respond(test::common::upstream::Respond respond, bool last_action) override;
   void triggerIntervalTimer(bool expect_client_create) override;
   void triggerTimeoutTimer(bool last_action) override;
   void raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) override;
