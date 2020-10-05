@@ -122,14 +122,16 @@ void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(input.health_check_config(), reuse_connection, true);
 }
 
-void HttpHealthCheckFuzz::respondHttp(const test::fuzz::Headers& headers, uint64_t status,
-                                      bool last_action) {
+void HttpHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool last_action) {
   // Timeout timer needs to be explicitly enabled, usually by onIntervalBase() (Callback on interval
   // timer).
   if (!test_sessions_[0]->timeout_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping response.");
     return;
   }
+
+  const test::fuzz::Headers& headers = respond.http_respond().headers();
+  uint64_t status = respond.http_respond().status();
 
   std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers =
       std::make_unique<Http::TestResponseHeaderMapImpl>(
@@ -157,10 +159,6 @@ void HttpHealthCheckFuzz::respondHttp(const test::fuzz::Headers& headers, uint64
     ENVOY_LOG_MISC(trace, "Creating client and stream because shouldClose() is true");
     triggerIntervalTimer(true);
   }
-}
-
-void HttpHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool last_action) {
-  respondHttp(respond.http_respond().headers(), respond.http_respond().status(), last_action);
 }
 
 void HttpHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
@@ -234,7 +232,8 @@ void TcpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase 
   }
 } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
-void TcpHealthCheckFuzz::respondTcp(std::string data, bool last_action) {
+void TcpHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool last_action) {
+  std::string data = respond.tcp_respond().data();
   if (!timeout_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping response.");
     return;
@@ -253,10 +252,6 @@ void TcpHealthCheckFuzz::respondTcp(std::string data, bool last_action) {
   if (!reuse_connection_ && interval_timer_->enabled_ && !last_action) {
     triggerIntervalTimer(true);
   }
-}
-
-void TcpHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool last_action) {
-  respondTcp(respond.tcp_respond().data(), last_action);
 }
 
 void TcpHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
@@ -336,8 +331,8 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
 }
 
 // Logic from respondResponseSpec() in unit tests
-void GrpcHealthCheckFuzz::respondGrpc(test::common::upstream::GrpcRespond grpc_respond,
-                                      bool last_action) {
+void GrpcHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool last_action) {
+  const test::common::upstream::GrpcRespond& grpc_respond = respond.grpc_respond();
   if (!test_sessions_[0]->timeout_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping response.");
     return;
@@ -413,10 +408,6 @@ void GrpcHealthCheckFuzz::respondGrpc(test::common::upstream::GrpcRespond grpc_r
     triggerIntervalTimer(!reuse_connection_ || received_no_error_goaway_);
     received_no_error_goaway_ = false; // from resetState()
   }
-}
-
-void GrpcHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool last_action) {
-  respondGrpc(respond.grpc_respond(), last_action);
 }
 
 void GrpcHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
