@@ -338,7 +338,7 @@ bool Filter::skipCheckForRoute(const Router::RouteConstSharedPtr& route) const {
 
 bool Filter::shouldBufferRequestBody(Http::RequestHeaderMap& headers, bool end_stream) const {
   return config_->withRequestBody() &&
-         !(per_route_config_ && per_route_config_->bypassBufferingRequestBody()) &&
+         !(per_route_config_ && per_route_config_->disableRequestBodyBuffering()) &&
          !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers) ||
            Http::Utility::isH2UpgradeRequest(headers));
 }

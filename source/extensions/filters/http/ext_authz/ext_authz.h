@@ -191,8 +191,8 @@ public:
       : context_extensions_(config.has_check_settings()
                                 ? config.check_settings().context_extensions()
                                 : ContextExtensionsMap()),
-        bypass_buffering_request_body_(config.has_check_settings() &&
-                                       config.check_settings().bypass_buffering_request_body()),
+        disable_request_body_buffering_(config.has_check_settings() &&
+                                        config.check_settings().disable_request_body_buffering()),
         disabled_(config.disabled()) {}
 
   void merge(const FilterConfigPerRoute& other);
@@ -206,13 +206,13 @@ public:
 
   bool disabled() const { return disabled_; }
 
-  bool bypassBufferingRequestBody() const { return bypass_buffering_request_body_; }
+  bool disableRequestBodyBuffering() const { return disable_request_body_buffering_; }
 
 private:
   // We save the context extensions as a protobuf map instead of an std::map as this allows us to
   // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
   ContextExtensionsMap context_extensions_;
-  bool bypass_buffering_request_body_;
+  bool disable_request_body_buffering_;
   bool disabled_;
 };
 

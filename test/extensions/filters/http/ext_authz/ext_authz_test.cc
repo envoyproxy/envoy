@@ -1800,15 +1800,15 @@ TEST_P(HttpFilterTestParam, NoCluster) {
   filter_->decodeHeaders(request_headers_, false);
 }
 
-// Verify that buffering request data can be bypassed per route.
-TEST_P(HttpFilterTestParam, BypassOnRouteWithRequestBody) {
+// Verify that request body buffering can be skipped per route.
+TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   FilterConfigPerRoute auth_per_route(settings);
 
   ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
       .WillByDefault(Return(&auth_per_route));
 
-  auto test_bypass_buffering_request_body = [&](bool bypass) {
+  auto test_disable_request_body_buffering = [&](bool bypass) {
     initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -1819,15 +1819,15 @@ TEST_P(HttpFilterTestParam, BypassOnRouteWithRequestBody) {
     allow_partial_message: false
   )EOF");
 
-    // Set bypass buffering request body for this route.
-    settings.mutable_check_settings()->set_bypass_buffering_request_body(bypass);
+    // Set bypass request body buffering for this route.
+    settings.mutable_check_settings()->set_disable_request_body_buffering(bypass);
     // Initialize the route's per filter config.
     auth_per_route = FilterConfigPerRoute(settings);
   };
 
-  test_bypass_buffering_request_body(false);
+  test_disable_request_body_buffering(false);
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  // When buffering reqeust body is not bypassed, setDecoderBufferLimit is called.
+  // When request body buffering is not skipped, setDecoderBufferLimit is called.
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(1);
   EXPECT_CALL(connection_, remoteAddress()).Times(0);
   EXPECT_CALL(connection_, localAddress()).Times(0);
@@ -1836,8 +1836,8 @@ TEST_P(HttpFilterTestParam, BypassOnRouteWithRequestBody) {
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
 
-  test_bypass_buffering_request_body(true);
-  // When buffering reqeust body is bypassed, setDecoderBufferLimit is not called.
+  test_disable_request_body_buffering(true);
+  // When request body buffering is skipped, setDecoderBufferLimit is not called.
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));

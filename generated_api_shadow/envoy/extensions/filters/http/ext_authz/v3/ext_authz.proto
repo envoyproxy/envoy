@@ -288,7 +288,7 @@ message CheckSettings {
   //   :ref:`grpc_service<envoy_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>`.
   map<string, string> context_extensions = 1;
 
-  // When set to true, bypass the configured :ref:`with_request_body
+  // When set to true, disable the configured :ref:`with_request_body
   // <envoy_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>` for a route.
-  bool bypass_buffering_request_body = 2;
+  bool disable_request_body_buffering = 2;
 }
