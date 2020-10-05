@@ -117,7 +117,8 @@ public:
         service = std::unique_ptr<grpc::Service>{capturing_handshaker_service_};
       } else {
         capturing_handshaker_service_ = nullptr;
-        service = grpc::gcp::CreateFakeHandshakerService();
+        service =
+            grpc::gcp::CreateFakeHandshakerService(0 /* expected max concurrent rpcs unset */);
       }
 
       std::string server_address = Network::Test::getLoopbackAddressUrlString(version_) + ":0";

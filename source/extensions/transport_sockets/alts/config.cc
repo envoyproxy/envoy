@@ -123,9 +123,9 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
     tsi_handshaker* handshaker = nullptr;
     // Specifying target name as empty since TSI won't take care of validating peer identity
     // in this use case. The validation will be performed by TsiSocket with the validator.
-    tsi_result status =
-        alts_tsi_handshaker_create(options.get(), target_name, handshaker_service.c_str(),
-                                   is_upstream, nullptr /* interested_parties */, &handshaker);
+    tsi_result status = alts_tsi_handshaker_create(
+        options.get(), target_name, handshaker_service.c_str(), is_upstream,
+        nullptr /* interested_parties */, &handshaker, 0 /* user_specified_max_frame_size */);
     CHandshakerPtr handshaker_ptr{handshaker};
 
     if (status != TSI_OK) {

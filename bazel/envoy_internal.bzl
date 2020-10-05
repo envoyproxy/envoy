@@ -6,13 +6,14 @@ load(":envoy_select.bzl", "envoy_select_google_grpc", "envoy_select_hot_restart"
 def envoy_copts(repository, test = False):
     posix_options = [
         "-Wall",
-        "-Wextra",
         "-Werror",
-        "-Wnon-virtual-dtor",
-        "-Woverloaded-virtual",
-        "-Wold-style-cast",
-        "-Wformat",
+        "-Wextra",
         "-Wformat-security",
+        "-Wformat",
+        "-Wno-deprecated-declarations",
+        "-Wnon-virtual-dtor",
+        "-Wold-style-cast",
+        "-Woverloaded-virtual",
         "-Wvla",
     ]
 

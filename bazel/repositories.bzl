@@ -223,7 +223,7 @@ def envoy_dependencies(skip_targets = []):
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
     _emscripten_toolchain()
-    _repository_impl("com_googlesource_code_re2")
+    _re2()
     _com_google_cel_cpp()
     _repository_impl("com_github_google_flatbuffers")
     _repository_impl("bazel_toolchains")
@@ -808,15 +808,19 @@ def _com_github_grpc_grpc():
     )
 
 def _upb():
-    _repository_impl(
-        name = "upb",
-        patches = ["@envoy//bazel:upb.patch"],
-        patch_args = ["-p1"],
-    )
+    _repository_impl("upb")
 
     native.bind(
         name = "upb_lib",
         actual = "@upb//:upb",
+    )
+
+def _re2():
+    _repository_impl("com_googlesource_code_re2")
+
+    native.bind(
+        name = "re2",
+        actual = "@com_googlesource_code_re2//:re2",
     )
 
 def _proxy_wasm_cpp_sdk():
