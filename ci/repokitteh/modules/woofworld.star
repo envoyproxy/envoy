@@ -100,7 +100,7 @@ def woof_author_and_commits(issue_user, sha, issue_number):
     % (base_sha, sha, docs_have_changed_between_commits(issue_user, base_sha, sha)))
 
 def woof_circle_artifacts(repo_owner):
-  github.issue_create_comment(github.get_combined_statuses()[0]["context"])
+  github.issue_create_comment(github.get_combined_statuses().keys())
 
 def _woof_circle_artifacts(repo_owner):
   github.issue_create_comment(github.check_list_runs())
