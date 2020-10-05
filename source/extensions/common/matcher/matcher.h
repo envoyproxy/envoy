@@ -3,6 +3,7 @@
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/matchers.h"
 #include "common/http/header_utility.h"
 
 namespace Envoy {
@@ -153,6 +154,31 @@ protected:
  */
 void buildMatcher(const envoy::config::common::matcher::v3::MatchPredicate& match_config,
                   std::vector<MatcherPtr>& matchers);
+void buildMatcher(const envoy::type::matcher::v3::MatchPredicate& match_config,
+                  std::vector<MatcherPtr>& matchers);
+
+/**
+ * Describe this class and methods below
+ */
+class StringHeaderMatcher {
+public:
+  StringHeaderMatcher(std::string, Matchers::StringMatcherImpl, bool);
+  // std::string& getName() { return name_; }
+  // Matchers::StringMatcherImpl& getPattern() { return pattern_; }
+  // bool isInvertMatch() { return invert_match_; }
+  static bool matchStringHeaders(const Http::HeaderMap& response_headers,
+                                 const std::vector<StringHeaderMatcher>& config_headers);
+
+private:
+  static bool matchSingleStringHeader(const Http::HeaderMap& response_headers,
+                                      const StringHeaderMatcher& header);
+  std::string name_;
+  Matchers::StringMatcherImpl pattern_;
+  bool invert_match_;
+};
+
+std::vector<StringHeaderMatcher> buildStringMatcherVector(
+    const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::HeaderMatcher>& header_matchers);
 
 /**
  * Base class for logic matchers that need to forward update calls to child matchers.
@@ -215,6 +241,8 @@ public:
 
   SetLogicMatcher(const envoy::config::common::matcher::v3::MatchPredicate::MatchSet& configs,
                   std::vector<MatcherPtr>& matchers, Type type);
+  SetLogicMatcher(const envoy::type::matcher::v3::MatchPredicate::MatchSet& configs,
+                  std::vector<MatcherPtr>& matchers, Type type);
 
 private:
   void updateLocalStatus(MatchStatusVector& statuses, const UpdateFunctor& functor) const override;
@@ -230,6 +258,8 @@ private:
 class NotMatcher : public LogicMatcherBase {
 public:
   NotMatcher(const envoy::config::common::matcher::v3::MatchPredicate& config,
+             std::vector<MatcherPtr>& matchers);
+  NotMatcher(const envoy::type::matcher::v3::MatchPredicate& config,
              std::vector<MatcherPtr>& matchers);
 
 private:
@@ -274,6 +304,8 @@ public:
  */
 class HttpHeaderMatcherBase : public SimpleMatcher {
 public:
+  HttpHeaderMatcherBase(const envoy::type::matcher::v3::HttpHeadersMatch& config,
+                        const std::vector<MatcherPtr>& matchers);
   HttpHeaderMatcherBase(const envoy::config::common::matcher::v3::HttpHeadersMatch& config,
                         const std::vector<MatcherPtr>& matchers);
 
@@ -281,6 +313,9 @@ protected:
   void matchHeaders(const Http::HeaderMap& headers, MatchStatusVector& statuses) const;
 
   const std::vector<Http::HeaderUtility::HeaderDataPtr> headers_to_match_;
+
+  // This field will be removed once HeaderMatcher is deprecated in favor of StringMatcher
+  const std::vector<StringHeaderMatcher> rewrite_headers_to_match_;
 };
 
 /**

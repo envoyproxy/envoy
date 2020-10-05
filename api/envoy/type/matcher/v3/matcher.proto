@@ -48,7 +48,7 @@ message MatchPredicate {
     bool any_match = 4 [(validate.rules).bool = {const: true}];
 
     // HTTP response headers match configuration.
-    HttpHeadersMatch http_headers_match = 5;
+    HttpHeadersMatch http_response_headers_match = 5;
   }
 }
 

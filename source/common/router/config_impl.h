@@ -31,6 +31,8 @@
 #include "common/router/tls_context_match_criteria_impl.h"
 #include "common/stats/symbol_table_impl.h"
 
+#include "extensions/common/matcher/matcher.h"
+
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 
@@ -532,7 +534,8 @@ public:
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
   void rewriteUpstreamResponseHeaders(Http::ResponseHeaderMap& headers) const;
   bool shouldRewriteHeader(absl::string_view key, absl::string_view value,
-                           std::string& matched_prefix, std::string& substitution) const;
+                           std::string& matched_prefix, std::string& substitution,
+                           Http::ResponseHeaderMap& headers) const;
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::RequestHeaderMap& headers) const override;
@@ -592,22 +595,29 @@ protected:
   };
   using HeaderRewriteLiteralSharedPtr = std::shared_ptr<HeaderRewriteLiteral>;
 
+  class UpstreamHeaderMatchPredicate {
+  public:
+    UpstreamHeaderMatchPredicate(const envoy::type::matcher::v3::MatchPredicate& config);
+    std::vector<Envoy::Extensions::Common::Matcher::MatcherPtr>& getMatchers() { return matchers_; }
+
+  private:
+    std::vector<Envoy::Extensions::Common::Matcher::MatcherPtr> matchers_;
+  };
+  using UpstreamHeaderMatchPredicateSharedPtr = std::shared_ptr<UpstreamHeaderMatchPredicate>;
+
   class UpstreamHeaderRewriter {
   public:
     UpstreamHeaderRewriter(const envoy::config::route::v3::HeaderMatchAndRewrite& config);
-    // UpstreamHeaderMatchPredicate& getHeaderMatchPredicate();
+    UpstreamHeaderMatchPredicateSharedPtr getHeaderMatchPredicate() const {
+      return header_match_predicate_;
+    }
     HeaderRewriteLiteralSharedPtr getValueRewriteLiteral() const { return value_rewrite_literal_; }
 
   private:
-    // UpstreamHeaderMatchPredicate header_match_predicate_;
+    UpstreamHeaderMatchPredicateSharedPtr header_match_predicate_;
     HeaderRewriteLiteralSharedPtr value_rewrite_literal_;
   };
   using UpstreamHeaderRewriterSharedPtr = std::shared_ptr<UpstreamHeaderRewriter>;
-
-  // class UpstreamHeaderMatchPredicate {
-  //   public:
-  //     UpstreamHeaderMatchPredicate(const  envoy::config::route::v3::MatchPredicate& config);
-  // };
 
 private:
   struct RuntimeData {

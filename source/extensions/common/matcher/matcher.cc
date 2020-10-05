@@ -7,6 +7,47 @@ namespace Extensions {
 namespace Common {
 namespace Matcher {
 
+std::vector<StringHeaderMatcher> buildStringMatcherVector(
+    const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::HeaderMatcher>& header_matchers) {
+  std::vector<StringHeaderMatcher> ret;
+  for (const auto& header_matcher : header_matchers) {
+    ret.emplace_back(StringHeaderMatcher(header_matcher.name(),
+                                         Matchers::StringMatcherImpl(header_matcher.pattern()),
+                                         header_matcher.invert_match()));
+  }
+  return ret;
+}
+
+bool StringHeaderMatcher::matchStringHeaders(
+    const Http::HeaderMap& response_headers,
+    const std::vector<StringHeaderMatcher>& config_headers) {
+  // Nothing to match implies a positive match
+  if (!config_headers.empty()) {
+    for (auto& header : config_headers) {
+      if (!StringHeaderMatcher::matchSingleStringHeader(response_headers, header)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+bool StringHeaderMatcher::matchSingleStringHeader(const Http::HeaderMap& response_headers,
+                                                  const StringHeaderMatcher& header) {
+  const Http::HeaderEntry* header_entry = response_headers.get(Http::LowerCaseString(header.name_));
+  if (header_entry != nullptr) {
+    bool match_result = header.pattern_.match(header_entry->value().getStringView());
+    return header.invert_match_ ? !match_result : match_result;
+  }
+  // If header map does not contain header that is
+  // mentioned in match predicate config, return false
+  return false;
+}
+
+StringHeaderMatcher::StringHeaderMatcher(std::string name,
+                                         Matchers::StringMatcherImpl match_pattern, bool is_invert)
+    : name_(name), pattern_(std::move(match_pattern)), invert_match_(is_invert) {}
+
 void buildMatcher(const envoy::config::common::matcher::v3::MatchPredicate& match_config,
                   std::vector<MatcherPtr>& matchers) {
   // In order to store indexes and build our matcher tree inline, we must reserve a slot where
@@ -64,6 +105,53 @@ void buildMatcher(const envoy::config::common::matcher::v3::MatchPredicate& matc
   matchers[new_matcher->index()] = std::move(new_matcher);
 }
 
+// TODO(shivanshu21): Once HeaderMatcher is deprecated in favor of StringMatcher,
+// this overloaded method will no longer be required as we will use
+// envoy::config::common::matcher::v3::MatchPredicate
+void buildMatcher(const envoy::type::matcher::v3::MatchPredicate& match_config,
+                  std::vector<MatcherPtr>& matchers) {
+  matchers.emplace_back(nullptr);
+
+  MatcherPtr new_matcher;
+  switch (match_config.rule_case()) {
+  case envoy::type::matcher::v3::MatchPredicate::RuleCase::kOrMatch:
+    new_matcher = std::make_unique<SetLogicMatcher>(match_config.or_match(), matchers,
+                                                    SetLogicMatcher::Type::Or);
+    break;
+  case envoy::type::matcher::v3::MatchPredicate::RuleCase::kAndMatch:
+    new_matcher = std::make_unique<SetLogicMatcher>(match_config.and_match(), matchers,
+                                                    SetLogicMatcher::Type::And);
+    break;
+  case envoy::type::matcher::v3::MatchPredicate::RuleCase::kNotMatch:
+    new_matcher = std::make_unique<NotMatcher>(match_config.not_match(), matchers);
+    break;
+  case envoy::type::matcher::v3::MatchPredicate::RuleCase::kAnyMatch:
+    new_matcher = std::make_unique<AnyMatcher>(matchers);
+    break;
+  case envoy::type::matcher::v3::MatchPredicate::RuleCase::kHttpResponseHeadersMatch:
+    new_matcher = std::make_unique<HttpResponseHeadersMatcher>(
+        match_config.http_response_headers_match(), matchers);
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+
+  // Per above, move the matcher into its position.
+  matchers[new_matcher->index()] = std::move(new_matcher);
+}
+
+// TODO(shivanshu21): Once HeaderMatcher is deprecated in favor of StringMatcher,
+// this overloaded method will no longer be required as we will use
+// envoy::config::common::matcher::v3::MatchPredicate
+SetLogicMatcher::SetLogicMatcher(const envoy::type::matcher::v3::MatchPredicate::MatchSet& configs,
+                                 std::vector<MatcherPtr>& matchers, Type type)
+    : LogicMatcherBase(matchers), matchers_(matchers), type_(type) {
+  for (const auto& config : configs.rules()) {
+    indexes_.push_back(matchers_.size());
+    buildMatcher(config, matchers_);
+  }
+}
+
 SetLogicMatcher::SetLogicMatcher(
     const envoy::config::common::matcher::v3::MatchPredicate::MatchSet& configs,
     std::vector<MatcherPtr>& matchers, Type type)
@@ -105,6 +193,12 @@ NotMatcher::NotMatcher(const envoy::config::common::matcher::v3::MatchPredicate&
   buildMatcher(config, matchers);
 }
 
+NotMatcher::NotMatcher(const envoy::type::matcher::v3::MatchPredicate& config,
+                       std::vector<MatcherPtr>& matchers)
+    : LogicMatcherBase(matchers), matchers_(matchers), not_index_(matchers.size()) {
+  buildMatcher(config, matchers);
+}
+
 void NotMatcher::updateLocalStatus(MatchStatusVector& statuses,
                                    const UpdateFunctor& functor) const {
   if (!statuses[my_index_].might_change_status_) {
@@ -117,6 +211,12 @@ void NotMatcher::updateLocalStatus(MatchStatusVector& statuses,
 }
 
 HttpHeaderMatcherBase::HttpHeaderMatcherBase(
+    const envoy::type::matcher::v3::HttpHeadersMatch& config,
+    const std::vector<MatcherPtr>& matchers)
+    : SimpleMatcher(matchers),
+      rewrite_headers_to_match_(buildStringMatcherVector(config.headers())) {}
+
+HttpHeaderMatcherBase::HttpHeaderMatcherBase(
     const envoy::config::common::matcher::v3::HttpHeadersMatch& config,
     const std::vector<MatcherPtr>& matchers)
     : SimpleMatcher(matchers),
@@ -125,7 +225,15 @@ HttpHeaderMatcherBase::HttpHeaderMatcherBase(
 void HttpHeaderMatcherBase::matchHeaders(const Http::HeaderMap& headers,
                                          MatchStatusVector& statuses) const {
   ASSERT(statuses[my_index_].might_change_status_);
-  statuses[my_index_].matches_ = Http::HeaderUtility::matchHeaders(headers, headers_to_match_);
+  if (headers_to_match_.size()) {
+    // Standard config::common::matcher gets preference
+    statuses[my_index_].matches_ = Http::HeaderUtility::matchHeaders(headers, headers_to_match_);
+  } else if (rewrite_headers_to_match_.size()) {
+    // If type::matcher was used to create this HttpHeaderMatcherBase
+    // use StringMatcher based header matcher
+    statuses[my_index_].matches_ =
+        StringHeaderMatcher::matchStringHeaders(headers, rewrite_headers_to_match_);
+  }
   statuses[my_index_].might_change_status_ = false;
 }
 

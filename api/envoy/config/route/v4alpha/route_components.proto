@@ -5,6 +5,7 @@ package envoy.config.route.v4alpha;
 import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/config/core/v4alpha/proxy_protocol.proto";
+import "envoy/type/matcher/v4alpha/matcher.proto";
 import "envoy/type/matcher/v4alpha/regex.proto";
 import "envoy/type/matcher/v4alpha/string.proto";
 import "envoy/type/metadata/v3/metadata.proto";
@@ -560,7 +561,7 @@ message HeaderRewriteLiteral {
   type.matcher.v4alpha.StringMatcher string_match = 1 [(validate.rules).message = {required: true}];
 
   // The matched part will be replaced by the value provided in substitution.
-  string substitution = 2 [(validate.rules).string = {min_bytes: 1}];
+  string substitution = 2 [(validate.rules).string = {min_len: 1}];
 }
 
 message HeaderMatchAndRewrite {
@@ -571,6 +572,8 @@ message HeaderMatchAndRewrite {
     // Describes the pattern to look for in the Header's value and what to substitute in its place
     HeaderRewriteLiteral value_rewrite_literal = 1;
   }
+
+  type.matcher.v4alpha.MatchPredicate response_match_criteria = 2;
 }
 
 // Consists of the name of the header to rewrite along with the criteria
@@ -858,21 +861,29 @@ message RouteAction {
   //                   - http_response_headers_match:
   //                     headers:
   //                     - name: "cookie"
-  //                       exact_match: "pagetype=123"
+  //                       pattern:
+  //                         exact: "pagetype=123"
+  //                       invert_match: false
   //                   - http_response_headers_match:
   //                     headers:
   //                     - name: "content-type"
-  //                       exact_match: "text/html"
+  //                       pattern:
+  //                         exact: "text/html"
+  //                       invert_match: false
   //                 - or_match:
   //                   rules:
   //                   - http_response_headers_match:
   //                     headers:
   //                     - name: "status"
-  //                       exact_match: "301"
+  //                       pattern:
+  //                         exact: "301"
+  //                       invert_match: false
   //                   - http_response_headers_match:
   //                     headers:
   //                     - name: "status"
-  //                       exact_match: "302"
+  //                       pattern:
+  //                         exact: "302"
+  //                       invert_match: false
   repeated UpstreamHeaderRewriter response_headers_to_rewrite = 37;
 
   oneof cluster_specifier {

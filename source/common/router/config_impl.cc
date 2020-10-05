@@ -479,7 +479,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
             .second;
     if (!success) {
       throw EnvoyException(
-          absl::StrCat("An upstream header can be added for rewrite only once. Duplicate header: ", element.header_name()));
+          absl::StrCat("An upstream header can be added for rewrite only once. Duplicate header: ",
+                       element.header_name()));
     }
   }
 }
@@ -512,9 +513,18 @@ bool RouteEntryImplBase::HeaderRewriteLiteral::matches(const absl::string_view h
   return matcher_->match(header_value);
 }
 
+RouteEntryImplBase::UpstreamHeaderMatchPredicate::UpstreamHeaderMatchPredicate(
+    const envoy::type::matcher::v3::MatchPredicate& config) {
+  // if (config.something()) // Requests without MatchPredicate are reaching
+  // NOT_REACHED_GCOVR_EXCL_LINE
+  Envoy::Extensions::Common::Matcher::buildMatcher(config, matchers_);
+}
+
 RouteEntryImplBase::UpstreamHeaderRewriter::UpstreamHeaderRewriter(
     const envoy::config::route::v3::HeaderMatchAndRewrite& config)
-    : value_rewrite_literal_(
+    : header_match_predicate_(
+          std::make_shared<UpstreamHeaderMatchPredicate>(config.response_match_criteria())),
+      value_rewrite_literal_(
           std::make_shared<HeaderRewriteLiteral>(config.value_rewrite_literal())) {}
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
@@ -619,11 +629,21 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
 }
 
 bool RouteEntryImplBase::shouldRewriteHeader(absl::string_view key, absl::string_view value,
-                                             std::string& matched_prefix,
-                                             std::string& substitution) const {
+                                             std::string& matched_prefix, std::string& substitution,
+                                             Http::ResponseHeaderMap& headers) const {
   auto it = this->response_headers_to_rewrite_.find(std::string(key));
   if (it != this->response_headers_to_rewrite_.end()) {
-    // Check for match predicate and header value conditions before substituting
+    // Check for match predicate
+    Envoy::Extensions::Common::Matcher::Matcher::MatchStatusVector match_predicates;
+    for (auto& matcher : it->second->getHeaderMatchPredicate()->getMatchers()) {
+      matcher->onHttpResponseHeaders(headers, match_predicates);
+    }
+    // Top level match predicate will match if the entire match condition evaluates to true
+    if (!match_predicates[0].matches_) {
+      return false;
+    }
+
+    // Check for header value conditions before substituting
     if (it->second->getValueRewriteLiteral()->matches(value)) {
       matched_prefix = it->second->getValueRewriteLiteral()->getMatchedPrefix();
       substitution = it->second->getValueRewriteLiteral()->getSubstitution();
@@ -635,25 +655,26 @@ bool RouteEntryImplBase::shouldRewriteHeader(absl::string_view key, absl::string
 
 void RouteEntryImplBase::rewriteUpstreamResponseHeaders(Http::ResponseHeaderMap& headers) const {
   std::vector<std::pair<Http::LowerCaseString, std::string>> headers_to_rewrite;
-  headers.iterate(
-      [this, &headers_to_rewrite](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-        absl::string_view key_to_use = header.key().getStringView();
-        absl::string_view value_to_use = header.value().getStringView();
-        std::string matched_prefix;
-        std::string substitution;
-        if (this->shouldRewriteHeader(key_to_use, value_to_use, matched_prefix, substitution)) {
-          std::string final_substitution(substitution);
-          if (matched_prefix.size()) {
-            // rewrite the matched prefix part with substitution value.
-            // If matched_prefix size is 0, the whole value is replaced.
-            final_substitution += std::string(value_to_use).substr(matched_prefix.size());
-          }
-          // Cannot directly change headers here as iterate() stops if headers change
-          headers_to_rewrite.push_back(
-              std::make_pair(Http::LowerCaseString(std::string(key_to_use)), final_substitution));
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      });
+  headers.iterate([this, &headers_to_rewrite,
+                   &headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    absl::string_view key_to_use = header.key().getStringView();
+    absl::string_view value_to_use = header.value().getStringView();
+    std::string matched_prefix;
+    std::string substitution;
+    if (this->shouldRewriteHeader(key_to_use, value_to_use, matched_prefix, substitution,
+                                  headers)) {
+      std::string final_substitution(substitution);
+      if (matched_prefix.size()) {
+        // rewrite the matched prefix part with substitution value.
+        // If matched_prefix size is 0, the whole value is replaced.
+        final_substitution += std::string(value_to_use).substr(matched_prefix.size());
+      }
+      // Cannot directly change headers here as iterate() stops if headers change
+      headers_to_rewrite.push_back(
+          std::make_pair(Http::LowerCaseString(std::string(key_to_use)), final_substitution));
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
 
   // Iterate over the list and rewrite headers
   for (auto vit = headers_to_rewrite.begin(); vit != headers_to_rewrite.end(); vit++) {
