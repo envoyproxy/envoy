@@ -64,10 +64,40 @@ public:
   absl::optional<int> domain() override;
   Address::InstanceConstSharedPtr localAddress() override;
   Address::InstanceConstSharedPtr peerAddress() override;
-  Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                      Event::FileTriggerType trigger, uint32_t events) override;
+  void createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                       Event::FileTriggerType trigger, uint32_t events) override;
   Api::SysCallIntResult shutdown(int how) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
+
+  void appendEvents(uint32_t events) {
+    auto prv_events = file_event_->getEnabled();
+    auto new_events = prv_events | events;
+    if (new_events != prv_events) {
+      ENVOY_LOG_MISC(debug, "Socket operation blocked, changing file events from {} to {}",
+                     prv_events, new_events);
+      file_event_->setEnabled(new_events);
+    }
+  };
+
+  void activateFileEvents(uint32_t events) override {
+    ASSERT(file_event_);
+    file_event_->activate(events);
+  };
+
+  void enableFileEvents(uint32_t events) override {
+    ASSERT(file_event_);
+    auto prv_events = file_event_->getEnabled();
+    if (prv_events != events) {
+      ENVOY_LOG_MISC(trace, " updating the fd event registration from {} -> {}", prv_events,
+                     events);
+      file_event_->setEnabled(events);
+    }
+  };
+
+  uint32_t getEnabledFileEvents() override {
+    ASSERT(file_event_);
+    return file_event_->getEnabled();
+  };
 
 protected:
   // Converts a SysCallSizeResult to IoCallUint64Result.
@@ -91,6 +121,7 @@ protected:
   os_fd_t fd_;
   int socket_v6only_{false};
   const absl::optional<int> domain_;
+  Event::FileEventPtr file_event_{nullptr};
 
   // The minimum cmsg buffer size to filled in destination address, packets dropped and gso
   // size when receiving a packet. It is possible for a received packet to contain both IPv4

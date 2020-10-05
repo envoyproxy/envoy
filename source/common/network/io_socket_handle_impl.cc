@@ -59,6 +59,10 @@ IoSocketHandleImpl::~IoSocketHandleImpl() {
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::close() {
+  if (file_event_) {
+    file_event_.reset();
+  }
+
   ASSERT(SOCKET_VALID(fd_));
   const int rc = Api::OsSysCallsSingleton::get().close(fd_).rc_;
   SET_SOCKET_INVALID(fd_);
@@ -80,8 +84,14 @@ Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::R
     num_bytes_to_read += slice_length;
   }
   ASSERT(num_bytes_to_read <= max_length);
-  return sysCallResultToIoCallResult(Api::OsSysCallsSingleton::get().readv(
+  auto result = sysCallResultToIoCallResult(Api::OsSysCallsSingleton::get().readv(
       fd_, iov.begin(), static_cast<int>(num_slices_to_read)));
+
+  if (!result.ok() && result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+    enableFileEvents(file_event_->getEnabled() | Event::FileReadyType::Read);
+  }
+
+  return result;
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer, uint64_t max_length) {
@@ -116,8 +126,18 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
   if (num_slices_to_write == 0) {
     return Api::ioCallUint64ResultNoError();
   }
-  return sysCallResultToIoCallResult(
+  auto result = sysCallResultToIoCallResult(
       Api::OsSysCallsSingleton::get().writev(fd_, iov.begin(), num_slices_to_write));
+
+  if (!result.ok() && result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+    if (Event::PlatformDefaultTriggerType == Event::FileTriggerType::Level) {
+      enableFileEvents(file_event_->getEnabled() | Event::FileReadyType::Write);
+    } else {
+      activateFileEvents(Event::FileReadyType::Write);
+    }
+  }
+
+  return result;
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::write(Buffer::Instance& buffer) {
@@ -517,11 +537,9 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
   return Address::addressFromSockAddr(ss, ss_len);
 }
 
-Event::FileEventPtr IoSocketHandleImpl::createFileEvent(Event::Dispatcher& dispatcher,
-                                                        Event::FileReadyCb cb,
-                                                        Event::FileTriggerType trigger,
-                                                        uint32_t events) {
-  return dispatcher.createFileEvent(fd_, cb, trigger, events);
+void IoSocketHandleImpl::createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                         Event::FileTriggerType trigger, uint32_t events) {
+  file_event_ = dispatcher.createFileEvent(fd_, cb, trigger, events);
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {

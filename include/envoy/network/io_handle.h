@@ -108,6 +108,23 @@ public:
                                           int flags, const Address::Ip* self_ip,
                                           const Address::Instance& peer_address) PURE;
 
+  /**
+   * Activates file events for the current underlying fd.
+   * @param events events that will be activated.
+   */
+  virtual void activateFileEvents(uint32_t events) PURE;
+
+  /**
+   * Enables file events for the current underlying fd.
+   * @param events events that will be enabled.
+   */
+  virtual void enableFileEvents(uint32_t events) PURE;
+
+  /**
+   * Gets the file events that are enabled for the underlying fd.
+   */
+  virtual uint32_t getEnabledFileEvents() PURE;
+
   struct RecvMsgPerPacketInfo {
     // The destination address from transport header.
     Address::InstanceConstSharedPtr local_address_;
@@ -266,10 +283,9 @@ public:
    * @param trigger specifies whether to edge or level trigger.
    * @param events supplies a logical OR of @ref Event::FileReadyType events that the file event
    *               should initially listen on.
-   * @return @ref Event::FileEventPtr
    */
-  virtual Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                              Event::FileTriggerType trigger, uint32_t events) PURE;
+  virtual void createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                               Event::FileTriggerType trigger, uint32_t events) PURE;
 
   /**
    * Shut down part of a full-duplex connection (see man 2 shutdown)

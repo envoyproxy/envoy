@@ -32,8 +32,6 @@ private:
   // Returns true if global connection limit has been reached and the accepted socket should be
   // rejected/closed. If the accepted socket is to be admitted, false is returned.
   static bool rejectCxOverGlobalLimit();
-
-  Event::FileEventPtr file_event_;
 };
 
 } // namespace Network

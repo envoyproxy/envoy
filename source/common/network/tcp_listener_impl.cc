@@ -95,7 +95,7 @@ void TcpListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socke
 
   // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
   // loss of the trigger due to transient accept errors.
-  file_event_ = socket.ioHandle().createFileEvent(
+  socket.ioHandle().createFileEvent(
       dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::FileTriggerType::Level, Event::FileReadyType::Read);
 
@@ -114,9 +114,9 @@ TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
   }
 }
 
-void TcpListenerImpl::enable() { file_event_->setEnabled(Event::FileReadyType::Read); }
+void TcpListenerImpl::enable() { socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read); }
 
-void TcpListenerImpl::disable() { file_event_->setEnabled(0); }
+void TcpListenerImpl::disable() { socket_->ioHandle().enableFileEvents(0); }
 
 } // namespace Network
 } // namespace Envoy
