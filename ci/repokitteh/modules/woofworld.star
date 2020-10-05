@@ -107,7 +107,7 @@ def woof_cleanup(config, repo_owner):
     github.call(method="DELETE", success_codes=[204], path="/".join(comment["url"].split("/")[3:]))
   github.issue_create_comment("done!")
 
-def circleci_call(owner, repo, build_id, verb, token, method='POST', **kwargs):
+def circleci_call(owner, repo, build_id, verb, token, method='GET', **kwargs):
   secret_url='https://circleci.com/api/v1.1/project/github/%s/%s/%d/%s?circle-token=%s' % (
     owner,
     repo,
@@ -117,7 +117,7 @@ def circleci_call(owner, repo, build_id, verb, token, method='POST', **kwargs):
     # "&".join(["%s=%s" % (k, v) for k, v in kwargs.items()]))
   return http(
     method=method,
-    headers={"Content-Type": "application/json"},
+    headers={"Accept": "application/json"},
     secret_url=secret_url)
 
 def woof_circle_artifacts(config, repo_owner):
