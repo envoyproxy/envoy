@@ -1,5 +1,5 @@
 // Fuzzer for HPACK encoding and decoding.
-// TODO(asraa): Speed up by using raw byte input and seperators rather than protobuf input.
+// TODO(asraa): Speed up by using raw byte input and separators rather than protobuf input.
 
 #include <algorithm>
 
