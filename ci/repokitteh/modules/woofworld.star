@@ -120,7 +120,7 @@ def circleci_call(owner, repo, build_id, verb, token, method='GET', **kwargs):
     headers={"Accept": "application/json"},
     secret_url=secret_url)
 
-def woof_circle_artifacts(config, repo_owner, sha):
+def woof_circle_artifacts(config, repo_owner, sha, comment_id):
   status = [
     _status
     for _status
@@ -154,6 +154,7 @@ def woof_circle_artifacts(config, repo_owner, sha):
     in artifacts or []
     if arti["path"] == "generated/docs/index.html"]
   if not index:
+    github.issue_create_comment_reaction(comment_id, "clock8")
     github.issue_create_comment("couldnt find generated index page...")
     return
   github.issue_create_comment(
