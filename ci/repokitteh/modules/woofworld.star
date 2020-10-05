@@ -100,6 +100,12 @@ def woof_author_and_commits(issue_user, sha, issue_number):
     "Docs have changed between commits (%s...%s): %s"
     % (base_sha, sha, docs_have_changed_between_commits(issue_user, base_sha, sha)))
 
+def woof_cleanup(config, repo_owner):
+  _comments = github.issue_list_comments()
+  comments = reversed([c for c in _comments if c['user']['login'] == 'phlax'])[:20]
+  for comment in comments:
+    github.call(method="DELETE", success_codes=[204], path="/".join(comment["url"].split("/")[3:]))
+  github.issue_create_comment("done!")
 
 def circleci_call(owner, repo, build_id, verb, token, method='POST', **kwargs):
   secret_url='https://circleci.com/api/v1.1/project/github/%s/%s/%d/%s?circle-token=%s' % (
@@ -155,13 +161,6 @@ def woof_circle_artifacts(config, repo_owner):
   github.issue_create_comment(index["url"])
 
 
-def woof_cleanup(config, repo_owner):
-  _comments = github.issue_list_comments()
-  comments = reversed([c for c in _comments if c['user']['login'] == 'phlax'])[:20]
-  for comment in comments:
-    github.call(method="DELETE", success_codes=[204], path="/".join(comment["url"].split("/")[3:]))
-  github.issue_create_comment("done!")
-
-handlers.command(name='woof', func=woof_cleanup)
+handlers.command(name='woof', func=woof_circle_artifacts)
 # handlers.command(name='woof', func=woof_docs_have_changed_in_this_pr)
 handlers.status(func=_status)
