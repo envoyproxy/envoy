@@ -1,0 +1,15 @@
+common_lb_config {
+
+}
+actions {
+    prefetch {
+
+    }
+}
+actions {
+    choose_host {
+
+    }
+}
+num_hosts_in_priority_set: 0
+num_hosts_in_failover_set: 0

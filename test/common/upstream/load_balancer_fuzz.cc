@@ -5,6 +5,17 @@
 namespace Envoy {
 namespace Upstream {
 
+//Anonymous namespace for helper functions
+namespace {
+  std::vector<uint64_t> ConstructByteVectorForRandom(test::common::upstream::LoadBalancerTestCase input) {
+    std::vector<uint64_t> byteVector;
+    for (int i = 0; i < input.bytestring_for_random_calls().size(); ++i) {
+      byteVector.push_back(input.bytestring_for_random_calls(i));
+    }
+    return byteVector;
+  }
+}
+
 LoadBalancerFuzzBase::LoadBalancerFuzzBase() : LoadBalancerFuzzTestBase() {}
 
 void LoadBalancerFuzzBase::initializeFixedHostSets(uint32_t num_hosts_in_priority_set,
@@ -54,7 +65,6 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(bool failover_host_set,
     host_set.excluded_hosts_.push_back(host_set.hosts_[i]);
   }
 
-  // host_set is a placeholder for however the fuzzer will determine which host set to use
   host_set.runCallbacks({}, {});
 }
 
@@ -84,12 +94,18 @@ void LoadBalancerFuzzBase::replay(test::common::upstream::LoadBalancerTestCase i
   }
 }
 
+void LoadBalancerFuzzBase
+
 RandomLoadBalancerFuzzTest::RandomLoadBalancerFuzzTest() : LoadBalancerFuzzBase() {}
 
 void RandomLoadBalancerFuzzTest::initialize(test::common::upstream::LoadBalancerTestCase input) {
   load_balancer_ = std::make_unique<RandomLoadBalancer>(priority_set_, nullptr, stats_, runtime_,
                                                         random_, input.common_lb_config());
 }
+
+//For random load balancing, a randomly generated uint64 gets moded against the hosts to choose from.
+//This is not something an untrusted upstream can affect, and fuzzing must be deterministic, so the fuzzer
+//just iterates it by one every call (done in an overriden mock random class)
 
 // Logic specific for random load balancers
 void RandomLoadBalancerFuzzTest::prefetch() {

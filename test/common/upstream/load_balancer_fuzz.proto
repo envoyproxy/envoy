@@ -37,4 +37,6 @@ message LoadBalancerTestCase {
   repeated LbAction actions = 2;
   int64 num_hosts_in_priority_set = 3; //Require this and cap it at something
   int64 num_hosts_in_failover_set = 4;
+  //TODO: Any validations on this?
+  repeated int64 bytestring_for_random_calls = 5; 
 }
