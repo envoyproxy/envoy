@@ -183,7 +183,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   // This function is called after the filter calls decodeHeaders() to drain accumulated metadata.
   void handleMetadataAfterHeadersCallback() override;
   void invokeMatchCallback(absl::string_view value, bool dual_filter) override {
-    // For dual filters we arbitrarly choose not to trigger the callback here to avoid calling it
+    // For dual filters we arbitrarily choose not to trigger the callback here to avoid calling it
     // twice.
     if (!dual_filter) {
       handle_->onMatchCallback(value);
