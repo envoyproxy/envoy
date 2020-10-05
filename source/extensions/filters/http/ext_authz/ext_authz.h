@@ -191,6 +191,8 @@ public:
       : context_extensions_(config.has_check_settings()
                                 ? config.check_settings().context_extensions()
                                 : ContextExtensionsMap()),
+        bypass_buffering_request_body_(config.has_check_settings() &&
+                                       config.check_settings().bypass_buffering_request_body()),
         disabled_(config.disabled()) {}
 
   void merge(const FilterConfigPerRoute& other);
@@ -204,10 +206,13 @@ public:
 
   bool disabled() const { return disabled_; }
 
+  bool bypassBufferingRequestBody() const { return bypass_buffering_request_body_; }
+
 private:
   // We save the context extensions as a protobuf map instead of an std::map as this allows us to
   // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
   ContextExtensionsMap context_extensions_;
+  bool bypass_buffering_request_body_;
   bool disabled_;
 };
 
@@ -242,6 +247,7 @@ private:
   void continueDecoding();
   bool isBufferFull() const;
   bool skipCheckForRoute(const Router::RouteConstSharedPtr& route) const;
+  bool shouldBufferRequestBody(Http::RequestHeaderMap& headers, bool end_stream) const;
 
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling
@@ -269,6 +275,7 @@ private:
   bool buffer_data_{};
   bool skip_check_{false};
   envoy::service::auth::v3::CheckRequest check_request_{};
+  mutable const FilterConfigPerRoute* per_route_config_{nullptr};
 };
 
 } // namespace ExtAuthz

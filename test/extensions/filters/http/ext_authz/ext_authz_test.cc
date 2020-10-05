@@ -1800,6 +1800,53 @@ TEST_P(HttpFilterTestParam, NoCluster) {
   filter_->decodeHeaders(request_headers_, false);
 }
 
+// Verify that buffering request data can be bypassed per route.
+TEST_P(HttpFilterTestParam, BypassOnRouteWithRequestBody) {
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
+  FilterConfigPerRoute auth_per_route(settings);
+
+  ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+      .WillByDefault(Return(&auth_per_route));
+
+  auto test_bypass_buffering_request_body = [&](bool bypass) {
+    initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  with_request_body:
+    max_request_bytes: 1
+    allow_partial_message: false
+  )EOF");
+
+    // Set bypass buffering request body for this route.
+    settings.mutable_check_settings()->set_bypass_buffering_request_body(bypass);
+    // Initialize the route's per filter config.
+    auth_per_route = FilterConfigPerRoute(settings);
+  };
+
+  test_bypass_buffering_request_body(false);
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  // When buffering reqeust body is not bypassed, setDecoderBufferLimit is called.
+  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(1);
+  EXPECT_CALL(connection_, remoteAddress()).Times(0);
+  EXPECT_CALL(connection_, localAddress()).Times(0);
+  EXPECT_CALL(*client_, check(_, _, _, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  test_bypass_buffering_request_body(true);
+  // When buffering reqeust body is bypassed, setDecoderBufferLimit is not called.
+  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(*client_, check(_, _, _, _, _)).Times(1);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+}
+
 } // namespace
 } // namespace ExtAuthz
 } // namespace HttpFilters
