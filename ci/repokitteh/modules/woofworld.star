@@ -148,7 +148,6 @@ def woof_circle_artifacts(config, repo_owner):
     'artifacts',
     config["token"],
     filter="successful")['json']
-  github.issue_create_comment(artifacts)
   index = [
     arti
     for arti
@@ -158,7 +157,6 @@ def woof_circle_artifacts(config, repo_owner):
     github.issue_create_comment("couldnt find generated index page...")
     return
   github.issue_create_comment(index["url"])
-
 
 handlers.command(name='woof', func=woof_circle_artifacts)
 # handlers.command(name='woof', func=woof_docs_have_changed_in_this_pr)
