@@ -147,9 +147,8 @@ def woof_circle_artifacts(config, repo_owner):
     build_id,
     'artifacts',
     config["token"],
-    filter="successful")['body']
+    filter="successful")['json']
   github.issue_create_comment(artifacts)
-  return
   index = [
     arti
     for arti
