@@ -21,6 +21,7 @@ const char AutonomousStream::RESPONSE_SIZE_BYTES[] = "response_size_bytes";
 const char AutonomousStream::RESPONSE_DATA_BLOCKS[] = "response_data_blocks";
 const char AutonomousStream::EXPECT_REQUEST_SIZE_BYTES[] = "expect_request_size_bytes";
 const char AutonomousStream::RESET_AFTER_REQUEST[] = "reset_after_request";
+const char AutonomousStream::NO_TRAILERS[] = "no_trailers";
 
 AutonomousStream::AutonomousStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                                    AutonomousUpstream& upstream, bool allow_incomplete_streams)
@@ -63,11 +64,17 @@ void AutonomousStream::sendResponse() {
   int32_t response_data_blocks = 1;
   HeaderToInt(RESPONSE_DATA_BLOCKS, response_data_blocks, headers);
 
-  encodeHeaders(upstream_.responseHeaders(), false);
-  for (int32_t i = 0; i < response_data_blocks; ++i) {
-    encodeData(response_body_length, false);
+  const bool send_trailers = headers.get_(NO_TRAILERS).empty();
+  const bool headers_only_response = !send_trailers && response_data_blocks == 0;
+  encodeHeaders(upstream_.responseHeaders(), headers_only_response);
+  if (!headers_only_response) {
+    for (int32_t i = 0; i < response_data_blocks; ++i) {
+      encodeData(response_body_length, i == (response_data_blocks - 1) && !send_trailers);
+    }
+    if (send_trailers) {
+      encodeTrailers(upstream_.responseTrailers());
+    }
   }
-  encodeTrailers(upstream_.responseTrailers());
 }
 
 AutonomousHttpConnection::AutonomousHttpConnection(AutonomousUpstream& autonomous_upstream,

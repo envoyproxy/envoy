@@ -21,6 +21,8 @@ public:
   // If set, the stream will reset when the request is complete, rather than
   // sending a response.
   static const char RESET_AFTER_REQUEST[];
+  // Prevents upstream from sending trailers.
+  static const char NO_TRAILERS[];
 
   AutonomousStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                    AutonomousUpstream& upstream, bool allow_incomplete_streams);
