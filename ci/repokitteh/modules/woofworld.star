@@ -1,4 +1,5 @@
-
+load('text', 'match')
+load("json", "from_json")
 
 def _woof0(sender):
   github.issue_create_comment(
@@ -99,7 +100,21 @@ def woof_author_and_commits(issue_user, sha, issue_number):
     "Docs have changed between commits (%s...%s): %s"
     % (base_sha, sha, docs_have_changed_between_commits(issue_user, base_sha, sha)))
 
-def woof_circle_artifacts(repo_owner):
+
+def circleci_call(owner, repo, build_id, verb, token, method='POST', **kwargs):
+  secret_url='https://circleci.com/api/v1.1/project/github/%s/%s/%d/%s?circle-token=%s' % (
+    owner,
+    repo,
+    build_id,
+    verb,
+    token)
+    # "&".join(["%s=%s" % (k, v) for k, v in kwargs.items()]))
+  return http(
+    method=method,
+    headers={"Content-Type": "application/json"},
+    secret_url=secret_url)
+
+def woof_circle_artifacts(config, repo_owner):
   status = [
     _status
     for _status
@@ -112,9 +127,41 @@ def woof_circle_artifacts(repo_owner):
   if not status:
     github.issue_create_comment("couldnt find status...")
     return
-  #  github.issue_create_comment("Checking artifacts for %s/%s" % (repo_owner, "build_id"))
-  github.issue_create_comment(status)
+  m = match(text=status["target_url"], pattern='/([0-9]+)\?')
+  build_id = (
+    int(m[1])
+    if m and len(m) == 2
+    else None)
+  if not build_id:
+    github.issue_create_comment("couldnt find build id...")
+    return
+  artifacts = circleci_call(
+    repo_owner,
+    'envoy',
+    build_id,
+    'artifacts',
+    config["token"],
+    filter="successful")['body']
+  github.issue_create_comment(artifacts)
+  return
+  index = [
+    arti
+    for arti
+    in artifacts or []
+    if arti["path"] == "generated/docs/index.html"]
+  if not index:
+    github.issue_create_comment("couldnt find generated index page...")
+    return
+  github.issue_create_comment(index["url"])
 
-handlers.command(name='woof', func=woof_circle_artifacts)
+
+def woof_cleanup(config, repo_owner):
+  _comments = github.issue_list_comments()
+  comments = reversed([c for c in _comments if c['user']['login'] == 'phlax'])[:20]
+  for comment in comments:
+    github.call(method="DELETE", success_codes=[204], path="/".join(comment["url"].split("/")[3:]))
+  github.issue_create_comment("done!")
+
+handlers.command(name='woof', func=woof_cleanup)
 # handlers.command(name='woof', func=woof_docs_have_changed_in_this_pr)
 handlers.status(func=_status)
