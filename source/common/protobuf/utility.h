@@ -364,6 +364,13 @@ public:
   };
 
   /**
+   * Invoke when a version upgrade (e.g. v2 -> v3) is detected. This may warn or throw
+   * depending on where we are in the major version deprecation cycle.
+   * @param desc description of upgrade to include in warning or exception.
+   */
+  static void onVersionUpgradeWarn(absl::string_view desc);
+
+  /**
    * Obtain a string field from a protobuf message dynamically.
    *
    * @param message message to extract from.

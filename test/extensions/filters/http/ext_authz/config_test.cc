@@ -62,6 +62,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
 
 TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   std::string yaml = R"EOF(
+  stat_prefix: "wall"
   http_service:
     server_uri:
       uri: "ext_authz:9000"
