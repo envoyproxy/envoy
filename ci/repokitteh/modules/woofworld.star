@@ -176,8 +176,8 @@ def woof_circle_artifacts(config, repo_owner, sha, comment_id):
   github.issue_create_comment(
     ":page_with_curl: You can view the docs for %s here: \n\n%s" % (sha[:10], index[0]["url"]))
 
-def _hello_pr(action, issue_author_association):
-  github.issue_create_comment("auth assoc: %s" % issue_author_association)
+def _hello_pr(action, issue_number):
+  github.issue_create_comment("auth assoc: %s" % issue_number)
 
 # handlers.command(name='woof', func=woof_hello)
 # handlers.command(name='woof', func=woof_docs_have_changed_in_this_pr)
