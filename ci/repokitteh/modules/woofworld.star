@@ -156,7 +156,7 @@ def woof_circle_artifacts(config, repo_owner):
   if not index:
     github.issue_create_comment("couldnt find generated index page...")
     return
-  github.issue_create_comment(index["url"])
+  github.issue_create_comment(index[0]["url"])
 
 handlers.command(name='woof', func=woof_circle_artifacts)
 # handlers.command(name='woof', func=woof_docs_have_changed_in_this_pr)
