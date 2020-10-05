@@ -8,7 +8,7 @@ multiple major API versions at any point in time. The following versions are cur
 
 * :ref:`v2 xDS API <envoy_api_reference>` (*deprecated*, end-of-life EOY 2020). This API will not
   accept new features after the end of Q1 2020.
-* :ref:`v3 xDS API <envoy_v3_api_reference>` (*active*, end-of-life EOY 2021). Envoy developers and
+* :ref:`v3 xDS API <envoy_v3_api_reference>` (*active*, end-of-life unknown). Envoy developers and
   operators are encouraged to be actively adopting and working with v3 xDS.
 
 The following API versions are no longer supported by Envoy:
