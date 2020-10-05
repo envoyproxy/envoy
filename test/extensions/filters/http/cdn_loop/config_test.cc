@@ -40,7 +40,7 @@ TEST(CdnLoopFilterFactoryTest, BlankCdnIdThrows) {
   CdnLoopFilterFactory factory;
 
   EXPECT_THAT_THROWS_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
-                             EnvoyException, HasSubstr("value length must be at least"));
+                             ProtoValidationException, HasSubstr("value length must be at least"));
 }
 
 TEST(CdnLoopFilterFactoryTest, InvalidCdnId) {
