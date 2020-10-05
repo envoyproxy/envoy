@@ -242,6 +242,9 @@ TEST_P(PostgresProxyFrontendDecoderTest, FrontendInc) {
   EXPECT_CALL(callbacks_, incMessagesFrontend()).Times(1);
   createPostgresMsg(data_, GetParam(), "SELECT 1;");
   decoder_->onData(data_, true);
+
+  // Make sure that decoder releases memory used during message processing.
+  ASSERT_TRUE(decoder_->getMessage().empty());
 }
 
 // Run the above test for each frontend message.
