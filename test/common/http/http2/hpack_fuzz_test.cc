@@ -114,8 +114,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::HpackTestCase& input) {
 
   // Create name value pairs from headers.
   std::vector<nghttp2_nv> input_nv = createNameValueArray(input.headers());
-  // Skip encoding empty headers. nghttp2 will throw a nullptr error on runtime if it receieves a
-  // nullptr with input_nv.data().
+  // Skip encoding empty headers. nghttp2 will throw a nullptr error on runtime if it receives a
+  // nullptr input.
   if (!input_nv.data()) {
     return;
   }
