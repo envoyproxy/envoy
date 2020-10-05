@@ -120,7 +120,7 @@ def circleci_call(owner, repo, build_id, verb, token, method='GET', **kwargs):
     headers={"Accept": "application/json"},
     secret_url=secret_url)
 
-def woof_circle_artifacts(config, repo_owner):
+def woof_circle_artifacts(config, repo_owner, sha):
   status = [
     _status
     for _status
@@ -156,7 +156,8 @@ def woof_circle_artifacts(config, repo_owner):
   if not index:
     github.issue_create_comment("couldnt find generated index page...")
     return
-  github.issue_create_comment(index[0]["url"])
+  github.issue_create_comment(
+    "You can view the docs for #%s here: \n\n%s" % (sha[:10], index[0]["url"]))
 
 handlers.command(name='woof', func=woof_circle_artifacts)
 # handlers.command(name='woof', func=woof_docs_have_changed_in_this_pr)
