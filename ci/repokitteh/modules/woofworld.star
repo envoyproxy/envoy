@@ -105,11 +105,15 @@ def woof_circle_artifacts(repo_owner):
     for _status
     in github.get_combined_statuses()
     if _status["context"] == "ci/circleci: docs"]
+  status = (
+    status[0]
+    if status
+    else None)
   if not status:
     github.issue_create_comment("couldnt find status...")
     return
   #  github.issue_create_comment("Checking artifacts for %s/%s" % (repo_owner, "build_id"))
-  github.issue_create_comment(status[0])
+  github.issue_create_comment(status)
 
 handlers.command(name='woof', func=woof_circle_artifacts)
 # handlers.command(name='woof', func=woof_docs_have_changed_in_this_pr)
