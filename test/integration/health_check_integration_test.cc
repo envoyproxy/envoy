@@ -14,14 +14,15 @@ namespace {
 // Integration tests for active health checking.
 // The tests fetch the cluster configuration using CDS in order to actively start health
 // checking after Envoy and the hosts are initialized.
-class HealthCheckIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                   public HttpIntegrationTest {
+class HealthCheckIntegrationTestBase : public Event::TestUsingSimulatedTime,
+                                       public HttpIntegrationTest {
 public:
-  HealthCheckIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam(),
-                            ConfigHelper::discoveredClustersBootstrap("GRPC")) {}
-
-  enum HealthCheckType { HTTP, TCP, GRPC };
+  HealthCheckIntegrationTestBase(
+      Network::Address::IpVersion ip_version,
+      FakeHttpConnection::Type upstream_protocol = FakeHttpConnection::Type::HTTP2)
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ip_version,
+                            ConfigHelper::discoveredClustersBootstrap("GRPC")),
+        ip_version_(ip_version), upstream_protocol_(upstream_protocol) {}
 
   // Per-cluster information including the fake connection and stream.
   struct ClusterData {
@@ -34,8 +35,6 @@ public:
 
     ClusterData(const std::string name) : name_(name) {}
   };
-
-  void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
     // The endpoints and their configuration is received as part of a CDS response, and not
@@ -70,23 +69,17 @@ public:
     // Expect 1 for the statically specified CDS server.
     test_server_->waitForGaugeGe("cluster_manager.active_clusters", 1);
 
-    // Register the xds server port in the test framework's downstream listener port map.
-    // test_server_->waitUntilListenersReady();
     registerTestServerPorts({"http"});
 
     // Create the regular (i.e. not an xDS server) upstreams. We create them manually here after
     // initialize() because finalize() expects all fake_upstreams_ to correspond to a static
     // cluster in the bootstrap config - which we don't want since we're using dynamic CDS.
-    const FakeHttpConnection::Type http_conn_type =
-        (envoy::type::v3::CodecClientType::HTTP1 == codec_client_type_)
-            ? FakeHttpConnection::Type::HTTP1
-            : FakeHttpConnection::Type::HTTP2;
     for (auto& cluster : clusters_) {
-      cluster.host_upstream_ = std::make_unique<FakeUpstream>(0, http_conn_type, version_,
+      cluster.host_upstream_ = std::make_unique<FakeUpstream>(0, upstream_protocol_, version_,
                                                               timeSystem(), enable_half_close_);
       cluster.cluster_ = ConfigHelper::buildStaticCluster(
           cluster.name_, cluster.host_upstream_->localAddress()->ip()->port(),
-          Network::Test::getLoopbackAddressString(GetParam()));
+          Network::Test::getLoopbackAddressString(ip_version_));
     }
   }
 
@@ -112,12 +105,12 @@ public:
     }
   }
 
-  // Adds an active health check specifier to the given cluster with the given timeout.
-  envoy::config::core::v3::HealthCheck* addHealthCheck(envoy::config::cluster::v3::Cluster& cluster,
-                                                       uint32_t timeout) {
+  // Adds an active health check specifier to the given cluster.
+  envoy::config::core::v3::HealthCheck*
+  addHealthCheck(envoy::config::cluster::v3::Cluster& cluster) {
     // Add general health check specifier to the cluster.
     auto* health_check = cluster.add_health_checks();
-    health_check->mutable_timeout()->set_seconds(timeout);
+    health_check->mutable_timeout()->set_seconds(30);
     health_check->mutable_interval()->CopyFrom(
         Protobuf::util::TimeUtil::MillisecondsToDuration(100));
     health_check->mutable_no_traffic_interval()->CopyFrom(
@@ -127,13 +120,63 @@ public:
     return health_check;
   }
 
-  // Adds a HTTP active health check specifier to the given cluster with the given timeout,
-  // and waits for the first health check probe to be received.
-  void initHttpHealthCheck(uint32_t cluster_idx, uint32_t timeout = 30) {
+  // The number of clusters and their names must match the clusters in the CDS integration test
+  // configuration.
+  static constexpr size_t clusters_num_ = 2;
+  std::array<ClusterData, clusters_num_> clusters_{{{"cluster_1"}, {"cluster_2"}}};
+  Network::Address::IpVersion ip_version_;
+  FakeHttpConnection::Type upstream_protocol_;
+};
+
+struct HttpHealthCheckIntegrationTestParams {
+  Network::Address::IpVersion ip_version;
+  FakeHttpConnection::Type upstream_protocol;
+};
+
+class HttpHealthCheckIntegrationTest
+    : public testing::TestWithParam<HttpHealthCheckIntegrationTestParams>,
+      public HealthCheckIntegrationTestBase {
+public:
+  HttpHealthCheckIntegrationTest()
+      : HealthCheckIntegrationTestBase(GetParam().ip_version, GetParam().upstream_protocol) {}
+
+  // Returns the 4 combinations for testing:
+  // [HTTP1, HTTP2] x [IPv4, IPv6]
+  static std::vector<HttpHealthCheckIntegrationTestParams>
+  getHttpHealthCheckIntegrationTestParams() {
+    std::vector<HttpHealthCheckIntegrationTestParams> ret;
+
+    for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+      for (auto upstream_protocol :
+           {FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP2}) {
+        ret.push_back(HttpHealthCheckIntegrationTestParams{ip_version, upstream_protocol});
+      }
+    }
+    return ret;
+  }
+
+  static std::string protocolTestParamsToString(
+      const ::testing::TestParamInfo<HttpHealthCheckIntegrationTestParams>& params) {
+    return absl::StrCat(
+        (params.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
+        (params.param.upstream_protocol == FakeHttpConnection::Type::HTTP2 ? "Http2Upstream"
+                                                                           : "HttpUpstream"));
+  }
+
+  void TearDown() override { cleanUpXdsConnection(); }
+
+  // Adds a HTTP active health check specifier to the given cluster, and waits for the first health
+  // check probe to be received.
+  void initHttpHealthCheck(uint32_t cluster_idx) {
+    const envoy::type::v3::CodecClientType codec_client_type =
+        (FakeHttpConnection::Type::HTTP1 == upstream_protocol_)
+            ? envoy::type::v3::CodecClientType::HTTP1
+            : envoy::type::v3::CodecClientType::HTTP2;
+
     auto& cluster_data = clusters_[cluster_idx];
-    auto* health_check = addHealthCheck(cluster_data.cluster_, timeout);
+    auto* health_check = addHealthCheck(cluster_data.cluster_);
     health_check->mutable_http_health_check()->set_path("/healthcheck");
-    health_check->mutable_http_health_check()->set_codec_client_type(codec_client_type_);
+    health_check->mutable_http_health_check()->set_codec_client_type(codec_client_type);
 
     // Introduce the cluster using compareDiscoveryRequest / sendDiscoveryResponse.
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
@@ -151,110 +194,68 @@ public:
     EXPECT_EQ(cluster_data.host_stream_->headers().getMethodValue(), "GET");
     EXPECT_EQ(cluster_data.host_stream_->headers().getHostValue(), cluster_data.name_);
   }
-
-  // Tests that a healthy endpoint returns a valid HTTP health check response.
-  // HTTP tests are defined here to check both HTTP1 and HTTP2.
-  void singleEndpointHealthyHttp(envoy::type::v3::CodecClientType codec_client_type) {
-    codec_client_type_ = codec_client_type;
-
-    const uint32_t cluster_idx = 0;
-    initialize();
-    initHttpHealthCheck(cluster_idx);
-
-    // Endpoint responds with healthy status to the health check.
-    clusters_[cluster_idx].host_stream_->encodeHeaders(
-        Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-    clusters_[cluster_idx].host_stream_->encodeData(1024, true);
-
-    // Verify that Envoy detected the health check response.
-    test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
-    EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
-    EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-
-    // Clean up connections.
-    cleanupHostConnections();
-  }
-
-  // Tests that an unhealthy endpoint returns a valid HTTP health check response.
-  // HTTP tests are defined here to check both HTTP1 and HTTP2.
-  void singleEndpointUnhealthyHttp(envoy::type::v3::CodecClientType codec_client_type) {
-    codec_client_type_ = codec_client_type;
-
-    const uint32_t cluster_idx = 0;
-    initialize();
-    initHttpHealthCheck(cluster_idx);
-
-    // Endpoint responds to the health check with unhealthy status.
-    clusters_[cluster_idx].host_stream_->encodeHeaders(
-        Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
-    clusters_[cluster_idx].host_stream_->encodeData(1024, true);
-
-    test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
-    EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
-    EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-
-    // Clean up connections.
-    cleanupHostConnections();
-  }
-
-  // Tests that no HTTP health check response results in timeout and unhealthy endpoint.
-  // HTTP tests are defined here to check both HTTP1 and HTTP2.
-  void singleEndpointTimeoutHttp(envoy::type::v3::CodecClientType codec_client_type) {
-    codec_client_type_ = codec_client_type;
-
-    const uint32_t cluster_idx = 0;
-    initialize();
-    // Set timeout to 1 second, so the waiting will not be long.
-    initHttpHealthCheck(cluster_idx, 1);
-
-    // Endpoint doesn't reply, and a healthcheck failure occurs (due to timeout).
-    test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
-    EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
-    EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-
-    // Clean up connections
-    cleanupHostConnections();
-  }
-
-  // The number of clusters and their names must match the clusters in the CDS integration test
-  // configuration.
-  static constexpr size_t clusters_num_ = 2;
-  std::array<ClusterData, clusters_num_> clusters_{{{"cluster_1"}, {"cluster_2"}}};
-  envoy::type::v3::CodecClientType codec_client_type_{envoy::type::v3::HTTP2};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, HealthCheckIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, HttpHealthCheckIntegrationTest,
+    testing::ValuesIn(HttpHealthCheckIntegrationTest::getHttpHealthCheckIntegrationTestParams()),
+    HttpHealthCheckIntegrationTest::protocolTestParamsToString);
 
-// Tests that a healthy endpoint returns a valid HTTP1 health check response.
-TEST_P(HealthCheckIntegrationTest, SingleEndpointHealthyHttp1) {
-  singleEndpointHealthyHttp(envoy::type::v3::CodecClientType::HTTP1);
+// Tests that a healthy endpoint returns a valid HTTP health check response.
+TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointHealthyHttp) {
+  const uint32_t cluster_idx = 0;
+  initialize();
+  initHttpHealthCheck(cluster_idx);
+
+  // Endpoint responds with healthy status to the health check.
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  clusters_[cluster_idx].host_stream_->encodeData(1024, true);
+
+  // Verify that Envoy detected the health check response.
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+
+  // Clean up connections.
+  cleanupHostConnections();
 }
 
-// Tests that a healthy endpoint returns a valid HTTP2 health check response.
-TEST_P(HealthCheckIntegrationTest, SingleEndpointHealthyHttp2) {
-  singleEndpointHealthyHttp(envoy::type::v3::CodecClientType::HTTP2);
+// Tests that an unhealthy endpoint returns a valid HTTP health check response.
+TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyHttp) {
+  const uint32_t cluster_idx = 0;
+  initialize();
+  initHttpHealthCheck(cluster_idx);
+
+  // Endpoint responds to the health check with unhealthy status.
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+  clusters_[cluster_idx].host_stream_->encodeData(1024, true);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+
+  // Clean up connections.
+  cleanupHostConnections();
 }
 
-// Tests that an unhealthy endpoint returns a valid HTTP1 health check response.
-TEST_P(HealthCheckIntegrationTest, SingleEndpointUnhealthyHttp1) {
-  singleEndpointUnhealthyHttp(envoy::type::v3::CodecClientType::HTTP1);
-}
+// Tests that no HTTP health check response results in timeout and unhealthy endpoint.
+TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointTimeoutHttp) {
+  const uint32_t cluster_idx = 0;
+  initialize();
+  initHttpHealthCheck(cluster_idx);
 
-// Tests that an unhealthy endpoint returns a valid HTTP2 health check response.
-TEST_P(HealthCheckIntegrationTest, SingleEndpointUnhealthyHttp2) {
-  singleEndpointUnhealthyHttp(envoy::type::v3::CodecClientType::HTTP2);
-}
+  // Increase time until timeout (30s).
+  timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
-// Tests that no HTTP1 health check response results in timeout and unhealthy endpoint.
-TEST_P(HealthCheckIntegrationTest, SingleEndpointTimeoutHttp1) {
-  singleEndpointTimeoutHttp(envoy::type::v3::CodecClientType::HTTP1);
-}
+  // Endpoint doesn't reply, and a healthcheck failure occurs (due to timeout).
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 
-// Tests that no HTTP2 health check response results in timeout and unhealthy endpoint.
-TEST_P(HealthCheckIntegrationTest, SingleEndpointTimeoutHttp2) {
-  singleEndpointTimeoutHttp(envoy::type::v3::CodecClientType::HTTP2);
+  // Clean up connections
+  cleanupHostConnections();
 }
 
 } // namespace
