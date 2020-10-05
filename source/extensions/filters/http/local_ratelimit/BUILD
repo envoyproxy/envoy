@@ -25,8 +25,8 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/local_ratelimit/v3:pkg_cc_proto",
     ],
 )
@@ -40,8 +40,8 @@ envoy_cc_extension(
         ":local_ratelimit_lib",
         "//include/envoy/http:filter_interface",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/local_ratelimit/v3:pkg_cc_proto",
     ],
 )
