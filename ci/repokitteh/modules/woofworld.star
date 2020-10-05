@@ -134,6 +134,7 @@ def woof_circle_artifacts(config, repo_owner, sha, comment_id):
     github.issue_create_comment_reaction(comment_id, "eyes")
     github.issue_create_comment(
       "Doc creation is still pending, please try again when the `ci/circleci: docs` task has completed")
+    return
   github.issue_create_comment(status)
   if not status:
     github.issue_create_comment("couldnt find status...")
