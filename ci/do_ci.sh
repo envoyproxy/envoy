@@ -222,17 +222,17 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
     popd
   fi
 
-  if [ "${CI_SKIP_INTEGRATION_TEST_TRAFFIC_TAPPING}" != "1" ] ; then
+  # TODO(mattklein123): This part of the test is now flaky in CI and it's unclear why, possibly
+  # due to sandboxing issue. Debug and enable it again.
+  # if [ "${CI_SKIP_INTEGRATION_TEST_TRAFFIC_TAPPING}" != "1" ] ; then
     # Also validate that integration test traffic tapping (useful when debugging etc.)
     # works. This requires that we set TAP_PATH. We do this under bazel.asan to
     # ensure a debug build in CI.
-    # TODO(mattklein123): This part of the test is now flaky in CI and it's unclear why, possibly
-    # due to sandboxing issue. Debug and enable it again.
     # echo "Validating integration test traffic tapping..."
     # bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" \
     #   --run_under=@envoy//bazel/test:verify_tap_test.sh \
     #   //test/extensions/transport_sockets/tls/integration:ssl_integration_test
-  fi
+  # fi
   exit 0
 elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
   setup_clang_toolchain
