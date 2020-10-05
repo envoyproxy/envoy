@@ -329,7 +329,8 @@ elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage
 
   [[ "$CI_TARGET" == "bazel.fuzz_coverage" ]] && export FUZZ_COVERAGE=true
 
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" test/run_envoy_bazel_coverage.sh "${COVERAGE_TEST_TARGETS[@]}"
+  # We use custom BAZEL_BUILD_OPTIONS here to cover profiler's code.
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" test/run_envoy_bazel_coverage.sh "${COVERAGE_TEST_TARGETS[@]}"
   collect_build_profile coverage
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
