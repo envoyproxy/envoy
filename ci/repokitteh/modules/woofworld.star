@@ -101,10 +101,10 @@ def woof_author_and_commits(issue_user, sha, issue_number):
 
 def woof_circle_artifacts(repo_owner):
   status = [
-    status
-    for status
+    _status
+    for _status
     in github.get_combined_statuses()
-    if status["context"] == "ci/circleci: docs"]
+    if _status["context"] == "ci/circleci: docs"]
   if not status:
     github.issue_create_comment("couldnt find status...")
     return
