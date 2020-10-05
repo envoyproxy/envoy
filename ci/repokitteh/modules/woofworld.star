@@ -101,8 +101,8 @@ def woof_author_and_commits(issue_user, sha, issue_number):
 
 def woof_circle_artifacts(repo_owner):
   combined = github.get_combined_statuses()
-  github.issue_create_comment("Checking artifacts for %s/%s" % (repo_owner, "build_id"))
-  github.issue_create_comment(combined["statuses"])
+  #  github.issue_create_comment("Checking artifacts for %s/%s" % (repo_owner, "build_id"))
+  github.issue_create_comment(combined["statuses"][0].keys())
 
 handlers.command(name='woof', func=woof_circle_artifacts)
 # handlers.command(name='woof', func=woof_docs_have_changed_in_this_pr)
