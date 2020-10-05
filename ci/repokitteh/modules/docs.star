@@ -1,4 +1,6 @@
 
+load('text', 'match')
+
 
 def docs_have_been_rebuilt(context, state):
   return (
@@ -52,7 +54,7 @@ def _status(context, state):
   if should_send_message:
     send_docs_message(pull_request, commit)
 
-def _docs_build_url(config, repo_owner):
+def _docs_build_url(config, repo_owner, sha, comment_id):
   status = [
     _status
     for _status
@@ -62,8 +64,20 @@ def _docs_build_url(config, repo_owner):
     status[0]
     if status
     else None)
-  if not status:
-    github.issue_create_comment("couldnt find status...")
+  if status["state"] == "pending":
+    github.issue_create_comment_reaction(comment_id, "eyes")
+    github.issue_create_comment(
+      ":clock8: The docs have not been rendered yet, please try again when the `ci/circleci: docs` task has completed")
+    return
+  elif status["state"] == "failed":
+    github.issue_create_comment_reaction(comment_id, "-1")
+    github.issue_create_comment(
+      ":x: The docs did not successfully render, check the `ci/circleci: docs` task below to track problems")
+    return
+  elif not status:
+    github.issue_create_comment_reaction(comment_id, "confused")
+    github.issue_create_comment(
+      ":warning: Unable to get status of `ci/circleci: docs` task")
     return
   m = match(text=status["target_url"], pattern='/([0-9]+)\?')
   build_id = (
@@ -71,7 +85,9 @@ def _docs_build_url(config, repo_owner):
     if m and len(m) == 2
     else None)
   if not build_id:
-    github.issue_create_comment("couldnt find build id...")
+    github.issue_create_comment_reaction(comment_id, "confused")
+    github.issue_create_comment(
+      ":warning: Unable to find build id")
     return
   artifacts = circleci_call(
     repo_owner,
@@ -86,9 +102,13 @@ def _docs_build_url(config, repo_owner):
     in artifacts or []
     if arti["path"] == "generated/docs/index.html"]
   if not index:
-    github.issue_create_comment("couldnt find generated index page...")
+    github.issue_create_comment_reaction(comment_id, "confused")
+    github.issue_create_comment(
+      ":warning: Unable to find index page for docs in generated artefacts")
     return
-  github.issue_create_comment(index[0]["url"])
+  github.issue_create_comment_reaction(comment_id, "+1")
+  github.issue_create_comment(
+    ":page_with_curl: You can view the docs for %s here: \n\n%s" % (sha[:10], index[0]["url"]))
 
 handlers.status(func=_status)
 handlers.command(name='docs', func=_docs_build_url)
