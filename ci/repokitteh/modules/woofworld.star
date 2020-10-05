@@ -130,6 +130,7 @@ def woof_circle_artifacts(config, repo_owner, sha, comment_id):
     status[0]
     if status
     else None)
+  github.issue_create_comment(status)
   if not status:
     github.issue_create_comment("couldnt find status...")
     return
