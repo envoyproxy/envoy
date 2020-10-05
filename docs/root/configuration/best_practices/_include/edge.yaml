@@ -44,8 +44,8 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-            - certificate_chain: { filename: "example_com_cert.pem" }
-              private_key: { filename: "example_com_key.pem" }
+            - certificate_chain: { filename: "certs/servercert.pem" }
+              private_key: { filename: "certs/serverkey.pem" }
       # Uncomment if Envoy is behind a load balancer that exposes client IP address using the PROXY protocol.
       # use_proxy_proto: true
       filters:
