@@ -240,7 +240,8 @@ public:
    * @param connection_termination_details the termination details string to set for this
    * connection.
    */
-  virtual void setConnectionTerminationDetails(std::string connection_termination_details) PURE;
+  virtual void
+  setConnectionTerminationDetails(absl::string_view connection_termination_details) PURE;
 
   /**
    * @param response_flags the response_flags to intersect with.

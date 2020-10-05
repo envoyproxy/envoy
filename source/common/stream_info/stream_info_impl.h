@@ -125,7 +125,7 @@ struct StreamInfoImpl : public StreamInfo {
     return connection_termination_details_;
   }
 
-  void setConnectionTerminationDetails(std::string connection_termination_details) override {
+  void setConnectionTerminationDetails(absl::string_view connection_termination_details) override {
     connection_termination_details_.emplace(connection_termination_details);
   }
 

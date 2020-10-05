@@ -44,7 +44,7 @@ public:
   const absl::optional<std::string>& connectionTerminationDetails() const override {
     return connection_termination_details_;
   }
-  void setConnectionTerminationDetails(std::string details) override {
+  void setConnectionTerminationDetails(absl::string_view details) override {
     connection_termination_details_.emplace(details);
   }
   void addBytesSent(uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

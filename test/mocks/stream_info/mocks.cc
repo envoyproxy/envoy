@@ -29,7 +29,7 @@ MockStreamInfo::MockStreamInfo()
   }));
   ON_CALL(*this, setConnectionTerminationDetails(_))
       .WillByDefault(
-          Invoke([this](std::string details) { connection_termination_details_ = details; }));
+          Invoke([this](absl::string_view details) { connection_termination_details_ = details; }));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
   ON_CALL(*this, lastDownstreamRxByteReceived())

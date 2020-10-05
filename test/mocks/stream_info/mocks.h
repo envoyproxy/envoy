@@ -22,7 +22,7 @@ public:
   // StreamInfo::StreamInfo
   MOCK_METHOD(void, setResponseFlag, (ResponseFlag response_flag));
   MOCK_METHOD(void, setResponseCodeDetails, (absl::string_view));
-  MOCK_METHOD(void, setConnectionTerminationDetails, (std::string));
+  MOCK_METHOD(void, setConnectionTerminationDetails, (absl::string_view));
   MOCK_METHOD(bool, intersectResponseFlags, (uint64_t), (const));
   MOCK_METHOD(void, onUpstreamHostSelected, (Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(SystemTime, startTime, (), (const));
