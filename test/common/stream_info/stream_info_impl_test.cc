@@ -153,10 +153,10 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
     EXPECT_EQ(ResponseCodeDetails::get().ViaUpstream, stream_info.responseCodeDetails().value());
 
-    EXPECT_FALSE(stream_info.terminationDetails().has_value());
-    stream_info.setTerminationDetails("access_denied");
-    ASSERT_TRUE(stream_info.terminationDetails().has_value());
-    EXPECT_EQ("access_denied", stream_info.terminationDetails().value());
+    EXPECT_FALSE(stream_info.connectionTerminationDetails().has_value());
+    stream_info.setConnectionTerminationDetails("access_denied");
+    ASSERT_TRUE(stream_info.connectionTerminationDetails().has_value());
+    EXPECT_EQ("access_denied", stream_info.connectionTerminationDetails().value());
 
     EXPECT_EQ(nullptr, stream_info.upstreamHost());
     Upstream::HostDescriptionConstSharedPtr host(new NiceMock<Upstream::MockHostDescription>());

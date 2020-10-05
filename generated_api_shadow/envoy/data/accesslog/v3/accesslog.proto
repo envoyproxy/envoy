@@ -76,9 +76,6 @@ message ConnectionProperties {
 
   // Number of bytes sent to downstream.
   uint64 sent_bytes = 2;
-
-  // Details about why the connection was terminated.
-  string termination_details = 3;
 }
 
 // Defines fields that are shared by all Envoy access logs.

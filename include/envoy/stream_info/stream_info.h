@@ -237,9 +237,10 @@ public:
   virtual void setResponseCodeDetails(absl::string_view rc_details) PURE;
 
   /**
-   * @param termination_details the termination details string to set for this connection.
+   * @param connection_termination_details the termination details string to set for this
+   * connection.
    */
-  virtual void setTerminationDetails(std::string termination_details) PURE;
+  virtual void setConnectionTerminationDetails(std::string connection_termination_details) PURE;
 
   /**
    * @param response_flags the response_flags to intersect with.
@@ -295,7 +296,7 @@ public:
   /**
    * @return the termination details of the connection.
    */
-  virtual const absl::optional<std::string>& terminationDetails() const PURE;
+  virtual const absl::optional<std::string>& connectionTerminationDetails() const PURE;
 
   /**
    * @return the time that the first byte of the request was received.

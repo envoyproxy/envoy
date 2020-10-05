@@ -202,12 +202,12 @@ The following command operators are supported:
   TCP
     Not implemented ("-")
 
-.. _config_access_log_format_termination_details:
+.. _config_access_log_format_connection_termination_details:
 
-%TERMINATION_DETAILS%
+%CONNECTION_TERMINATION_DETAILS%
   HTTP and TCP
-    Termination details may provide additional information about why the connection was terminated
-    by Envoy for L4 reasons.
+    Connection termination details may provide additional information about why the connection was
+    terminated by Envoy for L4 reasons.
 
 %BYTES_SENT%
   HTTP

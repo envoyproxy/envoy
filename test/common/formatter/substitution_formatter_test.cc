@@ -275,9 +275,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    StreamInfoFormatter termination_details_format("TERMINATION_DETAILS");
+    StreamInfoFormatter termination_details_format("CONNECTION_TERMINATION_DETAILS");
     absl::optional<std::string> details;
-    EXPECT_CALL(stream_info, terminationDetails()).WillRepeatedly(ReturnRef(details));
+    EXPECT_CALL(stream_info, connectionTerminationDetails()).WillRepeatedly(ReturnRef(details));
     EXPECT_EQ(absl::nullopt,
               termination_details_format.format(request_headers, response_headers,
                                                 response_trailers, stream_info, body));
@@ -287,9 +287,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    StreamInfoFormatter termination_details_format("TERMINATION_DETAILS");
+    StreamInfoFormatter termination_details_format("CONNECTION_TERMINATION_DETAILS");
     absl::optional<std::string> details{"access_denied"};
-    EXPECT_CALL(stream_info, terminationDetails()).WillRepeatedly(ReturnRef(details));
+    EXPECT_CALL(stream_info, connectionTerminationDetails()).WillRepeatedly(ReturnRef(details));
     EXPECT_EQ("access_denied",
               termination_details_format.format(request_headers, response_headers,
                                                 response_trailers, stream_info, body));

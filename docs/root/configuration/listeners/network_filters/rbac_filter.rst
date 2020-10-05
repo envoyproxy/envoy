@@ -10,7 +10,7 @@ block-list (DENY) set of policies based on properties of the connection (IPs, po
 This filter also supports policy in both enforcement and shadow modes. Shadow mode won't effect real
 users, it is used to test that a new set of policies work before rolling out to production.
 
-When a request is denied, the :ref:`TERMINATION_DETAILS<config_access_log_format_termination_details>`
+When a request is denied, the :ref:`CONNECTION_TERMINATION_DETAILS<config_access_log_format_connection_termination_details>`
 will include the name of the matched policy that caused the deny in the format of `rbac_access_denied_matched_policy[policy_name]`
 (policy_name will be `none` if no policy matched), this helps to distinguish the deny from Envoy
 RBAC filter and the upstream backend.

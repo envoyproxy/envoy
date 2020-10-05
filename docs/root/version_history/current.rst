@@ -82,7 +82,7 @@ New Features
 ------------
 * access log: added a :ref:`dynamic metadata filter<envoy_v3_api_msg_config.accesslog.v3.MetadataFilter>` for access logs, which filters whether to log based on matching dynamic metadata.
 * access log: added support for :ref:`%DOWNSTREAM_PEER_FINGERPRINT_1% <config_access_log_format_response_flags>` as a response flag.
-* access log: added support for :ref:`%TERMINATION_DETAILS% <config_access_log_format_termination_details>` as a log command operator about why the connection is terminated by Envoy.
+* access log: added support for :ref:`%CONNECTION_TERMINATION_DETAILS% <config_access_log_format_connection_termination_details>` as a log command operator about why the connection is terminated by Envoy.
 * access log: added support for nested objects in :ref:`JSON logging mode <config_access_log_format_dictionaries>`.
 * access log: added :ref:`omit_empty_values<envoy_v3_api_field_config.core.v3.SubstitutionFormatString.omit_empty_values>` option to omit unset value from formatted log.
 * admin: added :ref:`circuit breakers settings <envoy_v3_api_msg_config.cluster.v3.CircuitBreakers>` information to GET /clusters?format=json :ref:`cluster status <envoy_v3_api_msg_admin.v3.ClusterStatus>`.

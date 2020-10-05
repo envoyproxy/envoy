@@ -132,7 +132,7 @@ typed_config:
 }
 
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DeniedWithDenyAction) {
-  useListenerAccessLog("%TERMINATION_DETAILS%");
+  useListenerAccessLog("%CONNECTION_TERMINATION_DETAILS%");
   initializeFilter(R"EOF(
 name: rbac
 typed_config:

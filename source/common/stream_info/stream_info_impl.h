@@ -121,12 +121,12 @@ struct StreamInfoImpl : public StreamInfo {
     response_code_details_.emplace(rc_details);
   }
 
-  const absl::optional<std::string>& terminationDetails() const override {
-    return termination_details_;
+  const absl::optional<std::string>& connectionTerminationDetails() const override {
+    return connection_termination_details_;
   }
 
-  void setTerminationDetails(std::string termination_details) override {
-    termination_details_.emplace(termination_details);
+  void setConnectionTerminationDetails(std::string connection_termination_details) override {
+    connection_termination_details_.emplace(connection_termination_details);
   }
 
   void addBytesSent(uint64_t bytes_sent) override { bytes_sent_ += bytes_sent; }
@@ -292,7 +292,7 @@ struct StreamInfoImpl : public StreamInfo {
   absl::optional<Http::Protocol> protocol_;
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
-  absl::optional<std::string> termination_details_;
+  absl::optional<std::string> connection_termination_details_;
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};
