@@ -52,4 +52,43 @@ def _status(context, state):
   if should_send_message:
     send_docs_message(pull_request, commit)
 
+def _docs_build_url(config, repo_owner):
+  status = [
+    _status
+    for _status
+    in github.get_combined_statuses()["statuses"]
+    if _status["context"] == "ci/circleci: docs"]
+  status = (
+    status[0]
+    if status
+    else None)
+  if not status:
+    github.issue_create_comment("couldnt find status...")
+    return
+  m = match(text=status["target_url"], pattern='/([0-9]+)\?')
+  build_id = (
+    int(m[1])
+    if m and len(m) == 2
+    else None)
+  if not build_id:
+    github.issue_create_comment("couldnt find build id...")
+    return
+  artifacts = circleci_call(
+    repo_owner,
+    'envoy',
+    build_id,
+    'artifacts',
+    config["token"],
+    filter="successful")['json']
+  index = [
+    arti
+    for arti
+    in artifacts or []
+    if arti["path"] == "generated/docs/index.html"]
+  if not index:
+    github.issue_create_comment("couldnt find generated index page...")
+    return
+  github.issue_create_comment(index[0]["url"])
+
 handlers.status(func=_status)
+handlers.command(name='docs', func=_docs_build_url)
