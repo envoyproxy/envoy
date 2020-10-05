@@ -1,3 +1,5 @@
+#include <string>
+
 #include "envoy/extensions/filters/http/cdn_loop/v3alpha/cdn_loop.pb.h"
 
 #include "extensions/filters/http/cdn_loop/config.h"
@@ -38,7 +40,29 @@ TEST(CdnLoopFilterFactoryTest, BlankCdnIdThrows) {
   CdnLoopFilterFactory factory;
 
   EXPECT_THAT_THROWS_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
-                             EnvoyException, HasSubstr("value length must be at least"));
+                             ProtoValidationException, HasSubstr("value length must be at least"));
+}
+
+TEST(CdnLoopFilterFactoryTest, InvalidCdnId) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  envoy::extensions::filters::http::cdn_loop::v3alpha::CdnLoopConfig config;
+  config.set_cdn_id("[not-token-or-ip");
+  CdnLoopFilterFactory factory;
+
+  EXPECT_THAT_THROWS_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
+                             EnvoyException, HasSubstr("is not a valid CDN identifier"));
+}
+
+TEST(CdnLoopFilterFactoryTest, InvalidCdnIdNonHeaderWhitespace) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  envoy::extensions::filters::http::cdn_loop::v3alpha::CdnLoopConfig config;
+  config.set_cdn_id("\r\n");
+  CdnLoopFilterFactory factory;
+
+  EXPECT_THAT_THROWS_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
+                             EnvoyException, HasSubstr("is not a valid CDN identifier"));
 }
 
 } // namespace CdnLoop
