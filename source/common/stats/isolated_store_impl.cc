@@ -5,7 +5,6 @@
 #include <string>
 
 #include "common/common/utility.h"
-#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/scope_prefixer.h"
 #include "common/stats/symbol_table_creator.h"

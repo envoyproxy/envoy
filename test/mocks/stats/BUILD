@@ -17,7 +17,6 @@ envoy_cc_mock(
         "//include/envoy/stats:timespan_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/stats:fake_symbol_table_lib",
         "//source/common/stats:histogram_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",

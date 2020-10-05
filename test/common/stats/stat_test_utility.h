@@ -166,14 +166,7 @@ private:
 
 class SymbolTableCreatorTestPeer {
 public:
-  ~SymbolTableCreatorTestPeer() { SymbolTableCreator::setUseFakeSymbolTables(save_use_fakes_); }
-
-  void setUseFakeSymbolTables(bool use_fakes) {
-    SymbolTableCreator::setUseFakeSymbolTables(use_fakes);
-  }
-
-private:
-  const bool save_use_fakes_{SymbolTableCreator::useFakeSymbolTables()};
+  void setUseFakeSymbolTables(bool /*use_fakes*/) {}
 };
 
 // Serializes a number into a uint8_t array, and check that it de-serializes to

@@ -46,7 +46,6 @@ envoy_cc_library(
     srcs = ["isolated_store_impl.cc"],
     hdrs = ["isolated_store_impl.h"],
     deps = [
-        ":fake_symbol_table_lib",
         ":histogram_lib",
         ":null_counter_lib",
         ":null_gauge_lib",
@@ -197,15 +196,8 @@ envoy_cc_library(
     hdrs = ["symbol_table_creator.h"],
     external_deps = ["abseil_base"],
     deps = [
-        ":fake_symbol_table_lib",
         ":symbol_table_lib",
     ],
-)
-
-envoy_cc_library(
-    name = "fake_symbol_table_lib",
-    hdrs = ["fake_symbol_table_impl.h"],
-    deps = [":symbol_table_lib"],
 )
 
 envoy_cc_library(

@@ -3,22 +3,15 @@
 namespace Envoy {
 namespace Stats {
 
-bool SymbolTableCreator::initialized_ = false;
-bool SymbolTableCreator::use_fake_symbol_tables_ = false;
-
 SymbolTablePtr SymbolTableCreator::initAndMakeSymbolTable(bool use_fake) {
-  ASSERT(!initialized_ || (use_fake_symbol_tables_ == use_fake));
-  use_fake_symbol_tables_ = use_fake;
+  if (use_fake) {
+    ENVOY_LOG_MISC(warn, "Fake symbol tables have been removed. Please remove references to "
+                         "--use-fake-symbol-table");
+  }
   return makeSymbolTable();
 }
 
-SymbolTablePtr SymbolTableCreator::makeSymbolTable() {
-  initialized_ = true;
-  if (use_fake_symbol_tables_) {
-    return std::make_unique<FakeSymbolTableImpl>();
-  }
-  return std::make_unique<SymbolTableImpl>();
-}
+SymbolTablePtr SymbolTableCreator::makeSymbolTable() { return std::make_unique<SymbolTableImpl>(); }
 
 } // namespace Stats
 } // namespace Envoy

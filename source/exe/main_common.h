@@ -6,7 +6,7 @@
 #include "common/common/thread.h"
 #include "common/event/real_time_system.h"
 #include "common/grpc/google_grpc_context.h"
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
 

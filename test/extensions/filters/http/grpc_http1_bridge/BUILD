@@ -18,7 +18,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
-        "//source/common/stats:fake_symbol_table_lib",
         "//source/extensions/filters/http/grpc_http1_bridge:http1_bridge_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:global_lib",

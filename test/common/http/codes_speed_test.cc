@@ -9,8 +9,8 @@
 #include "envoy/stats/stats.h"
 
 #include "common/http/codes.h"
-#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/isolated_store_impl.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "benchmark/benchmark.h"
 
@@ -75,24 +75,6 @@ public:
 
 } // namespace Http
 } // namespace Envoy
-
-static void BM_AddResponsesFakeSymtab(benchmark::State& state) {
-  Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::FakeSymbolTableImpl> context;
-
-  for (auto _ : state) {
-    context.addResponses();
-  }
-}
-BENCHMARK(BM_AddResponsesFakeSymtab);
-
-static void BM_ResponseTimingFakeSymtab(benchmark::State& state) {
-  Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::FakeSymbolTableImpl> context;
-
-  for (auto _ : state) {
-    context.responseTiming();
-  }
-}
-BENCHMARK(BM_ResponseTimingFakeSymtab);
 
 static void BM_AddResponsesRealSymtab(benchmark::State& state) {
   Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::SymbolTableImpl> context;

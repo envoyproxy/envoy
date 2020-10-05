@@ -1,6 +1,5 @@
 #pragma once
 
-#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/symbol_table_impl.h"
 
 namespace Envoy {
@@ -35,22 +34,7 @@ public:
   /**
    * @return whether the system is initialized to use fake symbol tables.
    */
-  static bool useFakeSymbolTables() { return use_fake_symbol_tables_; }
-
-private:
-  friend class TestUtil::SymbolTableCreatorTestPeer;
-
-  /**
-   * Sets whether fake or real symbol tables should be used. Tests that alter
-   * this should restore previous value at the end of the test. This must be
-   * called via TestUtil::SymbolTableCreatorTestPeer.
-   *
-   * *param use_fakes whether to use fake symbol tables.
-   */
-  static void setUseFakeSymbolTables(bool use_fakes) { use_fake_symbol_tables_ = use_fakes; }
-
-  static bool initialized_;
-  static bool use_fake_symbol_tables_;
+  static bool useFakeSymbolTables() { return false; }
 };
 
 } // namespace Stats

@@ -4,7 +4,7 @@
 
 #include "common/grpc/context_impl.h"
 #include "common/http/context_impl.h"
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 

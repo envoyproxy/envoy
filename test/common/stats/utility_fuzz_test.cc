@@ -41,15 +41,10 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
 
   // model common/stats/utility_test.cc, initialize those objects to create random elements as
   // input
-  Stats::SymbolTablePtr symbol_table;
-  if (provider.ConsumeBool()) {
-    symbol_table = std::make_unique<Stats::FakeSymbolTableImpl>();
-  } else {
-    symbol_table = std::make_unique<Stats::SymbolTableImpl>();
-  }
+  Stats::SymbolTableImpl symbol_table;
   std::unique_ptr<Stats::IsolatedStoreImpl> store =
-      std::make_unique<Stats::IsolatedStoreImpl>(*symbol_table);
-  Stats::StatNamePool pool(*symbol_table);
+      std::make_unique<Stats::IsolatedStoreImpl>(symbol_table);
+  Stats::StatNamePool pool(symbol_table);
   Stats::ScopePtr scope = store->createScope(provider.ConsumeRandomLengthString(max_len));
   Stats::ElementVec ele_vec;
   Stats::StatNameVec sn_vec;

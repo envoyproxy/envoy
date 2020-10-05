@@ -1137,15 +1137,7 @@ TEST_F(StatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
 
 class StatsThreadLocalStoreTestNoFixture : public testing::Test {
 protected:
-  ~StatsThreadLocalStoreTestNoFixture() override {
-    if (threading_enabled_) {
-      store_->shutdownThreading();
-      tls_.shutdownThread();
-    }
-  }
-
-  void init(bool use_fakes) {
-    symbol_table_creator_test_peer_.setUseFakeSymbolTables(use_fakes);
+  StatsThreadLocalStoreTestNoFixture() {
     symbol_table_ = SymbolTableCreator::makeSymbolTable();
     alloc_ = std::make_unique<AllocatorImpl>(*symbol_table_);
     store_ = std::make_unique<ThreadLocalStoreImpl>(*alloc_);
@@ -1154,6 +1146,13 @@ protected:
     // Use a tag producer that will produce tags.
     envoy::config::metrics::v3::StatsConfig stats_config;
     store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+  }
+
+  ~StatsThreadLocalStoreTestNoFixture() override {
+    if (threading_enabled_) {
+      store_->shutdownThreading();
+      tls_.shutdownThread();
+    }
   }
 
   void initThreading() {
@@ -1174,28 +1173,7 @@ protected:
 };
 
 // Tests how much memory is consumed allocating 100k stats.
-TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsFakeSymbolTable) {
-  init(true);
-  TestUtil::MemoryTest memory_test;
-  TestUtil::forEachSampleStat(
-      100, [this](absl::string_view name) { store_->counterFromString(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 1358576); // Jan 23, 2020
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 1.4 * million_);
-}
-
-TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsFakeSymbolTable) {
-  init(true);
-  initThreading();
-  TestUtil::MemoryTest memory_test;
-  TestUtil::forEachSampleStat(
-      100, [this](absl::string_view name) { store_->counterFromString(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 1498128); // July 30, 2020
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 1.6 * million_);
-}
-
-// Tests how much memory is consumed allocating 100k stats.
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTable) {
-  init(false);
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       100, [this](absl::string_view name) { store_->counterFromString(std::string(name)); });
@@ -1204,7 +1182,6 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTable) {
 }
 
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
-  init(false);
   initThreading();
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(

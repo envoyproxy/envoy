@@ -26,7 +26,6 @@ envoy_cc_mock(
         "//include/envoy/stream_info:stream_info_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/stats:fake_symbol_table_lib",
         "//test/mocks:common_lib",
         "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
