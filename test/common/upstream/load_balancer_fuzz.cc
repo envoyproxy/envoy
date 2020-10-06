@@ -107,7 +107,7 @@ void RandomLoadBalancerFuzzTest::initialize(test::common::upstream::LoadBalancer
                                                         random_, input.common_lb_config());
 }
 
-// For random load balancing, a randomly generated uint64 gets moded against the hosts to choose
+// For random load balancing, a randomly generated uint64 gets modded against the hosts to choose
 // from. This is not something an untrusted upstream can affect, and fuzzing must be deterministic,
 // so the fuzzer generates a bytestring which represents the random calls.
 
