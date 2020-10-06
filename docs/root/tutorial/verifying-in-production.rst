@@ -1,4 +1,4 @@
-.. _tutorial_hosted_where_you_are:
+.. _tutorial_verifying_in_production:
 
 Verifying in production
 =======================
