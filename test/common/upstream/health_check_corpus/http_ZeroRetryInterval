@@ -5,9 +5,6 @@ health_check_config {
     interval {
         seconds: 1
     }
-    no_traffic_interval {
-        seconds: 1
-    }
     interval_jitter {
         seconds: 1
     }
@@ -18,10 +15,10 @@ health_check_config {
         value: 2
     }
     http_health_check {
-        path: "/healthcheck"
         service_name_matcher {
             prefix: "locations"
         }
+        path: "/healthcheck"
     }
 }
 actions {
@@ -32,11 +29,21 @@ actions {
                     key: ":status"
                     value: "200"
                 }
+                headers {
+                    key: "-upstream-healthchecked-cluster"
+                    value: "locations-production-iad"
+                }
             }
             status: 200
         }
         tcp_respond {
             
         }
+        grpc_respond {
+            grpc_respond_headers {
+                
+            }
+        }
     }
 }
+http_verify_cluster : true

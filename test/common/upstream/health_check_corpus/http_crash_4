@@ -42,6 +42,11 @@ actions {
         tcp_respond {
             
         }
+        grpc_respond {
+            grpc_respond_headers {
+                
+            }
+        }
     }
 }
 http_verify_cluster : true

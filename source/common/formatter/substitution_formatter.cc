@@ -685,6 +685,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         StreamInfoAddressFieldExtractor::withoutPort([](const StreamInfo::StreamInfo& stream_info) {
           return stream_info.downstreamDirectRemoteAddress();
         });
+  } else if (field_name == "CONNECTION_ID") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.connectionID().value_or(0);
+        });
   } else if (field_name == "REQUESTED_SERVER_NAME") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {

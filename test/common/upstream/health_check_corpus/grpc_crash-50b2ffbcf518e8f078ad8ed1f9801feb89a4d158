@@ -1,7 +1,6 @@
 health_check_config {
   timeout {
     seconds: 1
-    nanos: 196608
   }
   interval {
     seconds: 1
@@ -10,31 +9,24 @@ health_check_config {
     seconds: 1
   }
   unhealthy_threshold {
-    value: 2
+    value: 1
   }
   healthy_threshold {
-    value: 16580610
+    value: 2
   }
   alt_port {
-    value: 16580610
+    value: 544435713
   }
-  tcp_health_check {
+  grpc_health_check {
   }
   no_traffic_interval {
     seconds: 5
   }
-  initial_jitter {
-    nanos: 1701314560
+}
+actions {
+  trigger_timeout_timer {
   }
 }
 actions {
-  respond {
-    http_respond {
-      headers {
-      }
-      status: "200"
-    }
-    tcp_respond {
-    }
-  }
+  raise_event: REMOTE_CLOSE
 }

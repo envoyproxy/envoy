@@ -12,11 +12,7 @@ health_check_config {
     value: 2
   }
   healthy_threshold {
-  }
-  alt_port {
     value: 2
-  }
-  reuse_connection {
   }
   http_health_check {
     path: "/healthcheck"
@@ -24,7 +20,7 @@ health_check_config {
       prefix: "locations"
     }
   }
-  no_traffic_interval {
+  initial_jitter {
     seconds: 1
   }
 }
@@ -37,29 +33,8 @@ actions {
           value: "200"
         }
         headers {
-          key: ":status"
-          value: "200"
-        }
-        headers {
-          key: "x-envoy-degraded"
-          value: "true"
-        }
-      }
-      status: 200
-    }
-  }
-}
-actions {
-  trigger_interval_timer {
-  }
-}
-actions {
-  respond {
-    http_respond {
-      headers {
-        headers {
-          key: "200"
-          value: "200"
+          key: "-upstream-healthchecked-cluster"
+          value: "locations-production-iad"
         }
       }
       status: 200
@@ -67,5 +42,11 @@ actions {
     tcp_respond {
             
     }
+    grpc_respond {
+      grpc_respond_headers {
+        
+      }
+    }
   }
 }
+http_verify_cluster: true

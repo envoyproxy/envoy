@@ -25,6 +25,11 @@ health_check_config {
     }
 }
 actions {
+    trigger_timeout_timer {
+
+    }
+}
+actions {
     respond {
         http_respond {
             headers {
@@ -38,10 +43,10 @@ actions {
         tcp_respond {
             
         }
+        grpc_respond {
+            grpc_respond_headers {
+                
+            }
+        }
     }
-}
-actions {
-  trigger_interval_timer {
-      
-  }
 }

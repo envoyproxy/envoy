@@ -259,6 +259,14 @@ TEST_F(StreamInfoImplTest, DefaultRequestIDExtensionTest) {
   EXPECT_EQ(rid_extension->getTraceStatus(request_headers), Http::TraceStatus::NoTrace);
 }
 
+TEST_F(StreamInfoImplTest, ConnectionID) {
+  StreamInfoImpl stream_info(test_time_.timeSystem());
+  EXPECT_FALSE(stream_info.connectionID().has_value());
+  uint64_t id = 123;
+  stream_info.setConnectionID(id);
+  EXPECT_EQ(id, stream_info.connectionID());
+}
+
 } // namespace
 } // namespace StreamInfo
 } // namespace Envoy

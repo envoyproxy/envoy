@@ -9,7 +9,6 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
-#include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"

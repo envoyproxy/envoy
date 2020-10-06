@@ -9,6 +9,7 @@
 #include "common/common/utility.h"
 #include "common/formatter/substitution_formatter.h"
 #include "common/http/header_map_impl.h"
+#include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/string_accessor_impl.h"
@@ -464,6 +465,17 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
                 ProtoEq(ValueUtil::stringValue("127.0.0.1:0")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("CONNECTION_ID");
+    uint64_t id = 123;
+    EXPECT_CALL(stream_info, connectionID()).WillRepeatedly(Return(id));
+    EXPECT_EQ("123", upstream_format.format(request_headers, response_headers, response_trailers,
+                                            stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::numberValue(id)));
   }
 
   {

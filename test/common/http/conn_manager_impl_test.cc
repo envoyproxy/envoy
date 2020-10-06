@@ -2302,6 +2302,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
 
   // Cleanup.
   EXPECT_CALL(*timer, disableTimer());
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
   EXPECT_CALL(*decoder_filters_[0], onDestroy());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
