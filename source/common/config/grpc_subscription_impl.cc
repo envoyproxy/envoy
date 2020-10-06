@@ -112,6 +112,10 @@ void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason
   stats_.update_attempt_.inc();
 }
 
+void GrpcSubscriptionImpl::onConfigExpired(const std::vector<std::string>& expired) {
+  callbacks_.onConfigExpired(expired);
+}
+
 ScopedResume GrpcSubscriptionImpl::pause() { return grpc_mux_->pause(type_url_); }
 
 void GrpcSubscriptionImpl::disableInitFetchTimeoutTimer() {

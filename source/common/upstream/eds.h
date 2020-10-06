@@ -47,6 +47,9 @@ private:
                       const std::string& system_version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
+  void onConfigExpired(const std::vector<std::string>&) override {
+    // TODO(snowp): Implement EDS expiry.
+  }
   using LocalityWeightsMap = absl::node_hash_map<envoy::config::core::v3::Locality, uint32_t,
                                                  LocalityHash, LocalityEqualTo>;
   bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,

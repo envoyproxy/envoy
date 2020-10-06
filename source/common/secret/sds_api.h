@@ -73,6 +73,9 @@ protected:
                       const std::string& system_version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
+  void onConfigExpired(const std::vector<std::string>&) override {
+    // TODO(snowp): Implement.
+  }
   virtual std::vector<std::string> getDataSourceFilenames() PURE;
 
   Init::TargetImpl init_target_;

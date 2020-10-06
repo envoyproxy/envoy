@@ -19,6 +19,7 @@
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
 #include "common/config/grpc_stream.h"
+#include "common/config/ttl.h"
 #include "common/config/utility.h"
 #include "common/runtime/runtime_features.h"
 
@@ -119,6 +120,19 @@ private:
   struct ApiState {
     bool paused() const { return pauses_ > 0; }
 
+    Ttl& ttl(Event::Dispatcher& dispatcher, std::function<void(const std::vector<std::string>&)> callback) {
+      // TODO(snowp): This pattern is a bit gross, but it keeps ApiState default allocatable which makes
+      // the call sites much nicer by allowing operator[]. Ideally we should properly allocate ApiState
+      // with the Ttl object created in its ctor.
+      if (ttl_) {
+        return *ttl_;
+      }
+
+      ttl_ = std::make_unique<Ttl>(callback, dispatcher, dispatcher.timeSource());
+
+      return *ttl_;
+    }
+
     // Watches on the returned resources for the API;
     std::list<GrpcMuxWatchImpl*> watches_;
     // Current DiscoveryRequest for API.
@@ -129,8 +143,7 @@ private:
     bool pending_{};
     // Has this API been tracked in subscriptions_?
     bool subscribed_{};
-    // If set, this will fire the removal of this set of resources after the TTL expires.
-    Event::TimerPtr ttl_timer_;
+    std::unique_ptr<Ttl> ttl_;
   };
 
   // Request queue management logic.

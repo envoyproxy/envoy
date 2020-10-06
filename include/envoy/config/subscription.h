@@ -121,6 +121,12 @@ public:
    * @param e supplies any exception data on why the fetch failed. May be nullptr.
    */
   virtual void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) PURE;
+
+  /**
+   * Called when resources expires, e.g. due to its TTL expiring.
+   * @param resources names of resources that expired.
+   */
+  virtual void onConfigExpired(const std::vector<std::string>& resources) PURE;
 };
 
 /**
@@ -165,6 +171,12 @@ public:
    * @param e supplies any exception data on why the fetch failed. May be nullptr.
    */
   virtual void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) PURE;
+
+  /**
+   * Called when resources expires, e.g. due to its TTL expiring.
+   * @param resources names of resources that expired.
+   */
+  virtual void onConfigExpired(const std::vector<std::string>& resources) PURE;
 };
 
 /**

@@ -35,6 +35,7 @@ public:
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string& system_version_info) override;
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
+  void onConfigExpired(const std::vector<std::string>& expired) override;
 
   GrpcMuxSharedPtr grpcMux() { return grpc_mux_; }
 

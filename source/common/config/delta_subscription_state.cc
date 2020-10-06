@@ -15,7 +15,15 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
                                                const LocalInfo::LocalInfo& local_info,
                                                Event::Dispatcher& dispatcher)
-    : type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),
+    : ttl_(
+          [this](const auto& expired) {
+            for (const auto& resource : expired) {
+              setResourceWaitingForServer(resource);
+            }
+            watch_map_.onConfigExpired(expired);
+          },
+          dispatcher, dispatcher.timeSource()),
+      type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),
       dispatcher_(dispatcher) {}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
@@ -167,34 +175,19 @@ DeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
 
 void DeltaSubscriptionState::addResourceState(
     const envoy::service::discovery::v3::Resource& resource) {
-  Event::TimerPtr ttl_timer;
-  if (resource.has_ttl() && Runtime::runtimeFeatureEnabled("envoy.reloadable_features.delta_ttl")) {
-    ttl_timer = dispatcher_.createTimer(
-        [this, resource_name = resource.name(), version = resource.version()]() -> void {
-          Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> empty_resources;
-          Protobuf::RepeatedPtrField<std::string> remove_resources;
-          *remove_resources.Add() = resource_name;
-          watch_map_.onConfigUpdate(empty_resources, remove_resources, version);
-          setResourceWaitingForServer(resource_name);
-        });
-    ttl_timer->enableTimer(
-        std::chrono::milliseconds(DurationUtil::durationToMilliseconds(resource.ttl())));
+  if (resource.has_ttl()) {
+    ttl_.add(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(resource.ttl())),
+             resource.name());
+  } else {
+    ttl_.clear(resource.name());
   }
 
-  resource_state_[resource.name()] = ResourceState(resource, std::move(ttl_timer));
+  resource_state_[resource.name()] = ResourceState(resource);
   resource_names_.insert(resource.name());
 }
 
 void DeltaSubscriptionState::setResourceWaitingForServer(const std::string& resource_name) {
-  // We need some special handling here to ensure that we don't deallocate the Timer while executing
-  // the timer callback.
-  auto itr = resource_state_.find(resource_name);
-  if (itr != resource_state_.end()) {
-    resource_state_[resource_name] =
-        ResourceState::waitingForServerResource(std::move(itr->second));
-  } else {
-    resource_state_[resource_name] = ResourceState();
-  }
+  resource_state_[resource_name] = ResourceState();
   resource_names_.insert(resource_name);
 }
 

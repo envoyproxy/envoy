@@ -49,6 +49,7 @@ public:
       timer_cb_ = timer_cb;
       return timer_;
     }));
+    ttl_timer_ = new Event::MockTimer(&dispatcher_);
 
     mux_ = std::make_shared<Config::GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
@@ -186,6 +187,7 @@ public:
   Random::MockRandomGenerator random_;
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
+  Event::MockTimer ttl_timer_;
   envoy::config::core::v3::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>

@@ -10,6 +10,7 @@
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/config/api_version.h"
+#include "common/config/ttl.h"
 #include "common/config/pausable_ack_queue.h"
 #include "common/config/watch_map.h"
 
@@ -57,22 +58,12 @@ private:
 
   class ResourceState {
   public:
-    ResourceState(const envoy::service::discovery::v3::Resource& resource,
-                  Event::TimerPtr ttl_timer)
-        : version_(resource.version()), ttl_timer_(std::move(ttl_timer)) {}
+    ResourceState(const envoy::service::discovery::v3::Resource& resource)
+        : version_(resource.version()) {}
 
     // Builds a ResourceState in the waitingForServer state.
     ResourceState() = default;
 
-    static ResourceState waitingForServerResource(ResourceState old_version) {
-      ResourceState new_state;
-      new_state.ttl_timer_ = std::move(old_version.ttl_timer_);
-      if (new_state.ttl_timer_) {
-        new_state.ttl_timer_->disableTimer();
-      }
-
-      return new_state;
-    }
     // If true, we currently have no version of this resource - we are waiting for the server to
     // provide us with one.
     bool waitingForServer() const { return version_ == absl::nullopt; }
@@ -85,7 +76,6 @@ private:
 
   private:
     absl::optional<std::string> version_;
-    Event::TimerPtr ttl_timer_;
   };
 
   // Use these helpers to ensure resource_state_ and resource_names_ get updated together.
@@ -100,6 +90,7 @@ private:
   // any version for that resource: we need to inform the server if we lose interest in them, but we
   // also need to *not* include them in the initial_resource_versions map upon a reconnect.
   absl::node_hash_map<std::string, ResourceState> resource_state_;
+  Ttl ttl_;
   // The keys of resource_versions_. Only tracked separately because std::map does not provide an
   // iterator into just its keys, e.g. for use in std::set_difference.
   std::set<std::string> resource_names_;

@@ -203,6 +203,9 @@ struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtim
 
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
+  void onConfigExpired(const std::vector<std::string>&) override {
+    // TODO(snowp): Implement expiration for runtime.
+  }
 
   void start();
   void validateUpdateSize(uint32_t num_resources);

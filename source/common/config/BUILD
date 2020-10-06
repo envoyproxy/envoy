@@ -72,6 +72,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "ttl_lib",
+    hdrs = ["ttl.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:timer_interface",
+        "//include/envoy/config:subscription_interface",
+        "@com_google_absl//absl/container:btree",
+    ]
+)
+
+envoy_cc_library(
     name = "delta_subscription_state_lib",
     srcs = ["delta_subscription_state.cc"],
     hdrs = ["delta_subscription_state.h"],
@@ -79,6 +90,7 @@ envoy_cc_library(
         ":api_version_lib",
         ":pausable_ack_queue_lib",
         ":utility_lib",
+        ":ttl_lib",
         ":watch_map_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -136,6 +148,7 @@ envoy_cc_library(
     deps = [
         ":api_version_lib",
         ":decoded_resource_lib",
+        ":ttl_lib",
         ":grpc_stream_lib",
         ":utility_lib",
         "//include/envoy/config:grpc_mux_interface",
