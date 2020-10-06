@@ -115,7 +115,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
 }
 
 // Test that setting the use_alpha proto field throws.
-TEST(HttpExtAuthzConfigTest, UseAlphaFieldIsNoLongerSupported) {
+TEST(HttpExtAuthzConfigTest, DEPRECATED_FEATURE_TEST(UseAlphaFieldIsNoLongerSupported)) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.deprecated_features:envoy.extensions.filters.http.ext_authz.v3.ExtAuthz.hidden_"
