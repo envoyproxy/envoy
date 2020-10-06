@@ -80,7 +80,7 @@ public:
         actions_(action_symbol_table.size(), OverloadActionState(0)) {}
 
   const OverloadActionState& getState(const std::string& action) override {
-    if (auto symbol = action_symbol_table_.find(action); symbol != absl::nullopt) {
+    if (const auto symbol = action_symbol_table_.lookup(action); symbol != absl::nullopt) {
       return actions_[symbol->index()];
     }
     return always_inactive_;
@@ -128,7 +128,7 @@ NamedOverloadActionSymbolTable::get(absl::string_view string) {
 }
 
 absl::optional<NamedOverloadActionSymbolTable::Symbol>
-NamedOverloadActionSymbolTable::find(absl::string_view string) const {
+NamedOverloadActionSymbolTable::lookup(absl::string_view string) const {
   if (auto it = table_.find(string); it != table_.end()) {
     return Symbol(it->second);
   }

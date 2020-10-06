@@ -82,7 +82,7 @@ public:
   Symbol get(absl::string_view name);
 
   // Returns the symbol for the name if there is one, otherwise nullopt.
-  absl::optional<Symbol> find(absl::string_view string) const;
+  absl::optional<Symbol> lookup(absl::string_view string) const;
 
   // Translates a symbol back into a name.
   const std::string& name(Symbol symbol) const;
