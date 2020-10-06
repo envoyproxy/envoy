@@ -55,7 +55,7 @@ public:
           config,
       Server::Configuration::FactoryContext& context)
       : filter_(AccessLog::FilterFactory::fromProto(config.filter(), context.runtime(),
-                                                    context.random(),
+                                                    context.api().randomGenerator(),
                                                     context.messageValidationVisitor())) {
     if (config.has_status_code()) {
       status_code_ = static_cast<Http::Code>(config.status_code().value());

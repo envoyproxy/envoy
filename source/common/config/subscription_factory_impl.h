@@ -16,7 +16,7 @@ namespace Config {
 class SubscriptionFactoryImpl : public SubscriptionFactory, Logger::Loggable<Logger::Id::config> {
 public:
   SubscriptionFactoryImpl(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                          Upstream::ClusterManager& cm, Random::RandomGenerator& random,
+                          Upstream::ClusterManager& cm,
                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
                           Runtime::Loader& runtime);
 
@@ -36,7 +36,6 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;
   Upstream::ClusterManager& cm_;
-  Random::RandomGenerator& random_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
   Runtime::Loader& runtime_;

@@ -38,9 +38,9 @@ namespace {
 class SubscriptionFactoryTest : public testing::Test {
 public:
   SubscriptionFactoryTest()
-      : http_request_(&cm_.async_client_), api_(Api::createApiForTest(stats_store_)),
-        subscription_factory_(local_info_, dispatcher_, cm_, random_, validation_visitor_, *api_,
-                              runtime_) {}
+      : http_request_(&cm_.async_client_), api_(Api::createApiForTest(stats_store_, random_)),
+        subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_, runtime_) {
+  }
 
   SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {

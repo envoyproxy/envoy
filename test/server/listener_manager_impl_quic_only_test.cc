@@ -62,7 +62,7 @@ udp_writer_config:
 
   envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
   ON_CALL(udp_gso_syscall_, supportsUdpGso()).WillByDefault(Return(true));
-  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(server_.api_.random_, uuid());
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
 #ifdef SO_RXQ_OVFL // SO_REUSEPORT is on as configured
                            /* expected_num_options */

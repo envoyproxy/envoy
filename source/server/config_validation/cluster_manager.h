@@ -23,17 +23,17 @@ public:
 
   explicit ValidationClusterManagerFactory(
       Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
-      ThreadLocal::Instance& tls, Random::RandomGenerator& random,
-      Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
-      Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
-      Secret::SecretManager& secret_manager, ProtobufMessage::ValidationContext& validation_context,
-      Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
+      ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
+      Ssl::ContextManager& ssl_context_manager, Event::Dispatcher& main_thread_dispatcher,
+      const LocalInfo::LocalInfo& local_info, Secret::SecretManager& secret_manager,
+      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+      Http::Context& http_context, Grpc::Context& grpc_context,
       AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager,
       Event::TimeSystem& time_system)
-      : ProdClusterManagerFactory(admin, runtime, stats, tls, random, dns_resolver,
-                                  ssl_context_manager, main_thread_dispatcher, local_info,
-                                  secret_manager, validation_context, api, http_context,
-                                  grpc_context, log_manager, singleton_manager),
+      : ProdClusterManagerFactory(admin, runtime, stats, tls, dns_resolver, ssl_context_manager,
+                                  main_thread_dispatcher, local_info, secret_manager,
+                                  validation_context, api, http_context, grpc_context, log_manager,
+                                  singleton_manager),
         grpc_context_(grpc_context), time_system_(time_system) {}
 
   ClusterManagerPtr
@@ -57,7 +57,7 @@ public:
   ValidationClusterManager(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                            ClusterManagerFactory& factory, Stats::Store& stats,
                            ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                           Random::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                           const LocalInfo::LocalInfo& local_info,
                            AccessLog::AccessLogManager& log_manager, Event::Dispatcher& dispatcher,
                            Server::Admin& admin,
                            ProtobufMessage::ValidationContext& validation_context, Api::Api& api,

@@ -80,11 +80,6 @@ public:
   virtual AccessLog::AccessLogManager& logManager() PURE;
 
   /**
-   * @return RandomGenerator& the random generator for the server.
-   */
-  virtual Random::RandomGenerator& random() PURE;
-
-  /**
    * @return Runtime::Loader& the singleton runtime loader for the server.
    */
   virtual Runtime::Loader& runtime() PURE;

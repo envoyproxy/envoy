@@ -176,9 +176,10 @@ ClusterFactory::createClusterWithConfig(
     Upstream::ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
-  auto new_cluster = std::make_shared<Cluster>(
-      cluster, proto_config, context.clusterManager(), context.runtime(), context.random(),
-      socket_factory_context, std::move(stats_scope), context.tls(), context.addedViaApi());
+  auto new_cluster =
+      std::make_shared<Cluster>(cluster, proto_config, context.clusterManager(), context.runtime(),
+                                context.api().randomGenerator(), socket_factory_context,
+                                std::move(stats_scope), context.tls(), context.addedViaApi());
   auto lb = std::make_unique<AggregateThreadAwareLoadBalancer>(*new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
 }

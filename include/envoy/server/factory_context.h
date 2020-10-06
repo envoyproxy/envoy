@@ -65,11 +65,6 @@ public:
   virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
 
   /**
-   * @return RandomGenerator& the random generator for the server.
-   */
-  virtual Envoy::Random::RandomGenerator& random() PURE;
-
-  /**
    * @return Runtime::Loader& the singleton runtime loader for the server.
    */
   virtual Envoy::Runtime::Loader& runtime() PURE;

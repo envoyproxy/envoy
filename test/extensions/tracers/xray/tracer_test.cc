@@ -89,7 +89,7 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
   EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
   aws_metadata_.insert({"key", ValueUtil::stringValue(expected_aws_key_value)});
   Tracer tracer{expected_span_name, expected_origin_name, aws_metadata_,
-                std::move(broker_), server_.timeSource(), server_.random()};
+                std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
   auto span = tracer.startSpan(expected_operation_name, server_.timeSource().systemTime(),
                                absl::nullopt /*headers*/);
   span->setTag("http.method", expected_http_method);
@@ -104,14 +104,14 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
 
 TEST_F(XRayTracerTest, NonSampledSpansNotSerialized) {
   Tracer tracer{"" /*span name*/,   "" /*origin*/,        aws_metadata_,
-                std::move(broker_), server_.timeSource(), server_.random()};
+                std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
   auto span = tracer.createNonSampledSpan();
   span->finishSpan();
 }
 
 TEST_F(XRayTracerTest, BaggageNotImplemented) {
   Tracer tracer{"" /*span name*/,   "" /*origin*/,        aws_metadata_,
-                std::move(broker_), server_.timeSource(), server_.random()};
+                std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
   auto span = tracer.createNonSampledSpan();
   span->setBaggage("baggage_key", "baggage_value");
   span->finishSpan();
@@ -125,10 +125,11 @@ TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {
   constexpr auto expected_span_name = "Service 1";
   constexpr auto expected_operation_name = "Create";
   const auto& broker = *broker_;
-  Tracer tracer{expected_span_name, "", aws_metadata_, std::move(broker_), server_.timeSource(),
-                server_.random()};
+  Tracer tracer{expected_span_name,   "",
+                aws_metadata_,        std::move(broker_),
+                server_.timeSource(), server_.api().randomGenerator()};
   // Span id taken from random generator
-  EXPECT_CALL(server_.random_, random()).WillOnce(Return(999));
+  EXPECT_CALL(server_.api_.random_, random()).WillOnce(Return(999));
   auto parent_span = tracer.startSpan(expected_operation_name, server_.timeSource().systemTime(),
                                       absl::nullopt /*headers*/);
 
@@ -147,7 +148,7 @@ TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {
   EXPECT_CALL(broker, send(_)).WillOnce(Invoke(on_send));
 
   // Span id taken from random generator
-  EXPECT_CALL(server_.random_, random()).WillOnce(Return(262626262626));
+  EXPECT_CALL(server_.api_.random_, random()).WillOnce(Return(262626262626));
   auto child =
       parent_span->spawnChild(config, expected_operation_name, server_.timeSource().systemTime());
   child->finishSpan();
@@ -160,8 +161,12 @@ TEST_F(XRayTracerTest, UseExistingHeaderInformation) {
   constexpr auto span_name = "my span";
   constexpr auto operation_name = "my operation";
 
-  Tracer tracer{span_name,       "", aws_metadata_, std::move(broker_), server_.timeSource(),
-                server_.random()};
+  Tracer tracer{span_name,
+                "",
+                aws_metadata_,
+                std::move(broker_),
+                server_.timeSource(),
+                server_.api().randomGenerator()};
   auto span = tracer.startSpan(operation_name, server_.timeSource().systemTime(), xray_header);
 
   const XRay::Span* xray_span = static_cast<XRay::Span*>(span.get());
@@ -173,8 +178,12 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
   constexpr auto span_name = "my span";
   constexpr auto operation_name = "my operation";
 
-  Tracer tracer{span_name,       "", aws_metadata_, std::move(broker_), server_.timeSource(),
-                server_.random()};
+  Tracer tracer{span_name,
+                "",
+                aws_metadata_,
+                std::move(broker_),
+                server_.timeSource(),
+                server_.api().randomGenerator()};
   auto span = tracer.startSpan(operation_name, server_.timeSource().systemTime(),
                                absl::nullopt /*headers*/);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -188,8 +197,12 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
 
 TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
   constexpr auto span_name = "my span";
-  Tracer tracer{span_name,       "", aws_metadata_, std::move(broker_), server_.timeSource(),
-                server_.random()};
+  Tracer tracer{span_name,
+                "",
+                aws_metadata_,
+                std::move(broker_),
+                server_.timeSource(),
+                server_.api().randomGenerator()};
   auto span = tracer.createNonSampledSpan();
   Http::TestRequestHeaderMapImpl request_headers;
   span->injectContext(request_headers);
@@ -202,8 +215,12 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
 
 TEST_F(XRayTracerTest, TraceIDFormatTest) {
   constexpr auto span_name = "my span";
-  Tracer tracer{span_name,       "", aws_metadata_, std::move(broker_), server_.timeSource(),
-                server_.random()};
+  Tracer tracer{span_name,
+                "",
+                aws_metadata_,
+                std::move(broker_),
+                server_.timeSource(),
+                server_.api().randomGenerator()};
   auto span = tracer.createNonSampledSpan(); // startSpan and createNonSampledSpan use the same
                                              // logic to create a trace ID
   XRay::Span* xray_span = span.get();
@@ -227,7 +244,7 @@ TEST_P(XRayDaemonTest, VerifyUdpPacketContents) {
   const std::string daemon_endpoint = xray_fake_daemon.localAddress()->asString();
   Tracer tracer{"my_segment",        "origin",
                 aws_metadata,        std::make_unique<DaemonBrokerImpl>(daemon_endpoint),
-                server.timeSource(), server.random()};
+                server.timeSource(), server.api().randomGenerator()};
   auto span = tracer.startSpan("ingress" /*operation name*/, server.timeSource().systemTime(),
                                absl::nullopt /*headers*/);
 

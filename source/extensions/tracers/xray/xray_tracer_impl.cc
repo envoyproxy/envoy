@@ -47,16 +47,16 @@ Driver::Driver(const XRayConfiguration& config,
 
   ENVOY_LOG(debug, "send X-Ray generated segments to daemon address on {}", daemon_endpoint);
   sampling_strategy_ = std::make_unique<XRay::LocalizedSamplingStrategy>(
-      xray_config_.sampling_rules_, context.serverFactoryContext().random(),
+      xray_config_.sampling_rules_, context.serverFactoryContext().api().randomGenerator(),
       context.serverFactoryContext().timeSource());
 
   tls_slot_ptr_->set([this, daemon_endpoint,
                       &context](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     DaemonBrokerPtr broker = std::make_unique<DaemonBrokerImpl>(daemon_endpoint);
-    TracerPtr tracer = std::make_unique<Tracer>(xray_config_.segment_name_, xray_config_.origin_,
-                                                xray_config_.aws_metadata_, std::move(broker),
-                                                context.serverFactoryContext().timeSource(),
-                                                context.serverFactoryContext().random());
+    TracerPtr tracer = std::make_unique<Tracer>(
+        xray_config_.segment_name_, xray_config_.origin_, xray_config_.aws_metadata_,
+        std::move(broker), context.serverFactoryContext().timeSource(),
+        context.serverFactoryContext().api().randomGenerator());
     return std::make_shared<XRay::Driver::TlsTracer>(std::move(tracer), *this);
   });
 }
