@@ -268,13 +268,11 @@ In continuous integration, all of the sandboxes are checked using the `ci/verify
 
 This can also be called with a filter argument, which is a `glob` evaluated in the context of the `examples` folder.
 
-For example:
+For example, to run all sandboxes with names beginning `jaeger`:
 
 ```
 ./ci/verify-examples.sh jaeger*
 ```
-
-...will run all sandboxes with names beginning `jaeger`.
 
 ---
 
