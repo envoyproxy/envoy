@@ -188,6 +188,7 @@ void TcpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
   upstream_handle_ = nullptr;
   callbacks_->onGenericPoolFailure(reason, host);
 }
+
 void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                               Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_ = nullptr;
@@ -233,6 +234,7 @@ void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl:
   upstream_handle_ = nullptr;
   callbacks_->onGenericPoolFailure(reason, host);
 }
+
 void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
                                const StreamInfo::StreamInfo& info) {

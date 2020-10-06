@@ -366,7 +366,12 @@ protected:
 
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
+  // The upstream handle (either TCP or HTTP). This is set in onGenericPoolReady and should persist
+  // until either the upstream or downstream connection is terminated.
   std::unique_ptr<GenericUpstream> upstream_;
+  // The connection pool used to set up |upstream_|.
+  // This will be non-null from when an upstream connection is attempted until
+  // it either succeeds or fails.
   std::unique_ptr<GenericConnPool> generic_conn_pool_;
   RouteConstSharedPtr route_;
   Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
