@@ -173,7 +173,6 @@ envoy_cc_fuzz_test(
         "//source/common/http:request_id_extension_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
-        "//source/common/stats:symbol_table_creator_lib",
         "//source/server:drain_manager_lib",
         "//test/fuzz:utility_lib",
         "//test/mocks/access_log:access_log_mocks",

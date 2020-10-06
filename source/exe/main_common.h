@@ -75,7 +75,7 @@ protected:
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;
   Filesystem::Instance& file_system_;
-  Stats::SymbolTablePtr symbol_table_;
+  Stats::SymbolTableImpl symbol_table_;
   Stats::AllocatorImpl stats_allocator_;
 
   ThreadLocal::InstanceImplPtr tls_;
