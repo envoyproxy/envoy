@@ -1,4 +1,4 @@
-#include "test/common/upstream/load_balancer_fuzz.h"
+#include "test/common/upstream/load_balancer_fuzz_base.h"
 
 #include "test/common/upstream/utility.h"
 
@@ -18,10 +18,10 @@ namespace Upstream {
 // Anonymous namespace for helper functions
 namespace {
 std::vector<uint64_t>
-constructByteVectorForRandom(test::common::upstream::LoadBalancerTestCase input) {
+constructByteVectorForRandom(const Protobuf::RepeatedField<uint64_t>& byteString) {
   std::vector<uint64_t> byteVector;
-  for (int i = 0; i < input.bytestring_for_random_calls().size(); ++i) {
-    byteVector.push_back(input.bytestring_for_random_calls(i));
+  for (int i = 0; i < byteString.size(); ++i) {
+    byteVector.push_back(byteString.at(i));
   }
   return byteVector;
 }
@@ -42,22 +42,16 @@ void LoadBalancerFuzzBase::initializeFixedHostSets(uint32_t num_hosts_in_priorit
   // TODO: More than two hosts?
 }
 
-void LoadBalancerFuzzBase::initializeAndReplay(test::common::upstream::LoadBalancerTestCase input) {
-  // TODO: Keep this random instantiation even in load balancers that don't call into it, or do they
-  // all?
-  random_.bytestring_ = constructByteVectorForRandom(input);
-  try {
-    initialize(input); // Initializes specific load balancers
-  } catch (EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
-    return;
-  }
+// Initializes random and fixed host sets
+void LoadBalancerFuzzBase::initializeLbComponents(
+    test::common::upstream::LoadBalancerTestCase input) {
+  random_.bytestring_ = constructByteVectorForRandom(input.bytestring_for_random_calls());
   initializeFixedHostSets(input.num_hosts_in_priority_set(), input.num_hosts_in_failover_set());
-  replay(input);
 }
 
-// So, these should be shared amongst all of the types. Since logically, we're just setting the mock
-// priority set to have certain values, we're doing the same thing across all of them here
+// Updating host sets is shared amongst all the load balancer tests. Since logically, we're just
+// setting the mock priority set to have certain values, and all load balancers interface with host
+// sets and their health statuses, this action maps to all load balancers.
 void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(bool failover_host_set,
                                                         uint32_t num_healthy_hosts,
                                                         uint32_t num_degraded_hosts,
@@ -80,10 +74,21 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(bool failover_host_set,
   host_set.runCallbacks({}, {});
 }
 
-void LoadBalancerFuzzBase::replay(test::common::upstream::LoadBalancerTestCase input) {
+void LoadBalancerFuzzBase::prefetch() {
+  // TODO: context, could generate it in proto action
+  lb_->peekAnotherHost(nullptr);
+}
+
+void LoadBalancerFuzzBase::chooseHost() {
+  // TODO: context, could generate it in proto action
+  lb_->chooseHost(nullptr);
+}
+
+void LoadBalancerFuzzBase::replay(
+    const Protobuf::RepeatedPtrField<test::common::upstream::LbAction>& actions) {
   constexpr auto max_actions = 64;
-  for (int i = 0; i < std::min(max_actions, input.actions().size()); ++i) {
-    const auto& event = input.actions(i);
+  for (int i = 0; i < std::min(max_actions, actions.size()); ++i) {
+    const auto& event = actions.at(i);
     ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
     switch (event.action_selector_case()) {
     case test::common::upstream::LbAction::kUpdateHealthFlags: {
@@ -105,25 +110,6 @@ void LoadBalancerFuzzBase::replay(test::common::upstream::LoadBalancerTestCase i
     }
   }
 }
-
-RandomLoadBalancerFuzzTest::RandomLoadBalancerFuzzTest() : LoadBalancerFuzzBase() {}
-
-void RandomLoadBalancerFuzzTest::initialize(test::common::upstream::LoadBalancerTestCase input) {
-  load_balancer_ = std::make_unique<RandomLoadBalancer>(priority_set_, nullptr, stats_, runtime_,
-                                                        random_, input.common_lb_config());
-}
-
-// For random load balancing, a randomly generated uint64 gets modded against the hosts to choose
-// from. This is not something an untrusted upstream can affect, and fuzzing must be deterministic,
-// so the fuzzer generates a bytestring which represents the random calls.
-
-// Logic specific for random load balancers
-void RandomLoadBalancerFuzzTest::prefetch() {
-  // random() calls are handled by fake random
-  load_balancer_->peekAnotherHost(nullptr);
-}
-
-void RandomLoadBalancerFuzzTest::chooseHost() { load_balancer_->chooseHost(nullptr); }
 
 } // namespace Upstream
 } // namespace Envoy

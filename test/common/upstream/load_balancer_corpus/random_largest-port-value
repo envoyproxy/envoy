@@ -1,3 +1,4 @@
+load_balancer_test_case {
 common_lb_config {
 
 }
@@ -25,3 +26,4 @@ num_hosts_in_priority_set: 65455
 num_hosts_in_failover_set: 65455
 bytestring_for_random_calls: 2
 bytestring_for_random_calls: 3
+}
