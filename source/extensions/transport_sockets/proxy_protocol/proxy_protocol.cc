@@ -78,7 +78,7 @@ void UpstreamProxyProtocolSocket::generateHeaderV2() {
 Network::IoResult UpstreamProxyProtocolSocket::writeHeader() {
   Network::PostIoAction action = Network::PostIoAction::KeepOpen;
   uint64_t bytes_written = 0;
-  bool didBlock = false;
+  bool wouldBlock = false;
   do {
     if (header_buffer_.length() == 0) {
       break;
@@ -95,13 +95,13 @@ Network::IoResult UpstreamProxyProtocolSocket::writeHeader() {
       if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
         action = Network::PostIoAction::Close;
       } else {
-        didBlock = true;
+        wouldBlock = true;
       }
       break;
     }
   } while (true);
 
-  return {action, bytes_written, false, didBlock};
+  return {action, bytes_written, false, wouldBlock};
 }
 
 } // namespace ProxyProtocol

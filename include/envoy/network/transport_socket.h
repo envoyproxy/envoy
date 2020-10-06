@@ -35,9 +35,9 @@ struct IoResult {
   bool end_stream_read_;
 
   /**
-   * True if the I/O call blocked.
+   * True if the I/O call would block.
    */
-  bool didBlock_;
+  bool would_block;
 };
 
 /**

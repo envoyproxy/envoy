@@ -121,7 +121,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
 
   bool keep_reading = true;
   bool end_stream = false;
-  bool didBlock = false;
+  bool wouldBlock = false;
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
   while (keep_reading) {
@@ -141,14 +141,14 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
         int err = SSL_get_error(rawSsl(), result.error_.value());
         switch (err) {
         case SSL_ERROR_WANT_READ:
-          didBlock = true;
+          wouldBlock = true;
           break;
         case SSL_ERROR_ZERO_RETURN:
           end_stream = true;
           break;
         case SSL_ERROR_WANT_WRITE:
           // Renegotiation has started. We don't handle renegotiation so just fall through.
-          didBlock = true;
+          wouldBlock = true;
         default:
           drainErrorQueue();
           action = PostIoAction::Close;
@@ -170,7 +170,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
 
   ENVOY_CONN_LOG(trace, "ssl read {} bytes", callbacks_->connection(), bytes_read);
 
-  return {action, bytes_read, end_stream, didBlock};
+  return {action, bytes_read, end_stream, wouldBlock};
 }
 
 void SslSocket::onPrivateKeyMethodComplete() {
@@ -233,7 +233,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
     }
   }
 
-  bool didBlock = false;
+  bool wouldBlock = false;
   uint64_t bytes_to_write;
   if (bytes_to_retry_) {
     bytes_to_write = bytes_to_retry_;
@@ -263,11 +263,11 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
       switch (err) {
       case SSL_ERROR_WANT_WRITE:
         bytes_to_retry_ = bytes_to_write;
-        didBlock = true;
+        wouldBlock = true;
         break;
       case SSL_ERROR_WANT_READ:
         // Renegotiation has started. We don't handle renegotiation so just fall through.
-        didBlock = true;
+        wouldBlock = true;
       default:
         drainErrorQueue();
         return {PostIoAction::Close, total_bytes_written, false, false};
@@ -281,7 +281,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
     shutdownSsl();
   }
 
-  return {PostIoAction::KeepOpen, total_bytes_written, false, didBlock};
+  return {PostIoAction::KeepOpen, total_bytes_written, false, wouldBlock};
 }
 
 void SslSocket::onConnected() { ASSERT(info_->state() == Ssl::SocketState::PreHandshake); }
